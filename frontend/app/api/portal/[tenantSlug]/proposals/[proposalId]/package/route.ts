@@ -246,6 +246,10 @@ export async function POST(request: Request, ctx: RouteContext) {
   // A proposal mixes docx/pptx/xlsx volumes, so a single-format download is lossy;
   // the zip assembles each artifact from its sections and renders it natively.
   if (format === 'zip') {
+    // Audit parity with the docx/json/pdf paths: emit start once past the ownership/lock gate,
+    // and close it (end or error) on EVERY return — the zip is a real download and must leave the
+    // same system_events + proposal_activity_log + download_count trail as its siblings.
+    let zipStartId: string | null = null;
     try {
       // Ownership + the SAME lock/stage download gate the docx/json paths enforce,
       // BEFORE touching artifact data.
@@ -256,6 +260,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       if (!prop.isLocked && prop.stage !== 'submitted' && prop.stage !== 'archived') {
         return NextResponse.json({ error: 'Proposal must be locked or in submitted/archived stage to export package', code: 'FORBIDDEN' }, { status: 403 });
       }
+
+      zipStartId = await emitEventStart({
+        namespace: 'proposal',
+        type: 'package.export_started',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { proposalId, format: 'zip', userId: sessionUser.id },
+      });
 
       const artifacts = await sql<{ id: string; artifactType: string; volumeName: string; volumeNumber: number }[]>`
         SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", volume_number AS "volumeNumber"
@@ -284,19 +296,44 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Never ship a silently-incomplete package: if any volume failed to render,
       // fail the whole zip and name the volumes so the user can retry / export singly.
       if (failed.length > 0) {
+        await emitEventEnd(zipStartId, { error: { message: `Could not render ${failed.length} volume(s)`, code: 'EXPORT_ERROR' } });
         return NextResponse.json({ error: `Could not render ${failed.length} volume(s): ${failed.join(', ')}. Export each volume individually or retry.`, code: 'EXPORT_ERROR' }, { status: 500 });
       }
       if (fileCount === 0) {
+        await emitEventEnd(zipStartId, { error: { message: 'No volumes with content to export', code: 'NOT_FOUND' } });
         return NextResponse.json({ error: 'No volumes with content to export', code: 'NOT_FOUND' }, { status: 404 });
       }
       const zipBuf = await zip.generateAsync({ type: 'nodebuffer' });
       const safeName = (prop.title || 'proposal').replace(/[^a-z0-9]+/gi, '_').slice(0, 60);
+
+      // ── Audit trail (parity with docx/json): download_count + activity log + end event ──
+      try {
+        await sql`UPDATE proposals SET download_count = COALESCE(download_count, 0) + 1 WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid`;
+      } catch (e) {
+        console.error('[package/zip] download_count update failed', e);
+      }
+      try {
+        await sql`
+          INSERT INTO proposal_activity_log
+            (proposal_id, tenant_id, actor_id, actor_email, actor_role, activity_type, details)
+          VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                  ${sessionUser.email ?? null}, ${role}, 'proposal_exported',
+                  ${sql.json({ format: 'zip', volume_count: fileCount })})
+        `;
+      } catch (logErr) {
+        console.error('[package/zip] activity log failed', logErr);
+      }
+      await emitEventEnd(zipStartId, { result: { proposalId, format: 'zip', volumeCount: fileCount } });
+
       return new Response(new Uint8Array(zipBuf), {
         status: 200,
         headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${safeName}.zip"` },
       });
     } catch (e) {
       console.error('[portal/proposals/package] zip failed:', e);
+      if (zipStartId) {
+        try { await emitEventEnd(zipStartId, { error: { message: 'Package zip failed', code: 'DB_ERROR' } }); } catch { /* non-fatal */ }
+      }
       return NextResponse.json({ error: 'Package zip failed', code: 'DB_ERROR' }, { status: 500 });
     }
   }

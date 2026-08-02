@@ -43,35 +43,22 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+// Shared with the admin "doorbell" route via the single canonical emission helper — the mode /
+// voice / adversarial-policy token sets AND the emit+persist+log all live in one place so every
+// full-draft request (portal or admin) audits identically. docs/ADMIN_AGENT_DESIGN.md.
+import {
+  requestFullDraft,
+  DRAFT_MODES,
+  VOICE_TOKENS,
+  ADVERSARIAL_POLICIES,
+  type DraftMode,
+  type VoiceToken,
+  type AdversarialPolicy,
+} from '@/lib/proposal-full-draft';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
-
-// Automation modes — the workflow condition keys on this exact set (mode === 'a'
-// | 'b' | 'c'); anything else has no registered workflow branch.
-const DRAFT_MODES = ['a', 'b', 'c'] as const;
-type DraftMode = (typeof DRAFT_MODES)[number];
-
-// Adversarial-gate policy (P4-D). 'hitl' (default, safe) → the elevated AdvisoryOverlay
-// lands in a human review; 'auto' → it records the reconciled verdict as an advisory audit
-// event (no human review TODO). The pipeline overlay classes branch on this exact set.
-const ADVERSARIAL_POLICIES = ['hitl', 'auto'] as const;
-type AdversarialPolicy = (typeof ADVERSARIAL_POLICIES)[number];
-
-// The Voice-of-Proposal token set (mig 139 proposals.voice / the pipeline's
-// section_drafter _VOICE_REGISTERS). The UI multi-select emits a subset of
-// these; unknown tokens are rejected. Keep in sync with the pipeline tokens.
-const VOICE_TOKENS = [
-  'passive',
-  'persuasive',
-  'technical',
-  'commercial',
-  'research',
-  'development',
-] as const;
-type VoiceToken = (typeof VOICE_TOKENS)[number];
 
 export async function POST(request: Request, ctx: RouteContext) {
   try {
@@ -227,66 +214,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
       const opportunityId = proposal.opportunityId ?? null;
 
-      // Persist the Voice-of-Proposal register when supplied. jsonb via sql.json
-      // so it reads back as an array (not a char-iterated string). Non-fatal:
-      // the emitted event also carries `voice`, so a persist blip never blocks
-      // the draft request.
-      if (voice !== null) {
-        try {
-          await sql`
-            UPDATE proposals
-            SET voice = ${sql.json(voice)}
-            WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
-          `;
-        } catch (voiceErr) {
-          console.error('[portal/proposals/full-draft] voice persist failed', voiceErr);
-        }
-      }
-
-      // ── Emit proposal.full_draft_requested (start/end pair) ──────
-      // The END event is what the workflow triggers on; its payload carries the
-      // workflow inputs (see the header note on the event contract).
-      const eventPayload = {
+      // Single canonical emission path — persist voice + emit
+      // proposal:proposal.full_draft_requested (start/end, the workflow trigger) + log the
+      // activity. Identical to the admin doorbell; `source: 'portal'` attributes it.
+      await requestFullDraft({
         proposalId,
-        proposal_id: proposalId,
-        tenant_id: tenantId,
-        mode,
-        voice,
-        opportunity_id: opportunityId,
-        // Adversarial-gate (P4-D). Mode C's request_overlay step reads these (snake_case):
-        // `adversarial` gates the elevation; `adversarial_policy` selects the overlay's
-        // HITL vs AUTO landing; `adversarial_resolution` is the survival rule the reconcile
-        // step applies. Harmless for modes a/b (no request_overlay step).
-        adversarial,
-        adversarial_policy: adversarialPolicy,
-        adversarial_resolution: 'majority',
-      };
-      const startId = await emitEventStart({
-        namespace: 'proposal',
-        type: 'proposal.full_draft_requested',
-        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        payload: eventPayload,
+        opportunityId,
+        mode: mode as DraftMode,
+        voice,
+        adversarial,
+        adversarialPolicy,
+        actorId: sessionUser.id,
+        actorEmail: sessionUser.email ?? null,
+        role,
+        source: 'portal',
       });
-      await emitEventEnd(startId, { result: eventPayload });
-
-      // ── Activity log (non-critical) ──────────────────────────────
-      // activity_type is CHECK-constrained (mig 044); 'ai_draft_requested' is the
-      // allowed literal — the mode/voice specifics live in details, and the
-      // canonical audit record is the system_events emit above.
-      try {
-        await sql`
-          INSERT INTO proposal_activity_log
-            (proposal_id, tenant_id, actor_id, actor_email, actor_role,
-             activity_type, details)
-          VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
-                  ${sessionUser.email ?? null}, ${role},
-                  'ai_draft_requested',
-                  ${sql.json({ kind: 'full_draft', mode, voice, adversarial, adversarialPolicy })})
-        `;
-      } catch (logErr) {
-        console.error('[portal/proposals/full-draft] activity log failed', logErr);
-      }
 
       return NextResponse.json({
         data: {

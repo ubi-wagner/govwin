@@ -83,6 +83,37 @@ tables (no tenant filter); the workflow validates + registers with an independen
 land it as `review`; and an end-to-end run over a real `curated_solicitations` row writes
 `agent_task_log`/`agent_task_results` and mutates **no** business table.
 
+## The Proposal Auto-Drive "Doorbell" (admin-plane trigger — built 2026-08-02)
+
+The tenant-side proposal build manager is **already complete** — `proposal_manager` (planner) +
+`OnFullDraftRequested{ModeA,B,C}` (Mode C = full auto build), landing drafts in review-staged
+`canvas_versions`, never advancing a gate. It's already admin-drivable, but only by hand-descending
+into each tenant's portal proposal workspace and clicking "Run full draft." The **doorbell** is the
+missing admin-plane trigger: a thin `/admin` control that rings the *existing* engine on a chosen
+tenant's proposal — no portal descent, one canonical audit trail.
+
+**Single audit path (the point).** Both the portal control and the doorbell now funnel through ONE
+helper — `frontend/lib/proposal-full-draft.ts::requestFullDraft(...)` — which persists the Voice
+register, emits `proposal:proposal.full_draft_requested` (start/end, the trigger the workflows
+consume), and logs `proposal_activity_log`. The only difference is a **`source`** field carried on
+both the event payload and the activity row: `'portal'` vs `'admin_doorbell'`. So every full-draft —
+tenant-initiated or admin-initiated — is one auditable, attributable record; nothing diverges.
+
+**As-built:**
+- **`POST /api/admin/proposals/[proposalId]/full-draft`** (rfp_admin/master_admin). Resolves the
+  proposal's tenant + opportunity via a cross-tenant `sqlBypass` read (admin scope), validates
+  mode/voice/adversarial, `enterTenant(tenantId)`, then `requestFullDraft({..., source:'admin_doorbell'})`.
+  The emitted event carries the **admin** as actor + the target `tenant_id` → the same workflows fire,
+  attributed to the admin.
+- **`GET /api/admin/proposals?buildable=1`** (rfp_admin+) — recent proposals across tenants
+  (id, title, tenantSlug, stage, isLocked) for the picker.
+- **UI** — a "Proposal Auto-Drive (Doorbell)" card on `/admin/agents`: pick a proposal, pick a mode
+  (A/B/C), Ring. It's the admin doorbell for the build cohort, beside the workforce roster.
+- **Safety** — advisory (drafts land in review, never advance a gate), admin-gated, goes through the
+  same shadow-authorized emission the portal uses; no new engine, just an admin doorbell on it.
+
 ## Phase 2 (not built here)
 Descend into a tenant under an admin-issued, TTL'd, audited `shadow_admin_grant` and run the existing
-Mode C full-draft orchestrator — the agent never self-authorizes the tenant binding.
+Mode C full-draft orchestrator **autonomously** (the `rfp_ingest_manager`'s build-side sibling) — the
+agent never self-authorizes the tenant binding. The doorbell is the human-driven precursor: same
+emission, same audit, admin at the wheel.
