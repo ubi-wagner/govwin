@@ -230,12 +230,14 @@ async function main() {
       artByVol[v.n] = id;
     }
 
-    // sections
+    // sections — DETERMINISTIC ids keyed by sort_index, so re-running this script is stable
+    // (no id churn → fixtures/screenshots/tests stay valid). Format: valid UUID, sort in the tail.
+    const sid = (sort) => `c3db6000-0000-4000-8000-${String(sort).padStart(12, '0')}`;
     const mk = async (s, volNum) => {
       const [{ id }] = await tx`
         INSERT INTO proposal_sections
-          (proposal_id, artifact_id, section_number, sort_index, title, content, status, volume_name, volume_number, section_type, meta)
-        VALUES (${PROPOSAL}, ${artByVol[volNum]}, ${s.num ?? ''}, ${s.sort}, ${s.title},
+          (id, proposal_id, artifact_id, section_number, sort_index, title, content, status, volume_name, volume_number, section_type, meta)
+        VALUES (${sid(s.sort)}::uuid, ${PROPOSAL}, ${artByVol[volNum]}, ${s.num ?? ''}, ${s.sort}, ${s.title},
                 ${doc(s.nodes, { title: s.title })}, 'ai_drafted',
                 ${vols.find((v) => v.n === volNum).name}, ${volNum}, ${s.type},
                 ${tx.json({ itemType: s.type, canonical: 'TVSF_SPEC' })})

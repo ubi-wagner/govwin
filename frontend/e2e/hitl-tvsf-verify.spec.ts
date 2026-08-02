@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 const PW = process.env.FOUNDATION_PW || 'DemoPass123!';
 const P = 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';
-const S = '723f4457-b8d5-4faa-a9dc-e401f48215d4'; // Q2 Overview
+const S = 'c3db6000-0000-4000-8000-000000000002'; // Q2 Overview (stable id)
 
 async function login(page: Page, email: string) {
   await page.context().clearCookies();

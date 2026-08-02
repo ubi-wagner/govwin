@@ -50,6 +50,36 @@ interface Props {
   onMoveNodeToIndex?: (nodeId: string, targetIndex: number) => void;
 }
 
+/**
+ * NodeErrorBoundary — isolates a single canvas node's render. If ANY node throws (a
+ * malformed table/list from an agent, import, or paste), it degrades to a small inline
+ * notice instead of white-screening the entire proposal editor. Rock-solid by design:
+ * the document keeps rendering; the bad block is saved and can be reloaded or edited.
+ */
+class NodeErrorBoundary extends React.Component<
+  { nodeType: string; children: React.ReactNode },
+  { failed: boolean }
+> {
+  constructor(props: { nodeType: string; children: React.ReactNode }) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err: unknown) {
+    console.error('[canvas] node render failed (isolated):', this.props.nodeType, err);
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="my-1 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          This {this.props.nodeType.replace(/_/g, ' ')} block couldn’t be displayed — its content is still saved. Reload or edit it.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function substituteVars(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
@@ -156,6 +186,7 @@ export function CanvasRenderer({
                   }}
                 />
               )}
+              <NodeErrorBoundary nodeType={node.type}>
               {node.type === 'toc' ? (
                 <TocRenderer
                   nodes={nodes}
@@ -181,6 +212,7 @@ export function CanvasRenderer({
                   onDragEnd={() => setDraggingNodeId(null)}
                 />
               )}
+              </NodeErrorBoundary>
             </React.Fragment>
           ))}
           {/* Final drop zone at the end */}
@@ -768,7 +800,7 @@ function ListNode({ content, ordered, readOnly, onUpdate, isSelected }: {
   if (isSelected && !readOnly) {
     return (
       <div className="space-y-1 pl-4">
-        {content.items.map((item, i) => (
+        {(content.items ?? []).map((item, i) => (
           <div key={i} className="flex items-center gap-1" style={{ marginLeft: (item.indent_level ?? 0) * 20 }}>
             <span className="text-gray-400 text-xs w-4">{ordered ? `${i + 1}.` : '•'}</span>
             <input
@@ -819,7 +851,7 @@ function ListNode({ content, ordered, readOnly, onUpdate, isSelected }: {
   const Tag = ordered ? 'ol' : 'ul';
   return (
     <Tag className={`${ordered ? 'list-decimal' : 'list-disc'} pl-6 space-y-1`}>
-      {content.items.map((item, i) => (
+      {(content.items ?? []).map((item, i) => (
         <li key={i} style={{ marginLeft: (item.indent_level ?? 0) * 20 }}>
           {item.text}
         </li>
@@ -1073,20 +1105,20 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   };
 
   const updateCell = (ri: number, ci: number, text: string) => {
-    const rows = content.rows.map(r => [...r]);
+    const rows = (content.rows ?? []).map(r => [...r]);
     const cell = resolveTableCell(rows[ri][ci]);
     rows[ri][ci] = { ...cell, text };
     onUpdate({ ...content, rows });
   };
 
   const addRow = () => {
-    const newRow = content.headers.map(() => '' as string | TableCellType);
+    const newRow = (content.headers ?? []).map(() => '' as string | TableCellType);
     onUpdate({ ...content, rows: [...content.rows, newRow] });
   };
 
   const addCol = () => {
     const headers = [...content.headers, `Column ${content.headers.length + 1}`] as typeof content.headers;
-    const rows = content.rows.map(row => [...row, '']);
+    const rows = (content.rows ?? []).map(row => [...row, '']);
     onUpdate({ ...content, headers, rows });
   };
 
@@ -1098,7 +1130,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   const deleteCol = (colIndex: number) => {
     if (content.headers.length <= 1) return;
     const headers = content.headers.filter((_, i) => i !== colIndex);
-    const rows = content.rows.map(row => row.filter((_, i) => i !== colIndex));
+    const rows = (content.rows ?? []).map(row => row.filter((_, i) => i !== colIndex));
     onUpdate({ ...content, headers, rows });
   };
 
@@ -1108,7 +1140,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
         <table className={`w-full border-collapse text-sm ${outerBorder || 'border border-gray-300'}`}>
           <thead>
             <tr className="bg-gray-50">
-              {content.headers.map((h, i) => {
+              {(content.headers ?? []).map((h, i) => {
                 const cell = resolveTableCell(h);
                 return (
                   <th key={i} className={`text-left font-semibold ${cellBorder}`}>
@@ -1129,7 +1161,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
             </tr>
           </thead>
           <tbody>
-            {content.rows.map((row, ri) => (
+            {(content.rows ?? []).map((row, ri) => (
               <tr key={ri}>
                 {row.map((c, ci) => {
                   const cell = resolveTableCell(c);
@@ -1159,7 +1191,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
     <table className={`w-full border-collapse text-sm my-2 ${outerBorder || 'border border-gray-300'}`}>
       <thead>
         <tr className="bg-gray-50">
-          {content.headers.map((h, i) => {
+          {(content.headers ?? []).map((h, i) => {
             const cell = resolveTableCell(h);
             const styleProps = tableCellStyleProps(cell.style, content.header_style);
             return (<th key={i} className={`text-left font-semibold ${cellBorder}`} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{cell.text}</th>);
@@ -1167,7 +1199,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
         </tr>
       </thead>
       <tbody>
-        {content.rows.map((row, ri) => (
+        {(content.rows ?? []).map((row, ri) => (
           <tr key={ri}>
             {row.map((c, ci) => {
               const cell = resolveTableCell(c);
