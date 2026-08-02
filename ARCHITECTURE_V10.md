@@ -2,6 +2,21 @@
 
 **Date:** 2026-07-03
 
+> **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
+> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
+> (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
+> 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
+> — traced by actual call-site + whether the trigger event is emitted live — **34 are wired and exactly 1 is
+> dormant** (`content_generator`; its `library:content.requested` trigger has no emitter). Earlier "~11 dormant"
+> was a reference-count artifact (queue-producer / `AI_INVOKE`-step agents show few name-refs yet are wired).
+> Schema = **105 live tables (20
+> dropped)**; the `accounts` / `sessions` / `verification_tokens` NextAuth adapter tables are **dead**
+> (the app uses JWT sessions, no adapter), as are `agent_archetypes`, `system_health_snapshots`,
+> `audit_log`, `rate_limit_state`, `scout_runs`, and `tenant_automation_preferences` (superseded by
+> `tenant_automation_policies`). **Verified bug cluster** (mig-071 TEXT vs object): the portal + admin
+> section editors render blank on reload, and `seed-job/apply` silently destroys section content — export
+> is unaffected. See `docs/PROJECT_AUDIT.md §4b`.
+
 > **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19; roster count refreshed 2026-07-22).** The pipeline
 > `AgentFabric` (**27 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
 > as workflow actors, since expanded to 27) is a

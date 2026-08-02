@@ -375,7 +375,7 @@ export function CanvasSidebar({
   // The prioritized toolbox for this role×context — most-likely card first.
   const toolbox = capabilities ? toolboxFromCapabilities(capabilities, stage ?? (readOnly ? 'review' : 'draft')) : null;
   const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings', review: 'review' };
-  const ACTION_CARDS = new Set(['library', 'atomize', 'export', 'template', 'lock']);
+  const ACTION_CARDS = new Set(['library', 'atomize', 'export', 'template', 'lock', 'preview']);
 
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">

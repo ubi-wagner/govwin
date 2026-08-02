@@ -34,7 +34,7 @@ const POD_ORDER: Pod[] = [
   'Our-org — CMS content',
 ];
 
-// The 25 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
+// The 35 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
 // agents are role-bound to their assigned tenant (tenant_user authority; the trigger's
 // tenant_id is fixed by the task, never chosen by the model). Platform/our-org agents run at
 // our authority on master + cross-tenant data (no tenant to bind), and land into admin review.
@@ -55,6 +55,17 @@ const ROSTER: Agent[] = [
   { role: 'onboarding_agent', label: 'Onboarding Concierge', scope: 'tenant', trigger: 'Application accepted', status: 'live', pod: 'Tenant — build & pursue', does: 'Cold-starts a new tenant: profile, buckets, first atomize, getting-started ToDos.' },
   { role: 'outcome_analyst', label: 'Outcome Analyst', scope: 'tenant', trigger: 'Outcome recorded', status: 'live', pod: 'Tenant — build & pursue', does: 'Win/loss lesson → memory → scoring calibration.' },
   { role: 'research_scout', label: 'Research Scout', scope: 'tenant', trigger: 'Research requested (proposal AI tab)', status: 'live', pod: 'Tenant — build & pursue', does: 'Browses the web incl. DoD sources (SAM.gov/SBIR.gov/DSIP) for market research & prior art; web results injection-fenced, budget-capped, human-gated.' },
+  // ── Proposal Draft Manager cohort (P1–P4) + library-seed producers ────────
+  { role: 'proposal_manager', label: 'Proposal Draft Manager', scope: 'tenant', trigger: 'Run full draft (Mode A/B/C)', status: 'live', pod: 'Tenant — build & pursue', does: 'Plans a full draft: emits the per-section draft plan the cohort executes.' },
+  { role: 'formatter', label: 'Formatter', scope: 'tenant', trigger: 'Full draft / format pass', status: 'live', pod: 'Tenant — build & pursue', does: 'Per-section canvas scaffold-integrity reviewer (structure, headings, layout).' },
+  { role: 'stylist', label: 'Stylist', scope: 'tenant', trigger: 'Full draft (Mode B restyle)', status: 'live', pod: 'Tenant — build & pursue', does: 'Style-normalization reviewer across atom pedigrees — one consistent voice.' },
+  { role: 'continuity_manager', label: 'Continuity Manager', scope: 'tenant', trigger: 'Full-draft review gate / adversarial overlay', status: 'live', pod: 'Tenant — build & pursue', does: 'Whole-proposal continuity/QA + entity-reference integrity reviewer.' },
+  { role: 'traceability_auditor', label: 'Traceability Auditor', scope: 'tenant', trigger: 'Full-draft review gate', status: 'live', pod: 'Tenant — build & pursue', does: 'Requirement → section coverage traceability reviewer.' },
+  { role: 'redaction_guard', label: 'Redaction Guard', scope: 'tenant', trigger: 'Full-draft review gate', status: 'live', pod: 'Tenant — build & pursue', does: 'Cross-boundary / OPSEC redaction reviewer — flags leaked or sensitive content.' },
+  { role: 'market_analyst', label: 'Market Analyst', scope: 'tenant', trigger: 'Full draft (Mode C pre-augment)', status: 'live', pod: 'Tenant — build & pursue', does: 'Market/competitive context pre-augment; external web text injection-fenced.' },
+  { role: 'advisory_manager', label: 'Advisory Manager', scope: 'tenant', trigger: 'Adversarial overlay reconcile', status: 'live', pod: 'Tenant — build & pursue', does: 'Plans + reconciles the adversarial overlay fan-out into one advisory verdict.' },
+  { role: 'library_seed_suggester', label: 'Library Seed Suggester', scope: 'tenant', trigger: 'Seed job requested', status: 'live', pod: 'Tenant — build & pursue', does: 'Ranks prior proposals as seed sources for a new build.' },
+  { role: 'library_seed_mapper', label: 'Library Seed Mapper', scope: 'tenant', trigger: 'Seed job requested', status: 'live', pod: 'Tenant — build & pursue', does: 'Maps atoms from the selected source proposal onto the new build’s sections (reuse/regen/skip).' },
   // ── Master — ingestion (platform) ────────────────────────────────────────
   { role: 'opportunity_scout', label: 'Opportunity Scout', scope: 'platform', trigger: 'Opportunities detected (+ crawl findings)', status: 'live', pod: 'Master — ingestion (platform)', does: 'Prioritizes the triage backlog + crawler leads; flags likely updates/amendments.' },
   { role: 'ingest_analyst', label: 'Ingest Analyst', scope: 'platform', trigger: 'RFP uploaded', status: 'live', pod: 'Master — ingestion (platform)', does: 'Shredded solicitation → structured curation draft.' },
@@ -65,7 +76,7 @@ const ROSTER: Agent[] = [
   { role: 'curation_qa', label: 'Curation QA', scope: 'platform', trigger: 'Curation submitted for review', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Pre-release QC of a curated solicitation before push.' },
   { role: 'ops_digest', label: 'Ops Digest', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Scheduled health digest for master_admin (workforce, pipeline, SLA).' },
   // ── Our-org — CMS content ────────────────────────────────────────────────
-  { role: 'content_generator', label: 'Content Generator', scope: 'platform', trigger: 'Content requested', status: 'live', pod: 'Our-org — CMS content', does: 'Drafts new web/social copy from a brief, in our published voice (human-approved).' },
+  { role: 'content_generator', label: 'Content Generator', scope: 'platform', trigger: 'Content requested (no live emitter yet)', status: 'dormant', pod: 'Our-org — CMS content', does: 'Drafts new web/social copy from a brief, in our published voice (human-approved). Registered; its library:content.requested trigger has no emitter yet.' },
   { role: 'content_curator', label: 'Content Curator', scope: 'platform', trigger: 'Scheduled — weekly (crawl findings)', status: 'live', pod: 'Our-org — CMS content', does: 'The social/web content scout: curates crawler findings into reshare drafts.' },
   { role: 'social_scheduler', label: 'Social Scheduler', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — CMS content', does: 'Publisher: drafts a week of social posts from published content (human-approved).' },
 ];

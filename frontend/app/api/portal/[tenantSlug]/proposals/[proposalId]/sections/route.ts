@@ -101,7 +101,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
           artifact_id, volume_name, volume_number, is_locked, section_type
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}
-        ORDER BY section_number ASC
+        ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number ASC
       `;
     } catch (dbErr) {
       console.error('[api/portal/proposals/sections] sections query failed:', dbErr);

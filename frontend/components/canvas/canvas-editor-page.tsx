@@ -122,7 +122,7 @@ export function CanvasEditorPage({
       ? `/portal/${tenantSlug}/documents`
       : tenantSlug
         ? `/portal/${tenantSlug}/proposals/${proposalId}`
-        : `/admin/proposals/${proposalId}`;
+        : `/admin`; // no tenant context (admin editor) → admin home; /admin/proposals/[id] has no page (was a 404 back-link)
 
   const backLabel = isFoundation ? 'Back to Library' : isDocument ? 'Back to Documents' : 'Back to Proposal';
 

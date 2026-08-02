@@ -1,6 +1,7 @@
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
@@ -201,7 +202,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
         WHERE s.proposal_id = ${proposalId}::uuid
           AND s.is_locked = false
           AND COALESCE(a.is_required, true) = true
-        ORDER BY s.volume_number NULLS LAST, s.section_number
+        ORDER BY s.volume_number NULLS LAST, s.sort_index NULLS LAST, s.section_number
       `;
       if (openSections.length > 0 && !force) {
         throw new Error('SECTIONS_NOT_LOCKED:' + JSON.stringify(
@@ -246,7 +247,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       }[]>`
         SELECT id, title, version, status, content, is_locked
         FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid
-        ORDER BY section_number
+        ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number
       `;
 
       sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null; isLocked: boolean }) => ({
@@ -294,9 +295,15 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       // ── 4. Create canvas version snapshots for each section ───
       for (const s of sections) {
         if (s.content) {
+          // s.content is TEXT (a JSON-serialized canvas doc); canvas_versions.content is jsonb.
+          // Write the PARSED object via sql.json so it round-trips as an object — NOT ${string}::jsonb,
+          // which double-encodes to a jsonb STRING scalar and makes Version History render raw JSON
+          // (matches the correct sibling writers in sections/.../save + admin/.../section).
+          let contentJson: Parameters<typeof sql.json>[0];
+          try { contentJson = JSON.parse(s.content); } catch { contentJson = s.content; }
           await tx`
             INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
-            VALUES (${s.id}::uuid, ${s.version}, ${s.content}::jsonb, ${'stage_completed:' + previousStage}, 'system', ${actorId}::uuid)
+            VALUES (${s.id}::uuid, ${s.version}, ${sql.json(contentJson)}, ${'stage_completed:' + previousStage}, 'system', ${actorId}::uuid)
             ON CONFLICT (section_id, version_number) DO NOTHING
           `;
         }
@@ -426,12 +433,18 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   // box (proposal_comments, recommendation_type='ai_review'). Best-effort +
   // cost-guarded downstream — never blocks the advance.
   try {
-    const [pref] = await sql<{ aiReviewOnAdvance: boolean }[]>`
-      SELECT ai_review_on_advance FROM tenant_automation_preferences
-      WHERE tenant_id = ${tenantId}::uuid
-    `;
-    const aiReviewEnabled = pref ? pref.aiReviewOnAdvance : true; // default on
-    if (aiReviewEnabled) {
+    // AI review on advance is governed by the live 'Stage advanced' automation gate — the
+    // agent-capable catalog trigger 'proposal:proposal.advanced'. resolveGatePolicy defaults
+    // enabled=true (regression-safe: AI review stays on unless a tenant disables the gate) and
+    // honors a tenant policy row when configured. (Previously read tenant_automation_preferences,
+    // which nothing writes since mig 127 introduced tenant_automation_policies.)
+    const advancedGate = await resolveGatePolicy({
+      tenantId,
+      scope: 'build',
+      triggerKey: 'proposal:proposal.advanced',
+      gateDefaults: { assigneeRole: 'tenant_admin', nudgeDays: [], dueInMinutes: 0 },
+    });
+    if (advancedGate.enabled) {
       const reviewSections = await sql<{ id: string; title: string | null; content: string | null; sectionType: string | null }[]>`
         SELECT id, title, content, section_type
         FROM proposal_sections

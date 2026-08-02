@@ -214,7 +214,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       FROM proposal_sections ps
       LEFT JOIN users u ON u.id = ps.accepted_by
       WHERE ps.proposal_id = ${proposalId}
-      ORDER BY ps.section_number ASC
+      ORDER BY ps.volume_number ASC NULLS LAST, ps.sort_index ASC NULLS LAST, ps.section_number ASC
     `;
   } catch (e) {
     console.error('[portal/proposals/workspace] sections query error:', e);

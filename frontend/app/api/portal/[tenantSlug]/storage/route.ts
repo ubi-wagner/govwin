@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { assertKeyBelongsToTenant } from '@/lib/storage/paths';
 
@@ -29,6 +29,12 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     const role = isRole(su.role) ? su.role : null;
     if (!role || !su.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    // Partner-containment: presigning tenant-object downloads is a tenant-member action
+    // (tenant_user+). Partners download only their vault artifacts via the vault routes (which
+    // enforce vault_members grants) — keep them out of arbitrary tenant-key presigns here.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {

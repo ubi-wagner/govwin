@@ -64,7 +64,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         sections = await sql<{ title: string | null; content: string | null }[]>`
           SELECT title, content FROM proposal_sections
           WHERE proposal_id = ${proposalId}::uuid AND artifact_id = ${artifactId}::uuid
-          ORDER BY section_number
+          ORDER BY volume_number ASC NULLS LAST, sort_index ASC NULLS LAST, section_number ASC
         `;
       }
     } catch (e) {

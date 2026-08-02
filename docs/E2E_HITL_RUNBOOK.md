@@ -9,6 +9,22 @@ lifecycle **and** the new Proposal Draft Manager (full-draft Modes A/B/C + the a
 > RLS space as `tenant_admin`). *Machine* actors: the agent workforce (advisory; every output
 > lands at a human gate — it never advances a gate on its own).
 
+> ### ✅ Fixes verified this cycle (2026-08-01) — spot-check these as you go
+> The post-audit sweep (F1–F6) landed + is verified (`tsc` 0 · `vitest` 811 · `next build` · Playwright
+> `hitl-deep-sweep` 5/5, `hitl-role-smoke` 5/5). Confirm them live:
+> 1. **Section editors rehydrate (F2).** Open any proposal section that already has content → it shows
+>    the saved canvas, **not a blank editor**. (Was: mig-071 TEXT-vs-object guard rendered saved
+>    sections blank on reopen; §4 / §4b in docs/PROJECT_AUDIT.md.) *Fast check:* Foundation TVSF
+>    proposal `c3db60b1` → section "#2 Overview of the Technology" renders "Two differentiators define it".
+> 2. **Library-seed apply MERGES (F1).** Admin "Apply seed" into a section with existing content now
+>    **appends** (and snapshots the prior content to Version History) instead of **replacing** it.
+> 3. **Agent Workforce roster = 35 (F6).** `/admin/agents` lists all 35 archetypes incl. the Proposal
+>    Draft Manager cohort (Advisory Manager, Traceability Auditor, Redaction Guard, Continuity Manager,
+>    Market Analyst, Stylist, Formatter, Proposal Draft Manager) + both Library-Seed producers; exactly
+>    one shows **dormant** (Content Generator). (Was hardcoded to 25.)
+> 4. **Auto-advance / AI-review read the live policy table (F3).** No behavior change to click through;
+>    they no longer read the retired `tenant_automation_preferences` (dropped in mig 142).
+
 ---
 
 ## 1. Spin up + seed (one time per sandbox)
@@ -55,14 +71,30 @@ review-staged drafts; with `sk-noop` the AI_INVOKE steps safe-skip (the HITL gat
 | `tenant_user` | `e2e-tuser@acme-navy.test` | `/portal/acme-navy-systems` | scoped view/edit per admin grant |
 | `partner_user` | `e2e-partner@ext.test` | `/vaults` (per invite) | vault upload/atomize · stage-scoped review |
 
-**Scenario:** tenant **`acme-navy-systems`** · proposal **`3b0e7f8b-7ca2-4570-91d9-48326add00ff`**
-("Acme → Navy SBIR Phase I", draft, unlocked, sectioned — full-draft-drivable) · comp code
-**`rfppipelinetest`**. Multi-membership control: `expert@beacon-labs.test` (tenant_admin @ beacon +
-partner_user @ acme) tests the `/select-company` picker.
+**Two cohorts on the box — use the right one for the job:**
 
-> The acme-navy library is thin (few atoms). For richer library / atomize / reuse and the
-> **Army/AF cross-pedigree** continuity test, use the **`immobileyes`** tenant (CUAS scenario,
-> proposal `62960c36-…`, ~hundreds of atoms) — `atossa@immobileyes.com` / `DemoPass123!`.
+**(a) `acme-navy-systems` (e2e-* cohort)** — the clean 5-role LOGIN + DISCOVERY set. 6 ranked cards,
+comp code **`rfppipelinetest`**. On a fresh box it has **no provisioned proposal yet** (the build side
+starts empty) — drive the *discovery → purchase → curate → release* path here, or provision one, then
+build. `node scripts/seed-e2e-hitl.mjs` (re)asserts these accounts + refreshes the cards.
+
+**(b) `foundation` (Foundation / TVSF) — the RICH BUILD scenario.** This is the fully-seeded demo:
+company profile, library atoms, ranked SBIR buckets, and a **built TVSF proposal with 13 content-bearing
+sections + downloadable docx/xlsx**. Use it for the section editor, rehydration (F2), library/atoms,
+packaging, and the customer story. **All Foundation accounts use `DemoPass123!`.**
+
+| Role | Email | Notes |
+|---|---|---|
+| `tenant_admin` (bound) | `kate.ulepic@foundation3dp.com` | Foundation's INTERNAL admin — session is tenant-pinned to `foundation`. |
+| `tenant_admin` (external shadow) | `pjackson@ecinnovates.com` | **Paul Jackson (EC)** — the EXTERNAL shadow-admin. `users.tenant_id` is null, so the session is **not** tenant-pinned; he reaches Foundation via a membership resolved per-request. Lands at `/portal/foundation/dashboard`. This is the shadow-admin model, by design. |
+| `tenant_user` | `connor.casey@foundation3dp.com` (also `conor.atkins@`, `will.curley@`) | scoped team members |
+
+> **Drivable build:** Foundation proposal **`c3db60b1-2f0e-4bc8-903c-1ec098906c58`** ("TVSF Round 45").
+> Rehydration proof section: **`e43e02fd-798b-4d46-a95f-1e158ce67704`** ("#2 Overview of the Technology").
+>
+> The acme-navy / Foundation libraries are purpose-built; for the **Army/AF cross-pedigree** continuity
+> test (hundreds of atoms) the `immobileyes` CUAS scenario is available where seeded
+> (`atossa@immobileyes.com` / `DemoPass123!`, proposal `62960c36-…`).
 
 ---
 
@@ -94,6 +126,50 @@ partner_user @ acme) tests the `/select-company` picker.
 
 Every arrow is a HITL gate: an actor performs an action, the system records a `system_events`
 row, and (where applicable) a workflow parks a **ToDo** on the next actor's queue.
+
+---
+
+## 3.5 Hotel quick-start — the Foundation/TVSF rich build (30–40 min, touches every dimension)
+
+The fastest way to exercise the whole platform on the seeded box. Sign in at `/login`. Each step
+is **do → expect**; the DB one-liners in §6 confirm anything the UI doesn't show.
+
+**A — Discovery & scoring (as `pjackson@ecinnovates.com` / `DemoPass123!`)**
+1. Land → `/portal/foundation/dashboard`. **Expect** the Foundation cockpit (no bounce to `/login`).
+2. `/portal/foundation/buckets` → **Expect** SBIR opportunities ranked into spotlight buckets with
+   scores. `/portal/foundation/cards` → **Expect** the ranked opportunity cards; open one for score
+   transparency.
+
+**B — The build & the section editor (the F2 fix) — the core**
+3. `/portal/foundation/proposals` → open **TVSF Round 45** (`c3db60b1…`). **Expect** the section list
+   + compliance matrix + AI Actions panel.
+4. Open section **"#2 Overview of the Technology"** → **Expect** it renders the SAVED content
+   ("Foundation's system prints a foundation's wall geometry…", "Two differentiators define it…") —
+   **NOT a blank canvas.** This is the F2 rehydration fix; reopen a few sections to confirm none blank.
+5. Edit a paragraph → Save → reopen. **Expect** your edit persisted (round-trips through TEXT content).
+6. **Lock** a completed section → **Expect** the compliance-matrix row for its item flips to satisfied.
+7. **Advance** the stage (Review → Revise → Lock → Advance) → **Expect** the stage label moves + a
+   `proposal.advanced` event (§6). *(AI review on advance is governed by the 'Stage advanced'
+   automation gate — F3.)*
+
+**C — Library, packaging, downloads**
+8. `/portal/foundation/atoms` → **Expect** the atom library (uploaded → atomized → tagged). Upload a
+   doc → atomize → **Expect** new `library_atoms`. Select atoms to ground a section (mold).
+9. Package + **download** the proposal → **Expect** real docx/xlsx files that open.
+
+**D — Oversight & the agent workforce (the F6 fix) — sign in as `e2e-master@rfppipeline.test` / `E2ETest!2026`**
+10. `/admin/agents` (**Agent Workforce**) → **Expect** the **full 35-archetype roster** incl. Proposal
+    Draft Manager, Advisory Manager, Traceability Auditor, Redaction Guard, Continuity Manager, Stylist,
+    Formatter, Market Analyst + both Library-Seed producers; exactly **one dormant** (Content Generator).
+11. `/admin/events` → **Expect** the immutable audit timeline; filter by namespace. `/admin/tenants` →
+    open `foundation` → **Enter tenant** (shadow-descend) → **Expect** you're now acting as `tenant_admin`
+    in Foundation's space.
+
+**E — The other actors (login smoke)**
+12. `e2e-rfpadmin@…` → `/admin/intake`, `/admin/rfp-curation`, `/admin/purchases` render (ingest→release).
+13. `e2e-tuser@acme-navy.test` (tenant_user) → scoped portal; `e2e-partner@ext.test` (partner_user) → `/vaults` only.
+
+*(The `hitl-deep-sweep` Playwright spec automates B-step-4, D-step-10, and the surface walk — §7.)*
 
 ---
 
@@ -212,14 +288,20 @@ Run from `frontend/` (see the specs under `frontend/e2e/`):
 
 ```bash
 cd frontend
-npx playwright test --project=hitl              # both HITL specs (self-authenticating)
+TEST_BASE_URL=http://localhost:3000 npx playwright test --project=hitl   # self-authenticating HITL specs
 # or individually:
 npx playwright test e2e/hitl-role-smoke.spec.ts  # all 5 roles authenticate + carry the right role
+npx playwright test e2e/hitl-deep-sweep.spec.ts  # every actor reaches its surfaces + F2/F6 fix proofs
 npx playwright test e2e/hitl-full-draft.spec.ts  # the full-draft route incl. Mode C + adversarial
 ```
 
 - **`hitl-role-smoke`** — logs in as each of the 5 e2e-* accounts and asserts the session role
-  (+ tenant scope) — the role-routing contract for every actor.
+  (+ tenant scope) — the role-routing contract for every actor. *(Verified 5/5, 2026-08-01.)*
+- **`hitl-deep-sweep`** — the multi-actor surface sweep: logs in as master / rfp / tenant_admin
+  (Foundation) / tenant_user / partner and walks **29 surfaces** (admin + portal + vault), asserting
+  none 500 / blank / auth-bounce; **plus the two UI-observable fixes** — F2 (Foundation TVSF section
+  rehydrates its saved content) and F6 (`/admin/agents` lists the full 35-archetype roster incl. the
+  P1–P4 cohort, with one marked dormant). *(Verified 5/5, 2026-08-01.)*
 - **`hitl-full-draft`** — as tenant_admin, asserts the "Run full draft" panel is reachable and
   drives the full-draft route (Mode C + adversarial auto, Mode A ignores it, bad mode → 400).
 

@@ -5,6 +5,7 @@ import { sqlBypass as sql } from '@/lib/db';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,10 +45,13 @@ export default async function Page({ params }: Props) {
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];
 
-  // If no canvas content yet, create an empty one with default preset
+  // If no canvas content yet, create an empty one with default preset.
+  // content is TEXT (mig 071) → postgres.js returns a STRING; coerceJsonb parses it so the admin
+  // co-draft editor rehydrates saved content instead of blank (same mig-071 guard bug as the portal).
   let canvasDoc: CanvasDocument;
-  if (section.content && typeof section.content === 'object' && 'version' in (section.content as object)) {
-    canvasDoc = section.content as CanvasDocument;
+  const parsedContent = coerceJsonb<CanvasDocument | null>(section.content, null);
+  if (parsedContent && typeof parsedContent === 'object' && 'version' in parsedContent) {
+    canvasDoc = parsedContent;
   } else {
     canvasDoc = createEmptyCanvas({
       documentId: sectionId,

@@ -194,11 +194,20 @@ export async function lockSectionCore(g: LockSectionCtx): Promise<LockSectionRes
       });
 
       try {
-        const [autoPref] = await sql<{ autoAdvanceWhenAllLocked: boolean }[]>`
-          SELECT auto_advance_when_all_locked FROM tenant_automation_preferences
+        // Auto-advance-on-lock is OPT-IN and OFF by default: advancing a stage is a HITL gate,
+        // and the proposal.advance_ready event above already surfaces the human ToDo. A tenant can
+        // opt in by setting condition.auto_advance=true on the live 'Document ready' policy
+        // (tenant_automation_policies, mig 127). This replaces the old read of
+        // tenant_automation_preferences, a table nothing writes (so it always silently defaulted off).
+        const [autoPolicy] = await sql<{ autoAdvance: boolean | null }[]>`
+          SELECT (condition->>'auto_advance')::boolean AS "autoAdvance"
+          FROM tenant_automation_policies
           WHERE tenant_id = ${tenantId}::uuid
+            AND scope = 'build'
+            AND trigger_key = 'proposal:document.locked'
+            AND enabled = true
         `;
-        if (autoPref?.autoAdvanceWhenAllLocked) {
+        if (autoPolicy?.autoAdvance) {
           const result = await advanceProposalStage({
             tenantId, tenantSlug, proposalId, actorId: userId, actorEmail: email ?? null,
             actorRole: role, force: false, notes: 'Auto-advanced: all sections locked', trigger: 'auto',

@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { coerceJsonb } from '@/lib/jsonb';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
 
@@ -105,9 +106,9 @@ export async function POST(req: Request, { params }: Params) {
 
       if (reuseAtoms.length === 0 && regenAtoms.length === 0) continue;
 
-      // Load current section content
-      const [section] = await sql<{ id: string; content: unknown; title: string }[]>`
-        SELECT id, content, title
+      // Load current section content (+ version, for the pre-merge archive)
+      const [section] = await sql<{ id: string; content: unknown; title: string; version: number }[]>`
+        SELECT id, content, title, version
         FROM proposal_sections
         WHERE id = ${targetSectionId}::uuid
           AND proposal_id = ${proposalId}::uuid
@@ -170,11 +171,16 @@ export async function POST(req: Request, { params }: Params) {
 
       if (newNodes.length === 0) continue;
 
-      // Merge into existing canvas document
-      const existingDoc = (section.content &&
-        typeof section.content === 'object' &&
-        'version' in (section.content as object)
-          ? (section.content as CanvasDocument)
+      // Merge into existing canvas document.
+      // proposal_sections.content is TEXT (mig 071) → postgres.js returns a STRING, so the old
+      // `typeof content === 'object'` guard was ALWAYS false → existingDoc null → the section's
+      // real content was silently REPLACED instead of merged. Parse via coerceJsonb (handles the
+      // string-encoded TEXT and any legacy jsonb rows) before deciding.
+      const parsedContent = coerceJsonb<CanvasDocument | null>(section.content, null);
+      const existingDoc = (parsedContent &&
+        typeof parsedContent === 'object' &&
+        'version' in parsedContent
+          ? parsedContent
           : null);
 
       const doc: CanvasDocument = existingDoc ?? {
@@ -207,6 +213,43 @@ export async function POST(req: Request, { params }: Params) {
           version_number: (doc.metadata.version_number ?? 0) + 1,
         },
       };
+
+      // ── Archive the pre-merge content to canvas_versions (restore point) ──
+      // Defense-in-depth: even though we now merge (not replace), snapshot what was there so a
+      // seed apply is always reversible from Version History — matching the section-save discipline.
+      if (existingDoc) {
+        try {
+          const existingText = (existingDoc.nodes ?? [])
+            .map((n) => {
+              const c = n.content as unknown as { text?: unknown };
+              return typeof c?.text === 'string' ? c.text : '';
+            })
+            .filter(Boolean)
+            .join(' ');
+          await sql`
+            INSERT INTO canvas_versions
+              (section_id, version_number, content, snapshot_reason, source, created_by,
+               char_count, word_count, ai_instruction, ai_model, edit_summary)
+            VALUES (
+              ${targetSectionId}::uuid,
+              ${section.version},
+              ${sql.json(existingDoc as unknown as Parameters<typeof sql.json>[0])},
+              'seed_apply',
+              'human_edit',
+              ${sessionUser.id ?? null},
+              ${existingText.length},
+              ${existingText.split(/\s+/).filter(Boolean).length},
+              ${null},
+              ${null},
+              ${'Library seed applied (pre-merge snapshot)'}
+            )
+            ON CONFLICT (section_id, version_number) DO NOTHING
+          `;
+        } catch (e) {
+          console.error('[seed-apply] canvas_versions archive failed:', e);
+          // Non-fatal — the merge still preserves the prior nodes.
+        }
+      }
 
       await sql`
         UPDATE proposal_sections
