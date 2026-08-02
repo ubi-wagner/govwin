@@ -432,14 +432,15 @@ function renderSectionsToHtml(sections: CanvasSection[], vars: Record<string, st
     .join('\n');
 }
 
-export function renderCanvasToHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
-  const canvas = doc.canvas;
-  const font = canvas?.font_default ?? { family: 'Times New Roman', size: 12 };
-  const lineSpacing = canvas?.line_spacing ?? 1.15;
-  const body = doc.sections && doc.sections.length
-    ? renderSectionsToHtml(doc.sections, variables)
-    : (doc.nodes ?? []).map((n) => renderNode(n, variables)).join('\n');
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
+/**
+ * The shared <style> block used by BOTH the export HTML and the in-app preview,
+ * derived from the canvas' default font + line spacing. Kept identical to what
+ * renderCanvasToHtml used to inline so the PDF export is byte-for-byte unchanged.
+ */
+export function canvasBaseCss(doc: CanvasDocument): string {
+  const font = doc.canvas?.font_default ?? { family: 'Times New Roman', size: 12 };
+  const lineSpacing = doc.canvas?.line_spacing ?? 1.15;
+  return `
     * { box-sizing: border-box; }
     body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${lineSpacing}; color: ${font.color ?? '#111827'}; margin: 0; }
     h1 { font-size: ${(font.size ?? 12) * 1.6}pt; margin: 16px 0 8px; }
@@ -450,5 +451,54 @@ export function renderCanvasToHtml(doc: CanvasDocument, variables: Record<string
     li { margin: 3px 0; }
     a { color: #2563eb; }
     th { background: #1e293b; color: #fff; }
-  </style></head><body>${body}</body></html>`;
+  `;
+}
+
+/**
+ * Render just the document BODY (no <html>/<head>/<style>) so callers can wrap it
+ * in a page frame — the in-app preview does exactly this, while the PDF exporter
+ * uses renderCanvasToHtml below. Pure; safe to run in the browser.
+ */
+export function renderCanvasBodyHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
+  return doc.sections && doc.sections.length
+    ? renderSectionsToHtml(doc.sections, variables)
+    : (doc.nodes ?? []).map((n) => renderNode(n, variables)).join('\n');
+}
+
+export function renderCanvasToHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${canvasBaseCss(doc)}</style></head><body>${renderCanvasBodyHtml(doc, variables)}</body></html>`;
+}
+
+/**
+ * Render a page-FRAMED, self-contained HTML document for the in-app "preview as
+ * downloaded" — the same body as the PDF export, wrapped in a letter/A4 page at the
+ * canvas' real width + margins, with the header/footer templates substituted and drawn
+ * in the page margins (the PDF exporter draws these as Chromium running templates, which
+ * the plain export body omits). Pure — the SAME function backs the section preview
+ * (client-side, live edits) and the full-document preview (server-assembled), so both
+ * look identical. Continuous scroll (not hard-paginated) — a faithful layout, not a
+ * page-by-page raster; the .docx/.pdf download remains the exact file.
+ */
+export function renderCanvasPreviewHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
+  const c = doc.canvas;
+  const PT_TO_PX = 96 / 72;
+  const wPx = Math.round((c?.width ?? 612) * PT_TO_PX);
+  const hPx = Math.round((c?.height ?? 792) * PT_TO_PX);
+  const m = c?.margins ?? { top: 72, right: 72, bottom: 72, left: 72 };
+  // Header/footer substitution: known vars resolve; live page-number tokens render as "•" (a
+  // continuous-scroll preview has no fixed pagination — the .pdf/.docx supplies real numbers);
+  // any other unresolved {token} is dropped rather than shown literally.
+  const hfVars: Record<string, string> = { n: '•', page: '•', page_number: '•', N: '•', pages: '•', total_pages: '•', ...variables };
+  const substHf = (t: unknown) => String(t ?? '').replace(/\{(\w+)\}/g, (_, k) => hfVars[k] ?? '');
+  const header = c?.header ? `<div class="pv-hf pv-header">${esc(substHf(c.header.template))}</div>` : '';
+  const footer = c?.footer ? `<div class="pv-hf pv-footer">${esc(substHf(c.footer.template))}</div>` : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    html, body { margin: 0; background: #4b5563; }
+    ${canvasBaseCss(doc)}
+    .pv-page { width: ${wPx}px; min-height: ${hPx}px; margin: 24px auto; background: #fff;
+      padding: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt; box-shadow: 0 4px 24px rgba(0,0,0,.35); }
+    .pv-hf { color: #6b7280; font-size: ${c?.header?.font?.size ?? 10}pt; }
+    .pv-header { border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; padding-bottom: 6px; }
+    .pv-footer { border-top: 1px solid #e5e7eb; margin-top: 14px; padding-top: 6px; text-align: center; }
+  </style></head><body><div class="pv-page">${header}${renderCanvasBodyHtml(doc, variables)}${footer}</div></body></html>`;
 }

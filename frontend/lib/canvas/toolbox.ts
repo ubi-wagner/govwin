@@ -37,6 +37,7 @@ export const TOOL_CARDS: ToolCard[] = [
   { id: 'format',     title: 'Format',                  hint: 'style the selected block', requires: 'canFormat' },
   { id: 'atomize',    title: 'Harvest to Library',      hint: 'return locked content to the library', requires: 'canAtomize' },
   { id: 'compliance', title: 'Compliance & Status',     hint: 'page budget, sources, matrix status', requires: 'always', ambient: true },
+  { id: 'preview',    title: 'Preview',                 hint: 'see this section — or the full document — as it downloads', requires: 'always', ambient: true },
   { id: 'export',     title: 'Export',                  hint: 'download docx / pptx / xlsx / pdf', requires: 'canExport', ambient: true },
 ];
 
@@ -47,11 +48,11 @@ export const TOOL_CARDS: ToolCard[] = [
  * role×context and the tail is ambient/secondary.
  */
 const STAGE_ORDER: Record<string, string[]> = {
-  ingest:   ['annotate', 'template', 'sections', 'floorplan', 'insert', 'format', 'library', 'ai', 'compliance', 'export'],
-  template: ['template', 'sections', 'floorplan', 'insert', 'format', 'annotate', 'library', 'compliance', 'export'],
-  draft:    ['insert', 'format', 'library', 'ai', 'sections', 'annotate', 'floorplan', 'template', 'compliance', 'export'],
-  review:   ['review', 'ai', 'format', 'compliance', 'export'],
-  locked:   ['review', 'atomize', 'compliance', 'export'],
+  ingest:   ['annotate', 'template', 'sections', 'floorplan', 'insert', 'format', 'library', 'ai', 'compliance', 'preview', 'export'],
+  template: ['template', 'sections', 'floorplan', 'insert', 'format', 'annotate', 'library', 'compliance', 'preview', 'export'],
+  draft:    ['insert', 'format', 'library', 'ai', 'sections', 'annotate', 'floorplan', 'template', 'compliance', 'preview', 'export'],
+  review:   ['review', 'ai', 'format', 'compliance', 'preview', 'export'],
+  locked:   ['review', 'atomize', 'compliance', 'preview', 'export'],
 };
 
 export interface ResolvedToolbox {

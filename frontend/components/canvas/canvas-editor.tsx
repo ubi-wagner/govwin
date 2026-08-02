@@ -19,6 +19,7 @@ import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 import { CanvasToolbar } from './canvas-toolbar';
 import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
+import { DocumentPreview } from './document-preview';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
@@ -225,6 +226,7 @@ function CanvasEditorInner({
   const canInsertLibrary = Boolean(tenantSlug && (capabilities?.canInsertLibrary ?? !readOnly));
   const [showAtomRail, setShowAtomRail] = useState(false);
   const [showInsert, setShowInsert] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);
   const [atomBusyId, setAtomBusyId] = useState<string | null>(null);
   const [acceptedNodeIds, setAcceptedNodeIds] = useState<Set<string>>(new Set());
@@ -634,6 +636,7 @@ function CanvasEditorInner({
   const handleToolAction = useCallback((id: string) => {
     if (id === 'library') setShowInsert((v) => !v);
     else if (id === 'atomize') setShowAtomRail((v) => !v);
+    else if (id === 'preview') setPreviewOpen(true);
     else if (id === 'template') handleSaveTemplate();
     else if (id === 'lock') handleCompleteLock();
     else if (id === 'export' && onExport) {
@@ -998,6 +1001,16 @@ function CanvasEditorInner({
       />
           </div>
         </>
+      )}
+
+      {previewOpen && (
+        <DocumentPreview
+          doc={doc}
+          proposalId={proposalId}
+          tenantSlug={tenantSlug}
+          title={doc.metadata.title}
+          onClose={() => setPreviewOpen(false)}
+        />
       )}
     </div>
   );

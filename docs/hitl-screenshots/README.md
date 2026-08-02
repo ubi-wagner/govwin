@@ -27,3 +27,5 @@ Cohorts: `e2e-*` on acme-navy (`E2ETest!2026`) + Foundation/Paul (`DemoPass123!`
 | 18 | tenant_user | Scoped cockpit | §D |
 | 19 | tenant_user | Cards (scoped) | §D |
 | 20 | partner_user | Vaults only (contained) | §E |
+| 21 | tenant_admin (Paul) | **Preview — section (live, as it downloads)** | Preview toolbox card |
+| 22 | tenant_admin (Paul) | **Preview — full document (assembled proposal)** | Preview → Full document |
