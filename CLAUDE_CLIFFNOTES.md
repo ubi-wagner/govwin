@@ -1290,7 +1290,7 @@ clobbers the completed work. And when a paused instance IS failed, expire its si
 wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate the event's entity id
 (proposalId/userId/sourceId/…) to the parked instance's payload before resuming (`_event_correlates`).
 
-### Mistake 24: ordering proposal sections by `section_number` (string sort → scrambled numbering)
+### Mistake 43: ordering proposal sections by `section_number` (string sort → scrambled numbering)
 `ORDER BY section_number` string-sorts, so "10".."14" land before "2" and unnumbered sections
 (Abstract, letters) drift — the "numbering is fucked up" symptom the customer saw. Fixed sprint
 2026-08-02: a real integer `proposal_sections.sort_index` (mig 143, backfilled + indexed).
@@ -1301,7 +1301,7 @@ alone. Sites already fixed: workspace `page.tsx`, detail `route.ts`, `review/pag
 `artifacts/[id]/export` + `/layout`, `package/route.ts` (all formats), `proposal-advance.ts`. The
 `section_number` column stays a display label ('' for Abstract/letters); the sort key is `sort_index`.
 
-### Mistake 25: reaching for tools that AREN'T installed to make/inspect a PDF
+### Mistake 44: reaching for tools that AREN'T installed to make/inspect a PDF
 No `pdftoppm`/`pdftotext`/`pandoc`/`pdftk`/`gs`/`qpdf`, no python `markdown`, no `marked`. What IS
 here: `soffice`, `sharp` (SVG→PNG), `@napi-rs/canvas`, `pdfjs-dist` v5 (`legacy/build/pdf.mjs`),
 Chromium at `/opt/pw-browsers`.
