@@ -7,3 +7,4 @@
 # background verification runs; the real scratch (tests/drives) lives under the session scratchpad.
 # These must never be tracked or committed.
 *.scratch.config.*
+e2e/screenshots/
