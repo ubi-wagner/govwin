@@ -16,8 +16,12 @@ The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and n
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
 `tenant_opportunity_cards` (including the rebuilt `v_opportunity_rollup` view + the CMS
 `matched_opportunities` variable). The compliance matrix (`proposal_compliance_matrix`) populates
-at provision and advances on section lock. Verified end-to-end (Playwright + the live Python workflow
-engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 796 · `next build`).
+at provision and advances on section lock. A locked/submitted proposal downloads as **json/docx/pdf/zip**
+(`/proposals/[p]/package?format=…` — docx & the Chromium-rendered pdf share one combined-CanvasDocument
+assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
+integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
+end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
+`opportunity_id`; `tsc` 0 · `vitest` 823 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -26,7 +30,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 137). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 143). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
@@ -100,9 +104,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (796 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (823 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+  ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
+  `node .next/standalone/server.js` after staging `.next/static`+`public`; auth flows must hit
+  `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.
 
 ## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column

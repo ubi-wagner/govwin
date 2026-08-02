@@ -81,6 +81,12 @@ proposal_sections
   created_at, updated_at
   + last_modified_by, editing_by, editing_since (044)
   + completed_stage, completed_at, accepted_by, accepted_at (046)
+  + is_locked, locked_at (074); artifact_id → proposal_artifacts (083);
+    volume_name, volume_number, section_type, tags, meta (074+)
+  + sort_index INT (143) — the ORDERING KEY. ALWAYS list sections with
+    ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number.
+    NEVER order by section_number alone (string sort → "10" before "2",
+    volumes scrambled — the "numbering is fucked up" bug). mig 143 backfills it.
 
 proposal_comments
   id, proposal_id, section_id, user_id, content, resolved, created_at
@@ -1283,6 +1289,27 @@ clobbers the completed work. And when a paused instance IS failed, expire its si
 `match_waiting_instances` matches `wait_for` on namespace/type/phase only — resuming on that alone
 wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate the event's entity id
 (proposalId/userId/sourceId/…) to the parked instance's payload before resuming (`_event_correlates`).
+
+### Mistake 24: ordering proposal sections by `section_number` (string sort → scrambled numbering)
+`ORDER BY section_number` string-sorts, so "10".."14" land before "2" and unnumbered sections
+(Abstract, letters) drift — the "numbering is fucked up" symptom the customer saw. Fixed sprint
+2026-08-02: a real integer `proposal_sections.sort_index` (mig 143, backfilled + indexed).
+
+**Rule:** EVERY query that lists sections for display/export/assembly MUST
+`ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number` — never `section_number`
+alone. Sites already fixed: workspace `page.tsx`, detail `route.ts`, `review/page.tsx`, per-volume
+`artifacts/[id]/export` + `/layout`, `package/route.ts` (all formats), `proposal-advance.ts`. The
+`section_number` column stays a display label ('' for Abstract/letters); the sort key is `sort_index`.
+
+### Mistake 25: reaching for tools that AREN'T installed to make/inspect a PDF
+No `pdftoppm`/`pdftotext`/`pandoc`/`pdftk`/`gs`/`qpdf`, no python `markdown`, no `marked`. What IS
+here: `soffice`, `sharp` (SVG→PNG), `@napi-rs/canvas`, `pdfjs-dist` v5 (`legacy/build/pdf.mjs`),
+Chromium at `/opt/pw-browsers`.
+
+**Rule:** Whole-proposal docx/pdf = dogfood `POST /api/portal/<slug>/proposals/<id>/package?format=docx|pdf|zip`
+(proposal must be locked/submitted; docx & pdf share the combined-CanvasDocument assembly). Inspect a
+PDF by rasterizing with pdfjs + `@napi-rs/canvas`; markdown→PDF via Chromium `setContent`+`pdf()` with
+images inlined as `data:` URIs. Full recipes: docs/CONTINUATION.md §2.
 
 ---
 

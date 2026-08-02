@@ -20,13 +20,18 @@ q() { psql "$PROD_DATABASE_URL" -Atc "$1"; }
 The offboarding fix made proposal access **purely membership-based**. If mig 111 isn't applied +
 backfilled in prod, non-admin users with no membership row are locked out of their own tenant.
 
-**Verify the schema is current (through mig 129):**
+**Verify the schema is current (through mig 143):**
 ```bash
-q "SELECT count(*) FROM _migration_history WHERE filename IN ('111_user_memberships.sql','129_backfill_automation_policies.sql')"
-# PASS = 2   (both present → schema is at least through 111 and 129)
+q "SELECT count(*) FROM _migration_history WHERE filename IN ('111_user_memberships.sql','143_proposal_sort_index.sql')"
+# PASS = 2   (both present → schema is at least through 111 and 143)
 q "SELECT filename FROM _migration_history ORDER BY filename DESC LIMIT 1"
-# expect the highest to be 129_… (or later)
+# expect the highest to be 143_… (or later)
 ```
+
+> **Why 143 matters for display:** it adds + backfills `proposal_sections.sort_index`, the integer
+> key every section-ordering query now sorts on. Without it applied, the workspace/review/export
+> section lists fall back to string-sorting `section_number` ("10" before "2") — the "numbering is
+> fucked up" symptom — and any `ORDER BY sort_index` query errors on the missing column.
 
 **Apply migrations if the count above is < 2** (idempotent — already-applied ones are skipped):
 ```bash
@@ -124,12 +129,21 @@ complete (35 tenant tables, ~72 routes; the only 2 gaps are fixed). That makes s
 **defensible** for launch, but the cutover to the `NOBYPASSRLS` role is the belt-and-suspenders
 backstop (checklist in `docs/DEPRECATION_CLEANUP_2026-07-22.md`). Schedule it right after go-live.
 
+**Foundation TVSF demo content is canonical only after a refresh.** Migration 140
+(`gen-foundation-seed-migration.mjs` output) seeds the demo proposal, but that snapshot predates the
+canonical 3-volume structure + the Q3/Q6 figures. A **fresh** deploy will seed the older content
+(numbering is still correct — mig 143 backfills `sort_index`). To make the first-customer demo match
+the delivered PDFs, either (a) `DATABASE_URL=<prod> node scripts/rebuild-tvsf.mjs`, or (b) regenerate
+140 from a canonical sandbox (`node scripts/gen-foundation-seed-migration.mjs`; the generator now
+auto-includes `sort_index` since the column exists) and land it as a new upsert migration. Not
+launch-blocking — the demo is refreshable post-deploy.
+
 ---
 
 ### One-glance gate
 | # | Item | Pass signal |
 |---|------|-------------|
-| 1 | Migrations + membership backfill | `_migration_history` has 111 & 129; **0** active tenant users without an active membership |
+| 1 | Migrations + membership backfill | `_migration_history` has 111 & 143; **0** active tenant users without an active membership |
 | 2 | Email wired | a real send reports `gmail`/`resend`, not `skipped` |
 | 3 | `ANTHROPIC_API_KEY` | set in pipeline **and** frontend; live draft returns a real model, not `placeholder` |
 | 4 | Opportunities flowing | bridge & cards **> 0**; `finder` events are fresh |
