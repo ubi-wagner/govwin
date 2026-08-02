@@ -273,6 +273,8 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.solicitation.ingest": "ingest_analyst",
     "tool.matrix.stage": "matrix_stager",
     "tool.skeleton.build": "skeleton_architect",
+    # Admin-agent Phase 1 — ingest-pipeline orchestration manager (docs/ADMIN_AGENT_DESIGN.md)
+    "tool.ingest.assess": "rfp_ingest_manager",
     # Batch C — outcome learning loop, amendment delta, cost realism, PP matching
     "tool.outcome.analyze": "outcome_analyst",
     "tool.solicitation.amendment_delta": "amendment_monitor",

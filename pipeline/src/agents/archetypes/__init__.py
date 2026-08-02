@@ -30,6 +30,7 @@ from .proposal_architect import ProposalArchitectArchetype
 from .proposal_manager import ProposalManagerArchetype
 from .redaction_guard import RedactionGuardArchetype
 from .research_scout import ResearchScoutArchetype
+from .rfp_ingest_manager import RfpIngestManagerArchetype
 from .scoring_strategist import ScoringStrategistArchetype
 from .section_drafter import SectionDrafterArchetype
 from .skeleton_architect import SkeletonArchitectArchetype
@@ -68,6 +69,7 @@ __all__ = [
     "ProposalManagerArchetype",
     "RedactionGuardArchetype",
     "ResearchScoutArchetype",
+    "RfpIngestManagerArchetype",
     "ScoringStrategistArchetype",
     "SectionDrafterArchetype",
     "SkeletonArchitectArchetype",

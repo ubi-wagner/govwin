@@ -34,7 +34,7 @@ const POD_ORDER: Pod[] = [
   'Our-org — CMS content',
 ];
 
-// The 35 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
+// The 36 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
 // agents are role-bound to their assigned tenant (tenant_user authority; the trigger's
 // tenant_id is fixed by the task, never chosen by the model). Platform/our-org agents run at
 // our authority on master + cross-tenant data (no tenant to bind), and land into admin review.
@@ -74,6 +74,7 @@ const ROSTER: Agent[] = [
   { role: 'amendment_monitor', label: 'Amendment Monitor', scope: 'platform', trigger: 'Source change detected', status: 'live', pod: 'Master — ingestion (platform)', does: 'Flags compliance-affecting amendments.' },
   // ── Our-org — RFP-admin ops (POD 4) ──────────────────────────────────────
   { role: 'curation_qa', label: 'Curation QA', scope: 'platform', trigger: 'Curation submitted for review', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Pre-release QC of a curated solicitation before push.' },
+  { role: 'rfp_ingest_manager', label: 'RFP Ingest Manager', scope: 'platform', trigger: 'Assess ingest readiness (admin-invoked)', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Ingest-pipeline orchestration: reads a curated solicitation’s stage (shred → matrix → skeleton) and plans which specialist agents (ingest_analyst / matrix_stager / skeleton_architect / curation_qa) to run next — advisory, no descent.' },
   { role: 'ops_digest', label: 'Ops Digest', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Scheduled health digest for master_admin (workforce, pipeline, SLA).' },
   // ── Our-org — CMS content ────────────────────────────────────────────────
   { role: 'content_generator', label: 'Content Generator', scope: 'platform', trigger: 'Content requested (no live emitter yet)', status: 'dormant', pod: 'Our-org — CMS content', does: 'Drafts new web/social copy from a brief, in our published voice (human-approved). Registered; its library:content.requested trigger has no emitter yet.' },
