@@ -83,19 +83,23 @@ export async function GET(_request: Request, ctx: RouteContext) {
       SELECT section_number AS "sectionNumber", title, content
       FROM proposal_sections
       WHERE proposal_id = ${proposalId}::uuid
-      ORDER BY section_number ASC
+      ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number ASC
     `;
 
-    // Assemble one continuous document — numbered H1 per section, then its content — exactly
-    // like the .docx package path, so the preview matches the download.
+    // Assemble one continuous document. Each section is prefaced by a clean numbered H1 —
+    // "N. Title" (no number for an unnumbered section like the Abstract) — UNLESS the section's
+    // own content already leads with a heading (then we don't double it). Order is by the
+    // integer sort_index so sections never string-sort 1,10,2.
     const parsedSections = sections.map((s) => ({ ...s, ...parseSectionContent(s.content) }));
     const firstCanvas = parsedSections.find((s) => s.canvas)?.canvas ?? CANVAS_PRESETS.letter_standard;
     const now = new Date().toISOString();
     const docSections: CanvasSection[] = parsedSections.map((section) => {
+      const num = (section.sectionNumber ?? '').trim();
+      const alreadyTitled = section.nodes[0]?.type === 'heading';
       const headingNode: CanvasNode = {
         id: crypto.randomUUID(),
         type: 'heading',
-        content: { level: 1 as const, text: `${section.sectionNumber}. ${section.title}` },
+        content: { level: 1 as const, text: num ? `${num}. ${section.title}` : section.title },
         style: {},
         provenance: { source: 'manual', drafted_at: now },
         history: [],
@@ -105,7 +109,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         id: crypto.randomUUID(),
         title: section.title,
         layout: { mode: 'flow' as const },
-        groups: coalesceGroups([headingNode, ...section.nodes]),
+        groups: coalesceGroups(alreadyTitled ? section.nodes : [headingNode, ...section.nodes]),
       };
     });
 

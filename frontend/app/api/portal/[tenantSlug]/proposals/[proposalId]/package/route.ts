@@ -262,7 +262,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       let fileCount = 0;
       for (const a of artifacts) {
         const secs = await sql<{ title: string | null; content: string | null }[]>`
-          SELECT title, content FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY section_number`;
+          SELECT title, content FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
         if (secs.length === 0) continue;
         const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
         const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
@@ -405,7 +405,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         SELECT id, section_number, title, content, status, page_allocation, completed_stage
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}::uuid
-        ORDER BY section_number ASC
+        ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number ASC
       `;
     } catch (e) {
       console.error('[portal/proposals/package] sections query failed:', e);
@@ -447,10 +447,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       // tables kept together. No forced page breaks between molds: the whole
       // proposal flows continuously (headings mark the sections).
       const docSections: CanvasSection[] = parsedSections.map((section) => {
+        const num = (section.sectionNumber ?? '').trim();
+        const alreadyTitled = section.nodes[0]?.type === 'heading';
         const headingNode: CanvasNode = {
           id: crypto.randomUUID(),
           type: 'heading',
-          content: { level: 1 as const, text: `${section.sectionNumber}. ${section.title}` },
+          content: { level: 1 as const, text: num ? `${num}. ${section.title}` : section.title },
           style: {},
           provenance: { source: 'manual', drafted_at: new Date().toISOString() },
           history: [],
@@ -460,7 +462,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           id: crypto.randomUUID(),
           title: section.title,
           layout: { mode: 'flow' as const },
-          groups: coalesceGroups([headingNode, ...section.nodes]),
+          groups: coalesceGroups(alreadyTitled ? section.nodes : [headingNode, ...section.nodes]),
         };
       });
 
