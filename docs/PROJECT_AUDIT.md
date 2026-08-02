@@ -309,3 +309,44 @@ they're hygiene, not risk. The takeaway is the *method*: a blind "delete every u
    archetype** `content_generator` (§2 — its `library:content.requested` trigger has no emitter) — wire or shelve.
    (Earlier drafts said "~11 dormant"; verified count is **1**.)
 8. **Reconcile docs (§6).**
+
+---
+
+## 8. Adversarial leak hunt — tenant isolation · authZ · data layer (VERIFIED + FIXED, 2026-08-02)
+
+Three parallel adversarial auditors, each required to PROVE a finding ≥3 independent ways; every
+proven finding was then re-verified by hand and (for the security one) live on the running build.
+`tsc` 0 · `vitest` 823 · `next build` · Playwright role-smoke 5/5 + deep-sweep 5/5 on the fixed build.
+
+### 8a. Tenant isolation (cross-tenant) — **0 leaks** (124 routes/pages audited)
+The app-layer guard chain is disciplined: `auth()` → `getTenantBySlug` → `verifyTenantAccess`/
+`verifyProposalAccess` → `enterTenant` → every resource query scoped by `tenant_id` or bound through a
+tenant-verified parent. **`verifyProposalAccess` binds the proposal to `tenantId` FIRST** — the linchpin
+that makes every proposal sub-route cross-tenant-safe. Vault routes gate on `resolveVaultAccess`; storage
+on `assertKeyBelongsToTenant` (prefix-with-trailing-slash). No route trusts a client-supplied `tenant_id`.
+*Defense-in-depth note (not exploitable, optional):* `copyFoundationToTenant`→`readAtom(id)` reads the
+source with no tenant predicate, relying on the upstream `isSystemFoundation` tag gate; an explicit
+`tenant_id IS NULL` on the source would make it self-contained.
+
+### 8b. Authorization — **1 HIGH class FIXED: partner_user containment break (6 routes)**
+`verifyTenantAccess(userId, role, tenantId)` returns **true for a partner_user** holding any active tenant
+membership — and external collaborators are given exactly such a membership. Six routes gated on
+`verifyTenantAccess` **alone** (no `tenant_user` floor), so an accepted collaborator could read/enumerate
+proposals they're not on — full detail, compliance matrix, stage history, and **every collaborator's
+name/email (PII)**. The sibling routes (`activity`, `supporting-docs`, `sections`) already floor at
+`tenant_user`/scope partners via `resolveUserAccess` — these six were the dropped-check outliers.
+**Fixed** by adding `hasRoleAtLeast(role,'tenant_user')` before any tenant/DB work:
+`proposals/[id]` GET, `.../compliance` GET, `.../stage` GET, `.../collaborators` GET (the 4 HIGH), plus
+`storage` GET-presign and `uploads/image` POST (supporting; both had zero UI callers).
+**Proven 3 ways:** agent analysis (+ sibling-consistency) · hand code-review · unit test
+(`__tests__/partner-containment.test.ts`, 12 cases) **and** a live end-to-end proof — a partner_user with a
+Foundation membership now gets **403** on all six while `tenant_user` still gets **200**.
+Middleware `PATH_MIN_ROLE`, all ~87 `/api/admin/**` (rfp_admin+ floored), the 34-tool registry
+(`requiredRole` enforced), and money/team/policy mutations all audited **CLEAN**.
+
+### 8c. SQL / data layer — **1 MEDIUM FIXED; 7 classes CLEAN**
+`proposal-advance.ts:300` wrote stage-advance section snapshots as `${s.content}::jsonb` where `s.content`
+is TEXT → a jsonb **string scalar** → Version History rendered raw JSON (the correct sibling writers use
+`sql.json(parsed)`). **Fixed** to parse + `sql.json`. Verified CLEAN (each with schema/index corroboration):
+ON CONFLICT vs partial indexes, CHECK-set literals, optimistic-lock/CAS, FK-before-audit ordering,
+`::int` on counts, error leakage, ILIKE escaping.
