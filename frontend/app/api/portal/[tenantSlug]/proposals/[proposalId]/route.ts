@@ -150,7 +150,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         FROM proposal_sections ps
         LEFT JOIN users u ON u.id = ps.accepted_by
         WHERE ps.proposal_id = ${proposalId}
-        ORDER BY ps.section_number ASC
+        ORDER BY ps.volume_number ASC NULLS LAST, ps.sort_index ASC NULLS LAST, ps.section_number ASC
       `;
     } catch (dbErr) {
       console.error('[api/portal/proposals/detail] sections query failed:', dbErr);

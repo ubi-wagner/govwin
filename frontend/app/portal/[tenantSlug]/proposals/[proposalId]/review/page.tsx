@@ -106,7 +106,7 @@ export default async function ReviewPage({ params }: Props) {
         COALESCE(length(content), 0) AS content_length
       FROM proposal_sections
       WHERE proposal_id = ${proposalId}
-      ORDER BY section_number ASC
+      ORDER BY volume_number ASC NULLS LAST, sort_index ASC NULLS LAST, section_number ASC
     `;
   } catch (e) {
     console.error('[portal/review] sections query failed', e);

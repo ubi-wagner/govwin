@@ -202,7 +202,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
         WHERE s.proposal_id = ${proposalId}::uuid
           AND s.is_locked = false
           AND COALESCE(a.is_required, true) = true
-        ORDER BY s.volume_number NULLS LAST, s.section_number
+        ORDER BY s.volume_number NULLS LAST, s.sort_index NULLS LAST, s.section_number
       `;
       if (openSections.length > 0 && !force) {
         throw new Error('SECTIONS_NOT_LOCKED:' + JSON.stringify(
@@ -247,7 +247,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       }[]>`
         SELECT id, title, version, status, content, is_locked
         FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid
-        ORDER BY section_number
+        ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number
       `;
 
       sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null; isLocked: boolean }) => ({

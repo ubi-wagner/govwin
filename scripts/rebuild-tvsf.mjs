@@ -33,6 +33,10 @@ const table = (allRows) => {
   const [head, ...body] = allRows;
   return { id: nid(), type: 'table', content: { headers: head.map(cell), rows: body.map((r) => r.map(cell)) }, style: {}, provenance: prov, history: [], library_eligible: false };
 };
+// ChartContent = { chart_type, categories, series:[{name,data,color?}], title }. Renders as an
+// inline SVG (pdf draws it directly; docx/pptx rasterize it) — the proposal's real figures.
+const chart = (chart_type, categories, series, title) => ({ id: nid(), type: 'chart', content: { chart_type, categories, series, title }, style: {}, provenance: prov, history: [], library_eligible: false });
+const caption = (number, text) => ({ id: nid(), type: 'caption', content: { prefix: 'Figure', number, text }, style: {}, provenance: prov, history: [], library_eligible: false });
 
 // TVSF narrative canvas: .75in margins (54pt), 11pt Times New Roman, 7-page cap.
 function doc(nodes, { title }) {
@@ -77,8 +81,11 @@ const V1 = [
   { sort: 3, num: '3', type: 'narrative', title: 'Development Stage and Timeline', nodes: [
     h(1, '3. Development Stage and Timeline'),
     p('The core printing system is beyond proof-of-concept. Foundation has printed full-height wall segments with the runway-rail trolley and the external-gate nozzle using standard ready-mix concrete, validating the layer geometry and clean start/stop behavior that differentiate the product (TRL 5–6). The customer requirement driving the current MVP came directly from production-builder interviews: a printer that runs on locally batched concrete and produces an inspection-ready footing-to-top-of-wall in a single setup. This TVSF project takes the system to a manufacture-ready configuration and a fully instrumented field demonstration.'),
-    p('The 12-month plan below is summarized as a Gantt that matches the Q11 milestones one-for-one; time to first commercial installation is estimated at 14 months from award.'),
-    p('[Gantt chart — milestones MS1–MS8 across months 1–12, matching the Q11 Project Plan table.]'),
+    p('The 12-month plan below is summarized as a milestone schedule that matches the Q11 milestones one-for-one; time to first commercial installation is estimated at 14 months from award.'),
+    chart('bar', ['MS1', 'MS2', 'MS3', 'MS4', 'MS5', 'MS6', 'MS7', 'MS8'],
+      [{ name: 'Target completion month', data: [2, 3, 4, 5, 7, 9, 11, 12], color: '#3b82f6' }],
+      'TVSF 12-Month Milestone Schedule (target completion month)'),
+    caption('1', 'TVSF 12-month milestone schedule — target completion month for MS1–MS8, mapping one-for-one to the Q11 Project Plan table.'),
   ]},
   { sort: 4, num: '4', type: 'narrative', title: 'Commercialization and Market Entry Strategy', nodes: [
     h(1, '4. Commercialization and Market Entry Strategy'),
@@ -110,6 +117,11 @@ const V1 = [
       ['Net profit', '(920)', '(1,220)', '(900)', '900', '6,100'],
       ['Equity Investment', '1,500', '3,000', '0', '0', '0'],
     ]),
+    chart('line', ['2026', '2027', '2028', '2029', '2030'],
+      [{ name: 'Total revenues', data: [120, 900, 3400, 9200, 21000], color: '#3b82f6' },
+       { name: 'Gross profit', data: [30, 380, 1800, 5300, 12800], color: '#10b981' }],
+      'Pro-Forma Revenue & Gross Profit, 2026–2030 ($1,000s)'),
+    caption('2', 'Foundation pro-forma revenue and gross-profit ramp, 2026–2030 ($1,000s) — the recurring lease-plus-build-fee model visualized from the Q6 pro-forma above.'),
   ]},
   { sort: 7, num: '7', type: 'narrative', title: 'Current Financial Stage', nodes: [
     h(1, '7. Current Financial Stage'),

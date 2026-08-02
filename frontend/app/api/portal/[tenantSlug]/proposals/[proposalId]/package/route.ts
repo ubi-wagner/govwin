@@ -1,9 +1,13 @@
 /**
  * POST /api/portal/[tenantSlug]/proposals/[proposalId]/package
  *
- * Generate complete proposal package. Supports two output formats:
+ * Generate complete proposal package. Supports these output formats:
  *   ?format=json  — (default) structured JSON with text, compliance, docs
- *   ?format=docx  — Word document download (.docx) with all sections
+ *   ?format=docx  — Word document download (.docx), all sections combined
+ *   ?format=pdf   — PDF download (Chromium print), all sections combined, with
+ *                   the canvas header/footer + real page numbers, tables and
+ *                   inline SVG figures at full fidelity
+ *   ?format=zip   — each volume in its NATIVE format (docx/pptx/xlsx), zipped
  *
  * Auth: tenant_user or above with tenant access. Proposal must be locked.
  */
@@ -16,6 +20,7 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
+import { exportToPdf } from '@/lib/export/pdf-exporter';
 import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
 import JSZip from 'jszip';
 import {
@@ -171,10 +176,10 @@ export async function POST(request: Request, ctx: RouteContext) {
   // ── Parse format from query string ──────────────────────────────
   const url = new URL(request.url);
   const format = url.searchParams.get('format') || 'json';
-  if (format !== 'json' && format !== 'docx' && format !== 'zip') {
+  if (format !== 'json' && format !== 'docx' && format !== 'pdf' && format !== 'zip') {
     return NextResponse.json(
       {
-        error: 'Invalid format. Supported: json, docx, zip',
+        error: 'Invalid format. Supported: json, docx, pdf, zip',
         code: 'VALIDATION_ERROR',
       },
       { status: 400 },
@@ -435,8 +440,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       };
     });
 
-    // ── DOCX export path ─────────────────────────────────────────
-    if (format === 'docx') {
+    // ── DOCX / PDF export path (both assemble the same combined CanvasDocument
+    //    from all sections, then render to their format) ──────────────
+    if (format === 'docx' || format === 'pdf') {
       // Combine all section nodes into one CanvasDocument.
       // Use the first section's canvas rules, or fall back to standard preset.
       const firstCanvas =
@@ -494,14 +500,23 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       let buffer: Buffer;
       try {
-        buffer = await exportToDocx(combinedDoc, vars);
+        buffer =
+          format === 'pdf'
+            ? await exportToPdf(combinedDoc, vars)
+            : await exportToDocx(combinedDoc, vars);
       } catch (e) {
-        console.error('[portal/proposals/package] DOCX generation failed:', e);
+        console.error(
+          `[portal/proposals/package] ${format.toUpperCase()} generation failed:`,
+          e,
+        );
         await emitEventEnd(startEventId, {
-          error: { message: 'DOCX generation failed', code: 'EXPORT_ERROR' },
+          error: {
+            message: `${format.toUpperCase()} generation failed`,
+            code: 'EXPORT_ERROR',
+          },
         });
         return NextResponse.json(
-          { error: 'DOCX generation failed', code: 'EXPORT_ERROR' },
+          { error: `${format.toUpperCase()} generation failed`, code: 'EXPORT_ERROR' },
           { status: 500 },
         );
       }
@@ -529,7 +544,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                   ${sessionUser.email ?? null}, ${role},
                   'proposal_exported',
-                  ${sql.json({ section_count: parsedSections.length, format: 'docx' })})
+                  ${sql.json({ section_count: parsedSections.length, format })})
         `;
       } catch (logErr) {
         console.error('[portal/proposals/package] activity log failed', logErr);
@@ -544,19 +559,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       await emitEventEnd(startEventId, {
         result: {
           proposalId,
-          format: 'docx',
+          format,
           sectionCount: parsedSections.length,
           charCount: totalChars,
         },
       });
 
       const safeFilename = (proposal.title ?? 'proposal').replace(/[^a-zA-Z0-9-_ ]/g, '') || 'proposal';
+      const isPdf = format === 'pdf';
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {
-          'Content-Type':
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'Content-Disposition': `attachment; filename="${safeFilename}.docx"`,
+          'Content-Type': isPdf
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': `attachment; filename="${safeFilename}.${isPdf ? 'pdf' : 'docx'}"`,
           'Content-Length': String(buffer.length),
         },
       });

@@ -195,9 +195,11 @@ export function ProposalAdminPanel({
   );
 
   // ── Export Package handler ───────────────────────────────────
-  // format=docx → one assembled Word doc; format=zip → each volume in its NATIVE
-  // format (docx/pptx/xlsx/pdf) bundled into a .zip (lossless for mixed proposals).
-  const handleExport = useCallback(async (fmt: 'docx' | 'zip' = 'docx') => {
+  // format=docx → one assembled Word doc; format=pdf → one print-fidelity PDF
+  // (Chromium render: tables + inline figures + repeating header/footer + page
+  // numbers); format=zip → each volume in its NATIVE format (docx/pptx/xlsx/pdf)
+  // bundled into a .zip (lossless for mixed proposals).
+  const handleExport = useCallback(async (fmt: 'docx' | 'pdf' | 'zip' = 'docx') => {
     setExportLoading(true);
     setExportMessage(null);
     try {
@@ -783,6 +785,14 @@ export function ProposalAdminPanel({
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {exportLoading ? 'Exporting...' : 'Download Proposal (.docx)'}
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
+              className="px-4 py-2 text-sm font-medium text-white bg-rose-600 rounded-md hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="One print-fidelity PDF of the whole proposal — tables, figures, header/footer, and page numbers"
+            >
+              Download Proposal (.pdf)
             </button>
             <button
               onClick={() => handleExport('zip')}
