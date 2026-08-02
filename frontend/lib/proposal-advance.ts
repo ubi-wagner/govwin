@@ -295,9 +295,15 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       // ── 4. Create canvas version snapshots for each section ───
       for (const s of sections) {
         if (s.content) {
+          // s.content is TEXT (a JSON-serialized canvas doc); canvas_versions.content is jsonb.
+          // Write the PARSED object via sql.json so it round-trips as an object — NOT ${string}::jsonb,
+          // which double-encodes to a jsonb STRING scalar and makes Version History render raw JSON
+          // (matches the correct sibling writers in sections/.../save + admin/.../section).
+          let contentJson: Parameters<typeof sql.json>[0];
+          try { contentJson = JSON.parse(s.content); } catch { contentJson = s.content; }
           await tx`
             INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
-            VALUES (${s.id}::uuid, ${s.version}, ${s.content}::jsonb, ${'stage_completed:' + previousStage}, 'system', ${actorId}::uuid)
+            VALUES (${s.id}::uuid, ${s.version}, ${sql.json(contentJson)}, ${'stage_completed:' + previousStage}, 'system', ${actorId}::uuid)
             ON CONFLICT (section_id, version_number) DO NOTHING
           `;
         }

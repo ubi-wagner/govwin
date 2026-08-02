@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 import { customerImagePath } from '@/lib/storage/paths';
 
@@ -33,6 +33,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     const role = isRole(su.role) ? su.role : null;
     if (!role || !su.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    // Partner-containment: writing into the shared tenant image prefix is a tenant-member action
+    // (tenant_user+). Partners contribute content only through vault upload/atomize, not here.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {

@@ -33,6 +33,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
+    // Partner-containment: stage + gate + change-history is a proposal-wide read for tenant
+    // members (tenant_user+). External collaborators (partner_user) pass verifyTenantAccess on
+    // their membership, so a role floor is required so they can't read proposals they're not on.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
     const { tenantSlug, proposalId } = await ctx.params;
     if (!isValidUUID(proposalId)) {
       return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });

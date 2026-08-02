@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -31,6 +31,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    // Partner-containment: proposal-wide reads are for tenant members (tenant_user+). External
+    // collaborators (partner_user) reach only their granted sections via the scoped section routes;
+    // verifyTenantAccess alone is true for their collaborator membership, so it must NOT gate this.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const { tenantSlug, proposalId } = await ctx.params;

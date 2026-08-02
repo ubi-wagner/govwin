@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
@@ -32,6 +32,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    // Partner-containment: the compliance matrix is a proposal-wide read for tenant members
+    // (tenant_user+); external collaborators (partner_user) pass verifyTenantAccess on their
+    // membership, so a role floor is required to keep them out of proposals they're not on.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
