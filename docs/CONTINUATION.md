@@ -1,6 +1,6 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-02 (TVSF Foundation build: canonical Opp Card, whole-proposal PDF, numbering root fix)
+**Last updated:** 2026-08-02 (TVSF Foundation build + PDF/numbering; then the admin-agent program — rfp_ingest_manager, the Proposal Auto-Drive doorbell, and the event-audit sweep)
 **Branch:** `claude/nice-hamilton-kBqtD`
 
 ---
@@ -38,6 +38,27 @@ Shipped this sprint:
 and auth flows must hit `localhost:3000` (not `127.0.0.1`) or NextAuth bounces. Full recipe + the
 PDF-tooling map are in §2. Agents were NOT freshly run (sandbox `ANTHROPIC_API_KEY=sk-noop` is a
 no-op); sections are already `section_drafter`-drafted (`ai_drafted`).
+
+**Also shipped this session — the admin-agent program + observability sweep:**
+- **`rfp_ingest_manager` (36th archetype)** — the platform-scope ingest-orchestration *manager* (the
+  analog of the tenant `proposal_manager`). Admin-invoked (`.../assess-ingest` →
+  `OnIngestAssessmentRequested` → `tool.ingest.assess`), reads a curated solicitation's ingest state,
+  infers the stage deterministically, plans which specialist agents to run next. Advisory,
+  injection-fenced, guardrail-gated, **no tenant descent**. Locked by
+  `pipeline/tests/test_rfp_ingest_manager_wiring.py` (7/7, incl. a live drive over our own solicitations).
+  Full spec: **docs/ADMIN_AGENT_DESIGN.md**.
+- **Proposal Auto-Drive "doorbell"** — the tenant Proposal Draft Manager (`proposal_manager` +
+  `OnFullDraftRequested{ModeA,B,C}`, Mode C = full auto) is now admin-drivable from `/admin/agents`
+  without portal descent: a card → `POST /api/admin/proposals/[p]/full-draft` → the same
+  `proposal:full_draft_requested` trigger. Portal + doorbell funnel through ONE helper
+  (`lib/proposal-full-draft.ts::requestFullDraft`) — one auditable record, `source` = `portal` vs
+  `admin_doorbell`. **Verified live** as master_admin: the ring lands in `system_events` +
+  `proposal_activity_log` (attributed, `source=admin_doorbell`), visible atop `/admin/events`.
+- **Event-audit sweep** (**docs/EVENT_AUDIT_2026-08-02.md**) — every actor/automation/agent/manager
+  action posts to the `system_events` spine (+ domain logs). One gap found + fixed: `package?format=zip`
+  returned the whole native package with zero audit; now emits `package.export_started`/`.exported` +
+  `download_count` + `proposal_activity_log`, parity with docx/json/pdf.
+- Migrations still at **143**; frontend `vitest` now **829**; pipeline agent suite **257**.
 
 ## 0b. — 2026-07-25 (library + collaboration vaults)
 

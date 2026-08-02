@@ -18,7 +18,7 @@ lifecycle **and** the new Proposal Draft Manager (full-draft Modes A/B/C + the a
 >    proposal `c3db60b1` → section "#2 Overview of the Technology" renders "Two differentiators define it".
 > 2. **Library-seed apply MERGES (F1).** Admin "Apply seed" into a section with existing content now
 >    **appends** (and snapshots the prior content to Version History) instead of **replacing** it.
-> 3. **Agent Workforce roster = 35 (F6).** `/admin/agents` lists all 35 archetypes incl. the Proposal
+> 3. **Agent Workforce roster = 36 (F6).** `/admin/agents` lists all 36 archetypes incl. the Proposal
 >    Draft Manager cohort (Advisory Manager, Traceability Auditor, Redaction Guard, Continuity Manager,
 >    Market Analyst, Stylist, Formatter, Proposal Draft Manager) + both Library-Seed producers; exactly
 >    one shows **dormant** (Content Generator). (Was hardcoded to 25.)

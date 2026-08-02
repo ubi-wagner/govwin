@@ -111,6 +111,12 @@ tenant-initiated or admin-initiated — is one auditable, attributable record; n
   (A/B/C), Ring. It's the admin doorbell for the build cohort, beside the workforce roster.
 - **Safety** — advisory (drafts land in review, never advance a gate), admin-gated, goes through the
   same shadow-authorized emission the portal uses; no new engine, just an admin doorbell on it.
+- **Verified end-to-end (2026-08-02).** Driven live as `master_admin`: the card rings on
+  `/admin/agents`, and the `proposal:proposal.full_draft_requested` start+end lands in `system_events`
+  (+ `proposal_activity_log`) with `source=admin_doorbell`, the admin as actor, and the resolved
+  Foundation tenant — visible at the top of the `/admin/events` Event Stream. Unit-locked by
+  `frontend/__tests__/admin-doorbell.test.ts` (6/6). The downstream drafting (OnFullDraftRequested
+  Mode C running the agents) is deploy-gated on the pipeline `ANTHROPIC_API_KEY`, like every agent.
 
 ## Phase 2 (not built here)
 Descend into a tenant under an admin-issued, TTL'd, audited `shadow_admin_grant` and run the existing

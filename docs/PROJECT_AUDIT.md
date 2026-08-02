@@ -43,12 +43,12 @@ real INSERT/UPDATE sites.
 
 ---
 
-## 2. Agent workforce — wiring (VERIFIED — 35 archetypes + `base`)
+## 2. Agent workforce — wiring (VERIFIED — 36 archetypes + `base`)
 
 ⚠️ **Correction: my first-pass "~11 dormant" was wrong.** Reference-*count* is a bad proxy — an archetype
 invoked via a workflow `AI_INVOKE` step (`TOOL_ACTION_TO_ARCHETYPE`) or an `agent_task_queue` producer shows
 almost no name-references yet is fully wired. Traced by **actual call-site + whether its trigger event is
-emitted by live code: 34 of 35 are wired; exactly ONE is dormant.** (There is no automation-policy gate on
+emitted by live code: 35 of 36 are wired (incl. the admin-agent `rfp_ingest_manager`); exactly ONE is dormant.** (There is no automation-policy gate on
 AI steps — the tenant automation_framework governs notifications, not workflow AI.)
 
 - **LIVE-prod (18)** — tenant/admin queue-producers + core-flow inline: `section_drafter`,
@@ -66,7 +66,7 @@ AI steps — the tenant automation_framework governs notifications, not workflow
   has **no emitter** anywhere (CMS emits `content_pipeline.generation.*` instead; not cron-seeded). I'd wrongly
   listed it as wired.
 
-Notes: `base` is the shared ABC parent (excluded from the 35-entry auto-register) → **35 archetypes + base**.
+Notes: `base` is the shared ABC parent (excluded from the 36-entry auto-register) → **36 archetypes + base**.
 Tenant rescore uses deterministic `rescore.py::score_card`, not `scoring_strategist` (AI overlay is future).
 ⚠️ **`components/admin/agent-workforce.tsx` is stale** — hardcodes 25 agents "live", **omits 10** (the P1–P4
 cohort + both `library_seed_*`), header still says "25 archetypes" (actual 35). Fix the roster UI.

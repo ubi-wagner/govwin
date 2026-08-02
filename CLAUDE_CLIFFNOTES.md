@@ -1311,6 +1311,22 @@ Chromium at `/opt/pw-browsers`.
 PDF by rasterizing with pdfjs + `@napi-rs/canvas`; markdown→PDF via Chromium `setContent`+`pdf()` with
 images inlined as `data:` URIs. Full recipes: docs/CONTINUATION.md §2.
 
+### Mistake 45: an early-returning format/mode branch bypasses the route's shared audit-emit
+`package/route.ts` `format=zip` returned the whole native-format download from a branch that `return`s
+BEFORE the route's single `emitEventStart` (+ `proposal_activity_log` + `download_count`) at the bottom —
+so the zip left NO `system_events` / activity / download trail while its json/docx/pdf siblings all did.
+Fixed 2026-08-02 (the branch now emits start + closes it end/error on every return); swept in
+docs/EVENT_AUDIT_2026-08-02.md.
+
+**Rule:** every state-changing / deliverable-producing action MUST leave an auditable record —
+`system_events` (via `emitEventStart`/`End`/`Single`) and/or a domain log (`proposal_activity_log`,
+`agent_task_log`, `triage_actions`, `download_count`). When a route has an EARLY-RETURNING branch (a format,
+a mode, a fast path), emit **inside** that branch on every return — don't rely on the shared emit at the
+bottom it skips. Prefer ONE canonical emission helper both callers funnel through (e.g.
+`lib/proposal-full-draft.ts::requestFullDraft` — portal + admin doorbell, `source` distinguishes them) so
+the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='tool') + `/admin/events`
+(all namespaces) are the read surfaces.
+
 ---
 
 ## 1b. Schema additions — the opportunity spine (migs 088–092)

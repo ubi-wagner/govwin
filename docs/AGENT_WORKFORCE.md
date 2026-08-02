@@ -19,7 +19,7 @@
 > `pipeline/tests/test_rfp_ingest_manager_wiring.py` (7/7, incl. a live drive over our own solicitations).
 
 **Audience:** RFP-admin ops (setup + monitoring), engineering (wiring), marketing (how to talk about it).
-**As-built:** the pipeline `AgentFabric` auto-registers **35 archetypes** (`_ARCHETYPE_CLASSES` in
+**As-built:** the pipeline `AgentFabric` auto-registers **36 archetypes** (`_ARCHETYPE_CLASSES` in
 `fabric.py`) — **dormant ≠ dead**: all are registry-wired and invocable; "dormant" means only that no
 producer/step fires one yet. This doc is the pattern for waking them, the tenant-isolation rules they run
 under, and the RFP-admin oversight surface. The fabric mechanics + how to add an archetype are in

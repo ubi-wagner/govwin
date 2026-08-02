@@ -5,7 +5,7 @@
 > **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
 > (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
-> 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
+> 36 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded; the 36th is the admin-agent `rfp_ingest_manager`), of which
 > — traced by actual call-site + whether the trigger event is emitted live — **34 are wired and exactly 1 is
 > dormant** (`content_generator`; its `library:content.requested` trigger has no emitter). Earlier "~11 dormant"
 > was a reference-count artifact (queue-producer / `AI_INVOKE`-step agents show few name-refs yet are wired).
@@ -375,6 +375,19 @@ via `assembleArtifactCanvas`+`renderCanvas`). Figures are native `chart` nodes: 
 rasterized PNG in the docx. UI buttons live in `proposal-admin-panel.tsx`. **Every** section list here —
 and on the workspace/review pages — orders `volume_number NULLS LAST, sort_index NULLS LAST, section_number`
 (mig 143's integer `sort_index`), so volumes and Q1–14 render in true document order, never string-sorted.
+
+**Admin-plane triggers (admin-agent program, 2026-08-02).** Two admin-plane surfaces now drive the
+(already-built) engine from up top, both advisory + audited: (1) the **`rfp_ingest_manager`** archetype —
+the platform-scope ingest-orchestration *manager* (`.../assess-ingest` → `OnIngestAssessmentRequested` →
+`tool.ingest.assess`) that reads a curated solicitation's ingest state and plans which specialist agents to
+run next; and (2) the **Proposal Auto-Drive "doorbell"** — an `/admin/agents` card + `POST
+/api/admin/proposals/[p]/full-draft` that rings the tenant Proposal Draft Manager
+(`OnFullDraftRequested{ModeA,B,C}`) on a chosen proposal without portal descent. Portal + doorbell share
+one emission helper (`lib/proposal-full-draft.ts`), so every full draft is one auditable
+`proposal:full_draft_requested` record (`source` = `portal`|`admin_doorbell`). Neither descends into a
+tenant (Phase 2). Canonical: **docs/ADMIN_AGENT_DESIGN.md**. Observability of ALL actor/agent/automation
+actions was swept + gap-fixed (**docs/EVENT_AUDIT_2026-08-02.md** — the `package?format=zip` audit blind
+spot is closed; everything posts to `system_events` + domain logs).
 
 **Compliance matrix (`proposal_compliance_matrix`, pre-exists mig 001; now populated).** The create route
 inserts one row per required item (or per named required-section within it), sourced from the volume,
