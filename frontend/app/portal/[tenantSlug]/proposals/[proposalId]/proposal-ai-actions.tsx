@@ -43,6 +43,7 @@ export function ProposalAiActions({
 }: Props) {
   const router = useRouter();
   const [draftLoading, setDraftLoading] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -124,6 +125,38 @@ export function ProposalAiActions({
       setDraftLoading(false);
     }
   }, [canDraft, draftLoading, tenantSlug, proposalId]);
+
+  // AI color-team review — enqueues a color_team_reviewer task per section with content; each
+  // review posts back as an `ai_review` recommendation in the section's context-box thread.
+  const handleAiReview = useCallback(async () => {
+    if (!isAdmin || reviewLoading) return;
+    setReviewLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/ai-review`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        setMessage({ type: 'error', text: err.error || 'AI review failed' });
+      } else {
+        const json = await res.json();
+        const count = json.data?.enqueued ?? 0;
+        setMessage({
+          type: 'success',
+          text:
+            count === 0
+              ? 'No sections with content to review yet — draft some content first.'
+              : `AI color-team review queued for ${count} section${count > 1 ? 's' : ''}. Recommendations will appear in each section's thread shortly.`,
+        });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [isAdmin, reviewLoading, tenantSlug, proposalId]);
 
   const toggleVoice = useCallback((token: string) => {
     setVoice((prev) =>
@@ -282,8 +315,9 @@ export function ProposalAiActions({
           AI Actions
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          Use AI to draft empty sections or review existing content for quality
-          and compliance.
+          Direct AI controls — draft empty sections or run a color-team review. For a guided,
+          reviewable draft in three loops (draft → refine → compliance), use{' '}
+          <span className="font-medium text-indigo-700">Proposal Studio</span> above — the recommended path.
         </p>
         <div className="flex flex-wrap gap-3">
           <button
@@ -299,29 +333,38 @@ export function ProposalAiActions({
             {draftLoading ? 'Drafting...' : 'Draft with AI'}
           </button>
 
-          {/* AI color-team review runs via the pipeline agent workforce, which
-              is built but not yet wired for V1. Disabled rather than emitting a
-              request that nothing processes (admins review sections manually
-              during the review stage). */}
+          {/* AI color-team review — queues a per-section color_team_reviewer pass whose
+              recommendations post into each section's context-box thread (recommendation_type
+              'ai_review'). The same path the on-advance auto-review uses, triggered manually. */}
           <button
             type="button"
-            disabled
-            title="AI color-team review is coming soon. During the review stage an admin reviews sections."
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed"
+            onClick={handleAiReview}
+            disabled={!isAdmin || reviewLoading}
+            title="Queue an AI color-team review — recommendations post into each section's thread."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <span className="text-gray-300">&#x2726;</span>
-            AI Review (coming soon)
+            {reviewLoading ? (
+              <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+            ) : (
+              <span className="text-indigo-400">&#x2726;</span>
+            )}
+            {reviewLoading ? 'Queuing review…' : 'AI Review'}
           </button>
         </div>
       </div>
 
       {/* ── Run full draft (Proposal Draft Manager) ─────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">Run full draft</h3>
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-sm font-semibold text-gray-900">Run full draft</h3>
+          <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Advanced</span>
+        </div>
         <p className="text-sm text-gray-500 mb-4">
           The Proposal Draft Manager plans from the skeleton, compliance matrix, and your
-          library, then drafts across the proposal. Every output lands in review (redlined
-          &amp; reversible) — it never advances a gate on its own.
+          library, then drafts across the proposal in a single pass (Mode A/B/C). Prefer{' '}
+          <span className="font-medium text-indigo-700">Proposal Studio</span> for a gated,
+          review-at-each-step draft; use this for one full-pass run. Every output lands in review
+          (redlined &amp; reversible) — it never advances a gate on its own.
         </p>
 
         {/* Mode picker */}

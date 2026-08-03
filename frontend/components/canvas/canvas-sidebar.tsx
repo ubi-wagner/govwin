@@ -374,31 +374,36 @@ export function CanvasSidebar({
 
   // The prioritized toolbox for this role×context — most-likely card first.
   const toolbox = capabilities ? toolboxFromCapabilities(capabilities, stage ?? (readOnly ? 'review' : 'draft')) : null;
-  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings', review: 'review' };
+  // ai → the Node tab (home of AIRevisionPanel); format → Node; floorplan → Settings (page layout).
+  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings', review: 'review', ai: 'node' };
   const ACTION_CARDS = new Set(['library', 'atomize', 'export', 'template', 'lock', 'preview']);
+  // A card is renderable only if it actually routes somewhere (a tab or a handled action).
+  // Anything else (e.g. `sections`, which has no view yet) is filtered out rather than shown
+  // as a dead/disabled button — the toolbox only ever offers tools that work.
+  const cardIsActionable = (id: string) => {
+    const tab = CARD_TAB[id];
+    return (!!tab && tabs.includes(tab)) || (ACTION_CARDS.has(id) && !!onToolAction);
+  };
 
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
       {/* Toolbox — the role×context card list (most-likely tool on top). */}
-      {toolbox && toolbox.cards.length > 0 && (
+      {toolbox && toolbox.cards.some((c) => cardIsActionable(c.id)) && (
         <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-2">
           <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Your toolbox</div>
           <div className="space-y-1">
-            {toolbox.cards.map((c) => {
+            {toolbox.cards.filter((c) => cardIsActionable(c.id)).map((c) => {
               const tab = CARD_TAB[c.id];
               const isPrimary = toolbox.primary?.id === c.id;
               const toTab = tab && tabs.includes(tab);
-              const isAction = ACTION_CARDS.has(c.id) && !!onToolAction;
-              const clickable = !!toTab || isAction;
               return (
                 <button
                   key={c.id}
-                  onClick={() => (toTab ? setActiveTab(tab!) : isAction ? onToolAction!(c.id) : undefined)}
-                  disabled={!clickable}
+                  onClick={() => (toTab ? setActiveTab(tab!) : onToolAction?.(c.id))}
                   title={c.hint}
-                  className={`w-full text-left flex items-start gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
+                  className={`w-full text-left flex items-start gap-1.5 rounded px-2 py-1 text-xs transition-colors cursor-pointer ${
                     isPrimary ? 'bg-blue-50 border border-blue-200' : c.ambient ? 'text-gray-400' : 'hover:bg-white border border-transparent'
-                  } ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+                  }`}
                 >
                   <span className={isPrimary ? 'text-blue-500' : 'text-gray-300'}>{isPrimary ? '★' : '·'}</span>
                   <span className="flex-1 min-w-0">

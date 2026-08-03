@@ -9,7 +9,10 @@
  * plan (which specialist agents to run next) — advisory only, never mutates.
  *
  * Auth: rfp_admin or master_admin (platform/our-org op — no tenant scope).
- * Returns: { data: { solicitationId, requested: true } }
+ * Returns: { data: { solicitationId, requested: true, snapshot } } where snapshot is the
+ * DETERMINISTIC ingest-stage readout (stage + flags + missing stages), computed inline so the admin
+ * sees an immediate assessment even before the agent's richer LLM coordination plan lands. The
+ * snapshot logic mirrors rfp_ingest_manager._get_ingest_state (pipeline) — keep the two in step.
  */
 
 import { NextResponse } from 'next/server';
@@ -50,11 +53,24 @@ export async function POST(request: Request, routeCtx: RouteContext) {
       );
     }
 
-    // ── Verify the solicitation exists (never emit for a phantom id) ──
-    let existing: { id: string }[];
+    // ── Verify the solicitation exists + read the deterministic ingest-state flags in one query.
+    //    (Booleans computed in SQL so we never pull full_text/ai_extracted blobs across the wire.) ──
+    let rows: {
+      hasFullText: boolean;
+      hasAiExtracted: boolean;
+      status: string | null;
+      compCount: string | number;
+      hasOutline: boolean;
+    }[];
     try {
-      existing = await sql<{ id: string }[]>`
-        SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid
+      rows = await sql`
+        SELECT
+          (full_text IS NOT NULL AND length(full_text) > 0) AS "hasFullText",
+          (ai_extracted IS NOT NULL AND ai_extracted::text NOT IN ('null', '{}', '[]', '""')) AS "hasAiExtracted",
+          status,
+          (SELECT count(*) FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid) AS "compCount",
+          EXISTS(SELECT 1 FROM solicitation_outlines WHERE solicitation_id = ${solId}::uuid) AS "hasOutline"
+        FROM curated_solicitations WHERE id = ${solId}::uuid
       `;
     } catch (dbErr) {
       console.error('[rfp-curation] assess-ingest fetch failed:', dbErr);
@@ -63,12 +79,38 @@ export async function POST(request: Request, routeCtx: RouteContext) {
         { status: 500 },
       );
     }
-    if (existing.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { error: 'Solicitation not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
+
+    // Deterministic stage detection — mirrors rfp_ingest_manager._get_ingest_state.
+    const s = rows[0];
+    const hasFullText = s.hasFullText;
+    const hasAiExtracted = s.hasAiExtracted;
+    const compCount = Number(s.compCount) || 0;
+    const hasCompliance = compCount > 0;
+    const hasOutline = s.hasOutline;
+    const status = s.status ?? '';
+    let stage: string;
+    if (!hasFullText) stage = 'shredding';
+    else if (!hasAiExtracted) stage = 'extracting';
+    else if (!hasCompliance) stage = 'matrixing';
+    else if (!hasOutline) stage = 'skeletoning';
+    else if (!['review_requested', 'approved', 'pushed_to_pipeline'].includes(status)) stage = 'ready_for_qa';
+    else stage = 'release_ready';
+    const missingStages: { stage: string; agent: string }[] = [];
+    if (!hasAiExtracted) missingStages.push({ stage: 'extracting', agent: 'ingest_analyst' });
+    if (!hasCompliance) missingStages.push({ stage: 'matrixing', agent: 'matrix_stager' });
+    if (!hasOutline) missingStages.push({ stage: 'skeletoning', agent: 'skeleton_architect' });
+    const snapshot = {
+      stage,
+      status,
+      flags: { hasFullText, hasAiExtracted, complianceRowCount: compCount, hasOutline },
+      missingStages,
+    };
 
     // ── Emit the trigger (start/end). The workflow reads payload.solicitationId
     //    off the END event, so it is carried in the emitEventEnd result. ──
@@ -97,7 +139,7 @@ export async function POST(request: Request, routeCtx: RouteContext) {
       // The start row is emitted; the end failing is non-fatal to the caller.
     }
 
-    return NextResponse.json({ data: { solicitationId: solId, requested: true } });
+    return NextResponse.json({ data: { solicitationId: solId, requested: true, snapshot } });
   } catch (error) {
     console.error('[rfp-curation] assess-ingest failed:', error);
     return NextResponse.json(
