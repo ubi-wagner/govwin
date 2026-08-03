@@ -10,7 +10,7 @@ sweep — `archived_at` is the watermark it reads. Do not build a delete/purge.
 | Entity | Table | Actor | Action + cascade |
 |---|---|---|---|
 | **Portal / pipeline** (a proposal build) | `proposals` | tenant_admin+ | Archive the proposal → **cascade** its workflow instances (same tenant+opportunity). Restore un-archives both. |
-| **Library foundation** (+ its child atoms) | `library_atoms` (`grain='foundation'`) | tenant_admin+ | Archive a foundation → **cascade** its member atoms (foundation → sections → groups → primitives). |
+| **Library atom / foundational doc** | `library_atoms` | tenant_admin+ | Archive an atom → it drops out of the library + **draft selection** (`archived_at IS NULL` on every list/count/selection query). Atoms are **copied forward** into proposals, so archiving breaks nothing downstream and needs **no cascade** — it just means "can't be selected unless unarchived." Restore re-enables selection. |
 | **Tenant** | `tenants` | rfp_admin+ | Archive a tenant → **cascade** its proposals + workflow instances (+ everything tenant-scoped). |
 
 **Workflows (`process_instances`) are instantiated templates — NO archive action of their own.** They

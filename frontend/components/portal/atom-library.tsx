@@ -242,13 +242,13 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                 {a.status !== 'approved' ? (
                   <button onClick={() => setStatusOf(a.id, 'approved')} disabled={busy} className="text-xs font-medium text-green-700 border border-green-200 rounded px-2 py-1 hover:bg-green-50">Approve</button>
                 ) : <span className="text-[10px] text-green-600">approved</span>}
-                {/* Soft-archive is a FOUNDATION-level action: archiving a foundation cascades to its
-                    child atoms (docs/ARCHIVABLE_CONTRACT.md). Only foundations show the button. */}
-                {a.grain === 'foundation' && (showArchived ? (
-                  <button onClick={() => softArchive(a.id, 'restore')} disabled={busy} title="Restore this foundation and its child atoms" className="text-xs font-medium text-indigo-700 border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-50 disabled:opacity-50">Restore foundation</button>
+                {showArchived ? (
+                  // Archived view: bring the atom back into the active library.
+                  <button onClick={() => softArchive(a.id, 'restore')} disabled={busy} className="text-xs font-medium text-indigo-700 border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-50 disabled:opacity-50">Restore</button>
                 ) : (
-                  <button onClick={() => softArchive(a.id, 'archive')} disabled={busy} title="Archive this foundation and its child atoms — hide from the library and from drafting (reversible)" className="text-[10px] font-medium text-gray-400 hover:text-amber-600 disabled:opacity-50">Archive foundation</button>
-                ))}
+                  // Active view: the soft-archive (archived_at) — hides from library + drafting, reversible.
+                  <button onClick={() => softArchive(a.id, 'archive')} disabled={busy} title="Archive — hide from the active library and from drafting (reversible)" className="text-[10px] font-medium text-gray-400 hover:text-amber-600 disabled:opacity-50">Archive</button>
+                )}
                 {!showArchived && a.status !== 'archived' && <button onClick={() => setStatusOf(a.id, 'archived')} disabled={busy} title="Set curation status to 'archived' (the atom stays listed in the library)" className="text-[10px] text-gray-300 hover:text-rose-600">status: archive</button>}
               </div>
             </div>
