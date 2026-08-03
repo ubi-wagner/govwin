@@ -192,6 +192,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       const updateResult = await tx`
         UPDATE proposals
         SET stage = 'archived',
+            archived_at = now(),
             version = version + 1,
             updated_at = now()
         WHERE id = ${proposalId}

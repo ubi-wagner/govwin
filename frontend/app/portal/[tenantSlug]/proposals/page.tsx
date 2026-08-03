@@ -3,6 +3,8 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
+import { ArchivedProposals, type ArchivedItem } from '@/components/portal/archived-proposals';
+import { RETENTION_DAYS } from '@/lib/proposal-archive';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +52,7 @@ export default async function ProposalsListPage({ params }: Props) {
     title: string;
     stage: string;
     createdAt: Date;
+    archivedAt: Date | null;
     closeDate: Date | null;
     agency: string | null;
     topicNumber: string | null;
@@ -64,6 +67,7 @@ export default async function ProposalsListPage({ params }: Props) {
           p.title,
           p.stage,
           p.created_at,
+          p.archived_at,
           o.close_date,
           o.agency,
           o.topic_number,
@@ -83,6 +87,7 @@ export default async function ProposalsListPage({ params }: Props) {
           p.title,
           p.stage,
           p.created_at,
+          p.archived_at,
           o.close_date,
           o.agency,
           o.topic_number,
@@ -109,18 +114,31 @@ export default async function ProposalsListPage({ params }: Props) {
         ? 'Proposals are created when you purchase a topic from the pipeline.'
         : 'No builds yet. Your company admin can purchase a topic to start one.';
 
+  const active = proposals.filter((p) => p.stage !== 'archived');
+  const archived = proposals.filter((p) => p.stage === 'archived');
+  const canManage = role === 'tenant_admin' || role === 'rfp_admin' || role === 'master_admin';
+  const archivedItems: ArchivedItem[] = archived.map((p) => ({
+    id: p.id,
+    title: p.title,
+    agency: p.agency,
+    topicNumber: p.topicNumber,
+    sectionCount: p.sectionCount,
+    archivedAt: p.archivedAt ? new Date(p.archivedAt).toISOString() : null,
+  }));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Proposals</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {proposals.length} proposal{proposals.length !== 1 ? 's' : ''}
+            {active.length} active proposal{active.length !== 1 ? 's' : ''}
+            {archived.length > 0 ? ` · ${archived.length} archived` : ''}
           </p>
         </div>
       </div>
 
-      {proposals.length === 0 ? (
+      {active.length === 0 && archived.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-lg border border-dashed border-gray-300">
           <h3 className="text-lg font-medium text-gray-600">No proposals yet</h3>
           <p className="text-sm text-gray-500 mt-1">
@@ -128,8 +146,12 @@ export default async function ProposalsListPage({ params }: Props) {
           </p>
         </div>
       ) : (
+        <>
+          {active.length === 0 ? (
+            <p className="text-sm text-gray-500">No active proposals — see the archived section below.</p>
+          ) : (
         <div className="space-y-3">
-          {proposals.map((p) => {
+          {active.map((p) => {
             const stageInfo = STAGE_LABELS[p.stage] ?? { label: p.stage, color: 'bg-gray-100 text-gray-600' };
             const closeDateStr = p.closeDate
               ? new Date(p.closeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -168,6 +190,15 @@ export default async function ProposalsListPage({ params }: Props) {
             );
           })}
         </div>
+          )}
+          <ArchivedProposals
+            tenantSlug={tenantSlug}
+            items={archivedItems}
+            canManage={canManage}
+            canExport={canManage}
+            retentionDays={RETENTION_DAYS}
+          />
+        </>
       )}
     </div>
   );
