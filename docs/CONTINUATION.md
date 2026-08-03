@@ -5,7 +5,34 @@
 
 ---
 
-## 0a. LATEST — 2026-08-02 (TVSF Foundation proposal build; READ THIS FIRST)
+## 0. LATEST — 2026-08-03 (V1 UI-wiring program + universal archive; READ THIS FIRST)
+
+The V1 gap-register was wired end-to-end (H1–H5, M1–M6, H2) + three full builds: **amendment
+fan-out engine** (mig 146; detect→confirm→fan-out→acknowledge), **contract+kickoff** (was already
+built — audit added), and the **archive lifecycle**. Then a **universal archive** pass, corrected to
+the as-built model (docs/ARCHIVABLE_CONTRACT.md + docs/V1_LAUNCH_GUIDE.md):
+
+- **Archive = soft, reversible, sort/visibility only. NOTHING is ever hard-deleted** (future: S3 bulk
+  cold-storage by `archived_at` watermark). The earlier proposal hard-delete was removed.
+- **Archive actions on three entities ONLY:** portal/pipeline (proposal → cascades its
+  `process_instances` by tenant+opportunity), library atom / foundational doc (per-item `archived_at`
+  → excluded from library + **draft selection**; atoms are copied-forward so no cascade), tenant
+  (rfp_admin → cascades workflows). **Workflows are instantiated templates — no archive of their own**;
+  they cascade + keep `archived_at IS NULL` filters so they drop out of the monitor. **Cards are NOT
+  archivable** (reverted). mig 148 added `archived_at` to process_instances/library_atoms/contracts
+  (+ tenant_opportunity_cards, now unused).
+- **content_generator was never dormant** — the OnCmsContentRequested vertical runs it from the admin
+  "Generate Content" launcher; roster relabeled `live`. (Third stale gap-register claim caught by
+  verifying agent work — after M4 contract + Archive.)
+
+State: migrations **148** · **vitest 855** · tsc 0 · next build ✓ (`EIHMKFP62qwSslLPKG8B3`). Verified
+E2E on the live server as all four working actors (master_admin `eric@rfppipeline.com`, tenant_admin
+`kate.ulepic@foundation3dp.com`, tenant_user `connor.casey@foundation3dp.com`, partner
+`pjackson@ecinnovates.com` — all `DemoPass123!`): archive→cascade→restore proven via `proposal.archived`
+payload `workflowsArchived=1`; tenant_user boundary (no Studio/Archive) confirmed. **Remaining for
+launch:** regenerate the in-browser help HTML from docs/V1_LAUNCH_GUIDE.md (L5).
+
+## 0a. 2026-08-02 (TVSF Foundation proposal build)
 
 First-customer (Foundation 3DCP) TVSF proposal, built end-to-end as **Paul Jackson** (external
 EC shadow-admin, `pjackson@ecinnovates.com`). Canonical TVSF shape (docs/TVSF_SPEC.md): **3
