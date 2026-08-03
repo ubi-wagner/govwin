@@ -138,6 +138,16 @@ interface Transition {
   createdAt: string;
 }
 
+/** A soft-archived instance as returned by GET /api/admin/workflows?archived=1. */
+interface ArchivedRow {
+  id: string;
+  workflowName: string;
+  status: string;
+  source: string;
+  tenantId: string | null;
+  archivedAt: string | null;
+}
+
 /** The process_instance_transitions timeline for one workflow instance — the
  *  drill-through that lets an admin watch a workflow's actual step execution. */
 function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'error' }) {
@@ -184,6 +194,10 @@ export function WorkflowMonitorClient({
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
+
+  // Archived instances — lazy-loaded when the admin opens the Archived section.
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [archived, setArchived] = useState<ArchivedRow[] | 'loading' | 'error' | null>(null);
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
@@ -289,6 +303,85 @@ export function WorkflowMonitorClient({
       return next;
     });
   };
+
+  // ── Archive / restore (soft-archive visibility state) ─────────────
+  // Archived instances are hidden from the active views but stay in Postgres and
+  // restorable. The Archived section below lazy-loads them from ?archived=1.
+  const loadArchived = useCallback(async () => {
+    setArchived('loading');
+    try {
+      const res = await fetch('/api/admin/workflows?archived=1');
+      const body = await res.json().catch(() => ({}));
+      const rows = body?.data?.recent;
+      setArchived(Array.isArray(rows) ? (rows as ArchivedRow[]) : 'error');
+    } catch {
+      setArchived('error');
+    }
+  }, []);
+
+  const toggleArchived = useCallback(() => {
+    setArchivedOpen((open) => {
+      const next = !open;
+      if (next) void loadArchived(); // refresh the archived list on every open
+      return next;
+    });
+  }, [loadArchived]);
+
+  const handleArchive = useCallback(async (instanceId: string) => {
+    setActionLoading((prev) => ({ ...prev, [instanceId]: true }));
+    setActionErrors((prev) => {
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/admin/workflows/${instanceId}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Request failed' }));
+        setActionErrors((prev) => ({ ...prev, [instanceId]: body.error ?? 'Archive failed' }));
+      } else {
+        if (archivedOpen) void loadArchived();
+        router.refresh();
+      }
+    } catch {
+      setActionErrors((prev) => ({ ...prev, [instanceId]: 'Network error' }));
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [instanceId]: false }));
+    }
+  }, [router, archivedOpen, loadArchived]);
+
+  const handleRestore = useCallback(async (instanceId: string) => {
+    setActionLoading((prev) => ({ ...prev, [instanceId]: true }));
+    setActionErrors((prev) => {
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/admin/workflows/${instanceId}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Request failed' }));
+        setActionErrors((prev) => ({ ...prev, [instanceId]: body.error ?? 'Restore failed' }));
+      } else {
+        void loadArchived();
+        router.refresh();
+      }
+    } catch {
+      setActionErrors((prev) => ({ ...prev, [instanceId]: 'Network error' }));
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [instanceId]: false }));
+    }
+  }, [router, loadArchived]);
 
   // Lazy-loaded per-instance step timeline (process_instance_transitions) — the
   // drill-through the API already served but no UI rendered. Re-fetches on open
@@ -534,6 +627,16 @@ export function WorkflowMonitorClient({
                     >
                       {openTimelines.has(w.id) ? 'hide steps' : 'steps'}
                     </button>
+
+                    {/* Archive — terminal instances only (this section is completed/failed/cancelled) */}
+                    <button
+                      onClick={() => handleArchive(w.id)}
+                      disabled={isLoading}
+                      title="Archive — hides this instance from active views (restorable)"
+                      className="px-2.5 py-1 text-xs font-medium rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                    >
+                      {isLoading ? '...' : 'Archive'}
+                    </button>
                   </div>
 
                   {/* Inline action error */}
@@ -563,6 +666,93 @@ export function WorkflowMonitorClient({
                 </div>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Archived ───────────────────────────────────────────────── */}
+      <section>
+        <button
+          type="button"
+          onClick={toggleArchived}
+          className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-lg font-semibold text-gray-900">Archived</span>
+            <span className="text-sm text-gray-500">
+              {Array.isArray(archived) ? `${archived.length} archived` : 'hidden from active views'}
+            </span>
+          </span>
+          <span className="text-gray-400 text-sm">{archivedOpen ? '▲ hide' : '▼ show'}</span>
+        </button>
+
+        {archivedOpen && (
+          <div className="mt-2">
+            {archived === null || archived === 'loading' ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
+                Loading archived…
+              </div>
+            ) : archived === 'error' ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+                Could not load archived workflows.
+              </div>
+            ) : archived.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
+                No archived workflows
+              </div>
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+                {archived.map((w) => {
+                  const style = getStyle(w.status);
+                  const isLoading = actionLoading[w.id] ?? false;
+                  const error = actionErrors[w.id];
+                  return (
+                    <div key={w.id} className="p-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <StatusDot status={w.status} />
+                        <span className="text-sm font-medium text-gray-900">
+                          {formatWorkflowName(w.workflowName)}
+                        </span>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${style.text} ${style.bg}`}>
+                          {w.status}
+                        </span>
+                        <SourceBadge source={w.source} />
+                        {w.tenantId && (
+                          <span className="text-xs text-gray-400 font-mono">
+                            tenant: {w.tenantId.slice(0, 8)}...
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+                          <span className="text-xs text-gray-400">
+                            archived {relativeTime(w.archivedAt)}
+                          </span>
+                          <button
+                            onClick={() => handleRestore(w.id)}
+                            disabled={isLoading}
+                            title="Restore — return this instance to the active views"
+                            className="px-2.5 py-1 text-xs font-medium rounded border border-green-300 bg-white text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isLoading ? '...' : 'Restore'}
+                          </button>
+                          <button
+                            onClick={() => toggleTimeline(w.id)}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            {openTimelines.has(w.id) ? 'hide steps' : 'steps'}
+                          </button>
+                        </div>
+                      </div>
+                      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+                      {openTimelines.has(w.id) && (
+                        <div className="mt-3 pl-1">
+                          <TransitionTimeline state={timelines[w.id] ?? 'loading'} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>

@@ -110,6 +110,7 @@ export default async function WorkflowMonitorPage() {
                   ELSE NULL END as duration_ms
       FROM process_instances
       WHERE status IN ('running', 'paused', 'pending', 'retrying')
+        AND archived_at IS NULL
       ORDER BY started_at DESC NULLS LAST
       LIMIT 50
     `;
@@ -137,6 +138,7 @@ export default async function WorkflowMonitorPage() {
         FROM process_instances
         WHERE created_at > NOW() - INTERVAL '24 hours'
           AND status NOT IN ('running', 'paused', 'pending', 'retrying')
+          AND archived_at IS NULL
         ORDER BY completed_at DESC NULLS LAST
         LIMIT 100
       `;
@@ -156,6 +158,7 @@ export default async function WorkflowMonitorPage() {
           COUNT(*) FILTER (WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours') as completed_24h,
           COUNT(*) FILTER (WHERE status = 'failed' AND completed_at > NOW() - INTERVAL '24 hours') as failed_24h
         FROM process_instances
+        WHERE archived_at IS NULL
       `;
       if (rows.length > 0) {
         stats = {

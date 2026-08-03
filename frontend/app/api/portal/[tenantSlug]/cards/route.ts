@@ -42,6 +42,11 @@ export async function GET(
     const url = new URL(request.url);
     const includeClosed = url.searchParams.get('includeClosed') === 'true';
     const pinnedOnly = url.searchParams.get('pinned') === 'true';
+    // Soft-archive (mig 148) is a SEPARATE axis from the opp lifecycle: the active pipeline
+    // hides archived cards (archived_at IS NULL); `?archived=true` is the opt-in "Archived"
+    // view that shows ONLY soft-archived cards (regardless of opp lifecycle, so any archived
+    // card stays retrievable). See docs/ARCHIVABLE_CONTRACT.md rule 3.
+    const showArchived = url.searchParams.get('archived') === 'true';
 
     try {
       const cards = await withTenant(tenantId, async (tx) => {
@@ -51,7 +56,7 @@ export async function GET(
         // — not just recency with a "ranked by your buckets" label.
         return tx`
           SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
-                 c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
+                 c.is_pinned, c.pin_update_available, c.pinned_at, c.archived_at, c.created_at, c.updated_at,
                  bs.top_score, bs.top_bucket_id,
                  COALESCE(rk.rankings, '[]'::json) AS rankings
           FROM tenant_opportunity_cards c
@@ -72,7 +77,8 @@ export async function GET(
             WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
           ) rk ON true
           WHERE c.tenant_id = ${tenantId}::uuid
-            ${includeClosed ? tx`` : tx`AND c.lifecycle_status <> 'archived'`}
+            ${showArchived ? tx`AND c.archived_at IS NOT NULL` : tx`AND c.archived_at IS NULL`}
+            ${!showArchived && !includeClosed ? tx`AND c.lifecycle_status <> 'archived'` : tx``}
             ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}
           ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
           LIMIT 1000

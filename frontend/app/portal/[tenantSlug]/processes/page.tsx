@@ -52,6 +52,7 @@ export default async function ProcessesPage({
              started_at, updated_at, created_at
       FROM process_instances
       WHERE tenant_id = ${tenantId}::uuid
+        AND archived_at IS NULL
       ORDER BY updated_at DESC
       LIMIT 100
     `;

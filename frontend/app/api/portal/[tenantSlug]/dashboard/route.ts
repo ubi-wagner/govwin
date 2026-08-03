@@ -93,6 +93,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         SELECT count(*)::text AS count FROM tenant_opportunity_cards
         WHERE tenant_id = ${tenantId}::uuid
           AND lifecycle_status <> 'archived'
+          AND archived_at IS NULL
           AND (pursuit_status IS NULL OR pursuit_status NOT IN ('passed', 'dismissed'))
       `;
 

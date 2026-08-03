@@ -73,7 +73,7 @@ export default async function DashboardPage({
   };
   const libraryCount = await count('library', sql`SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}`);
   const proposalCount = await count('proposal', sql`SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')`);
-  const oppsCount = await count('opps', sql`SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived'`);
+  const oppsCount = await count('opps', sql`SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived' AND archived_at IS NULL`);
   const todosCount = await count('todos', sql`SELECT COUNT(*)::text AS count FROM tasks WHERE tenant_id = ${tenantId} AND status IN ('open','in_progress')`);
   const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}`);
   const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
