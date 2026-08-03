@@ -13,6 +13,7 @@ import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
+import { AmendmentsPanel } from './amendments-panel';
 
 interface Solicitation {
   id: string;
@@ -782,6 +783,11 @@ export function CurationWorkspace({
           <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan posts to the agent workforce.</p>
         </div>
       )}
+
+      {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
+      <div className="mb-4">
+        <AmendmentsPanel solId={sol.id} />
+      </div>
 
       {/* Quick-nav tabs */}
       <nav className="flex items-center gap-1 mb-6 border-b pb-2">
