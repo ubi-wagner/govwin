@@ -150,6 +150,8 @@ export function ProposalAdminPanel({
   const [exportLoading, setExportLoading] = useState(false);
   const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [complianceLoading, setComplianceLoading] = useState(false);
+  const [packageLoading, setPackageLoading] = useState(false);
+  const [packageMsg, setPackageMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [complianceResults, setComplianceResults] = useState<{
     totalVariables: number;
     passed: number;
@@ -228,6 +230,28 @@ export function ProposalAdminPanel({
   }, [tenantSlug, proposalId]);
 
   // ── Compliance Check handler ──────────────────────────────
+  // Submission package — enqueue the packaging_specialist (manifest: volume completeness, required
+  // forms, page/format compliance). Advisory; the agent never marks the proposal submitted.
+  const handlePackageReview = useCallback(async () => {
+    setPackageLoading(true);
+    setPackageMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/package-review`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPackageMsg({ type: 'error', text: j.error || 'Package review failed' });
+      } else {
+        setPackageMsg({ type: 'success', text: 'Package review queued — the packaging specialist will compile the manifest (volumes, forms, format).' });
+      }
+    } catch {
+      setPackageMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setPackageLoading(false);
+    }
+  }, [tenantSlug, proposalId]);
+
   const handleComplianceCheck = useCallback(async () => {
     setComplianceLoading(true);
     setComplianceError(null);
@@ -923,6 +947,42 @@ export function ProposalAdminPanel({
                 Run an AI compliance check to verify your proposal against solicitation requirements.
               </p>
             )}
+          </div>
+
+          {/* Submission Package — deterministic readiness + AI packaging review */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">Submission Package</h3>
+              <button
+                onClick={handlePackageReview}
+                disabled={packageLoading}
+                title="Run the packaging specialist — compiles the manifest: volume completeness, required forms, page/format compliance"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                {packageLoading ? 'Queuing…' : 'AI package review'}
+              </button>
+            </div>
+            {(() => {
+              const total = sections.length;
+              const locked = sections.filter((s) => isSectionLocked(s)).length;
+              const empty = sections.filter((s) => (s.nodeCount ?? 0) === 0).length;
+              const incomplete = total - locked;
+              return (
+                <div className="flex flex-wrap gap-4 text-xs mb-2">
+                  <span className="text-emerald-600 font-medium">{locked} locked</span>
+                  <span className="text-amber-600 font-medium">{incomplete} incomplete</span>
+                  <span className="text-red-600 font-medium">{empty} empty</span>
+                  <span className="text-gray-400">{total} sections</span>
+                </div>
+              );
+            })()}
+            {packageMsg && (
+              <p className={`text-xs ${packageMsg.type === 'success' ? 'text-green-600' : 'text-red-500'} mb-1`}>{packageMsg.text}</p>
+            )}
+            <p className="text-[11px] text-gray-400">
+              Deterministic readiness from your sections. Run “AI package review” for the agency-specific
+              manifest — missing volumes/forms, page counts, and format compliance — before you lock &amp; download.
+            </p>
           </div>
 
           {/* Compliance Checklist */}

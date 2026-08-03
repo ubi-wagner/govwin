@@ -95,6 +95,14 @@ export async function GET(request: Request, ctx: RouteContext) {
         OFFSET ${offset}
       `;
 
+      // Per-user read watermark — a notification is read iff created_at <= last_read_at.
+      const [readState] = await sql<{ lastReadAt: string | Date | null }[]>`
+        SELECT last_read_at FROM notification_read_state
+        WHERE user_id = ${sessionUser.id}::uuid AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+      const lastReadMs = readState?.lastReadAt ? new Date(readState.lastReadAt).getTime() : 0;
+
       const items = notifications.map((n) => {
         const p = (n.payload ?? {}) as Record<string, unknown>;
         // Canonical, human-readable label (shared with the activity stream +
@@ -117,7 +125,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           summary,
           payload: p, // returned so the bell can deep-link to the source entity
           created_at: n.createdAt,
-          is_read: false, // V1: no per-user read tracking; all shown as unread
+          is_read: new Date(n.createdAt).getTime() <= lastReadMs,
         };
       });
 
@@ -135,5 +143,53 @@ export async function GET(request: Request, ctx: RouteContext) {
       { error: 'Failed to query notifications', code: 'DB_ERROR' },
       { status: 500 },
     );
+  }
+}
+
+/**
+ * POST /api/portal/[tenantSlug]/notifications — mark all notifications read.
+ * Advances the per-user read watermark to now(); the badge then stays cleared across reloads.
+ *
+ * Auth: tenant_user or above with tenant access.
+ */
+export async function POST(_request: Request, ctx: RouteContext) {
+  try {
+    const { tenantSlug } = await ctx.params;
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    const sessionUser = session.user as { id?: string; role?: unknown };
+    const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    try {
+      await sql`
+        INSERT INTO notification_read_state (user_id, tenant_id, last_read_at, updated_at)
+        VALUES (${sessionUser.id}::uuid, ${tenantId}::uuid, now(), now())
+        ON CONFLICT (user_id, tenant_id)
+        DO UPDATE SET last_read_at = now(), updated_at = now()
+      `;
+    } catch (dbErr) {
+      console.error('[portal/notifications] mark-read DB error:', dbErr);
+      return NextResponse.json({ error: 'Failed to mark read', code: 'DB_ERROR' }, { status: 500 });
+    }
+    return NextResponse.json({ data: { ok: true } });
+  } catch (err) {
+    console.error('[portal/notifications] POST error:', err);
+    return NextResponse.json({ error: 'Failed to mark read', code: 'DB_ERROR' }, { status: 500 });
   }
 }

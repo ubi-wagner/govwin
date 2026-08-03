@@ -63,23 +63,30 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
     }
   }, [open]);
 
-  // Phase 2: persist read status server-side. For now, track "seen" IDs locally.
-  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  // Read-state is server-backed (a per-user watermark — mig 145). `newThisView` keeps the "new"
+  // highlight visible during the current viewing even after we optimistically flip is_read.
+  const [newThisView, setNewThisView] = useState<Set<string>>(new Set());
 
-  const unreadCount = notifications.filter((n) => !n.is_read && !seenIds.has(n.id)).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  const handleMarkSeen = useCallback((id: string) => {
-    setSeenIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, []);
+  const markAllRead = useCallback(async () => {
+    setNewThisView(new Set(notifications.filter((n) => !n.is_read).map((n) => n.id)));
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await fetch(`/api/portal/${tenantSlug}/notifications`, { method: 'POST' });
+    } catch {
+      /* non-fatal — the next GET reconciles from the server watermark */
+    }
+  }, [notifications, tenantSlug]);
 
   return (
     <div ref={panelRef} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && unreadCount > 0) markAllRead();
+        }}
         className="relative p-1.5 rounded-md hover:bg-gray-700 transition-colors"
         aria-label="Notifications"
       >
@@ -100,8 +107,13 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-          <div className="px-4 py-3 border-b border-gray-100">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+            {notifications.some((n) => !n.is_read) && (
+              <button onClick={markAllRead} className="text-[11px] text-indigo-600 hover:underline">
+                Mark all read
+              </button>
+            )}
           </div>
 
           {loading && (
@@ -121,13 +133,12 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
           {!loading && !error && notifications.length > 0 && (
             <ul className="divide-y divide-gray-50">
               {notifications.map((n) => {
-                const isUnseen = !n.is_read && !seenIds.has(n.id);
+                const isUnseen = newThisView.has(n.id);
                 const href = eventHref(tenantSlug, { namespace: n.namespace, type: n.type, payload: n.payload ?? undefined });
                 return (
                 <li
                   key={n.id}
-                  onClick={() => handleMarkSeen(n.id)}
-                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`px-4 py-3 hover:bg-gray-50 transition-colors ${
                     isUnseen ? 'bg-blue-50/50' : ''
                   }`}
                 >
