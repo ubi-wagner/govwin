@@ -80,7 +80,7 @@ async function deleteArchivedProposal(
   });
 
   let deleted = false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- postgres.js TransactionSql tagged-template typing (matches lib/rls withTenant)
+  // tx typed as any — postgres.js TransactionSql tagged-template typing (matches lib/rls withTenant).
   await sql.begin(async (tx: any) => {
     // Preserve financial/audit history — unlink, don't destroy.
     await tx`UPDATE agent_task_log SET proposal_id = NULL WHERE proposal_id = ${proposalId}::uuid`;

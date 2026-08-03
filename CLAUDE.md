@@ -21,7 +21,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 829 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 853 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -30,7 +30,15 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 143). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 147 — the **V1 UI-wiring pass**
+added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
+`proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
+`proposals.archived_at` (archive retention/purge-eligibility). That pass also made the AI-review button real
+(`lib/proposal-ai-review.ts` → per-section `color_team_reviewer`, audited `proposal:ai_review.requested`, NOT
+`review_requested` which the fabric double-dispatches), added the packaging-review + assess-ingest-readiness
+buttons, the archive restore/FK-safe-delete lifecycle (`lib/proposal-archive.ts` — unlinks NO-ACTION
+financial/audit refs, preserves them), and confirmed the contract entity + kickoff already fire on
+`outcome=awarded`). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
@@ -121,7 +129,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (829 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (853 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run

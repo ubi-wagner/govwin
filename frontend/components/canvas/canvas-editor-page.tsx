@@ -124,7 +124,13 @@ export function CanvasEditorPage({
         ? `/portal/${tenantSlug}/proposals/${proposalId}`
         : `/admin`; // no tenant context (admin editor) → admin home; /admin/proposals/[id] has no page (was a 404 back-link)
 
-  const backLabel = isFoundation ? 'Back to Library' : isDocument ? 'Back to Documents' : 'Back to Proposal';
+  const backLabel = isFoundation
+    ? 'Back to Library'
+    : isDocument
+      ? 'Back to Documents'
+      : tenantSlug
+        ? 'Back to Proposal'
+        : 'Back to Admin'; // admin editor has no tenant context → matches the /admin back target
 
   // ── Callbacks CanvasEditor calls to push state up into the ribbon ───
   const handleDirtyChange  = useCallback((d: boolean)  => setDirty(d),    []);
