@@ -1345,6 +1345,25 @@ the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='
   closes without resume) + date-anchored generation (`_sweep_date_anchored_tasks`, `task_type='final_due'`). `params.kind`
   (`upload|form|review`) selects the typed completer.
 
+## 1c. Schema additions — V1 wiring + universal archive (migs 145–148)
+- **`notification_read_state`** (mig 145): `(user_id, tenant_id, last_read_at, updated_at)` PK `(user_id, tenant_id)`.
+  Per-user notification read WATERMARK — a notification (derived from `system_events`) is read iff
+  `created_at <= last_read_at`. `POST /api/portal/<slug>/notifications` marks all read; the bell derives `is_read`.
+- **`solicitation_amendments`** (mig 146): `(id, solicitation_id, label, summary, compliance_delta JSONB, severity
+  CHECK(critical|major|minor|info), source CHECK(manual|amendment_monitor), status CHECK(detected|confirmed|dismissed),
+  detected_by, reviewed_by, …)`. The amendment fan-out engine's record. + **`proposal_amendment_flags`** `(id,
+  amendment_id, proposal_id, tenant_id, acknowledged_by, acknowledged_at)` UNIQUE `(amendment_id, proposal_id)` —
+  confirm→fan-out inserts one per proposal built from the solicitation; the tenant acknowledges. Events:
+  `finder:amendment.detected/confirmed/dismissed`, `capture:amendment.flagged` (per tenant), `proposal:amendment.acknowledged`.
+- **archive `archived_at TIMESTAMPTZ`** — SOFT, reversible, sort/visibility only; NEVER a delete (S3 cold-storage is a
+  future sweep). Added to `proposals` (mig 147; archive cascades → its `process_instances` by tenant+opportunity),
+  `process_instances` + `library_atoms` + `contracts` (mig 148; `tenant_opportunity_cards` got it too but is NOT
+  archivable — reverted). Every ACTIVE-view query on these carries `AND archived_at IS NULL`. Archive ACTIONS live ONLY on
+  portals (proposals → cascade workflows), library atoms/foundational docs (per-item → excluded from library + draft
+  selection; copied-forward, no cascade), tenants (rfp_admin → cascade workflows). **Workflows cascade-only** — no archive
+  of their own. docs/ARCHIVABLE_CONTRACT.md. Events `proposal:proposal.archived/.restored`, `library:atom.archived/.restored`,
+  `system:workflow.archived` (cascade), `finder:tenant.archived/.restored`.
+
 ## 3b. Event namespaces — spine additions
 - `proposal:project.collaboration_requested:single` — launches the generic `ProjectCollaboration` HITL reaction (the
   ONLY consumer). Emitted by `launchProjectCollaboration` (create route + Stripe webhook bridges).
