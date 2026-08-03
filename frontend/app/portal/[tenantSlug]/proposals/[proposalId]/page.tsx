@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/d
 import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
+import ProposalStudio from '@/components/portal/proposal-studio';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
 import { AssignTaskForm } from '@/components/tasks/assign-task-form';
@@ -526,6 +527,13 @@ export default async function ProposalWorkspacePage({ params }: Props) {
             />
           </div>
         </details>
+      )}
+
+      {/* ── Proposal Studio — 3-phase gated draft→refine→compliance (admins) ── */}
+      {access.role === 'admin' && (
+        <div className="mb-6">
+          <ProposalStudio tenantSlug={tenantSlug} proposalId={proposalId} />
+        </div>
       )}
 
       {/* ── Workspace Client Component ────────────────────────────────── */}

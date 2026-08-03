@@ -57,7 +57,13 @@ On the build side, the tenant Proposal Draft Manager (`proposal_manager` + `OnFu
 Mode C = full auto) is now also admin-drivable from up top via the **Proposal Auto-Drive "doorbell"**
 (`/admin/agents` card → `POST /api/admin/proposals/[p]/full-draft` → the same `proposal:full_draft_requested`
 trigger) — portal + doorbell funnel through one `requestFullDraft` helper (`lib/proposal-full-draft.ts`) so
-every full draft is one auditable record, `source` distinguishing `portal` vs `admin_doorbell`. Observability
+every full draft is one auditable record, `source` distinguishing `portal` vs `admin_doorbell`. The
+**Proposal Studio** (docs/PROPOSAL_STUDIO_DESIGN.md) then breaks that engine into **3 gated loops** —
+Draft → Refine → Compliance (`OnReviewPhaseRequested{Draft,Refine,Compliance}`, reusing the SAME cohort
+`AI_INVOKE` actions, mig 144 `proposals.studio_phase`): each loop lands in review, then a simple UI gate
+where the admin **comments + regenerates** (comments threaded as `guidance`) or **approves → next**, or
+**runs all 3 automatically** via the doorbell (`advance_studio_phase` ACTION auto-chains). Advisory —
+it never advances a stage, locks, or submits. Observability
 is enforced end-to-end: every actor/automation/agent/manager action posts to `system_events` (+ domain audit
 logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-02.md; the `package?format=zip` blind spot is closed).
 The rest are greenfielded + registry-wired, pending the **global automation-policy wiring**. Wiring pattern: realign to the current
