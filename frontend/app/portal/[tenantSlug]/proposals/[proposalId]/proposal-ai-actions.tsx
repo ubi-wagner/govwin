@@ -265,10 +265,15 @@ export function ProposalAiActions({
       } else {
         const json = await res.json();
         const atomsUpdated = json.data?.atomsUpdated ?? 0;
+        const contract = json.data?.contractStarted as { contractId: string; kickoffLaunched: boolean } | null;
         setOutcomeRecorded(true);
         setMessage({
           type: 'success',
-          text: `Outcome recorded as "${selectedOutcome}". ${atomsUpdated} library atom${atomsUpdated !== 1 ? 's' : ''} updated.`,
+          text:
+            `Outcome recorded as "${selectedOutcome}". ${atomsUpdated} library atom${atomsUpdated !== 1 ? 's' : ''} updated.` +
+            (contract
+              ? ` 🏆 Contract started${contract.kickoffLaunched ? ' — a kickoff task is in your queue.' : '.'}`
+              : ''),
         });
         router.refresh();
       }
