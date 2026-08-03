@@ -43,7 +43,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
         JOIN tenant_opportunity_cards c
           ON c.tenant_id = s.tenant_id AND c.opportunity_id = s.opportunity_id
         WHERE s.tenant_id = ${g.tenantId}::uuid AND s.bucket_id = ${bucketId}::uuid
-          AND c.archived_at IS NULL
         ORDER BY s.score DESC, c.is_pinned DESC
         LIMIT 500
       `,

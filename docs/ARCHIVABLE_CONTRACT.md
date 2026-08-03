@@ -1,45 +1,38 @@
-# Archivable Artifacts — the canonical contract
+# Archivable Artifacts — the canonical contract (corrected model)
 
-**Standing policy:** every user-sortable artifact gets an **archive action**. Archive is a *soft,
-reversible* state for **sorting + visibility** — it hides the artifact from active views but keeps the
-row in indexed Postgres. It is **not** a delete and **not** cold storage. Moving archived rows out of
-indexed Postgres ("when it gets huge") is a separate, later sweep, out of scope here.
+Archive is a **soft, reversible** state for **sorting + visibility**: it hides an entity from active
+views but keeps the row in indexed Postgres. **Nothing is ever hard-deleted.** When indexed Postgres
+gets large, archived rows are bulk-moved to **S3 cold storage** (pointed to as needed) by a future
+sweep — `archived_at` is the watermark it reads. Do not build a delete/purge.
 
-Reference implementation: **proposals** — `frontend/lib/proposal-archive.ts` +
-`frontend/components/portal/archived-proposals.tsx` + `app/api/portal/.../proposals/[p]/archive/route.ts`.
+## Archive ACTIONS live on exactly three entities — nothing else
 
-## The five rules (every archivable artifact MUST satisfy)
+| Entity | Table | Actor | Action + cascade |
+|---|---|---|---|
+| **Portal / pipeline** (a proposal build) | `proposals` | tenant_admin+ | Archive the proposal → **cascade** its workflow instances (same tenant+opportunity). Restore un-archives both. |
+| **Library foundation** (+ its child atoms) | `library_atoms` (`grain='foundation'`) | tenant_admin+ | Archive a foundation → **cascade** its member atoms (foundation → sections → groups → primitives). |
+| **Tenant** | `tenants` | rfp_admin+ | Archive a tenant → **cascade** its proposals + workflow instances (+ everything tenant-scoped). |
 
-1. **State** — a nullable `archived_at TIMESTAMPTZ` (mig 148 added it to process_instances,
-   tenant_opportunity_cards, library_atoms, contracts; proposals/tenants already had it). Archived ⇔
-   `archived_at IS NOT NULL`. Never a hard delete.
+**Workflows (`process_instances`) are instantiated templates — NO archive action of their own.** They
+archive *because* their parent pipeline or tenant was archived. Keep the `archived_at IS NULL` filters
+on every active-view process_instances query (so cascade-archived workflows drop out), but never a
+standalone archive button/route.
 
-2. **Actions** — `archive` sets `archived_at = now()` (compare-and-swap: `WHERE ... AND archived_at IS
-   NULL`); `restore` sets `archived_at = NULL`. Both idempotent, both guarded by the artifact's normal
-   auth (tenant-scoped artifact → tenant_admin+ with tenant access; platform artifact → rfp/master admin).
+**Opportunity cards are NOT an archive target.** (Reverted.)
 
-3. **Filter EVERY active-view query** — this is the load-bearing rule. Every query that lists/counts the
-   artifact for an *active* view MUST add `AND archived_at IS NULL` (or an explicit `show_archived`
-   opt-in). A missed query = archived rows leak back into active views. When implementing, enumerate
-   **all** the artifact's list/count query sites and filter each; the verifier will ask for that list.
+## The rules for the three archivable entities
 
-4. **Audit** — emit `<namespace>:<artifact>.archived` and `.restored` (start/end, or single) via
-   `lib/events`, tenant-scoped where the artifact is. Namespaces: `proposal`/`capture`/`library`/`finder`
-   /`system` per docs/NAMESPACES.md — pick the one that owns the artifact. Never `admin`/`cms`/`spotlight`.
+1. **State** — nullable `archived_at TIMESTAMPTZ` (mig 148). Archived ⇔ `archived_at IS NOT NULL`. Soft only.
+2. **Archive action** — `archived_at = now()` (compare-and-swap `WHERE ... AND archived_at IS NULL`),
+   plus **cascade** to children (workflows for a portal/tenant; member atoms for a foundation). Restore
+   NULLs `archived_at` and un-cascades. Idempotent; 409 on no-op.
+3. **Filter every active-view query** — the entity AND its cascaded children filter `archived_at IS
+   NULL` in every active list/count. A missed query leaks archived rows back in. Enumerate all sites.
+4. **Audit** — `<namespace>:<entity>.archived` / `.restored` via `lib/events`, tenant-scoped where the
+   entity is (proposal/library/finder per docs/NAMESPACES.md). Never `admin`/`cms`/`spotlight`.
+5. **Surface + restore** — an archive action on the entity + an Archived view with restore. Retrievable.
 
-5. **Surface** — an archive button on the artifact + a way to *see* archived ones (a collapsible
-   "Archived (N)" section or a filter toggle) with a **restore** action. Archived items stay retrievable.
-
-## Per-artifact map (this pass)
-
-| Artifact | Table | Namespace | Active-view query sites to filter | Archive surface |
-|---|---|---|---|---|
-| Proposal | proposals | proposal | proposals list ✓ | Archived section ✓ (done) |
-| **Workflow** | process_instances | system | admin workflow monitor list + counts | admin monitor: Archive action + Archived filter |
-| **Opportunity card** | tenant_opportunity_cards | capture | /cards list + rollup views + card counts | card Archive action + Archived filter |
-| **Library atom** | library_atoms | library | atom library list + selection queries + counts | atom Archive action + Archived filter |
-| **Contract** | contracts | capture | admin contract rollup/count (admin/opportunities) | Archive action on closed/terminated contracts |
-
-## Retention / cold storage (LATER — not this pass)
-A future sweep may move rows archived beyond a window out of indexed Postgres. `archived_at` is the
-watermark it will read. Do not build the purge here; archive is for sorting/visibility now.
+## Reference implementation
+Portal: `frontend/lib/proposal-archive.ts` (`archiveProposal`/`restoreProposal` + workflow cascade),
+`app/api/portal/.../proposals/[p]/archive/route.ts`, `components/portal/archive-portal-button.tsx`,
+`components/portal/archived-proposals.tsx`.

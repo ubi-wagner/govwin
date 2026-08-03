@@ -89,4 +89,27 @@ describe('archive route', () => {
     expect(res.status).toBe(409);
     expect(emitEventStartMock).not.toHaveBeenCalled();
   });
+
+  it('archive → archives the portal + cascades its workflows, emits proposal:proposal.archived', async () => {
+    sqlMock
+      .mockResolvedValueOnce([{ opportunityId: 'aaaaaaaa-0000-4000-8000-000000000001', stage: 'submitted' }]) // proposal lookup
+      .mockResolvedValueOnce([{ id: PROP_ID }]) // UPDATE proposals (cas)
+      .mockResolvedValueOnce([]) // stage_history insert
+      .mockResolvedValueOnce([{ id: 'wf-1' }]); // cascade: UPDATE process_instances
+    const res = await POST(req({ action: 'archive' }), ctx());
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(j.data.archived).toBe(true);
+    expect(j.data.workflowsArchived).toBe(1);
+    const arg = emitEventStartMock.mock.calls[0][0];
+    expect(arg.type).toBe('proposal.archived');
+    expect(arg.payload.workflowsArchived).toBe(1);
+  });
+
+  it('archive of an already-archived portal → 409', async () => {
+    sqlMock.mockResolvedValueOnce([{ opportunityId: null, stage: 'archived' }]);
+    const res = await POST(req({ action: 'archive' }), ctx());
+    expect(res.status).toBe(409);
+    expect(emitEventStartMock).not.toHaveBeenCalled();
+  });
 });

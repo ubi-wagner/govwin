@@ -1,21 +1,21 @@
 /**
- * Archive lifecycle (V1-11) — restore, retention policy, and an FK-safe permanent delete.
+ * Portal (pipeline) archive lifecycle — archive / restore, with workflow cascade.
  *
- * Archived proposals stay retrievable (they list under an "Archived" section) and RESTORABLE. A
- * guarded permanent delete removes an archived proposal for good — but does so FK-safely: it UNLINKS
- * the financial/audit rows that reference the proposal with NO ACTION (agent_task_log billing,
- * purchases, contracts, proposal_portals — all nullable) so that history is preserved, deletes the
- * transient rows (agent_task_queue, library_seed_jobs), then deletes the proposal (cascade handles
- * sections/comments/etc.). Retention: an archived proposal becomes purge-eligible after RETENTION_DAYS;
- * purgeExpiredArchived is the cron-ready sweep (opt-in ops procedure, not auto-wired for V1).
+ * Archiving a whole portal (proposal) is a SOFT, reversible visibility state for sorting/visibility:
+ * the proposal drops out of active views but the row stays in indexed Postgres, and its instantiated
+ * workflow instances (`process_instances` for the same tenant+opportunity) archive WITH it — workflows
+ * are instantiated templates, they have no archive of their own. Restore un-archives both.
  *
- * Audit: proposal:proposal.restored / proposal.deleted / proposal.purged (start/end or single).
+ * Nothing is ever hard-deleted here. When indexed Postgres gets large, archived rows are bulk-moved to
+ * S3 cold storage (pointed to as needed) by a future sweep — RETENTION_DAYS is the watermark it reads.
+ *
+ * Audit: proposal:proposal.archived / proposal.restored (start/end), tenant-scoped.
  */
 import { sql } from '@/lib/db';
-import { emitEventStart, emitEventEnd, emitEventSingle, userActor, systemActor, type EventActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
-/** Days an archived proposal is retained before it becomes purge-eligible. Documented policy. */
+/** Days an archived portal is retained in indexed Postgres before it is cold-storage eligible. */
 export const RETENTION_DAYS = 180;
 
 interface Actor {
@@ -24,15 +24,78 @@ interface Actor {
   role: Role;
 }
 
-/** Restore an archived proposal back to 'submitted' (compare-and-swap on stage='archived'). */
-export async function restoreProposal(p: Actor & { proposalId: string; tenantId: string }): Promise<{ restored: boolean }> {
-  const rows = await sql<{ id: string }[]>`
+/**
+ * Archive a whole portal/pipeline: soft-archive the proposal and cascade its workflow instances
+ * (same tenant + opportunity). Compare-and-swap on not-already-archived. Nothing is deleted.
+ */
+export async function archiveProposal(
+  p: Actor & { proposalId: string; tenantId: string },
+): Promise<{ archived: boolean; workflowsArchived: number }> {
+  const [row] = await sql<{ opportunityId: string | null; stage: string }[]>`
+    SELECT opportunity_id AS "opportunityId", stage FROM proposals
+    WHERE id = ${p.proposalId}::uuid AND tenant_id = ${p.tenantId}::uuid LIMIT 1
+  `;
+  if (!row || row.stage === 'archived') return { archived: false, workflowsArchived: 0 };
+
+  const upd = await sql<{ id: string }[]>`
+    UPDATE proposals
+    SET stage = 'archived', archived_at = now(), version = version + 1, updated_at = now()
+    WHERE id = ${p.proposalId}::uuid AND tenant_id = ${p.tenantId}::uuid AND stage <> 'archived'
+    RETURNING id
+  `;
+  if (upd.length === 0) return { archived: false, workflowsArchived: 0 };
+
+  try {
+    await sql`
+      INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+      VALUES (${p.proposalId}::uuid, ${row.stage}, 'archived', ${p.actorId}::uuid, 'Portal archived')
+    `;
+  } catch (e) {
+    console.error('[archiveProposal] stage history failed', e);
+  }
+
+  // Cascade: the pipeline's instantiated workflows archive with the portal.
+  let workflowsArchived = 0;
+  if (row.opportunityId) {
+    try {
+      const wf = await sql<{ id: string }[]>`
+        UPDATE process_instances SET archived_at = now()
+        WHERE tenant_id = ${p.tenantId}::uuid AND opportunity_id = ${row.opportunityId}::uuid AND archived_at IS NULL
+        RETURNING id
+      `;
+      workflowsArchived = wf.length;
+    } catch (e) {
+      console.error('[archiveProposal] workflow cascade failed', e);
+    }
+  }
+
+  const payload = { proposalId: p.proposalId, tenant_id: p.tenantId, workflowsArchived };
+  const startId = await emitEventStart({
+    namespace: 'proposal',
+    type: 'proposal.archived',
+    actor: userActor(p.actorId, p.actorEmail ?? undefined),
+    tenantId: p.tenantId,
+    payload,
+  });
+  await emitEventEnd(startId, { result: payload });
+  return { archived: true, workflowsArchived };
+}
+
+/**
+ * Restore an archived portal back to 'submitted' and un-archive its cascaded workflow instances.
+ * Compare-and-swap on stage='archived'.
+ */
+export async function restoreProposal(
+  p: Actor & { proposalId: string; tenantId: string },
+): Promise<{ restored: boolean }> {
+  const rows = await sql<{ opportunityId: string | null }[]>`
     UPDATE proposals
     SET stage = 'submitted', archived_at = NULL, version = version + 1, updated_at = now()
     WHERE id = ${p.proposalId}::uuid AND tenant_id = ${p.tenantId}::uuid AND stage = 'archived'
-    RETURNING id
+    RETURNING opportunity_id AS "opportunityId"
   `;
   if (rows.length === 0) return { restored: false };
+
   try {
     await sql`
       INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
@@ -41,6 +104,19 @@ export async function restoreProposal(p: Actor & { proposalId: string; tenantId:
   } catch (e) {
     console.error('[restoreProposal] stage history failed', e);
   }
+
+  // Cascade the restore to the pipeline's workflows.
+  if (rows[0].opportunityId) {
+    try {
+      await sql`
+        UPDATE process_instances SET archived_at = NULL
+        WHERE tenant_id = ${p.tenantId}::uuid AND opportunity_id = ${rows[0].opportunityId}::uuid AND archived_at IS NOT NULL
+      `;
+    } catch (e) {
+      console.error('[restoreProposal] workflow restore cascade failed', e);
+    }
+  }
+
   const payload = { proposalId: p.proposalId, tenant_id: p.tenantId };
   const startId = await emitEventStart({
     namespace: 'proposal',
@@ -51,79 +127,4 @@ export async function restoreProposal(p: Actor & { proposalId: string; tenantId:
   });
   await emitEventEnd(startId, { result: payload });
   return { restored: true };
-}
-
-/**
- * Permanently delete an archived proposal, FK-safely. Preserves financial/audit history by unlinking
- * (not deleting) the NO ACTION references. Only archived proposals are deletable.
- * `eventType` distinguishes an admin delete from a retention purge for the audit trail.
- */
-async function deleteArchivedProposal(
-  proposalId: string,
-  tenantId: string,
-  actor: EventActor,
-  eventType: 'proposal.deleted' | 'proposal.purged',
-  extraPayload: Record<string, unknown> = {},
-): Promise<boolean> {
-  const [row] = await sql<{ title: string; stage: string }[]>`
-    SELECT title, stage FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
-  `;
-  if (!row || row.stage !== 'archived') return false;
-
-  // Audit BEFORE the delete (the row disappears).
-  await emitEventSingle({
-    namespace: 'proposal',
-    type: eventType,
-    actor,
-    tenantId,
-    payload: { proposalId, title: row.title, ...extraPayload },
-  });
-
-  let deleted = false;
-  // tx typed as any — postgres.js TransactionSql tagged-template typing (matches lib/rls withTenant).
-  await sql.begin(async (tx: any) => {
-    // Preserve financial/audit history — unlink, don't destroy.
-    await tx`UPDATE agent_task_log SET proposal_id = NULL WHERE proposal_id = ${proposalId}::uuid`;
-    await tx`UPDATE purchases SET proposal_id = NULL WHERE proposal_id = ${proposalId}::uuid`;
-    await tx`UPDATE contracts SET proposal_id = NULL WHERE proposal_id = ${proposalId}::uuid`;
-    await tx`UPDATE proposal_portals SET proposal_id = NULL WHERE proposal_id = ${proposalId}::uuid`;
-    // Transient — safe to remove.
-    await tx`DELETE FROM agent_task_queue WHERE proposal_id = ${proposalId}::uuid`;
-    await tx`DELETE FROM library_seed_jobs WHERE proposal_id = ${proposalId}::uuid`;
-    // The proposal itself — cascades sections/comments/collaborators/matrix/history/etc.
-    const del = await tx`DELETE FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid AND stage = 'archived'`;
-    deleted = del.count > 0;
-  });
-  return deleted;
-}
-
-/** Guarded permanent delete of one archived proposal (admin action). */
-export async function hardDeleteProposal(p: Actor & { proposalId: string; tenantId: string }): Promise<{ deleted: boolean }> {
-  const deleted = await deleteArchivedProposal(
-    p.proposalId,
-    p.tenantId,
-    userActor(p.actorId, p.actorEmail ?? undefined),
-    'proposal.deleted',
-  );
-  return { deleted };
-}
-
-/**
- * Retention sweep — permanently delete proposals archived beyond the window. Cron-ready; returns the
- * purged count. NOT auto-wired for V1 (opt-in ops procedure). Attributed to a system actor.
- */
-export async function purgeExpiredArchived(p: { windowDays?: number } = {}): Promise<{ purged: number }> {
-  const windowDays = p.windowDays ?? RETENTION_DAYS;
-  const expired = await sql<{ id: string; tenantId: string }[]>`
-    SELECT id, tenant_id AS "tenantId" FROM proposals
-    WHERE stage = 'archived' AND archived_at IS NOT NULL
-      AND archived_at < now() - (${windowDays} || ' days')::interval
-  `;
-  let purged = 0;
-  const sys = systemActor('retention-sweep');
-  for (const row of expired) {
-    const ok = await deleteArchivedProposal(row.id, row.tenantId, sys, 'proposal.purged', { windowDays });
-    if (ok) purged++;
-  }
-  return { purged };
 }

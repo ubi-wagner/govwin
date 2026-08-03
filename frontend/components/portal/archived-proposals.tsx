@@ -44,16 +44,7 @@ export function ArchivedProposals({
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
 
-  const act = async (id: string, action: 'restore' | 'delete') => {
-    if (
-      action === 'delete' &&
-      typeof window !== 'undefined' &&
-      !window.confirm(
-        'Permanently delete this archived proposal? The build is removed for good (financial + audit history is preserved). This cannot be undone.',
-      )
-    ) {
-      return;
-    }
+  const act = async (id: string, action: 'restore') => {
     setBusy(id);
     setErr(null);
     try {
@@ -104,7 +95,7 @@ export function ArchivedProposals({
                     {p.topicNumber && <span>Topic {p.topicNumber}</span>}
                     <span>{p.sectionCount} section{p.sectionCount !== 1 ? 's' : ''}</span>
                     <span>{d === null ? 'archived' : d === 0 ? 'archived today' : `archived ${d} day${d !== 1 ? 's' : ''} ago`}</span>
-                    {purgeEligible && <span className="text-amber-600 font-medium">· eligible for removal (&gt;{retentionDays}d)</span>}
+                    {purgeEligible && <span className="text-amber-600 font-medium">· cold-storage eligible (&gt;{retentionDays}d)</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -120,9 +111,6 @@ export function ArchivedProposals({
                     <>
                       <button onClick={() => act(p.id, 'restore')} disabled={busy === p.id} className="px-2.5 py-1 text-[11px] font-medium text-indigo-700 border border-indigo-300 rounded hover:bg-indigo-50 disabled:opacity-50">
                         Restore
-                      </button>
-                      <button onClick={() => act(p.id, 'delete')} disabled={busy === p.id} className="px-2.5 py-1 text-[11px] font-medium text-red-600 border border-red-200 rounded hover:bg-red-50 disabled:opacity-50">
-                        Delete
                       </button>
                     </>
                   )}

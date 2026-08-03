@@ -11,7 +11,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
-import { restoreProposal, hardDeleteProposal } from '@/lib/proposal-archive';
+import { archiveProposal, restoreProposal } from '@/lib/proposal-archive';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -51,24 +51,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    if (body.action !== 'restore' && body.action !== 'delete') {
-      return NextResponse.json({ error: "action must be 'restore' or 'delete'", code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (body.action !== 'archive' && body.action !== 'restore') {
+      return NextResponse.json({ error: "action must be 'archive' or 'restore'", code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const actor = { actorId: user.id, actorEmail: user.email ?? null, role };
     try {
-      if (body.action === 'restore') {
-        const { restored } = await restoreProposal({ ...actor, proposalId, tenantId });
-        if (!restored) {
-          return NextResponse.json({ error: 'Proposal is not archived (nothing to restore)', code: 'CONFLICT' }, { status: 409 });
+      if (body.action === 'archive') {
+        const { archived, workflowsArchived } = await archiveProposal({ ...actor, proposalId, tenantId });
+        if (!archived) {
+          return NextResponse.json({ error: 'Portal is already archived (or not found)', code: 'CONFLICT' }, { status: 409 });
         }
-        return NextResponse.json({ data: { restored: true } });
+        return NextResponse.json({ data: { archived: true, workflowsArchived } });
       }
-      const { deleted } = await hardDeleteProposal({ ...actor, proposalId, tenantId });
-      if (!deleted) {
-        return NextResponse.json({ error: 'Only archived proposals can be deleted', code: 'CONFLICT' }, { status: 409 });
+      const { restored } = await restoreProposal({ ...actor, proposalId, tenantId });
+      if (!restored) {
+        return NextResponse.json({ error: 'Portal is not archived (nothing to restore)', code: 'CONFLICT' }, { status: 409 });
       }
-      return NextResponse.json({ data: { deleted: true } });
+      return NextResponse.json({ data: { restored: true } });
     } catch (e) {
       console.error('[proposals/archive] action failed', e);
       return NextResponse.json({ error: 'Archive action failed', code: 'DB_ERROR' }, { status: 500 });
