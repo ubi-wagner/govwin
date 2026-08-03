@@ -71,7 +71,7 @@ export default async function DashboardPage({
     try { const [r] = await q; return parseInt(r?.count ?? '0', 10); }
     catch (e) { console.error(`[dashboard] ${label} count failed`, e); return 0; }
   };
-  const libraryCount = await count('library', sql`SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}`);
+  const libraryCount = await count('library', sql`SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId} AND archived_at IS NULL`);
   const proposalCount = await count('proposal', sql`SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')`);
   const oppsCount = await count('opps', sql`SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived' AND archived_at IS NULL`);
   const todosCount = await count('todos', sql`SELECT COUNT(*)::text AS count FROM tasks WHERE tenant_id = ${tenantId} AND status IN ('open','in_progress')`);

@@ -100,7 +100,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       // Library units count
       const [libraryCount] = await sql<{ count: string }[]>`
         SELECT count(*)::text AS count FROM library_atoms
-        WHERE tenant_id = ${tenantId}::uuid AND vault_id IS NULL
+        WHERE tenant_id = ${tenantId}::uuid AND vault_id IS NULL AND archived_at IS NULL
       `;
 
       // Team members count

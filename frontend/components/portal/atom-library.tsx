@@ -42,6 +42,9 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const [status, setStatus] = useState('');
   const [tagFilter, setTagFilter] = useState<{ dimension: string; value: string } | null>(null);
   const [mine, setMine] = useState(false);
+  // Soft-archive (archived_at, mig 148) view toggle — ORTHOGONAL to the `status`
+  // curation ('archived' status). Off = active library; on = only archived atoms (restore).
+  const [showArchived, setShowArchived] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [groupTitle, setGroupTitle] = useState('');
   const [bulkTagDim, setBulkTagDim] = useState('agency');
@@ -58,12 +61,13 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
     if (grain) qs.set('grain', grain);
     if (status) qs.set('status', status);
     if (mine) qs.set('mine', '1');
+    if (showArchived) qs.set('archived', '1'); // opt-in: show only soft-archived atoms
     if (tagFilter) { qs.set('dimension', tagFilter.dimension); qs.set('value', tagFilter.value); }
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/atoms?${qs}`);
       if (res.ok) setAtoms((await res.json()).data?.atoms ?? []);
     } catch { /* keep */ }
-  }, [tenantSlug, q, grain, status, mine, tagFilter]);
+  }, [tenantSlug, q, grain, status, mine, showArchived, tagFilter]);
   useEffect(() => { load(); }, [load]);
 
   const toggle = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -73,6 +77,18 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: s }) });
       if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? `Could not ${s === 'archived' ? 'archive' : 'approve'} atom`); return; }
+      await load();
+    } catch { setErr('Network error'); } finally { setBusy(false); }
+  }, [tenantSlug, load]);
+
+  // Soft-archive / restore (archived_at) — hides from active library + counts + drafting,
+  // reversibly. Distinct from setStatusOf, which sets the curation `status`.
+  const softArchive = useCallback(async (id: string, action: 'archive' | 'restore') => {
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? `Could not ${action} atom`); return; }
+      setSel((p) => { const n = new Set(p); n.delete(id); return n; });
       await load();
     } catch { setErr('Network error'); } finally { setBusy(false); }
   }, [tenantSlug, load]);
@@ -135,6 +151,13 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
         </select>
         <button onClick={() => setMine((m) => !m)} className={`text-xs font-medium rounded px-2.5 py-1.5 border ${mine ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
           {mine ? 'My atoms' : 'All atoms'}
+        </button>
+        <button
+          onClick={() => { setShowArchived((v) => !v); setSel(new Set()); }}
+          title="Show soft-archived atoms (hidden from the active library and from drafting)"
+          className={`text-xs font-medium rounded px-2.5 py-1.5 border ${showArchived ? 'bg-amber-600 text-white border-amber-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+        >
+          {showArchived ? 'Archived' : 'Active'}
         </button>
         <button onClick={load} className="text-sm text-blue-600 hover:underline">Refresh</button>
         <span className="ml-auto flex items-center gap-2">
@@ -219,7 +242,14 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                 {a.status !== 'approved' ? (
                   <button onClick={() => setStatusOf(a.id, 'approved')} disabled={busy} className="text-xs font-medium text-green-700 border border-green-200 rounded px-2 py-1 hover:bg-green-50">Approve</button>
                 ) : <span className="text-[10px] text-green-600">approved</span>}
-                {a.status !== 'archived' && <button onClick={() => setStatusOf(a.id, 'archived')} disabled={busy} className="text-[10px] text-gray-400 hover:text-rose-600">archive</button>}
+                {showArchived ? (
+                  // Archived view: bring the atom back into the active library.
+                  <button onClick={() => softArchive(a.id, 'restore')} disabled={busy} className="text-xs font-medium text-indigo-700 border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-50 disabled:opacity-50">Restore</button>
+                ) : (
+                  // Active view: the soft-archive (archived_at) — hides from library + drafting, reversible.
+                  <button onClick={() => softArchive(a.id, 'archive')} disabled={busy} title="Archive — hide from the active library and from drafting (reversible)" className="text-[10px] font-medium text-gray-400 hover:text-amber-600 disabled:opacity-50">Archive</button>
+                )}
+                {!showArchived && a.status !== 'archived' && <button onClick={() => setStatusOf(a.id, 'archived')} disabled={busy} title="Set curation status to 'archived' (the atom stays listed in the library)" className="text-[10px] text-gray-300 hover:text-rose-600">status: archive</button>}
               </div>
             </div>
             {openId === a.id && (
@@ -249,7 +279,7 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
             )}
           </div>
         );})}
-        {atoms.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No atoms{tagFilter || status || q ? ' match these filters' : ' yet — upload a package or shred a document'}.</p>}
+        {atoms.length === 0 && <p className="text-sm text-gray-400 text-center py-10">{showArchived ? 'No archived atoms.' : <>No atoms{tagFilter || status || q ? ' match these filters' : ' yet — upload a package or shred a document'}.</>}</p>}
       </div>
     </div>
   );
