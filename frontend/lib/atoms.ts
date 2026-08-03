@@ -205,32 +205,50 @@ export async function confirmTags(
   });
 }
 
-// ── soft-archive lifecycle (mig 148: library_atoms.archived_at) ──
-// A reversible, sort/visibility-only state that is ORTHOGONAL to the curation `status`
-// column: archive HIDES the atom from active library lists + counts + draft selection
-// (every such read carries `archived_at IS NULL`) while keeping the row indexed in
-// Postgres — it is NOT a delete and NOT a status change. Both ops are compare-and-swap
-// (the caller 409s when the boolean is false) and main-library-only (vault_id IS NULL),
-// mirroring the vault fence on every other library_atoms write in this file.
-export async function archiveAtom(tenantId: string, atomId: string): Promise<{ archived: boolean }> {
+// ── soft-archive lifecycle at the FOUNDATION level (mig 148: library_atoms.archived_at) ──
+// Archive is a reversible, sort/visibility-only state ORTHOGONAL to the curation `status` column:
+// it HIDES atoms from active library lists + counts + draft selection (every such read carries
+// `archived_at IS NULL`) while keeping the rows indexed in Postgres — NOT a delete, NOT a status
+// change. Per the Archivable contract, atoms archive at the FOUNDATION level: archiving a foundation
+// (grain='foundation') cascades to its whole member subtree (foundation → sections → groups →
+// primitives, via atom_members). Main-library-only (vault_id IS NULL), the standard library fence.
+export async function archiveFoundation(tenantId: string, foundationId: string): Promise<{ archived: number }> {
   return withTenant(tenantId, async (tx) => {
+    const f = await tx<Array<{ id: string }>>`
+      SELECT id FROM library_atoms
+      WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation' AND vault_id IS NULL LIMIT 1`;
+    if (f.length === 0) return { archived: 0 }; // only a foundation is archivable at this level
     const rows = await tx<Array<{ id: string }>>`
+      WITH RECURSIVE subtree(id) AS (
+        SELECT ${foundationId}::uuid
+        UNION
+        SELECT m.member_atom_id FROM atom_members m JOIN subtree s ON m.group_atom_id = s.id
+      )
       UPDATE library_atoms SET archived_at = now()
-      WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid
+      WHERE id IN (SELECT id FROM subtree) AND tenant_id = ${tenantId}::uuid
         AND vault_id IS NULL AND archived_at IS NULL
       RETURNING id`;
-    return { archived: rows.length > 0 };
+    return { archived: rows.length };
   });
 }
 
-export async function restoreAtom(tenantId: string, atomId: string): Promise<{ restored: boolean }> {
+export async function restoreFoundation(tenantId: string, foundationId: string): Promise<{ restored: number }> {
   return withTenant(tenantId, async (tx) => {
+    const f = await tx<Array<{ id: string }>>`
+      SELECT id FROM library_atoms
+      WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation' AND vault_id IS NULL LIMIT 1`;
+    if (f.length === 0) return { restored: 0 };
     const rows = await tx<Array<{ id: string }>>`
+      WITH RECURSIVE subtree(id) AS (
+        SELECT ${foundationId}::uuid
+        UNION
+        SELECT m.member_atom_id FROM atom_members m JOIN subtree s ON m.group_atom_id = s.id
+      )
       UPDATE library_atoms SET archived_at = NULL
-      WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid
+      WHERE id IN (SELECT id FROM subtree) AND tenant_id = ${tenantId}::uuid
         AND vault_id IS NULL AND archived_at IS NOT NULL
       RETURNING id`;
-    return { restored: rows.length > 0 };
+    return { restored: rows.length };
   });
 }
 

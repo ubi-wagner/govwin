@@ -33,7 +33,20 @@ async function setArchived(tenantId: string, archived: boolean): Promise<{ id: s
     SET archived_at = ${archived ? sql`now()` : null}, updated_at = now()
     WHERE id = ${tenantId}
     RETURNING id, name`;
-  return row ?? null;
+  if (!row) return null;
+  // Cascade: the tenant's instantiated workflow instances archive/restore with the license state
+  // (workflows are instantiated templates — they archive when a pipeline OR tenant is archived).
+  // Best-effort; the tenant state is the source of truth for access (verifyTenantAccess gates on it).
+  try {
+    if (archived) {
+      await sql`UPDATE process_instances SET archived_at = now() WHERE tenant_id = ${tenantId}::uuid AND archived_at IS NULL`;
+    } else {
+      await sql`UPDATE process_instances SET archived_at = NULL WHERE tenant_id = ${tenantId}::uuid AND archived_at IS NOT NULL`;
+    }
+  } catch (e) {
+    console.error('[admin/tenants/archive] workflow cascade failed', e);
+  }
+  return row;
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ tenantId: string }> }) {

@@ -17,7 +17,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
-import { archiveAtom, restoreAtom } from '@/lib/atoms';
+import { archiveFoundation, restoreFoundation } from '@/lib/atoms';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -63,29 +63,30 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     try {
       if (body.action === 'archive') {
-        const { archived } = await archiveAtom(tenantId, atomId);
-        if (!archived) {
-          return NextResponse.json({ error: 'Atom is already archived or not found', code: 'CONFLICT' }, { status: 409 });
+        // atomId is a FOUNDATION id; the whole member subtree cascades.
+        const { archived } = await archiveFoundation(tenantId, atomId);
+        if (archived === 0) {
+          return NextResponse.json({ error: 'Not an archivable foundation (or already archived)', code: 'CONFLICT' }, { status: 409 });
         }
         await emitEventSingle({
           namespace: 'library',
-          type: 'atom.archived',
+          type: 'foundation.archived',
           actor: userActor(u.id, u.email ?? undefined),
           tenantId,
-          payload: { atomId },
+          payload: { foundationId: atomId, atomsArchived: archived },
         });
-        return NextResponse.json({ data: { archived: true } });
+        return NextResponse.json({ data: { archived: true, atomsArchived: archived } });
       }
-      const { restored } = await restoreAtom(tenantId, atomId);
-      if (!restored) {
-        return NextResponse.json({ error: 'Atom is not archived (nothing to restore)', code: 'CONFLICT' }, { status: 409 });
+      const { restored } = await restoreFoundation(tenantId, atomId);
+      if (restored === 0) {
+        return NextResponse.json({ error: 'Foundation is not archived (nothing to restore)', code: 'CONFLICT' }, { status: 409 });
       }
       await emitEventSingle({
         namespace: 'library',
-        type: 'atom.restored',
+        type: 'foundation.restored',
         actor: userActor(u.id, u.email ?? undefined),
         tenantId,
-        payload: { atomId },
+        payload: { foundationId: atomId, atomsRestored: restored },
       });
       return NextResponse.json({ data: { restored: true } });
     } catch (e) {
