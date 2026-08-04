@@ -21,7 +21,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 853 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 855 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -30,15 +30,22 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 147 — the **V1 UI-wiring pass**
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 148 — the **V1 UI-wiring pass**
 added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
 `proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
-`proposals.archived_at` (archive retention/purge-eligibility). That pass also made the AI-review button real
+`proposals.archived_at`, and mig 148 `archived_at` on `process_instances`/`tenant_opportunity_cards`/
+`library_atoms`/`contracts`. That pass also made the AI-review button real
 (`lib/proposal-ai-review.ts` → per-section `color_team_reviewer`, audited `proposal:ai_review.requested`, NOT
 `review_requested` which the fabric double-dispatches), added the packaging-review + assess-ingest-readiness
-buttons, the archive restore/FK-safe-delete lifecycle (`lib/proposal-archive.ts` — unlinks NO-ACTION
-financial/audit refs, preserves them), and confirmed the contract entity + kickoff already fire on
-`outcome=awarded`). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+buttons, and confirmed the contract entity + kickoff already fire on `outcome=awarded`). **Archive is soft +
+reversible only — NOTHING is hard-deleted** (canonical **docs/ARCHIVABLE_CONTRACT.md**): archive ACTIONS live on
+exactly three entities — a **portal** (`proposals`, tenant_admin+ → cascades its BUILD `process_instances`,
+scoped off co-active `spotlight`/`contract` runs), a **library atom / foundational doc** (`library_atoms`,
+per-item → drops out of the library + draft selection; copied-forward so no cascade), and a **tenant**
+(`tenants`, rfp_admin+ → license slumber: the `verifyTenantAccess` gate darkens every surface + a workflow
+cascade, no per-proposal write). Workflows archive ONLY via a parent's cascade (no standalone action);
+opportunity cards are NOT an archive target; archived rows are the future S3 cold-storage watermark (`lib/proposal-archive.ts`).
+A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
@@ -119,6 +126,9 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - `npx tsc --noEmit` must pass — zero type errors
 - No unhandled promises
 - No console.log — use console.error for error logging only
+- User feedback: `toast()` (`lib/toast.tsx`) for transient action results (success/error/info) — NOT
+  native `alert()`; native `confirm()` stays for destructive blocking gates; inline `setMsg`/`setErr`
+  for form-level validation
 - Return consistent shapes: `{ data: T }` success, `{ error: string, code: string }` failure
 - Auth checks first, then input validation, then business logic
 - Always verify tenant access before returning tenant-specific data
@@ -129,7 +139,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (853 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (855 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run

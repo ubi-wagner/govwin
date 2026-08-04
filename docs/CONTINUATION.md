@@ -1,11 +1,38 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-02 (TVSF Foundation build + PDF/numbering; then the admin-agent program — rfp_ingest_manager, the Proposal Auto-Drive doorbell, and the event-audit sweep)
+**Last updated:** 2026-08-04 (V1 hardening — adversarial bug-hunt, toast polish, manual + doc sync)
 **Branch:** `claude/nice-hamilton-kBqtD`
 
 ---
 
-## 0. LATEST — 2026-08-03 (V1 UI-wiring program + universal archive; READ THIS FIRST)
+## 0. LATEST — 2026-08-04 (V1 hardening: bug-hunt + polish + docs; READ THIS FIRST)
+
+Post-wiring hardening pass on the V1 + archive work:
+
+- **Bug hunt** (3 adversarial agents — API / React / data-layer; every finding proven against code
+  before fixing): **12 fixes** — amendment confirm no longer 200s on a no-op (`confirmAmendment` returns
+  `{confirmed}` → route 409s); fan-out skips archived proposals; portal + tenant + outcome archive
+  cascades scoped to **BUILD** `process_instances` (never a co-active `spotlight`/`contract` run on the
+  same opportunity); tenant archive is compare-and-swap (404/409, not a silent 200); `finder:tenant.*`
+  events dropped the top-level `tenantId` (finder=admin SOP); archived **Export** POSTs (was a GET → 405);
+  amendment banner / curation panel error paths surfaced; canvas Review composer honors `canComment`.
+  (commit `0e4a6fb`)
+- **Polish** — new dependency-free `frontend/lib/toast.tsx` (module-level pub/sub, `<Toaster/>` mounted
+  once in the root layout); every transient `alert()` across portal / admin / curation → `toast.*`.
+  Native `confirm()` kept for destructive blocking gates; form validation keeps inline `setMsg`/`setErr`.
+  (commit `e8b74bb`)
+- **Manuals regenerated** — all 3 role guides (`_src/build_*.py` → JSON → HTML/PDF): Studio, AI Actions /
+  full-draft modes, amendments (log→confirm→acknowledge), portal + atom + tenant archive, packaging
+  review, outcome→contract, mark-all-read, comped-portal grant, assess-ingest, auto-drive doorbell.
+  (commit `bea5881`)
+- **Docs synced** — CLAUDE.md (mig 148 + corrected archive contract + toast convention + vitest 855),
+  ARCHITECTURE_V10 §7 (migs 144–148), docs/ARCHIVABLE_CONTRACT.md (tenant/atom cascade text reconciled to
+  as-built), CLAUDE_CLIFFNOTES §1c.
+
+State: migrations **148** · **vitest 855** · tsc 0 · next build ✓. **Remaining for launch:** the final
+see-it-as-users functional pass (L6) + the V1-ready report.
+
+## 0b. 2026-08-03 (V1 UI-wiring program + universal archive)
 
 The V1 gap-register was wired end-to-end (H1–H5, M1–M6, H2) + three full builds: **amendment
 fan-out engine** (mig 146; detect→confirm→fan-out→acknowledge), **contract+kickoff** (was already

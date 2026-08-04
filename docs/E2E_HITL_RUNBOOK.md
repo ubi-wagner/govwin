@@ -5,6 +5,16 @@ one login-able account per role, against a ready scenario. Covers the master+mir
 lifecycle, the Proposal Draft Manager (full-draft Modes A/B/C + the adversarial gate), and the
 **admin-plane triggers** — the Proposal Auto-Drive doorbell + the `rfp_ingest_manager` (§5.5).
 
+> **V1 flows to spot-check (2026-08-04).** Also exercise: the **Proposal Studio** 3-loop gate
+> (Draft → Refine → Compliance — preview/comment/regenerate or approve→next; "run all 3"); the
+> **amendment engine** (admin logs → **Confirm → notify** on the curation Amendments panel → the
+> tenant's amber banner → an admin **Acknowledge**); the **soft-archive** lifecycle (Archive portal →
+> its build workflows cascade → **Restore**; archive a library atom → gone from draft selection;
+> archive a tenant = license slumber; **nothing is hard-deleted** — docs/ARCHIVABLE_CONTRACT.md); the
+> **Submission Package** review; and **Record Outcome → Won** starting a contract + kickoff task.
+> UI note: transient results now surface as **toasts** (not `alert()`); destructive actions still
+> gate on a native **confirm()**.
+
 > **Actors.** *Human* roles: `master_admin`, `rfp_admin`, `tenant_admin`, `tenant_user`,
 > `partner_user` (+ the *shadow-admin* path where an rfp/master admin descends into a tenant's
 > RLS space as `tenant_admin`). *Machine* actors: the agent workforce (advisory; every output
