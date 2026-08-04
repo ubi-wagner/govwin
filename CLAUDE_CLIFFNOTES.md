@@ -61,33 +61,29 @@ Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone
 > Prove copy + isolation: `… tsx scripts/verify-keep-copy.mts` (6/6). Bulk-copy unit drive:
 > `scripts/drive-starter-bulk.mts`.
 
-### Running the e2e suite (what's green, what needs fixtures)
+### Running the e2e suite — REPRODUCIBLY GREEN (Wave C closed, 2026-08-04)
 ```bash
-cd frontend && TEST_BASE_URL=http://localhost:3000 npx playwright test --project=admin --project=tenant --reporter=line
+# 1) serve the built app WITH the founding-cohort paywall bypass (E2E-only; prod never sets it)
+DATABASE_URL=postgresql://claude@127.0.0.1:5433/govtech_intel bash scripts/serve-e2e.sh &   # → :3000
+# 2) run the gate — globalSetup RE-SEEDS the fixtures each run (reset-then-run), so it's reproducible
+cd frontend && TEST_BASE_URL=http://localhost:3000 DATABASE_URL=<same> \
+  npx playwright test --project=setup --project=admin --project=tenant --reporter=line
 ```
-Projects: `setup` (auth → e2e/.auth/*.json) → `admin` (*.admin.spec) + `tenant` (*.tenant.spec, uses **Lighthouse**);
-`hitl` specs self-authenticate. **Baseline result on a fresh sandbox: 45 pass, ~13 fail — the 13 are ALL
-environmental, NOT product bugs** (verified against source this cycle):
-
-1. **Stale setup auth** — `e2e/auth.setup.ts` defaults `RFPAdmin2026!` / `collab@lighthouse.com`. After
-   `seed_dev_accounts.mjs` admin=RFPAdmin2026! (matches), but **`collab@lighthouse.com` is not seeded** →
-   collaborator setup fails → dependent tenant specs skip. Seed it:
-   ```sql
-   INSERT INTO users (email,name,role,tenant_id,password_hash,is_active,temp_password)
-   VALUES ('collab@lighthouse.com','Collab','partner_user',(SELECT id FROM tenants WHERE slug='lighthouse'),
-           crypt('CollabPass1',gen_salt('bf',12)),true,false)
-   ON CONFLICT (email) DO UPDATE SET role='partner_user',tenant_id=EXCLUDED.tenant_id,
-           password_hash=EXCLUDED.password_hash,is_active=true,temp_password=false;
-   ```
-2. **Paywall 402** on `matrix`/`lock`/`fullloop`/`atomloop` — they hit the **deliberately paywalled**
-   `/api/portal/<t>/proposals/create` (its own comment: *"the real flow provisions via portal release …
-   never hits this route"*). Serve with **`FOUNDING_COHORT_BYPASS=true`** to run them (start the standalone
-   server with that env; heartbeat.sh does NOT set it). The 402 is the paywall working.
-3. **Missing fixtures 404/403** — `ranking`/`fanout` hardcode solicitations `c3000000…`/`c4000000…`;
-   `lock`/`collab`/`library` need a provisioned proposal + atoms + a collaborator-on-a-proposal. No
-   fixture-seeder exists → **build `scripts/seed_e2e_fixtures.mjs`** (punch list C2) to fully green the suite.
-4. **`reach.tenant` flaky `-1`** — `page.goto(domcontentloaded)` + default timeout races under the rapid
-   sweep (server logs clean; same routes are HTTP 200 in `zzscreens`). Harness, not a bug.
+**Result: 62 passed · 0 failed · 1 skipped — run-over-run** (from a 45/13/5 baseline). Projects: `setup`
+(auth → e2e/.auth/*.json) → `admin` (*.admin.spec) + `tenant` (*.tenant.spec, uses **Lighthouse**); `hitl`
+self-authenticate. **No product bugs** — every prior failure was a stale/absent fixture or an environmental
+dep. What the close-out did (punch-list Wave C):
+- **serve-e2e.sh** sets `FOUNDING_COHORT_BYPASS=true` (matrix/lock/fullloop/atomloop hit the paywalled
+  `/proposals/create` direct-hook; the real purchase→release path needs no bypass).
+- **scripts/seed_e2e_fixtures.mjs** (runs scripts/e2e_fixtures.sql, extended) seeds every stateful fixture:
+  the hardcoded solicitations c3/c4 (with `spotlight_summary` + `close_date` — push validations added since
+  the SQL was written), provisioned-proposal/atoms/collaborator, and the zzaudit/zzblockers drive state.
+  Wired into **playwright globalSetup** so it re-seeds before every run (the specs mutate/leak state).
+- **seed_dev_accounts.mjs** now seeds `collab@lighthouse.com` + `member@ubihere.com` (were hand-seeded before).
+- **reach.tenant** de-flaked (`waitUntil:'load'` + timeout + one retry on the transient client-abort `-1`).
+- **⚠ ranking.tenant is SKIPPED frontend-only** — bucket scoring is event-driven + PIPELINE-side
+  (`OnCardApplied` → `pipeline/.../rescore.py` writes `tenant_bucket_scores`, which `/cards` reads). Set
+  **`E2E_WITH_PIPELINE=1`** (+ run the pipeline worker consuming events) to exercise it. Its fixtures ARE seeded.
 
 ### The REAL "fire off a portal" lifecycle (needs NO bypass — this is the product path)
 ```

@@ -51,27 +51,34 @@ Ordered by launch-criticality. Ops details for gates 1–4 live in docs/PRE_LAUN
       `DATABASE_URL=<prod> node scripts/rebuild-tvsf.mjs` **or** regenerate 140 via
       `scripts/gen-foundation-seed-migration.mjs`. Not launch-blocking — refreshable post-deploy.
 
-## C. Next-cycle QA — a full deploy-testing environment (this cycle's finding)
+## C. Next-cycle QA — a full deploy-testing environment ✅ CLOSED (2026-08-04)
 
-The unit backbone is green (vitest 855) and the **product** is proven (45 e2e surface specs pass; the
-purchase→release→build lifecycle fired end-to-end). But **8–13 stateful e2e specs can't currently go
-green in a bare sandbox** — they need a CI fixture chain that `seed_dev_accounts.mjs` doesn't build.
-**None are product bugs** (all verified: paywall-by-design 402, missing-fixture 404/403, flaky-timeout).
-To get the WHOLE suite green for real deploy-gating next cycle, close these — full recipe in
-**CLAUDE_CLIFFNOTES.md → "Deploy testing environment (fast + full refresh)"**:
+The driven Playwright persona+drive suite now goes green **reproducibly — 62 passed · 0 failed · 1
+skipped, run-over-run** (up from the 45 pass / 13 fail / 5 did-not-run baseline). **No product bugs**
+were found: every gap was a stale/absent fixture or an environmental dependency. One command serves +
+gates it: `DATABASE_URL=<db> bash scripts/serve-e2e.sh &` then `npx playwright test --project=setup
+--project=admin --project=tenant` (globalSetup auto-re-seeds the fixtures each run). Recipe in
+**CLAUDE_CLIFFNOTES.md → "Running the e2e suite"**.
 
-- [ ] **C1 · Serve e2e with `FOUNDING_COHORT_BYPASS=true`** — unblocks the paywalled `/proposals/create`
-      direct-hook that matrix/lock/fullloop/atomloop use (the real flow uses purchase→release, which needs
-      no bypass).
-- [ ] **C2 · Seed the fixture solicitations** the specs hardcode (`c3000000…`, `c4000000…`) for
-      `ranking`/`fanout`, plus a provisioned proposal + atoms + a collaborator-on-a-proposal for
-      `lock`/`collab`/`library`. (No fixture-seeder exists yet → build one: `scripts/seed_e2e_fixtures.mjs`.)
-- [ ] **C3 · Fix the stale e2e auth** — `auth.setup.ts` defaults (`RFPAdmin2026!`, `collab@lighthouse.com`)
-      drift from the Foundation demo seed. Either seed the e2e accounts with those exact passwords or pass
-      `RFP_ADMIN_PW`/`COLLAB_*` env overrides; seed `collab@lighthouse.com` (fused role+tenant) — it isn't created by default.
-- [ ] **C4 · De-flake `reach.tenant`** — the sweep uses `page.goto(…domcontentloaded)` + default timeout
-      and rapid iteration → intermittent `-1` (client abort; server logs clean). Serialize with `waitUntil:'load'`
-      + a per-route timeout, or assert on `page.request.get()` status instead of navigation.
+- [x] **C1 · `scripts/serve-e2e.sh`** — committed E2E serve front door with `FOUNDING_COHORT_BYPASS=true`
+      (matrix/lock/fullloop/atomloop hit the paywalled `/proposals/create` direct-hook; the real
+      purchase→release path needs no bypass). heartbeat.sh still never sets it; prod never should.
+- [x] **C2 · `scripts/seed_e2e_fixtures.mjs`** (+ the already-existing `scripts/e2e_fixtures.sql`, extended)
+      — seeds the hardcoded solicitations (`c3000000`/`c4000000` + AF SBIR topics with
+      agency/programType/`close_date`; a `spotlight_summary` — both were push validations added AFTER the
+      SQL was written), the provisioned-proposal/atoms/collaborator fixtures, AND the zzaudit (pinned card)
+      + zzblockers (free-portal opp + submitted/locked proposal) drive fixtures. Wired into Playwright
+      **globalSetup** (reset-then-run) so the gate is reproducible; also cleans the atoms fullloop/atomloop
+      leak each run.
+- [x] **C3 · e2e auth seeded durably** — `collab@lighthouse.com` (partner_user) + `member@ubihere.com`
+      (tenant_user) are now created by `seed_dev_accounts.mjs`, so a fresh refresh runs the whole suite.
+- [x] **C4 · `reach.tenant` de-flaked** — `waitUntil:'load'` + a per-route 30s timeout + one retry on the
+      transient client-abort. Verified stable 3/3.
+- [ ] **C5 (new, deferred) · `ranking.tenant` needs the pipeline** — the ONE spec not green frontend-only:
+      bucket scoring is event-driven + **pipeline-side** (`OnCardApplied` → `rescore.py` writes
+      `tenant_bucket_scores`, which `/cards` reads). Skipped in the frontend-only gate with a precise reason;
+      set **`E2E_WITH_PIPELINE=1`** in the full two-service env (app + pipeline worker) to exercise it. Its
+      fixtures ARE seeded. Not launch-blocking (ranking works in prod where the pipeline runs).
 
 ## D. Known-descoped (tracked, NOT blocking)
 
@@ -87,7 +94,8 @@ To get the WHOLE suite green for real deploy-gating next cycle, close these — 
 |---|---|---|
 | **A (block)** | migs@152 + membership · email · ANTHROPIC (both) · opps flowing | all 4 green |
 | **B (fast-follow)** | RLS cutover · TVSF demo refresh | scheduled post-go-live |
-| **C (QA next cycle)** | bypass env · fixture seeder · e2e auth · de-flake reach | full e2e suite green |
-| **D (known)** | Stripe self-serve · scoring overlay | intentionally deferred |
+| **C (QA)** ✅ | serve-e2e bypass · fixture seeder + globalSetup · e2e auth · de-flake reach | **62 pass · 0 fail · 1 skip (reproducible)** |
+| **D (known)** | Stripe self-serve · scoring overlay · ranking-needs-pipeline (C5) | intentionally deferred |
 
-**Wave A green → launch.** B right after. C before we gate deploys on the full e2e suite.
+**Wave A green → launch.** B right after. **C is CLOSED** — the e2e suite is deploy-gateable now
+(one spec, `ranking`, is skipped until the pipeline runs alongside the app; see C5).
