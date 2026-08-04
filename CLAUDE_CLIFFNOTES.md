@@ -21,6 +21,82 @@ mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library
 
 ---
 
+## 0. Deploy testing environment — fast + full refresh (next cycle)
+
+**Read this first when re-establishing a test box.** Written 2026-08-04 after the front-to-back /
+side-to-side V1 test. State at launch: migs **148**, `tsc 0 · vitest 855 · next build`. Full launch
+punch list: **docs/V1_LAUNCH_PUNCHLIST.md**. Standalone-serving caveats: CLAUDE.md SOP + docs/CONTINUATION.md §2.
+
+**Sandbox facts:** DB `postgresql://claude@127.0.0.1:5433/govtech_intel` (pg data dir `/tmp/pgs_gov/data`).
+App served standalone on **:3000** (`next start` is BROKEN — `output:'standalone'`). Chromium for Playwright:
+`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`, not `127.0.0.1`.
+
+### FAST refresh (~2 min — box already has DB data dir + a `.next` build)
+```bash
+bash scripts/heartbeat.sh          # idempotent: (re)starts pg :5433 + standalone server :3000; prints HEARTBEAT status
+export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
+node scripts/seed_dev_accounts.mjs # additive: admin + Lighthouse/Ubihere tenants + backfills every tenant's cards
+```
+Accounts after the seed (passwords ROTATED by the seed — these are the e2e-canonical ones):
+`eric@rfppipeline.com`/`RFPAdmin2026!` (master), `eric@lighthouse.com`/`LighthouseAdmin`,
+`eric@ubihere.com`/`UbihereAdmin`. The **Foundation demo** accounts are separate and use `DemoPass123!`
+(`kate.ulepic@foundation3dp.com` tenant_admin, `connor.casey@foundation3dp.com` tenant_user,
+`pjackson@ecinnovates.com` partner). ⚠ `seed_dev_accounts.mjs` **rotates** `eric@rfppipeline.com` to
+`RFPAdmin2026!` — so after seeding, admin login is NOT `DemoPass123!` anymore on the sandbox.
+
+### FULL refresh (rebuild from migrations — container reclaim / schema drift)
+`heartbeat.sh` prints `pg=DATA_GONE` when the data dir is gone → rebuild:
+`initdb` + `createdb govtech_intel` → `DATABASE_URL=<sandbox> node db/migrations/migrate.mjs` (⚠ never
+`ALLOW_SCHEMA_RESET` unless you mean the destructive 000_drop_all) → `node scripts/seed_dev_accounts.mjs`.
+Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone/.next/static && cp -r public
+.next/standalone/public`, and `heartbeat.sh` will boot it. Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
+
+### Running the e2e suite (what's green, what needs fixtures)
+```bash
+cd frontend && TEST_BASE_URL=http://localhost:3000 npx playwright test --project=admin --project=tenant --reporter=line
+```
+Projects: `setup` (auth → e2e/.auth/*.json) → `admin` (*.admin.spec) + `tenant` (*.tenant.spec, uses **Lighthouse**);
+`hitl` specs self-authenticate. **Baseline result on a fresh sandbox: 45 pass, ~13 fail — the 13 are ALL
+environmental, NOT product bugs** (verified against source this cycle):
+
+1. **Stale setup auth** — `e2e/auth.setup.ts` defaults `RFPAdmin2026!` / `collab@lighthouse.com`. After
+   `seed_dev_accounts.mjs` admin=RFPAdmin2026! (matches), but **`collab@lighthouse.com` is not seeded** →
+   collaborator setup fails → dependent tenant specs skip. Seed it:
+   ```sql
+   INSERT INTO users (email,name,role,tenant_id,password_hash,is_active,temp_password)
+   VALUES ('collab@lighthouse.com','Collab','partner_user',(SELECT id FROM tenants WHERE slug='lighthouse'),
+           crypt('CollabPass1',gen_salt('bf',12)),true,false)
+   ON CONFLICT (email) DO UPDATE SET role='partner_user',tenant_id=EXCLUDED.tenant_id,
+           password_hash=EXCLUDED.password_hash,is_active=true,temp_password=false;
+   ```
+2. **Paywall 402** on `matrix`/`lock`/`fullloop`/`atomloop` — they hit the **deliberately paywalled**
+   `/api/portal/<t>/proposals/create` (its own comment: *"the real flow provisions via portal release …
+   never hits this route"*). Serve with **`FOUNDING_COHORT_BYPASS=true`** to run them (start the standalone
+   server with that env; heartbeat.sh does NOT set it). The 402 is the paywall working.
+3. **Missing fixtures 404/403** — `ranking`/`fanout` hardcode solicitations `c3000000…`/`c4000000…`;
+   `lock`/`collab`/`library` need a provisioned proposal + atoms + a collaborator-on-a-proposal. No
+   fixture-seeder exists → **build `scripts/seed_e2e_fixtures.mjs`** (punch list C2) to fully green the suite.
+4. **`reach.tenant` flaky `-1`** — `page.goto(domcontentloaded)` + default timeout races under the rapid
+   sweep (server logs clean; same routes are HTTP 200 in `zzscreens`). Harness, not a bug.
+
+### The REAL "fire off a portal" lifecycle (needs NO bypass — this is the product path)
+```
+tenant_admin: POST /api/portal/<slug>/purchase { opportunityId, promoCode:'rfppipelinetest' }  → curation_pending ($0 comp purchase, emits capture:purchase.completed)
+rfp_admin:    POST /api/portal/<slug>/portals/<portalId>?action=release { }                     → provision (proposal + compliance matrix + section) → portal launched (UNLOCKED build)
+```
+`action=release` is rfp_admin-gated (a buyer can't self-release past the 72h SLA). `action=accept` is a
+DIFFERENT branch (guardrail-acceptance from `guardrails_pending`) — don't confuse them. Release body needs
+≥1 stage (defaults to draft/review/final if `{}`); the provision links the proposal BEFORE the status flip
+(idempotent, retryable).
+
+### ⚠ Gotcha — the capture specs overwrite committed guide screenshots
+`zzscreens.admin` / `zzscreens.tenant` / `zzcollab` / `zzblockers` **write** to `docs/manuals/img/**` and
+`frontend/blocker-shots/**`. Running the suite dirties ~37 tracked PNGs with fresh (often bare-tenant)
+captures. **`git checkout -- docs/manuals/img/ frontend/blocker-shots/` after a test run** unless you are
+deliberately re-capturing the guides (in which case rebuild them: `python3 docs/manuals/build_guides.py`).
+
+---
+
 ## 1. Database Schema Quick Reference
 
 The schema is defined across **69 migrations (000–067, plus the interleaved

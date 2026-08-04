@@ -29,8 +29,10 @@ Post-wiring hardening pass on the V1 + archive work:
   ARCHITECTURE_V10 §7 (migs 144–148), docs/ARCHIVABLE_CONTRACT.md (tenant/atom cascade text reconciled to
   as-built), CLAUDE_CLIFFNOTES §1c.
 
-State: migrations **148** · **vitest 855** · tsc 0 · next build ✓. **Remaining for launch:** the final
-see-it-as-users functional pass (L6) + the V1-ready report.
+State: migrations **148** · **vitest 855** · tsc 0 · next build ✓. Front-to-back / side-to-side live test
+done — **zero product bugs** (docs/V1_READY_REPORT.md §7). **Launch punch list: docs/V1_LAUNCH_PUNCHLIST.md**
+(Wave A = prod ops/config blockers; B = RLS cutover + demo refresh; C = next-cycle full-e2e QA fixtures).
+**Next-cycle test-env spin-up (fast + full refresh, e2e fixture gaps, the fire-a-portal recipe): CLAUDE_CLIFFNOTES §0.**
 
 ## 0b. 2026-08-03 (V1 UI-wiring program + universal archive)
 
