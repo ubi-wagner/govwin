@@ -76,22 +76,24 @@ export async function logAmendment(
  */
 export async function confirmAmendment(
   p: Actor & { amendmentId: string; solicitationId: string },
-): Promise<{ flagged: number; tenants: number }> {
-  // Compare-and-swap: only a 'detected' amendment can be confirmed.
+): Promise<{ confirmed: boolean; flagged: number; tenants: number }> {
+  // Compare-and-swap: only a 'detected' amendment can be confirmed. A no-op (unknown id or
+  // already confirmed/dismissed) returns confirmed:false so the caller can 409, distinct from a
+  // genuine confirmation that simply had zero proposals to fan out (confirmed:true, flagged:0).
   const updated = await sql<{ id: string }[]>`
     UPDATE solicitation_amendments
     SET status = 'confirmed', reviewed_by = ${p.actorId}::uuid, reviewed_at = now()
     WHERE id = ${p.amendmentId}::uuid AND solicitation_id = ${p.solicitationId}::uuid AND status = 'detected'
     RETURNING id
   `;
-  if (updated.length === 0) return { flagged: 0, tenants: 0 };
+  if (updated.length === 0) return { confirmed: false, flagged: 0, tenants: 0 };
 
-  // Fan out to every proposal built from this solicitation (skip already-flagged).
+  // Fan out to every ACTIVE proposal built from this solicitation (skip already-flagged + archived).
   const flagged = await sql<{ tenantId: string }[]>`
     INSERT INTO proposal_amendment_flags (amendment_id, proposal_id, tenant_id)
     SELECT ${p.amendmentId}::uuid, pr.id, pr.tenant_id
     FROM proposals pr
-    WHERE pr.solicitation_id = ${p.solicitationId}::uuid
+    WHERE pr.solicitation_id = ${p.solicitationId}::uuid AND pr.stage <> 'archived'
     ON CONFLICT (amendment_id, proposal_id) DO NOTHING
     RETURNING tenant_id AS "tenantId"
   `;
@@ -119,7 +121,7 @@ export async function confirmAmendment(
     });
   }
 
-  return { flagged: flagged.length, tenants: tenantIds.length };
+  return { confirmed: true, flagged: flagged.length, tenants: tenantIds.length };
 }
 
 /** Admin dismisses a false-positive amendment (status='dismissed'). No fan-out. */

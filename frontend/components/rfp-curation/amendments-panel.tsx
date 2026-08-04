@@ -90,6 +90,8 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
       setShowForm(false);
       setMsg({ type: 'success', text: 'Amendment logged. Confirm it to notify affected tenants.' });
       await load();
+    } catch {
+      setMsg({ type: 'error', text: 'Network error' });
     } finally {
       setBusy(false);
     }
@@ -116,6 +118,8 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
           setMsg({ type: 'success', text: 'Amendment dismissed.' });
         }
         await load();
+      } catch {
+        setMsg({ type: 'error', text: 'Network error' });
       } finally {
         setBusy(false);
       }

@@ -67,6 +67,34 @@ export function ArchivedProposals({
     }
   };
 
+  // The package route is POST-only (streams a blob) — a plain <a href> GET 405s. Mirror the
+  // admin-panel export: POST, then object-URL download.
+  const exportZip = async (id: string, title: string) => {
+    setBusy(id);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${id}/package?format=zip`, { method: 'POST' });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || 'Export failed');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(title || 'proposal').replace(/[^a-z0-9]+/gi, '_').slice(0, 60)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErr('Network error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (list.length === 0) return null;
 
   return (
@@ -100,12 +128,13 @@ export function ArchivedProposals({
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {canExport && (
-                    <a
-                      href={`/api/portal/${tenantSlug}/proposals/${p.id}/package?format=zip`}
-                      className="text-[11px] text-indigo-600 hover:underline"
+                    <button
+                      onClick={() => exportZip(p.id, p.title)}
+                      disabled={busy === p.id}
+                      className="text-[11px] text-indigo-600 hover:underline disabled:opacity-50"
                     >
                       Export
-                    </a>
+                    </button>
                   )}
                   {canManage && (
                     <>

@@ -47,6 +47,7 @@ export function AmendmentBanner({
   const [flags, setFlags] = useState<Flag[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -66,13 +67,22 @@ export function AmendmentBanner({
   const acknowledge = useCallback(
     async (flagId: string) => {
       setBusy(flagId);
+      setErr(null);
       try {
         const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/amendments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ flagId }),
         });
-        if (res.ok) setFlags((prev) => prev.filter((f) => f.flagId !== flagId));
+        // 409 = already acknowledged (e.g. by a co-admin) → drop it locally too, not an error.
+        if (res.ok || res.status === 409) {
+          setFlags((prev) => prev.filter((f) => f.flagId !== flagId));
+        } else {
+          const j = await res.json().catch(() => ({}));
+          setErr(j.error || 'Could not acknowledge the change');
+        }
+      } catch {
+        setErr('Network error');
       } finally {
         setBusy(null);
       }
@@ -98,6 +108,7 @@ export function AmendmentBanner({
           This solicitation was amended — review {flags.length === 1 ? 'the change' : 'the changes'}
         </h3>
       </div>
+      {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
       <ul className="space-y-2">
         {flags.map((f) => (
           <li key={f.flagId} className="rounded border border-amber-200 bg-white px-3 py-2">

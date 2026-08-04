@@ -204,6 +204,17 @@ export async function POST(request: Request, ctx: RouteContext) {
         throw new Error('CONFLICT');
       }
 
+      // Archiving the proposal cascades its BUILD workflow instances (ARCHIVABLE_CONTRACT). Scope to the
+      // build spine — never a co-active discovery ('spotlight') or the awarded-path 'contract' kickoff
+      // (which, for outcome='awarded', is launched AFTER this transaction on the same opportunity).
+      if (proposal.opportunityId) {
+        await tx`
+          UPDATE process_instances SET archived_at = now()
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${proposal.opportunityId}::uuid AND archived_at IS NULL
+            AND (scope IS NULL OR scope NOT IN ('spotlight', 'contract'))
+        `;
+      }
+
       // Record in stage history with outcome details
       await tx`
         INSERT INTO proposal_stage_history

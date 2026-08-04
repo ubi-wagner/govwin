@@ -45,10 +45,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     const actor = { actorId: user.id, actorEmail: user.email ?? null, role: user.role as Role };
     try {
       if (body.action === 'confirm') {
-        const { flagged, tenants } = await confirmAmendment({ ...actor, amendmentId, solicitationId: solId });
-        if (flagged === 0 && tenants === 0) {
-          // Either already-resolved amendment or no affected proposals — surface as a 409 vs 200 distinctly.
-          return NextResponse.json({ data: { confirmed: true, flagged: 0, tenants: 0 } });
+        const { confirmed, flagged, tenants } = await confirmAmendment({ ...actor, amendmentId, solicitationId: solId });
+        if (!confirmed) {
+          return NextResponse.json({ error: 'Amendment not found or already resolved', code: 'CONFLICT' }, { status: 409 });
         }
         return NextResponse.json({ data: { confirmed: true, flagged, tenants } });
       }

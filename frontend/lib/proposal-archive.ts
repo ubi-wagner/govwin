@@ -58,9 +58,13 @@ export async function archiveProposal(
   let workflowsArchived = 0;
   if (row.opportunityId) {
     try {
+      // Scope to the BUILD workflows only. A tenant can have a co-active discovery ('spotlight') or
+      // post-award ('contract') workflow on the SAME opportunity spine (master-mirror, two releases) —
+      // archiving a portal must not flip those. NULL scope = legacy build instance, included.
       const wf = await sql<{ id: string }[]>`
         UPDATE process_instances SET archived_at = now()
         WHERE tenant_id = ${p.tenantId}::uuid AND opportunity_id = ${row.opportunityId}::uuid AND archived_at IS NULL
+          AND (scope IS NULL OR scope NOT IN ('spotlight', 'contract'))
         RETURNING id
       `;
       workflowsArchived = wf.length;
@@ -111,6 +115,7 @@ export async function restoreProposal(
       await sql`
         UPDATE process_instances SET archived_at = NULL
         WHERE tenant_id = ${p.tenantId}::uuid AND opportunity_id = ${rows[0].opportunityId}::uuid AND archived_at IS NOT NULL
+          AND (scope IS NULL OR scope NOT IN ('spotlight', 'contract'))
       `;
     } catch (e) {
       console.error('[restoreProposal] workflow restore cascade failed', e);

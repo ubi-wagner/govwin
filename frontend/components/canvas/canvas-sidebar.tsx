@@ -858,7 +858,7 @@ export function CanvasSidebar({
                 Save your edits — an admin accepts &amp; locks the section to complete it.
               </p>
             ) : null}
-            <CommentsSection nodeId={sectionId} proposalId={proposalId} tenantSlug={tenantSlug} />
+            <CommentsSection nodeId={sectionId} proposalId={proposalId} tenantSlug={tenantSlug} canComment={capabilities?.canComment ?? true} />
           </div>
         )}
 
