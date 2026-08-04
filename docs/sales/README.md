@@ -12,7 +12,22 @@ stat, and price is grounded in shipping functionality — no vaporware.
 |---|---|
 | `RFP-Pipeline-Platform-Overview.pdf` | The 10-page designed brochure (hand-out). Rendered from `sales.html` via Chromium. |
 | `RFP-Pipeline-Platform-Overview.docx` | The editable, branded Word version (embeds the rendered logo + section icons). |
-| `sales.html` | Source of truth for the PDF — a self-contained, print-styled page (US Letter, inline SVG icon sprite). |
+| `sales.html` | Source of truth for the 10-page PDF — a self-contained, print-styled page (US Letter, inline SVG icon sprite). |
+| `RFP-Pipeline-Cut-Sheet.pdf` | The **2-page print cut sheet** (hook + economics on p1; capabilities-at-a-glance + trust + pricing on p2). Rendered from `cutsheet.html`. |
+| `RFP-Pipeline-Cut-Sheet.docx` | Editable, branded Word version of the cut sheet. |
+| `cutsheet.html` | Source of truth for the 2-page cut sheet PDF. |
+
+## System document templates (in-product)
+`db/migrations/150_seed_system_templates.sql` seeds two **system** `document_templates`
+(`is_system=true`, `tenant_id=NULL`) that appear in every tenant's **New document → Start from a
+template** chooser and flatten into an editable canvas starter:
+- **Capability Statement** — the government one-pager (core competencies, differentiators, past
+  performance, corporate data / NAICS / certs / UEI-CAGE, contact).
+- **Executive Summary** — a proposal exec-summary skeleton (opportunity, problem/need, solution,
+  why-us, outcomes & value).
+
+Verified end-to-end: both list with `isSystem:true` and create-from-template yields a real editable
+document. Skeleton source: `_src/gen-templates.mjs` (also writes the migration).
 
 ## Also shipped in-product (dogfood)
 The same content lives as an **editable canvas document in the RFP Pipeline company library**
