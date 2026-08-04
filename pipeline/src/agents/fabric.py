@@ -400,7 +400,11 @@ class AgentFabric:
                 )
             except Exception as exc:
                 logger.error("[invoke_agent] unknown-archetype audit failed: %s", exc)
-            return {"status": "error", "reason": reason}
+            # Carry the message under BOTH keys: every other error return uses `error`, and
+            # process_task_queue reads `error` to flag the queue row — using only `reason` here
+            # left agent_task_queue.error NULL on an unknown-archetype failure (the admin saw the
+            # task failed but not WHY). Keep `reason` for back-compat.
+            return {"status": "error", "error": reason, "reason": reason}
 
         # 1. Emit start event
         start_event_id = await self._emit_event(
@@ -947,7 +951,8 @@ class AgentFabric:
 
                 # Update task status
                 status = "completed" if result.get("status") == "completed" else "failed"
-                error_text = result.get("error") if status == "failed" else None
+                # Read either key so no failure lands on the queue without its message.
+                error_text = (result.get("error") or result.get("reason")) if status == "failed" else None
 
                 try:
                     await conn.execute(
