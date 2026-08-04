@@ -90,7 +90,21 @@ function mapRow(r: WorkflowInstanceRow): WorkflowInstance {
   };
 }
 
-export default async function WorkflowMonitorPage() {
+// Completed/failed history lookback for the cross-tenant rollup. Allowlisted (no injection);
+// the interval string is bound as a parameter (`${interval}::interval`). process_instances are
+// retained indefinitely (no purge), so 7d/30d/90d surface last week's/month's completed runs.
+const RANGE_MAP: Record<string, { interval: string; label: string; limit: number }> = {
+  '24h': { interval: '24 hours', label: '24h', limit: 100 },
+  '7d': { interval: '7 days', label: '7d', limit: 300 },
+  '30d': { interval: '30 days', label: '30d', limit: 500 },
+  '90d': { interval: '90 days', label: '90d', limit: 500 },
+};
+
+export default async function WorkflowMonitorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
@@ -98,6 +112,10 @@ export default async function WorkflowMonitorPage() {
   if (role !== 'rfp_admin' && role !== 'master_admin') {
     redirect('/');
   }
+
+  const sp = await searchParams;
+  const range = sp?.range && RANGE_MAP[sp.range] ? sp.range : '24h';
+  const { interval: lookback, label: rangeLabel, limit: recentLimit } = RANGE_MAP[range];
 
   let active: WorkflowInstance[] = [];
   let recent: WorkflowInstance[] = [];
@@ -146,11 +164,11 @@ export default async function WorkflowMonitorPage() {
                     ELSE NULL END as duration_ms
         FROM process_instances pi
         LEFT JOIN tenants t ON t.id = pi.tenant_id
-        WHERE pi.created_at > NOW() - INTERVAL '24 hours'
+        WHERE pi.created_at > NOW() - ${lookback}::interval
           AND pi.status NOT IN ('running', 'paused', 'pending', 'retrying')
           AND pi.archived_at IS NULL
         ORDER BY pi.completed_at DESC NULLS LAST
-        LIMIT 100
+        LIMIT ${recentLimit}
       `;
       recent = rows.map(mapRow);
     } catch (e) {
@@ -165,8 +183,8 @@ export default async function WorkflowMonitorPage() {
         SELECT
           COUNT(*) FILTER (WHERE status = 'running') as running,
           COUNT(*) FILTER (WHERE status = 'paused') as paused,
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours') as completed_24h,
-          COUNT(*) FILTER (WHERE status = 'failed' AND completed_at > NOW() - INTERVAL '24 hours') as failed_24h
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at > NOW() - ${lookback}::interval) as completed_24h,
+          COUNT(*) FILTER (WHERE status = 'failed' AND completed_at > NOW() - ${lookback}::interval) as failed_24h
         FROM process_instances
         WHERE archived_at IS NULL
       `;
@@ -228,10 +246,27 @@ export default async function WorkflowMonitorPage() {
       </div>
       <LaunchContentClient />
       <LaunchCollaborationClient />
+      <div className="mb-3 flex items-center gap-2 text-sm">
+        <span className="text-gray-500">Completed/failed history:</span>
+        {(['24h', '7d', '30d', '90d'] as const).map((r) => (
+          <Link
+            key={r}
+            href={`/admin/workflows?range=${r}`}
+            className={`px-2.5 py-1 rounded border ${
+              range === r
+                ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+                : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {r === '24h' ? '24h' : r === '7d' ? 'Last 7 days' : r === '30d' ? '30 days' : '90 days'}
+          </Link>
+        ))}
+      </div>
       <WorkflowMonitorClient
         active={active}
         recent={recent}
         stats={stats}
+        rangeLabel={rangeLabel}
       />
     </div>
   );
