@@ -51,6 +51,16 @@ Accounts after the seed (passwords ROTATED by the seed — these are the e2e-can
 Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone/.next/static && cp -r public
 .next/standalone/public`, and `heartbeat.sh` will boot it. Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
 
+> **Starter content is now migration-seeded** (no separate step). `migrate.mjs` applies **mig 152**
+> (`system_starter` MASTER LIBRARY — the 18-foundation `STARTER_SET` decomposed into the rfp-pipeline
+> platform tenant) and **migs 150/151** (six shared SYSTEM `document_templates`). New tenants then
+> **eager-copy** that library into their own space on creation (`copyStarterSetToTenant`, both create
+> paths) — tenant-isolated `my_library` copies with `derived_from` lineage; masters shared + untouched.
+> To regenerate 152 from the builders after editing `lib/library/starter-set.ts`:
+> `cd frontend && DATABASE_URL=<sandbox> node_modules/.bin/tsx scripts/gen-starter-set-seed.mts`.
+> Prove copy + isolation: `… tsx scripts/verify-keep-copy.mts` (6/6). Bulk-copy unit drive:
+> `scripts/drive-starter-bulk.mts`.
+
 ### Running the e2e suite (what's green, what needs fixtures)
 ```bash
 cd frontend && TEST_BASE_URL=http://localhost:3000 npx playwright test --project=admin --project=tenant --reporter=line

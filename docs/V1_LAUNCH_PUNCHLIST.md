@@ -1,21 +1,34 @@
 # V1 Launch Punch List — 2026-08-04
 
-**Status going in:** code is **V1-complete + hardened** — migrations **148**, `tsc 0 · vitest 855 ·
+**Status going in:** code is **V1-complete + hardened** — migrations **152**, `tsc 0 · vitest 855 ·
 next build`, adversarial bug-hunt closed (12 fixes), toast polish, all three manuals + docs synced,
 and a live front-to-back / side-to-side test with **zero product bugs** (see docs/V1_READY_REPORT.md).
 What's left is **environment / config + one QA-fixture build** — nothing in the product itself.
 
+**As-built since (migs 149–152, all idempotent + self-guarding):** the dogfooded sales collateral
+canvas doc (149), six shared SYSTEM `document_templates` (150/151 — capability statement, exec summary,
+pitch deck, past performance, platform overview + cut sheet; `is_system`, surface in **both** RFP-admin
+and every tenant-admin chooser), and the **`system_starter` MASTER LIBRARY** (152 — the 18-foundation
+`STARTER_SET` decomposed into the rfp-pipeline platform tenant). New tenants now **eager-copy** that
+master library into their OWN space on creation (`copyStarterSetToTenant`, both create paths), so a
+fresh workspace lands with a populated, tenant-isolated library — proven 6/6 (copies are `my_library`
+with `derived_from` lineage; zero master leakage; masters untouched; idempotent). Templates stay shared;
+the empty-library OFFER remains as the fallback. **No new launch blocker** — 152 seeds on the standard
+`migrate.mjs` run and no-ops if the platform tenant is absent.
+
 Ordered by launch-criticality. Ops details for gates 1–4 live in docs/PRE_LAUNCH_CHECKLIST.md
-(numbers below refreshed to mig 148); run them against **prod**.
+(numbers below refreshed to mig 152); run them against **prod**.
 
 ---
 
 ## A. Blocking — do before flipping the switch (prod ops/config)
 
-- [ ] **A1 · Migrations applied through 148 + `user_memberships` backfilled.** Most load-bearing.
+- [ ] **A1 · Migrations applied through 152 + `user_memberships` backfilled.** Most load-bearing.
       `DATABASE_URL=<prod> node db/migrations/migrate.mjs` (idempotent; never set `ALLOW_SCHEMA_RESET`).
-      **Pass:** `_migration_history` contains `111_user_memberships` + `148_*`; **0** active non-admin
-      users without an active membership (the offboarding-fix invariant — query in PRE_LAUNCH §1).
+      **Pass:** `_migration_history` contains `111_user_memberships` + `152_*`; **0** active non-admin
+      users without an active membership (the offboarding-fix invariant — query in PRE_LAUNCH §1); and
+      `152` seeded the master library — `system_starter` foundations **= 18** under the rfp-pipeline tenant
+      (so new-tenant starter-copy has content to copy).
 - [ ] **A2 · Email provider wired in the FRONTEND service** (Gmail 4-var *or* `RESEND_API_KEY`).
       **Pass:** a real send (invite yourself / accept a throwaway app) reports `provider:'gmail'|'resend'`,
       not `'skipped'`. `skipped` = no nudges = the automation value-prop is dark.
@@ -72,7 +85,7 @@ To get the WHOLE suite green for real deploy-gating next cycle, close these — 
 ### One-glance gate
 | Wave | Item | Pass |
 |---|---|---|
-| **A (block)** | migs@148 + membership · email · ANTHROPIC (both) · opps flowing | all 4 green |
+| **A (block)** | migs@152 + membership · email · ANTHROPIC (both) · opps flowing | all 4 green |
 | **B (fast-follow)** | RLS cutover · TVSF demo refresh | scheduled post-go-live |
 | **C (QA next cycle)** | bypass env · fixture seeder · e2e auth · de-flake reach | full e2e suite green |
 | **D (known)** | Stripe self-serve · scoring overlay | intentionally deferred |

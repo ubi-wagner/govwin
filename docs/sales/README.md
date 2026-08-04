@@ -37,11 +37,19 @@ Verified end-to-end: all six list with `isSystem:true` for **both** a tenant (Li
 RFP-admin tenant, and create-from-template (incl. the slide deck) yields a real editable document.
 Skeleton sources: `_src/gen-templates.mjs` (mig 150) + `_src/gen-templates2.mjs` (mig 151).
 
-> **How new tenants get starter content (as-built).** On creation a tenant gets its **buckets**
-> (`seedDefaultBuckets`) and **opportunity cards** (`backfillTenant` from the master bridge) copied in,
-> and a **starter-set OFFER** (`offerStarterSet`). Library foundations (`system_starter`) and these
-> templates are **shared + copy-on-use** — materialized per-tenant when used (`copyFoundationToTenant`
-> / `starterFromTemplate`), deliberately *not* deep-copied into every tenant on creation.
+> **How new tenants get starter content (as-built — "keep + copy").** On creation a tenant gets its
+> **buckets** (`seedDefaultBuckets`), **opportunity cards** (`backfillTenant` from the master bridge),
+> and — new — an **eager copy of the whole `system_starter` library** into its OWN space
+> (`copyStarterSetToTenant`, wired into **both** create paths: `api/admin/tenants` POST and
+> `api/admin/applications/[id]/accept`). Each of the 18 starter foundations is materialized as a
+> tenant-owned atom (`collection=my_library`, `derived_from` lineage) — so a fresh workspace lands with
+> a populated, **tenant-isolated** library, not an empty one. The shared model is **kept**: the master
+> `system_starter` catalog (seeded by **`db/migrations/152_seed_system_starter_library.sql`** into the
+> rfp-pipeline platform tenant) and these SYSTEM templates stay **shared + copy-on-use**
+> (`copyFoundationToTenant` / `starterFromTemplate`), and the dismissible **OFFER** (`offerStarterSet`)
+> remains as a fallback if the eager copy lands nothing. Isolation is total — copies carry the new
+> tenant's `tenant_id`; the masters are never mutated (proof: `frontend/scripts/verify-keep-copy.mts`,
+> 6/6). Seed regenerated from the real builders by `frontend/scripts/gen-starter-set-seed.mts`.
 
 ## Also shipped in-product (dogfood)
 The same content lives as an **editable canvas document in the RFP Pipeline company library**
