@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 
 interface DocumentMeta {
   id: string;
@@ -128,12 +129,12 @@ export function DocumentListClient() {
       const res = await fetch(`/api/admin/documents/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        alert(body.error ?? 'Failed to delete document');
+        toast.error(body.error ?? 'Failed to delete document');
         return;
       }
       setDocuments((prev) => prev.filter((d) => d.id !== id));
     } catch {
-      alert('Network error deleting document');
+      toast.error('Network error deleting document');
     }
   };
 

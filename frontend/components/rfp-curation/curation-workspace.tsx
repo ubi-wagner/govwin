@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
+import { toast } from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import type { TextSelection } from './pdf-viewer';
 // react-pdf / pdf.js sets its worker at module-eval (import) time and touches browser
@@ -219,12 +220,12 @@ export function CurationWorkspace({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
       const d = json.data ?? {};
-      if (typeof window !== 'undefined') window.alert(
-        `Ingest Assist complete (${d.source}):\n• ${d.volumes} volumes · ${d.items} section molds\n• ${d.topics} topic(s) · ${d.cards} card(s) published`
+      toast.success(
+        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) · ${d.cards} card(s) published`,
       );
       router.refresh();
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : 'Ingest Assist failed');
+      toast.error(e instanceof Error ? e.message : 'Ingest Assist failed');
     } finally {
       setAssistBusy(false);
     }
@@ -242,7 +243,7 @@ export function CurationWorkspace({
       if (!res.ok) throw new Error(json.error || 'Assessment failed');
       setAssessment(json.data?.snapshot ?? null);
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : 'Assessment failed');
+      toast.error(e instanceof Error ? e.message : 'Assessment failed');
     } finally {
       setAssessBusy(false);
     }
@@ -515,7 +516,7 @@ export function CurationWorkspace({
           });
           if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
-            alert((err as { error?: string }).error ?? 'Failed to start curation');
+            toast.error((err as { error?: string }).error ?? 'Failed to start curation');
             return;
           }
           setSol((s) => ({ ...s, status: 'curation_in_progress' }));
@@ -616,10 +617,10 @@ export function CurationWorkspace({
       parsed = ['true', 'yes', '1'].includes(value.toLowerCase());
     } else if (field?.type === 'int') {
       parsed = parseInt(value, 10);
-      if (Number.isNaN(parsed)) { alert('Please enter a valid integer'); return; }
+      if (Number.isNaN(parsed)) { toast.error('Please enter a valid integer'); return; }
     } else if (field?.type === 'numeric') {
       parsed = parseFloat(value);
-      if (Number.isNaN(parsed)) { alert('Please enter a valid number'); return; }
+      if (Number.isNaN(parsed)) { toast.error('Please enter a valid number'); return; }
     }
 
     try {
@@ -949,7 +950,7 @@ export function CurationWorkspace({
                       const json = await resp.json();
                       const extracted = json.data?.topics ?? [];
                       if (extracted.length === 0) {
-                        alert(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
+                        toast.info(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
                         return;
                       }
                       // Pre-fill the bulk import modal with extracted topics
@@ -961,7 +962,7 @@ export function CurationWorkspace({
                       setExtractedPasteText(pasteText);
                       setShowBulkAddTopics(true);
                     } catch {
-                      alert('Failed to extract topics from the PDF.');
+                      toast.error('Failed to extract topics from the PDF.');
                     } finally {
                       setExtractingTopics(false);
                     }

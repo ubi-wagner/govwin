@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 
 export function ArchivePortalButton({ tenantSlug, proposalId }: { tenantSlug: string; proposalId: string }) {
   const [busy, setBusy] = useState(false);
@@ -33,10 +34,10 @@ export function ArchivePortalButton({ tenantSlug, proposalId }: { tenantSlug: st
         router.refresh();
       } else {
         const j = await res.json().catch(() => ({}));
-        if (typeof window !== 'undefined') window.alert(j.error || 'Archive failed');
+        toast.error(j.error || 'Archive failed');
       }
     } catch {
-      if (typeof window !== 'undefined') window.alert('Network error');
+      toast.error('Network error');
     } finally {
       setBusy(false);
     }
