@@ -85,6 +85,21 @@ dep. What the close-out did (punch-list Wave C):
   (`OnCardApplied` → `pipeline/.../rescore.py` writes `tenant_bucket_scores`, which `/cards` reads). Set
   **`E2E_WITH_PIPELINE=1`** (+ run the pipeline worker consuming events) to exercise it. Its fixtures ARE seeded.
 
+### ⚠⚠ VALIDATION HYGIENE — two traps that make "green" LIE (learned 2026-08-04, the hard way)
+1. **The standalone server serves the BUILD, not your source.** After ANY app-code change (routes,
+   lib, components), the running `.next/standalone/server.js` is STALE until you `npx next build` +
+   **clear** `rm -rf .next/standalone/.next/static .next/standalone/public` (serve-e2e only stages when
+   absent) + restart. A route-level test against a stale build validates the OLD code and passes/fails
+   for the wrong reason. Confirm freshness: `grep -rl <a-symbol-from-your-change> .next/standalone/.next/server`.
+   (This bit us: keep+copy passed at the FUNCTION level but the REAL `POST /api/admin/tenants` copied 0 —
+   because the served build predated the code. Rebuild → 18 copied. Always validate on a FRESH build.)
+2. **The pipeline agent suite SILENTLY SKIPS its DB-backed guardrails without `DATABASE_URL`.**
+   `cd pipeline && python3 -m pytest -q` → 789 pass / **218 skipped** (the injection-fence, cross-tenant
+   isolation, ILIKE-escape, tenant_id-GUC/RLS tests skip with *"no reachable Postgres"*). Run WITH the DB:
+   `DATABASE_URL=<sandbox> python3 -m pytest -q --ignore=tests/test_crypto.py` → **979 pass / 28 skip**
+   (test_crypto's 8 fails are a PyO3/cryptography env binding bug, NOT agent code). ALWAYS export
+   DATABASE_URL when validating the agents, or the security guardrails are never actually exercised.
+
 ### The REAL "fire off a portal" lifecycle (needs NO bypass — this is the product path)
 ```
 tenant_admin: POST /api/portal/<slug>/purchase { opportunityId, promoCode:'rfppipelinetest' }  → curation_pending ($0 comp purchase, emits capture:purchase.completed)

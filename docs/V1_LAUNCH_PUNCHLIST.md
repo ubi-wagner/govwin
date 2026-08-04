@@ -16,6 +16,25 @@ with `derived_from` lineage; zero master leakage; masters untouched; idempotent)
 the empty-library OFFER remains as the fallback. **No new launch blocker** — 152 seeds on the standard
 `migrate.mjs` run and no-ops if the platform tenant is absent.
 
+**🔬 Independent validation pass (2026-08-04) — everything below re-verified against a FRESH build,
+adversarially (3+ real scenarios each, not the happy path):**
+- **keep+copy** — driven through the REAL running routes (`POST /api/admin/tenants` AND
+  `applications/[id]/accept`), NOT the helper in isolation: 18 `my_library` copies + lineage 303, full
+  tenant isolation (zero master leak, zero cross-tenant row overlap), and the empty-master **fallback
+  fires the OFFER**. ⚠ This surfaced that the running server was a 13h-STALE build (copied 0); **rebuilt →
+  all pass**. Validation now always runs on a fresh build.
+- **mig 152** — content integrity (real canvas + full taxonomy + containment), tenant-absent **guard**
+  (0 seeded, no FK error), **cold apply from empty** (18/303), and idempotent re-apply. All pass.
+- **e2e** — full admin+tenant suite green on the fresh build (**62 pass · 0 fail · 1 skip**) + a
+  **negative control**: a broken fixture makes the spec FAIL, restored makes it PASS (specs discriminate,
+  not vacuous).
+- **the AGENTS** — pipeline `pytest` **979 pass · 28 skip** (WITH a live DB; the 8 fails are a
+  PyO3/cryptography env bug, not agents), incl. **59 adversarial security tests** now actually executing
+  (injection fence-escape neutralized, cross-tenant rows excluded, wrong-tenant→not-found, registry strips
+  `tenant_id`, RLS `app.tenant_id` GUC set/reset); frontend agent vitest **66 pass**; fabric registers **36
+  archetypes**; boot invariant `Workflow.validate()` across **29 workflows → 0 unmapped AI_INVOKE**.
+  ⚠ These security tests were SILENTLY SKIPPING without `DATABASE_URL` — now run with the DB.
+
 Ordered by launch-criticality. Ops details for gates 1–4 live in docs/PRE_LAUNCH_CHECKLIST.md
 (numbers below refreshed to mig 152); run them against **prod**.
 
@@ -35,6 +54,9 @@ Ordered by launch-criticality. Ops details for gates 1–4 live in docs/PRE_LAUN
 - [ ] **A3 · `ANTHROPIC_API_KEY` set in BOTH pipeline and frontend.** Pipeline hard-raises without it
       (every woken agent fails); frontend silently falls back to a `placeholder` draft.
       **Pass:** release a portal / hit the draft route → a section returns a **real model id**, not `placeholder`.
+      *(The agent WIRING + guardrails are independently proven — 979 pipeline tests incl. 59 adversarial
+      security, 36 archetypes register, 0 unmapped AI_INVOKE. A3 gates only live MODEL OUTPUT, which the
+      sandbox can't exercise without the key — this is the one agent-behavior check that must happen on prod.)*
 - [ ] **A4 · Opportunities flowing.** `opportunity_bridge` > 0, `tenant_opportunity_cards` > 0, and
       `max(created_at)` on `finder` events is **fresh** (scout/ingest loop live, not a stale snapshot).
       **Pass:** a launch tenant's `/cards` is populated.
@@ -97,5 +119,11 @@ gates it: `DATABASE_URL=<db> bash scripts/serve-e2e.sh &` then `npx playwright t
 | **C (QA)** ✅ | serve-e2e bypass · fixture seeder + globalSetup · e2e auth · de-flake reach | **62 pass · 0 fail · 1 skip (reproducible)** |
 | **D (known)** | Stripe self-serve · scoring overlay · ranking-needs-pipeline (C5) | intentionally deferred |
 
-**Wave A green → launch.** B right after. **C is CLOSED** — the e2e suite is deploy-gateable now
-(one spec, `ranking`, is skipped until the pipeline runs alongside the app; see C5).
+**Wave A green → launch.** B right after. **C is CLOSED + independently validated** — the e2e suite is
+deploy-gateable now (one spec, `ranking`, skipped until the pipeline runs alongside the app; see C5).
+
+> **Pre-launch smoke-test reminders (from the 2026-08-04 validation, so we don't validate a lie):**
+> ① After the prod deploy, smoke-test against the **freshly-built** artifact — a stale build serves old
+>   code and "passes" for the wrong reason (this masked a keep+copy break here). ② When validating the
+>   agents, always export `DATABASE_URL` or the injection/tenant-isolation guardrail tests **silently skip**.
+>   ③ A3 (live model output) is the ONE agent behavior only prod can prove — do it right after the key lands.
