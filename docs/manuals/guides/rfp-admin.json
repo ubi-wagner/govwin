@@ -555,6 +555,49 @@
           "heading": "Customer interest & topic detail",
           "toc": "6.5 · Customer interest",
           "body": "<p>At the bottom of the workspace, <b>Customer Interest</b> lists tenants who pinned topics under this solicitation — with the topic, pin date, whether they bought a portal, the proposal stage, and a <b>View Portal</b> link (which drops you into that tenant’s workspace). Open a single topic (from the Topics list) to edit its Title, Description, Status, and Tech Focus Areas on the <b>topic detail</b> page.</p>"
+        },
+        {
+          "id": "assess-ingest",
+          "heading": "Assess ingest readiness (advisory)",
+          "toc": "6.6 · Assess ingest readiness",
+          "lead": "<p><b>Assess ingest readiness</b> wakes the <b>RFP Ingest Manager</b> agent to look over a curated solicitation and recommend what to do next. It is advisory and read-only — it never edits the solicitation and never descends into a tenant.</p>",
+          "steps": [
+            {
+              "t": "Click <b>Assess ingest readiness</b>. You get an immediate, deterministic <b>stage snapshot</b> — shred → extract → matrix → skeleton — showing how far ingest has progressed."
+            },
+            {
+              "t": "In the background the manager posts a coordination plan (which specialist agents to run next) to the <b>Agent Workforce</b> audit; the run is injection-fenced and budget-capped like every agent."
+            }
+          ],
+          "callouts": [
+            {
+              "kind": "note",
+              "html": "This is the platform-side analog of the tenant <b>Proposal Studio</b> manager: it <i>plans</i>, it doesn’t act. Use its readout to decide whether to run <b>Ingest Assist</b> or hand-finish the curation."
+            }
+          ]
+        },
+        {
+          "id": "amendments",
+          "heading": "Amendments — log a change, fan it out to tenants",
+          "toc": "6.7 · Amendments",
+          "lead": "<p>When an agency amends a solicitation after it’s been built against, the <b>Amendments</b> panel is how you push the change to every affected proposal. Log it → confirm it → each tenant acknowledges.</p>",
+          "steps": [
+            {
+              "t": "Click <b>+ Log amendment</b>. Give it a <b>label</b> (e.g. “Amendment 0002”), a <b>severity</b> (critical / major / minor / info), a <b>summary</b>, and — row by row — the <b>compliance delta</b> (added / removed / changed requirement + detail)."
+            },
+            {
+              "t": "Review the logged amendment, then <b>Confirm → notify</b>. This fans the change out to <i>every active proposal</i> built from this solicitation (archived builds are skipped); each tenant gets a banner to acknowledge."
+            },
+            {
+              "t": "Watch the per-amendment <b>acknowledged N / M</b> counter as tenants clear their banners. <b>Dismiss</b> a false positive instead of confirming — no fan-out."
+            }
+          ],
+          "callouts": [
+            {
+              "kind": "warn",
+              "html": "Confirming is a customer-visible action — it raises a banner on every affected build. Log the delta precisely (it’s what the tenant sees); dismiss anything that isn’t a real compliance change."
+            }
+          ]
         }
       ]
     },
@@ -604,6 +647,12 @@
         },
         {
           "t": "Confirm the tenant now sees an unlocked proposal workspace with a populated compliance matrix."
+        }
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "You can also grant a build <b>free</b> — approve it as a <b>comped portal</b> instead of waiting on a purchase. That records a <b>$0 purchase</b> row (<code>metadata.grant=admin</code>) and emits the same <code>capture:purchase.completed</code> event, so a comp <b>audits exactly like a paid buy</b>. (Self-serve Stripe checkout is descoped for V1 — the comp code <code>rfppipelinetest</code> and this admin grant are the two paths in.)"
         }
       ]
     },
@@ -851,6 +900,26 @@
               "t": "Set <b>Max stages</b>, <b>Max collaborators</b>, <b>Max managers</b>, and <b>Max nudges</b>, then <b>Save limits</b>. Changes apply to future launches; frozen configs are unaffected."
             }
           ]
+        },
+        {
+          "id": "doorbell",
+          "heading": "Proposal Auto-Drive (the doorbell)",
+          "toc": "13.2 · Proposal Auto-Drive",
+          "lead": "<p>From <code>/admin/agents</code> you can drive a tenant’s <b>full draft</b> from up top — the “doorbell.” It fires the exact same engine the customer’s <b>Proposal Studio</b> uses, without you descending into the portal.</p>",
+          "steps": [
+            {
+              "t": "On the <b>Proposal Auto-Drive</b> card, pick the target proposal and ring the doorbell — it posts a full-draft request (Mode C, full-auto) for that build."
+            },
+            {
+              "t": "The request funnels through the one shared helper as the in-portal button, so it lands as a single auditable record; the only difference is <b>source = admin_doorbell</b> vs <b>portal</b>."
+            }
+          ],
+          "callouts": [
+            {
+              "kind": "note",
+              "html": "Advisory, like everything here: the auto-drive drafts across the proposal and lands in review — it never advances a stage gate, locks, or submits. The tenant sees the drafts arrive in their workspace, fully attributed."
+            }
+          ]
         }
       ]
     },
@@ -1019,6 +1088,10 @@
         {
           "kind": "eg",
           "html": "<b>One account, both jobs.</b> <code>eric@rfppipeline.com</code> ingests at <code>/admin</code>, descends into Immobileyes to build, then rises back up — no separate login."
+        },
+        {
+          "kind": "note",
+          "html": "<b>Archive = license slumber (reversible).</b> Archiving a company sets its archived-at watermark; every non-admin user loses access at once (the access gate reads that watermark) and its running workflows cascade to archived — <i>without</i> touching anyone’s individual membership. <b>Restore</b> lifts the gate and returns everyone to <i>exactly</i> their prior state (active users active, individually-inactive users still inactive). Nothing is deleted."
         }
       ]
     },
