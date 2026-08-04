@@ -18,16 +18,30 @@ stat, and price is grounded in shipping functionality — no vaporware.
 | `cutsheet.html` | Source of truth for the 2-page cut sheet PDF. |
 
 ## System document templates (in-product)
-`db/migrations/150_seed_system_templates.sql` seeds two **system** `document_templates`
-(`is_system=true`, `tenant_id=NULL`) that appear in every tenant's **New document → Start from a
-template** chooser and flatten into an editable canvas starter:
-- **Capability Statement** — the government one-pager (core competencies, differentiators, past
-  performance, corporate data / NAICS / certs / UEI-CAGE, contact).
-- **Executive Summary** — a proposal exec-summary skeleton (opportunity, problem/need, solution,
-  why-us, outcomes & value).
+`db/migrations/150_*` + `151_*` seed **six SYSTEM** `document_templates` (`is_system=true`,
+`tenant_id=NULL`). System templates are **shared**, so a single seed surfaces them in **both** the
+RFP-admin platform tenant AND every tenant-admin's **New document → Start from a template** chooser
+(the portal `/templates` GET returns tenant + `is_system` rows). `starterFromTemplate` copies the
+skeleton into a fresh editable canvas on use.
 
-Verified end-to-end: both list with `isSystem:true` and create-from-template yields a real editable
-document. Skeleton source: `_src/gen-templates.mjs` (also writes the migration).
+| Template | Type | Purpose |
+|---|---|---|
+| **Capability Statement** | custom | Gov one-pager: core competencies, differentiators, past performance, corporate data, contact. |
+| **Executive Summary** | abstract | Proposal exec-summary skeleton. |
+| **Pitch Deck** | slide_deck | 7-slide 16:9 capability/pitch deck skeleton. |
+| **Past Performance** | past_performance | Contract-facts + scope/approach/outcomes/relevance write-up. |
+| **Platform Overview & Capabilities** | custom | The RFP Pipeline overview (reference/example canvas). |
+| **Platform Cut Sheet (2-page)** | custom | The RFP Pipeline cut sheet (reference/example canvas). |
+
+Verified end-to-end: all six list with `isSystem:true` for **both** a tenant (Lighthouse) and the
+RFP-admin tenant, and create-from-template (incl. the slide deck) yields a real editable document.
+Skeleton sources: `_src/gen-templates.mjs` (mig 150) + `_src/gen-templates2.mjs` (mig 151).
+
+> **How new tenants get starter content (as-built).** On creation a tenant gets its **buckets**
+> (`seedDefaultBuckets`) and **opportunity cards** (`backfillTenant` from the master bridge) copied in,
+> and a **starter-set OFFER** (`offerStarterSet`). Library foundations (`system_starter`) and these
+> templates are **shared + copy-on-use** — materialized per-tenant when used (`copyFoundationToTenant`
+> / `starterFromTemplate`), deliberately *not* deep-copied into every tenant on creation.
 
 ## Also shipped in-product (dogfood)
 The same content lives as an **editable canvas document in the RFP Pipeline company library**
