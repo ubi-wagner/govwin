@@ -21,6 +21,8 @@ export type WorkflowInstance = {
   completedAt: string | null;
   lastHeartbeatAt: string | null;
   tenantId: string | null;
+  tenantName: string | null;
+  tenantSlug: string | null;
   source: string;
   retryCount: number;
   lastError: string | null;
@@ -47,6 +49,8 @@ type WorkflowInstanceRow = {
   completedAt: Date | null;
   lastHeartbeatAt: Date | null;
   tenantId: string | null;
+  tenantName: string | null;
+  tenantSlug: string | null;
   source: string;
   retryCount: number;
   lastError: string | null;
@@ -75,6 +79,8 @@ function mapRow(r: WorkflowInstanceRow): WorkflowInstance {
     completedAt: r.completedAt ? r.completedAt.toISOString() : null,
     lastHeartbeatAt: r.lastHeartbeatAt ? r.lastHeartbeatAt.toISOString() : null,
     tenantId: r.tenantId,
+    tenantName: r.tenantName ?? null,
+    tenantSlug: r.tenantSlug ?? null,
     source: r.source ?? 'pipeline',
     retryCount: r.retryCount ?? 0,
     lastError: r.lastError,
@@ -101,17 +107,19 @@ export default async function WorkflowMonitorPage() {
   // (a) Active workflow instances
   try {
     const rows = await sql<WorkflowInstanceRow[]>`
-      SELECT id, workflow_name, status, current_step, current_step_index,
-             step_status, started_at, completed_at, last_heartbeat_at,
-             tenant_id, source, retry_count, last_error, last_error_step,
-             recovered_from,
-             CASE WHEN completed_at IS NOT NULL AND started_at IS NOT NULL
-                  THEN EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000
+      SELECT pi.id, pi.workflow_name, pi.status, pi.current_step, pi.current_step_index,
+             pi.step_status, pi.started_at, pi.completed_at, pi.last_heartbeat_at,
+             pi.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug,
+             pi.source, pi.retry_count, pi.last_error, pi.last_error_step,
+             pi.recovered_from,
+             CASE WHEN pi.completed_at IS NOT NULL AND pi.started_at IS NOT NULL
+                  THEN EXTRACT(EPOCH FROM (pi.completed_at - pi.started_at)) * 1000
                   ELSE NULL END as duration_ms
-      FROM process_instances
-      WHERE status IN ('running', 'paused', 'pending', 'retrying')
-        AND archived_at IS NULL
-      ORDER BY started_at DESC NULLS LAST
+      FROM process_instances pi
+      LEFT JOIN tenants t ON t.id = pi.tenant_id
+      WHERE pi.status IN ('running', 'paused', 'pending', 'retrying')
+        AND pi.archived_at IS NULL
+      ORDER BY pi.started_at DESC NULLS LAST
       LIMIT 50
     `;
     active = rows.map(mapRow);
@@ -128,18 +136,20 @@ export default async function WorkflowMonitorPage() {
   if (!migrationRequired) {
     try {
       const rows = await sql<WorkflowInstanceRow[]>`
-        SELECT id, workflow_name, status, current_step, current_step_index,
-               step_status, started_at, completed_at, last_heartbeat_at,
-               tenant_id, source, retry_count, last_error, last_error_step,
-               recovered_from,
-               CASE WHEN completed_at IS NOT NULL AND started_at IS NOT NULL
-                    THEN EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000
+        SELECT pi.id, pi.workflow_name, pi.status, pi.current_step, pi.current_step_index,
+               pi.step_status, pi.started_at, pi.completed_at, pi.last_heartbeat_at,
+               pi.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug,
+               pi.source, pi.retry_count, pi.last_error, pi.last_error_step,
+               pi.recovered_from,
+               CASE WHEN pi.completed_at IS NOT NULL AND pi.started_at IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (pi.completed_at - pi.started_at)) * 1000
                     ELSE NULL END as duration_ms
-        FROM process_instances
-        WHERE created_at > NOW() - INTERVAL '24 hours'
-          AND status NOT IN ('running', 'paused', 'pending', 'retrying')
-          AND archived_at IS NULL
-        ORDER BY completed_at DESC NULLS LAST
+        FROM process_instances pi
+        LEFT JOIN tenants t ON t.id = pi.tenant_id
+        WHERE pi.created_at > NOW() - INTERVAL '24 hours'
+          AND pi.status NOT IN ('running', 'paused', 'pending', 'retrying')
+          AND pi.archived_at IS NULL
+        ORDER BY pi.completed_at DESC NULLS LAST
         LIMIT 100
       `;
       recent = rows.map(mapRow);

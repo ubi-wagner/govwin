@@ -392,11 +392,11 @@ export function WorkflowMonitorClient({
 
                     <SourceBadge source={w.source} />
 
-                    {w.tenantId && (
-                      <span className="text-xs text-gray-400 font-mono">
-                        tenant: {w.tenantId.slice(0, 8)}...
-                      </span>
-                    )}
+                    <span className="text-xs text-gray-500" title={w.tenantId ?? 'platform (rfp-pipeline)'}>
+                      {w.tenantId
+                        ? <>tenant: <span className="font-medium text-gray-700">{w.tenantName ?? w.tenantSlug ?? `${w.tenantId.slice(0, 8)}…`}</span></>
+                        : <span className="font-medium text-indigo-600">Platform</span>}
+                    </span>
 
                     {w.retryCount > 0 && (
                       <span className="text-xs text-orange-600 font-medium">
@@ -486,6 +486,12 @@ export function WorkflowMonitorClient({
                     </span>
 
                     <SourceBadge source={w.source} />
+
+                    <span className="text-xs text-gray-500" title={w.tenantId ?? 'platform (rfp-pipeline)'}>
+                      {w.tenantId
+                        ? <>tenant: <span className="font-medium text-gray-700">{w.tenantName ?? w.tenantSlug ?? `${w.tenantId.slice(0, 8)}…`}</span></>
+                        : <span className="font-medium text-indigo-600">Platform</span>}
+                    </span>
 
                     {w.retryCount > 0 && (
                       <span className="text-xs text-orange-600 font-medium">
