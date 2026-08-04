@@ -88,3 +88,37 @@ manuals and engineering docs match the as-built system.
 - RLS cutover stays **inert until the one-op prod `DATABASE_URL` flip** off the owner role (docs/RLS_CUTOVER.md).
 - Self-serve Stripe checkout descoped — comp code `rfppipelinetest` + the admin comped-portal grant are the two paths in.
 - `scoring_strategist` agent overlay is forthcoming; bucket ranking is deterministic today.
+
+---
+
+## 7. Front-to-back / side-to-side test (2026-08-04)
+
+Full sweep against the live sandbox server. **Zero product bugs found.**
+
+### Side to side — every actor
+- **`hitl-role-smoke` 5/5 pass** — master_admin · rfp_admin · tenant_admin · tenant_user · partner_user each
+  authenticate and carry the correct session role.
+- **Surface reachability: 45 e2e specs pass** — every admin page and every portal page loads at **HTTP 200**
+  (`zzscreens.admin`/`zzscreens.tenant` captures), plus smoke, redirects, onboarding, and `reach.admin`.
+
+### Front to back — firing off a portal (the real customer lifecycle)
+Drove the exact path a customer runs, as the actual actors, verified in DB + UI:
+1. **tenant_admin purchases** a card with comp code `rfppipelinetest` → `200`, portal `curation_pending`, `comp:true`.
+2. **rfp_admin releases** (`POST /portals/[id]?action=release`, rfp_admin-gated so a buyer can't self-release past
+   the 72h SLA) → `200 released:true` → **provision** creates the proposal + compliance matrix + section, then flips
+   the portal **`launched`**.
+3. **Customer opens the provisioned, UNLOCKED build** — Studio, compliance-matrix volume, AI Section Drafter, stage
+   bar, export-gated-until-lock all render.
+- Audit verified: **$0 comp `purchases` row** (`status=completed`, `promo_code=rfppipelinetest`) + **`capture:purchase.completed`** event fired.
+
+### The 13 e2e "failures" — all environmental, none a product bug (each verified against source)
+- **`PAYMENT_REQUIRED` (402)** on `matrix`/`lock`/`fullloop`/`atomloop` — those specs use the **deliberately
+  paywalled** `/proposals/create` direct-hook (its own code comment: *"the real product flow provisions via portal
+  release … never hits this route"*). The 402 is the paywall **working**; the real path (purchase→release) is proven above.
+- **`NOT_FOUND` (404)** on `ranking`/`fanout` — the specs reference hardcoded fixture-solicitation UUIDs
+  (`c3000000…`, `c4000000…`) that a CI global-setup seeds and a bare sandbox tenant lacks.
+- **`FORBIDDEN` (403)** on `collab`/downstream — no proposal/collaborator fixture in the freshly-seeded Lighthouse tenant.
+- **`reach.tenant` `-1`** — a flaky client-side `page.goto` timeout under the rapid sweep (server logs are clean; the
+  same routes are proven **HTTP 200** by the zzscreens captures; different routes fail each run). Harness artifact.
+
+Sandbox left in its documented state (paywall-enforced server, Foundation/TVSF demo untouched).
