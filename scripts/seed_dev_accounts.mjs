@@ -141,6 +141,7 @@ async function run() {
   console.log(`✓ master_admin: ${ADMIN.email}`);
 
   // 2) The two customer tenants + their tenant_admins.
+  const tenantIds = {};
   for (const t of TENANTS) {
     const [tenant] = await sql`
       INSERT INTO tenants (slug, name, status, product_tier)
@@ -149,8 +150,22 @@ async function run() {
         SET name = EXCLUDED.name, status = 'active', product_tier = EXCLUDED.product_tier, updated_at = now()
       RETURNING id
     `;
+    tenantIds[t.slug] = tenant.id;
     await upsertUser({ email: t.adminEmail, name: t.adminName, role: 'tenant_admin', tenantId: tenant.id, password: t.pw });
     console.log(`✓ tenant '${t.slug}' (${tenant.id}) + tenant_admin ${t.adminEmail}`);
+  }
+
+  // 2b) The extra e2e/fixture personas the persona-suite + blocker drives log in as
+  //     (auth.setup.ts collaborator + zzblockers member). Seeded here so a fresh
+  //     `seed_dev_accounts` run makes the whole e2e suite runnable — previously these
+  //     were hand-seeded out-of-band and a full refresh missed them (punch list C3).
+  const EXTRA_USERS = [
+    { email: process.env.COLLAB_EMAIL || 'collab@lighthouse.com', name: 'Collaborator (Lighthouse)', role: 'partner_user', slug: 'lighthouse', pw: process.env.COLLAB_PW || 'CollabPass1' },
+    { email: 'member@ubihere.com', name: 'Team Member (Ubihere)', role: 'tenant_user', slug: 'ubihere', pw: process.env.MEMBER_PW || 'MemberPass1' },
+  ];
+  for (const u of EXTRA_USERS) {
+    await upsertUser({ email: u.email, name: u.name, role: u.role, tenantId: tenantIds[u.slug], password: u.pw });
+    console.log(`✓ extra persona: ${u.email} (${u.role} @ ${u.slug})`);
   }
 
   // 3) Optional: remove the migration-seeded demo fixtures (apex-defense + techalliance).
