@@ -41,10 +41,12 @@ interface HealthResponse {
 }
 
 const BOOTED_AT = Date.now();
-// Coordinated cross-service release tag — bumped to force + verify a deploy of
-// every service (frontend/pipeline/CMS) in the same merge cycle. Curl /api/health
-// and compare `release` across services to confirm they're all on this build.
-const RELEASE = 'alpha-e2e-2026-07-14';
+// Coordinated cross-service release tag — derived from the deployed build so there
+// is nothing to hand-edit. Railway injects RAILWAY_GIT_COMMIT_SHA per deploy; all
+// three services (frontend/pipeline/CMS) report the same value when they are on the
+// same build, which deploy-verify.yml asserts. APP_RELEASE can override with a
+// human-friendly tag if set for every service.
+const RELEASE = process.env.APP_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev';
 
 export const dynamic = 'force-dynamic';
 

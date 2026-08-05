@@ -1,0 +1,125 @@
+name: Deploy Verify (alignment)
+
+# One-touch verification that every service + the main DB is on the SAME, CURRENT build
+# after a Railway push-to-deploy. This does NOT deploy — Railway rebuilds all three
+# services on merge to main and auto-runs migrations (frontend entrypoint → migrate.mjs
+# for the main DB; CMS boot → services/cms/db/run.sh for the CMS DB). This workflow is the
+# "is everything aligned?" gate:
+#
+#   1. drift-audit    — `migrate.mjs --check` against the prod main DB. Fails if any applied
+#                       migration's file has changed since it was applied (the silent
+#                       edited-after-apply drift that left idx_process_instances_dedup
+#                       missing in prod; see mig 154). Read-only.
+#   2. health-parity  — polls each service's health endpoint, asserts it is healthy AND that
+#                       all services report the same build SHA (RAILWAY_GIT_COMMIT_SHA,
+#                       surfaced as `.version`). Frontend + CMS are required; pipeline is
+#                       included when PROD_PIPELINE_URL is set (it is a worker and may not
+#                       expose a public health URL).
+#
+# Config (NO new secrets beyond what migrate.yml already uses):
+#   secrets: DATABASE_URL                              (prod main DB — reused from migrate.yml)
+#   vars:    PROD_FRONTEND_URL, PROD_CMS_URL           (public https base URLs; required)
+#            PROD_PIPELINE_URL                          (optional — pipeline /healthz base URL)
+#
+# Run it from the Actions tab after a deploy, or let the schedule watchdog run it. Pass an
+# expected_sha to pin the check to a specific commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Optional: assert every service reports THIS 7-char commit SHA (blank = only require they all match each other)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '23 */6 * * *'   # every 6h: proactive drift + alignment watchdog (read-only)
+
+permissions:
+  contents: read
+
+jobs:
+  drift-audit:
+    name: Main DB migration drift (--check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: migrate.mjs --check against prod main DB
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret not set — cannot audit prod migration drift"
+            exit 1
+          fi
+          npm install --no-save postgres@3.4.3
+          # Exits 1 and lists the files if any applied migration drifted on prod.
+          node db/migrations/migrate.mjs --check
+
+  health-parity:
+    name: Cross-service health + build-SHA parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Poll health endpoints and assert alignment
+        env:
+          FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL }}
+          CMS_URL: ${{ vars.PROD_CMS_URL }}
+          PIPELINE_URL: ${{ vars.PROD_PIPELINE_URL }}
+          EXPECTED_SHA: ${{ github.event.inputs.expected_sha }}
+        run: |
+          set -uo pipefail
+          fail=0
+          versions=""
+
+          # ── Frontend (required): /api/health → { version, db:{ok}, s3:{ok} } ──
+          if [ -z "${FRONTEND_URL:-}" ]; then echo "::error::PROD_FRONTEND_URL repo variable not set"; exit 1; fi
+          FB=$(curl -fsS --max-time 20 "${FRONTEND_URL%/}/api/health") || { echo "::error::frontend unreachable at ${FRONTEND_URL}"; exit 1; }
+          FV=$(jq -r '.version' <<<"$FB"); FDB=$(jq -r '.db.ok' <<<"$FB"); FS3=$(jq -r '.s3.ok' <<<"$FB")
+          echo "frontend: version=$FV db.ok=$FDB s3.ok=$FS3"
+          [ "$FDB" = "true" ] || { echo "::error::frontend DB not ok"; fail=1; }
+          [ "$FS3" = "true" ] || { echo "::warning::frontend S3 not ok"; }
+          versions="$versions frontend=$FV"
+
+          # ── CMS (required): /health → { version, database:'connected' } ──
+          if [ -z "${CMS_URL:-}" ]; then echo "::error::PROD_CMS_URL repo variable not set"; exit 1; fi
+          CB=$(curl -fsS --max-time 20 "${CMS_URL%/}/health") || { echo "::error::cms unreachable at ${CMS_URL}"; exit 1; }
+          CV=$(jq -r '.version' <<<"$CB"); CDB=$(jq -r '.database' <<<"$CB")
+          echo "cms: version=$CV database=$CDB"
+          [ "$CDB" = "connected" ] || { echo "::error::cms DB not connected ($CDB)"; fail=1; }
+          versions="$versions cms=$CV"
+
+          # ── Pipeline (optional worker): /healthz → { version, db:{ok} } ──
+          if [ -n "${PIPELINE_URL:-}" ]; then
+            if PB=$(curl -fsS --max-time 20 "${PIPELINE_URL%/}/healthz"); then
+              PV=$(jq -r '.version' <<<"$PB"); PDB=$(jq -r '.db.ok' <<<"$PB")
+              echo "pipeline: version=$PV db.ok=$PDB"
+              [ "$PDB" = "true" ] || { echo "::error::pipeline DB not ok"; fail=1; }
+              versions="$versions pipeline=$PV"
+            else
+              echo "::error::pipeline unreachable at ${PIPELINE_URL}"; fail=1
+            fi
+          else
+            echo "pipeline: PROD_PIPELINE_URL not set — skipping (optional; worker may not expose a public health URL)"
+          fi
+
+          # ── Build-SHA parity ──
+          echo "reported builds:$versions"
+          distinct=$(echo "$versions" | tr ' ' '\n' | sed 's/.*=//' | grep -v '^$' | sort -u | wc -l | tr -d ' ')
+          if [ "$distinct" -gt 1 ]; then
+            echo "::error::services are NOT on the same build (a deploy may be mid-flight, or one service failed to redeploy):$versions"
+            fail=1
+          fi
+          if [ -n "${EXPECTED_SHA:-}" ]; then
+            for kv in $versions; do
+              v="${kv#*=}"
+              [ "$v" = "$EXPECTED_SHA" ] || { echo "::error::${kv} does not match expected SHA ${EXPECTED_SHA}"; fail=1; }
+            done
+          fi
+
+          if [ "$fail" = "0" ]; then
+            echo "✅ all services healthy and on the same build"
+          else
+            exit 1
+          fi

@@ -61,9 +61,13 @@ async def full_health() -> dict[str, Any]:
     """Composite check used by the /healthz endpoint."""
     db = await check_db()
     s3 = check_s3()
+    sha = os.getenv("RAILWAY_GIT_COMMIT_SHA", "dev")[:7]
     return {
         "ok": bool(db.get("ok")) and bool(s3.get("ok")),
         "uptime_ms": int((time.monotonic() - _booted_at) * 1000),
+        # Deployed build, for cross-service alignment checks (deploy-verify.yml).
+        "version": sha,
+        "release": os.getenv("APP_RELEASE") or sha,
         "db": db,
         "s3": s3,
     }
