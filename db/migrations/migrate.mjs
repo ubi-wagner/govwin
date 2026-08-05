@@ -5,6 +5,19 @@
  *
  * Runs all 0*.sql files in order, tracks applied migrations in _migration_history,
  * and skips destructive migrations (000_drop_all.sql) unless ALLOW_SCHEMA_RESET=true.
+ *
+ * DRIFT DETECTION: each applied migration's sha256 is stored in _migration_history.
+ * The runner skips already-applied files by FILENAME, so a migration edited AFTER a
+ * database applied it silently never re-runs — the edited DDL never reaches that DB
+ * (this is exactly how idx_process_instances_dedup went missing in prod; see mig 154).
+ * On every run we now compare each applied file's current checksum against the stored
+ * one and report any mismatch. `--check` runs this audit ALONE (applies nothing) and
+ * exits non-zero on drift, so it can be pointed at any database — e.g.
+ *   DATABASE_URL=<prod> node db/migrations/migrate.mjs --check
+ * to list exactly which migrations have drifted there. A normal run WARNS loudly on
+ * drift but still applies pending migrations (drift is fixed forward with a NEW
+ * migration file, never by editing the old one). Set MIGRATE_STRICT=true to make a
+ * normal run abort on drift instead of warning.
  */
 import { readdir, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
@@ -14,6 +27,8 @@ import postgres from 'postgres';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONN = process.env.DATABASE_URL;
+const CHECK_ONLY = process.argv.includes('--check');
+const STRICT = process.env.MIGRATE_STRICT === 'true';
 
 if (!CONN) {
   console.error('[migrate] FATAL: DATABASE_URL not set — cannot run migrations');
@@ -21,6 +36,8 @@ if (!CONN) {
 }
 
 const sql = postgres(CONN, { max: 1, idle_timeout: 5 });
+
+const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 async function run() {
   // Ensure tracking table
@@ -38,6 +55,45 @@ async function run() {
   const files = (await readdir(__dirname))
     .filter(f => /^\d{3}.*\.sql$/.test(f))
     .sort();
+
+  // ── Drift audit: compare each applied file's current checksum vs the stored one ──
+  const history = new Map(
+    (await sql`SELECT filename, checksum FROM _migration_history`).map(r => [r.filename, r.checksum]),
+  );
+  const drift = [];
+  const unverifiable = []; // applied before checksums were tracked (stored NULL)
+  for (const file of files) {
+    if (!history.has(file)) continue; // not applied here — a pending migration
+    const stored = history.get(file);
+    const current = sha256(await readFile(join(__dirname, file), 'utf-8'));
+    if (!stored) unverifiable.push(file);
+    else if (stored !== current) drift.push(file);
+  }
+  if (drift.length) {
+    console.error('[migrate] ⚠️  DRIFT: these applied migrations differ from their files on disk.');
+    console.error('[migrate]     The edited DDL never ran on THIS database. Fix forward with a NEW migration.');
+    for (const f of drift) console.error(`[migrate]     • ${f}`);
+  }
+  if (unverifiable.length && CHECK_ONLY) {
+    console.error(`[migrate] note: ${unverifiable.length} applied migration(s) have no stored checksum (pre-dating checksum tracking) — cannot verify.`);
+  }
+
+  if (CHECK_ONLY) {
+    const pending = files.filter(f => !history.has(f) && f !== '000_drop_all.sql');
+    if (pending.length) {
+      console.log(`[migrate] pending (not yet applied here): ${pending.length}`);
+      for (const f of pending) console.log(`[migrate]     + ${f}`);
+    }
+    console.log(`[migrate] check done — ${drift.length} drifted, ${pending.length} pending, ${unverifiable.length} unverifiable`);
+    await sql.end();
+    process.exit(drift.length ? 1 : 0);
+  }
+
+  if (drift.length && STRICT) {
+    console.error('[migrate] FATAL: drift detected and MIGRATE_STRICT=true — aborting before applying.');
+    await sql.end();
+    process.exit(1);
+  }
 
   let applied = 0;
   let skipped = 0;
