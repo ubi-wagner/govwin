@@ -48,6 +48,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       status: (url.searchParams.get('status') as 'draft' | 'approved' | 'archived') ?? undefined,
       q: url.searchParams.get('q') ?? undefined,
       mine: url.searchParams.get('mine') === '1' || url.searchParams.get('mine') === 'true',
+      // Opt-in: ?archived=1 shows ONLY soft-archived atoms (default = active only).
+      archived: url.searchParams.get('archived') === '1' || url.searchParams.get('archived') === 'true',
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
     }, viewerFromRole(g.userId, g.role));
     return NextResponse.json({ data: { atoms } });

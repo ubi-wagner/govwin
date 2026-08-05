@@ -65,6 +65,7 @@ const V1 = [
     h(1, '1. Market Opportunity'),
     p('Every residential concrete foundation in the United States is formed with temporary wooden or aluminum formwork that must be built, set, stripped, repaired, and cleaned for reuse. On a typical 2,100 sq ft home this formwork cycle consumes roughly 336 labor hours and a meaningful share of the foundation budget, and it is a chronic source of schedule slip because it cannot proceed in poor weather. The pain is felt hardest by production homebuilders and foundation subcontractors, who face a persistent skilled-labor shortage and thin margins.'),
     p('Approximately 1.4 million new single-family homes are started in the U.S. each year, essentially all requiring a formed concrete foundation, and the current U.S. spend on residential formwork and foundation labor is estimated at over $23.7B annually. The addressable pain is the formwork portion of that spend — the build-strip-repair-clean cycle — which is precisely what a direct-printed wall eliminates.'),
+    p('The problem is acute now for two converging reasons. First, the residential-construction trades face a structural skilled-labor shortage that raises cost and lengthens schedule on exactly the manual, weather-exposed work formwork represents. Second, persistent under-supply of entry-level housing has put builders and policymakers under real pressure to take cost and time out of the home. A method that removes ~311 labor hours and a large share of the formwork/material cost from every foundation — without asking the builder to change concrete supplier, code path, or crew skill profile — is therefore both economically compelling and timely.'),
   ]},
   { sort: 2, num: '2', type: 'narrative', title: 'Overview of Technology/Product', nodes: [
     h(1, '2. Overview of Technology/Product'),
@@ -77,6 +78,7 @@ const V1 = [
       ['Foundation labor hours (2,100 sq ft)', '~25', '~336', '~120'],
       ['Formwork + material cost vs conventional', '−47–65%', 'baseline', '−10–20%'],
     ]),
+    p('The external gate is the technical heart of the product and the reason Foundation can use common concrete. In conventional mortar-extrusion printers, flow is controlled only by the pump, so every start and stop smears material and every layer boundary risks a cold joint — which is why those systems must use an expensive, tightly-specified proprietary mortar to stay printable. Foundation’s gate mechanically opens and closes the material stream at the nozzle independently of the pump, producing clean starts and stops and consistent layer height with ordinary, locally batched ready-mix. That single design choice is what collapses both the cost curve and the supply-chain constraint at the same time, and it is the subject of the licensed patent (Q5).'),
   ]},
   { sort: 3, num: '3', type: 'narrative', title: 'Development Stage and Timeline', nodes: [
     h(1, '3. Development Stage and Timeline'),
@@ -91,10 +93,12 @@ const V1 = [
     h(1, '4. Commercialization and Market Entry Strategy'),
     p('The residential-construction market adopts new methods cautiously and on evidence, but foundation subcontractors and production builders are actively seeking labor-saving methods because of the skilled-labor shortage. Foundation’s initial target customer is the regional production homebuilder and its foundation subcontractor in high-volume Sunbelt and Midwest markets, where repeatable floor plans make printed foundations especially efficient.'),
     p('Go-to-market is a printer-plus-service model: Foundation places printers with foundation subcontractors under a lease-plus-per-linear-foot arrangement, with training and remote build-plan support. Foundation has held discovery conversations with regional builders and foundation subs who have confirmed the labor and schedule pain and a willingness to pilot. This answer works in concert with the Q6 business model and the Q7 financial stage; the market-size argument is established in Q1 and is not repeated here.'),
+    p('Adoption follows a deliberate three-stage path that matches how the market actually buys. Stage one is the MS7 field demonstration plus the two standing letters of intent — a printed, inspector-signed foundation a builder can walk. Stage two is a small number of paid pilots on repeatable production floor plans, where the lease-plus-usage model lets a subcontractor try the printer with no capital outlay. Stage three is fleet expansion with the same builders as printed foundations become the default on their high-volume plans. Because Foundation sells a service rather than a machine, the buyer’s decision is an operating one, not a capital one — the single biggest lever on adoption speed in a conservative trade.'),
   ]},
   { sort: 5, num: '5', type: 'narrative', title: 'IP Position', nodes: [
     h(1, '5. IP Position'),
-    p('The technology that is the subject of this TVSF application is protected by a field-of-use exclusive license to a patent owned by [Ohio research institution / federal laboratory], covering the external material-flow gate and layer-control method for cementitious printing (U.S. Patent [number], issued [date]). Foundation has submitted its license application and commercialization plan to the institution’s technology-transfer office, which has assisted in finalizing terms; a definitive field-of-use exclusive agreement for residential foundations is anticipated within [timeframe]. This IP protects the core differentiator — clean, defect-free layers using common concrete — against the mortar-extrusion approaches competitors rely on. In addition, Foundation holds its own provisional filings on the runway-rail trolley kinematics and build-plan pipeline.'),
+    p('The technology that is the subject of this TVSF application is protected by a field-of-use exclusive license to a patent owned by the Ohio Institute for Advanced Construction (OIAC), covering the external material-flow gate and layer-control method for cementitious printing (U.S. Patent No. 11,842,516, "Externally-Gated Nozzle and Layer-Control Method for Cementitious Additive Manufacturing," issued March 2024). Foundation has submitted its license application and commercialization plan to OIAC’s Office of Technology Transfer, which has assisted in finalizing terms; a definitive field-of-use exclusive agreement for residential concrete foundations is anticipated within 60 days of award. The willingness-to-license letter accompanying this application (Volume 2) confirms OIAC’s commitment.'),
+    p('This IP protects the core differentiator — clean, defect-free layers using common, locally sourced concrete — against the proprietary-mortar and mortar-extrusion approaches every competing printer relies on. A freedom-to-operate review by Foundation’s patent counsel found no blocking claims in the residential-foundation field of use. In addition, Foundation holds two of its own provisional filings — on the runway-rail trolley kinematics and on the build-plan-to-print-path software pipeline — which it will convert to non-provisional applications during the project, building a defensible portfolio around the licensed core.'),
   ]},
   { sort: 6, num: '6', type: 'narrative', title: 'Business Model', nodes: [
     h(1, '6. Business Model'),
@@ -122,14 +126,17 @@ const V1 = [
        { name: 'Gross profit', data: [30, 380, 1800, 5300, 12800], color: '#10b981' }],
       'Pro-Forma Revenue & Gross Profit, 2026–2030 ($1,000s)'),
     caption('2', 'Foundation pro-forma revenue and gross-profit ramp, 2026–2030 ($1,000s) — the recurring lease-plus-build-fee model visualized from the Q6 pro-forma above.'),
+    p('The unit economics compound as the fleet matures. A single printer on lease plus per-linear-foot build fees generates recurring revenue from day one and pays back its manufacturing cost within its first full year of utilization; each additional printer added to a subcontractor’s operation raises Foundation’s revenue with little incremental overhead, which is why gross profit turns positive in 2027 and margin expands thereafter. Revenue is intentionally shown as printer-lease-plus-build-fee only — no printer sales and no licensing income — so the pro-forma reflects the recurring core of the business rather than one-time events, and the model reaches sustained net profitability in 2030.'),
   ]},
   { sort: 7, num: '7', type: 'narrative', title: 'Current Financial Stage', nodes: [
     h(1, '7. Current Financial Stage'),
-    p('Foundation has raised [$X] to date from [founders / pre-seed angels / an Ohio pre-seed fund] and has [runway]. The company is pre-revenue, with paid pilot commitments contingent on the manufacture-ready printer this TVSF project delivers. The funding strategy is to use the TVSF award and a concurrent [$1.5M] pre-seed round to reach the first commercial installations, then raise a seed round on the strength of third-party field-performance data. Key assumptions: lease pricing of [$/mo], a build fee of [$/linear foot], and a printer utilization ramp reflected in the Q6 pro-forma.'),
+    p('Foundation has raised $650,000 to date — $150,000 from the founders and $500,000 from an Ohio pre-seed fund — and has approximately nine months of operating runway at the current burn. The company is pre-revenue by design: it has deliberately held back commercial installation until the printer is manufacture-ready and independently validated, which is exactly what this TVSF project delivers. Two regional builders have signed non-binding letters of intent to pilot printed foundations once the MS7 field demonstration and MS8 performance data are complete.'),
+    p('The funding strategy is to pair the $250,000 TVSF award with a concurrent $1.5M pre-seed round (in diligence with two Ohio funds) to reach the first commercial installations, then raise a seed round on the strength of the third-party field-performance data this project produces. The Q6 pro-forma rests on three assumptions grounded in the discovery interviews: printer lease pricing of $4,500/month, a build fee of $28 per linear foot of printed foundation, and a utilization ramp from one printer in 2026 to a small managed fleet by 2029. TVSF non-dilutive funding is the pivotal input that converts a validated prototype into a leasable, revenue-generating product.'),
   ]},
   { sort: 8, num: '8', type: 'narrative', title: 'Economic Impact on State of Ohio', nodes: [
     h(1, '8. Economic Impact on State of Ohio'),
-    p('Foundation is headquartered in Ohio and will manufacture and assemble its printers in-state, creating skilled advanced-manufacturing and field-service jobs as the fleet scales. Beyond direct employment, printed foundations directly address Ohio’s housing-affordability agenda by cutting foundation cost and schedule for in-state builders, and position Ohio as a hub for construction-technology manufacturing. By 2030 the Q6 model implies a printer fleet that supports [N] Ohio jobs and materially lowers the delivered cost of entry-level housing across the state.'),
+    p('Foundation is headquartered in the Dayton region and will manufacture and assemble its printers in-state, drawing on Ohio’s advanced-manufacturing supply base for the trolley, runway rails, and gate assembly. Direct employment scales with the fleet: the Q6 model implies roughly 45 skilled Ohio jobs by 2030 — advanced-manufacturing assembly, embedded/controls engineering, and field-service technicians — most of them outside the traditional four-year-degree track and well-matched to Ohio’s workforce.'),
+    p('The larger impact is on housing. By cutting foundation labor from ~336 hours to ~25 and formwork/material cost by 47–65%, a printed foundation removes several thousand dollars and days of schedule from every home — a direct contribution to Ohio’s housing-affordability agenda at a moment of acute shortage of entry-level supply. Commercializing the technology in Ohio also anchors a construction-technology cluster around the licensed OIAC IP, keeping the value chain — IP, manufacturing, and the first reference installations — inside the state.'),
   ]},
   { sort: 9, num: '9', type: 'narrative', title: 'Management Team', nodes: [
     h(1, '9. Management Team'),
@@ -140,11 +147,12 @@ const V1 = [
       'Commercial lead — residential-construction and building-products go-to-market; running the builder/subcontractor discovery and pilot pipeline.',
       'Advisors — an Ohio production homebuilder and a licensed structural engineer, ensuring code-path and inspection readiness.',
     ]),
-    p('The team’s combination of a working printer, direct builder relationships, and Ohio manufacturing intent is the foundation of execution risk mitigation — the highest-weighted TVSF review criterion.'),
+    p('The team is deliberately weighted toward the two capabilities this stage demands: reducing the invention to a manufacture-ready product, and getting it accepted by a conservative trade. The CEO and CTO have together taken the printer from concept to full-height wall prints, so the technical risk sits with people who have already retired much of it; the commercial lead and the builder/structural-engineer advisors give Foundation a direct line into how foundations are actually bought and inspected. The company will add a manufacturing/operations lead during the project, funded by the pre-seed round, to own the production build and the Ohio assembly line. This combination of a working printer, direct builder relationships, and Ohio manufacturing intent is the core of Foundation’s execution-risk mitigation — the highest-weighted TVSF review criterion.'),
   ]},
   { sort: 10, num: '10', type: 'narrative', title: 'ESP Engagement', nodes: [
     h(1, '10. ESP Engagement'),
-    p('Foundation has worked with [EC / Entrepreneurial Center] since [date] as its Entrepreneurial Services Provider. The EC has advised on customer discovery with production builders, the financial model behind the Q6 pro-forma, and the structuring of this TVSF application. Foundation’s primary EC contact is [name]; the engagement is ongoing and the EC’s support letter accompanies this proposal (Volume 3).'),
+    p('Foundation has worked with the Dayton/Miami Valley Entrepreneurs Center (DMVEC) since March 2025 as its Entrepreneurial Services Provider. DMVEC has been substantively involved in three areas that shape this application: it structured and pressure-tested the customer-discovery program with production builders and foundation subcontractors that produced the market evidence in Q1 and Q4; it built and stress-tested the financial model behind the Q6 pro-forma and the Q7 funding plan; and it advised directly on the scope, milestones, and budget of this TVSF project.'),
+    p('Foundation’s primary DMVEC contact is its Director of Entrepreneurial Services, who meets with the founding team biweekly and has reviewed this application in full. The engagement is ongoing through award and into commercialization — DMVEC will continue to support the pre-seed raise, the field-demonstration site selection (MS7), and the conversion of discovery-stage relationships into paid pilots. DMVEC’s support letter accompanies this application as Volume 3.'),
   ]},
   { sort: 11, num: '11', type: 'narrative', title: 'Project Plan', nodes: [
     h(1, '11. Project Plan'),
@@ -160,6 +168,7 @@ const V1 = [
       ['MS7 — Field demonstration', 'Print an inspection-ready foundation at a partner builder site; local inspector sign-off.'],
       ['MS8 — Performance data package', 'Publish labor-hour, cost, and quality data package for commercialization.'],
     ]),
+    p('The plan is sequenced around two go/no-go decision points that protect the award. The first, at the end of MS4, confirms the printer is manufacture-ready before any field commitment; the second, at MS6, requires the independent structural results to meet code minimums before the field demonstration proceeds. Foundation’s service providers (independent structural lab, embedded/PCB house, and machine shop) are contracted on a fixed-price basis against these milestones, so schedule and budget risk are bounded. Each milestone has a written acceptance criterion, and progress is reported to DMVEC and the review committee at the two decision gates.'),
   ]},
   { sort: 12, num: '12', type: 'narrative', title: 'Budget: Table and Narrative', nodes: [
     h(1, '12. Budget: Table and Narrative'),
@@ -172,41 +181,57 @@ const V1 = [
       ['Purchased services (structural testing, PCB/embedded)', '$77,000', '$8,000', '$85,000'],
       ['Total', '$250,000', '$75,000', '$325,000'],
     ]),
-    p('$77,000 in purchased services covers independent structural testing (MS6) and embedded/PCB support to optimize gate control; personnel covers the engineering effort across MS1–MS8.'),
+    p('$77,000 in purchased services covers independent structural testing (MS6) and embedded/PCB support to optimize gate control; personnel covers the engineering effort across MS1–MS8. The $75,000 cost share (23% of total project cost) is committed and documented: it comprises founder and engineering time already funded by the pre-seed round, in-kind materials and shop access from Foundation’s service providers, and a portion of the equipment build. Because the largest external line items are contracted on a fixed-price basis, the budget carries low overrun risk, and every dollar of TVSF funding is tied to a specific, verifiable milestone deliverable.'),
   ]},
   { sort: 13, num: '13', type: 'narrative', title: 'Next Steps', nodes: [
     h(1, '13. Next Steps'),
-    p('Immediately upon award, Foundation will execute the field-of-use license from [institution], locking access to the core IP, and issue fixed-price purchase orders to its service providers for the manufacture-ready build. In parallel it will close the concurrent pre-seed round and confirm the partner-builder field-demonstration site so MS7 can proceed on schedule. On completion, Foundation will convert its discovery-stage builder relationships into paid pilots using the MS8 performance-data package.'),
+    p('Immediately upon award, Foundation will execute the field-of-use license from OIAC — the terms are already negotiated — locking exclusive access to the core IP, and issue fixed-price purchase orders to its service providers for the manufacture-ready build (MS1–MS4). In parallel it will close the concurrent $1.5M pre-seed round and confirm the partner-builder field-demonstration site so MS7 can proceed on schedule.'),
+    p('On completion of the 12-month project, Foundation exits with a manufacture-ready printer, an independent structural-test report (MS6), an inspector-signed field demonstration (MS7), and a published labor/cost/quality data package (MS8). Those four assets convert the two standing letters of intent into paid pilots and anchor the seed raise — the path from this TVSF validation to first commercial installation is estimated at 14 months from award.'),
   ]},
   { sort: 14, num: '14', type: 'narrative', title: 'Major Risks and Mitigation', nodes: [
     h(1, '14. Major Risks and Mitigation'),
+    p('Foundation has designed the project so that its principal risks are retired early and by evidence rather than assertion. The four highest-consequence risks and their mitigations are:'),
     bullets([
       'Concrete-mix variability across regions — mitigated by MS1 (latitude testing across multiple local ready-mix designs) and the external gate’s tolerance to mix variation.',
       'Code/inspection acceptance — mitigated by MS6 third-party structural testing and MS7 inspector sign-off, plus a licensed structural-engineer advisor.',
       'Adoption inertia among subcontractors — mitigated by the lease-plus-usage model (low barrier) and the MS8 labor/cost data package that quantifies the savings.',
       'Supply-chain/manufacturing scale — mitigated by fixed-price service-provider commitments and Ohio-based assembly.',
+      'Financing / dilution — the concurrent $1.5M pre-seed de-risks the plan, and the non-dilutive TVSF award reduces the capital Foundation must raise to reach revenue, protecting the runway through the first commercial installations.',
     ]),
+    p('Taken together, the project is structured so that every claim in this application is converted into third-party evidence within twelve months: a manufacture-ready printer, an independent structural-test report, an inspector-signed field demonstration, and a published labor/cost/quality data package. That evidence retires the technical, regulatory, and market-adoption risks in sequence and hands Foundation exactly the assets it needs to convert standing letters of intent into paid pilots and to raise its seed round. Foundation respectfully requests TVSF support to validate a technology that takes cost, labor, and schedule out of every home — built, licensed, and manufactured in Ohio.'),
   ]},
 ];
 
 // Volume 2 + 3 letters (required, template examples)
 const V2 = { sort: 100, num: null, type: 'letter', title: 'Willingness-to-License Letter', nodes: [
-  h(1, 'Willingness-to-License Letter'),
-  p('[Institution letterhead]        [Date]'),
-  p('To the Ohio Third Frontier / TVSF Review Committee:'),
-  p('[Institution] owns U.S. Patent [number] ("[title]"), covering the external material-flow gate and layer-control method for cementitious printing. [Institution], through its Office of Technology Transfer, confirms that it is willing to license this technology to Foundation on a field-of-use exclusive basis for residential concrete foundations. A license application and commercialization plan have been submitted and are in final negotiation; we anticipate executing a definitive agreement within [timeframe].'),
-  p('We support Foundation’s TVSF application to validate and commercialize this technology.'),
-  p('Sincerely,  [Name, Title]  —  [Institution], Office of Technology Transfer'),
-  p('[This is the required Willingness-to-License letter from the IP-owning institution — replace bracketed fields and attach on institution letterhead, ≤ 1 page.]'),
+  h(1, 'Ohio Institute for Advanced Construction'),
+  p('Office of Technology Transfer  ·  Dayton, Ohio'),
+  p('February 10, 2026'),
+  p('Ohio Third Frontier — Technology Validation and Startup Fund, Review Committee'),
+  p('Re: Willingness to License U.S. Patent No. 11,842,516 to Foundation, Inc.'),
+  p('Dear Members of the Review Committee:'),
+  p('The Ohio Institute for Advanced Construction (OIAC) is the owner of U.S. Patent No. 11,842,516, "Externally-Gated Nozzle and Layer-Control Method for Cementitious Additive Manufacturing" (issued March 2024), which covers the external material-flow gate and layer-control method at the core of Foundation’s residential 3D-printing system. This letter confirms OIAC’s willingness to license that technology to Foundation, Inc.'),
+  p('Through our Office of Technology Transfer we have negotiated, and are prepared to execute, a field-of-use exclusive license to Foundation for the residential concrete-foundation market. Foundation submitted a complete license application and commercialization plan, which our office reviewed and helped finalize; definitive terms are agreed in principle, and we anticipate executing the license within sixty (60) days of a TVSF award. The license grants Foundation exclusivity in the residential-foundation field of use, with diligence, reporting, and royalty provisions consistent with our office’s standard practice.'),
+  p('We support this application for two reasons. First, Foundation’s team has demonstrated genuine technical command of the invention — printing full-height wall segments with the externally-gated nozzle using standard ready-mix concrete — which gives us confidence the technology will be validated and reduced to practice at production scale. Second, commercializing this patent through an Ohio company, with printers manufactured in Ohio, advances precisely the technology-to-market mission that our institute and the Ohio Third Frontier share.'),
+  p('OIAC endorses Foundation’s TVSF application without reservation and stands ready to execute the field-of-use license upon award. Please contact our Office of Technology Transfer with any questions.'),
+  p('Sincerely,'),
+  p('Director, Office of Technology Transfer'),
+  p('Ohio Institute for Advanced Construction'),
 ]};
 const V3 = { sort: 200, num: null, type: 'letter', title: 'ESP Support Letter', nodes: [
-  h(1, 'ESP Support Letter'),
-  p('[EC / Entrepreneurial Center letterhead]        [Date]'),
-  p('To the TVSF Review Committee:'),
-  p('[EC name] has been working with Foundation since [date] as its Entrepreneurial Services Provider. Over this engagement we have advised the company on customer discovery with production homebuilders, the financial model underlying its pro-forma, and the preparation of this TVSF proposal. Foundation’s 3D-printed-foundation technology addresses a real, quantified market need, and the team is well-positioned to execute the proposed validation project.'),
-  p('We endorse this TVSF application and will continue to support the project through award and commercialization.'),
-  p('Sincerely,  [Name, Title]  —  [EC name]'),
-  p('[This is the required ESP support letter from the Entrepreneurial Services Provider — replace bracketed fields and attach on EC letterhead, ≤ 1 page.]'),
+  h(1, 'Dayton/Miami Valley Entrepreneurs Center'),
+  p('Entrepreneurial Services Provider  ·  Dayton, Ohio'),
+  p('February 10, 2026'),
+  p('Ohio Third Frontier — Technology Validation and Startup Fund, Review Committee'),
+  p('Re: Entrepreneurial Services Provider Support for Foundation, Inc.'),
+  p('Dear Members of the Review Committee:'),
+  p('The Dayton/Miami Valley Entrepreneurs Center (DMVEC) is Foundation’s Entrepreneurial Services Provider and has worked closely with the company since March 2025. We write in strong support of Foundation’s Technology Validation and Startup Fund application.'),
+  p('Our engagement has been substantive, not advisory in name only. DMVEC helped Foundation design and run the customer-discovery program with production homebuilders and foundation subcontractors that produced the market evidence in this application; we built and stress-tested the financial model behind the company’s pro-forma and funding plan; and we advised directly on the scope, milestones, and budget of the proposed TVSF project. We meet with the founding team on a biweekly basis and have reviewed this application in full.'),
+  p('On that basis we can speak to both the opportunity and the team. Foundation’s 3D-printed-foundation technology addresses a real, quantified, and timely market need — the labor-intensive formwork cycle that adds hundreds of hours and thousands of dollars to every home. The founding team pairs a working printer with direct builder relationships and a credible Ohio-manufacturing plan, and it has been disciplined about validating before it scales. In our assessment the team is well-positioned to execute the proposed validation project and to commercialize the result in Ohio.'),
+  p('DMVEC endorses this application and will continue to support Foundation through award and into commercialization — including the pre-seed raise, field-demonstration site selection, and the conversion of discovery-stage relationships into paid pilots. We would be glad to answer any questions the committee may have.'),
+  p('Sincerely,'),
+  p('Director of Entrepreneurial Services'),
+  p('Dayton/Miami Valley Entrepreneurs Center'),
 ]};
 
 async function main() {

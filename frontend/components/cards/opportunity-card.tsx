@@ -65,7 +65,16 @@ export function OpportunityCard({ card }: { card: OpportunityCardView }) {
       />
       <Field label="Times locked" value={card.lockCount} />
       {card.unlockDeadline && <Field label="Unlock deadline" value={fmtDate(card.unlockDeadline)} />}
-      <Field label="Source bucket" value={bucket ? <Chip tone="purple">{bucket}</Chip> : '—'} />
+      {/* Fit — the tenant-to-bucket score (scoring_strategist, via tenant_bucket_scores). The score
+          is the frozen purchase-time fit; the bucket label reflects the current spotlight bucket. */}
+      <Field
+        label="Fit"
+        value={
+          card.origin.bucket
+            ? <Chip tone="purple">{bucketLabel(card.origin.bucket.key)} · score {card.origin.bucket.score}</Chip>
+            : bucket ? <Chip tone="purple">{bucket}</Chip> : '—'
+        }
+      />
       <Field label="Last activity" value={fmtDate(card.updatedAt)} />
     </div>
   );

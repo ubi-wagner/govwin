@@ -25,9 +25,13 @@ def test_unknown_archetype_is_not_a_silent_return():
     src = inspect.getsource(AgentFabric.invoke_agent)
     # Scope to the missing-archetype guard block: from `if not archetype` to its return.
     start = src.index("if not archetype")
-    guard = src[start: src.index("return {\"status\": \"error\", \"reason\": reason}", start)]
+    guard = src[start: src.index("\"reason\": reason}", start)]
     assert "_emit_event" in guard, "unknown-archetype path must emit a tool:agent.invoked event"
     assert "_log_task" in guard, "unknown-archetype path must write an agent_task_log row"
+    # The return must carry the message under `error` — process_task_queue reads `error` to set
+    # agent_task_queue.error, so a `reason`-only return left the queue row's error NULL (the admin
+    # saw the task failed but not WHY). Regression guard for that fix.
+    assert '"error": reason' in guard, "unknown-archetype return must carry `error` so the queue records the failure reason"
 
 
 @pytest.mark.asyncio

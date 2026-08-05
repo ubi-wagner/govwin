@@ -283,15 +283,59 @@ class SbirGovIngester(BaseIngester):
                 self._baa_cache[sol_number] = sol_id
                 return sol_id
 
-            # Create a new parent curated_solicitations row for this BAA
+            # Create an umbrella opportunity for the BAA container FIRST, then the
+            # parent curated_solicitations row that points at it. curated_solicitations
+            # .opportunity_id is NOT NULL, so a BAA parent needs a backing opportunity;
+            # inserting the parent without one threw NotNullViolation, was swallowed by
+            # the except below, and every BAA silently degraded to per-topic 'single'
+            # rows (the multi-topic grouping never took). The umbrella is inactive (it is
+            # a container, not a fundable unit) and its topic opportunities attach via
+            # solicitation_id — the canonical multi-topic shape (see e2e_fixtures.sql c4).
+            # source_id is suffixed so it can never collide with a topic's own source_id
+            # (SBIR normalize uses topic_number as source_id).
+            umbrella_source_id = f"{sol_number}::umbrella"
+            umbrella_title = row.get("title") or sol_number
+            umbrella_desc = (row.get("description") or "")[:50000] or None
+            umbrella_id = await conn.fetchval(
+                """
+                INSERT INTO opportunities
+                  (source, source_id, title, agency, office,
+                   solicitation_number, program_type, description,
+                   content_hash, is_active)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
+                ON CONFLICT (source, source_id) DO UPDATE SET updated_at = now()
+                RETURNING id
+                """,
+                self.source,
+                umbrella_source_id,
+                umbrella_title,
+                row.get("agency"),
+                row.get("office"),
+                sol_number,
+                row.get("program_type"),
+                umbrella_desc,
+                # content_hash has its OWN unique constraint — derive it from the
+                # umbrella's real fields (source_id carries sol_number) so two BAAs
+                # never collide on the empty-fields hash.
+                self._hash({
+                    "source": self.source,
+                    "source_id": umbrella_source_id,
+                    "title": umbrella_title,
+                    "close_date": row.get("close_date"),
+                    "description": row.get("description") or "",
+                }),
+            )
+
+            # Create the parent multi_topic solicitation, backed by the umbrella opp.
             new_row = await conn.fetchrow(
                 """
                 INSERT INTO curated_solicitations
-                  (namespace, status, solicitation_type,
+                  (opportunity_id, namespace, status, solicitation_type,
                    solicitation_title, solicitation_number, full_text)
-                VALUES ($1, 'new', 'multi_topic', $2, $3, $4)
+                VALUES ($1, $2, 'new', 'multi_topic', $3, $4, $5)
                 RETURNING id
                 """,
+                umbrella_id,
                 namespace,
                 row.get("title") or sol_number,
                 sol_number,
@@ -301,8 +345,8 @@ class SbirGovIngester(BaseIngester):
                 sol_id = str(new_row["id"])
                 self._baa_cache[sol_number] = sol_id
                 self.log.info(
-                    "created parent curated_solicitation %s for BAA %s",
-                    sol_id, sol_number,
+                    "created parent curated_solicitation %s (umbrella opp %s) for BAA %s",
+                    sol_id, umbrella_id, sol_number,
                 )
                 return sol_id
         except Exception as e:

@@ -174,10 +174,12 @@ export function WorkflowMonitorClient({
   active,
   recent,
   stats,
+  rangeLabel = '24h',
 }: {
   active: WorkflowInstance[];
   recent: WorkflowInstance[];
   stats: WorkflowStats;
+  rangeLabel?: string;
 }) {
   const router = useRouter();
   const [, setTick] = useState(0);
@@ -338,12 +340,12 @@ export function WorkflowMonitorClient({
         </div>
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-green-200 bg-green-50 text-sm font-medium text-green-700">
           <span className="inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-          <span>Completed 24h</span>
+          <span>Completed {rangeLabel}</span>
           <span className="font-bold text-lg">{stats.completedLast24h}</span>
         </div>
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-sm font-medium text-red-700">
           <span className="inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-          <span>Failed 24h</span>
+          <span>Failed {rangeLabel}</span>
           <span className="font-bold text-lg">{stats.failedLast24h}</span>
         </div>
       </section>
@@ -392,11 +394,11 @@ export function WorkflowMonitorClient({
 
                     <SourceBadge source={w.source} />
 
-                    {w.tenantId && (
-                      <span className="text-xs text-gray-400 font-mono">
-                        tenant: {w.tenantId.slice(0, 8)}...
-                      </span>
-                    )}
+                    <span className="text-xs text-gray-500" title={w.tenantId ?? 'platform (rfp-pipeline)'}>
+                      {w.tenantId
+                        ? <>tenant: <span className="font-medium text-gray-700">{w.tenantName ?? w.tenantSlug ?? `${w.tenantId.slice(0, 8)}…`}</span></>
+                        : <span className="font-medium text-indigo-600">Platform</span>}
+                    </span>
 
                     {w.retryCount > 0 && (
                       <span className="text-xs text-orange-600 font-medium">
@@ -454,7 +456,7 @@ export function WorkflowMonitorClient({
 
       {/* ── Recent History ─────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent History (24h)</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent History ({rangeLabel})</h2>
         {recent.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
             No completed workflows in the last 24 hours
@@ -486,6 +488,12 @@ export function WorkflowMonitorClient({
                     </span>
 
                     <SourceBadge source={w.source} />
+
+                    <span className="text-xs text-gray-500" title={w.tenantId ?? 'platform (rfp-pipeline)'}>
+                      {w.tenantId
+                        ? <>tenant: <span className="font-medium text-gray-700">{w.tenantName ?? w.tenantSlug ?? `${w.tenantId.slice(0, 8)}…`}</span></>
+                        : <span className="font-medium text-indigo-600">Platform</span>}
+                    </span>
 
                     {w.retryCount > 0 && (
                       <span className="text-xs text-orange-600 font-medium">

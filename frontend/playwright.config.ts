@@ -10,6 +10,9 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // Re-seed the stateful fixtures before every run (reset-then-run) so the gate is
+  // reproducible — scripts/e2e_fixtures.sql via e2e/global-setup.ts (non-fatal).
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],

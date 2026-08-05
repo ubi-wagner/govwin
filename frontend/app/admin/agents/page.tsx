@@ -7,6 +7,7 @@ import type { Tool } from '@/lib/tools';
 import { AgentUsageSummary } from '@/components/admin/agent-usage-summary';
 import { AgentWorkforce } from '@/components/admin/agent-workforce';
 import { PlatformAiConfigCard } from '@/components/admin/platform-ai-config-card';
+import ProposalAutoDrive from '@/components/admin/proposal-autodrive';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,12 @@ export default async function AgentsPage() {
       <section className="mb-10">
         <h2 className="text-lg font-semibold mb-4">Agent Workforce</h2>
         <AgentWorkforce />
+      </section>
+
+      {/* Proposal Auto-Drive (Doorbell) — admin-plane trigger for the build cohort */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-4">Proposal Auto-Drive</h2>
+        <ProposalAutoDrive />
       </section>
 
       {/* Usage Summary */}

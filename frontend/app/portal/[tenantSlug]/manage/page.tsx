@@ -112,11 +112,11 @@ export default async function ManagePage({
   };
   const [buckets, opps, portals, proposals, tasks, library] = await Promise.all([
     count('buckets', sql`SELECT COUNT(*)::text AS n FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId} AND is_active = true`),
-    count('opps', sql`SELECT COUNT(*)::text AS n FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived'`),
+    count('opps', sql`SELECT COUNT(*)::text AS n FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived' AND archived_at IS NULL`),
     count('portals', sql`SELECT COUNT(*)::text AS n FROM proposal_portals WHERE tenant_id = ${tenantId}`),
     count('proposals', sql`SELECT COUNT(*)::text AS n FROM proposals WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')`),
     count('tasks', sql`SELECT COUNT(*)::text AS n FROM tasks WHERE tenant_id = ${tenantId} AND status IN ('open','in_progress')`),
-    count('library', sql`SELECT COUNT(*)::text AS n FROM library_atoms WHERE tenant_id = ${tenantId}`),
+    count('library', sql`SELECT COUNT(*)::text AS n FROM library_atoms WHERE tenant_id = ${tenantId} AND archived_at IS NULL`),
   ]);
 
   const canEdit = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';

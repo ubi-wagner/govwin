@@ -16,6 +16,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
+import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
@@ -259,13 +260,27 @@ export async function POST(request: Request) {
     let cardsBackfilled = 0;
     try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[admin/tenants/create] backfill failed', e); }
 
-    // Offer the starter template set to the new tenant_admin (P5.3, best-effort).
-    try {
-      await offerStarterSet({
-        tenantId: created.tenantId, tenantSlug: created.slug, adminUserId: created.adminUserId,
-        actor: { id: sessionUser.id ?? '', email: (session.user as { email?: string }).email ?? null, role: role ?? 'rfp_admin', tenantId: null },
-      });
-    } catch (e) { console.error('[admin/tenants/create] starter-set offer failed', e); }
+    // "Keep + copy": eager-materialize the shared system-starter library into the new tenant's OWN
+    // space on creation — each foundation copied as a tenant-owned atom (derived_from lineage,
+    // collection=my_library) so a fresh workspace lands with a populated library, not an empty one.
+    // The shared masters stay shared (templates remain is_system; copy-on-use still works for the
+    // rest); isolation is preserved (every copy carries this tenant's tenant_id). Idempotent,
+    // best-effort — creation never fails on it.
+    let starterCopied = 0;
+    try { starterCopied = (await copyStarterSetToTenant(created.tenantId, { id: created.adminUserId })).added; }
+    catch (e) { console.error('[admin/tenants/create] starter-set copy failed', e); }
+
+    // Fallback OFFER (P5.3): only when the eager copy landed nothing (copy failed or the catalog is
+    // empty) do we drop the dismissible one-click "add the starter set" ToDo, so the tenant is never
+    // left with an empty library. On the happy path the copy already seeded it, so no redundant ToDo.
+    if (starterCopied === 0) {
+      try {
+        await offerStarterSet({
+          tenantId: created.tenantId, tenantSlug: created.slug, adminUserId: created.adminUserId,
+          actor: { id: sessionUser.id ?? '', email: (session.user as { email?: string }).email ?? null, role: role ?? 'rfp_admin', tenantId: null },
+        });
+      } catch (e) { console.error('[admin/tenants/create] starter-set offer failed', e); }
+    }
 
     await emitEventSingle({
       namespace: 'finder',

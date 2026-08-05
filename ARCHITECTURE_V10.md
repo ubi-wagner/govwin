@@ -3,9 +3,11 @@
 **Date:** 2026-07-03
 
 > **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
-> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
-> (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
-> 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
+> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **148**
+> (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix; the **V1 UI-wiring pass** then added 143
+> `proposal_sections.sort_index`, 144 `proposals.studio_phase`, 145 `notification_read_state`, 146 the amendment
+> engine, 147–148 the soft-archive `archived_at` cascade — canonical **docs/ARCHIVABLE_CONTRACT.md**); the archetype roster is **36 files =
+> 36 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded; the 36th is the admin-agent `rfp_ingest_manager`), of which
 > — traced by actual call-site + whether the trigger event is emitted live — **34 are wired and exactly 1 is
 > dormant** (`content_generator`; its `library:content.requested` trigger has no emitter). Earlier "~11 dormant"
 > was a reference-count artifact (queue-producer / `AI_INVOKE`-step agents show few name-refs yet are wired).
@@ -364,8 +366,30 @@ Comp-code purchase → curation → release → provision  (canonical: docs/MAST
     │   └─ document/proposal-ready signals + opt-in auto-advance (shared gated core)
     │      DELETE (unlock): matrix status → 'not_addressed'; artifact reopened (mirror)
     │
-    ▼  ADVANCE (gated) → SUBMIT/LOCK → DOWNLOAD (docx/json, in-memory, S3-independent)   ─ V9 retained
+    ▼  ADVANCE (gated) → SUBMIT/LOCK → DOWNLOAD (json/docx/pdf/zip, in-memory, S3-independent)
 ```
+
+**Download (`POST /api/portal/[t]/proposals/[p]/package?format=…`, gate: locked or submitted/archived).**
+Four formats off ONE section fetch: `json` (structured), `docx` (all sections combined → `exportToDocx`),
+`pdf` (the SAME combined CanvasDocument → `exportToPdf`, Chromium print: repeating header/footer, real
+page numbers, tables + inline SVG figures — added 2026-08-02), and `zip` (each volume in its NATIVE format
+via `assembleArtifactCanvas`+`renderCanvas`). Figures are native `chart` nodes: SVG in the pdf, sharp-
+rasterized PNG in the docx. UI buttons live in `proposal-admin-panel.tsx`. **Every** section list here —
+and on the workspace/review pages — orders `volume_number NULLS LAST, sort_index NULLS LAST, section_number`
+(mig 143's integer `sort_index`), so volumes and Q1–14 render in true document order, never string-sorted.
+
+**Admin-plane triggers (admin-agent program, 2026-08-02).** Two admin-plane surfaces now drive the
+(already-built) engine from up top, both advisory + audited: (1) the **`rfp_ingest_manager`** archetype —
+the platform-scope ingest-orchestration *manager* (`.../assess-ingest` → `OnIngestAssessmentRequested` →
+`tool.ingest.assess`) that reads a curated solicitation's ingest state and plans which specialist agents to
+run next; and (2) the **Proposal Auto-Drive "doorbell"** — an `/admin/agents` card + `POST
+/api/admin/proposals/[p]/full-draft` that rings the tenant Proposal Draft Manager
+(`OnFullDraftRequested{ModeA,B,C}`) on a chosen proposal without portal descent. Portal + doorbell share
+one emission helper (`lib/proposal-full-draft.ts`), so every full draft is one auditable
+`proposal:full_draft_requested` record (`source` = `portal`|`admin_doorbell`). Neither descends into a
+tenant (Phase 2). Canonical: **docs/ADMIN_AGENT_DESIGN.md**. Observability of ALL actor/agent/automation
+actions was swept + gap-fixed (**docs/EVENT_AUDIT_2026-08-02.md** — the `package?format=zip` audit blind
+spot is closed; everything posts to `system_events` + domain logs).
 
 **Compliance matrix (`proposal_compliance_matrix`, pre-exists mig 001; now populated).** The create route
 inserts one row per required item (or per named required-section within it), sourced from the volume,
@@ -498,13 +522,22 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 125)
+## 7. New / Changed Schema (migrations 093 → 148)
 
-Highest migration: **125** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **148** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
-launch credential rotation (124), and the dead-table drop (125). Domains added to V9's 72-table /
+launch credential rotation (124), and the dead-table drop (125). **126–143** then landed the RLS cutover
+scaffold (136/137), library + collaboration vaults (132–134), the Foundation TVSF demo seed (140,
+generated by `gen-foundation-seed-migration.mjs`; 141 fixed Paul's shadow-admin role), the superseded-
+table drop (142), and **`proposal_sections.sort_index`** (143 — the integer section-ordering key,
+backfilled + indexed; see §4 Download). The **V1 UI-wiring pass** then added **144** `proposals.studio_phase`
+(the Proposal Studio 3-loop state), **145** `notification_read_state` (per-user read watermark), **146**
+`solicitation_amendments` + `proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge
+engine), **147** `proposals.archived_at`, and **148** `archived_at` on `process_instances` /
+`tenant_opportunity_cards` / `library_atoms` / `contracts` — the **soft-archive** watermark (reversible,
+never hard-deleted; cascade + selection rules in **docs/ARCHIVABLE_CONTRACT.md**). Domains added to V9's 72-table /
 14-domain map (the 093–108 core; the drops that shrank it back are in "Table drops" below):
 
 | Migration | Adds |

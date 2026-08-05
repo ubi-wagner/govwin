@@ -16,8 +16,12 @@ The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and n
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
 `tenant_opportunity_cards` (including the rebuilt `v_opportunity_rollup` view + the CMS
 `matched_opportunities` variable). The compliance matrix (`proposal_compliance_matrix`) populates
-at provision and advances on section lock. Verified end-to-end (Playwright + the live Python workflow
-engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 796 · `next build`).
+at provision and advances on section lock. A locked/submitted proposal downloads as **json/docx/pdf/zip**
+(`/proposals/[p]/package?format=…` — docx & the Chromium-rendered pdf share one combined-CanvasDocument
+assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
+integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
+end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
+`opportunity_id`; `tsc` 0 · `vitest` 855 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -26,12 +30,27 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 137). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 148 — the **V1 UI-wiring pass**
+added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
+`proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
+`proposals.archived_at`, and mig 148 `archived_at` on `process_instances`/`tenant_opportunity_cards`/
+`library_atoms`/`contracts`. That pass also made the AI-review button real
+(`lib/proposal-ai-review.ts` → per-section `color_team_reviewer`, audited `proposal:ai_review.requested`, NOT
+`review_requested` which the fabric double-dispatches), added the packaging-review + assess-ingest-readiness
+buttons, and confirmed the contract entity + kickoff already fire on `outcome=awarded`). **Archive is soft +
+reversible only — NOTHING is hard-deleted** (canonical **docs/ARCHIVABLE_CONTRACT.md**): archive ACTIONS live on
+exactly three entities — a **portal** (`proposals`, tenant_admin+ → cascades its BUILD `process_instances`,
+scoped off co-active `spotlight`/`contract` runs), a **library atom / foundational doc** (`library_atoms`,
+per-item → drops out of the library + draft selection; copied-forward so no cascade), and a **tenant**
+(`tenants`, rfp_admin+ → license slumber: the `verifyTenantAccess` gate darkens every surface + a workflow
+cascade, no per-proposal write). Workflows archive ONLY via a parent's cascade (no standalone action);
+opportunity cards are NOT an archive target; archived rows are the future S3 cold-storage watermark (`lib/proposal-archive.ts`).
+A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, **35 archetypes, all auto-registered — dormant ≠ dead**)
+The pipeline agent workforce (`AgentFabric`, **36 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
@@ -44,8 +63,25 @@ archetypes (27→35): the G1 integrity cohort (`formatter`/`stylist`/`continuity
 restyle / V0.5 full auto), with `cost_estimator` **woken** (its `compute_budget` tool is backed by the
 deterministic `proposal.budget_model` burden-waterfall engine) and the **adversarial gate** = the reusable
 `AdvisoryOverlay` applied with `policy=auto` (Mode C's `request_overlay` elevates the review-gate cohort to a
-1:n fan-out → `advisory_manager` reconcile → HITL-or-AUTO landing; advisory, never advances a gate). The rest
-are greenfielded + registry-wired, pending the **global automation-policy wiring**. Wiring pattern: realign to the current
+1:n fan-out → `advisory_manager` reconcile → HITL-or-AUTO landing; advisory, never advances a gate). The **admin-agent
+program (Phase 1)** then added the 36th — `rfp_ingest_manager` (platform/our-org, the *manager* over the ingest
+cohort; the platform analog of `proposal_manager`): admin-invoked (`.../assess-ingest` → `OnIngestAssessmentRequested`
+→ `tool.ingest.assess`), it reads a curated solicitation's ingest state, infers the stage deterministically, and
+plans which specialist agents to run next — advisory, injection-fenced, **no tenant descent** (docs/ADMIN_AGENT_DESIGN.md).
+On the build side, the tenant Proposal Draft Manager (`proposal_manager` + `OnFullDraftRequested{ModeA,B,C}`,
+Mode C = full auto) is now also admin-drivable from up top via the **Proposal Auto-Drive "doorbell"**
+(`/admin/agents` card → `POST /api/admin/proposals/[p]/full-draft` → the same `proposal:full_draft_requested`
+trigger) — portal + doorbell funnel through one `requestFullDraft` helper (`lib/proposal-full-draft.ts`) so
+every full draft is one auditable record, `source` distinguishing `portal` vs `admin_doorbell`. The
+**Proposal Studio** (docs/PROPOSAL_STUDIO_DESIGN.md) then breaks that engine into **3 gated loops** —
+Draft → Refine → Compliance (`OnReviewPhaseRequested{Draft,Refine,Compliance}`, reusing the SAME cohort
+`AI_INVOKE` actions, mig 144 `proposals.studio_phase`): each loop lands in review, then a simple UI gate
+where the admin **comments + regenerates** (comments threaded as `guidance`) or **approves → next**, or
+**runs all 3 automatically** via the doorbell (`advance_studio_phase` ACTION auto-chains). Advisory —
+it never advances a stage, locks, or submits. Observability
+is enforced end-to-end: every actor/automation/agent/manager action posts to `system_events` (+ domain audit
+logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-02.md; the `package?format=zip` blind spot is closed).
+The rest are greenfielded + registry-wired, pending the **global automation-policy wiring**. Wiring pattern: realign to the current
 spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
 (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
@@ -90,6 +126,9 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - `npx tsc --noEmit` must pass — zero type errors
 - No unhandled promises
 - No console.log — use console.error for error logging only
+- User feedback: `toast()` (`lib/toast.tsx`) for transient action results (success/error/info) — NOT
+  native `alert()`; native `confirm()` stays for destructive blocking gates; inline `setMsg`/`setErr`
+  for form-level validation
 - Return consistent shapes: `{ data: T }` success, `{ error: string, code: string }` failure
 - Auth checks first, then input validation, then business logic
 - Always verify tenant access before returning tenant-specific data
@@ -100,9 +139,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (796 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (855 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+  ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
+  `node .next/standalone/server.js` after staging `.next/static`+`public`; auth flows must hit
+  `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.
 
 ## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column

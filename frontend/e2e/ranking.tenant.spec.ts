@@ -16,6 +16,15 @@ const SOL = 'c4000000-0000-4000-8000-000000000001';
 const T1 = '92000000-0000-4000-8000-000000000001';
 
 test('bucket ranking: cards auto-scored on push, surfaced + ordered on /cards', async ({ request, baseURL }) => {
+  // Bucket scoring is NOT computed in the frontend — it is event-driven and pipeline-side:
+  // the bridge fan-out emits capture:card.applied and the Python OnCardApplied workflow
+  // (pipeline/src/workflows/actions/rescore.py, a faithful port of scoreCard) writes
+  // tenant_bucket_scores, which /cards reads. A frontend-only e2e serve has no pipeline
+  // worker, so the score never lands (topScore = 0). Run the FULL two-service e2e env (the
+  // pipeline consuming events alongside the app) and set E2E_WITH_PIPELINE=1 to exercise
+  // this. Fixtures are seeded regardless (scripts/e2e_fixtures.sql: solicitation c4 + AF SBIR
+  // topics with agency/programType/close_date). See docs/V1_LAUNCH_PUNCHLIST.md (C-wave).
+  test.skip(process.env.E2E_WITH_PIPELINE !== '1', 'needs the pipeline rescore worker (event-driven scoring); set E2E_WITH_PIPELINE=1 in the two-service env');
   // Tenant creates a bucket that matches AF SBIR opportunities.
   const create = await request.post(`/api/portal/${SLUG}/buckets`, {
     data: { name: 'AF SBIR', criteria: { agencies: ['Air Force'], programTypes: ['sbir'] } },

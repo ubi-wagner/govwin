@@ -63,6 +63,14 @@ BEGIN
      SET section_type = 'technical',
          meta = coalesce(meta, '{}'::jsonb) || jsonb_build_object('sourceAtomIds', jsonb_build_array('a1a1a1a1-0000-4000-8000-000000000001'))
    WHERE id = 'd0000000-0000-4000-8000-000000000003';
+  -- fullloop/atomloop LEAK atoms every run: the uploaded reference ('approach.md') + primitive
+  -- ('Uploaded Technical Approach'), and the returned derivative (source='download_derivative',
+  -- titled after the section). Left to accumulate, the extra vol=technical primitives push the
+  -- freshly-uploaded one out of the mold selector's top-N and fullloop line 69 flakes. Delete ONLY
+  -- those leaked atoms — never the A1/A2/A3 fixtures. atom_tags/_lineage/_members cascade on delete.
+  DELETE FROM library_atoms WHERE tenant_id = lh AND title IN ('Uploaded Technical Approach', 'approach.md');
+  DELETE FROM library_atoms WHERE tenant_id = lh AND source = 'download_derivative'
+    AND title IN ('Fullloop Section', 'Lock Fixture Section', 'Collab Fixture Section');
 
   -- matrix.tenant: an RFP chain (solicitation + 1 volume + 2 required items + topic).
   INSERT INTO opportunities (id, source, source_id, title, is_active) VALUES
@@ -118,10 +126,18 @@ BEGIN
   VALUES ('c4000000-0000-4000-8000-000000000001', NULL, jsonb_build_object('submission_format', jsonb_build_object('value', 'DSIP')))
   ON CONFLICT DO NOTHING;
 
-  -- Reset both push fixtures so fan-out/ranking can re-push on every run.
-  UPDATE curated_solicitations SET status = 'approved', pushed_at = NULL
+  -- Reset both push fixtures so fan-out/ranking can re-push on every run. push now REQUIRES
+  -- a non-empty spotlight_summary (mig 107 — the first-pass matching context) before it will
+  -- release into the pipeline, so set it here (also feeds ranking's bucket text-match).
+  UPDATE curated_solicitations
+     SET status = 'approved', pushed_at = NULL,
+         spotlight_summary = 'Air Force SBIR — agencies: Air Force; program type: SBIR. Autonomy, sensing, navigation, and communications topics matching the AF SBIR spotlight bucket.'
    WHERE id IN ('c3000000-0000-4000-8000-000000000001', 'c4000000-0000-4000-8000-000000000001');
-  UPDATE opportunities SET is_active = false
+  -- push also date-guards: EVERY opp/topic that becomes a card must carry a close_date
+  -- (AUTOMATION_POLICY_DESIGN ⑤). Set an estimated future close on the umbrella + topics.
+  UPDATE opportunities SET is_active = false,
+         close_date = COALESCE(close_date, now() + interval '60 days'),
+         dates_estimated = true
    WHERE solicitation_id IN ('c3000000-0000-4000-8000-000000000001', 'c4000000-0000-4000-8000-000000000001');
   DELETE FROM tenant_bucket_scores WHERE opportunity_id IN (
     '90000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000002',
@@ -134,4 +150,50 @@ BEGIN
     'a0000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000002');
   DELETE FROM tenant_bucket_scores WHERE bucket_id IN (SELECT id FROM tenant_spotlight_buckets WHERE tenant_id = lh AND name = 'AF SBIR');
   DELETE FROM tenant_spotlight_buckets WHERE tenant_id = lh AND name = 'AF SBIR';
+
+  -- zzaudit.tenant (drive): the "Customer Interest" panel on /admin/rfp-curation/<sol>
+  -- reads the live tenant_opportunity_cards spine — Lighthouse must have a PINNED card
+  -- under solicitation 6c8571ca so the panel surfaces "Lighthouse". (opp first, then the
+  -- solicitation, then point the opp at it — opportunities.solicitation_id is an FK.)
+  INSERT INTO opportunities (id, source, source_id, title, is_active, topic_number, close_date, dates_estimated) VALUES
+    ('6c000000-0000-4000-8000-000000000001', 'manual_upload', 'fx-audit-topic', 'Autonomy Interest Topic', true, 'AUD-001', now() + interval '45 days', true)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO curated_solicitations (id, opportunity_id, namespace, status, solicitation_title, solicitation_number, spotlight_summary)
+  VALUES ('6c8571ca-292f-41db-9762-c5055a06e71e', '6c000000-0000-4000-8000-000000000001', 'af', 'approved', 'Autonomy Interest BAA', 'BAA-AUD-2026', 'Autonomy interest solicitation — customer-interest audit fixture.')
+  ON CONFLICT (id) DO NOTHING;
+  UPDATE opportunities SET solicitation_id = '6c8571ca-292f-41db-9762-c5055a06e71e' WHERE id = '6c000000-0000-4000-8000-000000000001';
+  INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage, is_pinned, pinned_at) VALUES
+    (lh, '6c000000-0000-4000-8000-000000000001', jsonb_build_object('title', 'Autonomy Interest Topic', 'opportunityId', '6c000000-0000-4000-8000-000000000001'), 1, 'open', 'open', true, now())
+  ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET is_pinned = true, pinned_at = now(), lifecycle_status = 'open';
+  -- (zzaudit's 2nd test creates 'audit-proof-co' but makes NO assertion — a screenshot drive —
+  --  so it passes whether or not the company already exists. We deliberately do NOT delete it:
+  --  the created tenant owns users/memberships/cards/atoms, and cascading that here is both
+  --  unnecessary and FK-fragile.)
+
+  -- zzblockers.tenant (drive): (t1) opp 223f57f4 — a Lighthouse opp WITHOUT a portal that
+  -- the RFP-admin free-portal form approves into guardrails_pending; drop any portal left by
+  -- a prior run so it re-approves clean. (t3) a submitted+locked proposal so the post-submit
+  -- "Unlock for Edit" button renders. (member@ubihere is seeded by seed_dev_accounts.)
+  INSERT INTO opportunities (id, source, source_id, title, is_active, close_date, dates_estimated) VALUES
+    ('223f57f4-d6c4-47d6-8795-2f0c46a61c06', 'manual_upload', 'fx-freeportal-opp', 'Free Portal Fixture Opp', true, now() + interval '50 days', true)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage) VALUES
+    (lh, '223f57f4-d6c4-47d6-8795-2f0c46a61c06', jsonb_build_object('title', 'Free Portal Fixture Opp', 'opportunityId', '223f57f4-d6c4-47d6-8795-2f0c46a61c06'), 1, 'open', 'open')
+  ON CONFLICT (tenant_id, opportunity_id) DO NOTHING;
+  -- drop any portal a prior t1 run approved so it re-approves clean (FK-safe: shadow_admin_grants
+  -- references proposal_portals; clear grants first). purchases has no unique on (tenant,opp) so a
+  -- re-approve's $0 purchase never conflicts — leave those (audit trail).
+  DELETE FROM shadow_admin_grants WHERE portal_id IN (
+    SELECT id FROM proposal_portals WHERE opportunity_id = '223f57f4-d6c4-47d6-8795-2f0c46a61c06' AND tenant_id = lh);
+  DELETE FROM proposal_portals WHERE opportunity_id = '223f57f4-d6c4-47d6-8795-2f0c46a61c06' AND tenant_id = lh;
+
+  INSERT INTO opportunities (id, source, source_id, title, is_active) VALUES
+    ('d1000000-0000-4000-8000-00000000000d', 'manual_upload', 'fx-submitted-opp', 'Submitted Fixture Opp', true)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO proposals (id, tenant_id, opportunity_id, title, stage, is_locked, lock_count) VALUES
+    ('a1b2c3d4-0000-4000-8000-000000000001', lh, 'd1000000-0000-4000-8000-00000000000d', 'Submitted Fixture Proposal', 'submitted', true, 1)
+  ON CONFLICT (id) DO UPDATE SET stage = 'submitted', is_locked = true, lock_count = 1;
+  INSERT INTO proposal_sections (id, proposal_id, section_number, title, status, version, is_locked, content) VALUES
+    ('a1b2c3d4-0000-4000-8000-000000000002', 'a1b2c3d4-0000-4000-8000-000000000001', '1', 'Submitted Section', 'in_progress', 1, true, '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"final"}}]}')
+  ON CONFLICT (id) DO NOTHING;
 END $$;

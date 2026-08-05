@@ -7,8 +7,19 @@
 > this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
 > `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
 
+> **Admin-agent Phase 1 (2026-08-02) — the fabric now auto-registers 36.** Added **`rfp_ingest_manager`**
+> (platform / our-org, `Our-org — RFP-admin ops` pod) — the *manager* over the ingest cohort and the
+> platform-scope analog of the tenant-side `proposal_manager`. Admin-invoked (`POST
+> /api/admin/rfp-curation/[solId]/assess-ingest` → `finder:ingest.assessment_requested` →
+> `OnIngestAssessmentRequested` → action `tool.ingest.assess`), it reads a curated solicitation's ingest
+> state (shred/extract → compliance matrix → skeleton), infers the pipeline stage **deterministically**,
+> and emits ONE advisory coordination plan: which specialist agents (`ingest_analyst` / `matrix_stager` /
+> `skeleton_architect` / `curation_qa`) to run next. Advisory-only, injection-fenced, guardrail-gated,
+> **no tenant descent** (Phase 2). Full spec: **docs/ADMIN_AGENT_DESIGN.md**; locked by
+> `pipeline/tests/test_rfp_ingest_manager_wiring.py` (7/7, incl. a live drive over our own solicitations).
+
 **Audience:** RFP-admin ops (setup + monitoring), engineering (wiring), marketing (how to talk about it).
-**As-built:** the pipeline `AgentFabric` auto-registers **35 archetypes** (`_ARCHETYPE_CLASSES` in
+**As-built:** the pipeline `AgentFabric` auto-registers **36 archetypes** (`_ARCHETYPE_CLASSES` in
 `fabric.py`) — **dormant ≠ dead**: all are registry-wired and invocable; "dormant" means only that no
 producer/step fires one yet. This doc is the pattern for waking them, the tenant-isolation rules they run
 under, and the RFP-admin oversight surface. The fabric mechanics + how to add an archetype are in

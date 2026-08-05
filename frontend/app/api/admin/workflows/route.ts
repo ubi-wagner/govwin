@@ -40,7 +40,14 @@ export async function GET(request: Request) {
 
     // ── Parse query params ───────────────────────────────────────
     const { searchParams } = new URL(request.url);
-    const statusFilter = searchParams.get('status');
+    const rawStatus = searchParams.get('status');
+    // Archived view (opt-in): `?archived=1` (or `?status=archived`) surfaces soft-archived
+    // instances (archived_at IS NOT NULL) that the default active views hide. (docs/ARCHIVABLE_CONTRACT.md)
+    const archivedParam = (searchParams.get('archived') ?? '').toLowerCase();
+    const showArchived =
+      archivedParam === '1' || archivedParam === 'true' || archivedParam === 'yes' || rawStatus === 'archived';
+    // In the archived view the status filter does not apply.
+    const statusFilter = showArchived ? null : rawStatus;
     const hours = Math.min(Math.max(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 1), 168);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
 
@@ -51,6 +58,38 @@ export async function GET(request: Request) {
         { error: `Invalid status filter. Must be one of: ${VALID_STATUSES.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
+    }
+
+    // ── Archived view (opt-in) ───────────────────────────────────
+    // Soft-archived instances, most-recently-archived first, returned in the `recent` slot so the
+    // monitor's Archived toggle can render + restore them. `active` is empty in this view.
+    if (showArchived) {
+      const archived = await sql<{
+        id: string;
+        workflowName: string;
+        status: string;
+        currentStep: string | null;
+        startedAt: string | null;
+        completedAt: string | null;
+        tenantId: string | null;
+        source: string;
+        stepStatus: Record<string, string> | null;
+        retryCount: number;
+        lastError: string | null;
+        lastErrorStep: string | null;
+        recoveredFrom: string | null;
+        archivedAt: string | null;
+      }[]>`
+        SELECT id, workflow_name, status, current_step,
+               started_at, completed_at, tenant_id, source,
+               step_status, retry_count, last_error, last_error_step,
+               recovered_from, archived_at
+        FROM process_instances
+        WHERE archived_at IS NOT NULL
+        ORDER BY archived_at DESC
+        LIMIT ${limit}
+      `;
+      return NextResponse.json({ data: { active: [], recent: archived } });
     }
 
     // ── Active instances ─────────────────────────────────────────
@@ -74,6 +113,7 @@ export async function GET(request: Request) {
                  step_status, retry_count, last_error
           FROM process_instances
           WHERE status = ${statusFilter}
+            AND archived_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limit}
         `
@@ -96,6 +136,7 @@ export async function GET(request: Request) {
                  step_status, retry_count, last_error
           FROM process_instances
           WHERE status IN ('running', 'paused', 'pending', 'retrying')
+            AND archived_at IS NULL
           ORDER BY started_at DESC
           LIMIT ${limit}
         `;
@@ -123,6 +164,7 @@ export async function GET(request: Request) {
       FROM process_instances
       WHERE created_at > now() - ${hours + ' hours'}::interval
         AND status IN ('completed', 'failed', 'cancelled')
+        AND archived_at IS NULL
       ORDER BY created_at DESC
       LIMIT ${limit}
     `;

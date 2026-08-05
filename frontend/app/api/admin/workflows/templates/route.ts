@@ -82,6 +82,7 @@ export async function GET() {
                count(*)                                                             AS total,
                max(created_at)                                                      AS last_launched_at
         FROM process_instances
+        WHERE archived_at IS NULL
         GROUP BY workflow_name
       ) i ON i.workflow_name = t.workflow_name
       ORDER BY t.active DESC, t.workflow_name ASC

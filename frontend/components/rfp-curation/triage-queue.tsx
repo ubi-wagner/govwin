@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
+import { toast } from '@/lib/toast';
 
 interface TriageItem {
   solicitationId: string;
@@ -134,7 +135,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
       const res = await fetch(`/api/admin/rfp-curation/${solId}/force-release`, { method: 'POST' });
       if (!res.ok) {
         const json = await res.json();
-        alert(json.error || 'Force release failed');
+        toast.error(json.error || 'Force release failed');
         return;
       }
       setItems((prev) =>
@@ -145,7 +146,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
         ),
       );
     } catch {
-      alert('Network error during force release');
+      toast.error('Network error during force release');
     } finally {
       setForceReleasing(null);
     }

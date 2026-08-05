@@ -50,6 +50,7 @@ export async function GET() {
         GROUP BY process_instance_id
       ) tk ON tk.process_instance_id = pi.id
       WHERE pi.status IN ('running', 'paused', 'pending', 'retrying')
+        AND pi.archived_at IS NULL
       ORDER BY pi.updated_at DESC
       LIMIT 300
     `;

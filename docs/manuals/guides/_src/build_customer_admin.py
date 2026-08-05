@@ -47,9 +47,10 @@ sec(id="orientation", toc="1 · Your portal", heading="Your portal — orientati
          ["AI Usage","/agents","your agent usage & budget"],
          ["Automation","/automation","your automation preferences"],
          ["Settings","/profile","your company profile"]]},
-       "callouts":[{"kind":"note","html":"The <b>notification bell</b> polls every 60s and badges unread (or <b>9+</b>). "
-         "If an RFP admin is working inside your company on your behalf, an amber <b>shadow-admin banner</b> shows at the top — "
-         "everything they do is logged to your audit trail."}]},
+       "callouts":[{"kind":"note","html":"The <b>notification bell</b> polls every 60s and badges unread (or <b>9+</b>). Open it "
+         "and hit <b>Mark all read</b> to clear the badge — your read position is remembered per-user, so a teammate’s reading "
+         "doesn’t clear yours. If an RFP admin is working inside your company on your behalf, an amber <b>shadow-admin banner</b> "
+         "shows at the top — everything they do is logged to your audit trail."}]},
     ])
 
 # ── 2. Dashboard ──────────────────────────────────────────────────────────────
@@ -215,6 +216,16 @@ sec(id="library", toc="5 · Library & atoms", heading="Library — build your co
          "<b>draft</b> atoms with a <i>“Screen capture from &lt;host&gt; · &lt;time&gt;”</i> provenance stamp."},
          {"kind":"tip","html":"Verified end-to-end: a captured frame boxed into two regions produced a reference atom + two "
            "tagged region atoms + a section group — all draft, provenance-stamped, insertable into the canvas."}]},
+      {"id":"lib-archive","heading":"Archive an atom (retire it from selection)","toc":"5.6 · Archive an atom",
+       "lead":"<p>Retire an atom you no longer want offered — a stale bio, a superseded past-performance blurb — by "
+         "<b>archiving</b> it. Archiving is soft: the atom stays in indexed storage, it just stops appearing.</p>",
+       "steps":[
+         S("On an atom, choose <b>Archive</b>. It drops out of the library browse <i>and</i> out of the draft-selection lists everywhere — it can’t be picked into a section until you unarchive it."),
+         S("Atoms are <b>copied forward</b> into any proposal that already used them, so archiving one <b>breaks nothing downstream</b> — locked and drafted sections keep their copy."),
+         S("<b>Restore</b> re-enables the atom for selection at any time."),
+       ],
+       "callouts":[{"kind":"note","html":"Archiving an atom only changes what’s <i>selectable</i> — it never deletes content and "
+         "never touches a proposal that already used it. (Foundational documents archive the same way.)"}]},
     ])
 
 # ── 6. Proposals list ─────────────────────────────────────────────────────────
@@ -232,7 +243,21 @@ sec(id="proposals", toc="6 · Proposals list", heading="Proposals — your build
     table={"title":"Proposal stages (what the pill means)","headers":["Pill","Meaning"],"rows":[
       ["V0.5 · Draft","building — sections being drafted"],["V0.5 · Review","in internal review"],
       ["V1 · Final","locked & ready to submit"],["V1 · Submitted","submitted to the agency"],
-      ["Archived","closed out"]]})
+      ["Archived","closed out — moved to the Archived list, still retrievable"]]},
+    subs=[
+      {"id":"archive-portal","heading":"Archive a portal — and restore it","toc":"6.1 · Archive & restore",
+       "lead":"<p>When a build is finished — won, lost, or shelved — <b>archive the whole portal</b> to clear it from your active "
+         "list. Archiving is <b>soft and reversible</b>: nothing is ever deleted here.</p>",
+       "steps":[
+         S("Open the proposal and click <b>Archive portal</b>. Confirm — the portal <i>and its running workflows</i> move to the "
+           "Archived list together (its automations stop; they’ll resume if you restore)."),
+         S("At the bottom of the proposals list, expand <b>Archived (N)</b> to see archived builds. Each still opens and still "
+           "<b>Export</b>s (as a .zip package)."),
+         S("An admin can <b>Restore</b> an archived portal back to the active list at any time — its workflows come back with it."),
+       ],
+       "callouts":[{"kind":"note","html":"Nothing is deleted — archived builds stay retrievable. After your retention window they’re "
+         "flagged <b>cold-storage eligible</b> (a future sweep bulk-moves them to long-term storage, still pointer-retrievable)."}]},
+    ])
 
 # ── 7. Proposal workspace / matrix (BIG) ──────────────────────────────────────
 sec(id="matrix", toc="7 · Proposal workspace", heading="The proposal workspace & compliance matrix",
@@ -283,6 +308,44 @@ sec(id="matrix", toc="7 · Proposal workspace", heading="The proposal workspace 
        "callouts":[{"kind":"tip","html":"Invite grants are <b>per section</b> and <b>per permission</b> (view / comment / "
          "edit). A collaborator only ever sees the sections you assign — see the Collaborator guide for the full picture."},
          {"kind":"note","html":"<b>AI &amp; Library</b> also hosts <b>Research this opportunity</b> — the R&D scout (see 7.5)."}]},
+      {"id":"studio","heading":"Proposal Studio — the guided 3-loop draft","toc":"7.4 · Proposal Studio",
+       "lead":"<p><b>Proposal Studio</b> is the recommended way to draft. It runs your proposal through three gated loops — "
+         "<b>Draft → Refine → Compliance</b> — and stops at each gate for your review before moving on. Advisory throughout: "
+         "drafts land in review, and the Studio never locks or submits for you.</p>",
+       "table":{"title":"The three loops","headers":["Loop","What it does"],"rows":[
+         ["1 · Draft","Plans from the skeleton + compliance matrix, then drafts every section from your library atoms."],
+         ["2 · Refine","Reformats + restyles to one house style, runs the cost model, and assembles the package."],
+         ["3 · Compliance","Checks requirement coverage, section-to-section continuity, and a redaction scan."]]},
+       "steps":[
+         S("Click <b>Start</b> on the current loop. The agent cohort runs — you can watch it; the gate opens automatically when the loop finishes."),
+         S("At the gate, <b>Preview</b> the document, then either type comments and <b>Regenerate</b> (your comments steer the re-run as guidance), or <b>Approve → next</b> to advance to the next loop."),
+         S("Prefer hands-off? <b>Run all 3 automatically</b> chains the loops end-to-end (the same path the admin “doorbell” uses) and still lands in review."),
+       ],
+       "callouts":[{"kind":"tip","html":"Studio is advisory — every draft is redlined and reversible, and no loop ever advances a "
+         "stage gate, locks, or submits. You stay in control at each gate."}]},
+      {"id":"ai-actions","heading":"AI Actions & the full-draft manager","toc":"7.7 · AI Actions & full draft",
+       "lead":"<p>Below the Studio, the <b>AI Actions</b> and <b>Run full draft</b> cards give you direct, single-pass AI controls "
+         "for when you want them.</p>",
+       "steps":[
+         S("<b>Draft with AI</b> — queues a first draft for every <i>empty</i> section."),
+         S("<b>AI Review</b> — runs an AI <b>color-team</b> pass; each section’s recommendations post into that section’s comment thread for you to accept or ignore."),
+         S("<b>Run full draft</b> (Advanced) — one full-pass draft across the whole proposal. Pick a <b>Mode</b>: <b>A · HITL + AI</b> "
+           "(you drive section-by-section), <b>B · Restyle</b> (reformat to one house style), or <b>C · Full auto</b> (auto-draft across "
+           "volumes + a review-gate pass). Optionally set a <b>Voice</b> (persuasive / technical / …). Mode C can add an "
+           "<b>Adversarial gate</b> — a directed 1:n review pass landing as either a <b>Human review</b> task or <b>Auto-reconcile</b>."),
+       ],
+       "callouts":[{"kind":"note","html":"Every AI output — Studio, Draft, AI Review, or full draft — <b>lands in review</b>, redlined "
+         "and reversible. AI never advances a gate, locks, or submits on its own."}]},
+      {"id":"amendments","heading":"Amendments — a solicitation change to acknowledge","toc":"7.8 · Amendments",
+       "lead":"<p>If the agency amends the solicitation after your build started, an RFP admin logs the change and it fans out to "
+         "your proposal. You’ll see an amber <b>“This solicitation was amended”</b> banner at the top of the workspace.</p>",
+       "steps":[
+         S("Read the banner: each change carries a <b>severity</b> chip (critical / major / minor / info) and a short summary."),
+         S("Click <b>Show N compliance changes</b> to expand the exact delta — the added / removed / changed requirements."),
+         S("An admin clicks <b>Acknowledge</b> to clear the banner for your team. (Contributors see the banner but can’t acknowledge — “An admin must acknowledge these changes.”)"),
+       ],
+       "callouts":[{"kind":"warn","html":"Acknowledging records that your team <i>saw</i> the change — it does <b>not</b> auto-edit "
+         "your proposal. Re-check the affected sections and your compliance matrix against the new requirements."}]},
       {"id":"research","heading":"Research this opportunity (R&D scout)","toc":"7.5 · Research this opportunity",
        "lead":"<p>In the <b>AI &amp; Library</b> tab, the <b>Research Scout</b> does your R&D — market research, prior art, "
          "and the competitor landscape, including DoD sources (SAM.gov, SBIR.gov, DSIP) — and returns a <b>cited brief</b>.</p>",
@@ -512,8 +575,15 @@ sec(id="export", toc="15 · Export & deliver", heading="Export — your submissi
          "<b>.docx</b> (US-Letter, 1″ margins, the agency’s fonts, figures inline &amp; captioned); the Cost Volume to an "
          "<b>.xlsx</b> with live formulas.</p>",
     img=DELIV+"tvp_1.png", caption="Page 1 of the exported Technical Volume — rendered by the system from your locked canvas.",
+    body="<p>Whole-proposal packages export as <b>.json / .docx / .pdf / .zip</b> from the Artifacts export row "
+      "(the .zip is per-volume-native). Before you submit, run the <b>Submission Package</b> review in the admin panel: it "
+      "shows a deterministic readiness check and, on demand, queues the <b>packaging specialist</b> to compile a manifest — "
+      "volume completeness, required forms, and page/format compliance — as an advisory report.</p>",
     callouts=[{"kind":"eg","html":"Verified deliverables: a <b>10-page Technical Volume .docx</b> (6 figures, 5 tables, 8 DON "
-      "TV2 sections) and a <b>Cost Volume .xlsx</b> — Base <b>$199,502 ≤ $200k</b>, Option <b>$114,464 ≤ $115k</b>, formulas live."}])
+      "TV2 sections) and a <b>Cost Volume .xlsx</b> — Base <b>$199,502 ≤ $200k</b>, Option <b>$114,464 ≤ $115k</b>, formulas live."},
+      {"kind":"tip","html":"When it’s over, record the result in <b>AI &amp; Library → Record Outcome</b> (Won / Lost / Withdrawn). "
+        "Recording <b>Won</b> starts a <b>contract</b> and drops a <b>kickoff task</b> in your queue; every outcome also feeds your "
+        "library so winning content ranks higher next time."}])
 
 spec = {
   "slug": "customer-admin",

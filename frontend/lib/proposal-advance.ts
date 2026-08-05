@@ -460,11 +460,17 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
           proposalId,
           sectionId: s.id,
           input: {
+            // snake_case is what color_team_reviewer.build_messages reads — camelCase alone left the
+            // reviewer with empty section_text. Both cases sent for parity with the manual path.
+            requested_by: actorId,
             requestedBy: actorId,
+            section_title: s.title ?? '',
             sectionTitle: s.title ?? '',
+            section_text: sectionText.slice(0, 20000),
             sectionText: sectionText.slice(0, 20000),
-            category: s.sectionType ?? 'review',
+            review_type: 'red_team',
             reviewType: 'red_team',
+            category: s.sectionType ?? 'review',
           },
         });
       }

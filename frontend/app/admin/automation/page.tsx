@@ -104,7 +104,8 @@ export default async function AutomationPage() {
     const [instRow] = await sql<Array<{ failed: number; active: number }>>`
       SELECT count(*) FILTER (WHERE status = 'failed')::int AS failed,
              count(*) FILTER (WHERE status IN ('running', 'retrying', 'paused'))::int AS active
-      FROM process_instances`;
+      FROM process_instances
+      WHERE archived_at IS NULL`;
     if (instRow) instances = instRow;
     const [spendRow] = await sql<Array<{ spend: number; ceiling: number | null }>>`
       SELECT COALESCE((SELECT SUM(cost_usd) FROM agent_task_log WHERE created_at >= date_trunc('month', now())), 0)::float AS spend,

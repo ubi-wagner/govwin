@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RFP Pipeline — Platform Overview & Capabilities</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  :root{
+    --coral:#e85d4a; --coral6:#d44432; --coral4:#f47a64; --coral7:#b23526; --coral50:#fef2f0; --coral100:#fde3df; --coral200:#fcc8bf;
+    --ink:#1a1816; --ink8:#2d2a27; --ink7:#45403a; --ink5:#7a6d5e; --ink4:#968775;
+    --green:#2d8b4e; --green50:#edf7f0; --gold:#d4a843;
+    --cream50:#faf8f4; --cream100:#f5f0e8; --cream200:#ede4d5; --cream300:#dfd2bc;
+    --sans:"Helvetica Neue",Helvetica,Arial,"Segoe UI",system-ui,sans-serif;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ font-family:var(--sans); color:var(--ink8); font-size:10.5pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sheet{ padding:0.66in 0.74in 0.52in; break-before:page; page-break-before:always; position:relative; min-height:10.9in; display:flex; flex-direction:column; }
+  .sheet:first-child{ break-before:avoid; page-break-before:avoid; }
+  .fill{ flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .fill.center{ justify-content:center; }
+  .bleed{ margin-left:-0.74in; margin-right:-0.74in; padding-left:0.74in; padding-right:0.74in; }
+
+  /* ── wordmark ── */
+  .wm-row{ display:flex; align-items:baseline; line-height:1; }
+  .wm-rfp{ font-family:var(--sans); font-weight:900; letter-spacing:-0.03em; color:var(--ink); }
+  .wm-pipe{ font-family:var(--serif); font-style:italic; color:var(--coral); margin-left:.09em; }
+  .wm-arrow{ display:flex; align-items:center; gap:5px; margin-top:3px; }
+  .wm-line{ flex:1; height:3px; border-radius:3px; background:linear-gradient(90deg,var(--coral4),var(--coral)); }
+  .wm-dot{ width:8px; height:8px; border-radius:50%; background:var(--green); flex-shrink:0; }
+  .wm-tag{ text-transform:uppercase; letter-spacing:.34em; font-weight:600; color:var(--ink4); font-size:7.5pt; margin-top:7px; }
+  .wm-lg .wm-rfp,.wm-lg .wm-pipe{ font-size:46pt; }
+  .wm-sm .wm-rfp,.wm-sm .wm-pipe{ font-size:17pt; }
+  /* corner brand mark on content pages */
+  .cmark{ position:absolute; top:0.34in; right:0.74in; font-size:10.5pt; letter-spacing:-0.01em; }
+  .cmark b{ font-weight:900; color:var(--ink); } .cmark i{ font-family:var(--serif); font-style:italic; color:var(--coral); }
+
+  /* ── icons ── */
+  svg.ic{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  svg.ic.lg{ width:34px; height:34px; } svg.ic.xl{ width:40px; height:40px; }
+
+  /* ── type ── */
+  .eyebrow{ text-transform:uppercase; letter-spacing:.28em; font-weight:700; font-size:8.5pt; color:var(--coral6); }
+  h1{ font-family:var(--sans); font-weight:900; color:var(--ink); font-size:37pt; line-height:1.03; letter-spacing:-0.018em; margin:16px 0 0; }
+  h1 em{ font-family:var(--serif); font-style:italic; font-weight:400; color:var(--coral); }
+  .lede{ font-family:var(--serif); font-style:italic; color:var(--ink7); font-size:14.5pt; line-height:1.5; margin:18px 0 0; max-width:6.1in; }
+  h2{ font-family:var(--sans); font-weight:800; color:#fff; font-size:16pt; margin:0; letter-spacing:-0.01em; }
+  h3{ font-family:var(--sans); font-weight:800; color:var(--ink); font-size:13pt; margin:0 0 3px; letter-spacing:-0.01em; }
+  p{ margin:0 0 8px; }
+  .muted{ color:var(--ink5); }
+  b.ink{ color:var(--ink); } b.coral{ color:var(--coral6); } em.s{ font-family:var(--serif); font-style:italic; }
+
+  /* section header band (full bleed) */
+  .band{ background:var(--ink); color:#fff; padding:14px 0.74in; margin:0 0 26px; display:flex; align-items:center; gap:13px; }
+  .band .ic{ color:var(--coral4); }
+  .band .kick{ margin-left:auto; text-transform:uppercase; letter-spacing:.2em; font-size:8pt; color:var(--ink4); font-weight:600; }
+
+  /* chips */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .chip{ border:1.5px solid var(--cream300); color:var(--ink7); border-radius:20px; padding:5px 14px; font-size:9pt; font-weight:700; letter-spacing:.04em; }
+
+  /* hero pipeline flow */
+  .pipeflow{ display:flex; align-items:flex-start; gap:0; margin-top:56px; }
+  .pfcap{ text-align:center; font-family:var(--serif); font-style:italic; color:var(--ink5); font-size:11pt; margin-top:26px; }
+  .pfnode{ flex:1; text-align:center; }
+  .pfcirc{ width:60px; height:60px; margin:0 auto; border-radius:50%; background:#fff; border:2px solid var(--coral200); color:var(--coral6); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(216,68,50,0.08); }
+  .pfname{ font-weight:800; color:var(--ink); font-size:10pt; margin-top:9px; letter-spacing:.02em; }
+  .pfsub{ font-size:7.8pt; color:var(--ink5); margin-top:2px; line-height:1.3; }
+  .pfarrow{ width:40px; flex-shrink:0; display:flex; align-items:center; justify-content:center; height:60px; color:var(--coral4); }
+
+  /* stat band */
+  .stats{ background:var(--ink); color:#fff; display:flex; }
+  .stats > div{ flex:1; text-align:center; padding:18px 6px; border-left:1px solid var(--ink7); }
+  .stats > div:first-child{ border-left:0; }
+  .stat-n{ font-family:var(--sans); font-weight:900; font-size:25pt; color:#fff; line-height:1; }
+  .stat-n em{ font-family:var(--serif); font-style:italic; color:var(--gold); font-weight:400; }
+  .stat-l{ text-transform:uppercase; letter-spacing:.14em; font-size:7pt; color:var(--ink4); margin-top:7px; }
+
+  /* capability card */
+  .cap{ display:flex; gap:16px; padding:22px 0; border-top:1px solid var(--cream200); }
+  .cap:first-of-type{ border-top:0; }
+  .capicon{ width:52px; height:52px; border-radius:13px; background:var(--coral50); color:var(--coral6); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid var(--coral100); }
+  .cap .how{ font-size:9pt; color:var(--ink5); margin-top:6px; }
+  .cap .how b{ color:var(--ink7); }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:30px 32px; }
+
+  /* lifecycle step w/ connector */
+  .flow{ margin-top:12px; position:relative; }
+  .step{ display:flex; gap:18px; align-items:flex-start; padding:18px 0; }
+  .stepnum{ width:30px; flex-shrink:0; font-family:var(--serif); font-style:italic; font-weight:700; color:var(--coral); font-size:16pt; }
+  .stepicon{ width:52px; height:52px; border-radius:50%; border:2px solid var(--cream300); color:var(--ink7); display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#fff; z-index:1; }
+  .stepwrap{ position:relative; }
+  .stepwrap::before{ content:''; position:absolute; left:74px; top:44px; bottom:44px; width:2px; background:var(--cream300); }
+
+  /* callout */
+  .callout{ background:var(--cream100); border-left:5px solid var(--coral); border-radius:0 10px 10px 0; padding:15px 18px; margin:22px 0; display:flex; gap:15px; align-items:center; }
+  .callout .ic{ color:var(--coral6); flex-shrink:0; }
+  .callout .green{ color:var(--green); } .callout.g{ border-left-color:var(--green); background:var(--green50); }
+
+  table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:9.5pt; }
+  th{ background:var(--ink); color:#fff; text-align:left; padding:9px 12px; font-size:9pt; font-weight:700; }
+  td{ padding:9px 12px; border-bottom:1px solid var(--cream200); vertical-align:top; }
+  td.r{ color:var(--ink); font-weight:700; white-space:nowrap; }
+  tr:nth-child(even) td{ background:var(--cream50); }
+
+  .price{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:8px; }
+  .pcard{ border:1.5px solid var(--cream300); border-radius:13px; padding:16px; position:relative; }
+  .pcard.feat{ border-color:var(--coral); background:var(--coral50); }
+  .pcard.feat::after{ content:'Most common'; position:absolute; top:-9px; right:14px; background:var(--coral); color:#fff; font-size:6.5pt; font-weight:800; letter-spacing:.12em; text-transform:uppercase; padding:3px 8px; border-radius:10px; }
+  .ptag{ text-transform:uppercase; letter-spacing:.14em; font-size:7.5pt; font-weight:700; color:var(--coral6); }
+  .pname{ font-weight:800; color:var(--ink); font-size:11.5pt; margin:4px 0 8px; }
+  .pamt{ font-family:var(--sans); font-weight:900; color:var(--ink); font-size:22pt; }
+  .pamt span{ font-size:9.5pt; font-weight:600; color:var(--ink5); }
+  .pbody{ font-size:8.6pt; color:var(--ink5); margin-top:9px; line-height:1.45; }
+
+  .trustlist{ display:grid; grid-template-columns:1fr 1fr; gap:24px 32px; margin-top:16px; }
+  .trust{ display:flex; gap:13px; }
+  .trust .capicon{ width:44px; height:44px; border-radius:11px; background:var(--green50); border-color:#cfe6d7; color:var(--green); }
+  .trust b{ color:var(--ink); display:block; font-size:10.5pt; }
+  .trust .muted{ font-size:9pt; }
+
+  .rule{ height:3px; background:linear-gradient(90deg,var(--coral),var(--coral4)); border:0; border-radius:3px; margin:0 0 4px; }
+  .foot{ position:absolute; bottom:0.32in; left:0.74in; right:0.74in; display:flex; justify-content:space-between; font-size:7.5pt; color:var(--ink4); border-top:1px solid var(--cream200); padding-top:7px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ PAGE 1 · COVER ══════════ -->
+<section class="sheet" style="background:var(--cream50);">
+  <div class="wm-lg">
+    <div class="wm-row"><span class="wm-rfp">RFP</span><span class="wm-pipe">Pipeline</span></div>
+    <div class="wm-arrow" style="width:240px;"><span class="wm-line"></span><span class="wm-dot"></span></div>
+    <div class="wm-tag">Apply &middot; Curate &middot; Draft &middot; Win</div>
+  </div>
+
+  <div style="margin-top:64px;">
+    <div class="eyebrow">AI + Expert &middot; From Application to Submission</div>
+    <h1>A proposal engine,<br><em>not a proposal gamble.</em></h1>
+    <p class="lede">Win non-dilutive federal R&amp;D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals.</p>
+    <div class="chips">
+      <span class="chip">SBIR</span><span class="chip">STTR</span><span class="chip">BAA</span>
+      <span class="chip">OTA</span><span class="chip">CSO</span><span class="chip">Grants / NOFO</span>
+    </div>
+  </div>
+
+  <!-- hero pipeline flow -->
+  <div class="pipeflow">
+    <div class="pfnode"><div class="pfcirc"><svg class="ic lg"><use href="#source-scout"/></svg></div><div class="pfname">APPLY</div><div class="pfsub">Find &amp; rank the right opportunity</div></div>
+    <div class="pfarrow"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="pfnode"><div class="pfcirc"><svg class="ic lg"><use href="#expert"/></svg></div><div class="pfname">CURATE</div><div class="pfsub">Expert sets up your build (72h)</div></div>
+    <div class="pfarrow"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="pfnode"><div class="pfcirc"><svg class="ic lg"><use href="#ai-drafting"/></svg></div><div class="pfname">DRAFT</div><div class="pfsub">Isolated AI + your team</div></div>
+    <div class="pfarrow"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="pfnode"><div class="pfcirc" style="border-color:#bfe0cc; color:var(--green);"><svg class="ic lg"><use href="#trophy"/></svg></div><div class="pfname">WIN</div><div class="pfsub">Submit, then get sharper</div></div>
+  </div>
+  <div class="pfcap">One connected pipeline — from application to award.</div>
+
+  <div class="stats bleed" style="position:absolute; left:0; right:0; bottom:0; margin:0; padding-left:0.74in; padding-right:0.74in;">
+    <div><div class="stat-n">4+</div><div class="stat-l">Federal Sources Ingested</div></div>
+    <div><div class="stat-n">72<em>h</em></div><div class="stat-l">Expert-Review SLA</div></div>
+    <div><div class="stat-n">25+</div><div class="stat-l">Years Fed R&amp;D Expertise</div></div>
+    <div><div class="stat-n">100%</div><div class="stat-l">Human-Gated AI</div></div>
+  </div>
+</section>
+
+<!-- ══════════ PAGE 2 · WHY ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#non-dilutive"/></svg><h2>Why RFP Pipeline</h2><span class="kick">The opportunity &amp; the economics</span></div>
+  <div class="fill center">
+
+  <h3>Billions a year in non-dilutive funding — most of it left on the table</h3>
+  <p class="muted">There are billions each year in non-dilutive federal R&amp;D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply, because the process is opaque, deadline-driven, and expensive to chase. RFP Pipeline makes it accessible: it finds the right opportunities, pairs you with an expert, and turns your best work into compliant, winning proposals — <em class="s">SBIR, STTR, BAA, OTA, CSO, and grants.</em></p>
+
+  <div class="callout g"><svg class="ic xl green"><use href="#non-dilutive"/></svg><div><b class="ink">Keep your equity and your IP.</b> <span class="muted">Non-dilutive awards fund your R&amp;D without giving up ownership — the cheapest capital a technical small business will ever raise.</span></div></div>
+
+  <h3 style="margin-top:18px;">The old way is slow, and it&rsquo;s expensive</h3>
+  <p class="muted">Discovering opportunities, reading solicitations, and hand-building compliant volumes is a full-time job — usually stitched together from a monitoring subscription, an outside consultant, and a month of your team&rsquo;s payroll on every submission.</p>
+
+  <table>
+    <tr><th style="width:2.4in">The status quo</th><th>What it costs you</th><th style="width:1.6in">RFP&nbsp;Pipeline</th></tr>
+    <tr><td class="r">Opportunity monitoring service</td><td>~$5,000 / month for a feed you still have to triage</td><td>Included</td></tr>
+    <tr><td class="r">Proposal consultant</td><td>Commonly ~10% of the award as a success fee</td><td>Flat fee, no success fee</td></tr>
+    <tr><td class="r">Your team&rsquo;s time</td><td>A month of payroll per submission, from scratch</td><td>Draft from your library; revise, don&rsquo;t write</td></tr>
+  </table>
+
+  <div class="callout"><svg class="ic xl"><use href="#funding"/></svg><div><b class="ink">The math.</b> <span class="muted">RFP Pipeline replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for <b class="coral">$499/mo and a flat per-proposal fee</b>. No success fee, ever. And every cycle makes the next one cheaper, faster, and more accurate.</span></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>2</span></div>
+</section>
+
+<!-- ══════════ PAGE 3 · LIFECYCLE ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#automation"/></svg><h2>How it works — the pursuit lifecycle</h2><span class="kick">Apply &middot; Curate &middot; Draft &middot; Win</span></div>
+  <div class="fill center">
+  <p class="muted">One connected flow from market to award. You stay in control at every gate; the platform and its AI do the heavy lifting in between.</p>
+
+  <div class="flow"><div class="stepwrap">
+    <div class="step">
+      <div class="stepnum">01</div><div class="stepicon"><svg class="ic lg"><use href="#source-scout"/></svg></div>
+      <div><h3>Apply — find the right opportunity</h3><p class="muted" style="margin:0;">Daily, expert-curated ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — <b class="ink">ranked to your tech areas</b>. Deadline alerts keep you ahead of the clock. Pin a fit to pull its documents in, then open a proposal portal.</p></div>
+    </div>
+    <div class="step">
+      <div class="stepnum">02</div><div class="stepicon"><svg class="ic lg"><use href="#expert"/></svg></div>
+      <div><h3>Curate — an expert sets you up to win</h3><p class="muted" style="margin:0;">Within a <b class="ink">72-hour SLA</b>, an RFP expert curates the solicitation and provisions your build — the compliance matrix, the required volumes, and the section molds — straight from the actual solicitation, so you start on exactly the structure the agency expects.</p></div>
+    </div>
+    <div class="step">
+      <div class="stepnum">03</div><div class="stepicon"><svg class="ic lg"><use href="#ai-drafting"/></svg></div>
+      <div><h3>Draft — your isolated AI + your team</h3><p class="muted" style="margin:0;">Your <b class="ink">company-specific, isolated AI</b> drafts every section against your own library; your team revises in a stage-gated workspace where a live compliance matrix advances as sections lock. AI is advisory — it proposes, you approve.</p></div>
+    </div>
+    <div class="step">
+      <div class="stepnum">04</div><div class="stepicon" style="border-color:#bfe0cc; color:var(--green);"><svg class="ic lg"><use href="#trophy"/></svg></div>
+      <div><h3>Win — submit, and get sharper</h3><p class="muted" style="margin:0;">Export a compliant, submission-ready package in the agency&rsquo;s format. Record the outcome — <b class="ink">a win starts your contract</b> with a kickoff task, and every result feeds your library so winning content ranks higher on the next bid.</p></div>
+    </div>
+  </div></div>
+
+  <div class="callout"><svg class="ic xl"><use href="#growth"/></svg><div><b class="ink">A compounding advantage.</b> <span class="muted">Because everything you draft is captured to your library with lineage, your second proposal is faster than your first — and your tenth is faster than your second.</span></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>3</span></div>
+</section>
+
+<!-- ══════════ PAGE 4 · CAPABILITIES I ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#radar"/></svg><h2>Discover &amp; prioritize</h2><span class="kick">Capabilities &middot; 1 of 5</span></div>
+  <div class="fill center">
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#source-scout"/></svg></div>
+    <div><h3>Opportunity discovery &amp; your ranked pipeline</h3>
+      <p class="muted" style="margin:0;">Every federal opportunity the platform surfaces lands on your Opportunity Pipeline, ranked for you. Each card shows the agency, program type, close date, and a live submission-stage badge — pre-release, open, updated, or closed.</p>
+      <p class="how"><b>How it works:</b> daily ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals; AI ranks each opportunity against your company profile and tech areas; deadline alerts fire before the clock runs out; pin an opportunity to copy its solicitation documents straight into your workspace.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#target"/></svg></div>
+    <div><h3>Scoring buckets — rank by your strategy</h3>
+      <p class="muted" style="margin:0;">Define scoring &ldquo;buckets&rdquo; — your own lenses on the market — from keywords, agencies, program types, and NAICS codes. Each bucket ranks your entire pipeline by your rules, so the opportunities that fit <em class="s">your</em> strategy always rise to the top.</p>
+      <p class="how"><b>How it works:</b> transparent, per-factor scoring you can inspect (you see <em class="s">why</em> something ranked where it did); edit a bucket and the pipeline re-ranks instantly; keep multiple buckets for different pursuit strategies side by side.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#deadline"/></svg></div>
+    <div><h3>Deadline &amp; amendment awareness</h3>
+      <p class="muted" style="margin:0;">The pipeline tracks the submission clock and flags solicitations that change. When an opportunity moves to <b class="ink">Updated</b>, you see it — and a resync pulls the new documents into your workspace.</p>
+      <p class="how"><b>How it works:</b> submission-stage badges and due dates on every card; an &ldquo;update available&rdquo; strip when the agency revises a solicitation you&rsquo;re pursuing; alerts surfaced on your dashboard and notification bell so a late change never slips past you.</p></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>4</span></div>
+</section>
+
+<!-- ══════════ PAGE 5 · CAPABILITIES II ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#expert"/></svg><h2>Expert curation &amp; isolated AI</h2><span class="kick">Capabilities &middot; 2 of 5</span></div>
+  <div class="fill center">
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#curation"/></svg></div>
+    <div><h3>Expert-curated proposal workspaces</h3>
+      <p class="muted" style="margin:0;">When you commit to a pursuit, an RFP Pipeline expert curates the solicitation and provisions your build — the compliance matrix, the required volumes, and the section molds — from the actual solicitation. You start with exactly the structure the agency expects: unlocked, populated, and ready to write.</p>
+      <p class="how"><b>How it works:</b> a real expert reads the solicitation and builds the skeleton within a 72-hour SLA; provisioning instantiates the compliance matrix + volume molds; you also get a running <b>Ask-the-Expert</b> allowance for the judgment calls AI can&rsquo;t make.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#isolation"/></svg></div>
+    <div><h3>Your isolated, company-specific AI</h3>
+      <p class="muted" style="margin:0;">Your AI is walled to your company. It drafts from <em class="s">your</em> library and your context — and nothing you write trains a shared model or leaks to another company. It&rsquo;s an advantage that compounds for you alone.</p>
+      <p class="how"><b>How it works:</b> per-company isolation enforced at the data layer; <b>no model training</b> on your content; structured memory grounds drafts in your prior work; untrusted external content is fenced away from the AI so it can&rsquo;t be steered by a malicious document.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#verified"/></svg></div>
+    <div><h3>Compliance built in from the first draft</h3>
+      <p class="muted" style="margin:0;">The compliance matrix is populated the moment your build is provisioned and advances as you lock sections — so readiness is something you can <em class="s">see</em>, not guess.</p>
+      <p class="how"><b>How it works:</b> requirements are extracted from the solicitation into a live matrix; an AI compliance pass scores your proposal against them and flags gaps before an evaluator would; page-fill gauges track you against the agency&rsquo;s limits.</p></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>5</span></div>
+</section>
+
+<!-- ══════════ PAGE 6 · CAPABILITIES III ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#library"/></svg><h2>Your library &amp; workspace</h2><span class="kick">Capabilities &middot; 3 of 5</span></div>
+  <div class="fill center">
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#library"/></svg></div>
+    <div><h3>A reusable content library that compounds</h3>
+      <p class="muted" style="margin:0;">Build a living library from your best work. Upload a document and the platform breaks it into tagged, searchable content pieces you compose into new proposals; capture content from any screen; or turn a past winning proposal into a reusable template.</p>
+      <p class="how"><b>How it works:</b> upload &rarr; auto-atomize &rarr; tag &rarr; reuse; capture-from-screen pulls in content one-way without connecting an account; your content is <b>copied forward</b> into each proposal, so retiring an item never disturbs a proposal already built from it.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#workspace"/></svg></div>
+    <div><h3>The proposal workspace &amp; compliance matrix</h3>
+      <p class="muted" style="margin:0;">The build cockpit: a volume-and-section matrix, a stage-control bar with visible gate requirements, per-section accept-and-lock, and page-fill gauges. Advance a stage only when its gates are met.</p>
+      <p class="how"><b>How it works:</b> sections carry status, assignee, and a page-fill bar; <b>accept &amp; lock</b> a section to freeze it; when a volume is fully locked its downloads light up; the live compliance matrix advances with every lock.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#template"/></svg></div>
+    <div><h3>Templates, versioning &amp; a full audit trail</h3>
+      <p class="muted" style="margin:0;">Reuse a winning structure as a template for the next bid, keep a version history on every section, and see a complete, attributed record of who did what — human or AI.</p>
+      <p class="how"><b>How it works:</b> save any proposal&rsquo;s structure as a reusable skeleton; per-section version history with restore; every action posts to an audit trail, so nothing happens off the record.</p></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>6</span></div>
+</section>
+
+<!-- ══════════ PAGE 7 · AI WORKFORCE ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#agent"/></svg><h2>The AI workforce</h2><span class="kick">Capabilities &middot; 4 of 5</span></div>
+  <div class="fill center">
+  <p class="muted">An AI workforce works your proposal alongside your team — <b class="ink">always advisory, always landing in review for your approval</b>. It never submits, locks, or advances a stage on its own, and it&rsquo;s governed by budget, rate, and per-run cost caps you set.</p>
+
+  <div class="grid2" style="margin-top:16px;">
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#automation"/></svg></div>
+      <div><h3>Proposal Studio</h3><p class="how" style="margin-top:3px;">Runs your draft through <b>three gated loops — Draft, Refine, Compliance</b> — stopping at each gate for your review, comments, and approval, or running all three automatically when you want speed.</p></div></div>
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#edit"/></svg></div>
+      <div><h3>AI drafting &amp; full-draft modes</h3><p class="how" style="margin-top:3px;">First-draft every empty section from your library, or draft the <b>whole proposal in one pass</b> — guided, restyle-only, or full-auto — in the voice and tone you choose.</p></div></div>
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#review"/></svg></div>
+      <div><h3>Color-team review</h3><p class="how" style="margin-top:3px;">Runs a red/gold-team pass and posts specific, section-level recommendations into each section&rsquo;s thread for your team to accept or set aside.</p></div></div>
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#compliance"/></svg></div>
+      <div><h3>Compliance check</h3><p class="how" style="margin-top:3px;">Scores your proposal against the solicitation&rsquo;s requirements, pass / fail / partial per item, so you fix gaps before an evaluator finds them.</p></div></div>
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#radar"/></svg></div>
+      <div><h3>Research scout</h3><p class="how" style="margin-top:3px;">Gathers market research, prior art, and the competitor landscape — including federal sources — into a <b>cited brief</b> for your review. Web results are treated as untrusted data.</p></div></div>
+    <div class="cap" style="border:0; padding:0;"><div class="capicon"><svg class="ic xl"><use href="#funding"/></svg></div>
+      <div><h3>Cost model</h3><p class="how" style="margin-top:3px;">Assembles your cost volume with live formulas, so the numbers stay consistent, traceable, and defensible.</p></div></div>
+  </div>
+
+  <div class="callout"><svg class="ic xl"><use href="#shield"/></svg><div><b class="ink">Advisory by design.</b> <span class="muted">Every AI output — Studio, drafting, review, or a full draft — lands in review, redlined and reversible. Your team is the gate; the AI never advances past it on its own.</span></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>7</span></div>
+</section>
+
+<!-- ══════════ PAGE 8 · CAPABILITIES V ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#collaboration"/></svg><h2>Collaborate, deliver &amp; win</h2><span class="kick">Capabilities &middot; 5 of 5</span></div>
+  <div class="fill center">
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#collaboration"/></svg></div>
+    <div><h3>Team &amp; partner collaboration</h3>
+      <p class="muted" style="margin:0;">Invite teammates and external partners with per-section, per-permission access — view, comment, or edit — so everyone sees exactly what they should and nothing more.</p>
+      <p class="how"><b>How it works:</b> grants are per section and per permission; segregated collaboration spaces wall off partner content; every contributor&rsquo;s work is attributed; deactivating a member revokes access instantly while keeping their history.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#export"/></svg></div>
+    <div><h3>Submission-ready deliverables</h3>
+      <p class="muted" style="margin:0;">Export your proposal as Word, PDF, Excel (cost volumes with live formulas), or a per-volume ZIP — submission-formatted, with figures and tables rendered natively and sections in true document order.</p>
+      <p class="how"><b>How it works:</b> the same engine renders every format from one canvas; a <b>packaging review</b> compiles a manifest — volume completeness, required forms, and page/format compliance — before you submit; downloads unlock once the proposal is locked.</p></div></div>
+
+  <div class="cap"><div class="capicon"><svg class="ic xl"><use href="#trophy"/></svg></div>
+    <div><h3>Outcome &amp; contract — the flywheel</h3>
+      <p class="muted" style="margin:0;">Record the outcome of every pursuit. A win starts your contract with a kickoff task in your queue, and every outcome feeds your library so winning content ranks higher on your next bid.</p>
+      <p class="how"><b>How it works:</b> record Won / Lost / Withdrawn once submitted; a win instantiates a contract entity + kickoff; outcome signals re-weight your library so the platform gets sharper the more you use it.</p></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>8</span></div>
+</section>
+
+<!-- ══════════ PAGE 9 · TRUST ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#shield"/></svg><h2>Built for trust &amp; control</h2><span class="kick">Security &amp; governance</span></div>
+  <div class="fill center">
+  <p class="muted">Federal work demands discretion. RFP Pipeline is built so your data stays yours, your AI stays walled to your company, and every action — human or machine — is on the record.</p>
+
+  <div class="trustlist">
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#isolation"/></svg></div><div><b>Isolated, company-specific AI</b><span class="muted">Your AI is walled to your company; your context and content never cross to another customer.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#no-training"/></svg></div><div><b>No model training on your data</b><span class="muted">Your proposals and library are used to serve you — never to train a shared model.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#lock"/></svg></div><div><b>Multi-tenant isolation</b><span class="muted">Your workspace, library, and proposals are structurally yours alone.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#audit"/></svg></div><div><b>Full audit trail</b><span class="muted">Every action, by every person and every AI, is logged and traceable end to end.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#review"/></svg></div><div><b>AI is advisory &amp; human-gated</b><span class="muted">It proposes; your team approves. It never auto-writes, submits, or locks.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#chip"/></svg></div><div><b>Governed AI</b><span class="muted">Budget, rate, and per-run cost caps keep AI usage predictable and under your control.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#memory"/></svg></div><div><b>Your content stays yours</b><span class="muted">Copied forward into each proposal, never crossed between customers.</span></div></div>
+    <div class="trust"><div class="capicon"><svg class="ic lg"><use href="#verified"/></svg></div><div><b>Injection-fenced</b><span class="muted">Untrusted external content is treated as data, never instructions the AI will follow.</span></div></div>
+  </div>
+
+  <div class="callout g" style="margin-top:20px;"><svg class="ic xl green"><use href="#verified"/></svg><div><b class="ink">Proven, not theoretical.</b> <span class="muted">The end-to-end flow — discover, curate, draft, comply, export, win — has been verified on real DoD SBIR builds, including a NAVAIR/NAVSEA counter-UAS topic, from a ranked opportunity to a submission-ready, downloadable package.</span></div></div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Overview &amp; Capabilities</span><span>9</span></div>
+</section>
+
+<!-- ══════════ PAGE 10 · PRICING + ROLES + CTA ══════════ -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#funding"/></svg><h2>Plans &amp; who does what</h2><span class="kick">Pricing &middot; roles &middot; next step</span></div>
+  <div class="fill center">
+
+  <div class="price">
+    <div class="pcard"><div class="ptag">Required &middot; Monthly</div><div class="pname">Spotlight Subscription</div><div class="pamt">$499<span>/mo</span></div><div class="pbody">Daily ingestion. AI ranking against your profile. Expert-curated compliance matrix. Deadline alerts. 15 min of Ask-the-Expert each month (rolls over). <em class="s">Required to purchase any portal &middot; 3-month minimum.</em></div></div>
+    <div class="pcard feat"><div class="ptag">Per-Proposal</div><div class="pname">Phase I — Like Effort</div><div class="pamt">$1,999<span>ea</span></div><div class="pbody">SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour expert curation. Stage-gated workspace. Custom AI drafting against your library.</div></div>
+    <div class="pcard"><div class="ptag">Per-Proposal</div><div class="pname">Phase II — Like Effort</div><div class="pamt">$4,999<span>ea</span></div><div class="pbody">SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20–50+ page tech volumes. Commercialization plans included. $3,999 with a linked Phase I in your library.</div></div>
+  </div>
+  <p class="muted" style="font-size:8.8pt; margin-top:10px;">No success fee, ever. Flat, predictable pricing that replaces a $5,000/mo monitoring service and a 10%-of-award consultant.</p>
+
+  <h3 style="margin-top:20px;">Who does what</h3>
+  <table>
+    <tr><th style="width:1.8in">Role</th><th>What they do</th></tr>
+    <tr><td class="r">Company Admin</td><td>Runs the company workspace — opens pursuits, invites the team, and drives the build from opportunity to submission.</td></tr>
+    <tr><td class="r">Team Member</td><td>Contributes to assigned proposals and sections, within the access their admin grants.</td></tr>
+    <tr><td class="r">External Partner</td><td>Stage-scoped access to a specific proposal — view, comment, or edit only where invited.</td></tr>
+    <tr><td class="r">RFP Pipeline Expert</td><td>Curates the solicitation and provisions your build behind the scenes, so you start on-structure.</td></tr>
+  </table>
+
+  <hr class="rule" style="margin-top:22px;">
+  <div style="display:flex; align-items:center; gap:18px; margin-top:16px;">
+    <div class="wm-sm" style="flex-shrink:0;">
+      <div class="wm-row"><span class="wm-rfp">RFP</span><span class="wm-pipe">Pipeline</span></div>
+      <div class="wm-arrow" style="width:118px;"><span class="wm-line"></span><span class="wm-dot"></span></div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-family:var(--serif); font-style:italic; color:var(--ink); font-size:13pt; line-height:1.4;">From a ranked opportunity to a submission-ready, compliant proposal — with your team in control at every gate.</div>
+      <div class="muted" style="font-size:9.5pt; margin-top:6px;">Book a walkthrough on one of your own target opportunities, or apply for the Founding Cohort. Platform launches August 2026.</div>
+    </div>
+  </div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; AI + Expert &middot; From Application to Submission</span><span>10</span></div>
+</section>
+
+<!-- ══════════ ICON SPRITE (RFP Pipeline MarketingIcon vectors) ══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="chevron" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7"/></symbol>
+  <symbol id="source-scout" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.6"/><path d="M10.5 1.6v2.3M10.5 16.7v2.3M1.6 10.5h2.3M16.7 10.5h2.3"/><path d="M15.4 15.4 21 21"/><text x="10.5" y="13.9" text-anchor="middle" font-size="9.5" font-weight="700" fill="currentColor" stroke="none">$</text></symbol>
+  <symbol id="radar" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7a5 5 0 0 1 5 5"/><path d="M12 12 19 5.5"/><circle cx="17" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="deadline" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.2h16M8 3.2v3.6M16 3.2v3.6"/><path d="M12 12.3v2.6l1.9 1.1"/></symbol>
+  <symbol id="curation" viewBox="0 0 24 24"><rect x="2.4" y="6.3" width="7" height="9" rx="1.2" transform="rotate(-13 5.9 10.8)"/><rect x="4.2" y="5" width="7" height="9" rx="1.2" transform="rotate(7 7.7 9.5)"/><path d="M12.5 12h2.4m-1.1-1.2L14.9 12l-1.1 1.2"/><rect x="16.1" y="4.4" width="5.7" height="15.2" rx="1.2"/><path d="M17.6 8.1h2.7M17.6 11.1h2.7M17.6 14.1h2.7M17.6 17.1h1.6"/></symbol>
+  <symbol id="expert" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.2"/><path d="M12 6.4l.9 1.9 2 .3-1.5 1.4.35 2L12 12l-1.75.9.35-2L9.1 9.6l2-.3z" fill="currentColor" stroke="none"/><path d="M9.4 13.5 8 21l4-2 4 2-1.4-7.5"/></symbol>
+  <symbol id="verified" viewBox="0 0 24 24"><path d="M12 3l7 2.3v5.2c0 4.3-3 7.1-7 9-4-1.9-7-4.7-7-9V5.3z"/><path d="M8.6 11.7l2.4 2.4 4.4-4.7"/></symbol>
+  <symbol id="review" viewBox="0 0 24 24"><rect x="4" y="3.2" width="10.5" height="14.5" rx="1.5"/><path d="M6.4 7h5.6M6.4 10h3.4"/><circle cx="15" cy="14.5" r="3.6"/><path d="M17.6 17.1 20.6 20.1"/></symbol>
+  <symbol id="ai-drafting" viewBox="0 0 24 24"><path d="M6 3.6h6.8L17 7.8v8.6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.8a2 2 0 0 1 2-2Z"/><path d="M12.6 3.6V8H17"/><path d="M6.8 11h5.2M6.8 13.7h3.6"/><path d="M9.4 18.4l5-5 1.8 1.8-5 5-2.3.5z"/><path d="M19.4 3.1c.16 1.2.42 1.46 1.6 1.6-1.18.16-1.44.42-1.6 1.6-.16-1.18-.42-1.44-1.6-1.6 1.18-.16 1.44-.4 1.6-1.6Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="isolation" viewBox="0 0 24 24"><path d="M12 3l7 2.3v5.2c0 4.3-3 7.1-7 9-4-1.9-7-4.7-7-9V5.3z"/><rect x="9.3" y="8" width="5.4" height="5.4" rx="1"/><path d="M12 6.4v1.6M12 13.4v1.6M7.7 10.7h1.6M14.7 10.7h1.6"/></symbol>
+  <symbol id="automation" viewBox="0 0 24 24"><path d="M3.4 12h13.2M14.6 9.4 17.8 12l-3.2 2.6"/><circle cx="5" cy="12" r="1.9"/><circle cx="11" cy="12" r="1.9"/><path d="M8 9.8v4.4"/></symbol>
+  <symbol id="chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><rect x="10" y="10" width="4" height="4" rx="0.5"/><path d="M9.5 4v3M12 4v3M14.5 4v3M9.5 17v3M12 17v3M14.5 17v3M4 9.5h3M4 12h3M4 14.5h3M17 9.5h3M17 12h3M17 14.5h3"/></symbol>
+  <symbol id="agent" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="2.6"/><path d="M12 5.2V8"/><circle cx="12" cy="4.4" r="1.1"/><circle cx="9.6" cy="13" r="1.3" fill="currentColor" stroke="none"/><circle cx="14.4" cy="13" r="1.3" fill="currentColor" stroke="none"/><path d="M9.8 16.4h4.4"/></symbol>
+  <symbol id="workspace" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M3 8.2h18M9 8.2V20M15 8.2V20"/><path d="M10.2 13.4l1.1 1.1 2.3-2.5"/></symbol>
+  <symbol id="library" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/><path d="M15.3 17l1.1 1.1 2.3-2.5"/></symbol>
+  <symbol id="compliance" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2.2"/><rect x="6.6" y="6.6" width="2.7" height="2.7" rx="0.6"/><path d="M7 7.9l.7.7 1.3-1.4"/><path d="M11.4 8h5.6"/><rect x="6.6" y="11.1" width="2.7" height="2.7" rx="0.6"/><path d="M7 12.4l.7.7 1.3-1.4"/><path d="M11.4 12.5h5.6"/><rect x="6.6" y="15.6" width="2.7" height="2.7" rx="0.6"/><path d="M11.4 17h5.6"/></symbol>
+  <symbol id="export" viewBox="0 0 24 24"><path d="M4 12.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5"/><path d="M4 12.5 6 9h12l2 3.5"/><path d="M12 3.4v8M9 6.2l3-2.8 3 2.8"/></symbol>
+  <symbol id="template" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.8"/><path d="M8 7h8"/><rect x="8" y="10" width="8" height="7.5" rx="0.8"/></symbol>
+  <symbol id="edit" viewBox="0 0 24 24"><path d="M4.5 19.5 4 20l.6-3.4L16 5.2a2 2 0 0 1 2.8 2.8L7.4 19.4 4.5 19.5Z"/><path d="M14.5 6.7l2.8 2.8"/></symbol>
+  <symbol id="collaboration" viewBox="0 0 24 24"><circle cx="8.6" cy="8" r="2.7"/><path d="M3.7 18.8c0-2.9 2.2-4.8 4.9-4.8 1 0 2 .27 2.8.74"/><circle cx="15.6" cy="9.3" r="2.4"/><path d="M12.5 15.4c.8-.74 1.9-1.16 3.1-1.16 2.5 0 4.5 1.8 4.5 4.5"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="audit" viewBox="0 0 24 24"><rect x="4" y="3.2" width="12.5" height="17.6" rx="1.5"/><path d="M6.8 7.6l1 1 2-2.2M6.8 12.4l1 1 2-2.2"/><path d="M12 7.4h2.2M12 12.2h1.6"/><circle cx="17" cy="17" r="3.4"/><path d="M17 15.4V17l1.1.8"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3l7 2.3v5.2c0 4.3-3 7.1-7 9-4-1.9-7-4.7-7-9V5.3z"/></symbol>
+  <symbol id="no-training" viewBox="0 0 24 24"><ellipse cx="11" cy="6.5" rx="5.5" ry="2"/><path d="M5.5 6.5v8c0 1.1 2.5 2 5.5 2 .6 0 1.2 0 1.7-.1"/><path d="M16.5 8.4v2.2"/><circle cx="15.5" cy="15.5" r="4.5"/><path d="M12.3 12.3 18.7 18.7"/></symbol>
+  <symbol id="memory" viewBox="0 0 24 24"><path d="M12 3.5 4 7.5l8 4 8-4z"/><path d="M4 11.5l8 4 8-4M4 15.5l8 4 8-4"/></symbol>
+  <symbol id="funding" viewBox="0 0 24 24"><circle cx="9.8" cy="9.8" r="6.4"/><text x="9.8" y="13.1" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor" stroke="none">$</text><circle cx="17.6" cy="17.4" r="3.7"/><path d="M16 17.4l1.1 1.1 2-2.2"/></symbol>
+  <symbol id="non-dilutive" viewBox="0 0 24 24"><circle cx="10.5" cy="11.5" r="6"/><text x="10.5" y="14.8" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none">$</text><rect x="14.8" y="15" width="6.2" height="5" rx="1"/><path d="M16.3 15v-1.4a1.8 1.8 0 0 1 3.4-.8"/></symbol>
+  <symbol id="growth" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M7 15.5l4-4 3 2 5-6"/><path d="M16.5 7.5H19v2.5"/></symbol>
+  <symbol id="trophy" viewBox="0 0 24 24"><path d="M8 4h8v4.5a4 4 0 0 1-8 0z"/><path d="M8 5.2H5.4a2.6 2.6 0 0 0 3.1 3.1M16 5.2h2.6a2.6 2.6 0 0 1-3.1 3.1"/><path d="M12 12.5v3.5M9 20h6M10 20l.6-4h2.8l.6 4"/></symbol>
+</defs></svg>
+
+</body>
+</html>

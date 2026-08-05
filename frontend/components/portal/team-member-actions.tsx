@@ -10,6 +10,7 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 
 export function TeamMemberActions({
   tenantSlug,
@@ -37,7 +38,7 @@ export function TeamMemberActions({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert(j.error || 'Action failed');
+        toast.error(j.error || 'Action failed');
         setBusy(false);
         return;
       }
@@ -46,7 +47,7 @@ export function TeamMemberActions({
       // control ourselves — otherwise it stays disabled until a full navigation.
       setBusy(false);
     } catch {
-      alert('Network error');
+      toast.error('Network error');
       setBusy(false);
     }
   }
@@ -62,14 +63,14 @@ export function TeamMemberActions({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert(j.error || 'Could not change role');
+        toast.error(j.error || 'Could not change role');
         setBusy(false);
         return;
       }
       router.refresh();
       setBusy(false);
     } catch {
-      alert('Network error');
+      toast.error('Network error');
       setBusy(false);
     }
   }

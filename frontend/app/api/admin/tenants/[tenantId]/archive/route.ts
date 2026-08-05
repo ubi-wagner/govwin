@@ -27,13 +27,41 @@ async function requireAdmin() {
   return { user };
 }
 
-async function setArchived(tenantId: string, archived: boolean): Promise<{ id: string; name: string } | null> {
+type SetResult = 'not_found' | 'noop' | { id: string; name: string };
+
+async function setArchived(tenantId: string, archived: boolean): Promise<SetResult> {
+  // Existence + state check first, so a no-op 409s (not a silent 200 that resets the retention
+  // watermark) and an unknown id 404s — compare-and-swap parity with the proposal/atom archive routes.
+  const [existing] = await sql<{ id: string; name: string; archivedAt: Date | string | null }[]>`
+    SELECT id, name, archived_at AS "archivedAt" FROM tenants WHERE id = ${tenantId} LIMIT 1`;
+  if (!existing) return 'not_found';
+  const alreadyInState = archived ? existing.archivedAt != null : existing.archivedAt == null;
+  if (alreadyInState) return 'noop';
+
   const [row] = await sql<{ id: string; name: string }[]>`
-    UPDATE tenants
-    SET archived_at = ${archived ? sql`now()` : null}, updated_at = now()
-    WHERE id = ${tenantId}
-    RETURNING id, name`;
-  return row ?? null;
+    UPDATE tenants SET archived_at = ${archived ? sql`now()` : null}, updated_at = now()
+    WHERE id = ${tenantId} RETURNING id, name`;
+  if (!row) return 'not_found';
+
+  // Cascade the tenant's instantiated workflows with the license state. On RESTORE, do NOT reactivate
+  // workflows whose owning portal is still archived (portal archive writes archived_at on the same
+  // rows via a separate scope; archived_at carries no provenance, so gate the restore on portal stage).
+  try {
+    if (archived) {
+      await sql`UPDATE process_instances SET archived_at = now() WHERE tenant_id = ${tenantId}::uuid AND archived_at IS NULL`;
+    } else {
+      await sql`
+        UPDATE process_instances pi SET archived_at = NULL
+        WHERE pi.tenant_id = ${tenantId}::uuid AND pi.archived_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM proposals p
+            WHERE p.tenant_id = pi.tenant_id AND p.opportunity_id = pi.opportunity_id AND p.stage = 'archived'
+          )`;
+    }
+  } catch (e) {
+    console.error('[admin/tenants/archive] workflow cascade failed', e);
+  }
+  return row;
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ tenantId: string }> }) {
@@ -44,14 +72,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ te
     if (!isValidUUID(tenantId)) {
       return NextResponse.json({ error: 'Invalid tenant id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    const tenant = await setArchived(tenantId, true);
-    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    const r = await setArchived(tenantId, true);
+    if (r === 'not_found') return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    if (r === 'noop') return NextResponse.json({ error: 'Tenant is already archived', code: 'CONFLICT' }, { status: 409 });
+    // finder = admin namespace → tenantId=null per the Events SOP; the tenant identity lives in payload.
     await emitEventSingle({
       namespace: 'finder',
       type: 'tenant.archived',
       actor: userActor(gate.user.id ?? '', gate.user.email ?? undefined),
-      tenantId,
-      payload: { tenantId, tenantName: tenant.name, reason: 'license_lapsed' },
+      payload: { tenantId, tenantName: r.name, reason: 'license_lapsed' },
     });
     return NextResponse.json({ data: { archived: true } });
   } catch (err) {
@@ -68,14 +97,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (!isValidUUID(tenantId)) {
       return NextResponse.json({ error: 'Invalid tenant id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    const tenant = await setArchived(tenantId, false);
-    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    const r = await setArchived(tenantId, false);
+    if (r === 'not_found') return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    if (r === 'noop') return NextResponse.json({ error: 'Tenant is not archived', code: 'CONFLICT' }, { status: 409 });
     await emitEventSingle({
       namespace: 'finder',
       type: 'tenant.restored',
       actor: userActor(gate.user.id ?? '', gate.user.email ?? undefined),
-      tenantId,
-      payload: { tenantId, tenantName: tenant.name, reason: 'license_renewed' },
+      payload: { tenantId, tenantName: r.name, reason: 'license_renewed' },
     });
     return NextResponse.json({ data: { archived: false } });
   } catch (err) {

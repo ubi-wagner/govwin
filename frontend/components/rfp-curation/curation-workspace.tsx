@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
+import { toast } from '@/lib/toast';
 import dynamic from 'next/dynamic';
 import type { TextSelection } from './pdf-viewer';
 // react-pdf / pdf.js sets its worker at module-eval (import) time and touches browser
@@ -13,6 +14,7 @@ import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
+import { AmendmentsPanel } from './amendments-panel';
 
 interface Solicitation {
   id: string;
@@ -194,6 +196,13 @@ export function CurationWorkspace({
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
   const [assistBusy, setAssistBusy] = useState(false);
+  const [assessBusy, setAssessBusy] = useState(false);
+  const [assessment, setAssessment] = useState<{
+    stage: string;
+    status: string;
+    flags: { hasFullText: boolean; hasAiExtracted: boolean; complianceRowCount: number; hasOutline: boolean };
+    missingStages: { stage: string; agent: string }[];
+  } | null>(null);
 
   // Ingest Assist — one action that runs the whole ingest SOP for this claimed
   // solicitation: parse its text → auto-build the compliance matrix + volumes +
@@ -211,14 +220,32 @@ export function CurationWorkspace({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
       const d = json.data ?? {};
-      if (typeof window !== 'undefined') window.alert(
-        `Ingest Assist complete (${d.source}):\n• ${d.volumes} volumes · ${d.items} section molds\n• ${d.topics} topic(s) · ${d.cards} card(s) published`
+      toast.success(
+        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) · ${d.cards} card(s) published`,
       );
       router.refresh();
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : 'Ingest Assist failed');
+      toast.error(e instanceof Error ? e.message : 'Ingest Assist failed');
     } finally {
       setAssistBusy(false);
+    }
+  };
+  // Assess ingest readiness — ADVISORY. Fires the rfp_ingest_manager agent (its async LLM
+  // coordination plan posts to the agent workforce) AND returns the deterministic stage snapshot
+  // (shred → extract → matrix → skeleton) so the admin sees an immediate readout. Read-only.
+  const handleAssessIngest = async () => {
+    setAssessBusy(true);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${sol.id}/assess-ingest`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Assessment failed');
+      setAssessment(json.data?.snapshot ?? null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Assessment failed');
+    } finally {
+      setAssessBusy(false);
     }
   };
   const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
@@ -489,7 +516,7 @@ export function CurationWorkspace({
           });
           if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
-            alert((err as { error?: string }).error ?? 'Failed to start curation');
+            toast.error((err as { error?: string }).error ?? 'Failed to start curation');
             return;
           }
           setSol((s) => ({ ...s, status: 'curation_in_progress' }));
@@ -590,10 +617,10 @@ export function CurationWorkspace({
       parsed = ['true', 'yes', '1'].includes(value.toLowerCase());
     } else if (field?.type === 'int') {
       parsed = parseInt(value, 10);
-      if (Number.isNaN(parsed)) { alert('Please enter a valid integer'); return; }
+      if (Number.isNaN(parsed)) { toast.error('Please enter a valid integer'); return; }
     } else if (field?.type === 'numeric') {
       parsed = parseFloat(value);
-      if (Number.isNaN(parsed)) { alert('Please enter a valid number'); return; }
+      if (Number.isNaN(parsed)) { toast.error('Please enter a valid number'); return; }
     }
 
     try {
@@ -710,6 +737,14 @@ export function CurationWorkspace({
           >
             {assistBusy ? 'Building…' : '✨ Ingest Assist'}
           </button>
+          <button
+            onClick={handleAssessIngest}
+            disabled={assessBusy}
+            title="Assess ingest readiness — rfp_ingest_manager infers the pipeline stage and plans which specialist agents to run next (advisory, read-only)"
+            className="px-3 py-1.5 text-sm font-medium rounded border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 disabled:opacity-50"
+          >
+            {assessBusy ? 'Assessing…' : '🩺 Assess readiness'}
+          </button>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${
             sol.status === 'pushed_to_pipeline' ? 'bg-emerald-100 text-emerald-800' :
             sol.status === 'dismissed' ? 'bg-gray-200 text-gray-600' :
@@ -719,6 +754,40 @@ export function CurationWorkspace({
             {sol.status.replace(/_/g, ' ')}
           </span>
         </div>
+      </div>
+
+      {/* Ingest-readiness readout (advisory — from Assess readiness) */}
+      {assessment && (
+        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50/60 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-indigo-900">Ingest readiness</span>
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-600 text-white">
+                {assessment.stage.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <button onClick={() => setAssessment(null)} className="text-xs text-gray-500 hover:text-gray-800">Dismiss ✕</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3 text-xs">
+            <span className={assessment.flags.hasFullText ? 'text-emerald-700' : 'text-gray-400'}>{assessment.flags.hasFullText ? '✓' : '○'} shredded text</span>
+            <span className={assessment.flags.hasAiExtracted ? 'text-emerald-700' : 'text-gray-400'}>{assessment.flags.hasAiExtracted ? '✓' : '○'} AI-extracted</span>
+            <span className={assessment.flags.complianceRowCount > 0 ? 'text-emerald-700' : 'text-gray-400'}>{assessment.flags.complianceRowCount > 0 ? '✓' : '○'} compliance matrix ({assessment.flags.complianceRowCount})</span>
+            <span className={assessment.flags.hasOutline ? 'text-emerald-700' : 'text-gray-400'}>{assessment.flags.hasOutline ? '✓' : '○'} skeleton</span>
+          </div>
+          {assessment.missingStages.length > 0 ? (
+            <p className="mt-2 text-xs text-gray-700">
+              Next: {assessment.missingStages.map((m) => `${m.stage} (${m.agent})`).join(' → ')}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-emerald-700">All ingest stages complete — ready for QA / release.</p>
+          )}
+          <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan posts to the agent workforce.</p>
+        </div>
+      )}
+
+      {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
+      <div className="mb-4">
+        <AmendmentsPanel solId={sol.id} />
       </div>
 
       {/* Quick-nav tabs */}
@@ -881,7 +950,7 @@ export function CurationWorkspace({
                       const json = await resp.json();
                       const extracted = json.data?.topics ?? [];
                       if (extracted.length === 0) {
-                        alert(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
+                        toast.info(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
                         return;
                       }
                       // Pre-fill the bulk import modal with extracted topics
@@ -893,7 +962,7 @@ export function CurationWorkspace({
                       setExtractedPasteText(pasteText);
                       setShowBulkAddTopics(true);
                     } catch {
-                      alert('Failed to extract topics from the PDF.');
+                      toast.error('Failed to extract topics from the PDF.');
                     } finally {
                       setExtractingTopics(false);
                     }

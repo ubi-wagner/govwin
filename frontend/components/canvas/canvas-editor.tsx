@@ -635,7 +635,11 @@ function CanvasEditorInner({
   // ── One dispatch the sidebar toolbox cards call for editor-hosted tools. ──
   const handleToolAction = useCallback((id: string) => {
     if (id === 'library') setShowInsert((v) => !v);
-    else if (id === 'atomize') setShowAtomRail((v) => !v);
+    // atomize (harvest locked content to library) and annotate (box-and-tag at ingest/template) both
+    // drive the atomization rail. NB: the rail is proposal-scoped today (canAtomize needs
+    // proposalId+sectionId), so `annotate` only activates once a dedicated ingest/template curation
+    // canvas provides that context — handled here so the card is never inert if such a surface lands.
+    else if (id === 'atomize' || id === 'annotate') setShowAtomRail((v) => !v);
     else if (id === 'preview') setPreviewOpen(true);
     else if (id === 'template') handleSaveTemplate();
     else if (id === 'lock') handleCompleteLock();

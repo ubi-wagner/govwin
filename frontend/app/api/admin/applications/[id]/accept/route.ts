@@ -8,6 +8,7 @@ import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
+import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { isRole, type Role } from '@/lib/rbac';
 import bcrypt from 'bcryptjs';
 
@@ -223,16 +224,30 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/admin/applications/accept] card backfill failed (non-fatal):', backfillErr);
     }
 
-    // Offer the dogfooded starter template set to the new tenant_admin (P5.3) — a
-    // one-time dismissible ToDo routing them to the Library's one-click bulk add.
-    // Best-effort: a failure must NEVER fail the accept.
+    // "Keep + copy": eager-materialize the shared system-starter library into the new tenant's OWN
+    // space on accept — each foundation copied as a tenant-owned atom (derived_from lineage,
+    // collection=my_library) so the customer lands with a populated library, not an empty one. The
+    // shared masters stay shared; isolation is preserved (each copy carries this tenant's tenant_id).
+    // Idempotent, best-effort — accept never fails on it.
+    let starterCopied = 0;
     try {
-      await offerStarterSet({
-        tenantId, tenantSlug: finalSlug, adminUserId: newUserId,
-        actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: (isRole(role) ? role : 'rfp_admin') as Role, tenantId: null },
-      });
-    } catch (offerErr) {
-      console.error('[api/admin/applications/accept] starter-set offer failed (non-fatal):', offerErr);
+      starterCopied = (await copyStarterSetToTenant(tenantId, { id: newUserId })).added;
+    } catch (copyErr) {
+      console.error('[api/admin/applications/accept] starter-set copy failed (non-fatal):', copyErr);
+    }
+
+    // Fallback OFFER (P5.3) — a one-time dismissible ToDo routing them to the Library's one-click
+    // bulk add. Only when the eager copy landed nothing (copy failed or the catalog is empty), so the
+    // tenant is never left with an empty library. Best-effort: a failure must NEVER fail the accept.
+    if (starterCopied === 0) {
+      try {
+        await offerStarterSet({
+          tenantId, tenantSlug: finalSlug, adminUserId: newUserId,
+          actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: (isRole(role) ? role : 'rfp_admin') as Role, tenantId: null },
+        });
+      } catch (offerErr) {
+        console.error('[api/admin/applications/accept] starter-set offer failed (non-fatal):', offerErr);
+      }
     }
 
     await emitEventEnd(eventId, {

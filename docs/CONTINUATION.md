@@ -1,11 +1,122 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-25 (library + collaboration-vaults build → two-sided nook UI shipped)
+**Last updated:** 2026-08-04 (V1 hardening — adversarial bug-hunt, toast polish, manual + doc sync)
 **Branch:** `claude/nice-hamilton-kBqtD`
 
 ---
 
-## 0a. LATEST — 2026-07-25 (library + collaboration vaults; READ THIS FIRST)
+## 0. LATEST — 2026-08-04 (V1 hardening: bug-hunt + polish + docs; READ THIS FIRST)
+
+Post-wiring hardening pass on the V1 + archive work:
+
+- **Bug hunt** (3 adversarial agents — API / React / data-layer; every finding proven against code
+  before fixing): **12 fixes** — amendment confirm no longer 200s on a no-op (`confirmAmendment` returns
+  `{confirmed}` → route 409s); fan-out skips archived proposals; portal + tenant + outcome archive
+  cascades scoped to **BUILD** `process_instances` (never a co-active `spotlight`/`contract` run on the
+  same opportunity); tenant archive is compare-and-swap (404/409, not a silent 200); `finder:tenant.*`
+  events dropped the top-level `tenantId` (finder=admin SOP); archived **Export** POSTs (was a GET → 405);
+  amendment banner / curation panel error paths surfaced; canvas Review composer honors `canComment`.
+  (commit `0e4a6fb`)
+- **Polish** — new dependency-free `frontend/lib/toast.tsx` (module-level pub/sub, `<Toaster/>` mounted
+  once in the root layout); every transient `alert()` across portal / admin / curation → `toast.*`.
+  Native `confirm()` kept for destructive blocking gates; form validation keeps inline `setMsg`/`setErr`.
+  (commit `e8b74bb`)
+- **Manuals regenerated** — all 3 role guides (`_src/build_*.py` → JSON → HTML/PDF): Studio, AI Actions /
+  full-draft modes, amendments (log→confirm→acknowledge), portal + atom + tenant archive, packaging
+  review, outcome→contract, mark-all-read, comped-portal grant, assess-ingest, auto-drive doorbell.
+  (commit `bea5881`)
+- **Docs synced** — CLAUDE.md (mig 148 + corrected archive contract + toast convention + vitest 855),
+  ARCHITECTURE_V10 §7 (migs 144–148), docs/ARCHIVABLE_CONTRACT.md (tenant/atom cascade text reconciled to
+  as-built), CLAUDE_CLIFFNOTES §1c.
+
+State: migrations **148** · **vitest 855** · tsc 0 · next build ✓. Front-to-back / side-to-side live test
+done — **zero product bugs** (docs/V1_READY_REPORT.md §7). **Launch punch list: docs/V1_LAUNCH_PUNCHLIST.md**
+(Wave A = prod ops/config blockers; B = RLS cutover + demo refresh; C = next-cycle full-e2e QA fixtures).
+**Next-cycle test-env spin-up (fast + full refresh, e2e fixture gaps, the fire-a-portal recipe): CLAUDE_CLIFFNOTES §0.**
+
+## 0b. 2026-08-03 (V1 UI-wiring program + universal archive)
+
+The V1 gap-register was wired end-to-end (H1–H5, M1–M6, H2) + three full builds: **amendment
+fan-out engine** (mig 146; detect→confirm→fan-out→acknowledge), **contract+kickoff** (was already
+built — audit added), and the **archive lifecycle**. Then a **universal archive** pass, corrected to
+the as-built model (docs/ARCHIVABLE_CONTRACT.md + docs/V1_LAUNCH_GUIDE.md):
+
+- **Archive = soft, reversible, sort/visibility only. NOTHING is ever hard-deleted** (future: S3 bulk
+  cold-storage by `archived_at` watermark). The earlier proposal hard-delete was removed.
+- **Archive actions on three entities ONLY:** portal/pipeline (proposal → cascades its
+  `process_instances` by tenant+opportunity), library atom / foundational doc (per-item `archived_at`
+  → excluded from library + **draft selection**; atoms are copied-forward so no cascade), tenant
+  (rfp_admin → cascades workflows). **Workflows are instantiated templates — no archive of their own**;
+  they cascade + keep `archived_at IS NULL` filters so they drop out of the monitor. **Cards are NOT
+  archivable** (reverted). mig 148 added `archived_at` to process_instances/library_atoms/contracts
+  (+ tenant_opportunity_cards, now unused).
+- **content_generator was never dormant** — the OnCmsContentRequested vertical runs it from the admin
+  "Generate Content" launcher; roster relabeled `live`. (Third stale gap-register claim caught by
+  verifying agent work — after M4 contract + Archive.)
+
+State: migrations **148** · **vitest 855** · tsc 0 · next build ✓ (`EIHMKFP62qwSslLPKG8B3`). Verified
+E2E on the live server as all four working actors (master_admin `eric@rfppipeline.com`, tenant_admin
+`kate.ulepic@foundation3dp.com`, tenant_user `connor.casey@foundation3dp.com`, partner
+`pjackson@ecinnovates.com` — all `DemoPass123!`): archive→cascade→restore proven via `proposal.archived`
+payload `workflowsArchived=1`; tenant_user boundary (no Studio/Archive) confirmed. **Remaining for
+launch:** regenerate the in-browser help HTML from docs/V1_LAUNCH_GUIDE.md (L5).
+
+## 0a. 2026-08-02 (TVSF Foundation proposal build)
+
+First-customer (Foundation 3DCP) TVSF proposal, built end-to-end as **Paul Jackson** (external
+EC shadow-admin, `pjackson@ecinnovates.com`). Canonical TVSF shape (docs/TVSF_SPEC.md): **3
+volumes** — Narrative (Abstract + Q1–14, 7pp) · Willingness-to-License Letter · ESP Support Letter;
+four mandatory tables (competitor Q2, pro-forma P&L Q6, milestone Q11, budget Q12). Proposal
+`c3db60b1-2f0e-4bc8-903c-1ec098906c58`, tenant `17780cad-…`. **`scripts/rebuild-tvsf.mjs` is the
+canonical demo builder** (idempotent, DETERMINISTIC section ids `c3db6000-0000-4000-8000-<sort>` so
+tests/screenshots don't churn — re-run any time).
+
+Shipped this sprint:
+- **Whole-proposal PDF download.** `POST /api/portal/<slug>/proposals/<id>/package` now takes
+  `format=json|docx|pdf|zip`. `pdf` reuses the SAME combined-CanvasDocument assembly as docx and
+  renders via `exportToPdf` (Chromium: header/footer, page numbers, tables + inline SVG figures).
+  UI: a red **Download Proposal (.pdf)** button in `proposal-admin-panel.tsx` beside .docx/.zip.
+- **Real figures in the narrative.** Native `chart` nodes (SVG in PDF, sharp-rasterized PNG in docx):
+  a milestone bar chart (Q3) + a pro-forma revenue/gross-profit line chart (Q6). `renderChartSvg`
+  in `lib/export/canvas-html.ts` was already there — rebuild-tvsf just authors the nodes.
+- **NUMBERING ROOT FIX (durable).** Sections were string-sorted by `section_number` ("10".."14"
+  before "2"; volumes out of order). Added a real integer **`sort_index`** column (**migration 143**
+  — adds + backfills + indexes it; it was previously created only ad-hoc by rebuild-tvsf, so the
+  new `ORDER BY sort_index` would have errored in prod). Every section-ordering query now sorts
+  `ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`: workspace page, detail
+  API, review page, per-volume export + layout, and `proposal-advance`. **Migrations now at 143.**
+- **Deliverables committed to git:** `docs/TVSF_PROPOSAL_BUILD_GUIDE.md` (+ `.pdf`, 12 screenshots
+  under `docs/tvsf-build-guide/`, driven by `frontend/e2e/hitl-tvsf-build-guide.spec.ts`) and
+  `docs/Foundation_TVSF_Proposal.pdf`.
+
+**Operational reality that ate the most tokens** (now fixed in §2): `next start` does NOT serve
+`output:'standalone'` — you must run `node .next/standalone/server.js` after staging static/public;
+and auth flows must hit `localhost:3000` (not `127.0.0.1`) or NextAuth bounces. Full recipe + the
+PDF-tooling map are in §2. Agents were NOT freshly run (sandbox `ANTHROPIC_API_KEY=sk-noop` is a
+no-op); sections are already `section_drafter`-drafted (`ai_drafted`).
+
+**Also shipped this session — the admin-agent program + observability sweep:**
+- **`rfp_ingest_manager` (36th archetype)** — the platform-scope ingest-orchestration *manager* (the
+  analog of the tenant `proposal_manager`). Admin-invoked (`.../assess-ingest` →
+  `OnIngestAssessmentRequested` → `tool.ingest.assess`), reads a curated solicitation's ingest state,
+  infers the stage deterministically, plans which specialist agents to run next. Advisory,
+  injection-fenced, guardrail-gated, **no tenant descent**. Locked by
+  `pipeline/tests/test_rfp_ingest_manager_wiring.py` (7/7, incl. a live drive over our own solicitations).
+  Full spec: **docs/ADMIN_AGENT_DESIGN.md**.
+- **Proposal Auto-Drive "doorbell"** — the tenant Proposal Draft Manager (`proposal_manager` +
+  `OnFullDraftRequested{ModeA,B,C}`, Mode C = full auto) is now admin-drivable from `/admin/agents`
+  without portal descent: a card → `POST /api/admin/proposals/[p]/full-draft` → the same
+  `proposal:full_draft_requested` trigger. Portal + doorbell funnel through ONE helper
+  (`lib/proposal-full-draft.ts::requestFullDraft`) — one auditable record, `source` = `portal` vs
+  `admin_doorbell`. **Verified live** as master_admin: the ring lands in `system_events` +
+  `proposal_activity_log` (attributed, `source=admin_doorbell`), visible atop `/admin/events`.
+- **Event-audit sweep** (**docs/EVENT_AUDIT_2026-08-02.md**) — every actor/automation/agent/manager
+  action posts to the `system_events` spine (+ domain logs). One gap found + fixed: `package?format=zip`
+  returned the whole native package with zero audit; now emits `package.export_started`/`.exported` +
+  `download_count` + `proposal_activity_log`, parity with docx/json/pdf.
+- Migrations still at **143**; frontend `vitest` now **829**; pipeline agent suite **257**.
+
+## 0b. — 2026-07-25 (library + collaboration vaults)
 
 Shipped the **library/vaults build plan** (docs/LIBRARY_VAULTS_BUILD_PLAN.md, tasks #231–275).
 Grain model `foundation ⊃ section ⊃ group ⊃ atom`; the **starter set** seeds + agent hookup;
@@ -321,35 +432,71 @@ psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 4 (i
 # frontend/scripts/seed-cuas-immobileyes.mts, seed-demo-*.mts).
 
 cd /home/user/govwin/frontend
-# Build (takes ~90s; the 2-min default Bash timeout WILL cut it off — use timeout 600000)
-NEXT_TELEMETRY_DISABLED=1 npm run build
+# Build (~2 min; the 2-min default Bash timeout WILL cut a FOREGROUND build off — run it with
+# run_in_background and poll the log, or pass a 600000ms timeout).
+NODE_ENV=production DATABASE_URL="$DATABASE_URL" npx next build
 
-# Start the server (production build; http, so NextAuth non-secure cookies work)
-setsid env DATABASE_URL="$DATABASE_URL" \
-  AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST='true' \
-  NEXTAUTH_URL='http://localhost:3000' ANTHROPIC_API_KEY='sk-noop' \
-  NODE_ENV=production node node_modules/next/dist/bin/next start -p 3000 \
-  >/tmp/next-app.log 2>&1 < /dev/null &
-disown
-until curl -s -o /dev/null http://localhost:3000/login; do sleep 1; done
+# ⚠️⚠️ THE SERVER — the single biggest recurring time-sink. next.config has
+# `output: 'standalone'`, so **`next start` DOES NOT serve this app** (chunk 404s, broken
+# hydration, notFound on every route). You MUST run the standalone server, AND stage static +
+# public INTO it first (Next does not copy them; do this on EVERY rebuild — a new BUILD_ID makes
+# the old chunks 404):
+rm -rf .next/standalone/.next/static && cp -r .next/static .next/standalone/.next/static
+cp -r public/* .next/standalone/public/ 2>/dev/null
+# Serve from the standalone dir. Start it with the harness run_in_background:true — NOT `setsid … &`
+# (detached launches keep getting reclaimed on idle, and $! is setsid's pid, not node's child, so
+# you can't stop it cleanly). Env below is the full set the app needs to boot + auth + export:
+( cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production \
+  DATABASE_URL="$DATABASE_URL" AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
+  NEXTAUTH_URL='http://localhost:3000' AUTH_URL='http://localhost:3000' \
+  ANTHROPIC_API_KEY='sk-noop' AWS_S3_BUCKET_NAME='rfp-pipeline-local' AWS_REGION='us-east-1' \
+  PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node server.js )
+until curl -s -o /dev/null http://127.0.0.1:3000/login; do sleep 1; done
 ```
 
-**GOTCHAS learned the hard way this sprint (save yourself the time):**
-- **Restarting the server:** `pkill`/`kill next-server` often returns exit 144
-  (cosmetic) BUT the old server can keep serving the OLD in-memory build while a new
-  one fails to bind :3000. ALWAYS verify with
-  `ps -eo pid,etime,cmd | grep next-server` — if `etime` isn't ~seconds, you're on the
-  stale build. Force it: `pkill -9 -f next-server; fuser -k 3000/tcp; sleep 2` then
-  start fresh and re-check the pid age. Next.js `start` serves the `.next` from
-  **startup time** — a rebuild does nothing until you restart.
-- **Background wait-loops:** `until ! pgrep -f "next build"` matches its **own**
-  command line (which contains "next build") → infinite loop that never fires the
-  build. Match a narrower string or check for the node process, not the bash wrapper.
-- Playwright drive-tests must live under `frontend/` (else `playwright` won't resolve).
-  Chromium: `executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`.
-- `GET /api/auth/session` (public path) returns the JWT-derived session incl. our
-  custom `role/tenantId/tenantSlug/membershipPinned` — the fastest way to assert the
-  active membership in a drive-test.
+**⚠️ AUTH HOST MISMATCH (silent login bounce — cost real time this sprint):** the server can
+LISTEN on `127.0.0.1` (via `HOSTNAME`), but you MUST hit it at **`http://localhost:3000`** in any
+login flow (curl, Playwright, the produce/export scripts) because `AUTH_URL`/`NEXTAUTH_URL` are
+`localhost`. NextAuth's session cookie is host-bound — sign in against `127.0.0.1:3000` and every
+authed request bounces back to `/login?from=…`. `localhost` resolves to `127.0.0.1`, so listening
+on `127.0.0.1` + browsing `localhost` is correct and consistent.
+
+**GOTCHAS learned the hard way (save yourself the time):**
+- **Restarting the standalone server:** stop the OLD one first or the new one hits
+  `EADDRINUSE :3000`. If you started it with `run_in_background`, `TaskStop <task_id>`;
+  otherwise `fuser -k -9 3000/tcp; sleep 2`. Then restage static (above) + start fresh +
+  poll `/login` for 200. The node child dying silently after a `setsid … &` launch is the
+  usual reason a "restart" appears to hang — use `run_in_background:true`.
+- **Rebuild ≠ live:** the standalone server serves the files present at start. After ANY
+  `next build` you must re-stage `.next/static` + `public` into `.next/standalone` AND
+  restart — the BUILD_ID changes, so a stale server 404s every new chunk. Verify the two
+  BUILD_IDs match: `cat .next/BUILD_ID` == `cat .next/standalone/.next/BUILD_ID`.
+- **Background wait-loops:** `until ! pgrep -f "next build"` matches its **own** command
+  line → never fires. Match the node process, not the bash wrapper. And the foreground
+  Bash tool caps at 2 min — long builds must be `run_in_background` or `timeout 600000`.
+- **PDF / office tooling that IS vs ISN'T installed** (don't re-probe every session):
+  - **Absent:** `pdftoppm`/`pdfinfo`/`pdftotext` (poppler), `pandoc`, `pdftk`, `gs`,
+    `qpdf`, python `markdown`, npm `marked`/`markdown-it`.
+  - **Present:** `soffice`/`libreoffice`; `sharp` (SVG→PNG works — the docx figure path);
+    `@napi-rs/canvas`; `pdfjs-dist` **v5** (ESM at `node_modules/pdfjs-dist/legacy/build/pdf.mjs`);
+    Chromium at `/opt/pw-browsers`.
+  - **Look at a PDF** (no poppler): rasterize with pdfjs + `@napi-rs/canvas` (custom
+    `canvasFactory` with create/reset/destroy → `page.render` → `canvas.toBuffer('image/png')`),
+    then Read the PNGs. **Verify PDF text/pages/order** with pdfjs `getTextContent`.
+  - **Markdown → PDF** (no pandoc): convert MD→HTML yourself, inline images as `data:` URIs,
+    `page.setContent` + `page.pdf()` via Chromium. Reusable scripts were written to the
+    scratchpad this sprint (md2pdf / raster / verify) — rewrite from these notes if gone.
+  - **From `/tmp` scripts, bare specifiers don't resolve** — import node modules by ABSOLUTE
+    path (`/home/user/govwin/frontend/node_modules/…`), and for the CJS `playwright` entry use
+    `const pw = await import(abs); const chromium = pw.chromium ?? pw.default?.chromium`.
+- **Produce the real docx/pdf by dogfooding the live endpoint**, authed as the actual user:
+  Playwright login (at `localhost:3000`) → `ctx.request.post('/api/portal/<slug>/proposals/<id>/package?format=docx|pdf|zip')`
+  → write `res.body()`. Proposal must be **locked or submitted/archived** to pass the export gate.
+- **Playwright e2e:** specs must live under `frontend/` and match a project's `testMatch`.
+  Self-authenticating specs use the **`hitl-*.spec.ts`** name and run with `--project=hitl`
+  (config `baseURL` is `localhost:3000`; Chromium via `executablePath` `/opt/pw-browsers/chromium`).
+- `GET /api/auth/session` (public path) returns the JWT-derived session incl. our custom
+  `role/tenantId/tenantSlug/membershipPinned` — fastest way to assert the active membership.
 
 **Demo accounts** (password `DemoPass123!` unless noted):
 
@@ -417,10 +564,19 @@ These are recurring bug-classes — treat them as a checklist, not one-offs:
    *contents* are not. Read camelCase in components (this bit us in atom-library).
 3. **Array-column type match:** `sql.array(text[])` into a `uuid[]` column throws — cast
    `::uuid[]` and validate elements. Only shows up with a NON-empty array.
-4. **Next.js start serves the startup-time build:** rebuild ≠ live; restart + verify pid
-   age. `pgrep`/`until` loops can match themselves.
+4. **Standalone serving (supersedes the old "next start" note):** `output:'standalone'` means
+   `next start` is broken — serve `node .next/standalone/server.js`, re-stage `.next/static` +
+   `public` on every rebuild, restart, verify matching BUILD_IDs. Rebuild ≠ live. (§2 has the recipe.)
 5. **JWT is the singular-session source of truth:** everything authz reads the active
    membership off the token; never infer tenant from `users.tenant_id`.
+6. **Section ordering = `sort_index`, never `section_number` string:** any new query that lists
+   proposal sections MUST `ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`
+   (string sort puts "10" before "2" and scrambles volumes). The column exists from mig 143.
+7. **Auth host-binding:** drive/produce scripts sign in at `localhost:3000` (matches AUTH_URL),
+   not `127.0.0.1` — cookie is host-bound, mismatch → silent `/login?from=…` bounce.
+8. **Verify exports by looking at them:** no poppler, but pdfjs (`legacy/build/pdf.mjs`) +
+   `@napi-rs/canvas` rasterize any PDF to PNG to Read; pdfjs `getTextContent` proves page count +
+   order + content. Dogfood the live `/package` endpoint (proposal locked/submitted) for the real files.
 
 ---
 

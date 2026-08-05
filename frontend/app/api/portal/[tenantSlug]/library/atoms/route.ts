@@ -39,6 +39,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       vehicle: p.get('vehicle') ?? undefined,
       grain,
       q: p.get('q') ?? undefined,
+      // Opt-in: ?archived=1 shows ONLY soft-archived atoms (default = active only).
+      archived: p.get('archived') === '1' || p.get('archived') === 'true',
       page: Number.isFinite(Number(p.get('page'))) && p.get('page') ? Number(p.get('page')) : undefined,
       pageSize: Number.isFinite(Number(p.get('pageSize'))) && p.get('pageSize') ? Number(p.get('pageSize')) : undefined,
     }, viewerFromRole(u.id, role));

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from '@/lib/toast';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -165,11 +166,11 @@ export default function AdminFileManager() {
         const { data: confirm } = await confirmRes.json();
         if (confirm.sbirIngest && !confirm.sbirIngest.isDuplicate) {
           setError(null);
-          alert(`SBIR data ingested: ${confirm.sbirIngest.rowCount} ${confirm.sbirIngest.fileType} records loaded`);
+          toast.success(`SBIR data ingested: ${confirm.sbirIngest.rowCount} ${confirm.sbirIngest.fileType} records loaded`);
         } else if (confirm.sbirIngest?.isDuplicate) {
-          alert('This SBIR data file was already ingested (duplicate detected by file hash)');
+          toast.info('This SBIR data file was already ingested (duplicate detected by file hash)');
         } else if (confirm.notice) {
-          alert(confirm.notice);
+          toast.info(confirm.notice);
         }
       }
       await loadListing(currentPrefix);

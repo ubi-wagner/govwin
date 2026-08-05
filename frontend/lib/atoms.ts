@@ -205,6 +205,35 @@ export async function confirmTags(
   });
 }
 
+// ── soft-archive lifecycle (mig 148: library_atoms.archived_at) ──
+// A reversible, sort/visibility-only state that is ORTHOGONAL to the curation `status`
+// column: archive HIDES the atom from active library lists + counts + draft selection
+// (every such read carries `archived_at IS NULL`) while keeping the row indexed in
+// Postgres — it is NOT a delete and NOT a status change. Both ops are compare-and-swap
+// (the caller 409s when the boolean is false) and main-library-only (vault_id IS NULL),
+// mirroring the vault fence on every other library_atoms write in this file.
+export async function archiveAtom(tenantId: string, atomId: string): Promise<{ archived: boolean }> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ id: string }>>`
+      UPDATE library_atoms SET archived_at = now()
+      WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid
+        AND vault_id IS NULL AND archived_at IS NULL
+      RETURNING id`;
+    return { archived: rows.length > 0 };
+  });
+}
+
+export async function restoreAtom(tenantId: string, atomId: string): Promise<{ restored: boolean }> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ id: string }>>`
+      UPDATE library_atoms SET archived_at = NULL
+      WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid
+        AND vault_id IS NULL AND archived_at IS NOT NULL
+      RETURNING id`;
+    return { restored: rows.length > 0 };
+  });
+}
+
 // A viewer for library visibility. Admins (tenant_admin / rfp_admin / master_admin)
 // get the whole tenant library (management view); everyone else sees tenant-shared
 // atoms plus the ones they own. owner_only / shared_for_proposal / admin_only are
@@ -261,6 +290,7 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
         FROM library_atoms a
         WHERE a.tenant_id = ${tenantId}::uuid
           AND a.vault_id IS NULL
+          AND a.archived_at IS NULL
           AND a.status = 'approved'
           AND a.grain <> 'reference'
           AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
@@ -285,7 +315,10 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
 }
 
 // ── list / facet ──
-export interface AtomListFilter { dimension?: string; value?: string; grain?: Grain; status?: AtomStatus; q?: string; limit?: number; mine?: boolean }
+// `archived`: opt-in switch for the soft-archive (mig 148) view. Default/false shows
+// only ACTIVE atoms (archived_at IS NULL); true shows ONLY archived atoms so the UI
+// can offer an "Archived" section with restore. Never mixes the two.
+export interface AtomListFilter { dimension?: string; value?: string; grain?: Grain; status?: AtomStatus; q?: string; limit?: number; mine?: boolean; archived?: boolean }
 export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Viewer): Promise<Array<Record<string, unknown>>> {
   const limit = Math.min(500, f.limit ?? 200);
   return withTenant(tenantId, async (tx) =>
@@ -302,6 +335,7 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
       LEFT JOIN users u ON u.id = a.owner_user_id
       WHERE a.tenant_id = ${tenantId}::uuid
         AND a.vault_id IS NULL
+        ${f.archived ? tx`AND a.archived_at IS NOT NULL` : tx`AND a.archived_at IS NULL`}
         AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
         ${f.mine ? tx`AND a.owner_user_id = ${viewer.userId}::uuid` : tx``}
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
@@ -318,6 +352,9 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
 export interface FacetFilter {
   kind?: string; form?: string; context?: string; collection?: string; vehicle?: string;
   grain?: Grain; q?: string; page?: number; pageSize?: number;
+  // Soft-archive (mig 148) opt-in: default/false = active only (archived_at IS NULL);
+  // true = only archived. Applied to the list, the total, AND the facet counts.
+  archived?: boolean;
 }
 export interface FacetResult {
   atoms: Array<Record<string, unknown>>;
@@ -340,12 +377,16 @@ export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer:
   const esc = (s: string) => '%' + s.replace(/[%_\\]/g, '\\$&') + '%';
   return withTenant(tenantId, async (tx) => {
     const vis = tx`(${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)`;
+    // Soft-archive scope — active-only by default, archived-only on opt-in. Reused by
+    // the list/total `where` and the facet-count query so both agree on the scope.
+    const arch = f.archived ? tx`AND a.archived_at IS NOT NULL` : tx`AND a.archived_at IS NULL`;
     const tagF = (dim: string, val?: string) =>
       val ? tx`AND EXISTS (SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND t.dimension = ${dim} AND t.value = ${val})` : tx``;
     const where = tx`
       a.tenant_id = ${tenantId}::uuid
       AND a.grain <> 'reference'
       AND a.vault_id IS NULL
+      ${arch}
       AND ${vis}
       ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
       ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
@@ -368,7 +409,7 @@ export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer:
     const facetRows = await tx<Array<{ dimension: string; value: string; n: number }>>`
       SELECT t.dimension, t.value, count(*)::int AS n
       FROM library_atoms a JOIN atom_tags t ON t.atom_id = a.id
-      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND a.vault_id IS NULL AND ${vis}
+      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND a.vault_id IS NULL ${arch} AND ${vis}
         AND t.dimension IN ('kind','form','context','collection','vehicle')
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
         ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}

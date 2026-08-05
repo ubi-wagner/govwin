@@ -2,7 +2,18 @@
 
 The single script for driving the whole platform through its human-in-the-loop (HITL) gates,
 one login-able account per role, against a ready scenario. Covers the master+mirror OPP
-lifecycle **and** the new Proposal Draft Manager (full-draft Modes A/B/C + the adversarial gate).
+lifecycle, the Proposal Draft Manager (full-draft Modes A/B/C + the adversarial gate), and the
+**admin-plane triggers** — the Proposal Auto-Drive doorbell + the `rfp_ingest_manager` (§5.5).
+
+> **V1 flows to spot-check (2026-08-04).** Also exercise: the **Proposal Studio** 3-loop gate
+> (Draft → Refine → Compliance — preview/comment/regenerate or approve→next; "run all 3"); the
+> **amendment engine** (admin logs → **Confirm → notify** on the curation Amendments panel → the
+> tenant's amber banner → an admin **Acknowledge**); the **soft-archive** lifecycle (Archive portal →
+> its build workflows cascade → **Restore**; archive a library atom → gone from draft selection;
+> archive a tenant = license slumber; **nothing is hard-deleted** — docs/ARCHIVABLE_CONTRACT.md); the
+> **Submission Package** review; and **Record Outcome → Won** starting a contract + kickoff task.
+> UI note: transient results now surface as **toasts** (not `alert()`); destructive actions still
+> gate on a native **confirm()**.
 
 > **Actors.** *Human* roles: `master_admin`, `rfp_admin`, `tenant_admin`, `tenant_user`,
 > `partner_user` (+ the *shadow-admin* path where an rfp/master admin descends into a tenant's
@@ -18,12 +29,25 @@ lifecycle **and** the new Proposal Draft Manager (full-draft Modes A/B/C + the a
 >    proposal `c3db60b1` → section "#2 Overview of the Technology" renders "Two differentiators define it".
 > 2. **Library-seed apply MERGES (F1).** Admin "Apply seed" into a section with existing content now
 >    **appends** (and snapshots the prior content to Version History) instead of **replacing** it.
-> 3. **Agent Workforce roster = 35 (F6).** `/admin/agents` lists all 35 archetypes incl. the Proposal
+> 3. **Agent Workforce roster = 36 (F6).** `/admin/agents` lists all 36 archetypes incl. the Proposal
 >    Draft Manager cohort (Advisory Manager, Traceability Auditor, Redaction Guard, Continuity Manager,
 >    Market Analyst, Stylist, Formatter, Proposal Draft Manager) + both Library-Seed producers; exactly
 >    one shows **dormant** (Content Generator). (Was hardcoded to 25.)
 > 4. **Auto-advance / AI-review read the live policy table (F3).** No behavior change to click through;
 >    they no longer read the retired `tenant_automation_preferences` (dropped in mig 142).
+
+> ### 🆕 New this cycle (2026-08-02) — the admin-agent program (drive these in §5.5)
+> `tsc` 0 · `vitest` **829** · pipeline agent suite **257** · admin-doorbell driven **live** as master_admin.
+> 1. **`rfp_ingest_manager` (36th archetype).** The platform-scope ingest-orchestration *manager* — reads a
+>    curated solicitation's ingest state, infers the stage, plans which specialist agents to run next.
+>    Advisory, injection-fenced, **no tenant descent**. Roster-visible on `/admin/agents`; triggered by
+>    `POST /api/admin/rfp-curation/[solId]/assess-ingest`.
+> 2. **Proposal Auto-Drive "doorbell".** The `/admin/agents` card that rings the tenant Proposal Draft
+>    Manager (`OnFullDraftRequested{A,B,C}`) on any tenant's proposal from the admin plane — no portal
+>    descent. Emits `proposal:full_draft_requested` (`source=admin_doorbell`).
+> 3. **One audit path + the zip gap closed.** Portal + doorbell funnel through one `requestFullDraft` helper
+>    (`source` distinguishes them); `package?format=zip` now emits its audit (was a blind spot). Every
+>    action posts to `system_events` — the `/admin/events` Event Stream is the "keep tabs" surface.
 
 ---
 
@@ -42,13 +66,18 @@ su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
 # 2) Seed the E2E HITL cohort (idempotent, additive — creates only e2e-* accounts)
 node scripts/seed-e2e-hitl.mjs        # prints accounts + the drivable proposal id
 
-# 3) Frontend (prod build so NextAuth http cookies work)
-cd frontend && NEXT_TELEMETRY_DISABLED=1 npm run build      # ~90s: use a long timeout
-setsid env DATABASE_URL="$DATABASE_URL" AUTH_SECRET='dev-screenshot-secret-000' \
-  AUTH_TRUST_HOST='true' NEXTAUTH_URL='http://localhost:3000' ANTHROPIC_API_KEY='sk-noop' \
-  NODE_ENV=production node node_modules/next/dist/bin/next start -p 3000 \
-  >/tmp/next-app.log 2>&1 < /dev/null & disown
+# 3) Frontend — build + serve. ⚠️ next.config is output:'standalone', so `next start` is BROKEN
+#    (chunk 404s). Run the standalone server, staging static + public into it first.
+cd frontend && NODE_ENV=production DATABASE_URL="$DATABASE_URL" npx next build   # ~2 min: long timeout
+rm -rf .next/standalone/.next/static && cp -r .next/static .next/standalone/.next/static
+cp -r public/* .next/standalone/public/ 2>/dev/null
+( cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
+  AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true NEXTAUTH_URL='http://localhost:3000' \
+  AUTH_URL='http://localhost:3000' ANTHROPIC_API_KEY='sk-noop' AWS_S3_BUCKET_NAME='rfp-pipeline-local' \
+  AWS_REGION='us-east-1' PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node server.js & )   # run_in_background
 until curl -s -o /dev/null http://localhost:3000/login; do sleep 1; done
+# ⚠️ Sign in at localhost:3000 (NOT 127.0.0.1) — the NextAuth cookie is host-bound. Full recipe +
+#    gotchas (re-stage on every rebuild; PDF tooling): docs/CONTINUATION.md §2.
 ```
 
 **Pipeline (only needed to see agents actually run).** The full-draft / adversarial workflows
@@ -120,8 +149,12 @@ packaging, and the customer story. **All Foundation accounts use `DemoPass123!`.
                     ├─ ADVANCE stage (Review → Revise → Lock → Advance)
                     └─ PACKAGE + DOWNLOAD (docx/pptx/xlsx/pdf)
 
- master_admin / rfp_admin oversight:  /admin/agents (Agent Workforce) · /admin/events (audit) ·
- shadow-descend into a tenant (act as tenant_admin in their RLS space).
+ master_admin / rfp_admin oversight + ADMIN-PLANE TRIGGERS (no portal descent):
+   /admin/agents  →  Agent Workforce roster  +  Proposal Auto-Drive DOORBELL (ring Mode A/B/C
+                     on any tenant's proposal)
+   rfp_ingest_manager  →  assess a curated solicitation's ingest readiness (which agents to run next)
+   /admin/events  →  the audit Event Stream (every action, all namespaces — "keep tabs")
+   shadow-descend into a tenant (act as tenant_admin in their RLS space).
 ```
 
 Every arrow is a HITL gate: an actor performs an action, the system records a `system_events`
@@ -158,12 +191,16 @@ is **do → expect**; the DB one-liners in §6 confirm anything the UI doesn't s
 9. Package + **download** the proposal → **Expect** real docx/xlsx files that open.
 
 **D — Oversight & the agent workforce (the F6 fix) — sign in as `e2e-master@rfppipeline.test` / `E2ETest!2026`**
-10. `/admin/agents` (**Agent Workforce**) → **Expect** the **full 35-archetype roster** incl. Proposal
+10. `/admin/agents` (**Agent Workforce**) → **Expect** the **full 36-archetype roster** incl. Proposal
     Draft Manager, Advisory Manager, Traceability Auditor, Redaction Guard, Continuity Manager, Stylist,
-    Formatter, Market Analyst + both Library-Seed producers; exactly **one dormant** (Content Generator).
-11. `/admin/events` → **Expect** the immutable audit timeline; filter by namespace. `/admin/tenants` →
-    open `foundation` → **Enter tenant** (shadow-descend) → **Expect** you're now acting as `tenant_admin`
-    in Foundation's space.
+    Formatter, Market Analyst, **RFP Ingest Manager** + both Library-Seed producers; exactly **one
+    dormant** (Content Generator).
+10b. On the same page → the **Proposal Auto-Drive (Doorbell)** card → pick **Foundation — TVSF Round 45**
+    + **Mode C** → **Ring**. **Expect** a success banner; a `proposal.full_draft_requested`
+    (`source=admin_doorbell`) pair in the audit (§5.5 / §6). This is the admin-plane build trigger.
+11. `/admin/events` → **Expect** the immutable audit Event Stream — your doorbell ring shows at the top,
+    attributed. Filter by namespace. `/admin/tenants` → open `foundation` → **Enter tenant**
+    (shadow-descend) → **Expect** you're now acting as `tenant_admin` in Foundation's space.
 
 **E — The other actors (login smoke)**
 12. `e2e-rfpadmin@…` → `/admin/intake`, `/admin/rfp-curation`, `/admin/purchases` render (ingest→release).
@@ -179,7 +216,7 @@ Each step: **do** → **expect** → **verify**. Verify with the UI, or the DB o
 
 ### A. `master_admin` — platform oversight + shadow
 1. Sign in `e2e-master@rfppipeline.test` → land `/admin/dashboard`. **Expect** platform metrics, no tenant scope.
-2. `/admin/agents` (**Agent Workforce**). **Expect** the 35-archetype roster with per-tenant usage; the Proposal Draft Manager cohort (proposal_manager, formatter, stylist, continuity_manager, traceability_auditor, redaction_guard, market_analyst, advisory_manager, cost_estimator woken) is listed. **Verify** roster renders; forward-only usage counts only (no tenant content).
+2. `/admin/agents` (**Agent Workforce**). **Expect** the 36-archetype roster with per-tenant usage; the Proposal Draft Manager cohort (proposal_manager, formatter, stylist, continuity_manager, traceability_auditor, redaction_guard, market_analyst, advisory_manager, cost_estimator woken) is listed. **Verify** roster renders; forward-only usage counts only (no tenant content).
 3. `/admin/events`. **Expect** the immutable audit timeline; filter by namespace (finder/capture/proposal/library/system/tool). **Verify** your own admin actions appear (tenantId null for admin events).
 4. **Shadow-descend:** `/admin/tenants` → open `acme-navy-systems` → "Enter tenant / Manage". **Expect** an in-session role rewrite to `tenant_admin` in that tenant's RLS space. **Verify** `GET /api/auth/session` now shows `role=tenant_admin`, `tenantSlug=acme-navy-systems`, `membershipPinned=true`.
 
@@ -258,6 +295,49 @@ incongruous-vs-intentional. This is the entity-reference integrity check, made 1
 
 ---
 
+## 5.5 Admin-plane triggers — the doorbell + the ingest manager (no portal descent)
+
+The **admin-agent program (Phase 1)**: drive the (already-built) tenant engine from up top, advisory +
+audited. Sign in as `e2e-master@rfppipeline.test` / `E2ETest!2026` (or any `rfp_admin`+). Canonical spec:
+docs/ADMIN_AGENT_DESIGN.md; audit sweep: docs/EVENT_AUDIT_2026-08-02.md.
+
+**A — Proposal Auto-Drive "doorbell" (fully clickable, verified live).**
+1. `/admin/agents` → scroll to the **Proposal Auto-Drive (Doorbell)** card (under Agent Workforce).
+   **Expect** a proposal dropdown populated across ALL tenants (`GET /api/admin/proposals`) + a Mode
+   picker (A/B/C).
+2. Pick a proposal (e.g. **Foundation — TVSF Round 45**), pick **Mode C**, click **Ring**. **Expect** a
+   success banner ("Full draft (Mode C) requested. Drafts land in review…").
+3. **Verify the audit landed, attributed to YOU as the admin:**
+   ```bash
+   psql "$DATABASE_URL" -c "SELECT phase,actor_email,payload->>'source' src,payload->>'mode' mode
+     FROM system_events WHERE type='proposal.full_draft_requested' ORDER BY created_at DESC LIMIT 2;"
+   # → start + end, actor_email=<you>, src=admin_doorbell, mode=c
+   ```
+   Then `/admin/events` → **Expect** the two `proposal.full_draft_requested` rows at the TOP of the Event
+   Stream (`source=admin_doorbell`). This is the "keep tabs" surface — the ring is visible + attributed.
+   *(The downstream drafting — OnFullDraftRequested Mode C running the agents — needs a live pipeline
+   `ANTHROPIC_API_KEY`, same deploy-gate as every agent; the ring + audit fire regardless.)*
+4. **Attribution contract:** a tenant-initiated full draft (the portal "Run full draft", §5) and this
+   admin ring land the SAME event via one `requestFullDraft` helper — only `source` differs
+   (`portal` vs `admin_doorbell`). Drive both and compare the two rows.
+
+**B — `rfp_ingest_manager` (roster-visible; API/workflow-triggered — UI button pending).**
+1. `/admin/agents` → the roster lists **RFP Ingest Manager** (Our-org — RFP-admin ops, `platform`, live).
+2. Trigger an ingest-readiness assessment on a curated solicitation (API for now — no UI button yet):
+   ```bash
+   SID=$(psql "$DATABASE_URL" -tAc "SELECT id FROM curated_solicitations LIMIT 1")
+   # from the browser devtools console (carries your admin cookie), or an authenticated client:
+   #   fetch(`/api/admin/rfp-curation/${SID}/assess-ingest`, {method:'POST'}).then(r=>r.json())
+   psql "$DATABASE_URL" -c "SELECT phase,actor_email FROM system_events
+     WHERE type='ingest.assessment_requested' ORDER BY created_at DESC LIMIT 2;"   # → start + end
+   ```
+   **Expect** the `finder:ingest.assessment_requested` start/end pair. With a live pipeline key the
+   `OnIngestAssessmentRequested` workflow runs `rfp_ingest_manager` → an advisory readiness plan +
+   `agent_task_log` row (advisory, never mutates). **Verify** the agent's deterministic stage read runs
+   over our own solicitations via `pipeline/tests/test_rfp_ingest_manager_wiring.py` (the live-drive test).
+
+---
+
 ## 6. Verification hooks (assert any gate)
 
 ```bash
@@ -269,8 +349,11 @@ curl -s http://localhost:3000/api/auth/session   # → role / tenantId / tenantS
 # recent audit events (namespace-scoped) — proves a gate fired:
 psql "$DATABASE_URL" -c "SELECT namespace,type,phase,tenant_id,created_at FROM system_events ORDER BY created_at DESC LIMIT 20;"
 
-# the full-draft / adversarial events specifically:
-psql "$DATABASE_URL" -c "SELECT type,phase,payload->>'mode' mode,payload->>'adversarial' adv,payload->>'adversarial_policy' pol FROM system_events WHERE type LIKE 'proposal.full_draft_requested' OR type LIKE 'proposal.advisory_overlay%' ORDER BY created_at DESC LIMIT 10;"
+# the full-draft / adversarial events specifically (payload.source = portal | admin_doorbell):
+psql "$DATABASE_URL" -c "SELECT type,phase,actor_email,payload->>'source' src,payload->>'mode' mode,payload->>'adversarial' adv FROM system_events WHERE type LIKE 'proposal.full_draft_requested' OR type LIKE 'proposal.advisory_overlay%' ORDER BY created_at DESC LIMIT 10;"
+
+# admin-agent triggers (the doorbell ring + the ingest-manager assessment):
+psql "$DATABASE_URL" -c "SELECT type,phase,actor_email,payload->>'source' src FROM system_events WHERE type IN ('proposal.full_draft_requested','ingest.assessment_requested') ORDER BY created_at DESC LIMIT 10;"
 
 # parked HITL ToDos by assignee (who owes an action):
 psql "$DATABASE_URL" -c "SELECT task_type,assignee_role,status,entity_ref FROM tasks WHERE status IN ('open','pending') ORDER BY created_at DESC LIMIT 20;"
@@ -300,14 +383,17 @@ npx playwright test e2e/hitl-full-draft.spec.ts  # the full-draft route incl. Mo
 - **`hitl-deep-sweep`** — the multi-actor surface sweep: logs in as master / rfp / tenant_admin
   (Foundation) / tenant_user / partner and walks **29 surfaces** (admin + portal + vault), asserting
   none 500 / blank / auth-bounce; **plus the two UI-observable fixes** — F2 (Foundation TVSF section
-  rehydrates its saved content) and F6 (`/admin/agents` lists the full 35-archetype roster incl. the
+  rehydrates its saved content) and F6 (`/admin/agents` lists the full 36-archetype roster incl. the
   P1–P4 cohort, with one marked dormant). *(Verified 5/5, 2026-08-01.)*
 - **`hitl-full-draft`** — as tenant_admin, asserts the "Run full draft" panel is reachable and
   drives the full-draft route (Mode C + adversarial auto, Mode A ignores it, bad mode → 400).
 
 The unit/contract layer already covers the internals: `frontend/__tests__/full-draft.test.ts`
-(route + adversarial threading) and pipeline `test_budget_model` / `test_advisory_gate` /
-`test_p5_scenario_proof` (cost math, overlay landing, SBIR + Army/AF wiring).
+(portal route + adversarial threading), **`frontend/__tests__/admin-doorbell.test.ts`** (the admin
+doorbell: rfp_admin+ gate, cross-tenant resolve, `source=admin_doorbell` emission — 6/6), and pipeline
+`test_budget_model` / `test_advisory_gate` / `test_p5_scenario_proof` (cost math, overlay landing,
+SBIR + Army/AF wiring) + **`test_rfp_ingest_manager_wiring.py`** (the ingest manager: registration,
+action map, injection fence, guardrail landing, + a live drive over our own solicitations — 7/7).
 
 ---
 

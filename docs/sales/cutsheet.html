@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>RFP Pipeline — Cut Sheet</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  :root{
+    --coral:#e85d4a;--coral6:#d44432;--coral4:#f47a64;--coral50:#fef2f0;--coral100:#fde3df;--coral200:#fcc8bf;
+    --ink:#1a1816;--ink8:#2d2a27;--ink7:#45403a;--ink5:#7a6d5e;--ink4:#968775;
+    --green:#2d8b4e;--green50:#edf7f0;--gold:#d4a843;
+    --cream50:#faf8f4;--cream100:#f5f0e8;--cream200:#ede4d5;--cream300:#dfd2bc;
+    --sans:"Helvetica Neue",Helvetica,Arial,"Segoe UI",system-ui,sans-serif;--serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font-family:var(--sans);color:var(--ink8);font-size:9pt;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sheet{padding:0.5in 0.55in 0.42in;position:relative;min-height:11in;break-before:page;page-break-before:always;display:flex;flex-direction:column}
+  .sheet:first-child{break-before:avoid;page-break-before:avoid}
+  .fill{flex:1;display:flex;flex-direction:column;justify-content:space-between}
+  .bleed{margin-left:-0.55in;margin-right:-0.55in;padding-left:0.55in;padding-right:0.55in}
+  /* wordmark */
+  .wm-row{display:flex;align-items:baseline;line-height:1}
+  .wm-rfp{font-weight:900;letter-spacing:-.03em;color:var(--ink);font-size:30pt}
+  .wm-pipe{font-family:var(--serif);font-style:italic;color:var(--coral);font-size:30pt;margin-left:.09em}
+  .wm-arrow{display:flex;align-items:center;gap:4px;margin-top:2px;width:158px}
+  .wm-line{flex:1;height:2.5px;border-radius:3px;background:linear-gradient(90deg,var(--coral4),var(--coral))}
+  .wm-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .wm-tag{text-transform:uppercase;letter-spacing:.28em;font-weight:600;color:var(--ink4);font-size:6pt;margin-top:4px}
+  .cmark{position:absolute;top:0.3in;right:0.55in;font-size:9pt}.cmark b{font-weight:900;color:var(--ink)}.cmark i{font-family:var(--serif);font-style:italic;color:var(--coral)}
+  svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  svg.ic.lg{width:26px;height:26px}
+  .eyebrow{text-transform:uppercase;letter-spacing:.24em;font-weight:700;font-size:7.5pt;color:var(--coral6)}
+  h1{font-weight:900;color:var(--ink);font-size:25pt;line-height:1.02;letter-spacing:-.02em;margin:8px 0 0}
+  h1 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--coral)}
+  .lede{color:var(--ink7);font-size:10pt;line-height:1.45;margin:9px 0 0;max-width:6.6in}
+  .lede b{color:var(--ink)}
+  .band{background:var(--ink);color:#fff;padding:8px 0.55in;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  .band .ic{color:var(--coral4)}.band h2{font-weight:800;font-size:12.5pt;margin:0;color:#fff}
+  .band .kick{margin-left:auto;text-transform:uppercase;letter-spacing:.18em;font-size:6.5pt;color:var(--ink4);font-weight:600}
+  /* pipe flow */
+  .flow{display:flex;align-items:flex-start;margin-top:18px}
+  .fn{flex:1;text-align:center}.fc{width:44px;height:44px;margin:0 auto;border-radius:50%;background:#fff;border:2px solid var(--coral200);color:var(--coral6);display:flex;align-items:center;justify-content:center}
+  .fname{font-weight:800;color:var(--ink);font-size:8.5pt;margin-top:6px;letter-spacing:.02em}.fsub{font-size:6.5pt;color:var(--ink5);margin-top:1px;line-height:1.25}
+  .fa{width:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:44px;color:var(--coral4)}
+  /* stats */
+  .stats{background:var(--ink);color:#fff;display:flex;margin-top:20px}
+  .stats>div{flex:1;text-align:center;padding:11px 4px;border-left:1px solid var(--ink7)}.stats>div:first-child{border-left:0}
+  .sn{font-weight:900;font-size:18pt;line-height:1}.sn em{font-family:var(--serif);font-style:italic;color:var(--gold);font-weight:400}
+  .sl{text-transform:uppercase;letter-spacing:.1em;font-size:5.8pt;color:var(--ink4);margin-top:4px}
+  h3{font-weight:800;color:var(--ink);font-size:11pt;margin:0 0 3px}
+  p{margin:0 0 6px}.muted{color:var(--ink5)}
+  .callout{background:var(--cream100);border-left:4px solid var(--coral);border-radius:0 7px 7px 0;padding:9px 13px;margin:12px 0;display:flex;gap:11px;align-items:center}
+  .callout .ic{color:var(--coral6);flex-shrink:0}.callout.g{border-left-color:var(--green);background:var(--green50)}.callout .green{color:var(--green)}
+  b.ink{color:var(--ink)}b.coral{color:var(--coral6)}
+  /* econ compare */
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:8.3pt}
+  th{background:var(--ink);color:#fff;text-align:left;padding:5px 9px;font-size:7.8pt;font-weight:700}
+  td{padding:5px 9px;border-bottom:1px solid var(--cream200);vertical-align:top}
+  td.r{color:var(--ink);font-weight:700;white-space:nowrap}tr:nth-child(even) td{background:var(--cream50)}
+  /* capability grid */
+  .cg{display:grid;grid-template-columns:1fr 1fr;gap:11px 20px;margin-top:2px}
+  .ci{display:flex;gap:10px}
+  .cib{width:34px;height:34px;border-radius:9px;background:var(--coral50);border:1px solid var(--coral100);color:var(--coral6);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ci b{color:var(--ink);font-size:9.5pt;display:block;line-height:1.2}.ci span{color:var(--ink5);font-size:8pt}
+  /* trust strip */
+  .trust{background:var(--cream50);border:1px solid var(--cream200);border-radius:9px;padding:10px 13px;margin-top:14px;display:flex;flex-wrap:wrap;gap:6px 16px}
+  .trust .t{display:flex;gap:6px;align-items:center;font-size:8pt;color:var(--ink7)}.trust .t svg{color:var(--green);width:15px;height:15px}.trust .t b{color:var(--ink)}
+  /* pricing */
+  .price{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px}
+  .pc{border:1.5px solid var(--cream300);border-radius:10px;padding:10px 12px;position:relative}.pc.feat{border-color:var(--coral);background:var(--coral50)}
+  .pt{text-transform:uppercase;letter-spacing:.1em;font-size:6.3pt;font-weight:700;color:var(--coral6)}
+  .pn{font-weight:800;color:var(--ink);font-size:9.5pt;margin:2px 0 4px}.pa{font-weight:900;color:var(--ink);font-size:16pt}.pa span{font-size:8pt;font-weight:600;color:var(--ink5)}
+  .pb{font-size:7.3pt;color:var(--ink5);margin-top:5px;line-height:1.35}
+  .rule{height:2.5px;background:linear-gradient(90deg,var(--coral),var(--coral4));border:0;border-radius:3px;margin:14px 0 8px}
+  .cta{display:flex;align-items:center;gap:14px}.cta .q{font-family:var(--serif);font-style:italic;color:var(--ink);font-size:11pt;line-height:1.35}
+  .foot{position:absolute;bottom:0.26in;left:0.55in;right:0.55in;display:flex;justify-content:space-between;font-size:6.8pt;color:var(--ink4);border-top:1px solid var(--cream200);padding-top:5px}
+</style></head><body>
+
+<!-- PAGE 1 -->
+<section class="sheet" style="background:var(--cream50)">
+  <div>
+    <div class="wm-row"><span class="wm-rfp">RFP</span><span class="wm-pipe">Pipeline</span></div>
+    <div class="wm-arrow"><span class="wm-line"></span><span class="wm-dot"></span></div>
+    <div class="wm-tag">Apply &middot; Curate &middot; Draft &middot; Win</div>
+  </div>
+  <div class="fill">
+  <div style="margin-top:24px">
+    <div class="eyebrow">AI + Expert &middot; From Application to Submission</div>
+    <h1>A proposal engine, <em>not a proposal gamble.</em></h1>
+    <p class="lede">Win non-dilutive federal R&amp;D funding — <b>without burning a month of payroll on every submission.</b> RFP Pipeline pairs 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. Built for <b>SBIR &middot; STTR &middot; BAA &middot; OTA &middot; CSO &middot; Grants.</b></p>
+  </div>
+
+  <div class="flow">
+    <div class="fn"><div class="fc"><svg class="ic lg"><use href="#source-scout"/></svg></div><div class="fname">APPLY</div><div class="fsub">Find &amp; rank a fit</div></div>
+    <div class="fa"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="fn"><div class="fc"><svg class="ic lg"><use href="#expert"/></svg></div><div class="fname">CURATE</div><div class="fsub">Expert build (72h)</div></div>
+    <div class="fa"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="fn"><div class="fc"><svg class="ic lg"><use href="#ai-drafting"/></svg></div><div class="fname">DRAFT</div><div class="fsub">Isolated AI + team</div></div>
+    <div class="fa"><svg class="ic"><use href="#chevron"/></svg></div>
+    <div class="fn"><div class="fc" style="border-color:#bfe0cc;color:var(--green)"><svg class="ic lg"><use href="#trophy"/></svg></div><div class="fname">WIN</div><div class="fsub">Submit &amp; improve</div></div>
+  </div>
+
+  <div class="stats bleed" style="margin-top:24px">
+    <div><div class="sn">4+</div><div class="sl">Federal Sources</div></div>
+    <div><div class="sn">72<em>h</em></div><div class="sl">Expert-Review SLA</div></div>
+    <div><div class="sn">25+</div><div class="sl">Years Fed R&amp;D</div></div>
+    <div><div class="sn">100%</div><div class="sl">Human-Gated AI</div></div>
+  </div>
+
+  <div style="margin-top:22px">
+    <h3>Billions a year in non-dilutive funding — kept off most companies&rsquo; radar</h3>
+    <p class="muted">There are billions each year in non-dilutive federal R&amp;D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply, because the process is opaque, deadline-driven, and expensive to chase. RFP Pipeline makes it accessible.</p>
+    <table>
+      <tr><th style="width:2.1in">The status quo</th><th>What it costs you</th><th style="width:1.4in">RFP&nbsp;Pipeline</th></tr>
+      <tr><td class="r">Opportunity monitoring</td><td>~$5,000 / month for a feed you still triage</td><td>Included</td></tr>
+      <tr><td class="r">Proposal consultant</td><td>Commonly ~10% of the award as a success fee</td><td>Flat fee, no success fee</td></tr>
+      <tr><td class="r">Your team&rsquo;s time</td><td>A month of payroll per submission, from scratch</td><td>Draft from your library</td></tr>
+    </table>
+    <div class="callout g"><svg class="ic lg green"><use href="#non-dilutive"/></svg><div><b class="ink">The math.</b> <span class="muted">Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for <b class="coral">$499/mo and a flat per-proposal fee</b>. No success fee, ever. Every cycle makes the next cheaper, faster, and more accurate.</span></div></div>
+  </div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Cut Sheet</span><span>AI + Expert · From Application to Submission</span></div>
+</section>
+
+<!-- PAGE 2 -->
+<section class="sheet">
+  <div class="cmark"><b>RFP</b> <i>Pipeline</i></div>
+  <div class="band bleed"><svg class="ic"><use href="#library"/></svg><h2>What you get — the platform at a glance</h2><span class="kick">Capabilities</span></div>
+  <div class="fill">
+  <div class="cg">
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#source-scout"/></svg></div><div><b>Discovery &amp; ranked pipeline</b><span>Daily ingestion across SAM.gov, SBIR.gov, Grants.gov &amp; agency portals, ranked to your tech areas.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#target"/></svg></div><div><b>Scoring buckets</b><span>Rank the whole pipeline by your own keywords, agencies, program types &amp; NAICS — transparent, per-factor.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#expert"/></svg></div><div><b>Expert curation (72h SLA)</b><span>A real expert provisions your compliance matrix, volumes &amp; section molds from the solicitation.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#isolation"/></svg></div><div><b>Isolated, company-specific AI</b><span>Walled to your company. No model training on your data. Injection-fenced.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#library"/></svg></div><div><b>Reusable content library</b><span>Upload &rarr; atomize &rarr; reuse. Copied forward into every proposal; retiring an item breaks nothing.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#workspace"/></svg></div><div><b>Workspace &amp; compliance matrix</b><span>Stage-gated build, per-section accept-and-lock, live requirement coverage &amp; page-fill gauges.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#automation"/></svg></div><div><b>Proposal Studio (AI workforce)</b><span>Draft &rarr; Refine &rarr; Compliance, gated — you approve at each step, or run all three automatically.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#review"/></svg></div><div><b>AI review &amp; compliance check</b><span>Color-team recommendations per section + pass/fail/partial requirement scoring.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#export"/></svg></div><div><b>Submission-ready exports</b><span>Word, PDF, Excel (live formulas) &amp; per-volume ZIP + a packaging-completeness review.</span></div></div>
+    <div class="ci"><div class="cib"><svg class="ic"><use href="#trophy"/></svg></div><div><b>Outcome &rarr; contract</b><span>A win starts your contract + kickoff; every result sharpens your library for the next bid.</span></div></div>
+  </div>
+
+  <div class="trust">
+    <div class="t"><svg><use href="#isolation"/></svg><span><b>Multi-tenant isolation</b></span></div>
+    <div class="t"><svg><use href="#no-training"/></svg><span><b>No model training</b> on your data</span></div>
+    <div class="t"><svg><use href="#audit"/></svg><span><b>Full audit trail</b></span></div>
+    <div class="t"><svg><use href="#review"/></svg><span><b>AI advisory &amp; human-gated</b></span></div>
+    <div class="t"><svg><use href="#verified"/></svg><span><b>Injection-fenced</b></span></div>
+    <div class="t"><svg><use href="#chip"/></svg><span><b>Governed AI</b> — budget/rate caps</span></div>
+  </div>
+
+  <div class="rule" style="margin-top:16px"></div>
+  <h3>Simple, flat pricing — no success fee, ever</h3>
+  <div class="price">
+    <div class="pc"><div class="pt">Required &middot; Monthly</div><div class="pn">Spotlight Subscription</div><div class="pa">$499<span>/mo</span></div><div class="pb">Daily ingestion, AI ranking, expert-curated compliance matrix, deadline alerts, 15 min Ask-the-Expert/mo. Required to buy any portal · 3-mo min.</div></div>
+    <div class="pc feat"><div class="pt">Per-Proposal</div><div class="pn">Phase I — Like Effort</div><div class="pa">$1,999<span>ea</span></div><div class="pb">SBIR/STTR Phase I, smaller BAA, OTA/CSO short-form. 72-hour expert curation, stage-gated workspace, custom AI drafting.</div></div>
+    <div class="pc"><div class="pt">Per-Proposal</div><div class="pn">Phase II — Like Effort</div><div class="pa">$4,999<span>ea</span></div><div class="pb">SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20–50+ pp volumes. $3,999 with a linked Phase I.</div></div>
+  </div>
+
+  <div class="rule"></div>
+  <div class="cta">
+    <div style="flex-shrink:0"><div class="wm-row"><span class="wm-rfp" style="font-size:18pt">RFP</span><span class="wm-pipe" style="font-size:18pt">Pipeline</span></div><div class="wm-arrow" style="width:100px"><span class="wm-line"></span><span class="wm-dot"></span></div></div>
+    <div style="flex:1"><div class="q">From a ranked opportunity to a submission-ready, compliant proposal — your team in control at every gate.</div>
+      <div class="muted" style="font-size:8pt;margin-top:3px">Book a walkthrough on one of your own target opportunities, or apply for the Founding Cohort. Platform launches August 2026.</div></div>
+  </div>
+  </div>
+  <div class="foot"><span>RFP Pipeline &middot; Platform Cut Sheet</span><span>Every capability, stat &amp; price grounded in shipping functionality.</span></div>
+</section>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="chevron" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7"/></symbol>
+  <symbol id="source-scout" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.6"/><path d="M10.5 1.6v2.3M10.5 16.7v2.3M1.6 10.5h2.3M16.7 10.5h2.3"/><path d="M15.4 15.4 21 21"/><text x="10.5" y="13.9" text-anchor="middle" font-size="9.5" font-weight="700" fill="currentColor" stroke="none">$</text></symbol>
+  <symbol id="target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="expert" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.2"/><path d="M12 6.4l.9 1.9 2 .3-1.5 1.4.35 2L12 12l-1.75.9.35-2L9.1 9.6l2-.3z" fill="currentColor" stroke="none"/><path d="M9.4 13.5 8 21l4-2 4 2-1.4-7.5"/></symbol>
+  <symbol id="verified" viewBox="0 0 24 24"><path d="M12 3l7 2.3v5.2c0 4.3-3 7.1-7 9-4-1.9-7-4.7-7-9V5.3z"/><path d="M8.6 11.7l2.4 2.4 4.4-4.7"/></symbol>
+  <symbol id="review" viewBox="0 0 24 24"><rect x="4" y="3.2" width="10.5" height="14.5" rx="1.5"/><path d="M6.4 7h5.6M6.4 10h3.4"/><circle cx="15" cy="14.5" r="3.6"/><path d="M17.6 17.1 20.6 20.1"/></symbol>
+  <symbol id="ai-drafting" viewBox="0 0 24 24"><path d="M6 3.6h6.8L17 7.8v8.6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8.8a2 2 0 0 1 2-2Z"/><path d="M12.6 3.6V8H17"/><path d="M6.8 11h5.2M6.8 13.7h3.6"/><path d="M9.4 18.4l5-5 1.8 1.8-5 5-2.3.5z"/><path d="M19.4 3.1c.16 1.2.42 1.46 1.6 1.6-1.18.16-1.44.42-1.6 1.6-.16-1.18-.42-1.44-1.6-1.6 1.18-.16 1.44-.4 1.6-1.6Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="isolation" viewBox="0 0 24 24"><path d="M12 3l7 2.3v5.2c0 4.3-3 7.1-7 9-4-1.9-7-4.7-7-9V5.3z"/><rect x="9.3" y="8" width="5.4" height="5.4" rx="1"/><path d="M12 6.4v1.6M12 13.4v1.6M7.7 10.7h1.6M14.7 10.7h1.6"/></symbol>
+  <symbol id="automation" viewBox="0 0 24 24"><path d="M3.4 12h13.2M14.6 9.4 17.8 12l-3.2 2.6"/><circle cx="5" cy="12" r="1.9"/><circle cx="11" cy="12" r="1.9"/><path d="M8 9.8v4.4"/></symbol>
+  <symbol id="chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><rect x="10" y="10" width="4" height="4" rx="0.5"/><path d="M9.5 4v3M12 4v3M14.5 4v3M9.5 17v3M12 17v3M14.5 17v3M4 9.5h3M4 12h3M4 14.5h3M17 9.5h3M17 12h3M17 14.5h3"/></symbol>
+  <symbol id="library" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/><path d="M15.3 17l1.1 1.1 2.3-2.5"/></symbol>
+  <symbol id="workspace" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M3 8.2h18M9 8.2V20M15 8.2V20"/><path d="M10.2 13.4l1.1 1.1 2.3-2.5"/></symbol>
+  <symbol id="export" viewBox="0 0 24 24"><path d="M4 12.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5"/><path d="M4 12.5 6 9h12l2 3.5"/><path d="M12 3.4v8M9 6.2l3-2.8 3 2.8"/></symbol>
+  <symbol id="audit" viewBox="0 0 24 24"><rect x="4" y="3.2" width="12.5" height="17.6" rx="1.5"/><path d="M6.8 7.6l1 1 2-2.2M6.8 12.4l1 1 2-2.2"/><path d="M12 7.4h2.2M12 12.2h1.6"/><circle cx="17" cy="17" r="3.4"/><path d="M17 15.4V17l1.1.8"/></symbol>
+  <symbol id="no-training" viewBox="0 0 24 24"><ellipse cx="11" cy="6.5" rx="5.5" ry="2"/><path d="M5.5 6.5v8c0 1.1 2.5 2 5.5 2 .6 0 1.2 0 1.7-.1"/><path d="M16.5 8.4v2.2"/><circle cx="15.5" cy="15.5" r="4.5"/><path d="M12.3 12.3 18.7 18.7"/></symbol>
+  <symbol id="non-dilutive" viewBox="0 0 24 24"><circle cx="10.5" cy="11.5" r="6"/><text x="10.5" y="14.8" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none">$</text><rect x="14.8" y="15" width="6.2" height="5" rx="1"/><path d="M16.3 15v-1.4a1.8 1.8 0 0 1 3.4-.8"/></symbol>
+  <symbol id="trophy" viewBox="0 0 24 24"><path d="M8 4h8v4.5a4 4 0 0 1-8 0z"/><path d="M8 5.2H5.4a2.6 2.6 0 0 0 3.1 3.1M16 5.2h2.6a2.6 2.6 0 0 1-3.1 3.1"/><path d="M12 12.5v3.5M9 20h6M10 20l.6-4h2.8l.6 4"/></symbol>
+</defs></svg>
+</body></html>

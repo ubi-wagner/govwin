@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 
 interface Collaborator {
   id: string;
@@ -150,7 +151,7 @@ export function TeamManager({
       );
       if (!res.ok) {
         const json = await res.json();
-        alert(json.error || 'Failed to remove collaborator');
+        toast.error(json.error || 'Failed to remove collaborator');
         return;
       }
       // Never drop them from the list — mark inactive so their history stays visible.
@@ -158,7 +159,7 @@ export function TeamManager({
         prev.map((c) => (c.id === collaboratorId ? { ...c, active: false, revokedAt: new Date().toISOString() } : c)),
       );
     } catch {
-      alert('Network error');
+      toast.error('Network error');
     }
   }, [tenantSlug, proposalId]);
 

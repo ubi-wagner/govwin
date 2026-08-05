@@ -267,7 +267,7 @@ async function fetchHealthSummary(): Promise<HealthSummary> {
   try {
     const rows = await sql<HealthRow[]>`
       SELECT
-        (SELECT COUNT(*) FROM process_instances WHERE status IN ('running', 'pending', 'retrying')) AS active_workflows,
+        (SELECT COUNT(*) FROM process_instances WHERE status IN ('running', 'pending', 'retrying') AND archived_at IS NULL) AS active_workflows,
         (SELECT COUNT(*) FROM pipeline_jobs WHERE status IN ('pending', 'running')) AS pending_jobs,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '1 hour') AS events_last_hour,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '24 hours') AS events_last_24h,
@@ -300,6 +300,7 @@ async function fetchActiveWorkflows(): Promise<ActiveWorkflow[]> {
              payload, created_at
       FROM process_instances
       WHERE status NOT IN ('completed', 'cancelled', 'failed')
+        AND archived_at IS NULL
       ORDER BY created_at DESC
       LIMIT 50
     `;

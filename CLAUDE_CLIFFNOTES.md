@@ -21,6 +21,103 @@ mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library
 
 ---
 
+## 0. Deploy testing environment — fast + full refresh (next cycle)
+
+**Read this first when re-establishing a test box.** Written 2026-08-04 after the front-to-back /
+side-to-side V1 test. State at launch: migs **148**, `tsc 0 · vitest 855 · next build`. Full launch
+punch list: **docs/V1_LAUNCH_PUNCHLIST.md**. Standalone-serving caveats: CLAUDE.md SOP + docs/CONTINUATION.md §2.
+
+**Sandbox facts:** DB `postgresql://claude@127.0.0.1:5433/govtech_intel` (pg data dir `/tmp/pgs_gov/data`).
+App served standalone on **:3000** (`next start` is BROKEN — `output:'standalone'`). Chromium for Playwright:
+`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`, not `127.0.0.1`.
+
+### FAST refresh (~2 min — box already has DB data dir + a `.next` build)
+```bash
+bash scripts/heartbeat.sh          # idempotent: (re)starts pg :5433 + standalone server :3000; prints HEARTBEAT status
+export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
+node scripts/seed_dev_accounts.mjs # additive: admin + Lighthouse/Ubihere tenants + backfills every tenant's cards
+```
+Accounts after the seed (passwords ROTATED by the seed — these are the e2e-canonical ones):
+`eric@rfppipeline.com`/`RFPAdmin2026!` (master), `eric@lighthouse.com`/`LighthouseAdmin`,
+`eric@ubihere.com`/`UbihereAdmin`. The **Foundation demo** accounts are separate and use `DemoPass123!`
+(`kate.ulepic@foundation3dp.com` tenant_admin, `connor.casey@foundation3dp.com` tenant_user,
+`pjackson@ecinnovates.com` partner). ⚠ `seed_dev_accounts.mjs` **rotates** `eric@rfppipeline.com` to
+`RFPAdmin2026!` — so after seeding, admin login is NOT `DemoPass123!` anymore on the sandbox.
+
+### FULL refresh (rebuild from migrations — container reclaim / schema drift)
+`heartbeat.sh` prints `pg=DATA_GONE` when the data dir is gone → rebuild:
+`initdb` + `createdb govtech_intel` → `DATABASE_URL=<sandbox> node db/migrations/migrate.mjs` (⚠ never
+`ALLOW_SCHEMA_RESET` unless you mean the destructive 000_drop_all) → `node scripts/seed_dev_accounts.mjs`.
+Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone/.next/static && cp -r public
+.next/standalone/public`, and `heartbeat.sh` will boot it. Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
+
+> **Starter content is now migration-seeded** (no separate step). `migrate.mjs` applies **mig 152**
+> (`system_starter` MASTER LIBRARY — the 18-foundation `STARTER_SET` decomposed into the rfp-pipeline
+> platform tenant) and **migs 150/151** (six shared SYSTEM `document_templates`). New tenants then
+> **eager-copy** that library into their own space on creation (`copyStarterSetToTenant`, both create
+> paths) — tenant-isolated `my_library` copies with `derived_from` lineage; masters shared + untouched.
+> To regenerate 152 from the builders after editing `lib/library/starter-set.ts`:
+> `cd frontend && DATABASE_URL=<sandbox> node_modules/.bin/tsx scripts/gen-starter-set-seed.mts`.
+> Prove copy + isolation: `… tsx scripts/verify-keep-copy.mts` (6/6). Bulk-copy unit drive:
+> `scripts/drive-starter-bulk.mts`.
+
+### Running the e2e suite — REPRODUCIBLY GREEN (Wave C closed, 2026-08-04)
+```bash
+# 1) serve the built app WITH the founding-cohort paywall bypass (E2E-only; prod never sets it)
+DATABASE_URL=postgresql://claude@127.0.0.1:5433/govtech_intel bash scripts/serve-e2e.sh &   # → :3000
+# 2) run the gate — globalSetup RE-SEEDS the fixtures each run (reset-then-run), so it's reproducible
+cd frontend && TEST_BASE_URL=http://localhost:3000 DATABASE_URL=<same> \
+  npx playwright test --project=setup --project=admin --project=tenant --reporter=line
+```
+**Result: 62 passed · 0 failed · 1 skipped — run-over-run** (from a 45/13/5 baseline). Projects: `setup`
+(auth → e2e/.auth/*.json) → `admin` (*.admin.spec) + `tenant` (*.tenant.spec, uses **Lighthouse**); `hitl`
+self-authenticate. **No product bugs** — every prior failure was a stale/absent fixture or an environmental
+dep. What the close-out did (punch-list Wave C):
+- **serve-e2e.sh** sets `FOUNDING_COHORT_BYPASS=true` (matrix/lock/fullloop/atomloop hit the paywalled
+  `/proposals/create` direct-hook; the real purchase→release path needs no bypass).
+- **scripts/seed_e2e_fixtures.mjs** (runs scripts/e2e_fixtures.sql, extended) seeds every stateful fixture:
+  the hardcoded solicitations c3/c4 (with `spotlight_summary` + `close_date` — push validations added since
+  the SQL was written), provisioned-proposal/atoms/collaborator, and the zzaudit/zzblockers drive state.
+  Wired into **playwright globalSetup** so it re-seeds before every run (the specs mutate/leak state).
+- **seed_dev_accounts.mjs** now seeds `collab@lighthouse.com` + `member@ubihere.com` (were hand-seeded before).
+- **reach.tenant** de-flaked (`waitUntil:'load'` + timeout + one retry on the transient client-abort `-1`).
+- **⚠ ranking.tenant is SKIPPED frontend-only** — bucket scoring is event-driven + PIPELINE-side
+  (`OnCardApplied` → `pipeline/.../rescore.py` writes `tenant_bucket_scores`, which `/cards` reads). Set
+  **`E2E_WITH_PIPELINE=1`** (+ run the pipeline worker consuming events) to exercise it. Its fixtures ARE seeded.
+
+### ⚠⚠ VALIDATION HYGIENE — two traps that make "green" LIE (learned 2026-08-04, the hard way)
+1. **The standalone server serves the BUILD, not your source.** After ANY app-code change (routes,
+   lib, components), the running `.next/standalone/server.js` is STALE until you `npx next build` +
+   **clear** `rm -rf .next/standalone/.next/static .next/standalone/public` (serve-e2e only stages when
+   absent) + restart. A route-level test against a stale build validates the OLD code and passes/fails
+   for the wrong reason. Confirm freshness: `grep -rl <a-symbol-from-your-change> .next/standalone/.next/server`.
+   (This bit us: keep+copy passed at the FUNCTION level but the REAL `POST /api/admin/tenants` copied 0 —
+   because the served build predated the code. Rebuild → 18 copied. Always validate on a FRESH build.)
+2. **The pipeline agent suite SILENTLY SKIPS its DB-backed guardrails without `DATABASE_URL`.**
+   `cd pipeline && python3 -m pytest -q` → 789 pass / **218 skipped** (the injection-fence, cross-tenant
+   isolation, ILIKE-escape, tenant_id-GUC/RLS tests skip with *"no reachable Postgres"*). Run WITH the DB:
+   `DATABASE_URL=<sandbox> python3 -m pytest -q --ignore=tests/test_crypto.py` → **979 pass / 28 skip**
+   (test_crypto's 8 fails are a PyO3/cryptography env binding bug, NOT agent code). ALWAYS export
+   DATABASE_URL when validating the agents, or the security guardrails are never actually exercised.
+
+### The REAL "fire off a portal" lifecycle (needs NO bypass — this is the product path)
+```
+tenant_admin: POST /api/portal/<slug>/purchase { opportunityId, promoCode:'rfppipelinetest' }  → curation_pending ($0 comp purchase, emits capture:purchase.completed)
+rfp_admin:    POST /api/portal/<slug>/portals/<portalId>?action=release { }                     → provision (proposal + compliance matrix + section) → portal launched (UNLOCKED build)
+```
+`action=release` is rfp_admin-gated (a buyer can't self-release past the 72h SLA). `action=accept` is a
+DIFFERENT branch (guardrail-acceptance from `guardrails_pending`) — don't confuse them. Release body needs
+≥1 stage (defaults to draft/review/final if `{}`); the provision links the proposal BEFORE the status flip
+(idempotent, retryable).
+
+### ⚠ Gotcha — the capture specs overwrite committed guide screenshots
+`zzscreens.admin` / `zzscreens.tenant` / `zzcollab` / `zzblockers` **write** to `docs/manuals/img/**` and
+`frontend/blocker-shots/**`. Running the suite dirties ~37 tracked PNGs with fresh (often bare-tenant)
+captures. **`git checkout -- docs/manuals/img/ frontend/blocker-shots/` after a test run** unless you are
+deliberately re-capturing the guides (in which case rebuild them: `python3 docs/manuals/build_guides.py`).
+
+---
+
 ## 1. Database Schema Quick Reference
 
 The schema is defined across **69 migrations (000–067, plus the interleaved
@@ -81,6 +178,12 @@ proposal_sections
   created_at, updated_at
   + last_modified_by, editing_by, editing_since (044)
   + completed_stage, completed_at, accepted_by, accepted_at (046)
+  + is_locked, locked_at (074); artifact_id → proposal_artifacts (083);
+    volume_name, volume_number, section_type, tags, meta (074+)
+  + sort_index INT (143) — the ORDERING KEY. ALWAYS list sections with
+    ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number.
+    NEVER order by section_number alone (string sort → "10" before "2",
+    volumes scrambled — the "numbering is fucked up" bug). mig 143 backfills it.
 
 proposal_comments
   id, proposal_id, section_id, user_id, content, resolved, created_at
@@ -1284,6 +1387,43 @@ clobbers the completed work. And when a paused instance IS failed, expire its si
 wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate the event's entity id
 (proposalId/userId/sourceId/…) to the parked instance's payload before resuming (`_event_correlates`).
 
+### Mistake 43: ordering proposal sections by `section_number` (string sort → scrambled numbering)
+`ORDER BY section_number` string-sorts, so "10".."14" land before "2" and unnumbered sections
+(Abstract, letters) drift — the "numbering is fucked up" symptom the customer saw. Fixed sprint
+2026-08-02: a real integer `proposal_sections.sort_index` (mig 143, backfilled + indexed).
+
+**Rule:** EVERY query that lists sections for display/export/assembly MUST
+`ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number` — never `section_number`
+alone. Sites already fixed: workspace `page.tsx`, detail `route.ts`, `review/page.tsx`, per-volume
+`artifacts/[id]/export` + `/layout`, `package/route.ts` (all formats), `proposal-advance.ts`. The
+`section_number` column stays a display label ('' for Abstract/letters); the sort key is `sort_index`.
+
+### Mistake 44: reaching for tools that AREN'T installed to make/inspect a PDF
+No `pdftoppm`/`pdftotext`/`pandoc`/`pdftk`/`gs`/`qpdf`, no python `markdown`, no `marked`. What IS
+here: `soffice`, `sharp` (SVG→PNG), `@napi-rs/canvas`, `pdfjs-dist` v5 (`legacy/build/pdf.mjs`),
+Chromium at `/opt/pw-browsers`.
+
+**Rule:** Whole-proposal docx/pdf = dogfood `POST /api/portal/<slug>/proposals/<id>/package?format=docx|pdf|zip`
+(proposal must be locked/submitted; docx & pdf share the combined-CanvasDocument assembly). Inspect a
+PDF by rasterizing with pdfjs + `@napi-rs/canvas`; markdown→PDF via Chromium `setContent`+`pdf()` with
+images inlined as `data:` URIs. Full recipes: docs/CONTINUATION.md §2.
+
+### Mistake 45: an early-returning format/mode branch bypasses the route's shared audit-emit
+`package/route.ts` `format=zip` returned the whole native-format download from a branch that `return`s
+BEFORE the route's single `emitEventStart` (+ `proposal_activity_log` + `download_count`) at the bottom —
+so the zip left NO `system_events` / activity / download trail while its json/docx/pdf siblings all did.
+Fixed 2026-08-02 (the branch now emits start + closes it end/error on every return); swept in
+docs/EVENT_AUDIT_2026-08-02.md.
+
+**Rule:** every state-changing / deliverable-producing action MUST leave an auditable record —
+`system_events` (via `emitEventStart`/`End`/`Single`) and/or a domain log (`proposal_activity_log`,
+`agent_task_log`, `triage_actions`, `download_count`). When a route has an EARLY-RETURNING branch (a format,
+a mode, a fast path), emit **inside** that branch on every return — don't rely on the shared emit at the
+bottom it skips. Prefer ONE canonical emission helper both callers funnel through (e.g.
+`lib/proposal-full-draft.ts::requestFullDraft` — portal + admin doorbell, `source` distinguishes them) so
+the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='tool') + `/admin/events`
+(all namespaces) are the read surfaces.
+
 ---
 
 ## 1b. Schema additions — the opportunity spine (migs 088–092)
@@ -1301,6 +1441,25 @@ wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate t
 - **`tasks`** (mig 053): now also written by HUMAN delegation (`createTask`, `process_instance_id` NULL → completeTask
   closes without resume) + date-anchored generation (`_sweep_date_anchored_tasks`, `task_type='final_due'`). `params.kind`
   (`upload|form|review`) selects the typed completer.
+
+## 1c. Schema additions — V1 wiring + universal archive (migs 145–148)
+- **`notification_read_state`** (mig 145): `(user_id, tenant_id, last_read_at, updated_at)` PK `(user_id, tenant_id)`.
+  Per-user notification read WATERMARK — a notification (derived from `system_events`) is read iff
+  `created_at <= last_read_at`. `POST /api/portal/<slug>/notifications` marks all read; the bell derives `is_read`.
+- **`solicitation_amendments`** (mig 146): `(id, solicitation_id, label, summary, compliance_delta JSONB, severity
+  CHECK(critical|major|minor|info), source CHECK(manual|amendment_monitor), status CHECK(detected|confirmed|dismissed),
+  detected_by, reviewed_by, …)`. The amendment fan-out engine's record. + **`proposal_amendment_flags`** `(id,
+  amendment_id, proposal_id, tenant_id, acknowledged_by, acknowledged_at)` UNIQUE `(amendment_id, proposal_id)` —
+  confirm→fan-out inserts one per proposal built from the solicitation; the tenant acknowledges. Events:
+  `finder:amendment.detected/confirmed/dismissed`, `capture:amendment.flagged` (per tenant), `proposal:amendment.acknowledged`.
+- **archive `archived_at TIMESTAMPTZ`** — SOFT, reversible, sort/visibility only; NEVER a delete (S3 cold-storage is a
+  future sweep). Added to `proposals` (mig 147; archive cascades → its `process_instances` by tenant+opportunity),
+  `process_instances` + `library_atoms` + `contracts` (mig 148; `tenant_opportunity_cards` got it too but is NOT
+  archivable — reverted). Every ACTIVE-view query on these carries `AND archived_at IS NULL`. Archive ACTIONS live ONLY on
+  portals (proposals → cascade workflows), library atoms/foundational docs (per-item → excluded from library + draft
+  selection; copied-forward, no cascade), tenants (rfp_admin → cascade workflows). **Workflows cascade-only** — no archive
+  of their own. docs/ARCHIVABLE_CONTRACT.md. Events `proposal:proposal.archived/.restored`, `library:atom.archived/.restored`,
+  `system:workflow.archived` (cascade), `finder:tenant.archived/.restored`.
 
 ## 3b. Event namespaces — spine additions
 - `proposal:project.collaboration_requested:single` — launches the generic `ProjectCollaboration` HITL reaction (the

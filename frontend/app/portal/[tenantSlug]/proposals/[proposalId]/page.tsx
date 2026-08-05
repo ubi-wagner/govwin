@@ -4,6 +4,9 @@ import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/d
 import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
+import ProposalStudio from '@/components/portal/proposal-studio';
+import { AmendmentBanner } from '@/components/portal/amendment-banner';
+import { ArchivePortalButton } from '@/components/portal/archive-portal-button';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
 import { AssignTaskForm } from '@/components/tasks/assign-task-form';
@@ -526,6 +529,23 @@ export default async function ProposalWorkspacePage({ params }: Props) {
             />
           </div>
         </details>
+      )}
+
+      {/* Amendment fan-out banner — self-hides when there are no unacknowledged flags. */}
+      <AmendmentBanner tenantSlug={tenantSlug} proposalId={proposalId} canAcknowledge={access.role === 'admin'} />
+
+      {/* Archive the whole portal (admins) — cascades its workflows; reversible, nothing deleted. */}
+      {access.role === 'admin' && proposal.stage !== 'archived' && (
+        <div className="flex justify-end mb-4">
+          <ArchivePortalButton tenantSlug={tenantSlug} proposalId={proposalId} />
+        </div>
+      )}
+
+      {/* ── Proposal Studio — 3-phase gated draft→refine→compliance (admins) ── */}
+      {access.role === 'admin' && (
+        <div className="mb-6">
+          <ProposalStudio tenantSlug={tenantSlug} proposalId={proposalId} />
+        </div>
       )}
 
       {/* ── Workspace Client Component ────────────────────────────────── */}

@@ -4,7 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 import { resolveGatePolicy } from '@/lib/automation/policy';
@@ -192,6 +192,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       const updateResult = await tx`
         UPDATE proposals
         SET stage = 'archived',
+            archived_at = now(),
             version = version + 1,
             updated_at = now()
         WHERE id = ${proposalId}
@@ -201,6 +202,17 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       if (updateResult.count === 0) {
         throw new Error('CONFLICT');
+      }
+
+      // Archiving the proposal cascades its BUILD workflow instances (ARCHIVABLE_CONTRACT). Scope to the
+      // build spine — never a co-active discovery ('spotlight') or the awarded-path 'contract' kickoff
+      // (which, for outcome='awarded', is launched AFTER this transaction on the same opportunity).
+      if (proposal.opportunityId) {
+        await tx`
+          UPDATE process_instances SET archived_at = now()
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${proposal.opportunityId}::uuid AND archived_at IS NULL
+            AND (scope IS NULL OR scope NOT IN ('spotlight', 'contract'))
+        `;
       }
 
       // Record in stage history with outcome details
@@ -288,6 +300,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── R6 (V2): a WIN seeds a contract on the SAME opportunity_id and launches
     //    a contract-scope ProjectCollaboration kickoff gate — the spine, one scope
     //    deeper. Idempotent (one contract per winning proposal); non-fatal.
+    let contractStarted: { contractId: string; kickoffLaunched: boolean } | null = null;
     if (outcome === 'awarded') {
       try {
         let contractId: string | null = null;
@@ -308,6 +321,16 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
 
         if (contractId) {
+          // Audit the contract-entity creation itself (the V1→V2 arc) — customer-facing, so
+          // capture namespace with the tenant. The kickoff gate posts its own process events.
+          await emitEventSingle({
+            namespace: 'capture',
+            type: 'contract.started',
+            actor: userActor(sessionUser.id, sessionUser.email),
+            tenantId,
+            payload: { contractId, proposalId, opportunityId: proposal.opportunityId, title: `Contract: ${proposal.title}` },
+          });
+          let kickoffLaunched = false;
           // #190: tenant-side kickoff gate — fully tenant-tunable (not SLA-pinned).
           const pol = await resolveGatePolicy({
             tenantId,
@@ -331,8 +354,11 @@ export async function POST(request: Request, ctx: RouteContext) {
             });
             if (!launch.ok) {
               console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+            } else {
+              kickoffLaunched = true;
             }
           }
+          contractStarted = { contractId, kickoffLaunched };
         }
       } catch (contractErr) {
         console.error('[proposals/outcome] contract seed failed (non-fatal):', contractErr);
@@ -360,6 +386,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         outcome,
         atomsUpdated,
         stage: 'archived',
+        contractStarted,
       },
     });
   } catch (e) {

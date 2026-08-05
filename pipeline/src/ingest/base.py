@@ -255,10 +255,13 @@ class BaseIngester(ABC):
                                    classification_code, set_aside_type,
                                    program_type, close_date, posted_date,
                                    estimated_value_min, estimated_value_max,
-                                   description, content_hash, is_active)
+                                   description, content_hash,
+                                   topic_number, topic_branch, topic_status,
+                                   tech_focus_areas, topic_metadata, is_active)
                                 VALUES
                                   ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-                                   $10, $11, $12, $13, $14, $15, $16, true)
+                                   $10, $11, $12, $13, $14, $15, $16,
+                                   $17, $18, $19, $20, $21::jsonb, true)
                                 ON CONFLICT (source, source_id) DO UPDATE SET
                                   title = EXCLUDED.title,
                                   agency = EXCLUDED.agency,
@@ -274,6 +277,11 @@ class BaseIngester(ABC):
                                   estimated_value_max = EXCLUDED.estimated_value_max,
                                   description = EXCLUDED.description,
                                   content_hash = EXCLUDED.content_hash,
+                                  topic_number = EXCLUDED.topic_number,
+                                  topic_branch = EXCLUDED.topic_branch,
+                                  topic_status = EXCLUDED.topic_status,
+                                  tech_focus_areas = EXCLUDED.tech_focus_areas,
+                                  topic_metadata = EXCLUDED.topic_metadata,
                                   updated_at = now()
                                 WHERE opportunities.content_hash != EXCLUDED.content_hash
                                 RETURNING id, (xmax = 0) AS was_insert
@@ -294,6 +302,16 @@ class BaseIngester(ABC):
                                 row.get("estimated_value_max"),
                                 (row.get("description") or "")[:50000],
                                 row.get("content_hash"),
+                                # Topic-level columns (013) that both DSIP + SBIR.gov
+                                # normalize populate but the INSERT previously dropped —
+                                # so topic_number/branch/status never persisted. Fallbacks
+                                # honor the column defaults (tech_focus_areas/topic_metadata
+                                # are NOT NULL; topic_status defaults 'open' + is CHECK-bound).
+                                row.get("topic_number"),
+                                row.get("topic_branch"),
+                                row.get("topic_status") or "open",
+                                row.get("tech_focus_areas") or [],
+                                json.dumps(row.get("topic_metadata") or {}),
                             )
 
                             if upsert_row is None:

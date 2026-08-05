@@ -95,6 +95,12 @@
         {
           "t": "Your edits save to the shared draft. The section owner reviews and, when it’s right, <b>Accepts &amp; Locks</b> it — that’s an admin action; your job is to get the content right and save."
         }
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "If the agency <b>amends</b> the solicitation, an amber banner appears at the top of the workspace with the change. You can read it (and expand the compliance delta), but <b>only a company admin can acknowledge</b> it — “An admin must acknowledge these changes.” Re-check any section you’re drafting against the change."
+        }
       ]
     },
     {

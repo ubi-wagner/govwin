@@ -63,6 +63,8 @@ EXPECTED_ARCHETYPES = {
     # POD 4 (#130-131) — our-org RFP-admin ops
     "curation_qa",
     "ops_digest",
+    # Admin-agent Phase 1 — ingest-pipeline orchestration manager (docs/ADMIN_AGENT_DESIGN.md)
+    "rfp_ingest_manager",
     # Our-org CMS — content generation + social curation/scheduling
     "content_generator",
     "content_curator",
