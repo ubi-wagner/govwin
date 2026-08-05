@@ -1,5 +1,4 @@
-# Deploy baseline 2026-06-14 — touch to exercise the pipeline service build/deploy
-# (also ships the content_pages AI repoint). No behavior change.
+# Deploy checkpoint 2026-08-05 — full redeploy checkpoint (all 3 services + both DBs). Touches the pipeline service build/deploy. No behavior change.
 """
 RFP Pipeline — Main Worker Process (v2.1)
 
