@@ -34,9 +34,13 @@ async def health_check():
         pass
 
     import os
+    sha = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'dev')[:7]
     return {
         'status': 'ok',
         'service': 'cms',
+        # Deployed build, for cross-service alignment checks (deploy-verify.yml).
+        'version': sha,
+        'release': os.getenv('APP_RELEASE') or sha,
         'database': db_status,
         'pending_generations': pending_gens,
         'anthropic_key_set': bool(os.getenv('ANTHROPIC_API_KEY')),
