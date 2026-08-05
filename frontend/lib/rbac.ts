@@ -11,6 +11,7 @@
 export const ROLES = [
   'master_admin',
   'rfp_admin',
+  'partner_admin',
   'tenant_admin',
   'tenant_user',
   'partner_user',
@@ -20,6 +21,10 @@ export type Role = (typeof ROLES)[number];
 const ROLE_RANK: Record<Role, number> = {
   master_admin: 100,
   rfp_admin: 80,
+  // EconDev partner-admin: owner-scoped. Deliberately BELOW rfp_admin (80) so it never
+  // satisfies the /admin god-view guard (fail-closed); it reaches only the owner-scoped
+  // /partner surface + tenant portals it holds a membership on. See docs/ECONDEV_PARTNER_ADMIN.md.
+  partner_admin: 50,
   tenant_admin: 60,
   tenant_user: 40,
   partner_user: 20,
@@ -51,6 +56,16 @@ export function isMasterAdmin(role: Role): boolean {
 
 export function canManageTenant(role: Role): boolean {
   return hasRoleAtLeast(role, 'tenant_admin');
+}
+
+/**
+ * EconDev partner-admin: an owner-scoped platform role that runs a stable of client
+ * companies as tenants. NOT a global operator — it can only see/manage tenants it owns
+ * (tenants.owner_id) via the /partner surface, and build inside them through a
+ * tenant_admin membership. rfp_admin+ also qualify (platform operators oversee everything).
+ */
+export function canManagePartnerTenants(role: Role): boolean {
+  return role === 'partner_admin' || hasRoleAtLeast(role, 'rfp_admin');
 }
 
 /**
@@ -127,6 +142,9 @@ const PATH_MIN_ROLE: Array<{ prefix: string; role: Role }> = [
   { prefix: '/api/admin/system', role: 'master_admin' },
   { prefix: '/admin', role: 'rfp_admin' },
   { prefix: '/api/admin', role: 'rfp_admin' },
+  // EconDev partner-admin surface (owner-scoped; handlers re-check owner_id + canManagePartnerTenants).
+  { prefix: '/partner', role: 'partner_admin' },
+  { prefix: '/api/partner', role: 'partner_admin' },
   { prefix: '/portal', role: 'partner_user' },
   { prefix: '/api/portal', role: 'partner_user' },
   { prefix: '/dashboard', role: 'tenant_user' },
