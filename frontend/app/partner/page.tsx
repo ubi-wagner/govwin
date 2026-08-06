@@ -69,7 +69,7 @@ export default async function PartnerHome() {
                   <td style={{ padding: '8px 6px', color: '#555' }}>{t.status}</td>
                   <td style={{ padding: '8px 6px', color: '#555' }}>{t.proposalCount}</td>
                   <td style={{ padding: '8px 6px' }}>
-                    <Link href={`/portal/${t.slug}`} style={{ color: '#1a4a8a', fontWeight: 600 }}>Open workspace →</Link>
+                    <Link href={`/portal/${t.slug}/dashboard`} style={{ color: '#1a4a8a', fontWeight: 600 }}>Open workspace →</Link>
                   </td>
                 </tr>
               ))}
