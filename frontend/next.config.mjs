@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Deploy baseline 2026-06-14 — touch to exercise the frontend build/deploy + main-DB migration runner. No behavior change.
+// Deploy checkpoint 2026-08-05 — full redeploy checkpoint (all 3 services + both DBs). Touches the frontend build/deploy + main-DB migration runner. No behavior change.
 
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },

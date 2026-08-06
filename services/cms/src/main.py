@@ -1,3 +1,4 @@
+# Deploy checkpoint 2026-08-05 — full redeploy checkpoint (all 3 services + both DBs). Touches the CMS service build/deploy. No behavior change.
 """
 CMS-CRM Service — email automation, content management, event-driven actions.
 
