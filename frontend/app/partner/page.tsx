@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { sqlBypass as sql, enterBypass } from '@/lib/db';
 import CreateCompanyForm from './create-company-form';
+import PartnerGuide from './partner-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,8 @@ export default async function PartnerHome() {
         pipeline, and a starter library already provisioned (no checkout). Open one to staff it and
         build proposals.
       </p>
+
+      <PartnerGuide />
 
       <CreateCompanyForm />
 
