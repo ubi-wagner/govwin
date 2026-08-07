@@ -180,6 +180,10 @@ export function getLandingPath(
   if (role === 'master_admin' || role === 'rfp_admin') {
     return '/admin/dashboard';
   }
+  // Partner-managers land on their console (their org + stable), not a single portal.
+  if (role === 'partner_admin') {
+    return '/partner';
+  }
   if (tenantSlug) {
     // Partner users land on the proposals list (restricted sidebar);
     // tenant admins and tenant users land on the dashboard.

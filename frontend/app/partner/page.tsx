@@ -19,8 +19,9 @@ import PartnerGuide from './partner-guide';
 export const dynamic = 'force-dynamic';
 
 function enterHref(slug: string): string {
-  // Reuse the tested descend path (pins the partner as tenant_admin where they hold a membership).
-  return `/api/enter?slug=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/portal/${slug}/dashboard`)}`;
+  // Partner-scoped descend: pins as tenant_admin, smooth hop between the partner's companies,
+  // and carries the base role so "Exit to console" can ascend (docs/PARTNER_MANAGER_DESIGN.md §3b).
+  return `/api/partner/enter?slug=${encodeURIComponent(slug)}`;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -34,9 +35,15 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export default async function PartnerConsole() {
   const session = await auth();
-  const u = session?.user as { id?: string; email?: string; role?: unknown; name?: string } | undefined;
+  const u = session?.user as { id?: string; email?: string; role?: unknown; name?: string; partnerHomeRole?: string | null } | undefined;
   const role = isRole(u?.role) ? u!.role : null;
-  if (!u?.id || !role || !canManagePartnerTenants(role)) redirect('/login');
+  if (!u?.id) redirect('/login');
+  if (!role || !canManagePartnerTenants(role)) {
+    // A partner who is still DESCENDED (session pinned to tenant_admin) landed on the console —
+    // ascend first, which restores partner_admin and returns here.
+    if (u?.partnerHomeRole === 'partner_admin') redirect('/api/partner/exit');
+    redirect('/login');
+  }
 
   const ownOrg = await partnerOwnOrg(u.id);
   // First-visit provisioning of the own org (idempotent, best-effort — never break the console).

@@ -58,6 +58,10 @@ export const authConfig: NextAuthConfig = {
         // never see it. Singular-session enforcement, see
         // docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
         token.membershipPinned = false;
+        // Set only while a partner-manager is DESCENDED into one of their companies
+        // (their real base role, so the portal chrome can offer "Exit to console" and
+        // the console can auto-ascend). Null when not descended. See PARTNER_MANAGER_DESIGN §3b.
+        token.partnerHomeRole = null;
       }
       // Membership selection: the /select-company server action calls unstable_update
       // to REWRITE the active company + role onto the token, so every downstream reader
@@ -71,6 +75,8 @@ export const authConfig: NextAuthConfig = {
           if (typeof su.role === 'string') token.role = su.role as Role;
           if ('tenantId' in su) token.tenantId = (su.tenantId as string | null) ?? null;
           if ('tenantSlug' in su) token.tenantSlug = (su.tenantSlug as string | null) ?? null;
+          // Partner descend sets this to the partner's real base role; ascend clears it (null).
+          if ('partnerHomeRole' in su) token.partnerHomeRole = (su.partnerHomeRole as string | null) ?? null;
           token.membershipPinned = true;
         }
       }
@@ -91,6 +97,9 @@ export const authConfig: NextAuthConfig = {
         // Whether this session has committed to a company (singular-session pin).
         (session.user as { membershipPinned?: boolean }).membershipPinned =
           (token.membershipPinned as boolean | undefined) ?? false;
+        // Set only while a partner-manager is descended into a company (their real base role).
+        (session.user as { partnerHomeRole?: string | null }).partnerHomeRole =
+          (token.partnerHomeRole as string | null | undefined) ?? null;
       }
       return session;
     },
