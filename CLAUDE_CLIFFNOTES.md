@@ -1461,6 +1461,27 @@ the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='
   of their own. docs/ARCHIVABLE_CONTRACT.md. Events `proposal:proposal.archived/.restored`, `library:atom.archived/.restored`,
   `system:workflow.archived` (cascade), `finder:tenant.archived/.restored`.
 
+## 1d. Schema additions — partner-manager actor (migs 158–161; docs/PARTNER_MANAGER_DESIGN.md)
+- **`user_memberships.source += 'partner_manager'`** (mig 158) — a partner holding tenant_admin on a
+  client company they manage (vs `home` for their own org). `partnerCanEnter` (descend gate) reads
+  `role='tenant_admin' AND source IN ('home','partner_manager')`; the team-page Managers list reads `source='partner_manager'`.
+- **`tenants.kind TEXT DEFAULT 'standard' CHECK('standard'|'partner_org')`** (mig 158) — `partner_org` = a
+  partner-manager's OWN org (owner_id=self); `standard` = client companies. `partnerScopeTenants` returns
+  owned/managed `standard`; `partnerOwnOrg` returns the `partner_org`.
+- **`applications.source TEXT DEFAULT 'public' CHECK('public'|'partner')`** (mig 158) + `metadata.partnerId` — a
+  partner-submitted registration. The accept route attributes ownership (owner_id + partner_manager membership)
+  when `source='partner'`; public accepts unchanged. GIN trgm index `idx_tenants_name_trgm` (add-company dedup precheck).
+- **Ownership backfills** (migs 159–161): mig 159 seeds the Entrepreneurs' Center as Paul's `partner_org`;
+  mig 160 backfills a `partner_manager` membership for partner-owned tenants missing it (owning ≠ access —
+  descend reads the membership); mig 161 normalizes legacy `collaborator` partner memberships to `partner_manager`.
+- **Session:** `partnerHomeRole` (auth.config jwt/session, additive) — set only while a partner is DESCENDED
+  (their real base role), so the portal chrome shows "Exit to console" with no per-render DB query.
+- **Routes:** `GET/POST /api/partner/tenants` (console list; POST retired→410), `POST /api/partner/tenants/precheck`,
+  `POST /api/partner/registrations`, `POST /api/partner/manager-requests`, `POST /api/portal/<slug>/manager-requests/<taskId>`
+  (approve/decline), `GET /api/partner/enter?slug`, `GET /api/partner/exit`. Events: `finder:partner.company_registered/
+  manager_requested/manager_granted/manager_declined/entered/exited`; ToDos `partner_registration_triage` (rfp_admin),
+  `manager_request` (company admin).
+
 ## 3b. Event namespaces — spine additions
 - `proposal:project.collaboration_requested:single` — launches the generic `ProjectCollaboration` HITL reaction (the
   ONLY consumer). Emitted by `launchProjectCollaboration` (create route + Stripe webhook bridges).

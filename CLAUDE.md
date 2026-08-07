@@ -111,6 +111,11 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 ## Roles
 - `master_admin`: Full system access, migrations, Railway management
 - `rfp_admin`: RFP triage/curation, customer onboarding, customer service
+- `partner_admin`: **Partner-manager** (EconDev, e.g. the Entrepreneurs' Center) — runs a stable of
+  client companies from the owner-scoped `/partner` console; is itself a higher-order `partner_org`
+  tenant. Rank 50 (below rfp_admin — NO `/admin` reach). New companies go through RFP-admin approval;
+  existing ones via a manager-request handshake; descends into any owned/managed company as
+  tenant_admin (Exit-to-console banner). Canonical: **docs/PARTNER_MANAGER_DESIGN.md**
 - `tenant_admin`: Manages their tenant, invites team, purchases proposals
 - `tenant_user`: Access per admin grant (all proposals or per-proposal)
 - `partner_user`: Stage-scoped access per proposal (view/comment/edit)
