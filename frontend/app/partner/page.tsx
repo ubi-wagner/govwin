@@ -13,7 +13,7 @@ import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { partnerOwnOrg, partnerScopeTenants } from '@/lib/partner/scope';
 import { tenantRollupStats, type TenantRollup } from '@/lib/partner/rollup';
 import { ensurePartnerOwnOrgProvisioned } from '@/lib/partner/own-org';
-import CreateCompanyForm from './create-company-form';
+import AddCompanyFlow from './add-company-flow';
 import PartnerGuide from './partner-guide';
 
 export const dynamic = 'force-dynamic';
@@ -90,7 +90,7 @@ export default async function PartnerConsole() {
       {/* ── Add a company ─────────────────────────────────────────────── */}
       <section className="mb-10">
         <h2 className="text-xs font-bold uppercase tracking-wide text-navy-400 mb-2">Add a company</h2>
-        <CreateCompanyForm />
+        <AddCompanyFlow />
       </section>
 
       {/* ── The stable ────────────────────────────────────────────────── */}

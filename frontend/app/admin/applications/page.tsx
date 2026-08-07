@@ -30,6 +30,7 @@ type ApplicationRow = {
   motivation: string | null;
   referralSource: string | null;
   status: string;
+  source: string | null;
   reviewedBy: string | null;
   reviewedAt: Date | null;
   reviewNotes: string | null;
@@ -87,6 +88,7 @@ export default async function ApplicationsPage() {
     motivation: r.motivation,
     referralSource: r.referralSource,
     status: r.status,
+    source: r.source,
     reviewedBy: r.reviewedBy,
     reviewedAt: r.reviewedAt?.toISOString() ?? null,
     reviewNotes: r.reviewNotes,

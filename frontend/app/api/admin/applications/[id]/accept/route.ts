@@ -59,8 +59,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       contactEmail: string;
       contactName: string;
       status: string;
+      source: string;
+      metadata: Record<string, unknown> | null;
     }[]>`
-      SELECT id, company_name, contact_email, contact_name, status
+      SELECT id, company_name, contact_email, contact_name, status, source, metadata
       FROM applications
       WHERE id = ${id}
       LIMIT 1
@@ -75,6 +77,15 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 409 },
       );
     }
+
+    // Partner registration (docs/PARTNER_MANAGER_DESIGN.md §4): a source='partner' application
+    // carries the submitting partner in metadata.partnerId. On accept we attribute ownership to
+    // that partner so the provisioned company lands in their stable. Public accepts have no
+    // partnerId and skip this path entirely.
+    const partnerId =
+      app.source === 'partner' && app.metadata && typeof app.metadata.partnerId === 'string'
+        ? (app.metadata.partnerId as string)
+        : null;
 
     // ── Start event for multi-step accept operation ────────────────
     eventId = await emitEventStart({
@@ -167,10 +178,42 @@ export async function POST(request: Request, ctx: RouteContext) {
         WHERE id = ${id}
       `;
 
-      return { tenantId, finalSlug, newUserId };
+      // Partner attribution: set owner + a partner_manager membership so the company joins the
+      // partner's stable. Validate the partner user exists first — tenants.owner_id has an FK, so
+      // a bad id would throw and roll back an otherwise-good accept (FK-before-write, CLIFFNOTES §4b).
+      let partnerAttributed = false;
+      if (partnerId) {
+        const [p] = await tsql`SELECT id FROM users WHERE id = ${partnerId}::uuid AND role = 'partner_admin' LIMIT 1`;
+        if (p) {
+          await tsql`UPDATE tenants SET owner_id = ${partnerId}::uuid WHERE id = ${tenantId}`;
+          await tsql`
+            INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+            VALUES (${partnerId}::uuid, ${tenantId}, 'tenant_admin', 'active', 'partner_manager', ${userId})
+            ON CONFLICT (user_id, tenant_id) DO UPDATE
+              SET status = 'active', role = 'tenant_admin', source = 'partner_manager'`;
+          partnerAttributed = true;
+        }
+      }
+
+      return { tenantId, finalSlug, newUserId, partnerAttributed };
     });
 
-    const { tenantId, finalSlug, newUserId } = result;
+    const { tenantId, finalSlug, newUserId, partnerAttributed } = result;
+
+    // Audit the partner attribution (the company joined the partner's stable). Best-effort.
+    if (partnerAttributed && partnerId) {
+      try {
+        await emitEventSingle({
+          namespace: 'finder',
+          type: 'partner.company_registered',
+          actor: userActor(userId, (session.user as { email?: string }).email),
+          tenantId,
+          payload: { tenantId, tenantSlug: finalSlug, partnerId, applicationId: id },
+        });
+      } catch (e) {
+        console.error('[api/admin/applications/accept] partner attribution event failed (non-fatal):', e);
+      }
+    }
 
     // Send welcome email with credentials. Post-commit + BEST-EFFORT: the tenant+user+membership
     // are already committed above, so an email-layer throw must NEVER 500 and swallow the temp
