@@ -19,6 +19,8 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { partnerOwnOrg, partnerScopeTenants } from '@/lib/partner/scope';
+import { tenantRollupStats } from '@/lib/partner/rollup';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -41,22 +43,25 @@ export async function GET() {
     const me = actor(await auth());
     if (!me) return NextResponse.json({ error: 'EconDev partner access required', code: 'FORBIDDEN' }, { status: 403 });
     enterBypass();
-    let tenants;
     try {
-      // Owner-scoped: a partner sees ONLY the tenants they own. (rfp_admin+ hitting this route
-      // likewise see only tenants they personally own — the global view lives at /admin.)
-      tenants = await sql`
-        SELECT t.id, t.slug, t.name, t.status, t.created_at,
-               (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
-               (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
-        FROM tenants t
-        WHERE t.owner_id = ${me.id}::uuid
-        ORDER BY t.created_at DESC`;
+      // The console model: the partner's OWN org + their STABLE (client companies they own or
+      // manage), each with rollup stats. Owner-scoped — a partner never sees another's stable.
+      const ownOrg = await partnerOwnOrg(me.id);
+      const stable = await partnerScopeTenants(me.id);
+      const rollup = await tenantRollupStats([...(ownOrg ? [ownOrg.id] : []), ...stable.map((t) => t.id)]);
+      const shape = (t: { id: string; slug: string; name: string; kind: string; relation: 'owner' | 'manager' }) => {
+        const s = rollup.get(t.id);
+        return {
+          id: t.id, slug: t.slug, name: t.name, kind: t.kind, relation: t.relation,
+          buckets: s?.buckets ?? 0, pins: s?.pins ?? 0, proposals: s?.proposals ?? 0,
+          portals: s?.portals ?? 0, adminPocEmail: s?.adminPocEmail ?? null, adminPocName: s?.adminPocName ?? null,
+        };
+      };
+      return NextResponse.json({ data: { ownOrg: ownOrg ? shape(ownOrg) : null, tenants: stable.map(shape) } });
     } catch (e) {
       console.error('[partner/tenants/list] error:', e);
       return NextResponse.json({ error: 'Query failed', code: 'DB_ERROR' }, { status: 500 });
     }
-    return NextResponse.json({ data: { tenants } });
   } catch (e) {
     console.error('[partner/tenants] GET error:', e);
     return NextResponse.json({ error: 'Internal error', code: 'INTERNAL_ERROR' }, { status: 500 });
