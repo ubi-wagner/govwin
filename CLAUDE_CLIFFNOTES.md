@@ -1461,7 +1461,7 @@ the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='
   of their own. docs/ARCHIVABLE_CONTRACT.md. Events `proposal:proposal.archived/.restored`, `library:atom.archived/.restored`,
   `system:workflow.archived` (cascade), `finder:tenant.archived/.restored`.
 
-## 1d. Schema additions — partner-manager actor (migs 158–161; docs/PARTNER_MANAGER_DESIGN.md)
+## 1d. Schema additions — partner-manager actor (migs 158–162; docs/PARTNER_MANAGER_DESIGN.md, V1_BASELINE.md)
 - **`user_memberships.source += 'partner_manager'`** (mig 158) — a partner holding tenant_admin on a
   client company they manage (vs `home` for their own org). `partnerCanEnter` (descend gate) reads
   `role='tenant_admin' AND source IN ('home','partner_manager')`; the team-page Managers list reads `source='partner_manager'`.

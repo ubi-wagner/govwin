@@ -160,6 +160,14 @@ V9's opportunity spine (the `opportunity_id` keying L0 master → L1 per-tenant 
 writing `tenant_pipeline_items`, but a **forward-only bridge** that replicates a thin, self-contained
 **card** to each tenant.
 
+**Partner‑managers** (`partner_admin`, e.g. the Entrepreneurs' Center, YBI) are a higher‑order actor
+over this spine: they run a **stable** of client tenants from the owner‑scoped `/partner` console,
+are themselves a `partner_org` tenant, and descend into any owned/managed tenant as its admin. New
+client companies route through **RFP‑admin approval** (reusing the `applications` accept path, which
+attributes ownership + **scores cards on arrival**); existing ones via a **manager‑request handshake**.
+No `/admin` reach (rank 50, fail‑closed). Canonical spec `docs/PARTNER_MANAGER_DESIGN.md`; manual
+`docs/PARTNER_MANAGER_MANUAL.md`; V1 verification record `docs/V1_BASELINE.md`.
+
 ```
 L0  opportunities (master, immutable key)              ─ admin-owned pool
          │  admin approval → solicitation.push
