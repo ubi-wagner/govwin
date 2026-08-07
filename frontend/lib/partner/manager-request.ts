@@ -9,6 +9,8 @@
 import { sqlBypass } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
+import { sendEmail } from '@/lib/email';
+import { managerRequestEmail } from '@/lib/email-templates';
 
 export type MRError = { ok: false; status: number; error: string; code: string };
 
@@ -23,8 +25,8 @@ export async function createManagerRequest(opts: {
   const { partner, tenantId } = opts;
   if (!tenantId) return { ok: false, status: 400, error: 'A company is required', code: 'VALIDATION_ERROR' };
 
-  const [t] = await sqlBypass<{ id: string; name: string; kind: string }[]>`
-    SELECT id, name, kind FROM tenants WHERE id = ${tenantId}::uuid AND archived_at IS NULL LIMIT 1`;
+  const [t] = await sqlBypass<{ id: string; name: string; kind: string; slug: string }[]>`
+    SELECT id, name, kind, slug FROM tenants WHERE id = ${tenantId}::uuid AND archived_at IS NULL LIMIT 1`;
   if (!t) return { ok: false, status: 404, error: 'Company not found', code: 'NOT_FOUND' };
   if (t.kind !== 'standard') return { ok: false, status: 400, error: 'Cannot request manager access on this organization', code: 'VALIDATION_ERROR' };
 
@@ -39,8 +41,8 @@ export async function createManagerRequest(opts: {
       AND status IN ('open', 'in_progress') AND (params->>'partnerId') = ${partner.id} LIMIT 1`;
   if (dup) return { ok: false, status: 409, error: 'You already have a pending request for this company', code: 'DUPLICATE_REQUEST' };
 
-  const [admin] = await sqlBypass<{ id: string }[]>`
-    SELECT u.id FROM user_memberships m JOIN users u ON u.id = m.user_id
+  const [admin] = await sqlBypass<{ id: string; email: string | null; name: string | null }[]>`
+    SELECT u.id, u.email, u.name FROM user_memberships m JOIN users u ON u.id = m.user_id
     WHERE m.tenant_id = ${tenantId}::uuid AND m.status = 'active'
       AND m.role = 'tenant_admin' AND m.source = 'home'
     ORDER BY m.created_at ASC LIMIT 1`;
@@ -67,6 +69,16 @@ export async function createManagerRequest(opts: {
       tenantId, payload: { tenantId, partnerId: partner.id, taskId: res.data.taskId, assignedTo: admin ? 'admin' : 'rfp_admin' },
     });
   } catch (e) { console.error('[partner/manager-request] event emit failed:', e); }
+
+  // Nudge the company admin by email too (not just the in-app ToDo). Best-effort.
+  if (admin?.email) {
+    try {
+      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const reviewUrl = `${base}/api/enter?slug=${encodeURIComponent(t.slug)}&next=${encodeURIComponent(`/portal/${t.slug}/team`)}`;
+      const content = managerRequestEmail({ adminName: admin.name, companyName: t.name, partnerOrg, reviewUrl });
+      await sendEmail({ to: admin.email, subject: content.subject, html: content.html });
+    } catch (e) { console.error('[partner/manager-request] admin email failed:', e); }
+  }
 
   return { ok: true, taskId: res.data.taskId, assignedTo: admin ? 'admin' : 'rfp_admin' };
 }
