@@ -162,3 +162,20 @@ Admin events `tenantId=null`; portal/tenant events carry the real tenant UUID (C
 3. **Reuse over rebuild:** provisioning = the accept route’s helper stack; grant = the team‑add
    membership insert; descend = the existing pin + tested tenant portal. New code is thin glue.
 4. **Nothing hard‑deleted:** manager removal revokes a membership (never‑delete); declines close tasks.
+
+## 9. Known behaviors (V1, verified)
+
+- **Manager requests resolve only via the Team page.** A `manager_request` ToDo is side‑effect‑bearing
+  (its approval *is* the grant), so `completeTask` (the generic ToDo completer) **refuses** it —
+  otherwise closing it in the normal ToDo list would silently drop the grant. It is resolved solely
+  through `POST /api/portal/<slug>/manager-requests/<taskId>` (`resolveManagerRequest`).
+- **Who can approve.** Approval requires `tenant_admin` of the company. A partner‑manager already
+  managing that company qualifies (they act as its tenant_admin) — so one partner can approve
+  another partner's request there. Acceptable: they are a consented manager of that company.
+- **Event namespace.** Partner‑lifecycle events (`partner.entered/exited/manager_*/company_*`) use the
+  `finder` namespace **with the affected tenant's id** — a deliberate hybrid: the partner is
+  platform‑scoped, but the event concerns a specific company. `.company_dedup_reviewed` fires on a
+  partner registration submit; `.company_registered` on the attributed accept.
+- **Ranked on arrival.** New companies are scored **synchronously** on provision
+  (`lib/cards/score-tenant.ts`), so `/cards` is ranked immediately — not dependent on the async
+  scoring workflow. (Legacy tenants created before this may show unranked until a rescore.)

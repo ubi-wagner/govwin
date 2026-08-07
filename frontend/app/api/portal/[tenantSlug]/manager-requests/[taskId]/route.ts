@@ -9,6 +9,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { resolveManagerRequest } from '@/lib/partner/manager-request';
+import { isValidUUID } from '@/lib/validation';
 
 interface Ctx { params: Promise<{ tenantSlug: string; taskId: string }> }
 
@@ -24,6 +25,7 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const { tenantSlug, taskId } = await ctx.params;
+    if (!isValidUUID(taskId)) return NextResponse.json({ error: 'Invalid request id', code: 'VALIDATION_ERROR' }, { status: 400 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Company not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;

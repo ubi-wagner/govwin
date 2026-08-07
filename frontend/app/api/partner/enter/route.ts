@@ -34,17 +34,22 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug')?.trim() ?? '';
   if (!slug) return NextResponse.redirect(url('/partner'));
 
-  const [t] = await sqlBypass<{ id: string }[]>`SELECT id FROM tenants WHERE slug = ${slug} AND archived_at IS NULL LIMIT 1`;
-  if (!t) return NextResponse.redirect(url('/partner'));
-  if (!(await partnerCanEnter(u.id, t.id))) return NextResponse.redirect(url('/partner'));
-
-  await unstable_update({
-    user: { role: 'tenant_admin', tenantId: t.id, tenantSlug: slug, partnerHomeRole: rr },
-  } as unknown as Parameters<typeof unstable_update>[0]);
-
   try {
-    await emitEventSingle({ namespace: 'finder', type: 'partner.entered', actor: userActor(u.id, u.email), tenantId: t.id, payload: { tenantId: t.id, slug } });
-  } catch { /* best-effort */ }
+    const [t] = await sqlBypass<{ id: string }[]>`SELECT id FROM tenants WHERE slug = ${slug} AND archived_at IS NULL LIMIT 1`;
+    if (!t) return NextResponse.redirect(url('/partner'));
+    if (!(await partnerCanEnter(u.id, t.id))) return NextResponse.redirect(url('/partner'));
 
-  return NextResponse.redirect(url(`/portal/${slug}/dashboard`));
+    await unstable_update({
+      user: { role: 'tenant_admin', tenantId: t.id, tenantSlug: slug, partnerHomeRole: rr },
+    } as unknown as Parameters<typeof unstable_update>[0]);
+
+    try {
+      await emitEventSingle({ namespace: 'finder', type: 'partner.entered', actor: userActor(u.id, u.email), tenantId: t.id, payload: { tenantId: t.id, slug } });
+    } catch { /* best-effort */ }
+
+    return NextResponse.redirect(url(`/portal/${slug}/dashboard`));
+  } catch (e) {
+    console.error('[partner/enter] failed:', e);
+    return NextResponse.redirect(url('/partner'));
+  }
 }

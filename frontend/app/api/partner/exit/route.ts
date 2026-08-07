@@ -27,14 +27,23 @@ export async function GET(req: NextRequest) {
   const rr = await realRole(u.id);
   if (!rr || !canManagePartnerTenants(rr)) return NextResponse.redirect(url('/login'));
 
-  const own = await partnerOwnOrg(u.id);
-  await unstable_update({
-    user: { role: rr, tenantId: own?.id ?? null, tenantSlug: own?.slug ?? null, partnerHomeRole: null },
-  } as unknown as Parameters<typeof unstable_update>[0]);
-
   try {
-    await emitEventSingle({ namespace: 'finder', type: 'partner.exited', actor: userActor(u.id, u.email), tenantId: null, payload: {} });
-  } catch { /* best-effort */ }
+    const own = await partnerOwnOrg(u.id);
+    await unstable_update({
+      user: { role: rr, tenantId: own?.id ?? null, tenantSlug: own?.slug ?? null, partnerHomeRole: null },
+    } as unknown as Parameters<typeof unstable_update>[0]);
 
-  return NextResponse.redirect(url('/partner'));
+    try {
+      await emitEventSingle({ namespace: 'finder', type: 'partner.exited', actor: userActor(u.id, u.email), tenantId: null, payload: {} });
+    } catch { /* best-effort */ }
+
+    return NextResponse.redirect(url('/partner'));
+  } catch (e) {
+    console.error('[partner/exit] failed:', e);
+    // Restore the base role even if the own-org lookup failed, so the partner isn't stuck descended.
+    try {
+      await unstable_update({ user: { role: rr, tenantId: null, tenantSlug: null, partnerHomeRole: null } } as unknown as Parameters<typeof unstable_update>[0]);
+    } catch { /* best-effort */ }
+    return NextResponse.redirect(url('/partner'));
+  }
 }

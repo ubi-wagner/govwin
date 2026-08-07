@@ -110,6 +110,16 @@ export async function submitPartnerRegistration(input: PartnerRegistrationInput)
       payload: { correlationId, applicationId, companyName, source: 'partner', partnerId: input.partner.id, dedupDecision: input.dedupDecision ?? 'clear' },
     });
   } catch (e) { console.error('[partner/registration] event emit failed:', e); }
+  // Audit the dedup-review decision (docs/PARTNER_MANAGER_DESIGN.md §6) — a partner submitting a new
+  // company either cleared the precheck or overrode a similar-name match ('confirmed_new').
+  try {
+    await emitEventSingle({
+      namespace: 'finder', type: 'partner.company_dedup_reviewed',
+      actor: userActor(input.partner.id, input.partner.email ?? undefined),
+      tenantId: null,
+      payload: { applicationId, companyName, partnerId: input.partner.id, decision: input.dedupDecision ?? 'clear', similarCount: pre.similar.length },
+    });
+  } catch (e) { console.error('[partner/registration] dedup event emit failed:', e); }
   try {
     await createTask({
       actor: { id: input.partner.id, email: input.partner.email ?? null, role: 'partner_admin', tenantId: null },

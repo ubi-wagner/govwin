@@ -173,6 +173,12 @@ export async function createTask(opts: {
   const nudgeDays = Array.isArray(opts.nudgeDays)
     ? opts.nudgeDays.filter((n) => typeof n === 'number' && Number.isFinite(n) && n > 0)
     : [];
+  // A declared nudge cadence only fires when the task has a due_at (the pipeline sweep skips
+  // due_at IS NULL, and the in-app queue's urgency is a no-op without it). If nudgeDays were given
+  // WITHOUT an explicit dueAt, derive one from the last nudge day so the cadence is actually live.
+  if (!dueAtIso && nudgeDays.length > 0) {
+    dueAtIso = new Date(Date.now() + Math.max(...nudgeDays) * 86_400_000).toISOString();
+  }
 
   // ── same-tenant assignee guard (a named user must belong to the task tenant) ──
   if (assigneeUserId) {
@@ -301,6 +307,15 @@ export async function completeTask(opts: {
     (task.assigneeUserId && task.assigneeUserId === actor.id);
   if (!isAssignee) {
     return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
+  }
+
+  // Side-effect-bearing, engine-external task types must be resolved through their OWN handler, not
+  // the generic completer (which only closes the row + resumes a parked workflow — granting nothing).
+  // A manager_request carries no process instance; closing it here would silently DROP the
+  // partner_manager grant. Route it to the company Team page's approve/decline
+  // (resolveManagerRequest). See docs/PARTNER_MANAGER_DESIGN.md §4B.
+  if (task.taskType === 'manager_request') {
+    return { ok: false, status: 409, error: 'Approve or decline this manager request from the company Team page.', code: 'USE_MANAGER_REQUEST_FLOW' };
   }
 
   // Close the task (guarded against a lost race).

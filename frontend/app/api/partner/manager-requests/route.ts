@@ -8,6 +8,7 @@ import { auth } from '@/auth';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { createManagerRequest } from '@/lib/partner/manager-request';
 import { partnerOwnOrg } from '@/lib/partner/scope';
+import { isValidUUID } from '@/lib/validation';
 
 function partnerActor(session: unknown): { id: string; email: string | null; name: string | null } | null {
   const u = (session as { user?: { id?: string; email?: string; name?: string; role?: unknown } } | null)?.user;
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     }
     const tenantId = typeof body.tenantId === 'string' ? body.tenantId.trim() : '';
     if (!tenantId) return NextResponse.json({ error: 'A company is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (!isValidUUID(tenantId)) return NextResponse.json({ error: 'Invalid company id', code: 'VALIDATION_ERROR' }, { status: 400 });
 
     // Identify the requester by their org name (nicer than the person's name in the company's ToDo).
     let orgName = me.name;
