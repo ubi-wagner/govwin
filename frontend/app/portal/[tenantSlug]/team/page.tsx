@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { TeamInviteForm } from '@/components/portal/team-invite-form';
 import { TeamMemberActions } from '@/components/portal/team-member-actions';
+import { ManagerRequestActions } from '@/components/portal/manager-request-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,6 +109,26 @@ export default async function TeamPage({ params }: Props) {
     console.error('[portal/team] collaborators query failed', e);
   }
 
+  // ── Managers (partner_manager memberships) + pending manager-access requests ──────
+  interface Manager { id: string; name: string | null; email: string; createdAt: Date }
+  interface MgrRequest { id: string; partnerOrg: string | null; partnerEmail: string | null; createdAt: Date }
+  let managers: Manager[] = [];
+  let mgrRequests: MgrRequest[] = [];
+  try {
+    managers = await sql<Manager[]>`
+      SELECT u.id, u.name, u.email, m.created_at
+      FROM user_memberships m JOIN users u ON u.id = m.user_id
+      WHERE m.tenant_id = ${tenantId} AND m.status = 'active' AND m.source = 'partner_manager'
+      ORDER BY m.created_at ASC`;
+  } catch (e) { console.error('[portal/team] managers query failed', e); }
+  try {
+    mgrRequests = await sql<MgrRequest[]>`
+      SELECT id, params->>'partnerOrg' AS partner_org, params->>'partnerEmail' AS partner_email, created_at
+      FROM tasks
+      WHERE task_type = 'manager_request' AND entity_id = ${tenantId} AND status IN ('open', 'in_progress')
+      ORDER BY created_at DESC`;
+  } catch (e) { console.error('[portal/team] manager requests query failed', e); }
+
   const basePath = `/portal/${tenantSlug}`;
   const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
   // Guards the role control: the last active admin can't be demoted.
@@ -129,6 +150,27 @@ export default async function TeamPage({ params }: Props) {
         <div className="mb-8">
           <TeamInviteForm tenantSlug={tenantSlug} />
         </div>
+      )}
+
+      {/* Manager access requests (admin only) */}
+      {isAdmin && mgrRequests.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold mb-1">Manager access requests</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            A partner has asked to manage this company. Approving grants them admin-level access to build here on your behalf.
+          </p>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 divide-y divide-amber-100">
+            {mgrRequests.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{r.partnerOrg ?? r.partnerEmail ?? 'A partner'}</p>
+                  {r.partnerEmail && <p className="text-xs text-gray-500">{r.partnerEmail}</p>}
+                </div>
+                <ManagerRequestActions tenantSlug={tenantSlug} taskId={r.id} />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Team Members */}
@@ -196,6 +238,36 @@ export default async function TeamPage({ params }: Props) {
           </div>
         )}
       </section>
+
+      {/* Managers (external partners with manager access) */}
+      {managers.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold mb-1">Managers</h2>
+          <p className="text-sm text-gray-500 mb-4">External partners who manage this company on your behalf.</p>
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Email</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Manager since</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {managers.map((m) => (
+                  <tr key={m.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{m.name ?? <span className="text-gray-400 italic">No name</span>}</td>
+                    <td className="px-4 py-3 text-gray-600">{m.email}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Proposal Collaborators */}
       <section>

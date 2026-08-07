@@ -39,15 +39,31 @@ export default function AddCompanyFlow() {
   const [claimedExisting, setClaimedExisting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [mgrBusy, setMgrBusy] = useState(false);
+  const [mgrDone, setMgrDone] = useState<string | null>(null);
 
   function close() {
     setOpen(false); setStep('id'); setName(''); setAdminName(''); setAdminEmail('');
     setPhone(''); setWebsite(''); setCompanyState(''); setDescription(''); setPartnerNotes('');
     setPrecheck(null); setClaimedExisting(false); setErr(null); setDedupDecision('clear');
+    setMgrBusy(false); setMgrDone(null);
+  }
+
+  async function requestManager(tenantId: string, companyName: string) {
+    setMgrBusy(true); setErr(null);
+    try {
+      const res = await fetch('/api/partner/manager-requests', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json?.error || `Request failed (${res.status})`); return; }
+      setMgrDone(companyName);
+    } catch { setErr('Network error'); } finally { setMgrBusy(false); }
   }
 
   async function doPrecheck(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setErr(null); setPrecheck(null); setClaimedExisting(false);
+    e.preventDefault(); setBusy(true); setErr(null); setPrecheck(null); setClaimedExisting(false); setMgrDone(null);
     try {
       const res = await fetch('/api/partner/tenants/precheck', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -157,11 +173,23 @@ export default function AddCompanyFlow() {
 
           {(precheck?.verdict === 'must_request_manager' || (precheck?.verdict === 'review_similar' && claimedExisting)) && existingMatch && (
             <div className="mt-4 border border-navy-200 bg-cream-50 rounded-lg p-4">
-              <p className="text-sm font-semibold text-navy-900 mb-1">“{existingMatch.name}” already exists on RFP Pipeline</p>
-              <p className="text-sm text-navy-600">
-                You can’t register it again. To add it to your stable, request <span className="font-semibold">manager access</span> —
-                the company’s admin approves, and it appears here. Manager requests open in the Manager step.
-              </p>
+              {mgrDone ? (
+                <p className="text-sm text-navy-700">
+                  <span className="font-semibold">Request sent.</span> {mgrDone}’s admin will review your manager-access
+                  request. Once approved, the company joins your stable.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-navy-900 mb-1">“{existingMatch.name}” already exists on RFP Pipeline</p>
+                  <p className="text-sm text-navy-600 mb-3">
+                    You can’t register it again. Request <span className="font-semibold">manager access</span> — the company’s
+                    admin approves, and it joins your stable.
+                  </p>
+                  <button type="button" disabled={mgrBusy} onClick={() => requestManager(existingMatch.id, existingMatch.name)} className={primaryBtn}>
+                    {mgrBusy ? 'Requesting…' : 'Request manager access →'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 

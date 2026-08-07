@@ -116,7 +116,9 @@ export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
             <option value="tenant_user">Contributor</option>
             <option value="tenant_admin">Admin</option>
             <option value="partner_user">External Partner</option>
+            <option value="manager">Manager (external partner org)</option>
           </select>
+          <p className="text-xs text-gray-400 mt-1">A Manager is an existing partner organization you grant admin-level access to build on your behalf.</p>
         </div>
         <button
           type="submit"
