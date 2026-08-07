@@ -13,6 +13,7 @@
 import { sqlBypass } from '@/lib/db';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { backfillTenant } from '@/lib/opportunity-bridge';
+import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { emitEventSingle, userActor } from '@/lib/events';
 
@@ -37,6 +38,7 @@ export async function ensurePartnerOwnOrgProvisioned(
 
   try { await seedDefaultBuckets(tenantId, userId); } catch (e) { console.error('[partner/own-org] seed buckets failed:', e); }
   try { await backfillTenant(tenantId); } catch (e) { console.error('[partner/own-org] backfill failed:', e); }
+  try { await scoreTenantCards(tenantId); } catch (e) { console.error('[partner/own-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(tenantId, { id: userId }); } catch (e) { console.error('[partner/own-org] starter-set copy failed:', e); }
   try {
     await emitEventSingle({

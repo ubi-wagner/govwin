@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
+import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
@@ -265,6 +266,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (backfillErr) {
       console.error('[api/admin/applications/accept] card backfill failed (non-fatal):', backfillErr);
+    }
+
+    // Score the backfilled cards against the seeded buckets SYNCHRONOUSLY so the fresh customer
+    // lands on a RANKED pipeline, not a flat list (the async OnCardApplied workflow also rescores,
+    // but that depends on the pipeline running). Best-effort — never fail the accept.
+    try { await scoreTenantCards(tenantId); } catch (scoreErr) {
+      console.error('[api/admin/applications/accept] card scoring failed (non-fatal):', scoreErr);
     }
 
     // "Keep + copy": eager-materialize the shared system-starter library into the new tenant's OWN

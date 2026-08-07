@@ -8,6 +8,7 @@
 import { sqlBypass } from '@/lib/db';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { backfillTenant } from '@/lib/opportunity-bridge';
+import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import bcrypt from 'bcryptjs';
@@ -90,6 +91,7 @@ export async function createPartnerOrg(input: CreatePartnerOrgInput): Promise<Cr
   // Provision the own org (best-effort — creation already committed).
   try { await seedDefaultBuckets(created.tenantId, created.userId); } catch (e) { console.error('[create-partner-org] seed buckets failed:', e); }
   try { await backfillTenant(created.tenantId); } catch (e) { console.error('[create-partner-org] backfill failed:', e); }
+  try { await scoreTenantCards(created.tenantId); } catch (e) { console.error('[create-partner-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(created.tenantId, { id: created.userId }); } catch (e) { console.error('[create-partner-org] starter copy failed:', e); }
   try {
     await emitEventSingle({
