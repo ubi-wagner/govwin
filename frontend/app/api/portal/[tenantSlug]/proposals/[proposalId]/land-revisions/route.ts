@@ -115,9 +115,15 @@ export async function POST(
     for (const [sectionId, canvas] of staged) {
       if (!isValidUUID(sectionId)) continue;
       try {
-        // Ownership: the section MUST belong to this proposal.
-        const [owned] = await sql<{ id: string }[]>`
-          SELECT id FROM proposal_sections WHERE id = ${sectionId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1
+        // Ownership + the section's CURRENT version. The landing must number by the same
+        // counter every canvas_versions writer uses (proposal_sections.version), then ADVANCE
+        // it — so a later human-save's archive (which snapshots at proposal_sections.version)
+        // never collides with this proposed row. Numbering at MAX(version_number)+1 WITHOUT
+        // advancing breaks the invariant `proposal_sections.version > MAX(version_number)` and
+        // silently drops the next save's archive (an undo/history content-loss risk — found via
+        // a live staging scenario, not the mocked unit tests).
+        const [owned] = await sql<{ id: string; version: number }[]>`
+          SELECT id, version FROM proposal_sections WHERE id = ${sectionId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1
         `;
         if (!owned) continue;
 
@@ -129,17 +135,20 @@ export async function POST(
         `;
         if (prior && JSON.stringify(coerceJsonb(prior.content, null)) === JSON.stringify(canvas)) continue;
 
-        const [{ next }] = await sql<{ next: number }[]>`
-          SELECT COALESCE(MAX(version_number), 0) + 1 AS next FROM canvas_versions WHERE section_id = ${sectionId}::uuid
-        `;
+        const v = owned.version;
         const { chars, words } = counts(canvas);
-        await sql`
+        const ins = await sql<{ versionNumber: number }[]>`
           INSERT INTO canvas_versions
             (section_id, version_number, content, snapshot_reason, source, created_by, char_count, word_count, edit_summary)
-          VALUES (${sectionId}::uuid, ${next}, ${sql.json(canvas as never)}, 'full_draft', 'ai_revision',
+          VALUES (${sectionId}::uuid, ${v}, ${sql.json(canvas as never)}, 'full_draft', 'ai_revision',
                   ${u.id}::uuid, ${chars}, ${words}, 'AI-proposed revision (full draft)')
           ON CONFLICT (section_id, version_number) DO NOTHING
+          RETURNING version_number
         `;
+        if (ins.length === 0) continue; // version slot already taken (race) — skip, don't advance
+        // Advance the section's version counter past the proposed row (compare-and-swap), so the
+        // next save archives into a free slot and the invariant holds. Content is untouched.
+        await sql`UPDATE proposal_sections SET version = version + 1 WHERE id = ${sectionId}::uuid AND version = ${v}`;
         landed.push(sectionId);
       } catch (e) {
         console.error('[land-revisions] landing section failed (skipped):', sectionId, e);

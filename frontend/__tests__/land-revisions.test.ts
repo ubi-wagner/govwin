@@ -79,16 +79,31 @@ describe('POST land-revisions', () => {
     setupAuth();
     sqlMock
       .mockResolvedValueOnce([{ stepResults: stepResultsWith(SECTION_ID, CANVAS) }]) // instance
-      .mockResolvedValueOnce([{ id: SECTION_ID }]) // ownership
+      .mockResolvedValueOnce([{ id: SECTION_ID, version: 5 }]) // ownership (+ current version)
       .mockResolvedValueOnce([])                    // prior ai_revision (none)
-      .mockResolvedValueOnce([{ next: 3 }])         // next version
-      .mockResolvedValueOnce([]);                   // INSERT
+      .mockResolvedValueOnce([{ versionNumber: 5 }]) // INSERT ... RETURNING (inserted)
+      .mockResolvedValueOnce([]);                    // UPDATE proposal_sections (advance counter)
     const res = await POST(req(), ctx());
     expect(res.status).toBe(200);
     const data = (await res.json()).data;
     expect(data.landed).toBe(1);
     expect(data.sections).toEqual([SECTION_ID]);
     expect(emitEventSingleMock).toHaveBeenCalledTimes(1);
+    // The version counter is advanced (INSERT RETURNING + UPDATE) — 5 sql calls total.
+    expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('does NOT land (or advance) when the version slot is already taken (race)', async () => {
+    setupAuth();
+    sqlMock
+      .mockResolvedValueOnce([{ stepResults: stepResultsWith(SECTION_ID, CANVAS) }]) // instance
+      .mockResolvedValueOnce([{ id: SECTION_ID, version: 5 }]) // ownership
+      .mockResolvedValueOnce([])                    // prior (none)
+      .mockResolvedValueOnce([]);                   // INSERT ... RETURNING → conflict (empty)
+    const data = (await (await POST(req(), ctx())).json()).data;
+    expect(data.landed).toBe(0);
+    expect(sqlMock).toHaveBeenCalledTimes(4); // no UPDATE (didn't advance)
+    expect(emitEventSingleMock).not.toHaveBeenCalled();
   });
 
   it('returns landed:0 with reason when there is no full-draft run', async () => {
@@ -120,7 +135,7 @@ describe('POST land-revisions', () => {
     setupAuth();
     sqlMock
       .mockResolvedValueOnce([{ stepResults: stepResultsWith(SECTION_ID, CANVAS) }])
-      .mockResolvedValueOnce([{ id: SECTION_ID }])   // ownership
+      .mockResolvedValueOnce([{ id: SECTION_ID, version: 5 }]) // ownership
       .mockResolvedValueOnce([{ content: CANVAS }]); // prior matches → skip
     const data = (await (await POST(req(), ctx())).json()).data;
     expect(data.landed).toBe(0);
