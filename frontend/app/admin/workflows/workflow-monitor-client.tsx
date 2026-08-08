@@ -392,7 +392,7 @@ export function WorkflowMonitorClient({
         </select>
         <label className="text-xs font-medium text-gray-500 uppercase ml-2">Source</label>
         <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-          {['all', 'portal', 'pipeline', 'cms'].map((s) => <option key={s} value={s}>{s}</option>)}
+          {['all', 'pipeline', 'cms'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="search workflow…" className="border border-gray-300 rounded px-2 py-1 text-sm bg-white w-44 ml-2" />
         <label className="text-xs font-medium text-gray-500 uppercase ml-2">Sort</label>
