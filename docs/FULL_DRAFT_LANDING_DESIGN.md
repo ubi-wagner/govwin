@@ -86,3 +86,54 @@ Add the `land_ai_revisions` node to the Mode A/B/C shapes in
 ## Lift
 Pipeline action + 3 workflow wirings + shapes update + tests ≈ **M–L**, gated on the two-service test
 env for green verification. Build as a focused piece, not a session-tail rush.
+
+---
+
+## ⚠️ UPDATE 2026-08-08 — the pipeline-ACTION approach is ARCHITECTURALLY BLOCKED
+
+I built the `land_ai_revisions` ACTION above and wired it into Mode A/B/C. The **engine's own
+invariants (verified by its test suite) reject it** — and correctly so. Two invariants combine to
+make it structurally impossible for a pipeline ACTION to consume an agent's staged output:
+
+1. **no-dead-end** (`test_workflow_no_deadend_emission.py`): a non-AI_INVOKE step must **never**
+   `depends_on` an AI_INVOKE agent — *"an advisory agent must never gate a hard step"* (an agent can
+   skip/fail; a hard step behind it would strand).
+2. **input-map-ancestor** (`Workflow.validate()`): an `input_map` that references `step.X.result`
+   requires **X to be a transitive `depends_on` ancestor** — *"its result may not be ready"* otherwise.
+
+Together: to READ `step.reformat.result` an ACTION must depend on `reformat` (inv 2), but `reformat`
+is an AI_INVOKE, so depending on it violates inv 1. **An ACTION therefore cannot legally read an
+agent step's result.** The moat is deliberately preventing a deterministic step from consuming
+advisory agent output. (A direct `SELECT step_results` from within the action doesn't help either —
+the action isn't handed its own `instance_id`, and mid-workflow `step_results` may be incomplete.)
+
+**The `land_ai_revisions` ACTION + its wiring + tests were reverted** (they fail `validate()` + 3
+suite tests; shipping them would break the boot invariant). The pipeline is back to green baseline.
+
+### The correct architecture — FRONTEND read-on-review (recommended)
+
+The invariant-clean landing lives **outside the pipeline**, human-triggered:
+
+- A frontend route `POST /api/portal/[slug]/proposals/[p]/land-proposed-revisions` (tenant_admin+)
+  reads the proposal's latest `OnFullDraftRequested%` `process_instances.step_results`, recursively
+  scans for the staged `{section_id, canvas, source:'ai_revision'}` shapes (the exact nesting is
+  `result → result → tool_results[] → output`), validates each section belongs to the proposal, and
+  writes a **proposed** `canvas_versions` row (`source='ai_revision'`) per section — reusing the
+  existing version-write path. The existing version-history UI already surfaces + restores
+  `ai_revision` rows, so review needs no new surface.
+- Trigger: a button on the proposal workspace ("Apply AI-proposed revisions", shown when a completed
+  full-draft instance has staged output), or land-on-open of the Mode A/B/C review TODO.
+- **Why this is clean:** nothing in the pipeline consumes agent output (invariants untouched); the
+  landing is human-initiated (the strongest advisory posture); fully vitest-verifiable with synthetic
+  `step_results` (no live LLM/DB needed). Est. **M** (route + extract + a UI trigger + tests).
+
+### Alternative — agent-tool-lands (rejected)
+
+Make the formatter/stylist tool WRITE the proposed `canvas_versions` row itself and return
+`persisted:true`. Smaller, but it has the agent auto-write a business table — murky against the
+*"agents never auto-write business tables"* invariant (even for a proposed-only version). The
+frontend approach keeps that line bright; prefer it.
+
+**Net:** the naive "wire a landing step into the pipeline" is a dead end — the engine forbids it by
+design. Build the frontend read-on-review as a focused piece. (Save-side compliance — the other
+follow-on — shipped green: commit `7373c98`.)
