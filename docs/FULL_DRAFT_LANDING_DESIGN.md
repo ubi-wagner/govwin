@@ -1,10 +1,9 @@
 # Full-Draft Landing — design (the "land-or-review" step)
 
-**Status:** designed, not yet built. This is the one punchlist item that is a **cross-service
-architectural change** (pipeline + frontend) touching the **agent-write safety boundary**, so it
-is scoped here to be built + verified in the two-service env rather than rushed. Everything else in
-the 2026-08-08 quick-win pass (doc hygiene, canvas TOC/page-count, compliance-floor enforcement)
-shipped green.
+**Status:** ✅ **BUILT + live-verified** (2026-08-08, commit `b22a0fc`) — via the FRONTEND
+read-on-review approach. The obvious pipeline-ACTION approach was tried and **architecturally
+blocked** by the engine's invariants (see the UPDATE at the bottom); the working landing lives in
+the frontend, human-triggered. This doc records both the gap and why the naive fix fails.
 
 ## The gap (verified in code)
 
@@ -110,7 +109,7 @@ the action isn't handed its own `instance_id`, and mid-workflow `step_results` m
 **The `land_ai_revisions` ACTION + its wiring + tests were reverted** (they fail `validate()` + 3
 suite tests; shipping them would break the boot invariant). The pipeline is back to green baseline.
 
-### The correct architecture — FRONTEND read-on-review (recommended)
+### The correct architecture — FRONTEND read-on-review ✅ BUILT (commit `b22a0fc`)
 
 The invariant-clean landing lives **outside the pipeline**, human-triggered:
 
