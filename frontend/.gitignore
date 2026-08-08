@@ -8,3 +8,7 @@
 # These must never be tracked or committed.
 *.scratch.config.*
 e2e/screenshots/
+
+# Session-local scratch drive/verification scripts (underscore-prefixed, never committed)
+_*.mjs
+_*.ts
