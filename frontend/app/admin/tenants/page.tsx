@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { sqlBypass as sql } from '@/lib/db';
 import Link from 'next/link';
 import { NewCompanyForm } from '@/components/admin/new-company-form';
+import { CreatePartnerOrgForm } from '@/components/admin/create-partner-org-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +72,10 @@ export default async function TenantsPage() {
               : `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''} registered`}
           </p>
         </div>
-        <NewCompanyForm />
+        <div className="flex items-center gap-2">
+          <CreatePartnerOrgForm />
+          <NewCompanyForm />
+        </div>
       </header>
 
       {queryError ? (

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { rankBucket } from '@/lib/bucket-ranking';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
@@ -71,6 +72,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       tenantId: g.tenantId,
       payload: { tenantId: g.tenantId, bucketId: row.id, action: 'created', name: body.name },
     });
+    // Rank the new bucket SYNCHRONOUSLY so it shows a ranked list immediately (the async
+    // OnBucketsUpdated workflow above also rescores; this doesn't depend on the pipeline running).
+    try { await rankBucket(g.tenantId, row.id, Date.now()); } catch (e) { console.error('[portal/buckets] rank failed (non-fatal)', e); }
     return NextResponse.json({ data: { id: row.id } });
   } catch (err) {
     console.error('[portal/buckets] POST error', err);

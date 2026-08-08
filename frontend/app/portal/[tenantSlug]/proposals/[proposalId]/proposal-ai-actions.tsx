@@ -58,6 +58,7 @@ export function ProposalAiActions({
   const [adversarial, setAdversarial] = useState(false);
   const [adversarialPolicy, setAdversarialPolicy] = useState<'hitl' | 'auto'>('hitl');
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
+  const [landLoading, setLandLoading] = useState(false);
   const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -205,6 +206,42 @@ export function ProposalAiActions({
       setFullDraftLoading(false);
     }
   }, [canDraft, fullDraftLoading, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId]);
+
+  // Apply AI-proposed revisions — the read-on-review LANDING. The fabric never lands agent output
+  // and the workflow engine forbids a pipeline consumer (docs/FULL_DRAFT_LANDING_DESIGN.md), so the
+  // admin lands it here: read the latest full-draft run's staged canvases and write them as PROPOSED
+  // ai_revision versions in each section's history. Never touches live content — restore what you want.
+  const handleLandRevisions = useCallback(async () => {
+    if (!canDraft || landLoading) return;
+    setLandLoading(true);
+    setFullDraftMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/land-revisions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFullDraftMsg({ type: 'error', text: json.error || 'Failed to apply revisions' });
+      } else {
+        const n = json.data?.landed ?? 0;
+        const reason = json.data?.reason;
+        setFullDraftMsg({
+          type: 'success',
+          text:
+            n > 0
+              ? `Landed ${n} AI-proposed revision${n > 1 ? 's' : ''} — review + restore them in each section's version history.`
+              : reason === 'no_full_draft_run'
+                ? 'No full-draft run found yet — run a full draft first, then apply its revisions.'
+                : 'No new AI-proposed revisions to apply (already landed, or the run staged none yet).',
+        });
+        router.refresh();
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setLandLoading(false);
+    }
+  }, [canDraft, landLoading, tenantSlug, proposalId, router]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -491,18 +528,37 @@ export function ProposalAiActions({
           </fieldset>
         )}
 
-        <button
-          onClick={handleFullDraft}
-          disabled={!canDraft || fullDraftLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {fullDraftLoading ? (
-            <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
-          ) : (
-            <span className="text-indigo-400">&#x2726;</span>
-          )}
-          {fullDraftLoading ? 'Requesting…' : `Run full draft (Mode ${fullDraftMode.toUpperCase()})`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleFullDraft}
+            disabled={!canDraft || fullDraftLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {fullDraftLoading ? (
+              <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+            ) : (
+              <span className="text-indigo-400">&#x2726;</span>
+            )}
+            {fullDraftLoading ? 'Requesting…' : `Run full draft (Mode ${fullDraftMode.toUpperCase()})`}
+          </button>
+
+          {/* Read-on-review landing: after a full-draft run completes, land its staged AI
+              revisions as proposed versions in each section's history (review + restore). */}
+          <button
+            type="button"
+            onClick={handleLandRevisions}
+            disabled={!canDraft || landLoading}
+            title="Land the latest full-draft run's AI revisions as proposed versions in each section's history."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {landLoading ? (
+              <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+            ) : (
+              <span className="text-gray-400">&#x21A9;</span>
+            )}
+            {landLoading ? 'Applying…' : 'Apply AI-proposed revisions'}
+          </button>
+        </div>
         {isLocked && (
           <p className="text-xs text-amber-600 mt-2">
             This proposal is locked — unlock it to run a full draft.

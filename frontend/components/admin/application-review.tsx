@@ -56,6 +56,7 @@ export interface ApplicationItem {
   motivation: string | null;
   referralSource: string | null;
   status: string;
+  source?: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
   reviewNotes: string | null;
@@ -287,6 +288,11 @@ export function ApplicationReview({ applications }: Props) {
                     {app.companyName}
                   </span>
                   <StatusBadge status={app.status} />
+                  {app.source === 'partner' && (
+                    <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 whitespace-nowrap">
+                      Partner registration
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span>{app.contactName}</span>

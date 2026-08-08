@@ -36,7 +36,11 @@ export default async function PortalLayout({
     role?: unknown;
     tenantId?: string | null;
     membershipPinned?: boolean;
+    partnerHomeRole?: string | null;
   };
+  // A partner-manager descended into one of their companies (session pinned to tenant_admin, real
+  // base role carried on partnerHomeRole). Shows the "Exit to console" chrome. See PARTNER_MANAGER_DESIGN §3b.
+  const isDescendedPartner = sessionUser.partnerHomeRole === 'partner_admin';
 
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role) {
@@ -152,6 +156,12 @@ export default async function PortalLayout({
         </div>
       </>}
     >
+      {isDescendedPartner && (
+        <div className="bg-navy-900 text-white px-6 py-2 text-sm flex items-center justify-between gap-4">
+          <span>Managing <strong>{companyName}</strong> as a partner-manager.</span>
+          <a href="/api/partner/exit" className="underline hover:no-underline whitespace-nowrap">Exit to partner console →</a>
+        </div>
+      )}
       {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
       <div className="p-8">{children}</div>
     </NavShell>

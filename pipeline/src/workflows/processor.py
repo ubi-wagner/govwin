@@ -235,16 +235,17 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     # generic content drafting invocations
     "tool.proposal.draft_section": "section_drafter",
     "tool.proposal.review_color_team": "color_team_reviewer",
-    # production-integrity cohort (G1, greenfielded DORMANT — mapped so a future
-    # AI_INVOKE step validates at boot; no step references these yet, so inert):
+    # production-integrity cohort (G1 — now LIVE: reformat/restyle/check_continuity are
+    # referenced by OnFullDraftRequested{ModeB,ModeC} + Proposal Studio (Refine/Compliance)):
     #   formatter — per-section CanvasDocument v2 scaffold integrity + revectoring
     #   stylist   — style normalization across atom pedigrees (section/artifact)
     #   continuity_manager — phase-gate whole-proposal cross-artifact + RFP-alignment QA
     "tool.proposal.reformat_section": "formatter",
     "tool.proposal.restyle": "stylist",
     "tool.proposal.check_continuity": "continuity_manager",
-    # Proposal Draft Manager cohort (P1, greenfielded DORMANT — mapped so a future AI_INVOKE
-    # step validates at boot; no step references these yet, so inert):
+    # Proposal Draft Manager cohort (P1 — mostly LIVE: plan_draft/audit_traceability/scan_redaction
+    # are referenced by OnFullDraftRequested + Proposal Studio; market_analyst (analyze_sota) still
+    # awaits a producer step):
     #   proposal_manager     — PLANNER: skeleton + matrix + ranked atoms → a per-section draft plan
     #   traceability_auditor — requirement→coverage map (unaddressed + orphan content)
     #   redaction_guard      — cross-boundary / OPSEC leak scan over assembled content

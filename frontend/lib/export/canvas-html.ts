@@ -400,7 +400,9 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'spacer':
       return `<div style="height:${(node.style?.space_after ?? 12)}pt"></div>`;
     case 'toc':
-      return '';
+      // The document's TOC — a heading-list assembled once in renderCanvasBodyHtml
+      // and threaded through `vars` (mirrors the editor's TOC; was silently dropped).
+      return vars.__toc_html ?? '';
     default:
       return '';
   }
@@ -459,10 +461,50 @@ export function canvasBaseCss(doc: CanvasDocument): string {
  * in a page frame — the in-app preview does exactly this, while the PDF exporter
  * uses renderCanvasToHtml below. Pure; safe to run in the browser.
  */
+/** Collect heading nodes across the document (sections→groups→nodes, or flat nodes). */
+function collectDocHeadings(doc: CanvasDocument): { level: number; text: string; numbering?: string }[] {
+  const out: { level: number; text: string; numbering?: string }[] = [];
+  const scan = (nodes: CanvasNode[] | undefined) => {
+    for (const n of nodes ?? []) {
+      if (n.type === 'heading') {
+        const h = n.content as HeadingContent;
+        out.push({ level: Math.min(Math.max(h.level ?? 1, 1), 3), text: h.text, numbering: h.numbering });
+      }
+    }
+  };
+  if (doc.sections?.length) {
+    for (const s of doc.sections) for (const g of s.groups ?? []) scan(g.nodes);
+  } else {
+    scan(doc.nodes);
+  }
+  return out;
+}
+
+/** Build the table-of-contents HTML — mirrors the editor's TOC (title + indented,
+ *  numbering-prefixed, level-weighted heading list). Empty when there are no headings. */
+function buildTocHtml(doc: CanvasDocument, vars: Record<string, string>): string {
+  const headings = collectDocHeadings(doc);
+  if (!headings.length) return '';
+  const rows = headings
+    .map((h) => {
+      const weight =
+        h.level === 1 ? 'font-weight:600;color:#1f2937' : h.level === 2 ? 'font-weight:500;color:#374151' : 'color:#4b5563';
+      const num = h.numbering ? `<span style="color:#64748b">${esc(h.numbering)} </span>` : '';
+      return `<div style="margin-left:${(h.level - 1) * 20}pt;padding:2pt 0"><span style="${weight}">${num}${esc(subst(h.text, vars))}</span></div>`;
+    })
+    .join('');
+  return `<nav data-toc style="margin:4pt 0 14pt"><div style="font-size:9pt;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:6pt">Table of Contents</div>${rows}</nav>`;
+}
+
 export function renderCanvasBodyHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
+  // Assemble the TOC once (the per-node renderer can't see the whole doc) and thread it
+  // through `vars` so the 'toc' node renders it — in BOTH the PDF export and the in-app
+  // preview, which share this body renderer.
+  const toc = buildTocHtml(doc, variables);
+  const vars = toc ? { ...variables, __toc_html: toc } : variables;
   return doc.sections && doc.sections.length
-    ? renderSectionsToHtml(doc.sections, variables)
-    : (doc.nodes ?? []).map((n) => renderNode(n, variables)).join('\n');
+    ? renderSectionsToHtml(doc.sections, vars)
+    : (doc.nodes ?? []).map((n) => renderNode(n, vars)).join('\n');
 }
 
 export function renderCanvasToHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {

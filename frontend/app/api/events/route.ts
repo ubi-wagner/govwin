@@ -158,6 +158,15 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
+    // Type must be entity.action_past_tense (docs/EVENT_CONTRACT.md §3). The DB CHECKs enforce
+    // namespace/phase/actor_type but NOT type format, so guard it here — this is the one
+    // client-facing emit endpoint, so it's the one place a malformed type could reach the spine.
+    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(body.type)) {
+      return NextResponse.json(
+        { error: 'Invalid type — expected entity.action_past_tense (e.g. finder.tenant_created)', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
 
     // ── Insert event ─────────────────────────────────────────────
     try {

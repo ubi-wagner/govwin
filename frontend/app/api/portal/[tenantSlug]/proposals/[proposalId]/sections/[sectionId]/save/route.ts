@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { resolveUserAccess } from '@/lib/proposal-access';
+import { validateCanvasAgainstSpec, type ComplianceSpec, type CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -145,12 +146,15 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean }[]>`
-        SELECT id, version, status, title, content, completed_stage, completed_at, is_locked FROM proposal_sections
-        WHERE id = ${sectionId}
-          AND proposal_id = ${proposalId}
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null }[]>`
+        SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
+               pa.compliance_spec
+        FROM proposal_sections ps
+        LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
+        WHERE ps.id = ${sectionId}
+          AND ps.proposal_id = ${proposalId}
         LIMIT 1
       `;
     } catch (e) {
@@ -359,11 +363,26 @@ export async function PUT(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/sections/save] activity log failed', logErr);
     }
 
+    // Compliance floor (E4) — section-local checks (font / images) on the saved
+    // canvas, surfaced as NON-BLOCKING warnings. Whole-doc limits (pages, header/
+    // footer) are validated at the export gate, not per section-save.
+    let complianceWarnings: { code: string; message: string }[] = [];
+    if (section.complianceSpec) {
+      try {
+        complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, section.complianceSpec)
+          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed')
+          .map((v) => ({ code: v.code, message: v.message }));
+      } catch {
+        // advisory only — never fail a save on the compliance check
+      }
+    }
+
     return NextResponse.json({
       data: {
         sectionId,
         version: nextVersion,
         status: newStatus ?? section.status,
+        complianceWarnings,
       },
     });
   } catch (e) {

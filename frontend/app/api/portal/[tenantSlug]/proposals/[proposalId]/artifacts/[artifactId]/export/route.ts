@@ -18,6 +18,7 @@ import { isRole, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
+import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; artifactId: string }>;
@@ -67,11 +68,11 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Artifact + its sections ────────────────────────────────────────
-    let artifact: { id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean } | undefined;
+    let artifact: { id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean; complianceSpec: ComplianceSpec | null } | undefined;
     let sections: { title: string | null; content: string | null }[] = [];
     try {
-      [artifact] = await sql<{ id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean }[]>`
-        SELECT id, artifact_type, volume_name, is_locked FROM proposal_artifacts
+      [artifact] = await sql<{ id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean; complianceSpec: ComplianceSpec | null }[]>`
+        SELECT id, artifact_type, volume_name, is_locked, compliance_spec FROM proposal_artifacts
         WHERE id = ${artifactId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1
       `;
       if (artifact) {
@@ -102,6 +103,14 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── Assemble + resolve format + render ─────────────────────────────
     const title = artifact.volumeName || 'artifact';
     const assembled = assembleArtifactCanvas(sections, artifact.artifactType, title);
+
+    // Deterministic compliance floor (E4): record whether the exported artifact
+    // satisfies the ComplianceSpec frozen at purchase. Advisory — surfaced via the
+    // audit event + a response header, never a hard block (the page count is an
+    // estimate, so blocking a locked download on a heuristic would false-positive).
+    const violations = artifact.complianceSpec
+      ? validateCanvasAgainstSpec(assembled, artifact.complianceSpec)
+      : [];
     const requested = new URL(request.url).searchParams.get('format');
     const format = resolveArtifactFormat(artifact.artifactType, assembled.canvas?.format, requested);
     const vars: Record<string, string> = {
@@ -133,7 +142,11 @@ export async function GET(request: Request, ctx: RouteContext) {
       await emitEventSingle({
         namespace: 'proposal', type: 'artifact.exported',
         actor: userActor(su.id, su.email ?? undefined), tenantId,
-        payload: { proposalId, artifactId, format, title },
+        payload: {
+          proposalId, artifactId, format, title,
+          compliant: violations.length === 0,
+          complianceViolations: violations.map((v) => v.code),
+        },
       });
     } catch (e) {
       console.error('[artifacts/export] event emission failed (non-fatal):', e);
@@ -146,6 +159,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         'Content-Type': CONTENT_TYPE[format],
         'Content-Disposition': `attachment; filename="${safe}.${format}"`,
         'Content-Length': String(buffer.length),
+        'X-Compliance-Violations': String(violations.length),
       },
     });
   } catch (err) {

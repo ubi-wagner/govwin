@@ -649,6 +649,78 @@ export function docNodes(doc: CanvasDocument): CanvasNode[] {
   return doc.sections && doc.sections.length ? sectionsToNodes(doc.sections) : (doc.nodes ?? []);
 }
 
+/** One failed compliance limit — surfaced at save/export so a non-compliant volume
+ *  is caught before submission (not silently shipped). */
+export interface ComplianceViolation {
+  code:
+    | 'font_too_small'
+    | 'over_page_limit'
+    | 'image_not_allowed'
+    | 'missing_header'
+    | 'missing_footer';
+  message: string;
+  limit?: number | null;
+  actual?: number;
+}
+
+/**
+ * validateCanvasAgainstSpec — the deterministic compliance floor (E4): check a
+ * CanvasDocument against the ComplianceSpec frozen onto its artifact at purchase.
+ * Complements the AI compliance review with hard, cheap limits (font floor, page
+ * cap, header/footer, images). A `null` limit means "unconstrained". Pure — safe
+ * to call on save AND at the export gate. Returns [] when fully compliant.
+ */
+export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceSpec): ComplianceViolation[] {
+  const out: ComplianceViolation[] = [];
+  const defaultSize = doc.canvas?.font_default?.size ?? 12;
+
+  // Font floor — the smallest font on any text-bearing node (else the doc default).
+  if (spec.min_font_size != null) {
+    let smallest = defaultSize;
+    for (const n of docNodes(doc)) {
+      if (!getNodeText(n)) continue;
+      const size = (n.style as { size?: number } | undefined)?.size ?? defaultSize;
+      if (size < smallest) smallest = size;
+    }
+    if (smallest < spec.min_font_size) {
+      out.push({
+        code: 'font_too_small',
+        message: `Body font ${smallest}pt is below the ${spec.min_font_size}pt RFP minimum.`,
+        limit: spec.min_font_size,
+        actual: smallest,
+      });
+    }
+  }
+
+  // Page cap — the same estimator the editor gauge uses.
+  if (spec.max_pages != null) {
+    const pages = estimatePageCount(doc);
+    if (pages > spec.max_pages) {
+      out.push({
+        code: 'over_page_limit',
+        message: `Estimated ${pages} pages exceeds the ${spec.max_pages}-page limit.`,
+        limit: spec.max_pages,
+        actual: pages,
+      });
+    }
+  }
+
+  // Images/figures not permitted by the RFP.
+  if (spec.images_allowed === false && docNodes(doc).some((n) => n.type === 'image')) {
+    out.push({ code: 'image_not_allowed', message: 'This artifact does not permit images/figures.' });
+  }
+
+  // Required page furniture.
+  if (spec.header_required && !doc.canvas?.header) {
+    out.push({ code: 'missing_header', message: 'A page header is required but not configured.' });
+  }
+  if (spec.footer_required && !doc.canvas?.footer) {
+    out.push({ code: 'missing_footer', message: 'A page footer is required but not configured.' });
+  }
+
+  return out;
+}
+
 /**
  * Normalize any doc into a FLAT, editable v1 doc for the canvas editor (which
  * edits `nodes`). A v1 doc passes through untouched. A v2 doc flattens its

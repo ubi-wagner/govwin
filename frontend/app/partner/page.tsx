@@ -1,82 +1,142 @@
 /**
- * /partner — the EconDev partner's owner-scoped home ("My Companies").
- * Lists ONLY the tenants this partner owns (tenants.owner_id = me) and lets them create a new
- * one (auto-provisioned, no Stripe). Middleware gates /partner at partner_admin; this page
- * re-checks canManagePartnerTenants defensively. See docs/ECONDEV_PARTNER_ADMIN.md.
+ * /partner — the partner-manager console (docs/PARTNER_MANAGER_DESIGN.md §3a).
+ *
+ * A higher-order home: the partner's OWN org (kind='partner_org') shown up top, then their STABLE
+ * — one rollup stat card per client company they own or manage. Owner-scoped: reads only tenants
+ * the partner owns (tenants.owner_id) or manages (active partner_manager membership). Middleware
+ * gates /partner at partner_admin; this page re-checks canManagePartnerTenants defensively.
  */
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
-import { sqlBypass as sql, enterBypass } from '@/lib/db';
-import CreateCompanyForm from './create-company-form';
+import { partnerOwnOrg, partnerScopeTenants } from '@/lib/partner/scope';
+import { tenantRollupStats, type TenantRollup } from '@/lib/partner/rollup';
+import { ensurePartnerOwnOrgProvisioned } from '@/lib/partner/own-org';
+import AddCompanyFlow from './add-company-flow';
 import PartnerGuide from './partner-guide';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PartnerHome() {
-  const session = await auth();
-  const u = session?.user as { id?: string; role?: unknown; name?: string } | undefined;
-  const role = isRole(u?.role) ? u!.role : null;
-  if (!u?.id || !role || !canManagePartnerTenants(role)) redirect('/login');
+function enterHref(slug: string): string {
+  // Partner-scoped descend: pins as tenant_admin, smooth hop between the partner's companies,
+  // and carries the base role so "Exit to console" can ascend (docs/PARTNER_MANAGER_DESIGN.md §3b).
+  return `/api/partner/enter?slug=${encodeURIComponent(slug)}`;
+}
 
-  enterBypass();
-  let tenants: { id: string; slug: string; name: string; status: string; proposalCount: number }[] = [];
-  try {
-    tenants = await sql<{ id: string; slug: string; name: string; status: string; proposalCount: number }[]>`
-      SELECT t.id, t.slug, t.name, t.status,
-             (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS "proposalCount"
-      FROM tenants t
-      WHERE t.owner_id = ${u.id}::uuid
-      ORDER BY t.created_at DESC`;
-  } catch {
-    tenants = [];
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-lg font-bold text-navy-900 leading-none">{value}</span>
+      <span className="text-[11px] uppercase tracking-wide text-navy-400">{label}</span>
+    </div>
+  );
+}
+
+export default async function PartnerConsole() {
+  const session = await auth();
+  const u = session?.user as { id?: string; email?: string; role?: unknown; name?: string; partnerHomeRole?: string | null } | undefined;
+  const role = isRole(u?.role) ? u!.role : null;
+  if (!u?.id) redirect('/login');
+  if (!role || !canManagePartnerTenants(role)) {
+    // A partner who is still DESCENDED (session pinned to tenant_admin) landed on the console —
+    // ascend first, which restores partner_admin and returns here.
+    if (u?.partnerHomeRole === 'partner_admin') redirect('/api/partner/exit');
+    redirect('/login');
   }
 
+  const ownOrg = await partnerOwnOrg(u.id);
+  // First-visit provisioning of the own org (idempotent, best-effort — never break the console).
+  if (ownOrg) {
+    try { await ensurePartnerOwnOrgProvisioned(ownOrg.id, u.id, u.email ?? null); } catch { /* non-fatal */ }
+  }
+
+  const stable = await partnerScopeTenants(u.id);
+  const rollupIds = [...(ownOrg ? [ownOrg.id] : []), ...stable.map((t) => t.id)];
+  let rollup: Map<string, TenantRollup> = new Map();
+  try { rollup = await tenantRollupStats(rollupIds); } catch { rollup = new Map(); }
+
+  const ownStats = ownOrg ? rollup.get(ownOrg.id) : undefined;
+
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', padding: '2rem 1.25rem', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <h1 style={{ fontSize: 22, margin: 0 }}>My Companies</h1>
-        <span style={{ fontSize: 13, color: '#666' }}>{u.name ?? 'Partner'} · EconDev partner</span>
+    <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="flex items-baseline justify-between mb-1">
+        <h1 className="font-display text-2xl font-black text-navy-900">Partner Console</h1>
+        <span className="text-sm text-navy-500">{u.name ?? 'Partner'}{ownOrg ? ` · ${ownOrg.name}` : ''}</span>
       </div>
-      <p style={{ color: '#555', fontSize: 14, marginTop: 4 }}>
-        Every company you create is yours — it lands with spotlight buckets, the live opportunity
-        pipeline, and a starter library already provisioned (no checkout). Open one to staff it and
-        build proposals.
+      <p className="text-sm text-navy-600 mb-8">
+        Your organization and the companies you support. Open any company to work inside it as its
+        manager, or add a new company to your stable.
       </p>
+
+      {/* ── Your organization ─────────────────────────────────────────── */}
+      {ownOrg && (
+        <section className="mb-10">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-navy-400 mb-2">Your organization</h2>
+          <div className="bg-white border border-cream-200 rounded-xl p-6 flex flex-wrap items-center justify-between gap-6">
+            <div>
+              <p className="text-base font-bold text-navy-900">{ownOrg.name}</p>
+              <p className="text-sm text-navy-500">Higher-order org — run your own buckets, pipeline &amp; grants here.</p>
+            </div>
+            {ownStats && (
+              <div className="flex gap-6">
+                <Stat label="Buckets" value={ownStats.buckets} />
+                <Stat label="Pins" value={ownStats.pins} />
+                <Stat label="Proposals" value={ownStats.proposals} />
+              </div>
+            )}
+            <a href={enterHref(ownOrg.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900 whitespace-nowrap">
+              Open my org workspace →
+            </a>
+          </div>
+        </section>
+      )}
 
       <PartnerGuide />
 
-      <CreateCompanyForm />
+      {/* ── Add a company ─────────────────────────────────────────────── */}
+      <section className="mb-10">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-navy-400 mb-2">Add a company</h2>
+        <AddCompanyFlow />
+      </section>
 
-      <div style={{ marginTop: 24 }}>
-        {tenants.length === 0 ? (
-          <p style={{ color: '#888', fontSize: 14 }}>No companies yet — create your first above.</p>
+      {/* ── The stable ────────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-xs font-bold uppercase tracking-wide text-navy-400 mb-3">
+          Supported companies {stable.length > 0 && <span className="text-navy-400">({stable.length})</span>}
+        </h2>
+        {stable.length === 0 ? (
+          <p className="text-sm text-navy-500">No companies yet — add your first above.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e5e5' }}>
-                <th style={{ padding: '8px 6px' }}>Company</th>
-                <th style={{ padding: '8px 6px' }}>Status</th>
-                <th style={{ padding: '8px 6px' }}>Proposals</th>
-                <th style={{ padding: '8px 6px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((t) => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '8px 6px', fontWeight: 600 }}>{t.name}</td>
-                  <td style={{ padding: '8px 6px', color: '#555' }}>{t.status}</td>
-                  <td style={{ padding: '8px 6px', color: '#555' }}>{t.proposalCount}</td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <Link href={`/portal/${t.slug}/dashboard`} style={{ color: '#1a4a8a', fontWeight: 600 }}>Open workspace →</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {stable.map((t) => {
+              const s = rollup.get(t.id);
+              return (
+                <div key={t.id} className="bg-white border border-cream-200 rounded-xl p-5 hover:border-navy-300 transition-colors">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <p className="text-base font-bold text-navy-900">{t.name}</p>
+                    <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      t.relation === 'owner' ? 'border-navy-200 text-navy-500' : 'border-award-300 text-award-700'
+                    }`}>{t.relation === 'owner' ? 'Created' : 'Manager'}</span>
+                  </div>
+                  <p className="text-xs text-navy-500 mb-4 truncate">
+                    {s?.adminPocEmail ? <>Admin: {s.adminPocName ? `${s.adminPocName} · ` : ''}{s.adminPocEmail}</> : 'No admin POC'}
+                  </p>
+                  <div className="flex gap-5 mb-4">
+                    <Stat label="Buckets" value={s?.buckets ?? 0} />
+                    <Stat label="Pins" value={s?.pins ?? 0} />
+                    <Stat label="Proposals" value={s?.proposals ?? 0} />
+                    <Stat label="Portals" value={s?.portals ?? 0} />
+                  </div>
+                  <a href={enterHref(t.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900">
+                    Open workspace →
+                  </a>
+                </div>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -363,3 +363,22 @@ ${cta}
 
   return { subject, html: layout(body) };
 }
+
+export function managerRequestEmail(params: {
+  adminName: string | null;
+  companyName: string;
+  partnerOrg: string;
+  reviewUrl: string;
+}): { subject: string; html: string } {
+  const { adminName, companyName, partnerOrg, reviewUrl } = params;
+  const subject = `${partnerOrg} requested manager access to ${companyName}`;
+  const body = `
+<h2 style="margin:0 0 16px;font-size:20px;color:${BRAND_NAVY};">Hi ${escapeHtml(adminName || 'there')},</h2>
+<p><strong>${escapeHtml(partnerOrg)}</strong> has requested <strong>manager access</strong> to <strong>${escapeHtml(companyName)}</strong> on RFP Pipeline.</p>
+<p>A manager is a partner organization you grant admin-level access to build proposals on your behalf. If you approve, they can work inside ${escapeHtml(companyName)} as an admin — you can revoke it any time.</p>
+<p style="margin-top:8px;">Review it on your team page and approve or decline.</p>
+${button('Review the request', reviewUrl)}
+<p style="font-size:13px;color:#64748b;margin-top:16px;">If you don't recognize this request, you can safely decline it — nothing changes until you approve.</p>
+`;
+  return { subject, html: layout(body) };
+}

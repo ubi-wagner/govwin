@@ -638,3 +638,30 @@ describe('PUT section/save — success path', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('PUT section/save — compliance warnings (E4, non-blocking)', () => {
+  beforeEach(() => {
+    authMock.mockReset(); sqlMock.mockReset(); getTenantBySlugMock.mockReset();
+    verifyProposalAccessMock.mockReset(); emitEventSingleMock.mockReset(); isValidUUIDMock.mockReset();
+    emitEventSingleMock.mockResolvedValue(undefined);
+  });
+
+  const SPEC = { max_pages: null, max_slides: null, min_font_size: 11, images_allowed: true, required_sections: [], header_required: false, footer_required: false };
+
+  it('flags a saved node below the RFP font floor (non-blocking, still 200)', async () => {
+    setupFullHappyPath({ section: { ...makeSection(), complianceSpec: SPEC } });
+    const body = { baseVersion: 5, content: { version: 1, nodes: [{ type: 'text_block', content: { text: 'small' }, style: { size: 8 } }] } };
+    const res = await PUT(makeRequest(body), makeCtx());
+    expect(res.status).toBe(200);
+    const data = (await res.json()).data;
+    expect(data.complianceWarnings.map((w: { code: string }) => w.code)).toContain('font_too_small');
+  });
+
+  it('returns no warnings when the section carries no compliance spec', async () => {
+    setupFullHappyPath({ section: makeSection() });
+    const body = { baseVersion: 5, content: { version: 1, nodes: [{ type: 'text_block', content: { text: 'x' }, style: { size: 4 } }] } };
+    const res = await PUT(makeRequest(body), makeCtx());
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.complianceWarnings).toEqual([]);
+  });
+});

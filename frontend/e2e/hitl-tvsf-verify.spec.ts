@@ -4,16 +4,22 @@ const PW = process.env.FOUNDATION_PW || 'DemoPass123!';
 const P = 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';
 const S = 'c3db6000-0000-4000-8000-000000000002'; // Q2 Overview (stable id)
 
-async function login(page: Page, email: string) {
+async function login(page: Page, email: string, pinSlug?: string) {
   await page.context().clearCookies();
   await page.goto('/login');
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PW);
   await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30000 }), page.click('button[type="submit"]')]);
+  // Paul is multi-membership (no home tenant) — pin Foundation onto the session or a tenant URL
+  // bounces to /select-company. Matches hitl-foundation-verify's pinSlug pattern.
+  if (pinSlug) {
+    await page.goto(`/api/enter?slug=${pinSlug}&next=/portal/${pinSlug}/dashboard`);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  }
 }
 
 test('rebuilt TVSF — full-document preview', async ({ page }) => {
-  await login(page, 'pjackson@ecinnovates.com');
+  await login(page, 'pjackson@ecinnovates.com', 'foundation');
   await page.goto(`/portal/foundation/proposals/${P}/sections/${S}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /Preview/ }).first().click();
   const dialog = page.getByRole('dialog', { name: /document preview/i });

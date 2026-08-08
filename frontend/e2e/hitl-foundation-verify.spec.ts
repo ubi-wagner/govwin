@@ -10,7 +10,7 @@
 import { test, expect } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 
-const PID = process.env.PROPOSAL_ID || 'e463eb9b-6689-43e7-bbc6-a995a68c1790';
+const PID = process.env.PROPOSAL_ID || 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';
 const OUT = '/home/user/govwin/docs/proposals/foundation-tvsf';
 const PW = process.env.FOUNDATION_PW || 'DemoPass123!';
 

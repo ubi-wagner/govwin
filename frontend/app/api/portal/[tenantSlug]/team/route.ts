@@ -150,11 +150,50 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    if (!['tenant_admin', 'tenant_user', 'partner_user'].includes(memberRole)) {
+    if (!['tenant_admin', 'tenant_user', 'partner_user', 'manager'].includes(memberRole)) {
       return NextResponse.json(
-        { error: 'Role must be tenant_admin, tenant_user, or partner_user', code: 'VALIDATION_ERROR' },
+        { error: 'Role must be tenant_admin, tenant_user, partner_user, or manager', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
+    }
+
+    // ── Manager grant (docs/PARTNER_MANAGER_DESIGN.md §5): the company grants admin-level access
+    //    to an EXISTING partner organization — the same terminal membership as approving a partner's
+    //    manager request, but company-initiated (the company consents by making the grant). No new
+    //    user and no temp-password email: a manager is already a registered partner.
+    if (memberRole === 'manager') {
+      let partner: { id: string; name: string | null } | undefined;
+      try {
+        [partner] = await sql<{ id: string; name: string | null }[]>`
+          SELECT id, name FROM users WHERE email = ${email} AND role = 'partner_admin' LIMIT 1`;
+      } catch (dbErr) {
+        console.error('[api/portal/team] manager lookup failed:', dbErr);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+      if (!partner) {
+        return NextResponse.json(
+          { error: 'A Manager must be an existing RFP Pipeline partner. Ask them to register first, or invite them as an External Partner collaborator instead.', code: 'NOT_A_PARTNER' },
+          { status: 422 },
+        );
+      }
+      try {
+        await sql`
+          INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+          VALUES (${partner.id}, ${tenantId}, 'tenant_admin', 'active', 'partner_manager', ${sessionUser.id})
+          ON CONFLICT (user_id, tenant_id) DO UPDATE
+            SET status = 'active', role = 'tenant_admin', source = 'partner_manager'`;
+      } catch (dbErr) {
+        console.error('[api/portal/team] manager grant failed:', dbErr);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+      try {
+        await emitEventSingle({
+          namespace: 'finder', type: 'partner.manager_granted',
+          actor: userActor(sessionUser.id, sessionUser.email),
+          tenantId, payload: { tenantId, partnerId: partner.id, via: 'company_direct' },
+        });
+      } catch { /* best-effort */ }
+      return NextResponse.json({ data: { id: partner.id, email, name: partner.name, role: 'manager' } });
     }
 
     // Check if the user already exists. The multi-membership model allows one

@@ -36,6 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { estimatePageCount } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
@@ -255,7 +256,7 @@ export function CanvasRenderer({
           <>
             <span>&middot;</span>
             <span>
-              ~{Math.min(canvas.max_pages, Math.ceil(nodes.length / 8))} of {canvas.max_pages} pages
+              ~{Math.min(canvas.max_pages, estimatePageCount(doc))} of {canvas.max_pages} pages
             </span>
           </>
         )}

@@ -10,9 +10,9 @@
  *   emitEventSingle(params) → Promise<void>
  *
  * See docs/EVENT_CONTRACT.md for the binding specification of the
- * event shape, the start/end pattern, and the namespace registry.
- * See docs/NAMESPACES.md §"Event namespaces" for the authoritative
- * list of namespaces and what each owns.
+ * event shape, the start/end pattern, the namespace registry, and the
+ * full event-type catalog. The event-contract + audit-coverage vitest
+ * guards (frontend/__tests__/) enforce it in CI.
  *
  * IMPORTANT: these functions MUST NEVER throw. Instrumentation
  * failures are logged via lib/logger.ts but never propagate —
@@ -24,6 +24,17 @@ import { sql } from './db';
 import { createLogger } from './logger';
 
 const log = createLogger('events');
+
+// The event-namespace registry (docs/EVENT_CONTRACT.md §Namespace registry). The static
+// event-contract guard enforces this for LITERAL call sites; this runtime set catches DYNAMIC
+// namespaces (computed at call time) the static check can't see. Non-fatal by contract — emitters
+// never throw — so an unregistered namespace only logs a warning (drift signal, not a break).
+const KNOWN_NAMESPACES = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool']);
+function warnUnknownNamespace(namespace: string, type: string): void {
+  if (!KNOWN_NAMESPACES.has(namespace)) {
+    log.warn({ namespace, type }, 'event uses an unregistered namespace (see docs/EVENT_CONTRACT.md)');
+  }
+}
 
 // Write jsonb payloads as OBJECTS via sql.json (NOT `${JSON.stringify(x)}::jsonb`,
 // which stores a jsonb string scalar so `payload->>'field'` returns null for every
@@ -109,6 +120,7 @@ const startTimestamps = new Map<string, number>();
  */
 export async function emitEventStart(params: EmitStartParams): Promise<string> {
   try {
+    warnUnknownNamespace(params.namespace, params.type);
     const startedAt = Date.now();
     const [row] = await sql<{ id: string }[]>`
       INSERT INTO system_events (
@@ -219,6 +231,7 @@ export async function emitEventEnd(
  */
 export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
   try {
+    warnUnknownNamespace(params.namespace, params.type);
     const [row] = await sql<{ id: string }[]>`
       INSERT INTO system_events (
         namespace, type, phase, actor_type, actor_id, actor_email,
