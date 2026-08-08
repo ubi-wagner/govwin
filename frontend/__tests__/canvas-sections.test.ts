@@ -191,3 +191,19 @@ describe('paginate', () => {
     expect(r.perSection[1].startPage).toBe(2);
   });
 });
+
+describe('renderCanvasToHtml — table of contents (regression: was silently dropped)', () => {
+  const toc = (): CanvasNode => node('toc', {});
+  it('renders a heading-list TOC from the document headings', () => {
+    const html = renderCanvasToHtml(v1([heading('Intro'), toc(), heading('Approach'), para('body')]));
+    const m = html.match(/<nav data-toc[\s\S]*?<\/nav>/);
+    expect(m).toBeTruthy();
+    const nav = m![0];
+    expect(nav).toContain('Table of Contents');
+    expect(nav).toContain('Intro');
+    expect(nav).toContain('Approach');
+  });
+  it('emits nothing for a toc node when the document has no headings', () => {
+    expect(renderCanvasToHtml(v1([toc(), para('body only')]))).not.toContain('data-toc');
+  });
+});
