@@ -24,7 +24,7 @@ const TVSF_SECTION = 'e43e02fd-798b-4d46-a95f-1e158ce67704'; // "#2 Overview of 
 const TVSF_SECTION_PHRASE = 'Two differentiators define it'; // a node only present if content rehydrated
 
 /** Fresh login — clears any prior session first (authenticated users get redirected off /login). */
-async function login(page: Page, email: string, pw: string) {
+async function login(page: Page, email: string, pw: string, pinSlug?: string) {
   await page.context().clearCookies();
   await page.goto('/login');
   await page.fill('input[name="email"]', email);
@@ -34,6 +34,13 @@ async function login(page: Page, email: string, pw: string) {
     page.click('button[type="submit"]'),
   ]);
   await expect(page, `${email} bounced back to /login`).not.toHaveURL(/\/login/);
+  // Multi-membership user with no home tenant (Paul, partner-manager of Foundation) must PIN the
+  // company onto the session or a tenant URL bounces to /select-company. Matches
+  // hitl-foundation-verify's pinSlug pattern.
+  if (pinSlug) {
+    await page.goto(`/api/enter?slug=${pinSlug}&next=/portal/${pinSlug}/dashboard`);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  }
 }
 
 type Row = { url: string; status: number; verdict: string };
@@ -90,7 +97,7 @@ test('rfp_admin — ingest/curate/release surfaces render', async ({ page }) => 
 });
 
 test('tenant_admin (Foundation/Paul) — build surfaces + F2 section rehydration', async ({ page }) => {
-  await login(page, 'pjackson@ecinnovates.com', FOUNDATION_PW);
+  await login(page, 'pjackson@ecinnovates.com', FOUNDATION_PW, 'foundation');
   await sweep(page, 'tenant_admin(foundation)', [
     '/portal/foundation/dashboard', '/portal/foundation/cards', '/portal/foundation/buckets',
     '/portal/foundation/proposals', `/portal/foundation/proposals/${TVSF_PROPOSAL}`,

@@ -12,7 +12,7 @@ const FOUNDATION_PW = process.env.FOUNDATION_PW || 'DemoPass123!';
 const PROPOSAL = 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';
 const SECTION = 'e43e02fd-798b-4d46-a95f-1e158ce67704'; // "#2 Overview of the Technology"
 
-async function login(page: Page, email: string, pw: string) {
+async function login(page: Page, email: string, pw: string, pinSlug?: string) {
   await page.context().clearCookies();
   await page.goto('/login');
   await page.fill('input[name="email"]', email);
@@ -21,10 +21,17 @@ async function login(page: Page, email: string, pw: string) {
     page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
     page.click('button[type="submit"]'),
   ]);
+  // Multi-membership user with no home tenant (Paul, partner-manager of Foundation) must PIN the
+  // company onto the session (/api/enter rewrites the JWT to the membership role); without it a
+  // tenant URL bounces to /select-company. Matches hitl-foundation-verify's pinSlug pattern.
+  if (pinSlug) {
+    await page.goto(`/api/enter?slug=${pinSlug}&next=/portal/${pinSlug}/dashboard`);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  }
 }
 
 test('preview: section (live) + full document', async ({ page }) => {
-  await login(page, 'pjackson@ecinnovates.com', FOUNDATION_PW);
+  await login(page, 'pjackson@ecinnovates.com', FOUNDATION_PW, 'foundation');
   await page.goto(`/portal/foundation/proposals/${PROPOSAL}/sections/${SECTION}`, { waitUntil: 'networkidle' });
 
   // Open Preview from the toolbox card.

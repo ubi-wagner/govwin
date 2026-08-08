@@ -74,7 +74,9 @@ cp -r public/* .next/standalone/public/ 2>/dev/null
 ( cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
   AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true NEXTAUTH_URL='http://localhost:3000' \
   AUTH_URL='http://localhost:3000' ANTHROPIC_API_KEY='sk-noop' AWS_S3_BUCKET_NAME='rfp-pipeline-local' \
-  AWS_REGION='us-east-1' PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node server.js & )   # run_in_background
+  AWS_REGION='us-east-1' FOUNDING_COHORT_BYPASS=true PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node server.js & )   # run_in_background
+# ⚠️ FOUNDING_COHORT_BYPASS=true is REQUIRED — matrix.tenant provisions via /proposals/create (the
+#    future billing hook), which 402s ("Active subscription required") without it. Prod founding-cohort sets it too.
 until curl -s -o /dev/null http://localhost:3000/login; do sleep 1; done
 # ⚠️ Sign in at localhost:3000 (NOT 127.0.0.1) — the NextAuth cookie is host-bound. Full recipe +
 #    gotchas (re-stage on every rebuild; PDF tooling): docs/CONTINUATION.md §2.
