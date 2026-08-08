@@ -187,13 +187,20 @@ export function WorkflowMonitorClient({
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
 
-  // Auto-refresh every 10 seconds
+  // Filter / sort / live controls — the "workflow treatment" mirroring the Event Stream.
+  const [liveOn, setLiveOn] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<'time' | 'workflow' | 'status' | 'tenant' | 'duration'>('time');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // Auto-refresh every 10 seconds while Live is on (toggleable, so an admin can freeze the view).
   useEffect(() => {
-    const id = setInterval(() => {
-      router.refresh();
-    }, 10_000);
+    if (!liveOn) return;
+    const id = setInterval(() => router.refresh(), 10_000);
     return () => clearInterval(id);
-  }, [router]);
+  }, [router, liveOn]);
 
   // Tick every second to update elapsed times for active workflows
   useEffect(() => {
@@ -321,6 +328,33 @@ export function WorkflowMonitorClient({
     }
   }, [openTimelines]);
 
+  // ── Filter + sort (client-side, over the loaded active/recent lists) ──────────
+  const tenantOf = (w: WorkflowInstance) =>
+    (w.tenantName ?? w.tenantSlug ?? (w.tenantId ? w.tenantId.slice(0, 8) : '~platform')).toLowerCase();
+  const matches = (w: WorkflowInstance) =>
+    (statusFilter === 'all' || w.status === statusFilter) &&
+    (sourceFilter === 'all' || w.source === sourceFilter) &&
+    (search.trim() === '' ||
+      formatWorkflowName(w.workflowName).toLowerCase().includes(search.trim().toLowerCase()) ||
+      w.workflowName.toLowerCase().includes(search.trim().toLowerCase()));
+  const sortVal = (w: WorkflowInstance): string | number => {
+    switch (sortKey) {
+      case 'time': return new Date(w.completedAt ?? w.startedAt ?? 0).getTime();
+      case 'workflow': return formatWorkflowName(w.workflowName).toLowerCase();
+      case 'status': return w.status;
+      case 'tenant': return tenantOf(w);
+      case 'duration': return w.durationMs ?? -1;
+    }
+  };
+  const sortList = (list: WorkflowInstance[]) =>
+    [...list].sort((a, b) => {
+      const av = sortVal(a), bv = sortVal(b);
+      const c = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? c : -c;
+    });
+  const filteredActive = sortList(active.filter(matches));
+  const filteredRecent = sortList(recent.filter(matches));
+
   return (
     <div className="space-y-6">
       {/* ── Stats bar ──────────────────────────────────────────────── */}
@@ -350,19 +384,50 @@ export function WorkflowMonitorClient({
         </div>
       </section>
 
+      {/* ── Filter · sort · live controls (the workflow treatment) ────── */}
+      <section className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <label className="text-xs font-medium text-gray-500 uppercase">Status</label>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+          {['all', 'running', 'paused', 'pending', 'retrying', 'completed', 'failed', 'cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <label className="text-xs font-medium text-gray-500 uppercase ml-2">Source</label>
+        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+          {['all', 'portal', 'pipeline', 'cms'].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="search workflow…" className="border border-gray-300 rounded px-2 py-1 text-sm bg-white w-44 ml-2" />
+        <label className="text-xs font-medium text-gray-500 uppercase ml-2">Sort</label>
+        <select value={sortKey} onChange={(e) => setSortKey(e.target.value as typeof sortKey)} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+          <option value="time">Time</option>
+          <option value="workflow">Workflow</option>
+          <option value="status">Status</option>
+          <option value="tenant">Tenant</option>
+          <option value="duration">Duration</option>
+        </select>
+        <button onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))} className="px-2 py-1 text-xs rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100" title="Toggle sort direction">
+          {sortDir === 'asc' ? '▲ Asc' : '▼ Desc'}
+        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <label className="text-xs text-gray-500">Live</label>
+          <button onClick={() => setLiveOn((v) => !v)} className={`w-10 h-5 rounded-full relative transition-colors ${liveOn ? 'bg-green-500' : 'bg-gray-300'}`} title="Auto-refresh every 10s">
+            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${liveOn ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+          {liveOn && <span className="text-xs text-green-600 font-medium">10s</span>}
+        </div>
+      </section>
+
       {/* ── Workflow Catalog (all templates + activation switch) ─────── */}
       <WorkflowCatalog />
 
       {/* ── Active Workflows ───────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Active Workflows</h2>
-        {active.length === 0 ? (
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Active Workflows ({filteredActive.length})</h2>
+        {filteredActive.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
-            No active workflows
+            No active workflows{active.length > 0 ? ' match the current filters' : ''}
           </div>
         ) : (
           <div className="space-y-2">
-            {active.map((w) => {
+            {filteredActive.map((w) => {
               const style = getStyle(w.status);
               const isLoading = actionLoading[w.id] ?? false;
               const error = actionErrors[w.id];
@@ -456,14 +521,14 @@ export function WorkflowMonitorClient({
 
       {/* ── Recent History ─────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent History ({rangeLabel})</h2>
-        {recent.length === 0 ? (
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent History ({rangeLabel}) · {filteredRecent.length} shown</h2>
+        {filteredRecent.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
-            No completed workflows in the last 24 hours
+            No completed workflows{recent.length > 0 ? ' match the current filters' : ` in the last ${rangeLabel}`}
           </div>
         ) : (
           <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
-            {recent.map((w) => {
+            {filteredRecent.map((w) => {
               const style = getStyle(w.status);
               const isLoading = actionLoading[w.id] ?? false;
               const error = actionErrors[w.id];
