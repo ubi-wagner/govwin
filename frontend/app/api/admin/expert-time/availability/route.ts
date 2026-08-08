@@ -10,6 +10,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import {
   listAdminAvailability, createAvailabilityBlock, cancelAvailabilityBlock,
 } from '@/lib/calendar';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 const MAX_SLOT_MINUTES = 480; // an 8h ceiling guards against fat-finger windows
 
@@ -52,6 +53,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `A slot cannot exceed ${MAX_SLOT_MINUTES} minutes`, code: 'BAD_REQUEST' }, { status: 400 });
     }
     const block = await createAvailabilityBlock(a.userId, start.toISOString(), end.toISOString());
+    // Audit: an admin opened a bookable expert-time slot (admin-global pool → tenantId null).
+    // Best-effort post-write — the slot is committed, so an audit-emit throw must not 500 it.
+    try {
+      await emitEventSingle({
+        namespace: 'finder', type: 'expert_time.availability_opened',
+        actor: userActor(a.userId, a.email), tenantId: null,
+        payload: { blockId: (block as { id?: string })?.id ?? null, startAt: start.toISOString(), endAt: end.toISOString() },
+      });
+    } catch (evErr) { console.error('[expert-time/availability POST] audit emit failed', evErr); }
     return NextResponse.json({ data: block }, { status: 201 });
   } catch (e) {
     console.error('[expert-time/availability POST]', e);
@@ -71,6 +81,14 @@ export async function DELETE(request: Request) {
         { error: 'Slot is not open or not yours to cancel', code: 'CONFLICT' }, { status: 409 },
       );
     }
+    // Audit: an admin cancelled one of their open expert-time slots (best-effort post-write).
+    try {
+      await emitEventSingle({
+        namespace: 'finder', type: 'expert_time.availability_cancelled',
+        actor: userActor(a.userId, a.email), tenantId: null,
+        payload: { blockId: id },
+      });
+    } catch (evErr) { console.error('[expert-time/availability DELETE] audit emit failed', evErr); }
     return NextResponse.json({ data: { id, status: 'cancelled' } });
   } catch (e) {
     console.error('[expert-time/availability DELETE]', e);

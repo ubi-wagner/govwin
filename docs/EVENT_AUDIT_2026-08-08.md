@@ -56,8 +56,16 @@ decision posts a `system_events` row (admin events `tenantId=null`; tenant/partn
 affected tenant's UUID, per CLAUDE.md SOP: Events). Combined with the platform sweep of 2026-08-02, the
 observability spine is intact end-to-end.
 
-## Optional hardening (recommended, not built)
+## Enforced invariant (built)
 
-Add a CI guard that fails if a mutating `app/api/**/route.ts` (one containing `INSERT`/`UPDATE`/`DELETE`
-or calling a lib that does) has no `emitEvent*` / audited helper on its write path — so *future* actions
-can't ship unaudited. This turns the convention into an enforced invariant.
+`frontend/__tests__/audit-coverage.test.ts` rides the standard `vitest` gate and **fails if a mutating
+`app/api/**/route.ts` ships without an `emitEvent*` / `createTask` / `logActivity` on its write path** —
+the route plus its 1-hop `@/lib` imports, excluding writes to the audit tables themselves. So *future*
+actions can't ship unaudited: a new write either audits, or is explicitly allowlisted with a reason (a
+reviewed decision, which is the point).
+
+**Seeding the guard caught one real (minor) gap:** `POST` / `DELETE /api/admin/expert-time/availability`
+(an admin opening / cancelling bookable expert-time slots) wrote via `lib/calendar` with no event — now
+emits `finder:expert_time.availability_opened` / `finder:expert_time.availability_cancelled`. Exactly one
+route is allowlisted — `api/analytics/pageview` (anonymous public marketing telemetry, not an actor action;
+lives in the analytics tables, not the audit spine).
