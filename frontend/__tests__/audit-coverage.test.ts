@@ -97,7 +97,32 @@ function scan(): { route: string; writePath: string[] }[] {
 
     violations.push({ route: rel, writePath: writers.map((f) => path.relative(FRONTEND, f)) });
   }
+  // Server actions ('use server') are mutating entry points too — the moat must see them, not just
+  // app/api routes (found during the "check the work" adversarial pass; empty of writes today).
+  for (const af of walkTs(path.join(FRONTEND, 'app', 'actions'))) {
+    const rel = path.relative(FRONTEND, af);
+    const content = fs.readFileSync(af, 'utf8');
+    if (!/['"]use server['"]/.test(content)) continue;
+    const files = [af, ...localImports(content, af)];
+    const texts = files.map((f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } });
+    const writers = files.filter((_f, i) => hasBusinessWrite(texts[i]));
+    if (writers.length === 0) continue;
+    if (texts.some((t) => AUDIT_SIGNAL.test(t))) continue;
+    if (ALLOWLIST[rel]) continue;
+    violations.push({ route: rel, writePath: writers.map((f) => path.relative(FRONTEND, f)) });
+  }
   return violations;
+}
+
+function walkTs(dir: string): string[] {
+  const out: string[] = [];
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkTs(p));
+    else if (e.name.endsWith('.ts') && !e.name.endsWith('.test.ts')) out.push(p);
+  }
+  return out;
 }
 
 describe('audit coverage — no business write without a domain event', () => {

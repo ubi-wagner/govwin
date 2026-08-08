@@ -71,7 +71,9 @@ function scan(): string[] {
           violations.push(`BAD type format '${ns}:${ty}' at ${loc} (want entity.action_past_tense)`);
         }
       }
-      if (starts > 0 && ends === 0) violations.push(`ORPHAN start (${starts} emitEventStart, 0 emitEventEnd) in ${rel}`);
+      // starts > ends means at least one emitEventStart has no emitEventEnd on any path — a real
+      // orphan the file-level "ends===0" check would miss when a *different* handler in the file ends.
+      if (starts > ends) violations.push(`ORPHAN start (${starts} emitEventStart, ${ends} emitEventEnd) in ${rel}`);
     }
   }
   return violations;
