@@ -96,16 +96,33 @@ Exactly **seven** event namespaces. **Never** `admin`, `cms`, or `spotlight`.
   `proposal:section.drafted`, `finder:scoring.completed`, …).
 - **Agents** emit `tool:agent.invoked` / `agent.dispatch` and `system:agent.calibrated`; memory ops
   emit `system:memory.*` / `tool:memory.*`.
-- **Six pipeline paths write `system_events` raw** (bypassing `emit_event`) — all verified to set
-  `namespace`/`type`/`phase`/`actor`: `agents/fabric.py`, `ingest/dispatcher.py` (×2),
-  `ingest/base.py`, `ingest/topic_expander.py` (`finder:topics.expanded`), `shredder/runner.py`.
-  `ingest/dispatcher.py:393` emits `finder:rfp.shredded`.
+- **Raw `INSERT INTO system_events` (bypassing the helpers) — every site is inventoried + conformant**,
+  and Layer-0 DB CHECKs enforce namespace/phase/actor_type on them regardless:
+  - *Pipeline (6):* `agents/fabric.py`, `ingest/dispatcher.py` (×2), `ingest/base.py`,
+    `ingest/topic_expander.py` (`finder:topics.expanded`), `shredder/runner.py`;
+    `ingest/dispatcher.py:393` = `finder:rfp.shredded`.
+  - *Frontend (3, allowlisted in `event-contract.test.ts`):* `auth.ts` (`identity:user.logged_in` /
+    `user.login_failed` — raw because NextAuth `authorize()` must not import the automation-triggering
+    emit layer), `lib/process/launch-template.ts` (workflow-trigger emit), `app/api/events/route.ts`
+    (admin-only client emit — validates namespace **and** type first).
+  - *CMS (1):* `models/events.py::emit_system_event` — the single CMS→bus choke point.
+  A **new** frontend raw insert fails the event-contract guard until it uses the helpers or is reviewed in.
 - `emitEventSingle` also **fires automation rules** (`lib/automation/triggers`) — so the audit spine
   and the automation spine are the same events.
 
 ## 7. Enforcement (the moat)
 
-Three layers, all live:
+**Layer 0 — the database floor (the hard guarantee).** `system_events` carries three CHECK
+constraints, so NO insert from ANY service (helper, raw insert, or the client-facing endpoint) can
+write an invalid row — the DB itself rejects it:
+- `system_events_namespace_chk` (mig 069) — `namespace` ∈ the 7 registry values. *Proven live:*
+  inserting `namespace='admin'` raises a constraint violation.
+- `system_events_phase_check` (mig 007) — `phase` ∈ `start` / `end` / `single`.
+- `system_events_actor_type_check` — `actor_type` ∈ `user` / `system` / `pipeline` / `agent`.
+
+The DB does **not** enforce TYPE FORMAT — that's the job of the build-time guards below plus the
+client-endpoint check in `app/api/events` (which validates `type` against the `entity.action`
+regex before insert). On top of the DB floor, three build-time / runtime layers:
 
 1. **`__tests__/audit-coverage.test.ts`** (vitest) — every mutating `app/api/**` route (POST/PUT/
    PATCH/DELETE) that writes a business table on its 1-hop write path MUST emit (or be allowlisted
@@ -126,8 +143,9 @@ guards). To add a namespace: update the registry here, in both guards, and in `l
 **8 namespaces · 210 distinct literal types** (frontend + pipeline `emit_event`; `[py]` = pipeline).
 This is a dated snapshot for compliance reference; the guards enforce the contract, not this list.
 
-**identity** (5): `consent.recorded`, `invite.accepted`, `password.reset_completed`,
-`password.reset_requested`, `user.password_changed`.
+**identity** (7): `consent.recorded`, `invite.accepted`, `password.reset_completed`,
+`password.reset_requested`, `user.logged_in`, `user.login_failed`, `user.password_changed`.
+(`user.logged_in` / `user.login_failed` are raw inserts in `auth.ts` — see §6.)
 
 **capture** (31): `amendment.flagged`, `application.accepted`, `application.rejected`,
 `application.status_changed`, `application.submitted`, `automation_preferences.updated`,

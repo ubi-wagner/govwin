@@ -32,6 +32,17 @@ const TYPE_ALLOWLIST: Record<string, string> = {
     'phase column (tool·invoke·start / ·end); the specific tool is in the payload. See lib/tools/registry.ts.',
 };
 
+// Raw `INSERT INTO system_events` bypasses the emitter helpers. The DB CHECK constraints (mig 069/007)
+// still enforce namespace/phase/actor_type on EVERY insert, but raw inserts skip the emit-layer
+// conventions, so each sanctioned site is allowlisted with a reason. A NEW raw insert fails this guard
+// until it uses the emitEvent* helpers or is reviewed in. Keys are FRONTEND-relative paths.
+const RAW_INSERT_ALLOWLIST: Record<string, string> = {
+  'lib/events.ts': 'the canonical emitter helpers (emitEventStart/End/Single)',
+  'auth.ts': 'identity login / login_failed — raw because NextAuth authorize() must not import the automation-triggering emit layer; literals are conformant',
+  'lib/process/launch-template.ts': 'workflow-trigger emit (namespace/type from a validated template)',
+  'app/api/events/route.ts': 'admin-only client-facing emit endpoint — validates namespace + type before insert',
+};
+
 function walk(dir: string): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
@@ -74,6 +85,10 @@ function scan(): string[] {
       // starts > ends means at least one emitEventStart has no emitEventEnd on any path — a real
       // orphan the file-level "ends===0" check would miss when a *different* handler in the file ends.
       if (starts > ends) violations.push(`ORPHAN start (${starts} emitEventStart, ${ends} emitEventEnd) in ${rel}`);
+      // 100%-surface: raw inserts bypass the helpers. Sanctioned ones are allowlisted; a new one fails.
+      if (txt.includes('INSERT INTO system_events') && !RAW_INSERT_ALLOWLIST[rel]) {
+        violations.push(`RAW insert into system_events in ${rel} — use the emitEvent* helpers, or allowlist it (with a reason) in event-contract.test.ts`);
+      }
     }
   }
   return violations;
