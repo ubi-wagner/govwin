@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import type { WorkflowInstance, WorkflowStats } from './page';
-import { WorkflowCatalog } from './workflow-catalog';
+import { WorkflowMap } from './workflow-map';
+import { WorkflowGraph, WorkflowGraphLegend } from './workflow-graph';
+import { buildGraphFromStatus } from './workflow-shapes';
 
 // ─── Status styles ─────────────────────────────────────────────────
 
@@ -165,6 +167,32 @@ function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'erro
         );
       })}
     </ol>
+  );
+}
+
+/** The live DAG for one instance — the template's designed flow with each step
+ *  coloured by this instance's actual run status (step_status). Sits above the
+ *  textual transition timeline so an admin can SEE where a workflow is. */
+function InstanceStepGraph({
+  workflowName,
+  stepStatus,
+  status,
+}: {
+  workflowName: string;
+  stepStatus: Record<string, string>;
+  status: string;
+}) {
+  const { nodes, edges } = buildGraphFromStatus(workflowName, stepStatus, status);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow</span>
+        <WorkflowGraphLegend live />
+      </div>
+      <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-2">
+        <WorkflowGraph nodes={nodes} edges={edges} live compact />
+      </div>
+    </div>
   );
 }
 
@@ -416,7 +444,7 @@ export function WorkflowMonitorClient({
       </section>
 
       {/* ── Workflow Catalog (all templates + activation switch) ─────── */}
-      <WorkflowCatalog />
+      <WorkflowMap />
 
       {/* ── Active Workflows ───────────────────────────────────────── */}
       <section>
@@ -508,7 +536,8 @@ export function WorkflowMonitorClient({
                   )}
 
                   {openTimelines.has(w.id) && (
-                    <div className="mt-3 pl-1">
+                    <div className="mt-3 pl-1 space-y-3">
+                      <InstanceStepGraph workflowName={w.workflowName} stepStatus={w.stepStatus} status={w.status} />
                       <TransitionTimeline state={timelines[w.id] ?? 'loading'} />
                     </div>
                   )}
@@ -629,7 +658,8 @@ export function WorkflowMonitorClient({
                   )}
 
                   {openTimelines.has(w.id) && (
-                    <div className="mt-3 pl-1">
+                    <div className="mt-3 pl-1 space-y-3">
+                      <InstanceStepGraph workflowName={w.workflowName} stepStatus={w.stepStatus} status={w.status} />
                       <TransitionTimeline state={timelines[w.id] ?? 'loading'} />
                     </div>
                   )}
