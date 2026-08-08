@@ -136,3 +136,33 @@ frontend approach keeps that line bright; prefer it.
 **Net:** the naive "wire a landing step into the pipeline" is a dead end — the engine forbids it by
 design. Build the frontend read-on-review as a focused piece. (Save-side compliance — the other
 follow-on — shipped green: commit `7373c98`.)
+
+---
+
+## Staging-verified + a bug it caught (2026-08-08)
+
+The read-on-review landing was exercised with **live staging scenarios on real Foundation data**
+(not just mocked unit tests). Three passed — compliance export gate, save-side warning, and the full
+**land → review → restore** loop (a proposed `ai_revision` version applied back to live content).
+
+The restore scenario then surfaced a real bug the mocked tests could not:
+
+**Bug — version-counter collision.** The landing numbered `canvas_versions` at
+`MAX(version_number)+1` WITHOUT advancing `proposal_sections.version`. That breaks the invariant
+every `canvas_versions` writer relies on:
+
+> **`proposal_sections.version` MUST stay `> MAX(canvas_versions.version_number)` per section.**
+
+The next human save archives the current content at `proposal_sections.version` — which now collided
+with the proposed row → `ON CONFLICT (section_id, version_number) DO NOTHING` silently dropped the
+archive → the human's prior content was never snapshotted (an undo/history content-loss risk).
+
+**Fix (commit `bf923e7`).** Number the proposed row at the section's CURRENT version and ADVANCE the
+counter (`INSERT … RETURNING` gate → compare-and-swap `UPDATE version = version + 1`) — mirroring how
+`lib/proposal/lock-section.ts` and `lib/proposal-advance.ts` number their snapshots. Content is
+untouched (proposed-only). Re-verified live: land → save now yields BOTH `v1 ai_revision` AND
+`v2 human_edit` for the section (the archive lands; invariant holds). A race-safety unit test guards
+the `RETURNING`-gated advance.
+
+**Lesson:** any new `canvas_versions` writer must keep `proposal_sections.version` ahead of the max
+version_number, or the save/lock/advance archive path silently no-ops on the next write.
