@@ -30,7 +30,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 148 — the **V1 UI-wiring pass**
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **162** — the **V1 UI-wiring pass** (145–148)
 added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
 `proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
 `proposals.archived_at`, and mig 148 `archived_at` on `process_instances`/`tenant_opportunity_cards`/
@@ -81,7 +81,7 @@ where the admin **comments + regenerates** (comments threaded as `guidance`) or 
 it never advances a stage, locks, or submits. Observability
 is enforced end-to-end: every actor/automation/agent/manager action posts to `system_events` (+ domain audit
 logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-02.md; the `package?format=zip` blind spot is closed).
-The rest are greenfielded + registry-wired, pending the **global automation-policy wiring**. Wiring pattern: realign to the current
+The rest are greenfielded + registry-wired, pending their per-producer wiring (the **global automation-policy layer** #190 — recipients×timing×escalation — is BUILT + complete, docs/AUTOMATION_POLICY_BUILD_LOG.md; it ships inert until a tenant edits a policy). Wiring pattern: realign to the current
 spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
 (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user

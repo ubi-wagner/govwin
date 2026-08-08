@@ -3,7 +3,7 @@
 **Date:** 2026-07-03
 
 > **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
-> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **148**
+> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **162**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix; the **V1 UI-wiring pass** then added 143
 > `proposal_sections.sort_index`, 144 `proposals.studio_phase`, 145 `notification_read_state`, 146 the amendment
 > engine, 147–148 the soft-archive `archived_at` cascade — canonical **docs/ARCHIVABLE_CONTRACT.md**); the archetype roster is **36 files =
@@ -530,9 +530,9 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 148)
+## 7. New / Changed Schema (migrations 093 → 162)
 
-Highest migration: **148** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **162** (149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
