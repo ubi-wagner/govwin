@@ -66,7 +66,7 @@ for (const [name, t] of Object.entries(schema.tables)) {
 
 const model = {
   meta: { source: 'govtech_intel', migrationHead, tableCount: Object.keys(tables).length, fkCount: schema.fks.length },
-  subsystems: overlay.subsystems.map(({ id, label, hue }) => ({ id, label, hue })),
+  subsystems: overlay.subsystems.map(({ id, label, hue, match, exact }) => ({ id, label, hue, match: match || [], exact: exact || [] })),
   tables, traces: overlay.traces, uis: overlay.uis,
 };
 

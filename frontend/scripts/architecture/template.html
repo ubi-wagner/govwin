@@ -216,11 +216,57 @@ async function loadStats(){
   } catch { /* not running in-app — static schema only */ }
 }
 
-$('subfilter').innerHTML = M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
-  const on = state.sub === s.id;
-  const style = `--h:${s.hue};color:hsl(${s.hue} var(--ctsat) var(--ctxt));border-color:hsl(${s.hue} var(--csat) var(--cbd));background:${on?`hsl(${s.hue} var(--csat) var(--cbg))`:'transparent'}`;
-  return `<button class="sflag" data-sub="${s.id}" style="${style}">${esc(s.label)}</button>`;
-}).join('');
+function renderSubfilter(){
+  $('subfilter').innerHTML = M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
+    const on = state.sub === s.id;
+    const style = `--h:${s.hue};color:hsl(${s.hue} var(--ctsat) var(--ctxt));border-color:hsl(${s.hue} var(--csat) var(--cbd));background:${on?`hsl(${s.hue} var(--csat) var(--cbg))`:'transparent'}`;
+    return `<button class="sflag" data-sub="${s.id}" style="${style}">${esc(s.label)}</button>`;
+  }).join('');
+}
+renderSubfilter();
+
+// LIVE SCHEMA — when embedded in the app, read the running DB's actual schema and swap it in, so
+// the map reflects new migrations with no regeneration. Same shape as extract.mjs, re-enriched
+// here with the committed overlay (subsystem rules stay embedded; traces/uis unchanged). Fails
+// silently as a file/artifact → the committed snapshot stands.
+function assignSub(name){
+  for (const s of M.subsystems){
+    if (s.id === 'other') continue;
+    if (s.exact && s.exact.includes(name)) return s.id;
+    if (s.match && s.match.some(p => name.startsWith(p))) return s.id;
+  }
+  return 'other';
+}
+function enrichLive(raw){
+  const outBy = {}, inBy = {};
+  for (const f of raw.fks){ (outBy[f.table] ??= []).push(f); (inBy[f.refTable] ??= []).push({ fromTable: f.table, col: f.col }); }
+  const tables = {};
+  for (const [name, t] of Object.entries(raw.tables)){
+    const outs = outBy[name] || [];
+    const byCol = new Map(outs.map(f => [f.col, f]));
+    tables[name] = {
+      subsystem: assignSub(name), isView: name.startsWith('v_'), pk: t.pk,
+      columns: t.columns.map(c => ({ name: c.name, type: c.type, nullable: c.nullable, pk: t.pk.includes(c.name),
+        fk: byCol.has(c.name) ? { refTable: byCol.get(c.name).refTable, refCol: byCol.get(c.name).refCol } : null })),
+      out: outs.map(f => ({ col: f.col, refTable: f.refTable, refCol: f.refCol })),
+      in: (inBy[name] || []).map(e => ({ fromTable: e.fromTable, col: e.col })),
+    };
+  }
+  return tables;
+}
+async function loadLiveSchema(){
+  try {
+    const r = await fetch('/api/admin/architecture/schema', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.data || !j.data.tables) return;
+    M.tables = enrichLive(j.data);
+    M.meta = { ...M.meta, tableCount: Object.keys(M.tables).length, fkCount: j.data.fks.length, live: true };
+    if (state.sel && !M.tables[state.sel]) state.sel = null;
+    renderMeta(); renderSubfilter(); renderList();
+    if (state.view === 'schema') { state.sel ? renderDetail(state.sel) : renderOverview(); }
+  } catch { /* not in-app — keep the committed snapshot */ }
+}
 
 function tablesIn(sub){ return Object.keys(M.tables).filter(t => M.tables[t].subsystem === sub); }
 
@@ -430,6 +476,6 @@ window.addEventListener('hashchange', fromHash);
 /* ---------- boot ---------- */
 renderList();
 fromHash();
-loadStats();
+loadLiveSchema().then(loadStats);
 
 </script>
