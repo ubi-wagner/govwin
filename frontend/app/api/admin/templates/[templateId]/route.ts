@@ -98,6 +98,31 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!existing) {
       return NextResponse.json({ error: 'Template not found', code: 'NOT_FOUND' }, { status: 404 });
     }
+
+    // Publish / unpublish — an explicit toggle of is_system, handled BEFORE the read-only guard
+    // below (which blocks CONTENT edits to system templates). Publishing writes is_system=true +
+    // tenant_id=NULL so the template appears in every tenant's chooser (the H-E orphan fix — the
+    // Studio's output was is_system=false + null tenant, visible to no one). Zero new consumer code.
+    if (typeof body.publish === 'boolean') {
+      try {
+        await sql`
+          UPDATE document_templates SET is_system = ${body.publish}, tenant_id = NULL, updated_at = now()
+          WHERE id = ${templateId}::uuid
+        `;
+      } catch (e) {
+        console.error('[admin/templates/:id] publish toggle failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'template.updated',
+        actor: userActor(who.userId, who.email ?? undefined),
+        tenantId: null,
+        payload: { templateId, published: body.publish },
+      });
+      return NextResponse.json({ data: { templateId, published: body.publish } });
+    }
+
     if (existing.isSystem) {
       return NextResponse.json(
         { error: 'System templates are read-only — use "save as new" instead', code: 'FORBIDDEN' },

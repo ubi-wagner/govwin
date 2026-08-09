@@ -129,6 +129,11 @@ export async function POST(request: Request) {
       ? (canvasDocument as { nodes: unknown[] }).nodes.length
       : 0;
 
+    // Publish-to-library: when `publish` is set, the template is written is_system=true so it
+    // appears in every tenant's template chooser (portal/templates + proposals/create already read
+    // `is_system=true OR tenant_id=$tenant`). Without it the admin's Studio output was is_system=false
+    // + null tenant — an orphan visible to no one (the G8/H-E black hole). Zero new consumer code.
+    const isSystem = body.publish === true;
     let created;
     try {
       [created] = await sql<{ id: string }[]>`
@@ -144,9 +149,9 @@ export async function POST(request: Request) {
           ${sql.json(canvasPreset as Parameters<typeof sql.json>[0])},
           ${sql.json(canvasDocument as Parameters<typeof sql.json>[0])},
           ${nodeCount},
-          false,
+          ${isSystem},
           ${who.userId}::uuid,
-          '{}'::jsonb
+          ${sql.json({ published: isSystem })}
         )
         RETURNING id
       `;
