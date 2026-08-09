@@ -105,33 +105,25 @@ export function CanvasEditorPage({
     ? `/api/portal/${tenantSlug}/library/foundation/${foundationId}/save`
     : isDocument
       ? `/api/portal/${tenantSlug}/documents/${documentId}/save`
-      : tenantSlug
-        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
-        : `/api/admin/proposals/${proposalId}/sections/${sectionId}`;
+      : `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`;
 
   const exportUrl = isFoundation
     ? `/api/portal/${tenantSlug}/library/foundation/${foundationId}/export`
     : isDocument
       ? `/api/portal/${tenantSlug}/documents/${documentId}/export`
-      : tenantSlug
-        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
-        : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
+      : `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`;
 
   const backUrl = isFoundation
     ? `/portal/${tenantSlug}/atoms`
     : isDocument
       ? `/portal/${tenantSlug}/documents`
-      : tenantSlug
-        ? `/portal/${tenantSlug}/proposals/${proposalId}`
-        : `/admin`; // no tenant context (admin editor) → admin home; /admin/proposals/[id] has no page (was a 404 back-link)
+      : `/portal/${tenantSlug}/proposals/${proposalId}`;
 
   const backLabel = isFoundation
     ? 'Back to Library'
     : isDocument
       ? 'Back to Documents'
-      : tenantSlug
-        ? 'Back to Proposal'
-        : 'Back to Admin'; // admin editor has no tenant context → matches the /admin back target
+      : 'Back to Proposal';
 
   // ── Callbacks CanvasEditor calls to push state up into the ribbon ───
   const handleDirtyChange  = useCallback((d: boolean)  => setDirty(d),    []);
