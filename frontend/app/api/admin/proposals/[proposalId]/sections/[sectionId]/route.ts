@@ -46,35 +46,42 @@ export async function PUT(request: Request, ctx: RouteContext) {
   }
 
   try {
-    const current = await sql<{ content: unknown }[]>`
-      SELECT content FROM proposal_sections
+    const [current] = await sql<{ content: unknown; version: number }[]>`
+      SELECT content, version FROM proposal_sections
       WHERE id = ${sectionId}::uuid AND proposal_id = ${proposalId}::uuid
     `;
-    if (current.length === 0) {
+    if (!current) {
       return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    const versionNumber = (content as { metadata?: { version_number?: number } })?.metadata?.version_number ?? 1;
+    // Number the snapshot from the section's LIVE version counter (NOT client-supplied
+    // metadata.version_number, which the editor page hardcodes to 1 — so the old code archived
+    // every admin save onto version 1 with DO UPDATE, permanently overwriting the section's v1
+    // history and never advancing the counter). Mirror the portal save / lock-section /
+    // proposal-advance / land-revisions pattern: archive the CURRENT (pre-save) content at the
+    // live version (DO NOTHING — never clobber existing history), then advance the counter so the
+    // invariant proposal_sections.version > MAX(canvas_versions.version_number) holds and the next
+    // save's archive lands in a free slot.
+    const versionNumber = current.version ?? 1;
+
+    try {
+      await sql`
+        INSERT INTO canvas_versions (section_id, version_number, content, created_by, snapshot_reason)
+        VALUES (${sectionId}::uuid, ${versionNumber}, ${sql.json((current.content ?? {}) as Parameters<typeof sql.json>[0])}, ${userId ?? null}::uuid, 'auto_save')
+        ON CONFLICT (section_id, version_number) DO NOTHING
+      `;
+    } catch (err) {
+      console.error('[admin/canvas-save] version snapshot failed (non-fatal)', err);
+    }
 
     await sql`
       UPDATE proposal_sections
       SET content = ${JSON.stringify(content)},
           status = 'in_progress',
+          version = version + 1,
           updated_at = now()
       WHERE id = ${sectionId}::uuid
     `;
-
-    try {
-      await sql`
-        INSERT INTO canvas_versions (section_id, version_number, content, created_by, snapshot_reason)
-        VALUES (${sectionId}::uuid, ${versionNumber}, ${sql.json((content) as Parameters<typeof sql.json>[0])}, ${userId ?? null}::uuid, 'auto_save')
-        ON CONFLICT (section_id, version_number) DO UPDATE SET
-          content = EXCLUDED.content,
-          created_at = now()
-      `;
-    } catch (err) {
-      console.error('[canvas-save] version snapshot failed (non-fatal)', err);
-    }
 
     await emitEventSingle({
       namespace: 'proposal',
@@ -84,12 +91,12 @@ export async function PUT(request: Request, ctx: RouteContext) {
         correlationId: randomUUID(),
         proposalId,
         sectionId,
-        versionNumber,
+        versionNumber: versionNumber + 1, // the new live version (snapshot archived the prior at versionNumber)
         nodeCount: Array.isArray((content as { nodes?: unknown[] })?.nodes) ? (content as { nodes: unknown[] }).nodes.length : 0,
       },
     });
 
-    return NextResponse.json({ data: { saved: true, version: versionNumber } });
+    return NextResponse.json({ data: { saved: true, version: versionNumber + 1 } });
   } catch (err) {
     console.error('[admin/canvas-save] failed', err);
     return NextResponse.json({ error: 'Failed to save section', code: 'DB_ERROR' }, { status: 500 });
