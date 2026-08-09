@@ -231,3 +231,17 @@ per-instance DAGs are the `/admin/workflows` Workflow Map).
 sprint state, how to spin up the sandbox, verified demo accounts, the live gap list, and
 the recurring bug-classes. Read it first when resuming; the identity model is in
 docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+
+**Common-Canvas redesign (2026-08):** the four-phase analysis (`docs/CANVAS_ARCHITECTURE.md` →
+`CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` → `CANVAS_REDESIGN_PLAN.md`) drove a
+signed-off MVP + admin-plane build recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
+hub** — a writable section restore path (`…/sections/[s]/versions` POST, CAS-safe, mig 163
+`content_source`), local-draft **autosave**/recover + Ctrl-S, and one-click **Accept AI drafts**
+(`accept-ai-revisions`) that lands the staged full-draft workforce onto the page; a **non-destructive
+409** (explicit-overwrite confirm, no more silent last-write-wins); real **Accept/Revert** node
+buttons; **self-serve reuse** (seed-job routes opened to tenant_admin + `verifyTenantAccess`) and
+**verbatim reuse** of an uploaded past proposal (`reuse-past`); **images survive export** (S3 keys
+inlined to data: URIs across docx/pptx/xlsx/pdf); **notification routing** (self-excluded + "for you");
+and **Studio publish-to-library** (PATCH `publish` flips `is_system=true`, no orphans). Deferred (scoped
+in the build log): the polymorphic artifact key / one-canvas refactor, whole-proposal
+submission-readiness, the shared *atom* library, and the rest of the admin enable plane.
