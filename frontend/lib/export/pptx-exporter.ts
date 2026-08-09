@@ -38,7 +38,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { rasterizeDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
+import { rasterizeDataUri, resolveImageDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
 import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
 
 // ─── Layout constants (inches) ────────────────────────────────────────
@@ -156,7 +156,7 @@ export async function exportToPptx(
   const raster = new Map<CanvasNode, RasterPng | null>();
   await Promise.all(
     nodes.filter((n) => n.type === 'image').map(async (n) => {
-      const key = (n.content as { storage_key?: string })?.storage_key;
+      const key = await resolveImageDataUri((n.content as { storage_key?: string })?.storage_key);
       raster.set(n, await rasterizeDataUri(key));
     }),
   );

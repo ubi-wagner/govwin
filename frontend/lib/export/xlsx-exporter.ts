@@ -10,7 +10,7 @@
 
 import ExcelJS from 'exceljs';
 import { docNodes } from '@/lib/types/canvas-document';
-import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { rasterizeDataUri, resolveImageDataUri, type RasterPng } from '@/lib/export/image-raster';
 import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
 import type {
   CanvasDocument,
@@ -283,7 +283,7 @@ export async function exportToXlsx(
     await Promise.all(
       nonTableNodes.filter((n) => n.type === 'image' || n.type === 'chart' || n.type === 'shape').map(async (n) => {
         const uri = n.type === 'image'
-          ? (n.content as ImageContent)?.storage_key
+          ? await resolveImageDataUri((n.content as ImageContent)?.storage_key)
           : n.type === 'chart'
             ? svgDataUri(renderChartSvg(n.content as ChartContent))
             : svgDataUri(renderShapeSvg(n));

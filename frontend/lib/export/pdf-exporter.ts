@@ -13,6 +13,7 @@
  * the pipeline worker — the native docx/pptx/xlsx exporters have no such need.
  */
 import { renderCanvasToHtml } from './canvas-html';
+import { inlineImageDataUris } from './image-raster';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 type RunningSpec = { template?: string } | null | undefined;
@@ -62,7 +63,9 @@ async function resolveExecutable(): Promise<string | undefined> {
 }
 
 export async function exportToPdf(doc: CanvasDocument, variables: Record<string, string> = {}): Promise<Buffer> {
-  const html = renderCanvasToHtml(doc, variables);
+  // Inline uploaded-image S3 keys to data: URIs first — the sync HTML render can't fetch a storage
+  // key, so without this a customer's logo / screenshots export as a broken <img> (the G3 bug).
+  const html = renderCanvasToHtml(await inlineImageDataUris(doc), variables);
   const { chromium } = await import('playwright');
   const executablePath = await resolveExecutable();
   const browser = await chromium.launch(executablePath ? { executablePath } : {});
