@@ -291,6 +291,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
 
       // 3. Create volumes + items from preset
+      // solicitation_volumes.volume_format is CHECK-constrained to {dsip_standard, l_and_m, custom};
+      // some seed presets (e.g. TVSF) carry descriptive formats like 'tvsf_narrative' that would 500 the
+      // INSERT. Coerce anything outside the enum to 'custom' — the descriptive intent lives in the name.
+      const ALLOWED_VOL_FMT = new Set(['dsip_standard', 'l_and_m', 'custom']);
+      const coerceVolFmt = (f: unknown): string =>
+        typeof f === 'string' && ALLOWED_VOL_FMT.has(f) ? f : 'custom';
       for (const vol of volumesData) {
         const [newVol] = await sql<{ id: string }[]>`
           INSERT INTO solicitation_volumes (
@@ -300,7 +306,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             ${solId}::uuid, ${topicId}::uuid,
             ${vol.volume_number},
             ${vol.volume_name},
-            ${vol.volume_format ?? null},
+            ${coerceVolFmt(vol.volume_format)},
             ${vol.description ?? null},
             ${user.id ?? null}
           )
@@ -314,7 +320,8 @@ export async function POST(request: Request, ctx: RouteContext) {
               INSERT INTO volume_required_items (
                 volume_id, item_number, item_name, item_type, required,
                 page_limit, slide_limit, font_family, font_size,
-                margins, line_spacing, header_format, footer_format
+                margins, line_spacing, header_format, footer_format,
+                required_sections, format_rules, template_id
               ) VALUES (
                 ${newVol.id}::uuid,
                 ${idx + 1},
@@ -328,7 +335,10 @@ export async function POST(request: Request, ctx: RouteContext) {
                 ${item.margins ?? null},
                 ${item.line_spacing ?? null},
                 ${item.header_format ?? null},
-                ${item.footer_format ?? null}
+                ${item.footer_format ?? null},
+                ${sql.json(((item as Record<string, unknown>).required_sections ?? []) as Parameters<typeof sql.json>[0])},
+                ${sql.json(((item as Record<string, unknown>).format_rules ?? {}) as Parameters<typeof sql.json>[0])},
+                ${((item as Record<string, unknown>).template_id as string) ?? null}
               )
             `;
           }

@@ -116,7 +116,12 @@ export async function provisionProposalForPortal(opts: {
         for (const vol of resolved.volumes) {
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
-          const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost' : 'narrative';
+          // Map the volume to its artifact_type (CHECK: narrative|cost|form|matrix|other). Cost/budget
+          // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
+          // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
+          const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost'
+            : /support|letter|form|attach|appendix|certif|commercial/i.test(volName ?? '') ? 'form'
+            : 'narrative';
           const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
