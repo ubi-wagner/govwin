@@ -90,7 +90,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE tenant_id = ${tenantId}::uuid
           AND namespace IN ('proposal', 'capture', 'library', 'system')
           AND phase IN ('single', 'end')
-          AND actor_id IS DISTINCT FROM ${sessionUser.id}::uuid
+          AND actor_id IS DISTINCT FROM ${sessionUser.id}
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}

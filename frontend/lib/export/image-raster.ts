@@ -12,7 +12,6 @@
  * callers fall back to a text placeholder rather than throwing an export.
  */
 import sharp from 'sharp';
-import { getObjectBuffer } from '@/lib/storage/s3-client';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
 
 const EXT_MIME: Record<string, string> = {
@@ -31,6 +30,10 @@ export async function resolveImageDataUri(keyOrUri: string | null | undefined): 
   if (!keyOrUri) return null;
   if (keyOrUri.startsWith('data:')) return keyOrUri;
   try {
+    // Lazy import so exporting a doc never pulls in the s3-client at module-eval — its guard
+    // throws when AWS_S3_BUCKET_NAME is unset, which would otherwise 500 EVERY export in a
+    // mis-configured env. Here a storage misconfig just degrades this image to the stub fallback.
+    const { getObjectBuffer } = await import('@/lib/storage/s3-client');
     const buf = await getObjectBuffer(keyOrUri);
     if (!buf || buf.length === 0) return null;
     const ext = keyOrUri.split('.').pop()?.toLowerCase() ?? 'png';
