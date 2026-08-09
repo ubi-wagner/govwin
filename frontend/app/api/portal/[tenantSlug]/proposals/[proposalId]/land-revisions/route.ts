@@ -1,14 +1,18 @@
 /**
  * POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions
  *
- * The full-draft LAND-OR-REVIEW consumer (read-on-review). The fabric never lands
- * agent output itself, and the workflow engine's invariants forbid a pipeline
- * ACTION from consuming an agent step's result (docs/FULL_DRAFT_LANDING_DESIGN.md).
- * So the landing lives HERE, human-triggered: read the proposal's latest
- * OnFullDraftRequested% process_instance, scan its step_results for the drafting
- * cohort's review-staged section canvases (source='ai_revision', persisted:false),
- * and land each as a PROPOSED canvas_versions row (source='ai_revision') that the
- * builder reviews + restores in the section's version history.
+ * The LAND-OR-REVIEW consumer (read-on-review) for AI-proposed section revisions.
+ * The fabric never lands agent output itself, and the workflow engine's invariants
+ * forbid a pipeline ACTION from consuming an agent step's result
+ * (docs/FULL_DRAFT_LANDING_DESIGN.md). So the landing lives HERE, human-triggered:
+ * read the proposal's latest drafting runs — the one-shot full draft
+ * (OnFullDraftRequested{ModeA,B,C}) AND the Proposal Studio's gated loops
+ * (OnReviewPhaseRequested{Draft,Refine}, which stage canvases via the same
+ * draft/reformat/restyle tools; the Compliance phase stages findings, not canvases)
+ * — scan their step_results for the cohort's review-staged section canvases
+ * (source='ai_revision', persisted:false), and land each as a PROPOSED
+ * canvas_versions row (source='ai_revision') that the builder reviews + restores in
+ * the section's version history.
  *
  * Proposed-only: never touches live proposal_sections.content. Idempotent: skips a
  * section whose latest full-draft ai_revision already matches the staged canvas.
@@ -83,29 +87,39 @@ export async function POST(
     }
     enterTenant(tenantId);
 
-    // ── Find the proposal's latest full-draft run + its step_results ──
-    let instance: { stepResults: Record<string, unknown> | null } | undefined;
+    // ── Find the proposal's latest drafting runs + their step_results ──
+    // Two staging paths reach this consumer:
+    //   • the one-shot full draft (OnFullDraftRequested{ModeA,B,C}) — one instance stages everything;
+    //   • the Proposal Studio (OnReviewPhaseRequested{Draft,Refine,Compliance}) — THREE instances, the
+    //     Draft + Refine phases each staging canvases (Compliance stages findings, not canvases).
+    // Take the LATEST instance per workflow_name (DISTINCT ON), then merge their staged canvases
+    // oldest→newest, so a later Refine restyle wins over the earlier Draft for the same section.
+    type Inst = { workflowName?: string; stepResults: Record<string, unknown> | null; startedAt?: string | null };
+    let instances: Inst[];
     try {
-      [instance] = await sql<{ stepResults: Record<string, unknown> | null }[]>`
-        SELECT step_results
+      instances = await sql<Inst[]>`
+        SELECT DISTINCT ON (workflow_name)
+               workflow_name, step_results, started_at
         FROM process_instances
         WHERE tenant_id = ${tenantId}::uuid
-          AND workflow_name LIKE 'OnFullDraftRequested%'
+          AND (workflow_name LIKE 'OnFullDraftRequested%' OR workflow_name LIKE 'OnReviewPhaseRequested%')
           AND payload->>'proposal_id' = ${proposalId}
-        ORDER BY started_at DESC NULLS LAST
-        LIMIT 1
+        ORDER BY workflow_name, started_at DESC NULLS LAST
       `;
     } catch (e) {
       console.error('[land-revisions] instance query failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
-    if (!instance) {
+    if (!instances || instances.length === 0) {
       return NextResponse.json({ data: { landed: 0, sections: [], scanned: false, reason: 'no_full_draft_run' } });
     }
 
-    // ── Extract the staged section canvases ──────────────────────────
+    // ── Extract + merge the staged section canvases (oldest→newest wins per section) ──
+    const ordered = [...instances].sort((a, b) => String(a.startedAt ?? '').localeCompare(String(b.startedAt ?? '')));
     const staged = new Map<string, unknown>();
-    collectStaged(coerceJsonb<Record<string, unknown>>(instance.stepResults, {}), staged);
+    for (const inst of ordered) {
+      collectStaged(coerceJsonb<Record<string, unknown>>(inst.stepResults, {}), staged);
+    }
     if (staged.size === 0) {
       return NextResponse.json({ data: { landed: 0, sections: [], scanned: true, reason: 'no_staged_revisions' } });
     }

@@ -19,6 +19,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/lib/toast';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import type { ComplianceItem } from '@/components/portal/section-compliance-chip';
@@ -167,6 +168,10 @@ export function CanvasEditorPage({
     }
     const okJson = await resp.json().catch(() => null);
     if (okJson?.data?.version != null) versionRef.current = okJson.data.version;
+    // Surface the compliance floor's section-local warnings (advisory, non-blocking) the save
+    // route computes — otherwise the shipped save-side check is invisible to the builder.
+    const warns = okJson?.data?.complianceWarnings as { code: string; message: string }[] | undefined;
+    if (warns && warns.length) toast(`Compliance: ${warns.map((w) => w.message).join(' · ')}`, 'info');
   }, [saveUrl, isDocument]);
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {

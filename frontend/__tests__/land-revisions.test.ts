@@ -1,10 +1,11 @@
 /**
  * POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions
  *
- * The read-on-review landing: reads the proposal's latest OnFullDraftRequested% instance's
- * step_results, extracts review-staged section canvases, and lands each as a PROPOSED
- * ai_revision canvas_versions row. Mocked: @/auth, @/lib/db, @/lib/events. Real: rbac,
- * validation, jsonb (pure).
+ * The read-on-review landing: reads the proposal's latest drafting runs (the one-shot full
+ * draft OnFullDraftRequested% AND the Proposal Studio OnReviewPhaseRequested% Draft/Refine
+ * phases), extracts review-staged section canvases (merged oldest→newest), and lands each as
+ * a PROPOSED ai_revision canvas_versions row. Mocked: @/auth, @/lib/db, @/lib/events. Real:
+ * rbac, validation, jsonb (pure).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -91,6 +92,29 @@ describe('POST land-revisions', () => {
     expect(emitEventSingleMock).toHaveBeenCalledTimes(1);
     // The version counter is advanced (INSERT RETURNING + UPDATE) — 5 sql calls total.
     expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('merges across Studio phases — the later Refine canvas wins over the earlier Draft', async () => {
+    setupAuth();
+    const OLD_CANVAS = { version: 1, nodes: [{ type: 'text_block', content: { text: 'draft' } }] };
+    const NEW_CANVAS = { version: 1, nodes: [{ type: 'text_block', content: { text: 'refined' } }] };
+    // Two instances returned by the DISTINCT ON query, deliberately out of order to prove the
+    // oldest→newest re-sort: Refine (newer) first, Draft (older) second → Refine still wins.
+    sqlMock
+      .mockResolvedValueOnce([
+        { workflowName: 'OnReviewPhaseRequestedRefine', startedAt: '2026-08-02T00:00:00Z', stepResults: stepResultsWith(SECTION_ID, NEW_CANVAS) },
+        { workflowName: 'OnReviewPhaseRequestedDraft', startedAt: '2026-08-01T00:00:00Z', stepResults: stepResultsWith(SECTION_ID, OLD_CANVAS) },
+      ])
+      .mockResolvedValueOnce([{ id: SECTION_ID, version: 5 }]) // ownership
+      .mockResolvedValueOnce([])                    // prior (none)
+      .mockResolvedValueOnce([{ versionNumber: 5 }]) // INSERT ... RETURNING
+      .mockResolvedValueOnce([]);                    // UPDATE advance
+    const data = (await (await POST(req(), ctx())).json()).data;
+    expect(data.landed).toBe(1);
+    // The INSERT (4th sql call) must carry the NEW (Refine) canvas, not the stale Draft one.
+    const insertCall = sqlMock.mock.calls[3];
+    expect(insertCall).toContain(NEW_CANVAS);
+    expect(insertCall).not.toContain(OLD_CANVAS);
   });
 
   it('does NOT land (or advance) when the version slot is already taken (race)', async () => {
