@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, enterTenant } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { sql, getTenantBySlug, enterTenant, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { coerceJsonb } from '@/lib/jsonb';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
@@ -43,7 +43,8 @@ export async function POST(req: Request, { params }: Params) {
 
   const sessionUser = session.user as { id?: string; role?: unknown };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
-  if (!role || !['master_admin', 'rfp_admin'].includes(role)) {
+  // Reuse is now self-serve: tenant_admin+ (own tenant, verified below) — was rfp/master only.
+  if (!role || !sessionUser.id || !hasRoleAtLeast(role, 'tenant_admin')) {
     return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -57,6 +58,10 @@ export async function POST(req: Request, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug).catch(() => null);
   if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
   const tenantId = tenant.id as string;
+
+  if (!(await verifyTenantAccess(sessionUser.id, role, tenantId))) {
+    return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+  }
 
   enterTenant(tenantId);
 

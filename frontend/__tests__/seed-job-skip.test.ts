@@ -8,9 +8,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { authMock, sqlMock, getTenantBySlugMock, emitEventSingleMock } = vi.hoisted(() => {
+const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, emitEventSingleMock } = vi.hoisted(() => {
   const sqlMock = Object.assign(vi.fn(), { json: (x: unknown) => x });
-  return { authMock: vi.fn(), sqlMock, getTenantBySlugMock: vi.fn(), emitEventSingleMock: vi.fn() };
+  return { authMock: vi.fn(), sqlMock, getTenantBySlugMock: vi.fn(), verifyTenantAccessMock: vi.fn(), emitEventSingleMock: vi.fn() };
 });
 
 vi.mock('@/auth', () => ({ auth: authMock }));
@@ -18,6 +18,7 @@ vi.mock('@/lib/db', () => ({
   enterTenant: () => {},
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,
+  verifyTenantAccess: verifyTenantAccessMock,
 }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,
@@ -43,12 +44,13 @@ function req(body: unknown = { seedJobId: SEED_JOB_ID }) {
 function setupAuth(role = 'rfp_admin') {
   authMock.mockResolvedValue({ user: { id: USER_ID, email: 'a@a.com', role, tenantId: TENANT_ID } });
   getTenantBySlugMock.mockResolvedValue({ id: TENANT_ID });
+  verifyTenantAccessMock.mockResolvedValue(true);
   emitEventSingleMock.mockResolvedValue(undefined);
 }
 
 describe('POST seed-job/skip', () => {
   beforeEach(() => {
-    authMock.mockReset(); sqlMock.mockReset(); getTenantBySlugMock.mockReset(); emitEventSingleMock.mockReset();
+    authMock.mockReset(); sqlMock.mockReset(); getTenantBySlugMock.mockReset(); verifyTenantAccessMock.mockReset(); emitEventSingleMock.mockReset();
   });
 
   it('401 when unauthenticated', async () => {
@@ -56,9 +58,21 @@ describe('POST seed-job/skip', () => {
     expect((await POST(req(), ctx())).status).toBe(401);
   });
 
-  it('403 for a non-admin role', async () => {
-    setupAuth('tenant_admin');
+  it('403 for a below-tenant_admin role (reuse is now self-serve for tenant_admin+)', async () => {
+    setupAuth('tenant_user');
     expect((await POST(req(), ctx())).status).toBe(403);
+  });
+
+  it('403 when tenant access is denied (a tenant_admin of another tenant)', async () => {
+    setupAuth('tenant_admin');
+    verifyTenantAccessMock.mockResolvedValue(false);
+    expect((await POST(req(), ctx())).status).toBe(403);
+  });
+
+  it('allows tenant_admin of the owning tenant (was rfp/master only)', async () => {
+    setupAuth('tenant_admin');
+    sqlMock.mockResolvedValueOnce([{ id: SEED_JOB_ID }]); // CAS UPDATE ... RETURNING id
+    expect((await POST(req(), ctx())).status).toBe(200);
   });
 
   it('400 when seedJobId is missing', async () => {
