@@ -75,6 +75,7 @@
   .dhead h2{font-family:var(--font-mono);font-size:1.35rem;letter-spacing:-.01em;margin:0;}
   .subchip{font-family:var(--font-mono);font-size:.68rem;padding:.16rem .5rem;border-radius:20px;background:hsl(var(--h) var(--csat) var(--cbg));color:hsl(var(--h) var(--ctsat) var(--ctxt));border:1px solid hsl(var(--h) var(--csat) var(--cbd));}
   .badge{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:.05rem .35rem;}
+  .mchip.live,.badge.live{color:var(--good);border-color:color-mix(in oklab,var(--good) 42%,var(--line));background:color-mix(in oklab,var(--good) 10%,transparent);}
   .dsub{color:var(--muted);font-size:.85rem;margin:.35rem 0 0;}
 
   .sectitle{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:1.7rem 0 .6rem;}
@@ -186,12 +187,34 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let state = { view:'schema', sel:null, sub:null, q:'' };
+let COUNTS = null, COUNT_TOTAL = 0;
+const fmt = n => n==null ? '' : n>=1e6 ? (n/1e6).toFixed(n>=1e7?0:1)+'M' : n>=1e3 ? (n/1e3).toFixed(n>=1e4?0:1)+'k' : String(Math.round(n));
 
 /* ---------- meta + subsystem filter ---------- */
 $('src').textContent = M.meta.source;
-$('meta').innerHTML = [
-  `${M.meta.tableCount} tables`, `${M.meta.fkCount} FKs`, `mig ${M.meta.migrationHead}`
-].map(x => `<span class="mchip">${esc(x)}</span>`).join('');
+function renderMeta(){
+  let html = [`${M.meta.tableCount} tables`, `${M.meta.fkCount} FKs`, `mig ${M.meta.migrationHead}`]
+    .map(x => `<span class="mchip">${esc(x)}</span>`).join('');
+  if (COUNTS) html += `<span class="mchip live" title="planner row estimates (pg_class.reltuples)">~${fmt(COUNT_TOTAL)} rows · live</span>`;
+  $('meta').innerHTML = html;
+}
+renderMeta();
+
+// When embedded in the app (/admin/architecture), pull live per-table row estimates and merge
+// them in. Same-origin fetch (CSP connect-src 'self'); the iframe carries the admin session.
+// Opened as a file or Claude artifact this 404s and we keep the static schema — graceful.
+async function loadStats(){
+  try {
+    const r = await fetch('/api/admin/architecture/stats', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    const c = j && j.data && j.data.counts;
+    if (!c) return;
+    COUNTS = c; COUNT_TOTAL = (j.data.total != null) ? j.data.total : Object.values(c).reduce((a, b) => a + b, 0);
+    renderMeta(); renderList();
+    if (state.view === 'schema' && state.sel) renderDetail(state.sel);
+  } catch { /* not running in-app — static schema only */ }
+}
 
 $('subfilter').innerHTML = M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
   const on = state.sub === s.id;
@@ -220,7 +243,7 @@ function renderList(){
       html += `<button class="trow" data-nav="t:${esc(t)}" aria-current="${state.sel===t}">`+
         `<span class="tdot" style="background:hsl(${s.hue} var(--ctsat) 50%)"></span>`+
         `<span class="tn">${esc(t)}</span>`+
-        `<span class="tm">${tb.columns.length}c·${tb.out.length}fk</span></button>`;
+        `<span class="tm">${tb.columns.length}c·${tb.out.length}fk${COUNTS&&COUNTS[t]!=null?` · ${fmt(COUNTS[t])}`:''}</span></button>`;
     }
   }
   $('list').innerHTML = html || `<div class="gempty">no match</div>`;
@@ -295,6 +318,7 @@ function renderDetail(name){
       ${t.isView?'<span class="badge">view</span>':''}
       <span class="badge">${t.columns.length} fields</span>
       <span class="badge">${t.out.length} out · ${t.in.length} in</span>
+      ${COUNTS && COUNTS[name]!=null ? `<span class="badge live">~${fmt(COUNTS[name])} rows</span>` : ''}
     </div>
     <div class="sectitle">Foreign-key neighborhood</div>
     ${graph(name)}
@@ -406,5 +430,6 @@ window.addEventListener('hashchange', fromHash);
 /* ---------- boot ---------- */
 renderList();
 fromHash();
+loadStats();
 
 </script>
