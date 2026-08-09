@@ -22,6 +22,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isSectionWritable } from '@/lib/proposal/section-writable';
 import { randomUUID } from 'crypto';
 
 // Char/word counts from a section's JSON content string (mirrors the save + versions routes).
@@ -88,6 +89,7 @@ export async function POST(
     type Row = {
       sectionId: string; title: string | null; aiVersion: number; aiContent: unknown;
       liveVersion: number; liveContent: string | null; isLocked: boolean; contentSource: string | null;
+      completedStage: string | null; proposalStage: string | null;
     };
     let rows: Row[];
     try {
@@ -95,9 +97,11 @@ export async function POST(
         SELECT DISTINCT ON (cv.section_id)
                cv.section_id AS "sectionId", ps.title, cv.version_number AS "aiVersion", cv.content AS "aiContent",
                ps.version AS "liveVersion", ps.content AS "liveContent", ps.is_locked AS "isLocked",
-               ps.content_source AS "contentSource"
+               ps.content_source AS "contentSource",
+               ps.completed_stage AS "completedStage", p.stage AS "proposalStage"
         FROM canvas_versions cv
         JOIN proposal_sections ps ON ps.id = cv.section_id
+        JOIN proposals p ON p.id = ps.proposal_id
         WHERE ps.proposal_id = ${proposalId}::uuid AND cv.source = 'ai_revision'
         ORDER BY cv.section_id, cv.version_number DESC
       `;
@@ -112,7 +116,8 @@ export async function POST(
     const applied: string[] = [];
     let skipped = 0;
     for (const r of rows) {
-      if (r.isLocked) { skipped++; continue; }
+      // Same immutability contract as PUT …/save — skip locked or prior-stage-frozen sections.
+      if (!isSectionWritable(r, r.proposalStage)) { skipped++; continue; }
       try {
         const aiObj = coerceJsonb<unknown>(r.aiContent, {});
         const aiJson = JSON.stringify(aiObj);

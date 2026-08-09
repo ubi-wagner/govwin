@@ -137,6 +137,30 @@ limits:** `ANTHROPIC_API_KEY` is present-but-empty in the sandbox, so the drafti
 model — W1.3 was proven by staging the agent's output shape into the real instance and driving the
 land→accept path; the wiring is real, the LLM token is not.
 
+### Close-out sweep (2026-08-09, "tested in full") — 8 more phantom bugs found + fixed
+
+A follow-on pass drove the items proven only by *unit test or diff* to the same live standard, plus a
+three-lens adversarial sweep (SQL/DB · API/auth · React/client) over the whole Canvas diff — every finding
+**independently re-proven against the live stack** before it was trusted (agents included). Eight distinct
+defects the green backbone never saw, all now fixed and live-verified:
+
+| # | Severity | Bug | Proof it was real | Fix |
+|---|----------|-----|-------------------|-----|
+| 1 | **critical** | `reuse-past` wrote `content_source='library'`, which is **not** in the `canvas_versions.source` CHECK → the NEXT archive of that section (save/restore/accept) throws → caught non-fatal → snapshot **dropped** → content-loss. **One poisoned row already in live data** (from an earlier "passing" test that asserted the buggy value). | live: `INSERT … source='library'` throws the CHECK; a reuse→save left the reused content unrecoverable | write `'library_import'`; **migration 164** heals existing rows |
+| 2 | high | `save` persisted the **unvalidated** client `body.source` into `content_source` (ignoring its own whitelisted `source`) → same downstream CHECK-fail/content-loss, client-triggerable | code path + the same CHECK proof | use the validated `source` |
+| 3 | high | `seed-job/apply` archived the pre-merge content at the current version but **never advanced** `proposal_sections.version` → invariant `version > MAX(cv)` broken → the next human-save collided on the slot and dropped its snapshot | live repro: after apply `version==MAX(cv)`; the following save lost the seeded state from history | advance under CAS, like save/restore |
+| 4 | high | `TemplateCanvasEditor` mounted `<CanvasEditor>` with **no autosave key** → `draftKey` collapsed to the shared constant `canvas-draft:doc` → editing template A then opening B offered to "recover" A's body into B → overwrite (template PATCH keeps no history) | code: the only keyless mount | pass `autosaveKey`; make autosave **inert** without a real key |
+| 5 | medium | editor **white-screened** (`doc.canvas.format.startsWith(...)` on `undefined`) on any document missing `canvas.format` — an agent/import/legacy doc | live: two sections with the key absent threw React #419 error-boundary | `withCanvasDefaults` normalizes on ingest |
+| 6 | medium | **draft-restore crashed** the editor on a partial persisted doc (`setDoc` bypassed mount-time normalization; a canvas missing `font_default`/`line_spacing` threw) | live screenshot: clicking "Restore them" → error boundary | normalize on restore + `withCanvasDefaults` now fills **every** canvas field |
+| 7 | medium | the `STAGE_LOCKED` immutability contract `save` enforces was **missing** from `versions`/restore, `accept-ai-revisions`, and `seed-job/apply` → an admin could overwrite a stage-frozen (completed-but-unlocked) section those routes should refuse | live: on a `completed_stage≠stage` section, restore→423, accept-ai/seed-apply skip, content unchanged — after the fix | shared `isSectionWritable`/`sectionLockReason` helper across all four writers |
+| 8 | medium | `handleUpdateNode` didn't reset `provenance.source`, so a hand-edited AI node kept `ai_draft` and **Revert** would silently discard the manual edit back to the pre-AI snapshot | code + Accept/Revert gate | set `source:'manual'` on a human content edit |
+
+All eight are DB/live-asserted on the final rebuilt bundle (repro harnesses in the session scratchpad).
+Cross-tenant security was re-proven live too: a foundation `tenant_admin` hitting another tenant's slug is
+**403** on all seed-job + reuse + accept routes (IDOR closed). Deferred as known low-priority (non-functional):
+the research-poll unmount cleanup, a cosmetic version-source badge tag, and wrapping the `auth()`/tenant
+resolve in select/decide/skip so an unlikely throw returns the `{error,code}` shape.
+
 ---
 
 ## Corrections applied to the baseline analysis (the CANVAS_ADVERSARIAL §8 items)

@@ -11,7 +11,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
-import { createNode, getNodeText, toEditableFlat } from '@/lib/types/canvas-document';
+import { createNode, getNodeText, toEditableFlat, withCanvasDefaults } from '@/lib/types/canvas-document';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
@@ -161,7 +161,7 @@ function defaultStyle(type: NodeType): NodeStyle | undefined {
 export function CanvasEditor(props: Props) {
   // Normalize a v2 (section-layer) doc into a flat, editable doc so its content
   // is visible + editable in the canvas — every editor surface edits `nodes`.
-  const initialDocument = toEditableFlat(props.initialDocument);
+  const initialDocument = toEditableFlat(withCanvasDefaults(props.initialDocument));
 
   // Delegate to SheetEditor for spreadsheet format
   if (initialDocument.canvas.format === 'spreadsheet') {
@@ -227,12 +227,17 @@ function CanvasEditorInner({
   // Every change is debounced to localStorage so a tab-close / crash / reload never loses
   // work; on mount we offer to restore a newer local draft. The manual Save (button / Ctrl+S)
   // is still the only SERVER write — this is the local safety net that makes reload safe.
-  const draftKey = `canvas-draft:${autosaveKey ?? sectionId ?? proposalId ?? 'doc'}`;
+  // Autosave is scoped to a STABLE per-document key. If the caller supplies none of
+  // autosaveKey/sectionId/proposalId, DISABLE autosave (draftKey=null) rather than fall back to a
+  // shared constant — a shared key cross-contaminates unrelated editors (recovering doc A's draft
+  // into editor B, which Save then persists over B). Every real mount passes a key.
+  const draftScope = autosaveKey ?? sectionId ?? proposalId ?? null;
+  const draftKey = draftScope ? `canvas-draft:${draftScope}` : null;
   const [recoverable, setRecoverable] = useState<CanvasDocument | null>(null);
   const draftCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (draftCheckedRef.current) return;
+    if (!draftKey || draftCheckedRef.current) return;
     draftCheckedRef.current = true;
     try {
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(draftKey) : null;
@@ -247,7 +252,7 @@ function CanvasEditorInner({
   }, [draftKey, initialDocument]);
 
   useEffect(() => {
-    if (!dirty || typeof window === 'undefined') return;
+    if (!dirty || !draftKey || typeof window === 'undefined') return;
     const t = setTimeout(() => {
       try { window.localStorage.setItem(draftKey, JSON.stringify({ doc, savedAt: Date.now() })); } catch { /* quota / private mode */ }
     }, 1200);
@@ -255,10 +260,12 @@ function CanvasEditorInner({
   }, [doc, dirty, draftKey]);
 
   const handleRestoreDraft = useCallback(() => {
-    setRecoverable((rec) => { if (rec) { setDoc(rec); setDirty(true); } return null; });
+    // Normalize the recovered draft the same way the mount path does — a partial/legacy persisted doc
+    // would otherwise crash the editor on setDoc (the mount-time withCanvasDefaults doesn't cover this path).
+    setRecoverable((rec) => { if (rec) { setDoc(withCanvasDefaults(rec)); setDirty(true); } return null; });
   }, []);
   const handleDiscardDraft = useCallback(() => {
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    try { if (draftKey && typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
     setRecoverable(null);
   }, [draftKey]);
 
@@ -363,6 +370,10 @@ function CanvasEditorInner({
         return {
           ...n,
           content,
+          // A human content edit makes the node human-owned. Clear the ai_draft provenance so the
+          // Accept/Revert affordances (gated on source==='ai_draft') retire — otherwise Revert would
+          // still restore the pre-AI snapshot and silently discard this manual edit.
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString() },
@@ -629,7 +640,7 @@ function CanvasEditorInner({
       await onSave(docWithMeta);
       setDirty(false);
       // Clear the local recovery draft — the server now has this content.
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      try { if (draftKey && typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
       // Clear revision meta after successful save
       lastRevisionMetaRef.current = null;
     } catch (err) {

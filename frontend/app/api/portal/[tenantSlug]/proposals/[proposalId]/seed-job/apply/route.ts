@@ -6,6 +6,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { coerceJsonb } from '@/lib/jsonb';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
+import { isSectionWritable } from '@/lib/proposal/section-writable';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,10 +72,12 @@ export async function POST(req: Request, { params }: Params) {
       id: string;
       sectionMapping: Record<string, SectionMappingEntry>;
       sectionDecisions: Record<string, Record<string, string>>;
+      proposalStage: string | null;
     }[]>`
       SELECT lsj.id,
              lsj.section_mapping   AS "sectionMapping",
-             lsj.section_decisions AS "sectionDecisions"
+             lsj.section_decisions AS "sectionDecisions",
+             p.stage               AS "proposalStage"
       FROM library_seed_jobs lsj
       JOIN proposals p ON p.id = lsj.proposal_id
       WHERE lsj.id          = ${seedJobId}::uuid
@@ -111,15 +114,18 @@ export async function POST(req: Request, { params }: Params) {
 
       if (reuseAtoms.length === 0 && regenAtoms.length === 0) continue;
 
-      // Load current section content (+ version, for the pre-merge archive)
-      const [section] = await sql<{ id: string; content: unknown; title: string; version: number }[]>`
-        SELECT id, content, title, version
+      // Load current section content (+ version, for the pre-merge archive; + lock/stage state)
+      const [section] = await sql<{ id: string; content: unknown; title: string; version: number; isLocked: boolean; completedStage: string | null }[]>`
+        SELECT id, content, title, version, is_locked AS "isLocked", completed_stage AS "completedStage"
         FROM proposal_sections
         WHERE id = ${targetSectionId}::uuid
           AND proposal_id = ${proposalId}::uuid
         LIMIT 1
       `;
       if (!section) continue;
+      // Respect the same immutability contract PUT …/save enforces: never seed onto a locked or
+      // prior-stage-frozen section (skip it silently — a seed apply is advisory, not a gate).
+      if (!isSectionWritable(section, job.proposalStage)) continue;
 
       // Build canvas nodes from reuse atoms (red italic — reuse_marker)
       const newNodes: CanvasNode[] = [];
@@ -219,9 +225,31 @@ export async function POST(req: Request, { params }: Params) {
         },
       };
 
-      // ── Archive the pre-merge content to canvas_versions (restore point) ──
-      // Defense-in-depth: even though we now merge (not replace), snapshot what was there so a
-      // seed apply is always reversible from Version History — matching the section-save discipline.
+      // ── Advance the section under CAS, archiving the pre-merge content as a restore point ──
+      // Mirrors the section-save discipline (lib/proposal/lock-section.ts / the save + restore routes):
+      // the new content numbers at the section's CURRENT version and ADVANCES the counter (version + 1),
+      // and the prior content is archived at the *old* version — which is now < the live version. Without
+      // the advance, proposal_sections.version stays == MAX(canvas_versions.version_number), so the NEXT
+      // human-save archives at that same slot → ON CONFLICT (section_id, version_number) DO NOTHING silently
+      // drops the snapshot → the seeded state is lost from Version History. The advance is the whole
+      // invariant: proposal_sections.version MUST stay > MAX(canvas_versions.version_number). (Proven by a
+      // live seed-apply → human-save repro; matches how reuse-past / accept-ai-revisions already behave.)
+      const upd = await sql`
+        UPDATE proposal_sections
+        SET content    = ${JSON.stringify(updatedDoc)},
+            status     = 'ai_drafted',
+            version    = ${section.version + 1},
+            updated_at = now()
+        WHERE id = ${targetSectionId}::uuid
+          AND version = ${section.version}
+      `;
+      if (upd.count === 0) {
+        // The section changed under us between the read and this write — skip rather than corrupt
+        // its history with a stale-based archive/advance.
+        console.error('[seed-apply] version CAS miss on section', targetSectionId, '— skipped (concurrent edit)');
+        continue;
+      }
+
       if (existingDoc) {
         try {
           const existingText = (existingDoc.nodes ?? [])
@@ -255,14 +283,6 @@ export async function POST(req: Request, { params }: Params) {
           // Non-fatal — the merge still preserves the prior nodes.
         }
       }
-
-      await sql`
-        UPDATE proposal_sections
-        SET content    = ${JSON.stringify(updatedDoc)},
-            status     = 'ai_drafted',
-            updated_at = now()
-        WHERE id = ${targetSectionId}::uuid
-      `;
       sectionsSeeded++;
     }
 

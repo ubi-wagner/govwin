@@ -80,6 +80,7 @@ export function TemplateCanvasEditor({ templateId, initialDocument, actorId, act
           actorId={actorId}
           actorName={actorName}
           readOnly={readOnly}
+          autosaveKey={`admin-template:${templateId}`}
           variables={{ company_name: 'Your Company', topic_number: 'TBD' }}
         />
       </div>

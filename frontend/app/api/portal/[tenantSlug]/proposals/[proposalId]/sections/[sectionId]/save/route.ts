@@ -277,10 +277,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
       : section.version;
     const nextVersion = base + 1;
     // Provenance of the INCOMING content (client __revisionMeta.source, if any). Recorded on the
-    // section so the NEXT archive labels this version honestly. Defaults to human_edit for plain saves.
-    const contentSource = typeof (body as { source?: unknown }).source === 'string'
-      ? (body as { source: string }).source
-      : 'human_edit';
+    // section so the NEXT archive labels this version honestly. MUST be the whitelist-validated
+    // `source` (computed above) — writing the raw client value lets an arbitrary string land in
+    // content_source, and the next archive copies it into canvas_versions.source (CHECK-constrained),
+    // which throws → the snapshot is silently dropped (content-loss). Defaults to human_edit.
+    const contentSource = source;
 
     let updateResult;
     try {

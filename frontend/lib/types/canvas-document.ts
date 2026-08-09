@@ -747,6 +747,28 @@ export function toEditableFlat(doc: CanvasDocument): CanvasDocument {
   return { ...doc, version: 1, nodes, sections: undefined };
 }
 
+/**
+ * Fill missing `canvas` rules with the letter_standard defaults so the editor never crashes on a
+ * partial/legacy/agent-produced document. Several editor surfaces call `doc.canvas.format.startsWith(…)`
+ * unguarded, so a document persisted without `canvas.format` (e.g. an agent's markdown_to_canvas output
+ * or an older import) would otherwise white-screen the whole section. A document that already carries a
+ * truthy `canvas.format` is returned unchanged (stable identity — no needless re-render for valid docs).
+ */
+export function withCanvasDefaults(doc: CanvasDocument): CanvasDocument {
+  const c = doc.canvas as Partial<CanvasRules> | undefined;
+  // Fast path: a fully-formed canvas is returned UNCHANGED (stable identity, no re-render for valid docs).
+  if (c && c.format && c.width && c.height && c.margins && c.font_default && typeof c.line_spacing === 'number') {
+    return doc;
+  }
+  // Otherwise merge the letter_standard defaults under whatever the doc supplies, so EVERY field the
+  // renderer reads (format, font_default, line_spacing, margins, header/footer, page limits) is present.
+  // Any single missing field (e.g. an agent doc with format but no font_default) would otherwise crash a
+  // downstream `doc.canvas.<field>.<prop>` access and white-screen the section.
+  const canvas = { ...CANVAS_PRESETS.letter_standard, ...(c ?? {}) } as CanvasRules;
+  if (!canvas.format) canvas.format = 'letter';
+  return { ...doc, canvas };
+}
+
 /** Build a group from nodes (optionally a labeled, keep-together, atom-backed group). */
 export function createGroup(
   nodes: CanvasNode[],

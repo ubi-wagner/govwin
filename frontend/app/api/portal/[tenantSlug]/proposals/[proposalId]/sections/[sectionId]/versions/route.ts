@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
+import { sectionLockReason } from '@/lib/proposal/section-writable';
 import { isValidUUID } from '@/lib/validation';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -365,8 +366,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
     enterTenant(tenantId);
 
-    let proposal: { id: string } | undefined;
-    try { [proposal] = await sql<{ id: string }[]>`SELECT id FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId} LIMIT 1`; }
+    let proposal: { id: string; stage: string | null } | undefined;
+    try { [proposal] = await sql<{ id: string; stage: string | null }[]>`SELECT id, stage FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId} LIMIT 1`; }
     catch (e) { console.error('[versions/restore] proposal query failed:', e); return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 }); }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -382,17 +383,24 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    let section: { id: string; title: string | null; version: number; content: string | null; isLocked: boolean; contentSource: string | null } | undefined;
+    let section: { id: string; title: string | null; version: number; content: string | null; isLocked: boolean; contentSource: string | null; completedStage: string | null } | undefined;
     try {
       [section] = await sql<typeof section[]>`
-        SELECT id, title, version, content, is_locked AS "isLocked", content_source AS "contentSource"
+        SELECT id, title, version, content, is_locked AS "isLocked", content_source AS "contentSource", completed_stage AS "completedStage"
         FROM proposal_sections WHERE id = ${sectionId} AND proposal_id = ${proposalId} LIMIT 1`;
     } catch (e) { console.error('[versions/restore] section query failed:', e); return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 }); }
     if (!section) {
       return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
     }
-    if (section.isLocked) {
-      return NextResponse.json({ error: 'This section is locked and cannot be edited. Unlock it first.', code: 'SECTION_LOCKED' }, { status: 423 });
+    // Restore is a WRITE — enforce the same immutability contract as PUT …/save: a locked section,
+    // or one frozen by a prior stage (completed_stage !== current stage), is read-only. Without the
+    // stage check an admin could restore over a stage-frozen section that save itself refuses.
+    const lockReason = sectionLockReason(section, proposal.stage);
+    if (lockReason) {
+      return NextResponse.json(
+        { error: lockReason.message, code: lockReason.code, ...(lockReason.code === 'STAGE_LOCKED' ? { completedStage: section.completedStage } : {}) },
+        { status: 423 },
+      );
     }
     if (versionNumber === section.version) {
       return NextResponse.json({ error: 'That version is already current', code: 'VALIDATION_ERROR' }, { status: 400 });

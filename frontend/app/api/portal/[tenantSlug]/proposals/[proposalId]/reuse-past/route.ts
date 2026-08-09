@@ -155,7 +155,7 @@ export async function POST(
         const nextVersion = s.version + 1;
         const upd = await sql`
           UPDATE proposal_sections
-          SET content = ${JSON.stringify(doc)}, version = ${nextVersion}, content_source = 'library',
+          SET content = ${JSON.stringify(doc)}, version = ${nextVersion}, content_source = 'library_import',
               status = 'ai_drafted', last_modified_by = ${u.id}::uuid, editing_by = NULL, editing_since = NULL, updated_at = now()
           WHERE id = ${s.id}::uuid AND version = ${s.version}`;
         if (upd.count === 0) { continue; } // raced — skip
