@@ -45,6 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/storage">S3 Storage</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">System</span>
+          <AdminNavLink href="/admin/architecture">Architecture</AdminNavLink>
           <AdminNavLink href="/admin/system-state">System State</AdminNavLink>
           <AdminNavLink href="/admin/events">Event Stream</AdminNavLink>
           <AdminNavLink href="/admin/agents">Agents</AdminNavLink>

@@ -9,7 +9,7 @@
  * No database needed here — it consumes what extract.mjs already wrote. Re-run extract first
  * when the schema changed; re-run this whenever schema.json OR overlay.json changes.
  */
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -76,6 +76,11 @@ if (!template.includes(marker)) { console.error('generate: template.html is miss
 const payload = JSON.stringify(model).replace(/</g, '\\u003c');
 const html = template.replace(marker, payload);
 
-const out = join(ROOT, 'docs', 'architecture', 'explorer.html');
-writeFileSync(out, html);
-console.error(`generate: ${model.meta.tableCount} tables · ${model.meta.fkCount} FKs · mig ${migrationHead} → ${out} (${(html.length / 1024).toFixed(0)} KB)`);
+// Write both the canonical docs copy AND the in-app static asset (served at
+// /architecture/explorer.html and embedded on /admin/architecture).
+const outputs = [
+  join(ROOT, 'docs', 'architecture', 'explorer.html'),
+  join(HERE, '..', '..', 'public', 'architecture', 'explorer.html'),
+];
+for (const out of outputs) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, html); }
+console.error(`generate: ${model.meta.tableCount} tables · ${model.meta.fkCount} FKs · mig ${migrationHead} · ${(html.length / 1024).toFixed(0)} KB → ${outputs.length} outputs`);

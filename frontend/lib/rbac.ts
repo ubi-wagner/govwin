@@ -142,6 +142,9 @@ const PATH_MIN_ROLE: Array<{ prefix: string; role: Role }> = [
   { prefix: '/api/admin/system', role: 'master_admin' },
   { prefix: '/admin', role: 'rfp_admin' },
   { prefix: '/api/admin', role: 'rfp_admin' },
+  // The Architecture Explorer static asset (embedded on /admin/architecture) exposes the full
+  // schema structure — gate it to rfp_admin like the page, not just any authenticated user.
+  { prefix: '/architecture', role: 'rfp_admin' },
   // EconDev partner-admin surface (owner-scoped; handlers re-check owner_id + canManagePartnerTenants).
   { prefix: '/partner', role: 'partner_admin' },
   { prefix: '/api/partner', role: 'partner_admin' },
