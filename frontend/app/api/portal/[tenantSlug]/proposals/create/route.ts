@@ -433,7 +433,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             }
           }
           if (!templateDoc) {
-            const templateKey = resolveTemplateKey(programType, item.itemType);
+            const templateKey = resolveTemplateKey(programType, item.itemType, item.itemName);
             if (templateKey) templateDoc = getTemplate(templateKey);
           }
           if (templateDoc) {

@@ -151,7 +151,7 @@ export async function provisionProposalForPortal(opts: {
             const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
             if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) templateDoc = tpl.canvasDocument;
           }
-          if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType); if (k) templateDoc = getTemplate(k); }
+          if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k); }
           if (templateDoc) {
             templateDoc.metadata.proposal_id = p.id;
             templateDoc.metadata.solicitation_id = t.solicitationId ?? '';

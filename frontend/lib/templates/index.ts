@@ -52,13 +52,22 @@ export function getTemplate(key: string): CanvasDocument | null {
 export function resolveTemplateKey(
   programType: string,
   itemType: string,
+  itemName?: string,
 ): string | null {
+  // Cover sheets, certifications, commercialization reports and cost sheets are auto/form volumes —
+  // they must NEVER inherit a narrative content template. (Seeding the 15-page Technical template into
+  // a 1-page Cover Sheet is what produced the "15/1p" over-limit.) Guard by name first.
+  const name = (itemName ?? '').toLowerCase();
+  if (/cover\s*sheet|cover\s*page|\bcertif|commercial(iz|is)ation report|\bccr\b|cost\s*sheet|sf-?424|funding agreement/.test(name)) {
+    return null;
+  }
   let key: string | null = null;
-  if (programType === 'sbir_phase_1' && (itemType === 'cost' || itemType === 'cost_volume')) {
+  if (programType === 'sbir_phase_1' && (itemType === 'cost' || itemType === 'cost_volume' || itemType === 'spreadsheet')) {
     key = 'dod-sbir-phase1-cost';
   } else if (itemType === 'slide_deck') {
     if (programType === 'cso') key = 'dod-cso-phase1-briefing';
-  } else if (itemType === 'word_doc' || itemType === 'pdf' || itemType === 'text') {
+  } else if (itemType === 'word_doc') {
+    // Only the word_doc Technical narrative gets the technical template — NOT pdf/form/text items.
     if (programType === 'sbir_phase_1') key = 'dod-sbir-phase1-technical';
     if (programType === 'sbir_phase_2') key = 'dod-sbir-phase2-technical';
   }
