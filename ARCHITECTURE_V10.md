@@ -3,7 +3,11 @@
 **Date:** 2026-07-03
 
 > **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
-> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **162**
+> (schema · 191 routes · 104 pages · agent wiring · bugs). **2026-08-09 additions (merged PR #205 + deployed):**
+> the `/admin/workflows` **Workflow Map + live instance DAG visualization** (`app/admin/workflows/workflow-{graph,shapes,map}.tsx`;
+> operator guide docs/WORKFLOW_ADMIN_GUIDE.md); the **compliance floor** `validateCanvasAgainstSpec` at the
+> export gate + section save; and the full-draft **read-on-review landing** route `…/proposals/[p]/land-revisions`
+> (docs/FULL_DRAFT_LANDING_DESIGN.md). Reconciliations: migration head is now **162**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix; the **V1 UI-wiring pass** then added 143
 > `proposal_sections.sort_index`, 144 `proposals.studio_phase`, 145 `notification_read_state`, 146 the amendment
 > engine, 147–148 the soft-archive `archived_at` cascade — canonical **docs/ARCHIVABLE_CONTRACT.md**); the archetype roster is **36 files =

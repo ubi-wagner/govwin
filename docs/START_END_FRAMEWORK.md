@@ -5,6 +5,14 @@ read, not remembered). This is the canonical map of *how work starts and ends at
 *every message that crosses the bridge in both directions*, and *every trigger→step→trigger chain* the
 declarative engine runs — written so a **compliance domain** can be layered on without re-deriving any of it.
 
+> **2026-08-09 (merged PR #205 + deployed):** that compliance layer is now partly built —
+> `validateCanvasAgainstSpec` (export gate + section save), and the full-draft cohort's staged output now
+> **LANDS** via a *frontend read-on-review* route (`POST …/proposals/[p]/land-revisions`) writing proposed
+> `ai_revision` `canvas_versions`. Key finding: the engine's invariants (no-dead-end + input-map-ancestor)
+> **forbid a pipeline ACTION from consuming an agent step's result**, so the landing lives in the frontend,
+> human-triggered — see **docs/FULL_DRAFT_LANDING_DESIGN.md**. Operator view: **docs/WORKFLOW_ADMIN_GUIDE.md**
+> (the by-spine Workflow Map + live instance DAGs at `/admin/workflows`).
+
 Design-of-record companions (this doc supersedes their spine framing where they disagree — see §9 drift):
 `docs/AUTOMATION_SPINE_MAP.md` (engine), `docs/MASTER_MIRROR_OPP_DESIGN.md` (bridge),
 `docs/AUTOMATION_POLICY_DESIGN.md` (#190 grammar), `docs/AGENT_WORKFORCE.md` (agents).

@@ -185,10 +185,10 @@ This is a dated snapshot for compliance reference; the guards enforce the contra
 `template.updated`, `unit.uploaded`, `vault.artifact_uploaded`, `vault.created`, `vault.member_invited`,
 `vault.member_revoked`.
 
-**proposal** (47): `ai_review.requested`, `amendment.acknowledged`, `artifact.exported`,
+**proposal** (48): `ai_review.requested`, `amendment.acknowledged`, `artifact.exported` (now carries `{compliant, complianceViolations}` from the export-gate compliance floor),
 `artifact.locked`, `collaborator.access_revoked`, `collaborator.invited`, `comment.created`,
 `comment.resolved`, `compliance.checked`, `document.locked`, `draft.completed`[py],
-`gate_requirement.created`, `gate_requirement.toggled`, `outcome.attributed`[py], `outcome.recorded`,
+`full_draft.landed` (read-on-review landing of a full-draft run's staged canvases), `gate_requirement.created`, `gate_requirement.toggled`, `outcome.attributed`[py], `outcome.recorded`,
 `package.export_started`, `package_review.requested`, `preview.generated`[py], `proposal.advance_ready`,
 `proposal.advanced`, `proposal.archived`, `proposal.created`, `proposal.draft_requested`,
 `proposal.dropbox_file_deleted`, `proposal.dropbox_file_uploaded`, `proposal.full_draft_requested`,

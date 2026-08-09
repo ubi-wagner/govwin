@@ -1,11 +1,64 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-04 (V1 hardening — adversarial bug-hunt, toast polish, manual + doc sync)
-**Branch:** `claude/nice-hamilton-kBqtD`
+**Last updated:** 2026-08-09 (workflow viz + compliance enforcement + full-draft landing — MERGED to `main` via PR #205 and DEPLOYED)
+**Branch:** `claude/nice-hamilton-kBqtD` — the prior PR is MERGED; on resume RESTART the branch from `origin/main` (`git fetch origin && git checkout -B claude/nice-hamilton-kBqtD origin/main`), do NOT stack on the old history.
 
 ---
 
-## 0. LATEST — 2026-08-04 (V1 hardening: bug-hunt + polish + docs; READ THIS FIRST)
+## 0. LATEST — 2026-08-09 (workflow viz + compliance + full-draft landing; MERGED + DEPLOYED; READ THIS FIRST)
+
+Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162**. `tsc 0 · vitest 899`.
+
+**Shipped this stretch:**
+- **Workflow visualization** at `/admin/workflows` — a dependency-free, by-spine **Workflow Map** (all 29
+  templates, discovery + build spines + platform) + **live instance DAGs** (step status overlay) +
+  sortable/filterable/Live monitor. Files: `app/admin/workflows/workflow-graph.tsx` (renderer),
+  `workflow-shapes.ts` (the code-defined shape catalog, 1:1 with `pipeline/src/workflows/*`),
+  `workflow-map.tsx`. Both-spine admin guide: `docs/WORKFLOW_ADMIN_GUIDE.md`.
+- **Compliance enforcement** — `validateCanvasAgainstSpec(doc, spec)` in `lib/types/canvas-document.ts`
+  (font floor · page cap · images · header/footer), wired at the **export gate** (artifact export →
+  `X-Compliance-Violations` header + `proposal:artifact.exported {compliant}` audit) and **section save**
+  (`data.complianceWarnings`, non-blocking).
+- **Full-draft LANDING (read-on-review)** — the fabric never lands agent output, and the workflow engine's
+  invariants FORBID a pipeline ACTION from consuming an agent step's result (see
+  `docs/FULL_DRAFT_LANDING_DESIGN.md`). So the landing is a **frontend, human-triggered** route:
+  `POST /api/portal/[slug]/proposals/[p]/land-revisions` reads the proposal's latest `OnFullDraftRequested%`
+  `process_instances.step_results`, extracts the staged canvases, and lands each as a **proposed
+  `ai_revision` canvas_versions row** for the version-history UI to review + restore. Button: "Apply
+  AI-proposed revisions" in `proposal-ai-actions.tsx`. Emits `proposal:full_draft.landed`.
+- **Canvas export fidelity** — the TOC now renders in the PDF/preview (`lib/export/canvas-html.ts`), and the
+  editor page-count uses the real `estimatePageCount` (not `nodes.length/8`).
+
+**⚠️ INVARIANT any new `canvas_versions` writer MUST hold** (a bug the live staging scenario caught + I
+fixed in the landing route): **`proposal_sections.version` must stay `> MAX(canvas_versions.version_number)`
+per section.** Number a new row at the section's CURRENT `version` and ADVANCE the counter (compare-and-swap
+`version = version + 1`) — mirror `lib/proposal/lock-section.ts` / `lib/proposal-advance.ts`. Numbering at
+`MAX+1` without advancing makes the next human-save's archive collide → `ON CONFLICT DO NOTHING` silently
+drops it → undo/history content-loss.
+
+**One honest asterisk:** the landing's read/extract/land/restore path is fully live-verified, but the
+UPSTREAM staging (agents generating the real canvases into `step_results`) needs `ANTHROPIC_API_KEY` — prod
+has it, the sandbox doesn't. So the landing mechanism is proven; the LLM that fills the tray runs in prod.
+
+**Recurring gotcha — the self-reverting sandbox (hit ~8×):** on idle the container reverts the working tree
++ local git + the `/tmp` Postgres to an OLD commit, and kills PG/server/heartbeat. **Nothing is lost** — every
+commit is pushed. Recover: `git fetch origin && git reset --hard origin/<branch>` (or `checkout -B` from
+`origin/main` if the PR merged); restart PG as the **`claude`** user (NOT root) on port **5433**
+(`su claude -c '/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data -o "-p 5433 -k /tmp/pgs_gov" -l /tmp/pgs_gov/pg.log start'`);
+`psql -h /tmp/pgs_gov -p 5433 -U claude -d govtech_intel`. Serve = the standalone recipe in §2 (stage
+`.next/static`+`public`, then `node server.js`; auth on `localhost:3000`, env `AUTH_TRUST_HOST=true` +
+`AUTH_SECRET`). Re-arm the scratchpad heartbeat to keep the box alive during live drives.
+
+**Verified demo accounts:** `kate.ulepic@foundation3dp.com` / `DemoPass123!` (Foundation tenant_admin) ·
+`eric@rfppipeline.com` / `RFPAdmin2026!` (rfp_admin). Foundation TVSF proposal `c3db60b1-…` (submitted/locked;
+`scripts/rebuild-tvsf.mjs` restores it to canonical — run with `NODE_PATH=frontend/node_modules`).
+
+**Next up (2026-08-09):** a fresh punchlist sweep + a docs-accuracy pass (CLAUDE.md · ARCHITECTURE_V10 ·
+workflow docs · EVENT_CONTRACT namespaces) — in progress.
+
+---
+
+## 0·aug04 — 2026-08-04 (V1 hardening: bug-hunt + polish + docs)
 
 Post-wiring hardening pass on the V1 + archive work:
 

@@ -1,5 +1,10 @@
 # Automation Spine — End-to-End Map (for review, 2026-07-22)
 
+> **2026-08-09:** the workflows here are now visualized at `/admin/workflows` (by-spine Workflow Map + live
+> instance DAGs; operator guide **docs/WORKFLOW_ADMIN_GUIDE.md**), and the full-draft cohort's staged output
+> lands via a frontend read-on-review route (**docs/FULL_DRAFT_LANDING_DESIGN.md** — the engine forbids a
+> pipeline consumer of agent output).
+
 > **As-built correction (deepest-review sweep).** The authoritative, `file:line`-verified spine is now
 > **docs/START_END_FRAMEWORK.md**. Corrected here: the trigger keys `proposal:outcome.recorded:end` and
 > `finder:solicitation.triaged:end` (the earlier `proposal:proposal.outcome_recorded` /

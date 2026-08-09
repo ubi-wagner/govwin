@@ -92,7 +92,18 @@ in schema** — mig 116 forced RLS on `episodic_memories`, and mig 136_rls_cutov
 (`govtech_app` app / `rfp_agent` agents), `tenant_isolation` policies, and the per-request `SET app.tenant_id`
 context layer (mig 137 validates the namespace CHECK); it stays **inert until the one-op prod `DATABASE_URL`
 flip** off the owner role (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
-per-tenant usage, forward-only bridge).
+per-tenant usage, forward-only bridge). **Workflow visualization + compliance + full-draft landing (2026-08,
+merged via PR #205 + deployed):** `/admin/workflows` renders a dependency-free **Workflow Map** — all 29
+templates as DAGs, grouped by the two spines + platform — plus **live instance graphs** (per-step status
+overlay) and a sortable/filterable/Live monitor (operator guide: docs/WORKFLOW_ADMIN_GUIDE.md;
+`app/admin/workflows/workflow-{graph,shapes,map}.tsx`). The **compliance floor** `validateCanvasAgainstSpec`
+(`lib/types/canvas-document.ts` — font/pages/images/header-footer) is enforced at the artifact export gate
+(`X-Compliance-Violations` header + `proposal:artifact.exported {compliant}`) and on section save
+(`data.complianceWarnings`, non-blocking). The full-draft cohort's staged output LANDS via a **read-on-review**
+route (`POST …/proposals/[p]/land-revisions` + the "Apply AI-proposed revisions" button in
+`proposal-ai-actions.tsx`) that writes proposed `ai_revision` `canvas_versions` the builder reviews + restores
+— the workflow engine's invariants FORBID a pipeline consumer of agent output, so the landing is frontend +
+human-triggered (docs/FULL_DRAFT_LANDING_DESIGN.md).
 `opportunity_id` keys the spine (mig 088). **The workflow engine the agents plug into — the declarative
 trigger+step templates, the start→end event gate, and the two stateless reconcilers — is mapped in
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
@@ -170,6 +181,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `proposal_portals.opportunity_id` does not).
 - **Dropping tables:** drop ONLY when superseded-with-a-successor AND zero live code refs. "Empty in the
   sandbox" is NOT a drop signal — most empty tables are live-but-unused.
+- **canvas_versions numbering:** `proposal_sections.version` MUST stay `> MAX(canvas_versions.version_number)`
+  per section. A new version row numbers at the section's CURRENT `version` and ADVANCES the counter (CAS
+  `version = version + 1`), like `lib/proposal/lock-section.ts` / `lib/proposal-advance.ts` / the save route.
+  Numbering at `MAX+1` WITHOUT advancing makes the next human-save's archive collide on the slot →
+  `ON CONFLICT (section_id, version_number) DO NOTHING` silently drops it → undo/history content-loss. (The
+  full-draft read-on-review landing route follows this; found via a live staging scenario, docs/FULL_DRAFT_LANDING_DESIGN.md.)
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
