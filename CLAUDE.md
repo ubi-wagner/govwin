@@ -221,7 +221,11 @@ See CLAUDE_CLIFFNOTES.md for:
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
-docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow.
+docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow. For the
+**UI→DB→back request path** — the seven planes (UI · API · domain · data · events · engine · agents) and
+the canonical end-to-end traces (section save · discovery fan-out · build→package · agent land-or-review ·
+amendment fan-out) with their invariants — see **docs/DATA_FLOW.md** (the *static* cross-section; the *live*
+per-instance DAGs are the `/admin/workflows` Workflow Map).
 
 **Continuity:** `docs/CONTINUATION.md` is the durable "start here" memory — current
 sprint state, how to spin up the sandbox, verified demo accounts, the live gap list, and
