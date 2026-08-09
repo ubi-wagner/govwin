@@ -142,7 +142,11 @@ Break one and the failure is quiet: lost history, a stranded workflow, an off-le
 ## Where this lives
 
 - **Source of truth (text):** this file — `docs/DATA_FLOW.md`.
-- **Rendered visual:** the Claude artifact above (cross-section, both themes, drawn to scale).
+- **Rendered cross-section:** the Claude artifact above (both themes, drawn to scale).
+- **Interactive schema explorer:** `docs/architecture/explorer.html` — every table, field, type and FK
+  from the migrated database (108 tables · 192 FKs), click-navigable down to the foreign-key
+  neighborhood, with these five traces and the UI→table map built in. Regenerate it as the schema
+  grows: `node frontend/scripts/architecture/{extract,generate}.mjs` (see that folder's README).
 - **Live per-instance DAGs:** `/admin/workflows` Workflow Map (`docs/WORKFLOW_ADMIN_GUIDE.md`).
 - **Deeper detail per plane:** `ARCHITECTURE_V10.md` (system + file tree), `docs/AUTOMATION_SPINE_MAP.md`
   (engine), `docs/START_END_FRAMEWORK.md` (event gate), `docs/EVENT_CONTRACT.md` (event catalog),
