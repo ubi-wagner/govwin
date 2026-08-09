@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Props = {
@@ -59,6 +59,10 @@ export function ProposalAiActions({
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [landLoading, setLandLoading] = useState(false);
   const [acceptLoading, setAcceptLoading] = useState(false);
+  // Direct verbatim reuse of an uploaded past proposal into empty sections (W3.2).
+  const [pastProposals, setPastProposals] = useState<{ id: string; name: string; sectionCount: number }[]>([]);
+  const [reuseCocoonId, setReuseCocoonId] = useState('');
+  const [reuseLoading, setReuseLoading] = useState(false);
   const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -242,6 +246,48 @@ export function ProposalAiActions({
       setAcceptLoading(false);
     }
   }, [canDraft, acceptLoading, tenantSlug, proposalId, router]);
+
+  // Load the tenant's uploaded past proposals (for verbatim reuse into this build).
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    fetch(`/api/portal/${tenantSlug}/library/past-proposals`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.data?.pastProposals) setPastProposals(j.data.pastProposals); })
+      .catch(() => { /* non-fatal */ });
+  }, [tenantSlug, userRole]);
+
+  const handleReusePast = useCallback(async () => {
+    if (!canDraft || reuseLoading || !reuseCocoonId) return;
+    if (!window.confirm(
+      "Reuse this past proposal verbatim into the build's EMPTY matching sections? " +
+      'Existing content is untouched; imported text is marked red-italic and stays editable.',
+    )) return;
+    setReuseLoading(true);
+    setFullDraftMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/reuse-past`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cocoonId: reuseCocoonId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFullDraftMsg({ type: 'error', text: json.error || 'Reuse failed' });
+      } else {
+        const n = json.data?.applied ?? 0;
+        const um = (json.data?.unmatched ?? []).length;
+        setFullDraftMsg({
+          type: 'success',
+          text: n > 0
+            ? `Reused past content into ${n} empty section${n > 1 ? 's' : ''}${um ? ` (${um} had no title match)` : ''}. Open a section to review — imported text is red-italic.`
+            : 'No empty sections matched this past proposal by title (existing content is never overwritten).',
+        });
+        router.refresh();
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setReuseLoading(false);
+    }
+  }, [canDraft, reuseLoading, reuseCocoonId, tenantSlug, proposalId, router]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -579,6 +625,36 @@ export function ProposalAiActions({
             }`}
           >
             {fullDraftMsg.text}
+          </div>
+        )}
+
+        {pastProposals.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs font-medium text-gray-600 mb-0.5">Reuse a past proposal (verbatim)</p>
+            <p className="text-xs text-gray-400 mb-2">
+              Pull an uploaded past win&apos;s content straight into this build&apos;s EMPTY matching sections
+              (by title). Imported text is marked red-italic; existing content is never overwritten.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={reuseCocoonId}
+                onChange={(e) => setReuseCocoonId(e.target.value)}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 max-w-xs"
+              >
+                <option value="">Select an uploaded past proposal…</option>
+                {pastProposals.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.sectionCount} section{p.sectionCount !== 1 ? 's' : ''})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleReusePast}
+                disabled={!canDraft || reuseLoading || !reuseCocoonId}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border border-amber-200 rounded-lg bg-white text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {reuseLoading ? 'Reusing…' : 'Reuse verbatim'}
+              </button>
+            </div>
           </div>
         )}
       </div>
