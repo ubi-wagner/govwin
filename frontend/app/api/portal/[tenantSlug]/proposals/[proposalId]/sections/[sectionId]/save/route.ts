@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { resolveUserAccess } from '@/lib/proposal-access';
-import { validateCanvasAgainstSpec, type ComplianceSpec, type CanvasDocument } from '@/lib/types/canvas-document';
+import { validateCanvasAgainstSpec, getNodeText, type ComplianceSpec, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -283,13 +283,28 @@ export async function PUT(request: Request, ctx: RouteContext) {
     // which throws → the snapshot is silently dropped (content-loss). Defaults to human_edit.
     const contentSource = source;
 
+    // Auto-advance an untouched 'empty' section to 'in_progress' the instant real content
+    // lands. The client rarely sends an explicit status on a plain content save, so without
+    // this a drafted-but-not-locked section stays status='empty' forever — and the submission
+    // readiness rollup (which treats status='empty' as "nothing drafted yet") under-counts the
+    // work. Only fires when the caller didn't set a status AND the incoming canvas carries text.
+    let effectiveStatus: string | null = newStatus;
+    if (!effectiveStatus && section.status === 'empty') {
+      let incomingText = '';
+      try {
+        const nodes = (body.content as { nodes?: CanvasNode[] } | null)?.nodes;
+        if (Array.isArray(nodes)) incomingText = nodes.map(getNodeText).join('').trim();
+      } catch { incomingText = ''; }
+      if (incomingText.length > 0) effectiveStatus = 'in_progress';
+    }
+
     let updateResult;
     try {
-      if (newStatus) {
+      if (effectiveStatus) {
         updateResult = await sql`
           UPDATE proposal_sections
           SET content = ${contentJson},
-              status = ${newStatus},
+              status = ${effectiveStatus},
               version = ${nextVersion},
               content_source = ${contentSource},
               last_modified_by = ${sessionUser.id}::uuid,

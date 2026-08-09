@@ -133,8 +133,8 @@ export async function provisionProposalForPortal(opts: {
         for (const item of requiredItems) {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           const [section] = await tx<{ id: string }[]>`
-            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, title, content, status, page_allocation, volume_name, volume_number, section_type, meta)
-            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
+            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, volume_name, volume_number, section_type, meta)
+            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemNumber}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
             RETURNING id
           `;
           // Compliance matrix: one requirement row per required item, linked to the
@@ -172,8 +172,8 @@ export async function provisionProposalForPortal(opts: {
           RETURNING id
         `;
         const [defSection] = await tx<{ id: string }[]>`
-          INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, title, content, status, page_allocation)
-          VALUES (${p.id}, ${defArt.id}, '1', 'Technical Volume', ${null}, 'empty', ${null})
+          INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation)
+          VALUES (${p.id}, ${defArt.id}, '1', 1, 'Technical Volume', ${null}, 'empty', ${null})
           RETURNING id
         `;
         // Matrix: at least one requirement so the card burden isn't an empty 0% shell.

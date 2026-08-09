@@ -31,6 +31,7 @@ interface SectionItem {
   volumeName?: string | null;
   volumeNumber?: number | null;
   artifactId?: string | null;
+  itemType?: string | null;
 }
 
 interface Collaborator {
@@ -106,7 +107,24 @@ const FILE_ICONS: Record<string, { label: string; color: string }> = {
   form: { label: 'FORM', color: 'bg-indigo-100 text-indigo-600' },
 };
 
-function getSectionIcon(title: string): { label: string; color: string } {
+// The AUTHORED item type (persisted at provision from the solicitation's volume spec) is the
+// source of truth for the glyph. The title heuristic below only runs as a fallback for legacy
+// sections with no itemType — it mis-fires on prose whose TITLE happens to contain a keyword
+// ("Budget *Narrative*" → XLS, "Pro-*forma*" → FORM) even though the section is a word doc.
+const ITEM_TYPE_ICON: Record<string, { label: string; color: string }> = {
+  word_doc: FILE_ICONS.docx,
+  text: FILE_ICONS.docx,
+  slide_deck: FILE_ICONS.pptx,
+  spreadsheet: FILE_ICONS.xlsx,
+  pdf: FILE_ICONS.pdf,
+  form_sf424: FILE_ICONS.form,
+  form_sbir_certs: FILE_ICONS.form,
+  form_other: FILE_ICONS.form,
+  other: FILE_ICONS.docx,
+};
+
+function getSectionIcon(title: string, itemType?: string | null): { label: string; color: string } {
+  if (itemType && ITEM_TYPE_ICON[itemType]) return ITEM_TYPE_ICON[itemType];
   const lower = title.toLowerCase();
   if (lower.includes('cost') || lower.includes('budget') || lower.includes('spreadsheet')) {
     return FILE_ICONS.xlsx;
@@ -615,7 +633,7 @@ export function ProposalAdminPanel({
               </div>
               <div className="border border-gray-200 border-t-0 rounded-b-lg divide-y divide-gray-100">
                 {volume.sections.map((section) => {
-                  const icon        = getSectionIcon(section.title);
+                  const icon        = getSectionIcon(section.title, section.itemType);
                   const statusInfo  = STATUS_CONFIG[section.status] || STATUS_CONFIG.empty;
                   const assignee    = collaborators.find((c) => c.userId === section.assignedTo);
                   const assigneeIdx = assignee ? collaborators.indexOf(assignee) : -1;
