@@ -15,6 +15,7 @@ const CATEGORY_LABEL: Record<BlockerCategory, string> = {
   empty_section: 'Not drafted',
   unlocked_section: 'Not locked',
   orphan_requirement: 'Requirement',
+  page_budget: 'Over budget',
   format_floor: 'Format',
 };
 

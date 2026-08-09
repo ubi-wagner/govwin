@@ -30,6 +30,7 @@ export type BlockerCategory =
   | 'empty_section'
   | 'unlocked_section'
   | 'orphan_requirement'
+  | 'page_budget'
   | 'format_floor';
 
 export interface ReadinessBlocker {
@@ -50,6 +51,7 @@ export interface ReadinessReport {
     sections: { total: number; locked: number; drafted_unlocked: number; empty: number };
     requirements: { mandatory: number; satisfied: number; unmet: number };
     formatWarnings: number;
+    overBudget: number;
   };
   blockers: ReadinessBlocker[];
 }
@@ -61,6 +63,7 @@ interface SectionRow {
   status: string | null;
   isLocked: boolean;
   artifactId: string | null;
+  pageAllocation: number | null;
 }
 interface MatrixRow {
   requirementText: string | null;
@@ -76,7 +79,8 @@ const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   empty_section: 0,
   unlocked_section: 1,
   orphan_requirement: 2,
-  format_floor: 3,
+  page_budget: 3,
+  format_floor: 4,
 };
 
 /**
@@ -93,7 +97,8 @@ export async function computeSubmissionReadiness(
   if (!proposal) return null;
 
   const sections = await sql<SectionRow[]>`
-    SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId"
+    SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId",
+           page_allocation AS "pageAllocation"
     FROM proposal_sections
     WHERE proposal_id = ${proposalId}::uuid
     ORDER BY sort_index NULLS LAST, id
@@ -117,7 +122,7 @@ export async function computeSubmissionReadiness(
   const blockers: ReadinessBlocker[] = [];
 
   // ── Section state ──────────────────────────────────────────────────────────
-  let locked = 0, emptyN = 0, draftedUnlocked = 0, formatWarnings = 0;
+  let locked = 0, emptyN = 0, draftedUnlocked = 0, formatWarnings = 0, overBudget = 0;
   for (const s of sections) {
     const isEmpty = (s.status ?? '') === 'empty';
     if (s.isLocked) {
@@ -143,11 +148,31 @@ export async function computeSubmissionReadiness(
       });
     }
 
+    // Content-based checks (parse the canvas once). Run for LOCKED sections too — a section can be
+    // accepted yet still bust its page budget, which pure lock-state readiness would miss.
+    const doc = coerceJsonb<CanvasDocument | null>(s.content, null);
+    if (!doc) continue;
+    const nodeCount = docNodes(doc).length;
+    if (nodeCount === 0) continue;
+
+    // Page budget (advisory estimate — mirrors the overview's per-section gauge, ~3 nodes/page).
+    if ((s.pageAllocation ?? 0) > 0) {
+      const pageEst = Math.ceil(nodeCount / 3);
+      if (pageEst > (s.pageAllocation as number)) {
+        overBudget++;
+        blockers.push({
+          category: 'page_budget',
+          severity: 'warning',
+          message: `"${s.title ?? 'Section'}" runs ~${pageEst}pp against a ${s.pageAllocation}pp budget (estimate — confirm at export).`,
+          sectionId: s.id,
+          sectionTitle: s.title ?? undefined,
+        });
+      }
+    }
+
     // Format floor (advisory) — only the per-section-meaningful rules, from the section's artifact spec.
     const spec = s.artifactId ? specByArtifact.get(s.artifactId) : undefined;
     if (!spec) continue;
-    const doc = coerceJsonb<CanvasDocument | null>(s.content, null);
-    if (!doc || (!doc.nodes && !doc.sections) || docNodes(doc).length === 0) continue;
     for (const v of validateCanvasAgainstSpec(doc, spec)) {
       if (v.code !== 'font_too_small' && v.code !== 'image_not_allowed') continue; // per-section only
       formatWarnings++;
@@ -190,6 +215,7 @@ export async function computeSubmissionReadiness(
       sections: { total: sections.length, locked, drafted_unlocked: draftedUnlocked, empty: emptyN },
       requirements: { mandatory: matrix.length, satisfied: satisfiedReq, unmet: matrix.length - satisfiedReq },
       formatWarnings,
+      overBudget,
     },
     blockers,
   };

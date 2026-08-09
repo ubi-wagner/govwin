@@ -73,9 +73,19 @@
 These were in the plan's full 8-wave program but **not** in this pass; each is a clean, scoped follow-on, not a
 loose end:
 
-- **T4.1 (unify the 3 page-count heuristics) + T4.2 (whole-proposal submission-readiness screen).** The
-  section-level compliance floor already runs at the export gate; the *whole-proposal* readiness rollup + the
-  unified page-count estimator is a larger UI + refactor. **Deferred** — high value, next-up for compliance.
+- **T4.2 (whole-proposal submission-readiness screen). SHIPPED** (post-close-out, commits `c2555e8` +
+  page-budget follow-on). `lib/proposal/submission-readiness.ts` (`computeSubmissionReadiness`) fuses the
+  signals the platform already maintains — section lock/empty state, requirement-matrix coverage (mandatory;
+  auto-satisfies 1:1 on lock, so it's a summary + only an *orphan* unmet requirement blocks), the advisory
+  format floor (`validateCanvasAgainstSpec`, per-section font/image), and a page-budget estimate that runs on
+  LOCKED sections too (catches a locked-but-over-limit section that lock-state readiness misses) — into one
+  `{ready, blockerCount, warningCount, summary, blockers[]}` verdict. Surfaced by `GET …/proposals/[p]/readiness`
+  (tenant-gated, `verifyProposalAccess`) → `SubmissionReadinessCard` on the proposal Compliance tab: GO /
+  NOT-READY banner, summary chips, deep-linked blocker list, format/budget advisories folded away, auto-recheck
+  on lock. Advisory + read-only. **Proven live** (`readiness.mjs`): verdict matches the DB exactly, cross-tenant
+  → 403, and it recomputes dynamically (lock a section → blockers 18→17). **T4.1 (unify the 3 page-count
+  heuristics)** stays deferred — readiness uses the same cheap per-section estimate the overview shows (labeled
+  as an estimate); folding in the authoritative `paginate()` per volume is the follow-on.
 - **T2.x (the polymorphic artifact key / "one canvas").** Documents are still second-class (no version
   capture; masked AI/comments). The two-table refactor (re-key comments + versions off `(artifact_type,
   artifact_id)`) is the deep fix that makes one-offs first-class and unblocks one-off agent drafting.
