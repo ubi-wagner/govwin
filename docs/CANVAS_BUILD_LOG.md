@@ -109,6 +109,34 @@ loose end:
 - **Live multi-actor UI evidence:** see the closing section (production build + Chromium drive of the trust
   hub, images-survive-export, notification routing, and Studio publish, from the tenant + admin chairs).
 
+### Zero-trust full-stack verification (2026-08-09) — "no green without proof"
+
+`tsc`/`vitest`/`next build` green is **necessary but not sufficient** — those exercise compilation and
+mocks, not the real request path. So the whole stack was brought up (Next.js standalone build · Python
+pipeline worker · PostgreSQL · a path-style S3 mock standing in for R2) and every shipped item was touch-
+tested as a **real actor → real API → verified DB/S3 state → pipeline agent → UI**. Two **phantom bugs**
+that all three green signals missed were caught this way and fixed (commit `52db0e2`):
+
+1. **Notification bell 500 for every user** — the W5.1 self-exclude clause cast `actor_id::uuid`, but
+   `system_events.actor_id` is **TEXT** → `operator does not exist: text = uuid` → the bell 500'd for
+   everyone. Fixed by dropping the cast. **Re-proven on the fresh build:** `GET …/notifications` = **200**,
+   another actor's event appears in Kate's feed flagged `is_for_you`, her own event self-excluded.
+2. **All exports 500 without a configured bucket** — `image-raster.ts` had a *top-level* `import` of the S3
+   client, whose module-eval throws when `AWS_S3_BUCKET_NAME` is unset, taking down docx/pptx/xlsx/pdf even
+   for image-free documents. Fixed by making the S3 client a **lazy** `await import()` inside
+   `resolveImageDataUri`. **Re-proven on the fresh build:** upload → S3 (round-trip byte-equal) → export;
+   the docx `word/media/` carries the **same 8×8 RGB (220,40,40) red square** (re-compressed, pixel-
+   identical), and the pdf embeds image XObjects.
+
+DB/S3-asserted end-to-end this way: **W4.3** (image survives to docx+pdf), **W1.1** (restore CAS + version
+advance), **W0.1** (non-destructive 409), **W3.2** (verbatim reuse into empty section), **W6.1** (publish
+flips `is_system`/`tenant_id`, appears in the real portal chooser as the tenant), **W1.3** (accept-AI lands
+staged `ai_revision` from a **real `process_instance`'s `step_results`** onto live content), and the
+cross-service reconciler (frontend event → `system_events` → pipeline → `process_instances`). **Honest env
+limits:** `ANTHROPIC_API_KEY` is present-but-empty in the sandbox, so the drafting agents can't call the
+model — W1.3 was proven by staging the agent's output shape into the real instance and driving the
+land→accept path; the wiring is real, the LLM token is not.
+
 ---
 
 ## Corrections applied to the baseline analysis (the CANVAS_ADVERSARIAL §8 items)
@@ -122,4 +150,5 @@ as-built delta.**
 ---
 
 *Phase 5 (execution) + Phase 6 (documentation) of the Common-Canvas redesign. Commits on
-`claude/nice-hamilton-kBqtD`: a6c0474 · 13592bb · 87a1ec9 · 82fb08e · 3fd87f0 · 7836520.*
+`claude/nice-hamilton-kBqtD`: a6c0474 · 13592bb · 87a1ec9 · 82fb08e · 3fd87f0 · 7836520 · 52db0e2 (phantom-bug fixes,
+zero-trust full-stack verified).*
