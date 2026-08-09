@@ -9,6 +9,7 @@ import { SaveAsTemplate } from './save-as-template';
 import { SectionComplianceChip } from './section-compliance-chip';
 import { LibrarySeedPanel } from './library-seed-panel';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
+import { SubmissionReadinessCard } from '@/components/portal/submission-readiness-card';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -950,6 +951,9 @@ export function ProposalAdminPanel({
           </div>
 
           {/* Submission Package — deterministic readiness + AI packaging review */}
+          {/* Submission-readiness verdict — the single go / not-ready roll-up (deep-links to fix). */}
+          <SubmissionReadinessCard tenantSlug={tenantSlug} proposalId={proposalId} refreshKey={Object.values(lockOverrides).filter(Boolean).length} />
+
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">Submission Package</h3>

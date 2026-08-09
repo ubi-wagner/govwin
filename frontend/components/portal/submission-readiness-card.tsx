@@ -1,0 +1,163 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import type { ReadinessReport, ReadinessBlocker, BlockerCategory } from '@/lib/proposal/submission-readiness';
+
+interface Props {
+  tenantSlug: string;
+  proposalId: string;
+  /** Bump to force a re-check (e.g. after a lock action elsewhere on the page). */
+  refreshKey?: number;
+}
+
+const CATEGORY_LABEL: Record<BlockerCategory, string> = {
+  empty_section: 'Not drafted',
+  unlocked_section: 'Not locked',
+  orphan_requirement: 'Requirement',
+  format_floor: 'Format',
+};
+
+const MAX_SHOWN = 8;
+
+/**
+ * Submission-readiness — the single "can this go out the door?" verdict for a proposal. Fetches the
+ * roll-up from …/proposals/[p]/readiness and renders a GO / NOT-READY banner with an actionable,
+ * deep-linked blocker list. Advisory: it reports; it never locks or submits.
+ */
+export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0 }: Props) {
+  const [report, setReport] = useState<ReadinessReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/readiness`, { cache: 'no-store' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error || 'Could not compute readiness');
+        setReport(null);
+      } else {
+        setReport(j.data as ReadinessReport);
+      }
+    } catch {
+      setError('Could not reach the readiness service');
+      setReport(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantSlug, proposalId]);
+
+  useEffect(() => { void load(); }, [load, refreshKey]);
+
+  const blockers = report?.blockers ?? [];
+  const hardBlockers = blockers.filter((b) => b.severity === 'blocker');
+  const warnings = blockers.filter((b) => b.severity === 'warning');
+  const shown = showAll ? hardBlockers : hardBlockers.slice(0, MAX_SHOWN);
+  const ready = !!report?.ready;
+
+  const sectionHref = (b: ReadinessBlocker) =>
+    b.sectionId ? `/portal/${tenantSlug}/proposals/${proposalId}/sections/${b.sectionId}` : null;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-900">Submission readiness</h3>
+        <button
+          onClick={() => void load()}
+          disabled={loading}
+          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 transition-colors"
+        >
+          {loading ? 'Checking…' : 'Re-check'}
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+
+      {report && (
+        <>
+          {/* Verdict banner */}
+          <div
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 mb-3 text-sm font-semibold ${
+              ready ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+            }`}
+          >
+            <span aria-hidden>{ready ? '✓' : '⚠'}</span>
+            {ready
+              ? 'Ready to submit — no blockers'
+              : `Not ready — ${report.blockerCount} blocker${report.blockerCount === 1 ? '' : 's'}`}
+            {report.warningCount > 0 && (
+              <span className="ml-auto text-[11px] font-medium text-gray-500">
+                {report.warningCount} advisor{report.warningCount === 1 ? 'y' : 'ies'}
+              </span>
+            )}
+          </div>
+
+          {/* Summary chips */}
+          <div className="flex flex-wrap gap-3 text-xs mb-3">
+            <span className="text-emerald-600 font-medium">{report.summary.sections.locked} locked</span>
+            <span className="text-amber-600 font-medium">{report.summary.sections.drafted_unlocked} to lock</span>
+            <span className="text-red-600 font-medium">{report.summary.sections.empty} empty</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-600 font-medium">
+              {report.summary.requirements.satisfied}/{report.summary.requirements.mandatory} requirements met
+            </span>
+          </div>
+
+          {/* Blocker list */}
+          {hardBlockers.length > 0 && (
+            <div className="space-y-1.5 mb-2">
+              {shown.map((b, i) => {
+                const href = sectionHref(b);
+                return (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="shrink-0 mt-0.5 inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-medium uppercase tracking-wide">
+                      {CATEGORY_LABEL[b.category]}
+                    </span>
+                    <span className="text-gray-700 flex-1">{b.message}</span>
+                    {href && (
+                      <Link href={href} className="shrink-0 text-indigo-600 hover:text-indigo-800 font-medium">
+                        Open →
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+              {hardBlockers.length > MAX_SHOWN && (
+                <button
+                  onClick={() => setShowAll((v) => !v)}
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  {showAll ? 'Show fewer' : `Show all ${hardBlockers.length} blockers`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Advisories */}
+          {warnings.length > 0 && (
+            <details className="mt-1">
+              <summary className="text-[11px] text-gray-500 cursor-pointer hover:text-gray-700">
+                {warnings.length} format advisor{warnings.length === 1 ? 'y' : 'ies'} (won’t block submission)
+              </summary>
+              <div className="space-y-1 mt-1.5">
+                {warnings.slice(0, MAX_SHOWN).map((w, i) => (
+                  <div key={i} className="text-[11px] text-gray-500 pl-2">• {w.message}</div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          <p className="text-[11px] text-gray-400 mt-2">
+            Rolls up section lock state, requirement coverage, and the format floor. Advisory — lock every
+            section (and clear the blockers) to unlock export &amp; submission.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
