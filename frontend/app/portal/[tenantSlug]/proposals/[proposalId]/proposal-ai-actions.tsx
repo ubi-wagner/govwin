@@ -58,6 +58,7 @@ export function ProposalAiActions({
   const [adversarialPolicy, setAdversarialPolicy] = useState<'hitl' | 'auto'>('hitl');
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [landLoading, setLandLoading] = useState(false);
+  const [acceptLoading, setAcceptLoading] = useState(false);
   const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -191,7 +192,7 @@ export function ProposalAiActions({
           type: 'success',
           text:
             n > 0
-              ? `Landed ${n} AI-proposed revision${n > 1 ? 's' : ''} — review + restore them in each section's version history.`
+              ? `Staged ${n} AI revision${n > 1 ? 's' : ''} for review — Restore any from a section's history, or Accept all into the document below.`
               : reason === 'no_full_draft_run'
                 ? 'No full-draft run found yet — run a full draft first, then apply its revisions.'
                 : 'No new AI-proposed revisions to apply (already landed, or the run staged none yet).',
@@ -204,6 +205,43 @@ export function ProposalAiActions({
       setLandLoading(false);
     }
   }, [canDraft, landLoading, tenantSlug, proposalId, router]);
+
+  // Accept AI drafts INTO the document — the one-click apply. Takes each section's latest staged
+  // ai_revision and writes it to LIVE content (archive-first + CAS advance, like a save). For the
+  // builder who has reviewed and wants the whole draft on the page at once. Fully undoable.
+  const handleAcceptAi = useCallback(async () => {
+    if (!canDraft || acceptLoading) return;
+    if (!window.confirm(
+      "Accept the AI drafts into the document? This replaces each section's current content with its " +
+      'latest AI revision. The current content of each is saved to history first, so you can undo it.',
+    )) return;
+    setAcceptLoading(true);
+    setFullDraftMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/accept-ai-revisions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFullDraftMsg({ type: 'error', text: json.error || 'Failed to accept AI drafts' });
+      } else {
+        const n = json.data?.applied ?? 0;
+        setFullDraftMsg({
+          type: 'success',
+          text: n > 0
+            ? `Accepted ${n} AI draft${n > 1 ? 's' : ''} into the document. Open any section to review — the previous content is in its history.`
+            : json.data?.reason === 'no_ai_revisions'
+              ? 'No staged AI revisions to accept — run a full draft and Stage its revisions first.'
+              : 'No new AI drafts to accept (already applied, or sections are locked).',
+        });
+        router.refresh();
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setAcceptLoading(false);
+    }
+  }, [canDraft, acceptLoading, tenantSlug, proposalId, router]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -492,13 +530,13 @@ export function ProposalAiActions({
             {fullDraftLoading ? 'Requesting…' : `Run full draft (Mode ${fullDraftMode.toUpperCase()})`}
           </button>
 
-          {/* Read-on-review landing: after a full-draft run completes, land its staged AI
-              revisions as proposed versions in each section's history (review + restore). */}
+          {/* Read-on-review landing: after a full-draft run completes, STAGE its AI revisions as
+              proposed versions in each section's history (review-first — Restore any, or Accept all). */}
           <button
             type="button"
             onClick={handleLandRevisions}
             disabled={!canDraft || landLoading}
-            title="Land the latest full-draft run's AI revisions as proposed versions in each section's history."
+            title="Stage the latest full-draft run's AI revisions as proposed versions in each section's history (review-first)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {landLoading ? (
@@ -506,7 +544,24 @@ export function ProposalAiActions({
             ) : (
               <span className="text-gray-400">&#x21A9;</span>
             )}
-            {landLoading ? 'Applying…' : 'Apply AI-proposed revisions'}
+            {landLoading ? 'Staging…' : 'Stage AI revisions for review'}
+          </button>
+
+          {/* One-click apply: write each section's latest staged ai_revision to LIVE content
+              (archive-first + CAS, fully undoable). The payoff of the full-draft workforce. */}
+          <button
+            type="button"
+            onClick={handleAcceptAi}
+            disabled={!canDraft || acceptLoading}
+            title="Accept the staged AI drafts into the document — writes each section's latest AI revision to live content (undoable via each section's history)."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-emerald-200 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {acceptLoading ? (
+              <span className="w-4 h-4 border-2 border-emerald-200 border-t-white rounded-full animate-spin" />
+            ) : (
+              <span>&#x2713;</span>
+            )}
+            {acceptLoading ? 'Accepting…' : 'Accept AI drafts into document'}
           </button>
         </div>
         {isLocked && (

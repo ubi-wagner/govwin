@@ -274,6 +274,7 @@ export function CanvasEditorPage({
           onLocked={() => router.refresh()}
           proposalId={isDocument ? undefined : proposalId}
           sectionId={isDocument ? undefined : sectionId}
+          autosaveKey={saveUrl}
           tenantSlug={tenantSlug}
           variables={{
             company_name: 'Your Company',

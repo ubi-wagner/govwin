@@ -66,6 +66,8 @@ interface Props {
   sectionId?: string;
   /** Tenant slug — enables comments API when present */
   tenantSlug?: string;
+  /** Stable per-artifact key for the local recovery draft (the unique save URL is a good key). */
+  autosaveKey?: string;
 
   // ── Ribbon state callbacks (SectionTopRibbon integration) ──────────────
   // When a SectionTopRibbon is mounted above this editor, it needs to reflect
@@ -191,6 +193,7 @@ function CanvasEditorInner({
   actorName,
   proposalId,
   sectionId,
+  autosaveKey,
   tenantSlug,
   onDirtyChange,
   onSavingChange,
@@ -219,6 +222,45 @@ function CanvasEditorInner({
   const [undoStack, setUndoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
   const [redoStack, setRedoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
+
+  // ── Local draft autosave + recover-on-reload (W1.2) ──────────────────
+  // Every change is debounced to localStorage so a tab-close / crash / reload never loses
+  // work; on mount we offer to restore a newer local draft. The manual Save (button / Ctrl+S)
+  // is still the only SERVER write — this is the local safety net that makes reload safe.
+  const draftKey = `canvas-draft:${autosaveKey ?? sectionId ?? proposalId ?? 'doc'}`;
+  const [recoverable, setRecoverable] = useState<CanvasDocument | null>(null);
+  const draftCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(draftKey) : null;
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { doc?: CanvasDocument };
+      if (saved?.doc && JSON.stringify(saved.doc.nodes) !== JSON.stringify(initialDocument.nodes)) {
+        setRecoverable(saved.doc);
+      } else if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(draftKey);
+      }
+    } catch { /* ignore a corrupt draft */ }
+  }, [draftKey, initialDocument]);
+
+  useEffect(() => {
+    if (!dirty || typeof window === 'undefined') return;
+    const t = setTimeout(() => {
+      try { window.localStorage.setItem(draftKey, JSON.stringify({ doc, savedAt: Date.now() })); } catch { /* quota / private mode */ }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [doc, dirty, draftKey]);
+
+  const handleRestoreDraft = useCallback(() => {
+    setRecoverable((rec) => { if (rec) { setDoc(rec); setDirty(true); } return null; });
+  }, []);
+  const handleDiscardDraft = useCallback(() => {
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    setRecoverable(null);
+  }, [draftKey]);
 
   // ── Fine tools gated by the resolved capabilities (role × stage), falling back
   //    to !readOnly when the caller hasn't resolved them yet. ──
@@ -586,6 +628,8 @@ function CanvasEditorInner({
         : doc;
       await onSave(docWithMeta);
       setDirty(false);
+      // Clear the local recovery draft — the server now has this content.
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
       // Clear revision meta after successful save
       lastRevisionMetaRef.current = null;
     } catch (err) {
@@ -593,7 +637,19 @@ function CanvasEditorInner({
     } finally {
       setSaving(false);
     }
-  }, [doc, onSave]);
+  }, [doc, onSave, draftKey]);
+
+  // Ctrl/⌘+S saves (a separate effect, after handleSave, to avoid a TDZ reference).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (dirty && !saving) void handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dirty, saving, handleSave]);
 
   // ── Complete & Lock (finish the ToDo) — save, then POST the section lock
   //    route (admin-gated server-side). On success, refresh so the server
@@ -767,6 +823,15 @@ function CanvasEditorInner({
     <div className="flex h-full">
       {/* Canvas area */}
       <div className="flex-1 min-w-0 overflow-y-auto">
+        {!readOnly && recoverable && (
+          <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800">
+            <span>You have unsaved changes from a previous session on this page.</span>
+            <span className="flex items-center gap-2 shrink-0">
+              <button onClick={handleRestoreDraft} className="px-2 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700">Restore them</button>
+              <button onClick={handleDiscardDraft} className="px-2 py-1 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100">Discard</button>
+            </span>
+          </div>
+        )}
         {/* Toolbar */}
         <div className="sticky top-0 z-10 flex items-center justify-between bg-white border-b px-4 py-2">
           <div className="flex items-center gap-3">

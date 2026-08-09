@@ -146,10 +146,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null }[]>`
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null }[]>`
         SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
+               ps.content_source AS "contentSource",
                pa.compliance_spec
         FROM proposal_sections ps
         LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
@@ -189,8 +190,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Save current version to canvas_versions before overwriting ──
-    // Archive the PREVIOUS content with source='human_edit' (safe default for what was there before).
-    // The body's source/aiInstruction describe the INCOMING change, not the archived snapshot.
+    // Archive the PREVIOUS content with ITS OWN provenance (proposal_sections.content_source), not a
+    // hard-coded 'human_edit' — so history honestly labels which past versions were AI-authored. The
+    // body's source/aiInstruction describe the INCOMING change (recorded on content_source below).
     {
       const currentContent = section.content;
       // Compute char/word counts from extracted text, not raw JSON
@@ -240,7 +242,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
             ${section.version},
             ${sql.json(archiveJson)},
             'save',
-            'human_edit',
+            ${section.contentSource ?? 'human_edit'},
             ${sessionUser.id}::uuid,
             ${archiveCharCount},
             ${archiveWordCount},
@@ -274,6 +276,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
       ? body.baseVersion
       : section.version;
     const nextVersion = base + 1;
+    // Provenance of the INCOMING content (client __revisionMeta.source, if any). Recorded on the
+    // section so the NEXT archive labels this version honestly. Defaults to human_edit for plain saves.
+    const contentSource = typeof (body as { source?: unknown }).source === 'string'
+      ? (body as { source: string }).source
+      : 'human_edit';
 
     let updateResult;
     try {
@@ -283,6 +290,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           SET content = ${contentJson},
               status = ${newStatus},
               version = ${nextVersion},
+              content_source = ${contentSource},
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -295,6 +303,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           UPDATE proposal_sections
           SET content = ${contentJson},
               version = ${nextVersion},
+              content_source = ${contentSource},
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,

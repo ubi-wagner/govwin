@@ -167,10 +167,12 @@ function VersionHistorySection({
   proposalId,
   tenantSlug,
   sectionId,
+  canRestore,
 }: {
   proposalId: string;
   tenantSlug: string;
   sectionId: string;
+  canRestore: boolean;
 }) {
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -248,6 +250,38 @@ function VersionHistorySection({
     [proposalId, tenantSlug, sectionId, selectedVersion],
   );
 
+  const [restoring, setRestoring] = useState<number | null>(null);
+  const [restoreErr, setRestoreErr] = useState<string | null>(null);
+
+  const handleRestore = useCallback(
+    async (vn: number) => {
+      if (!window.confirm(
+        `Restore v${vn}? This replaces the current content with this version. ` +
+        `The current content is saved to history first, so you can undo this.`,
+      )) return;
+      setRestoring(vn);
+      setRestoreErr(null);
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/versions`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ versionNumber: vn }) },
+        );
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({ error: 'Restore failed' }));
+          setRestoreErr(json.error || 'Restore failed');
+          setRestoring(null);
+          return;
+        }
+        // Reload so the editor picks up the restored content as the new live version.
+        window.location.reload();
+      } catch {
+        setRestoreErr('Network error');
+        setRestoring(null);
+      }
+    },
+    [tenantSlug, proposalId, sectionId],
+  );
+
   const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     ai_draft: { label: 'AI Draft', color: 'bg-yellow-100 text-yellow-700' },
     human_edit: { label: 'Human Edit', color: 'bg-blue-100 text-blue-700' },
@@ -311,9 +345,24 @@ function VersionHistorySection({
                   )}
                 </button>
                 {isSelected && (
-                  <div className="mx-1 mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                    {contentLoading ? 'Loading...' : versionContent ?? 'No content'}
-                  </div>
+                  <>
+                    <div className="mx-1 mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                      {contentLoading ? 'Loading...' : versionContent ?? 'No content'}
+                    </div>
+                    {canRestore && (
+                      <div className="mx-1 mt-1 flex items-center gap-2">
+                        <button
+                          onClick={() => handleRestore(v.version_number)}
+                          disabled={restoring !== null}
+                          title="Replace the current content with this version (the current content is archived first, so it stays undoable)"
+                          className="px-2 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {restoring === v.version_number ? 'Restoring…' : 'Restore this version'}
+                        </button>
+                        {restoreErr && <span className="text-[10px] text-red-500">{restoreErr}</span>}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -874,6 +923,7 @@ export function CanvasSidebar({
             proposalId={proposalId}
             tenantSlug={tenantSlug}
             sectionId={sectionId}
+            canRestore={!readOnly}
           />
         )}
 
