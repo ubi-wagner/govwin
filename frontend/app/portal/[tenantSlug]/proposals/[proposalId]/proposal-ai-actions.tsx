@@ -42,7 +42,6 @@ export function ProposalAiActions({
   isLocked,
 }: Props) {
   const router = useRouter();
-  const [draftLoading, setDraftLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
@@ -80,52 +79,15 @@ export function ProposalAiActions({
 
   const isAdmin = userRole === 'admin';
 
-  // AI Draft: available for admin when not locked
+  // Full-draft + research controls: available for admin when the proposal is unlocked.
   const canDraft = isAdmin && !isLocked;
+
   // Outcome: available for admin only when the proposal is in a stage the
   // outcome route accepts as a precondition (submitted | final). It 409s on
   // 'archived' (outcome already recorded) and 400s on any other stage, so
   // those must not surface the panel.
   const canRecordOutcome =
     isAdmin && ['submitted', 'final'].includes(stage);
-
-  const handleDraft = useCallback(async () => {
-    if (!canDraft || draftLoading) return;
-    setDraftLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/ai/draft`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Failed' }));
-        setMessage({ type: 'error', text: err.error || 'Draft failed' });
-      } else {
-        const json = await res.json();
-        const count = json.data?.sections_queued ?? 0;
-        if (count === 0) {
-          setMessage({
-            type: 'success',
-            text: 'No empty sections to draft.',
-          });
-        } else {
-          setMessage({
-            type: 'success',
-            text: `AI drafting queued for ${count} section${count > 1 ? 's' : ''}. Content will update shortly.`,
-          });
-        }
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setDraftLoading(false);
-    }
-  }, [canDraft, draftLoading, tenantSlug, proposalId]);
 
   // AI color-team review — enqueues a color_team_reviewer task per section with content; each
   // review posts back as an `ai_review` recommendation in the section's context-box thread.
@@ -357,24 +319,12 @@ export function ProposalAiActions({
           AI Actions
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          Direct AI controls — draft empty sections or run a color-team review. For a guided,
-          reviewable draft in three loops (draft → refine → compliance), use{' '}
-          <span className="font-medium text-indigo-700">Proposal Studio</span> above — the recommended path.
+          Run a color-team review of every drafted section. To draft or refine content, use{' '}
+          <span className="font-medium text-indigo-700">Proposal Studio</span> above (the recommended
+          guided path — draft → refine → compliance), or <span className="font-medium text-indigo-700">Draft
+          All Sections</span> on the workspace.
         </p>
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleDraft}
-            disabled={!canDraft || draftLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {draftLoading ? (
-              <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
-            ) : (
-              <span className="text-indigo-400">&#x2726;</span>
-            )}
-            {draftLoading ? 'Drafting...' : 'Draft with AI'}
-          </button>
-
           {/* AI color-team review — queues a per-section color_team_reviewer pass whose
               recommendations post into each section's context-box thread (recommendation_type
               'ai_review'). The same path the on-advance auto-review uses, triggered manually. */}

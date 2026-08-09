@@ -546,8 +546,14 @@ export function CanvasSidebar({
               <div className="flex flex-wrap gap-1">
                 <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
                 <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
-                <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
-                <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                {selectedNode.provenance.source === 'ai_draft' && (
+                  <>
+                    <button onClick={() => onAcceptNode(selectedNode.id)} title="Keep this AI content" className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
+                    {selectedNode.history.some((h) => h.previous_content != null) && (
+                      <button onClick={() => onRevertNode(selectedNode.id)} title="Undo the AI revision — restore your previous content" className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                    )}
+                  </>
+                )}
                 <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
                 {onReplaceFromLibrary && (
                   <button

@@ -395,8 +395,11 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Accept = keep the AI content as the human's own. Flipping source off
+        // 'ai_draft' clears the pending Accept/Revert affordance (they are gated on it).
         return {
           ...n,
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'accepted' as const, timestamp: new Date().toISOString() },
@@ -410,9 +413,18 @@ function CanvasEditorInner({
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
-        if (n.id !== nodeId || n.history.length < 2) return n;
+        if (n.id !== nodeId) return n;
+        // Restore the content captured before the last revision. Walk history back to
+        // the most recent entry that snapshotted previous_content; no-op if there is none.
+        const snapshot = [...n.history].reverse().find((h) => h.previous_content != null);
+        if (snapshot?.previous_content == null) return n;
+        let restored: CanvasNode['content'];
+        try { restored = JSON.parse(snapshot.previous_content) as CanvasNode['content']; }
+        catch { return n; }
         return {
           ...n,
+          content: restored,
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'reverted' as const, timestamp: new Date().toISOString() },
@@ -459,13 +471,15 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Snapshot the pre-revision content so Revert can restore it (undo the AI edit).
+        const prior = JSON.stringify(n.content);
         return {
           ...n,
           content: newContent,
           provenance: { ...n.provenance, source: 'ai_draft' as const, drafted_at: new Date().toISOString() },
           history: [
             ...n.history,
-            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), comment: 'AI revision' },
+            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), previous_content: prior, comment: 'AI revision' },
           ],
         };
       }),

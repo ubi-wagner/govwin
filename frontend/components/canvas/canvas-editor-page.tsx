@@ -141,22 +141,47 @@ export function CanvasEditorPage({
   // ── Persistence handlers (same logic as before) ─────────────────────
   const handleSave = useCallback(async (doc: CanvasDocument & { __revisionMeta?: { source: string; aiInstruction: string } }) => {
     const meta = doc.__revisionMeta;
-    const payload: Record<string, unknown> = { content: doc };
-    if (versionRef.current != null) payload.baseVersion = versionRef.current;
-    if (meta) { payload.source = meta.source; payload.aiInstruction = meta.aiInstruction; }
-    const resp = await fetch(saveUrl, {
+    const basePayload: Record<string, unknown> = { content: doc };
+    if (meta) { basePayload.source = meta.source; basePayload.aiInstruction = meta.aiInstruction; }
+    const put = (baseVersion: number | null) => fetch(saveUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(baseVersion != null ? { ...basePayload, baseVersion } : basePayload),
     });
+
+    let resp = await put(versionRef.current ?? null);
+
+    // Concurrent-save conflict. NEVER silently overwrite the other person's work by bumping
+    // the base version and letting a re-click win — that was a real last-write-wins data-loss
+    // bug (the button re-enables on the thrown error, and the retry carried the bumped version
+    // which now matched). Overwriting a teammate's saved content is a destructive blocking gate,
+    // so we require an explicit, informed decision via native confirm() (house SOP).
+    if (resp.status === 409) {
+      const json = await resp.json().catch(() => ({} as { currentVersion?: number }));
+      const theirs = typeof json.currentVersion === 'number' ? json.currentVersion : null;
+      const noun = isDocument ? 'document' : 'section';
+      const overwrite =
+        theirs != null &&
+        typeof window !== 'undefined' &&
+        window.confirm(
+          `This ${noun} was changed by someone else since you opened it.\n\n` +
+          `OK — overwrite their saved changes with your version (their edits will be lost).\n` +
+          `Cancel — keep your edits unsaved; reload the page to see their version first.`,
+        );
+      if (!overwrite) {
+        // Do NOT advance versionRef — a later retry safely 409s again and can never clobber.
+        throw new Error(
+          `This ${noun} was changed by someone else — not saved. Reload to see their version ` +
+          `before saving (your unsaved edits will be lost on reload).`,
+        );
+      }
+      // Explicit, deliberate overwrite: rebase onto their version and re-save exactly once.
+      resp = await put(theirs);
+    }
+
     if (!resp.ok) {
-      const json = await resp.json().catch(() => ({}));
-      if (resp.status === 409 && typeof json.currentVersion === 'number') versionRef.current = json.currentVersion;
-      throw new Error(
-        resp.status === 409
-          ? `This ${isDocument ? 'document' : 'section'} was changed by someone else since you opened it. Reload to get the latest before saving.`
-          : json.error ?? `Save failed (HTTP ${resp.status})`,
-      );
+      const json = await resp.json().catch(() => ({} as { error?: string }));
+      throw new Error(json.error ?? `Save failed (HTTP ${resp.status})`);
     }
     const okJson = await resp.json().catch(() => null);
     if (okJson?.data?.version != null) versionRef.current = okJson.data.version;
