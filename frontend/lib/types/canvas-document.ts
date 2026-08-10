@@ -46,6 +46,9 @@ export interface CanvasRules {
   image_max_width?: number;
   image_max_height?: number;
   watermark?: { text: string; color?: string; opacity?: number };
+  /** Deck/page background fill (hex, e.g. '#0F172A'). Painted behind content in the
+   *  editor AND honored on export (pptx slide.background, html/pdf page). Slides mainly. */
+  background?: string;
 }
 
 /**
@@ -124,6 +127,13 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     max_pages: null, max_slides: null,
   },
 };
+
+/** Slide frame dimensions (pt) by aspect: 16:9 widescreen (960×540) vs 4:3 standard
+ *  (720×540). Same 540pt height, so switching aspect only reflows width — the canonical
+ *  PowerPoint frames (13.333″×7.5″ / 10″×7.5″ at 72dpi). Used by the slide-frame control. */
+export function slideFrame(format: 'slide_16_9' | 'slide_4_3'): { width: number; height: number } {
+  return format === 'slide_4_3' ? { width: 720, height: 540 } : { width: 960, height: 540 };
+}
 
 // ─── Node types ─────────────────────────────────────────────────────
 

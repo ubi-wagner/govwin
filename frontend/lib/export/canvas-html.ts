@@ -600,7 +600,7 @@ export function renderCanvasPreviewHtml(doc: CanvasDocument, variables: Record<s
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     html, body { margin: 0; background: #4b5563; }
     ${canvasBaseCss(doc)}
-    .pv-page { width: ${wPx}px; min-height: ${hPx}px; margin: 24px auto; background: #fff;
+    .pv-page { width: ${wPx}px; min-height: ${hPx}px; margin: 24px auto; background: ${c?.background ?? '#fff'};
       padding: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt; box-shadow: 0 4px 24px rgba(0,0,0,.35); }
     .pv-hf { color: #6b7280; font-size: ${c?.header?.font?.size ?? 10}pt; }
     .pv-header { border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; padding-bottom: 6px; }

@@ -177,7 +177,7 @@ export async function exportToPptx(
   for (const group of slideGroups) {
     slideIndex++;
     const slide = pptx.addSlide();
-    slide.background = { color: 'FFFFFF' };
+    slide.background = { color: hex(canvas.background) ?? 'FFFFFF' };
 
     const titleNode = group.find((n) => n.type === 'heading');
     const bodyNodes = titleNode ? group.filter((n) => n !== titleNode) : group;

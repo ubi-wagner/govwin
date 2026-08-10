@@ -1099,6 +1099,7 @@ function CanvasEditorInner({
             onUpdateNode={handleUpdateNode}
             onAddNode={handleAddNode}
             onDeleteNode={handleDeleteNode}
+            onUpdateCanvas={handleUpdateCanvas}
             variables={variables}
             readOnly={readOnly}
           />

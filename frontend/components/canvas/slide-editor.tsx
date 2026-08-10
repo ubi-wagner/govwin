@@ -10,7 +10,8 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { CanvasDocument, CanvasNode, NodeType, HeadingContent } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeType, HeadingContent, CanvasRules } from '@/lib/types/canvas-document';
+import { slideFrame } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { useContainerScale } from '@/lib/hooks/use-container-scale';
 
@@ -23,6 +24,8 @@ interface SlideEditorProps {
   onUpdateNode: (nodeId: string, content: CanvasNode['content']) => void;
   onAddNode: (type: NodeType, afterId?: string) => void;
   onDeleteNode: (nodeId: string) => void;
+  /** Slide-frame control: change aspect (16:9 ↔ 4:3) + deck background. */
+  onUpdateCanvas?: (canvas: CanvasRules) => void;
   variables?: Record<string, string>;
   readOnly?: boolean;
 }
@@ -68,6 +71,7 @@ export function SlideEditor({
   onUpdateNode,
   onAddNode,
   onDeleteNode,
+  onUpdateCanvas,
   variables = {},
   readOnly = false,
 }: SlideEditorProps) {
@@ -112,6 +116,18 @@ export function SlideEditor({
   // Thumbnail dimensions
   const thumbWidth = 164; // px (inside the w-48 panel with padding)
   const thumbHeight = Math.round(thumbWidth / aspectRatio);
+
+  // ── Slide-frame control: aspect (16:9 ↔ 4:3) + deck background ──
+  const slideBg = doc.canvas.background || '#ffffff';
+  const setAspect = useCallback((format: 'slide_16_9' | 'slide_4_3') => {
+    if (!onUpdateCanvas || doc.canvas.format === format) return;
+    const { width, height } = slideFrame(format);
+    onUpdateCanvas({ ...doc.canvas, format, width, height });
+  }, [onUpdateCanvas, doc.canvas]);
+  const setBackground = useCallback((background: string | undefined) => {
+    if (!onUpdateCanvas) return;
+    onUpdateCanvas({ ...doc.canvas, background });
+  }, [onUpdateCanvas, doc.canvas]);
 
   const handleAddSlide = useCallback(() => {
     // Find the last node in the current slide and insert a page_break after it
@@ -242,14 +258,59 @@ export function SlideEditor({
       </div>
 
       {/* ── Current slide editing area ── */}
-      <div ref={slideAreaRef} className="flex-1 min-w-0 bg-gray-700 flex items-center justify-center overflow-auto p-8">
+      <div className="flex-1 min-w-0 flex flex-col bg-gray-700">
+        {/* Slide-frame control bar — size · ratio · count · background */}
+        {!readOnly && onUpdateCanvas && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-gray-800 border-b border-gray-900 text-xs text-gray-300 flex-wrap">
+            <span className="font-semibold uppercase tracking-wide text-gray-500 text-[10px]">Slide frame</span>
+            {/* Aspect ratio */}
+            <div className="flex items-center rounded overflow-hidden border border-gray-600">
+              {(['slide_16_9', 'slide_4_3'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setAspect(f)}
+                  className={`px-2.5 py-1 transition-colors ${
+                    doc.canvas.format === f ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'
+                  }`}
+                  title={f === 'slide_16_9' ? 'Widescreen 16:9 (13.33″ × 7.5″)' : 'Standard 4:3 (10″ × 7.5″)'}
+                >
+                  {f === 'slide_16_9' ? '16:9' : '4:3'}
+                </button>
+              ))}
+            </div>
+            {/* Slide count */}
+            <div className="flex items-center gap-1.5">
+              <span className="tabular-nums text-gray-400">
+                {slides.length} slide{slides.length !== 1 ? 's' : ''}{doc.canvas.max_slides ? ` / ${doc.canvas.max_slides}` : ''}
+              </span>
+              <button onClick={handleAddSlide} className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 border border-gray-600" title="Add a slide">+ Slide</button>
+            </div>
+            {/* Background */}
+            <label className="flex items-center gap-1.5 ml-auto">
+              <span className="text-gray-400">Background</span>
+              <input
+                type="color"
+                value={slideBg}
+                onChange={(e) => setBackground(e.target.value)}
+                className="h-6 w-8 rounded cursor-pointer border border-gray-600 bg-transparent p-0"
+                title="Deck background color"
+              />
+              {doc.canvas.background && (
+                <button onClick={() => setBackground(undefined)} className="text-gray-400 hover:text-rose-400" title="Clear background (white)">clear</button>
+              )}
+            </label>
+          </div>
+        )}
+
+        <div ref={slideAreaRef} className="flex-1 min-w-0 flex items-center justify-center overflow-auto p-8">
         <div className="flex flex-col items-center gap-4">
           {/* Slide surface */}
           <div
-            className="bg-white shadow-2xl relative overflow-hidden"
+            className="shadow-2xl relative overflow-hidden"
             style={{
               width: slideW,
               height: slideH,
+              background: slideBg,
             }}
           >
             {/* Render current slide nodes using CanvasRenderer internals */}
@@ -296,6 +357,7 @@ export function SlideEditor({
           <div className="text-[10px] text-gray-500">
             Use the thumbnail panel to navigate between slides
           </div>
+        </div>
         </div>
       </div>
     </div>
