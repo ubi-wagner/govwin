@@ -61,4 +61,36 @@ describe('computeSttrSplit — STTR work-split from the Cost Volume', () => {
     expect(computeSttrSplit([]).found).toBe(false);
     expect(computeSttrSplit([{ content: null }]).found).toBe(false);
   });
+
+  // Regression: adversarial review — realistic cost tables that the first cut mis-read.
+  it('expands K/M/B money magnitudes ($1.2M / $800K), not just plain digits', () => {
+    const r = computeSttrSplit([costSection([
+      ['Small Business Concern', '$1.2M'],
+      ['Research Institution', '$800K'],
+    ])]);
+    expect(r.total).toBe(2_000_000);
+    expect(Math.round(r.sbPct)).toBe(60);
+    expect(Math.round(r.riPct)).toBe(40);
+  });
+
+  it('ignores a bare year cell (FY2026 / 2026) when picking the row amount', () => {
+    const r = computeSttrSplit([costSection([
+      ['Small Business Concern', 'FY2026', '$600,000'],
+      ['Research Institution', '2026', '$400,000'],
+    ])]);
+    expect(r.total).toBe(1_000_000); // not 2026 + 2026
+    expect(Math.round(r.sbPct)).toBe(60);
+  });
+
+  it('classifies entity-named research institutions (MIT, Univ. of X) as RI, not dropped', () => {
+    const r = computeSttrSplit([costSection([
+      ['Small Business Concern', '$550,000'],
+      ['Massachusetts Institute of Technology', '$300,000'],
+      ['Univ. of Michigan (subaward)', '$150,000'],
+    ])]);
+    expect(r.found).toBe(true);
+    expect(r.total).toBe(1_000_000);
+    expect(Math.round(r.sbPct)).toBe(55);
+    expect(Math.round(r.riPct)).toBe(45); // MIT + Univ. both counted as RI
+  });
 });

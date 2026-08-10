@@ -365,7 +365,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           sectionId,
           sectionTitle: section.title,
           version: nextVersion,
-          status: newStatus ?? undefined,
+          status: effectiveStatus ?? undefined,
         },
       });
     } catch (evtErr) {
@@ -406,7 +406,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
       data: {
         sectionId,
         version: nextVersion,
-        status: newStatus ?? section.status,
+        status: effectiveStatus ?? section.status,
         complianceWarnings,
       },
     });

@@ -19,11 +19,11 @@
  */
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
-import { paginate } from '@/lib/export/paginate';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
 import { computeSttrSplit } from '@/lib/proposal/sttr-split';
 import {
   validateCanvasAgainstSpec,
+  estimatePageCount,
   docNodes,
   type CanvasDocument,
   type ComplianceSpec,
@@ -201,29 +201,33 @@ export async function computeSubmissionReadiness(
     }
   }
 
-  // ── Rendered page-count gate (per volume) — the real, HARD DSIP limit ───────
-  // Assemble each volume exactly as the exporter does and measure with the layout engine, then gate
-  // on the artifact's compliance max_pages. This is a BLOCKER, not an estimate warning: an over-limit
-  // Technical Volume is rejected outright on DSIP, so a customer must never pass GO while over.
+  // ── Page-count gate (per PAGE-BASED volume) — the hard DSIP page limit ──────
+  // Only NARRATIVE volumes are page-measured: cost volumes (spreadsheets), forms, and slide decks
+  // carry a max_pages in their spec but a document page-flow count is meaningless for them (an XLSX
+  // budget or a webform is not paginated). We measure with `estimatePageCount` — the SAME estimator
+  // the export compliance floor uses (validateCanvasAgainstSpec) — so readiness and the export gate
+  // can never contradict each other. Over the limit is a BLOCKER: an over-limit Technical Volume is
+  // rejected outright on DSIP.
   const volumeInfo: ReadinessReport['summary']['volumes'] = [];
   for (const [artifactId, secs] of volSections) {
     const spec = specByArtifact.get(artifactId);
     const max = spec?.max_pages;
-    if (max == null || secs.length === 0) continue; // only page-based volumes that carry a cap
     const meta = metaByArtifact.get(artifactId);
-    let totalPages: number;
+    if (max == null || secs.length === 0) continue; // needs a page cap
+    if (meta?.artifactType !== 'narrative') continue; // page count is only meaningful for prose volumes
+    let pages: number;
     try {
-      const doc = assembleArtifactCanvas(secs, meta?.artifactType ?? null, meta?.volumeName ?? 'Volume');
-      totalPages = paginate(doc).totalPages;
+      const doc = assembleArtifactCanvas(secs, meta.artifactType, meta.volumeName ?? 'Volume');
+      pages = estimatePageCount(doc);
     } catch { continue; } // a measurement failure must never itself block
-    const over = totalPages > max;
-    volumeInfo.push({ name: meta?.volumeName ?? 'Volume', pages: totalPages, max, over });
+    const over = pages > max;
+    volumeInfo.push({ name: meta.volumeName ?? 'Volume', pages, max, over });
     if (over) {
       overBudget++;
       blockers.push({
         category: 'page_overflow',
         severity: 'blocker',
-        message: `"${meta?.volumeName ?? 'Volume'}" renders ${totalPages} pages against a hard ${max}-page limit — trim ${totalPages - max} page(s) before submission.`,
+        message: `"${meta.volumeName ?? 'Volume'}" is estimated at ${pages} pages against a ${max}-page limit — trim ${pages - max} page(s) before submission (same estimate the export compliance check uses).`,
       });
     }
   }
@@ -231,22 +235,28 @@ export async function computeSubmissionReadiness(
   // ── STTR cooperative work-split (SB≥40% / RI≥30% by cost) — computed, not asserted ──────────
   let workSplit: ReadinessReport['summary']['workSplit'];
   if (isSttr) {
-    const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost')?.[0];
+    // The Cost Volume may be a 'cost' spreadsheet OR a budget 'form' — match either.
+    const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost' || /cost|budget/i.test(m.volumeName ?? ''))?.[0];
     const costSecs = costArtifactId ? volSections.get(costArtifactId) : undefined;
     const split = computeSttrSplit(costSecs ?? []);
     const ok = split.found && split.sbPct >= 40 && split.riPct >= 30;
-    workSplit = { sbPct: Math.round(split.sbPct), riPct: Math.round(split.riPct), ok, computable: split.found };
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    workSplit = { sbPct: r1(split.sbPct), riPct: r1(split.riPct), ok, computable: split.found };
+    // ADVISORY only. Reading the split from a free-text cost table (performer labels, $ formats) is
+    // heuristic and can mis-read a realistic table, so we SURFACE the computed split for the human to
+    // verify and never HARD-block a possibly-compliant proposal on it — a hard gate would need a
+    // structured cost model with an explicit performer/role column.
     if (!split.found) {
       blockers.push({
         category: 'work_split',
         severity: 'warning',
-        message: 'STTR work-split not computable — add a Cost Volume with labeled Small Business and Research Institution totals so the 40% / 30% split can be verified.',
+        message: 'STTR work-split not computable from the Cost Volume — verify the small business performs at least 40% and the single research institution at least 30% by cost.',
       });
     } else if (!ok) {
       blockers.push({
         category: 'work_split',
-        severity: 'blocker',
-        message: `STTR work-split out of bounds by cost: small business ${Math.round(split.sbPct)}% (min 40%), research institution ${Math.round(split.riPct)}% (min 30%). Rebalance the Cost Volume before submission.`,
+        severity: 'warning',
+        message: `STTR work-split (computed from the Cost Volume) reads small business ${r1(split.sbPct)}% / research institution ${r1(split.riPct)}% — verify against the statutory 40% / 30% floor before submission.`,
       });
     }
   }
