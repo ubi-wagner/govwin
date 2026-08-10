@@ -12,7 +12,8 @@
 import type { NodeType, ShapeKind } from '@/lib/types/canvas-document';
 
 export type ElementKind =
-  | 'shape' | 'callout' | 'chart' | 'divider' | 'code' | 'signature' | 'equation' | 'video' | 'heading' | 'list' | null;
+  | 'shape' | 'callout' | 'chart' | 'divider' | 'code' | 'signature' | 'equation' | 'video'
+  | 'textbox' | 'blockquote' | 'heading' | 'list' | null;
 
 export interface FormatCaps {
   /** run styling applies (the node bears text) */
@@ -59,9 +60,11 @@ export function formatCapabilities(type: NodeType): FormatCaps {
               : type === 'signature' ? 'signature'
                 : type === 'equation' ? 'equation'
                   : type === 'video' ? 'video'
-                    : type === 'heading' ? 'heading'
-                      : (type === 'bulleted_list' || type === 'numbered_list') ? 'list'
-                        : null;
+                    : type === 'text_box' ? 'textbox'
+                      : type === 'blockquote' ? 'blockquote'
+                        : type === 'heading' ? 'heading'
+                          : (type === 'bulleted_list' || type === 'numbered_list') ? 'list'
+                            : null;
   return { text: TEXT_RUN.has(type), box: BOX.has(type), arrange: ARRANGE.has(type), element };
 }
 
@@ -94,5 +97,6 @@ export const INSERT_ELEMENTS: ReadonlyArray<{ type: NodeType; label: string; ico
   { type: 'code_block', label: 'Code', icon: '</>' },
   { type: 'blockquote', label: 'Quote', icon: '❝' },
   { type: 'equation', label: 'Equation', icon: '∑' },
+  { type: 'video', label: 'Video', icon: '▶' },
   { type: 'signature', label: 'Signature', icon: '✍' },
 ];

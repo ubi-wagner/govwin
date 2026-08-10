@@ -16,6 +16,7 @@
 import type {
   CanvasNode, NodeStyle, NodePosition, ShapeContent, CalloutContent,
   ChartContent, DividerContent, CodeBlockContent, SignatureContent,
+  TextBoxContent, BlockquoteContent, EquationContent, VideoContent,
 } from '@/lib/types/canvas-document';
 import {
   formatCapabilities, SHAPE_KINDS, CALLOUT_VARIANTS, CHART_TYPES, LINE_STYLES, BORDER_STYLES, WRAP_MODES,
@@ -44,6 +45,39 @@ function Opacity({ value, onChange, title }: { value?: number; onChange: (v: num
       <input type="range" min={0} max={100} step={5} value={pct}
         onChange={(e) => { const v = parseInt(e.target.value) / 100; onChange(v >= 1 ? undefined : v); }}
         className="w-full h-1.5 accent-blue-600" />
+    </div>
+  );
+}
+
+/** Compact editor for a chart's data — categories + one row per series (name + comma-
+ *  separated numbers), with add/remove. Keeps ChartContent.categories/series in sync so a
+ *  chart node is no longer insert-and-freeze (it exports as a native chart with real data). */
+function ChartDataEditor({ chart, onContent }: { chart: ChartContent; onContent: (c: CanvasNode['content']) => void }) {
+  const cats = chart.categories ?? [];
+  const series = chart.series ?? [];
+  const set = (patch: Partial<ChartContent>) => onContent({ ...chart, ...patch } as ChartContent);
+  const nums = (s: string) => s.split(',').map((x) => parseFloat(x.trim())).map((n) => (Number.isFinite(n) ? n : 0));
+  return (
+    <div className="mt-2">
+      <label className="text-[10px] text-gray-400 block mb-1">Categories (comma-separated)</label>
+      <input
+        value={cats.join(', ')}
+        onChange={(e) => set({ categories: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })}
+        className="w-full text-xs border rounded px-1.5 py-1" placeholder="Q1, Q2, Q3" />
+      <label className="text-[10px] text-gray-400 block mb-1 mt-2">Series</label>
+      <div className="space-y-1">
+        {series.map((s, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <input value={s.name ?? ''} onChange={(e) => { const ns = [...series]; ns[i] = { ...s, name: e.target.value }; set({ series: ns }); }}
+              className="text-xs border rounded px-1.5 py-1 w-20 shrink-0" placeholder="Name" />
+            <input value={(s.data ?? []).join(', ')} onChange={(e) => { const ns = [...series]; ns[i] = { ...s, data: nums(e.target.value) }; set({ series: ns }); }}
+              className="text-xs border rounded px-1.5 py-1 flex-1" placeholder="3, 7, 5" />
+            <button onClick={() => set({ series: series.filter((_, j) => j !== i) })} className="text-rose-500 text-xs px-1" title="Remove series">×</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => set({ series: [...series, { name: `Series ${series.length + 1}`, data: cats.map(() => 0) }] })}
+        className="mt-1 text-[11px] text-blue-600 hover:underline">+ Add series</button>
     </div>
   );
 }
@@ -175,6 +209,8 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
           </select>
           <label className={`${label} mt-2`}>Title</label>
           <input value={(c as CalloutContent).title ?? ''} onChange={(e) => onContent({ ...(c as CalloutContent), title: e.target.value } as CalloutContent)} className={field} />
+          <label className={`${label} mt-2`}>Text</label>
+          <textarea value={(c as CalloutContent).text ?? ''} onChange={(e) => onContent({ ...(c as CalloutContent), text: e.target.value } as CalloutContent)} className={`${field} min-h-[60px]`} placeholder="Callout body" />
         </>
       )}
       {caps.element === 'chart' && (
@@ -186,6 +222,43 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
           </select>
           <label className={`${label} mt-2`}>Title</label>
           <input value={(c as ChartContent).title ?? ''} onChange={(e) => onContent({ ...(c as ChartContent), title: e.target.value } as ChartContent)} className={field} />
+          <ChartDataEditor chart={c as ChartContent} onContent={onContent} />
+        </>
+      )}
+      {caps.element === 'textbox' && (
+        <>
+          <H3>Text box</H3>
+          <label className={label}>Text</label>
+          <textarea value={(c as TextBoxContent).text ?? ''} onChange={(e) => onContent({ ...(c as TextBoxContent), text: e.target.value } as TextBoxContent)} className={`${field} min-h-[70px]`} placeholder="Box text" />
+        </>
+      )}
+      {caps.element === 'blockquote' && (
+        <>
+          <H3>Quote</H3>
+          <label className={label}>Text</label>
+          <textarea value={(c as BlockquoteContent).text ?? ''} onChange={(e) => onContent({ ...(c as BlockquoteContent), text: e.target.value } as BlockquoteContent)} className={`${field} min-h-[60px]`} placeholder="Quoted text" />
+          <label className={`${label} mt-2`}>Citation</label>
+          <input value={(c as BlockquoteContent).cite ?? ''} onChange={(e) => onContent({ ...(c as BlockquoteContent), cite: e.target.value } as BlockquoteContent)} className={field} placeholder="— Source" />
+        </>
+      )}
+      {caps.element === 'equation' && (
+        <>
+          <H3>Equation</H3>
+          <label className={label}>LaTeX</label>
+          <textarea value={(c as EquationContent).latex ?? ''} onChange={(e) => onContent({ ...(c as EquationContent), latex: e.target.value } as EquationContent)} className={`${field} min-h-[50px] font-mono`} placeholder="E = mc^2" />
+          <label className="mt-2 flex items-center gap-2 text-[10px] text-gray-500">
+            <input type="checkbox" checked={(c as EquationContent).display ?? true} onChange={(e) => onContent({ ...(c as EquationContent), display: e.target.checked } as EquationContent)} />
+            Display (block) mode
+          </label>
+        </>
+      )}
+      {caps.element === 'video' && (
+        <>
+          <H3>Video</H3>
+          <label className={label}>URL</label>
+          <input value={(c as VideoContent).url ?? ''} onChange={(e) => onContent({ ...(c as VideoContent), url: e.target.value } as VideoContent)} className={field} placeholder="https://…" />
+          <label className={`${label} mt-2`}>Caption</label>
+          <input value={(c as VideoContent).caption ?? ''} onChange={(e) => onContent({ ...(c as VideoContent), caption: e.target.value } as VideoContent)} className={field} />
         </>
       )}
       {caps.element === 'divider' && (
@@ -211,6 +284,8 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
           <H3>Code</H3>
           <label className={label}>Language</label>
           <input value={(c as CodeBlockContent).language ?? ''} onChange={(e) => onContent({ ...(c as CodeBlockContent), language: e.target.value } as CodeBlockContent)} className={field} placeholder="e.g. python" />
+          <label className={`${label} mt-2`}>Code</label>
+          <textarea value={(c as CodeBlockContent).code ?? ''} onChange={(e) => onContent({ ...(c as CodeBlockContent), code: e.target.value } as CodeBlockContent)} className={`${field} min-h-[80px] font-mono`} placeholder="// code" spellCheck={false} />
         </>
       )}
       {caps.element === 'signature' && (
