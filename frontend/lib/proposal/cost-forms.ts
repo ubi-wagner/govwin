@@ -46,7 +46,10 @@ export function resolveCostForm(o: { agency?: string | null; program?: string | 
   const p = (o.program ?? '').toLowerCase();
   const vf = (o.volumeFormat ?? '').toLowerCase();
   if (vf.includes('tvsf') || vf.includes('otf') || /\btvsf\b|third frontier|\botf\b|econdev/.test(p) || /third frontier|dmvec/.test(a)) return 'otf_state_budget';
-  if (vf === 'sf424a' || vf.includes('424') || /\bnsf\b|national science|\bdoe\b|department of energy|\benergy\b|grants?\.gov|nih|usda|\bnasa\b/.test(a) || /\bnsf\b|\bdoe\b|grant/.test(p)) return 'sf424a';
+  // Grant agencies. NOTE: no bare `\benergy\b` (DOE is already caught by \bdoe\b / "department of energy";
+  // \benergy\b would wrongly grab DoD "Directed Energy" / "High Energy Laser" program offices), and the
+  // program grant token is word-bounded (\bgrant\b — not bare "grant", which matches "migrant").
+  if (vf === 'sf424a' || vf.includes('424') || /\bnsf\b|national science|\bdoe\b|department of energy|grants?\.gov|\bnih\b|\busda\b|\bnasa\b/.test(a) || /\bnsf\b|\bdoe\b|\bgrant\b/.test(p)) return 'sf424a';
   return 'burden_waterfall';
 }
 
@@ -196,16 +199,28 @@ export function buildOtfStateBudgetCanvas(
 
 // ─── Provisional starter inputs per form ────────────────────────────────────────
 
-/** TVSF starter: fills exactly to the $200k cap with Personnel at the 20% ceiling (compliant). */
+/**
+ * Starter spend-type lines that fill EXACTLY to the ask ceiling with Personnel at (but never over)
+ * the share cap. Every non-Personnel line scales with the ceiling — no hardcoded floor — so a small
+ * micro-grant ($25k) stays non-negative and compliant, not just the $200k case. Personnel is floored
+ * so `personnel/ceiling ≤ personnelMaxPct` for any ceiling; Purchased Services absorbs the rounding
+ * residual (~0.375·rest, always ≥ 0).
+ */
 export function provisionalOtfLines(ceiling = 200000, personnelMaxPct = 0.2): OtfSpendLine[] {
-  const personnel = Math.round(ceiling * personnelMaxPct); // 20% → $40,000
-  const rest = ceiling - personnel; // $160,000 across the remaining categories
+  const c = Math.max(0, Math.round(ceiling));
+  const pct = Math.min(1, Math.max(0, personnelMaxPct));
+  const personnel = Math.floor(c * pct);      // ≤ the personnel share cap (never rounds over)
+  const rest = c - personnel;
+  const equipment = Math.round(rest * 0.375);
+  const supplies = Math.round(rest * 0.1875);
+  const other = Math.round(rest * 0.0625);
+  const purchased = rest - equipment - supplies - other; // residual (~0.375·rest ≥ 0); keeps the sum = ceiling
   return [
     { type: 'Personnel', amount: personnel, note: '[Roles, FTE %, and basis — capped at the personnel share limit]' },
-    { type: 'Equipment', amount: Math.round(rest * 0.375), note: '[Capital equipment itemized]' },
-    { type: 'Supplies', amount: Math.round(rest * 0.1875), note: '[Materials & consumables]' },
-    { type: 'Purchased Services', amount: rest - Math.round(rest * 0.375) - Math.round(rest * 0.1875) - 10000, note: '[Vendors / subcontracted services]' },
-    { type: 'Other Direct Costs', amount: 10000, note: '[Other project costs]' },
+    { type: 'Equipment', amount: equipment, note: '[Capital equipment itemized]' },
+    { type: 'Supplies', amount: supplies, note: '[Materials & consumables]' },
+    { type: 'Purchased Services', amount: purchased, note: '[Vendors / subcontracted services]' },
+    { type: 'Other Direct Costs', amount: other, note: '[Other project costs]' },
   ];
 }
 

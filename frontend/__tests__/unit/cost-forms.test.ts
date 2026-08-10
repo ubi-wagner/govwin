@@ -35,6 +35,14 @@ describe('resolveCostForm — pick the common form from the opportunity', () => 
     expect(resolveCostForm({ agency: 'Department of War', program: 'sbir_phase_1' })).toBe('burden_waterfall');
     expect(resolveCostForm({})).toBe('burden_waterfall');
   });
+  it('does NOT over-match DoD "Directed Energy" / "migrant" as a grant form (adversarial regression)', () => {
+    expect(resolveCostForm({ agency: 'Air Force Directed Energy Directorate', program: 'sbir_phase_1' })).toBe('burden_waterfall');
+    expect(resolveCostForm({ agency: 'High Energy Laser Joint Program Office', program: 'sttr' })).toBe('burden_waterfall');
+    expect(resolveCostForm({ program: 'migrant workforce sbir' })).toBe('burden_waterfall');
+    // DOE itself still resolves to the grant form
+    expect(resolveCostForm({ agency: 'Department of Energy' })).toBe('sf424a');
+    expect(resolveCostForm({ agency: 'DOE' })).toBe('sf424a');
+  });
 });
 
 describe('SF-424A — Section B categories driven by the same engine', () => {
@@ -61,6 +69,17 @@ describe('OTF / state project budget (Ohio TVSF Round-45 Budget volume)', () => 
     expect(total).toBe(200000);        // fills the cap, does not exceed
     expect(personnel).toBe(40000);     // 20% of 200k
     expect(personnel / total).toBeCloseTo(0.2, 6);
+  });
+
+  it('scales to any ceiling with NO negative line and Personnel never over the cap (adversarial regression)', () => {
+    for (const [cap, pct] of [[25000, 0.2], [20000, 0.2], [99999, 0.2], [99999, 0.25], [150000, 0.2], [250000, 0.3]] as const) {
+      const lines = provisionalOtfLines(cap, pct);
+      const total = lines.reduce((a, l) => a + l.amount, 0);
+      const personnel = lines.find((l) => l.type === 'Personnel')!.amount;
+      expect(total).toBe(cap);                                  // sums to exactly the ceiling
+      expect(lines.every((l) => l.amount >= 0)).toBe(true);     // no negative "Purchased Services"
+      expect(personnel / cap).toBeLessThanOrEqual(pct + 1e-9);  // Personnel ≤ the share cap (no false OVER)
+    }
   });
 
   it('renders the spend-type table + a PASS compliance panel at the cap', () => {
