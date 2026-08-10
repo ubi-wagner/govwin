@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules, NodeType } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
@@ -16,6 +16,39 @@ import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { canReplaceFromLibrary } from '@/lib/canvas/format-controls';
 import { NodeFormatControls } from './node-format-controls';
+
+/** Every insertable node type, categorized — the single insert surface (the Add tab).
+ *  All 22 types are reachable here (was 12; the extended elements were toolbar-only). */
+const INSERT_CATEGORIES: ReadonlyArray<{ title: string; items: ReadonlyArray<{ type: NodeType; label: string; icon: string }> }> = [
+  { title: 'Text', items: [
+    { type: 'heading', label: 'Heading', icon: 'H' },
+    { type: 'text_block', label: 'Paragraph', icon: 'T' },
+    { type: 'bulleted_list', label: 'Bullet List', icon: '•' },
+    { type: 'numbered_list', label: 'Numbered List', icon: '#' },
+    { type: 'blockquote', label: 'Quote', icon: '❝' },
+    { type: 'url', label: 'Link', icon: '↗' },
+    { type: 'caption', label: 'Caption', icon: 'C' },
+    { type: 'footnote', label: 'Footnote', icon: '†' },
+  ] },
+  { title: 'Structure', items: [
+    { type: 'table', label: 'Table', icon: '⊞' },
+    { type: 'divider', label: 'Divider', icon: '―' },
+    { type: 'page_break', label: 'Page Break', icon: '—' },
+    { type: 'toc', label: 'Contents', icon: '☰' },
+    { type: 'spacer', label: 'Spacer', icon: '⎵' },
+  ] },
+  { title: 'Media & elements', items: [
+    { type: 'image', label: 'Image', icon: '🖼' },
+    { type: 'chart', label: 'Chart', icon: '📊' },
+    { type: 'shape', label: 'Shape', icon: '▭' },
+    { type: 'text_box', label: 'Text box', icon: '⬚' },
+    { type: 'callout', label: 'Callout', icon: '❗' },
+    { type: 'code_block', label: 'Code', icon: '‹›' },
+    { type: 'equation', label: 'Equation', icon: '∑' },
+    { type: 'video', label: 'Video', icon: '▶' },
+    { type: 'signature', label: 'Signature', icon: '✍' },
+  ] },
+];
 
 interface Props {
   document: CanvasDocument;
@@ -860,35 +893,28 @@ export function CanvasSidebar({
           <p className="text-sm text-gray-400 text-center py-8">Click a node on the canvas to see its details</p>
         )}
 
-        {/* ── Add node tab ────────────────────────────────────── */}
+        {/* ── Add node tab — the ONE comprehensive insert surface: every insertable
+              node type, categorized (was 12 of 22 here, the extended elements only on
+              the toolbar — a user hunting for "Chart" never found it). ── */}
         {activeTab === 'add' && (
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Insert Content</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { type: 'heading' as const, label: 'Heading', icon: 'H' },
-                { type: 'text_block' as const, label: 'Paragraph', icon: 'T' },
-                { type: 'bulleted_list' as const, label: 'Bullet List', icon: '•' },
-                { type: 'numbered_list' as const, label: 'Numbered List', icon: '#' },
-                { type: 'image' as const, label: 'Image', icon: 'img' },
-                { type: 'table' as const, label: 'Table', icon: '⊞' },
-                { type: 'caption' as const, label: 'Caption', icon: 'C' },
-                { type: 'footnote' as const, label: 'Footnote', icon: '†' },
-                { type: 'page_break' as const, label: 'Page Break', icon: '—' },
-                { type: 'toc' as const, label: 'TOC', icon: '☰' },
-                { type: 'url' as const, label: 'Link', icon: '↗' },
-                { type: 'spacer' as const, label: 'Spacer', icon: '⎵' },
-              ].map((item) => (
-                <button
-                  key={item.type}
-                  onClick={() => onAddNode(item.type, selectedNode?.id)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs border rounded hover:bg-blue-50 hover:border-blue-200 text-left"
-                >
-                  <span className="w-5 text-center font-bold text-gray-400">{item.icon}</span>
-                  <span className="text-gray-700">{item.label}</span>
-                </button>
-              ))}
-            </div>
+          <div className="space-y-4">
+            {INSERT_CATEGORIES.map((cat) => (
+              <div key={cat.title}>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{cat.title}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {cat.items.map((item) => (
+                    <button
+                      key={item.type}
+                      onClick={() => onAddNode(item.type, selectedNode?.id)}
+                      className="flex items-center gap-2 px-3 py-2 text-xs border rounded hover:bg-blue-50 hover:border-blue-200 text-left"
+                    >
+                      <span className="w-5 text-center font-bold text-gray-400">{item.icon}</span>
+                      <span className="text-gray-700">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
