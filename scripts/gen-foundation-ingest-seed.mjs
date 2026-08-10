@@ -17,7 +17,7 @@ if (!CONN) { console.error('set DATABASE_URL'); process.exit(1); }
 const sql = postgres(CONN, { max: 1, idle_timeout: 5 });
 const OUT = 'db/migrations/170_seed_foundation_deck_ingest.sql';
 
-const COCOON = `'2aa196d5-9e23-4d8e-b197-87dda06414bc'`;
+const COCOON = `'3d080499-3bff-4392-9497-173ae4c7102f'`;
 const FND = `(SELECT id FROM tenants WHERE slug='foundation')`;
 
 // Order matters for FKs: cocoon → atoms → tags → librarian task.
@@ -25,7 +25,7 @@ const PLAN = [
   ['document_cocoons', `WHERE id = ${COCOON}`],
   ['library_atoms',    `WHERE cocoon_id = ${COCOON}`],
   ['atom_tags',        `WHERE atom_id IN (SELECT id FROM library_atoms WHERE cocoon_id = ${COCOON})`],
-  ['agent_task_queue', `WHERE agent_role='librarian' AND input->>'cocoonId' = '2aa196d5-9e23-4d8e-b197-87dda06414bc'`],
+  ['agent_task_queue', `WHERE agent_role='librarian' AND input->>'cocoonId' = '3d080499-3bff-4392-9497-173ae4c7102f'`],
 ];
 
 const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
