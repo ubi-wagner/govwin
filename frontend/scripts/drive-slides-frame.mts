@@ -51,14 +51,17 @@ async function run() {
     await page.getByRole('button', { name: '16:9', exact: true }).click();
     await page.waitForTimeout(700);
 
-    // Deck background → dark navy (native color input driven via events)
+    // Deck background → dark navy. A React controlled <input> ignores a plain `.value =`
+    // assignment (React overrides the setter + tracks the last value), so use the native
+    // value setter, then dispatch input/change — exactly what a real picker selection does.
     const bgSet = await page.evaluate((color) => {
       const el = document.querySelector('input[type=color][title="Deck background color"]') as HTMLInputElement | null;
       if (!el) return false;
-      el.value = color;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, color);
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
+      return el.value;
     }, '#0f172a');
     console.log(`background input set: ${bgSet}`);
     await page.waitForTimeout(900);
