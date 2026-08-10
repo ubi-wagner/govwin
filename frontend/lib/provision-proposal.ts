@@ -120,7 +120,7 @@ export async function provisionProposalForPortal(opts: {
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
           const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost'
-            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercial/i.test(volName ?? '') ? 'form'
+            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercial|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
             : 'narrative';
           const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
           const [art] = await tx<{ id: string }[]>`
