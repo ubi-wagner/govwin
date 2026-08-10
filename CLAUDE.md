@@ -21,7 +21,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 855 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 987 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -105,9 +105,15 @@ merged via PR #205 + deployed):** `/admin/workflows` renders a dependency-free *
 templates as DAGs, grouped by the two spines + platform — plus **live instance graphs** (per-step status
 overlay) and a sortable/filterable/Live monitor (operator guide: docs/WORKFLOW_ADMIN_GUIDE.md;
 `app/admin/workflows/workflow-{graph,shapes,map}.tsx`). The **compliance floor** `validateCanvasAgainstSpec`
-(`lib/types/canvas-document.ts` — font/pages/images/header-footer) is enforced at the artifact export gate
-(`X-Compliance-Violations` header + `proposal:artifact.exported {compliant}`) and on section save
-(`data.complianceWarnings`, non-blocking). The full-draft cohort's staged output LANDS via a **read-on-review**
+(`lib/types/canvas-document.ts`) checks font/**pages**/**slides**/**per-section page budgets**/images/header-footer
+across ALL canvas types (doc·pdf·ppt·xls) — the size ruler is now **one calibrated engine**: `estimatePageCount`
+delegates to `paginate()` (moved into `canvas-document.ts`; `lib/export/paginate.ts` re-exports it) so the live
+editor gauge and the export gate can never disagree, and `estimateSlideCount`/`overflowingSlides`/`sectionPageSpan`
+extend it to decks + section limits. It is enforced at the artifact export gate (`X-Compliance-Violations` header +
+`proposal:artifact.exported {compliant}`) and on section save (`data.complianceWarnings`, non-blocking), AND on
+**standalone (non-proposal) documents** — the portal/admin document + library-foundation save/export routes call
+`validateStandaloneCanvas` (a self-declared floor read off `doc.canvas`), so a 2-page flier or a 10-slide deck built
+outside a proposal is size-checked too. The full-draft cohort's staged output LANDS via a **read-on-review**
 route (`POST …/proposals/[p]/land-revisions` + the "Apply AI-proposed revisions" button in
 `proposal-ai-actions.tsx`) that writes proposed `ai_revision` `canvas_versions` the builder reviews + restores
 — the workflow engine's invariants FORBID a pipeline consumer of agent output, so the landing is frontend +
@@ -163,7 +169,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (855 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (987 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
