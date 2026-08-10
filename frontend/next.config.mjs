@@ -28,6 +28,10 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    // The atomize-package / atoms-upload routes accept files up to 25MB, but the middleware
+    // buffers request bodies to a 10MB default — silently truncating 10–25MB uploads (e.g. a
+    // real slide deck) before the route ever sees them. Lift the middleware cap to match.
+    middlewareClientMaxBodySize: '50mb',
   },
   async headers() {
     return [

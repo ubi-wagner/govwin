@@ -54,6 +54,38 @@ def test_build_messages_references_the_cocoon():
     assert any(isinstance(m.get("content"), str) and "abc-123" in m["content"] for m in msgs)
 
 
+def test_librarian_prompt_is_adversarial():
+    """The ingest recommendation is adversarial: a skeptical disqualifier audit + a
+    keep/retag/merge/reject disposition per atom (the 'auto-library option')."""
+    p = LibrarianArchetype().system_prompt.lower()
+    assert "adversarial" in p
+    assert "disqualifier" in p
+    for token in ("ingest_noise", "boilerplate", "fragment", "duplicate"):
+        assert token in p, token
+    for action in ("keep", "retag", "merge", "reject"):
+        assert action in p, action
+    # Still advisory — never auto-writes; the human gate is the safety.
+    assert "advisory" in p and "never auto-approve" in p
+
+
+def test_build_messages_requests_recommendation_and_disqualifiers():
+    a = LibrarianArchetype()
+    msgs = a.build_messages({"tenant_id": "t", "payload": {"cocoonId": "c1"}}, [])
+    joined = " ".join(m["content"] for m in msgs if isinstance(m.get("content"), str))
+    assert '"recommendation"' in joined and '"disqualifiers"' in joined
+    assert '"action": "keep|retag|merge|reject"' in joined
+    assert '"recommended_rejects"' in joined
+
+
+def test_summarize_counts_dispositions():
+    a = LibrarianArchetype()
+    s = a.summarize_result({"text": '{"assessments":['
+        '{"atom_id":"1","recommendation":{"action":"reject"}},'
+        '{"atom_id":"2","recommendation":{"action":"keep"}},'
+        '{"atom_id":"3","recommendation":{"action":"merge"}}]}'})
+    assert "reject 1" in s and "merge 1" in s and "keep/retag 1" in s
+
+
 def test_untrusted_atom_content_is_fenced_no_injection():
     """No injection: tenant atom text is fenced as UNTRUSTED with a treat-as-data guard, so
     a malicious 'ignore your instructions' inside an atom cannot hijack the agent."""
