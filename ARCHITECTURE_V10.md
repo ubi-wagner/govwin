@@ -7,7 +7,10 @@
 > the `/admin/workflows` **Workflow Map + live instance DAG visualization** (`app/admin/workflows/workflow-{graph,shapes,map}.tsx`;
 > operator guide docs/WORKFLOW_ADMIN_GUIDE.md); the **compliance floor** `validateCanvasAgainstSpec` at the
 > export gate + section save; and the full-draft **read-on-review landing** route `…/proposals/[p]/land-revisions`
-> (docs/FULL_DRAFT_LANDING_DESIGN.md). Reconciliations: migration head is now **162**
+> (docs/FULL_DRAFT_LANDING_DESIGN.md). The **cost/budget volume is now computed + agency-neutral** — one deterministic
+> burden engine rendered in the common government FORM the solicitation needs (DoW waterfall · NSF/DOE SF-424A · Ohio
+> TVSF OTF state budget), migs 168–169 seeding the Ohio TVSF Round-45 card + the final Foundation proposal
+> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **169**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix; the **V1 UI-wiring pass** then added 143
 > `proposal_sections.sort_index`, 144 `proposals.studio_phase`, 145 `notification_read_state`, 146 the amendment
 > engine, 147–148 the soft-archive `archived_at` cascade — canonical **docs/ARCHIVABLE_CONTRACT.md**); the archetype roster is **36 files =
@@ -534,7 +537,7 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 162)
+## 7. New / Changed Schema (migrations 093 → 169)
 
 Highest migration: **162** (149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents

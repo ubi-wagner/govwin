@@ -30,7 +30,15 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **162** — the **V1 UI-wiring pass** (145–148)
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **169** — migs 163–167 per below;
+the **cost-volume common-form pass** added migs **168–169** (the Ohio TVSF Round-45 OPP card + the final Foundation
+3DCP proposal off it, for deployment verification). The cost/budget volume is now COMPUTED + agency-neutral: one
+deterministic burden engine (`lib/proposal/cost-model.ts`, a TS port of `pipeline/…/budget_model.py`, parity to the
+cent) rendered in the common government FORM the solicitation requires — `burden_waterfall` (DoW/DoD SBIR·STTR),
+`sf424a` (NSF/DOE grants), or `otf_state_budget` (Ohio TVSF / state EDA) — via `resolveCostForm`/`buildCostVolume`
+(`lib/proposal/cost-forms.ts`); readiness rolls up the computed price + work-split, and one shared numeric-cell parser
+(`lib/numeric-cell.ts`) keeps edited cell `value`s in sync so tenant edits drive the roll-up + exports. Canonical:
+**docs/COST_VOLUME_FORMS.md**. — the **V1 UI-wiring pass** (145–148)
 added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
 `proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
 `proposals.archived_at`, and mig 148 `archived_at` on `process_instances`/`tenant_opportunity_cards`/
