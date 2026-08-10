@@ -124,7 +124,8 @@ export function CanvasRenderer({
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-4 py-4 bg-gray-200 min-h-[600px] overflow-x-hidden">
-      {/* Page */}
+      {/* Page — honors canvas.background (deck/page fill) so what you see == what exports
+          (pptx slide.background + the html/pdf page); falls back to the bg-white class. */}
       <div
         className="bg-white shadow-lg relative"
         style={{
@@ -133,6 +134,7 @@ export function CanvasRenderer({
           padding: `${canvas.margins.top * scale}px ${canvas.margins.right * scale}px ${canvas.margins.bottom * scale}px ${canvas.margins.left * scale}px`,
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
+          background: canvas.background || undefined,
         }}
       >
         {/* Watermark overlay — behind content */}
