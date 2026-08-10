@@ -53,7 +53,8 @@ export async function parseSolicitation(text: string, hint?: ParseHint): Promise
   if (!apiKey || apiKey === 'sk-noop' || !text?.trim()) return defaultResult();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const base = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+    const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 4096, system: SYSTEM, messages: [{ role: 'user', content: buildPrompt(text, hint) }] }),
