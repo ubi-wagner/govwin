@@ -189,6 +189,7 @@ export interface ImageContent {
 
 export interface TableCellStyle {
   bg?: string;           // hex color for cell background
+  fg?: string;           // hex color for the cell TEXT (e.g. white on a dark branded header)
   bold?: boolean;
   alignment?: 'left' | 'center' | 'right';
   border?: 'none' | 'thin' | 'thick';

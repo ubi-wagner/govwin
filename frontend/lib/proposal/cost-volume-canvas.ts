@@ -49,13 +49,13 @@ export interface CostVolumeInputs {
 }
 
 // ─── Cell styling (mirrors the retired DoD template's look) ─────────────────────
-const HDR: TableCellStyle = { bold: true, bg: '#2c3e7a', alignment: 'center' };
+const HDR: TableCellStyle = { bold: true, bg: '#1F4E79', fg: '#FFFFFF', alignment: 'center' };
 const CAT: TableCellStyle = { bold: true, bg: '#e8e8e8' };
 const CUR: TableCellStyle = { alignment: 'right' };
 const TOTAL: TableCellStyle = { bold: true, bg: '#f0f0f0', alignment: 'right' };
 const TOTAL_L: TableCellStyle = { bold: true, bg: '#f0f0f0' };
-const GRAND: TableCellStyle = { bold: true, bg: '#2c3e7a', alignment: 'right' };
-const GRAND_L: TableCellStyle = { bold: true, bg: '#2c3e7a' };
+const GRAND: TableCellStyle = { bold: true, bg: '#1F4E79', fg: '#FFFFFF', alignment: 'right' };
+const GRAND_L: TableCellStyle = { bold: true, bg: '#1F4E79', fg: '#FFFFFF' };
 
 function h(text: string): TableCell { return { text, style: HDR }; }
 /** Money cell — whole-dollar DISPLAY (gov cost volumes show whole dollars); `value` carries FULL

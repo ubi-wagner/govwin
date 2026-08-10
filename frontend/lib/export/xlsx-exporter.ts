@@ -169,8 +169,8 @@ export async function exportToXlsx(
           fgColor: { argb: 'FF' + resolved.style.bg.replace('#', '') },
         };
       }
-      if (resolved.style?.bold !== undefined) {
-        excelCell.font = { ...excelCell.font, bold: resolved.style.bold };
+      if (resolved.style?.bold !== undefined || resolved.style?.fg) {
+        excelCell.font = { ...excelCell.font, ...(resolved.style.bold !== undefined ? { bold: resolved.style.bold } : {}), ...(resolved.style.fg ? { color: { argb: 'FF' + resolved.style.fg.replace('#', '') } } : {}) };
       }
       if (resolved.style?.alignment) {
         excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
@@ -218,8 +218,8 @@ export async function exportToXlsx(
         if (isNumeric && !resolved.style?.alignment) {
           excelCell.alignment = { ...excelCell.alignment, horizontal: 'right', wrapText: false };
         }
-        if (resolved.style?.bold) {
-          excelCell.font = { ...excelCell.font, bold: true };
+        if (resolved.style?.bold || resolved.style?.fg) {
+          excelCell.font = { ...excelCell.font, ...(resolved.style.bold ? { bold: true } : {}), ...(resolved.style.fg ? { color: { argb: 'FF' + resolved.style.fg.replace('#', '') } } : {}) };
         }
         if (resolved.style?.bg) {
           excelCell.fill = {

@@ -173,6 +173,7 @@ function cellStyle(c: TableCell): string {
   const st = c.style ?? {};
   const bits = ['border:1px solid #cbd5e1', 'padding:4px 8px'];
   if (st.bg) bits.push(`background:${st.bg}`);
+  if (st.fg) bits.push(`color:${st.fg}`);
   if (st.bold) bits.push('font-weight:700');
   if (st.alignment) bits.push(`text-align:${st.alignment}`);
   if (c.cell_type === 'currency' || c.cell_type === 'number' || c.cell_type === 'percent') bits.push('text-align:right');

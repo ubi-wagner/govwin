@@ -408,6 +408,7 @@ function nodeToDocx(
               children: [new TextRun({
                 text: cell.text,
                 bold: mergedStyle.bold !== false,
+                color: mergedStyle.fg ? mergedStyle.fg.replace('#', '') : undefined,
                 font,
                 size,
               })],
@@ -434,6 +435,7 @@ function nodeToDocx(
                 children: [new TextRun({
                   text: cell.text,
                   bold: cellStyle?.bold ?? false,
+                  color: cellStyle?.fg ? cellStyle.fg.replace('#', '') : undefined,
                   font,
                   size,
                 })],
