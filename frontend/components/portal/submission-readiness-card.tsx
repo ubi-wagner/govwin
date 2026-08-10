@@ -110,14 +110,19 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
             </span>
           </div>
 
-          {/* Hard-compliance gauges: rendered page count per volume + STTR work-split */}
-          {((report.summary.volumes && report.summary.volumes.length > 0) || report.summary.workSplit) && (
+          {/* Hard-compliance gauges: rendered page count per volume + cost total + STTR work-split */}
+          {((report.summary.volumes && report.summary.volumes.length > 0) || report.summary.workSplit || report.summary.cost) && (
             <div className="flex flex-wrap gap-3 text-xs mb-3 border-t border-gray-100 pt-3">
               {(report.summary.volumes ?? []).map((v, i) => (
                 <span key={i} className={v.over ? 'text-red-600 font-semibold' : 'text-gray-600 font-medium'}>
                   {v.name}: {v.pages}/{v.max}pp{v.over ? ' — over limit' : ''}
                 </span>
               ))}
+              {report.summary.cost && report.summary.cost.computable && (
+                <span className="text-gray-600 font-medium">
+                  Total proposed price ${report.summary.cost.totalPrice.toLocaleString('en-US')}
+                </span>
+              )}
               {report.summary.workSplit && (
                 <span className={report.summary.workSplit.ok ? 'text-gray-600 font-medium' : 'text-red-600 font-semibold'}>
                   Work-split SB {report.summary.workSplit.sbPct}% / RI {report.summary.workSplit.riPct}% (min 40 / 30)

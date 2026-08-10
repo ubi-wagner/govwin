@@ -21,6 +21,7 @@ import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
+import { buildStarterCostVolume } from '@/lib/proposal/cost-volume-canvas';
 import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -109,8 +110,13 @@ export async function provisionProposalForPortal(opts: {
       `;
       let count = 0;
       const artifactByVolKey = new Map<string, string>();
+      const artifactTypeByVolKey = new Map<string, string>();
+      const costFilled = new Set<string>(); // one computed cost workbook per cost volume
       const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
       const programType = t.programType ?? '';
+      // Normalize to the work-share program family: sbir_phase_1/2 → 'sbir', sttr* / d2p2 → 'sttr',
+      // everything else (BAA, OTA, CSO, NSF, DOE, …) → null (no SBIR/STTR work-share floor shown).
+      const workshareProgram = /sttr|d2p2/i.test(programType) ? 'sttr' : /sbir/i.test(programType) ? 'sbir' : null;
 
       if (requiredItems.length > 0) {
         for (const vol of resolved.volumes) {
@@ -129,6 +135,7 @@ export async function provisionProposalForPortal(opts: {
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
+          artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
         }
         for (const item of requiredItems) {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
@@ -150,6 +157,23 @@ export async function provisionProposalForPortal(opts: {
           if (item.templateId) {
             const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
             if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) templateDoc = tpl.canvasDocument;
+          }
+          // Universal cost volume: any cost item (DoW / NSF / DOE / BAA / OTA — not just DoD SBIR)
+          // gets a COMPUTED cost workbook from the deterministic burden-waterfall engine, taking
+          // precedence over the static narrative templates. One workbook per cost volume (the first
+          // non-narrative item); sibling narrative/justification items stay empty prose.
+          if (!templateDoc) {
+            const volAT = artifactTypeByVolKey.get(volKey(item.volumeNumber, item.volumeName));
+            const nm = (item.itemName ?? '').toLowerCase();
+            const vkey = volKey(item.volumeNumber, item.volumeName);
+            if (volAT === 'cost' && !costFilled.has(vkey) && !/narrative|justification|explanation|rationale/.test(nm)) {
+              templateDoc = buildStarterCostVolume({
+                title: item.itemName, agency: t.agency, program: workshareProgram,
+                companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
+                proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
+              });
+              costFilled.add(vkey);
+            }
           }
           if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k); }
           if (templateDoc) {

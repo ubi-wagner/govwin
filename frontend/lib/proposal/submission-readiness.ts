@@ -21,6 +21,8 @@ import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
 import { computeSttrSplit } from '@/lib/proposal/sttr-split';
+import { parseStructuredCostInputs } from '@/lib/proposal/cost-volume-canvas';
+import { computeBudget } from '@/lib/proposal/cost-model';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
@@ -60,6 +62,8 @@ export interface ReadinessReport {
     volumes: Array<{ name: string; pages: number; max: number; over: boolean }>;
     /** STTR only: the cooperative work-split computed from the Cost Volume (min SB 40% / RI 30%). */
     workSplit?: { sbPct: number; riPct: number; ok: boolean; computable: boolean };
+    /** Any cost volume: the total proposed price rolled up by the deterministic burden engine. */
+    cost?: { totalPrice: number; computable: boolean };
   };
   blockers: ReadinessBlocker[];
 }
@@ -232,20 +236,41 @@ export async function computeSubmissionReadiness(
     }
   }
 
-  // ── STTR cooperative work-split (SB≥40% / RI≥30% by cost) — computed, not asserted ──────────
+  // ── Deterministic cost roll-up (the universal burden-waterfall engine) ──────────────────────
+  // The Cost Volume may be a 'cost' spreadsheet OR a budget 'form' — match either.
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost' || /cost|budget/i.test(m.volumeName ?? ''))?.[0];
+  const costSecs = (costArtifactId ? volSections.get(costArtifactId) : undefined) ?? [];
+  // Preferred path: the cost volume is the STRUCTURED workbook (Rates/Labor/ODC/Subs sheets). Parse
+  // its inputs and run the SAME deterministic engine the pipeline `cost_estimator` uses, so the total
+  // price and the work-share reflect the tenant's actual edits — no free-text label guessing.
+  const structured = parseStructuredCostInputs(costSecs);
+  let cost: ReadinessReport['summary']['cost'];
   let workSplit: ReadinessReport['summary']['workSplit'];
-  if (isSttr) {
-    // The Cost Volume may be a 'cost' spreadsheet OR a budget 'form' — match either.
-    const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost' || /cost|budget/i.test(m.volumeName ?? ''))?.[0];
-    const costSecs = costArtifactId ? volSections.get(costArtifactId) : undefined;
-    const split = computeSttrSplit(costSecs ?? []);
+  if (structured) {
+    const b = computeBudget(structured.labor, structured.rates, { odcs: structured.odcs, subs: structured.subs });
+    cost = { totalPrice: Math.round(b.grand.totalPrice), computable: b.grand.totalPrice > 0 };
+    if (isSttr) {
+      // Share-of-price basis (matches the shipped work-split semantics): SB = prime share = 1 − subs/price;
+      // RI = research-institution subcontract share of price (from the explicit RI column, not a label guess).
+      const sbPct = (1 - b.workshare.subcontractShareOfPrice) * 100;
+      const riPct = b.workshare.researchInstitutionShareOfPrice * 100;
+      const ok = sbPct >= 40 && riPct >= 30;
+      workSplit = { sbPct: r1(sbPct), riPct: r1(riPct), ok, computable: true };
+      if (!ok) {
+        blockers.push({
+          category: 'work_split',
+          severity: 'warning',
+          message: `STTR work-split (computed from the structured Cost Volume) reads small business ${r1(sbPct)}% / research institution ${r1(riPct)}% — verify against the statutory 40% / 30% floor before submission.`,
+        });
+      }
+    }
+  } else if (isSttr) {
+    // Fallback: a free-text / uploaded cost table. Heuristic reader (performer labels, $ formats) — can
+    // mis-read a realistic table, so it is ADVISORY and never a hard block.
+    const split = computeSttrSplit(costSecs);
     const ok = split.found && split.sbPct >= 40 && split.riPct >= 30;
-    const r1 = (n: number) => Math.round(n * 10) / 10;
     workSplit = { sbPct: r1(split.sbPct), riPct: r1(split.riPct), ok, computable: split.found };
-    // ADVISORY only. Reading the split from a free-text cost table (performer labels, $ formats) is
-    // heuristic and can mis-read a realistic table, so we SURFACE the computed split for the human to
-    // verify and never HARD-block a possibly-compliant proposal on it — a hard gate would need a
-    // structured cost model with an explicit performer/role column.
     if (!split.found) {
       blockers.push({
         category: 'work_split',
@@ -293,6 +318,7 @@ export async function computeSubmissionReadiness(
       overBudget,
       volumes: volumeInfo,
       ...(workSplit ? { workSplit } : {}),
+      ...(cost ? { cost } : {}),
     },
     blockers,
   };
