@@ -539,6 +539,7 @@ function NodeRenderer({
 
   return (
     <div
+      data-node-id={node.id}
       className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
       style={{ ...nodeStyle, ...posStyle }}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
