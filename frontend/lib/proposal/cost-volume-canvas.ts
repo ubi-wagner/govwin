@@ -17,6 +17,7 @@
 import type { CanvasDocument, CanvasNode, CanvasRules, TableCell, TableCellStyle, TableContent } from '@/lib/types/canvas-document';
 import { docNodes } from '@/lib/types/canvas-document';
 import { coerceJsonb } from '@/lib/jsonb';
+import { parseNumericText } from '@/lib/numeric-cell';
 import {
   computeBudget, odcTotal, roundCents,
   type LaborLine, type IndirectRates, type OtherDirectCost, type Subcontract, type Period,
@@ -57,10 +58,10 @@ const GRAND: TableCellStyle = { bold: true, bg: '#2c3e7a', alignment: 'right' };
 const GRAND_L: TableCellStyle = { bold: true, bg: '#2c3e7a' };
 
 function h(text: string): TableCell { return { text, style: HDR }; }
-/** Whole-dollar money cell (gov cost volumes show whole dollars); value carries precision. */
+/** Money cell — whole-dollar DISPLAY (gov cost volumes show whole dollars); `value` carries FULL
+ * precision so the readiness parse + exports never lose cents on a fractional input. */
 function money(x: number, style: TableCellStyle = CUR): TableCell {
-  const v = Math.round(x);
-  return { text: `$${v.toLocaleString('en-US')}`, value: v, number_format: '$#,##0', cell_type: 'currency', style };
+  return { text: `$${Math.round(x).toLocaleString('en-US')}`, value: x, number_format: '$#,##0', cell_type: 'currency', style };
 }
 function pctCell(frac: number, style: TableCellStyle = CUR): TableCell {
   return { text: `${(frac * 100).toFixed(1)}%`, value: frac, number_format: '0.0%', cell_type: 'percent', style };
@@ -323,14 +324,14 @@ export function buildStarterCostVolume(meta: CostVolumeMeta): CanvasDocument {
 // ─── Structured parse (canvas → typed inputs), for the readiness roll-up ─────────
 
 function loose(s: string): number {
-  const t = (s ?? '').trim();
-  if (!t) return NaN;
-  if (t.includes('%')) return parseFloat(t.replace(/[%\s]/g, '')) / 100;
-  return parseFloat(t.replace(/[$,\s]/g, ''));
+  const v = parseNumericText(s); // shared parser: $, commas, %, K/M/B suffixes, accounting negatives
+  return v == null ? NaN : v;
 }
 function cellNum(cell: string | TableCell | undefined): number {
   if (cell == null) return NaN;
   if (typeof cell === 'string') return loose(cell);
+  // Object cells carry a machine `value` (kept in sync with the edited text by the canvas editors);
+  // prefer it, falling back to parsing the visible text for string/edited cells.
   if (typeof cell.value === 'number') return cell.value;
   return loose(cell.text ?? '');
 }

@@ -27,12 +27,13 @@ function summaryValue(nodes: CanvasNode[], label: string): number | undefined {
 describe('cost-volume-canvas — computed universal cost volume', () => {
   const inputs = provisionalCostInputs();
 
-  it('summary TOTAL PROPOSED PRICE equals the engine grand total (whole dollars)', () => {
+  it('summary TOTAL PROPOSED PRICE equals the engine grand total (full-precision value; whole-dollar display)', () => {
     const doc = buildCostVolumeCanvas({ ...inputs, meta: { program: 'sttr' } });
     const engine = computeBudget(inputs.labor, inputs.rates, { odcs: inputs.odcs, subs: inputs.subs, program: 'sttr' });
-    expect(summaryValue(doc.nodes, 'TOTAL PROPOSED PRICE')).toBe(Math.round(engine.grand.totalPrice));
-    expect(summaryValue(doc.nodes, 'TOTAL ESTIMATED COST')).toBe(Math.round(engine.grand.totalEstCost));
-    expect(summaryValue(doc.nodes, 'A. Direct Labor')).toBe(Math.round(engine.grand.directLabor));
+    // The cell `value` now carries full precision (F3 fix); the display text is whole dollars.
+    expect(summaryValue(doc.nodes, 'TOTAL PROPOSED PRICE')).toBeCloseTo(engine.grand.totalPrice, 4);
+    expect(summaryValue(doc.nodes, 'TOTAL ESTIMATED COST')).toBeCloseTo(engine.grand.totalEstCost, 4);
+    expect(summaryValue(doc.nodes, 'A. Direct Labor')).toBeCloseTo(engine.grand.directLabor, 4);
   });
 
   it('shows a Work-Share Compliance section for SBIR/STTR only', () => {
@@ -94,6 +95,39 @@ describe('parseStructuredCostInputs — canvas → typed inputs (readiness roll-
     const b = computeBudget(parsed.labor, parsed.rates, { odcs: parsed.odcs, subs: parsed.subs });
     expect(b.workshare.subcontractShareOfPrice).toBe(0);
     expect(parsed.subs).toHaveLength(0);
+  });
+
+  it('money value carries full precision: a fractional labor rate round-trips exactly (F3)', () => {
+    const doc = buildCostVolumeCanvas({
+      labor: [{ name: 'PI', category: 'PI', hours: 500, unburdenedRate: 85.75 }],
+      rates: { fringePct: 0.35, overheadPct: 0.45, gnaPct: 0.15, feePct: 0.07 },
+      odcs: [], subs: [], meta: { program: 'sttr' },
+    });
+    const parsed = parseStructuredCostInputs([{ content: JSON.stringify(doc) }])!;
+    expect(parsed.labor[0].unburdenedRate).toBe(85.75); // not 86 (whole-dollar display) — precise value
+  });
+
+  it('honors a tenant edit: a synced numeric cell + a plain-string new row both read correctly (F1/F4)', () => {
+    const doc = buildCostVolumeCanvas({ ...inputs, meta: { program: 'sttr' } });
+    const labor = doc.nodes.find((n) => n.type === 'table' && (n.content as { sheet_name?: string }).sheet_name === 'Labor')!;
+    const rows = (labor.content as { rows: (string | { text: string; value?: number })[][] }).rows;
+    // Fixed editor writes BOTH text and value on an edit → parser reads the new number.
+    rows[0][3] = { text: '800', value: 800 }; // PI hours 500 → 800 (col 3)
+    // A brand-new row is plain strings (no value) — the parser must read the visible text, incl. "$1.2M".
+    const subs = doc.nodes.find((n) => n.type === 'table' && (n.content as { sheet_name?: string }).sheet_name === 'Subs')!;
+    (subs.content as { rows: unknown[][] }).rows.unshift(['New Partner', 'extra work', 'Subcontractor', '$1.2M']);
+    const parsed = parseStructuredCostInputs([{ content: JSON.stringify(doc) }])!;
+    expect(parsed.labor[0].hours).toBe(800);
+    expect(parsed.subs.some((s) => s.amount === 1_200_000)).toBe(true); // "$1.2M" expanded, not read as $1.20
+  });
+
+  it('parser reads visible text when a cell has no machine value (defense-in-depth)', () => {
+    const doc = buildCostVolumeCanvas({ ...inputs, meta: { program: 'sttr' } });
+    const labor = doc.nodes.find((n) => n.type === 'table' && (n.content as { sheet_name?: string }).sheet_name === 'Labor')!;
+    const rows = (labor.content as { rows: (string | { text: string; value?: number })[][] }).rows;
+    rows[0][3] = { text: '900' }; // text-only edit, no value → parser must fall back to the text
+    const parsed = parseStructuredCostInputs([{ content: JSON.stringify(doc) }])!;
+    expect(parsed.labor[0].hours).toBe(900);
   });
 
   it('returns null for a free-text (non-structured) cost canvas → caller falls back', () => {

@@ -17,6 +17,7 @@ import type {
   TableCellStyle,
 } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
+import { parseNumericText, isNumericCell } from '@/lib/numeric-cell';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -216,9 +217,15 @@ export function SheetEditor({
         newRows[editingCell.row].push('');
       }
       const existing = newRows[editingCell.row][editingCell.col];
-      const styledCell = typeof existing === 'string'
-        ? editValue
-        : { ...existing, text: editValue };
+      let styledCell: typeof existing;
+      if (typeof existing === 'string') {
+        styledCell = editValue;
+      } else {
+        styledCell = { ...existing, text: editValue };
+        // Re-derive the numeric `value` from the edited text so exports + the cost readiness
+        // roll-up (which read `value`) reflect the edit instead of a stale provisioned number.
+        if (isNumericCell(existing)) { const v = parseNumericText(editValue); styledCell.value = v == null ? undefined : v; }
+      }
       newRows[editingCell.row][editingCell.col] = styledCell;
       updateNodeContent(currentSheet.nodeId, { ...content, rows: newRows });
     }

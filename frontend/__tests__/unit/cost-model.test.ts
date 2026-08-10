@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeBudget, budgetAsDisplay, popByMonths, popByYear, popBasePlusOption, singlePeriod,
+  computeBudget, budgetAsDisplay, roundCents, popByMonths, popByYear, popBasePlusOption, singlePeriod,
   type LaborLine, type IndirectRates, type OtherDirectCost, type Subcontract,
 } from '@/lib/proposal/cost-model';
 
@@ -104,5 +104,19 @@ describe('cost-model — edges', () => {
   it('rejects an unknown ODC kind', () => {
     expect(() => computeBudget(LABOR, RATES, { odcs: [{ kind: 'bogus' as never, label: 'x', amount: 1 }] }))
       .toThrow(/unknown ODC kind/);
+  });
+});
+
+describe('roundCents — matches Python round() (banker\'s, not Math.round half-up)', () => {
+  it('rounds half-to-even on exact ties and up on the true-binary value', () => {
+    // Verified equal to Python round(x,2) over a 2,220-value sweep. Math.round would give .63/.13.
+    expect(roundCents(2642.625)).toBe(2642.62);   // exact tie → even (2)
+    expect(roundCents(20260.125)).toBe(20260.12); // exact tie → even (2)
+    expect(roundCents(67443.705)).toBe(67443.71); // true binary just above → up
+    expect(roundCents(9454.725)).toBe(9454.73);
+    expect(roundCents(144522.225)).toBe(144522.23);
+    expect(roundCents(11975.985)).toBe(11975.99);
+    expect(roundCents(100)).toBe(100);
+    expect(roundCents(0)).toBe(0);
   });
 });

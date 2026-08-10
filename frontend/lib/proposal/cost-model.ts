@@ -45,12 +45,27 @@ export const FEE_REASONABLE_MAX = 0.1;
 
 const CENTS = 2;
 
-/** Round to cents for display. Internal math never uses this — only outputs do. */
+/**
+ * Round to cents for display. Internal math never uses this — only outputs do.
+ *
+ * Matches Python's round(x, 2): round-half-to-EVEN (banker's rounding), so the frontend cost
+ * volume agrees with the pipeline `cost_estimator`'s advisory numbers to the cent. (JS Math.round
+ * is half-UP, which diverges on exact half-cent values like 2642.625 → 2642.62, not .63.)
+ */
 export function roundCents(x: number): number {
-  // Mirror Python round() half-to-even? Python's round IS banker's rounding, but budget_model
-  // rounds only for display and the pipeline's own tests accept cents equality; JS toFixed is
-  // half-away-from-zero. Use a cents-scaled round that matches the observed Python outputs.
-  return Math.round((x + Number.EPSILON) * 100) / 100;
+  if (!Number.isFinite(x)) return x;
+  const neg = x < 0;
+  const s = Math.abs(x).toPrecision(17); // full-precision decimal (reveals the true binary value)
+  if (s.includes('e') || s.includes('E')) return Math.round(x * 100) / 100; // out of cost range → fallback
+  const [ip, frac = ''] = s.split('.');
+  const fp = frac.padEnd(3, '0');
+  let cents = parseInt(ip + fp.slice(0, 2), 10); // whole number of cents (2dp), rounded DOWN so far
+  const first = fp[2];
+  const after = fp.slice(3).replace(/0+$/, '');
+  if (first > '5' || (first === '5' && after !== '')) cents += 1;          // > half → up
+  else if (first === '5' && after === '' && cents % 2 !== 0) cents += 1;   // exact tie → to even
+  const r = cents / 100;
+  return neg ? -r : r;
 }
 
 // ─── Typed inputs (treated as immutable) ────────────────────────────────────────

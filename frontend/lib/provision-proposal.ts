@@ -21,7 +21,7 @@ import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
-import { buildStarterCostVolume } from '@/lib/proposal/cost-volume-canvas';
+import { resolveCostForm, buildCostVolume } from '@/lib/proposal/cost-forms';
 import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -111,7 +111,6 @@ export async function provisionProposalForPortal(opts: {
       let count = 0;
       const artifactByVolKey = new Map<string, string>();
       const artifactTypeByVolKey = new Map<string, string>();
-      const costFilled = new Set<string>(); // one computed cost workbook per cost volume
       const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
       const programType = t.programType ?? '';
       // Normalize to the work-share program family: sbir_phase_1/2 → 'sbir', sttr* / d2p2 → 'sttr',
@@ -137,6 +136,38 @@ export async function provisionProposalForPortal(opts: {
           artifactByVolKey.set(volKey(volNum, volName), art.id);
           artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
         }
+        // Choose which item in each COST volume receives the computed workbook: prefer a data-bearing
+        // item (spreadsheet/cost type, or a name like spreadsheet/workbook/budget/pricing) over a prose
+        // sibling ("Basis of Estimate", "Cost Narrative"), so the workbook never lands on a prose item
+        // while the real data item is left empty. One workbook per cost volume.
+        const PROSE_ITEM = /narrative|justification|explanation|rationale|basis of estimate|\bboe\b|assumption/i;
+        const DATA_ITEM_TYPES = new Set(['spreadsheet', 'cost', 'cost_volume', 'budget']);
+        const DATA_ITEM_NAME = /spreadsheet|workbook|\btable\b|budget|pricing|cost\s*(?:volume|proposal|sheet)/i;
+        const isDataItem = (it: { itemType: string; itemName: string }) =>
+          DATA_ITEM_TYPES.has((it.itemType ?? '').toLowerCase()) || DATA_ITEM_NAME.test(it.itemName ?? '');
+        const costWorkbookItem = new Map<string, number>(); // volKey → chosen itemNumber
+        for (const it of requiredItems) {
+          const vkey = volKey(it.volumeNumber, it.volumeName);
+          if (artifactTypeByVolKey.get(vkey) !== 'cost' || PROSE_ITEM.test(it.itemName ?? '')) continue;
+          const cur = costWorkbookItem.get(vkey);
+          if (cur == null) { costWorkbookItem.set(vkey, it.itemNumber); continue; }
+          const curItem = requiredItems.find((r) => r.itemNumber === cur);
+          if (isDataItem(it) && !(curItem && isDataItem(curItem))) costWorkbookItem.set(vkey, it.itemNumber);
+        }
+        // OTF / state-grant budget caps (used by the otf_state_budget cost form), from the preset's
+        // custom variables. Absent → the form's own defaults apply.
+        const cvars = ((resolved.compliance as Record<string, unknown>)?.customVariables ?? {}) as Record<string, unknown>;
+        const cvVal = (k: string): string | null => {
+          const raw = cvars[k];
+          if (raw == null) return null;
+          if (typeof raw === 'object' && raw !== null && 'value' in (raw as Record<string, unknown>)) return String((raw as { value?: unknown }).value ?? '');
+          return String(raw);
+        };
+        const cvNum = (k: string): number | null => { const s = cvVal(k); if (s == null) return null; const n = Number(s.replace(/[^0-9.]/g, '')); return Number.isFinite(n) && n > 0 ? n : null; };
+        const costCeiling = cvNum('budget_cap_usd');
+        const persRaw = cvNum('personnel_max_pct');
+        const personnelMax = persRaw != null ? (persRaw > 1 ? persRaw / 100 : persRaw) : null;
+        const costShareAllowed = (cvVal('cost_share_allowed') ?? '').toLowerCase() === 'true';
         for (const item of requiredItems) {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           const [section] = await tx<{ id: string }[]>`
@@ -158,21 +189,20 @@ export async function provisionProposalForPortal(opts: {
             const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
             if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) templateDoc = tpl.canvasDocument;
           }
-          // Universal cost volume: any cost item (DoW / NSF / DOE / BAA / OTA — not just DoD SBIR)
-          // gets a COMPUTED cost workbook from the deterministic burden-waterfall engine, taking
-          // precedence over the static narrative templates. One workbook per cost volume (the first
-          // non-narrative item); sibling narrative/justification items stay empty prose.
+          // Universal cost volume: the cost item (DoW / NSF / DOE / BAA / OTA — not just DoD SBIR) gets a
+          // COMPUTED workbook, rendered in the common budget FORM the opportunity requires (DoD burden
+          // waterfall · SF-424A federal grant · OTF state budget), taking precedence over the narrative
+          // templates. Exactly the data-bearing item per cost volume (picked above); prose siblings stay empty.
           if (!templateDoc) {
-            const volAT = artifactTypeByVolKey.get(volKey(item.volumeNumber, item.volumeName));
-            const nm = (item.itemName ?? '').toLowerCase();
             const vkey = volKey(item.volumeNumber, item.volumeName);
-            if (volAT === 'cost' && !costFilled.has(vkey) && !/narrative|justification|explanation|rationale/.test(nm)) {
-              templateDoc = buildStarterCostVolume({
+            if (artifactTypeByVolKey.get(vkey) === 'cost' && costWorkbookItem.get(vkey) === item.itemNumber) {
+              const form = resolveCostForm({ agency: t.agency, program: programType, volumeName: item.volumeName });
+              templateDoc = buildCostVolume(form, {
                 title: item.itemName, agency: t.agency, program: workshareProgram,
                 companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
                 proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
+                ceiling: costCeiling, personnelMaxPct: personnelMax, costShareAllowed,
               });
-              costFilled.add(vkey);
             }
           }
           if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k); }

@@ -38,6 +38,7 @@ import type {
 } from '@/lib/types/canvas-document';
 import { estimatePageCount } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
+import { parseNumericText, isNumericCell } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 
@@ -1108,7 +1109,11 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   const updateCell = (ri: number, ci: number, text: string) => {
     const rows = (content.rows ?? []).map(r => [...r]);
     const cell = resolveTableCell(rows[ri][ci]);
-    rows[ri][ci] = { ...cell, text };
+    const next: TableCellType = { ...cell, text };
+    // Keep a numeric cell's machine `value` in sync with the edited text — exports (docx/xlsx/pdf)
+    // and the cost readiness roll-up read `value`, so a stale value silently ignores the edit.
+    if (isNumericCell(cell)) { const v = parseNumericText(text); next.value = v == null ? undefined : v; }
+    rows[ri][ci] = next;
     onUpdate({ ...content, rows });
   };
 

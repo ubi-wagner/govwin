@@ -239,8 +239,13 @@ export async function computeSubmissionReadiness(
   // ── Deterministic cost roll-up (the universal burden-waterfall engine) ──────────────────────
   // The Cost Volume may be a 'cost' spreadsheet OR a budget 'form' — match either.
   const r1 = (n: number) => Math.round(n * 10) / 10;
-  const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost' || /cost|budget/i.test(m.volumeName ?? ''))?.[0];
-  const costSecs = (costArtifactId ? volSections.get(costArtifactId) : undefined) ?? [];
+  // Gather sections from ALL cost-ish artifacts (a proposal may carry a cost-narrative/justification
+  // volume alongside the workbook volume; an unordered first-match could miss the real workbook). The
+  // structured parser scans them for the 'Labor' sheet wherever it lives.
+  const costArtifactIds = [...metaByArtifact]
+    .filter(([, m]) => m.artifactType === 'cost' || /cost|budget/i.test(m.volumeName ?? ''))
+    .map(([id]) => id);
+  const costSecs = costArtifactIds.flatMap((id) => volSections.get(id) ?? []);
   // Preferred path: the cost volume is the STRUCTURED workbook (Rates/Labor/ODC/Subs sheets). Parse
   // its inputs and run the SAME deterministic engine the pipeline `cost_estimator` uses, so the total
   // price and the work-share reflect the tenant's actual edits — no free-text label guessing.
