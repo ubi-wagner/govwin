@@ -309,9 +309,17 @@ function DropZone({ onDrop }: { onDrop: () => void }) {
 
 // ─── Drag handle icon ───────────────────────────────────────────────
 
-function DragHandle() {
+function DragHandle({ nodeId, onDragStart, onDragEnd }: { nodeId: string; onDragStart: () => void; onDragEnd: () => void }) {
   return (
-    <div className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-opacity">
+    <div
+      // The grip is the ONLY drag initiator now — so dragging across the node's TEXT
+      // makes a text selection (which pops the selection toolbar) instead of a reorder.
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', nodeId); e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
+      onDragEnd={onDragEnd}
+      title="Drag to reorder"
+      className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-opacity"
+    >
       <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
         <circle cx="3" cy="2" r="1.5" />
         <circle cx="9" cy="2" r="1.5" />
@@ -351,15 +359,8 @@ function TocRenderer({ nodes, isSelected, onSelect, readOnly, nodeId, isDragging
     <div
       className={`relative rounded px-1 cursor-pointer transition-all py-2 group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      draggable={!readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', nodeId);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
     >
-      {!readOnly && <DragHandle />}
+      {!readOnly && <DragHandle nodeId={nodeId} onDragStart={onDragStart} onDragEnd={onDragEnd} />}
       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Table of Contents</div>
       {headings.length === 0 ? (
         <div className="text-xs text-gray-400 italic">No headings in document. Add Heading nodes to populate the TOC.</div>
@@ -540,19 +541,15 @@ function NodeRenderer({
   return (
     <div
       data-node-id={node.id}
-      className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
-      style={{ ...nodeStyle, ...posStyle }}
+      className={`relative rounded px-1 cursor-text transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
+      // The node body is NOT draggable (only the grip is) and the text is selectable, so a
+      // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,
+      // instead of a drag-reorder. Reorder still works from the ⠿ grip.
+      style={{ ...nodeStyle, ...posStyle, userSelect: readOnly ? undefined : 'text' }}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      draggable={!readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', node.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
     >
-      {/* Drag handle */}
-      {!readOnly && <DragHandle />}
+      {/* Drag handle — the sole drag initiator */}
+      {!readOnly && <DragHandle nodeId={node.id} onDragStart={onDragStart} onDragEnd={onDragEnd} />}
 
       {/* Provenance badge */}
       {provenanceBadge && isSelected && (
