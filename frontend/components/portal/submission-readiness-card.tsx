@@ -115,7 +115,7 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
             <div className="flex flex-wrap gap-3 text-xs mb-3 border-t border-gray-100 pt-3">
               {(report.summary.volumes ?? []).map((v, i) => (
                 <span key={i} className={v.over ? 'text-red-600 font-semibold' : 'text-gray-600 font-medium'}>
-                  {v.name}: {v.pages}/{v.max}pp{v.over ? ' — over limit' : ''}
+                  {v.name}: {v.pages}/{v.max}{v.unit === 'slides' ? ' slides' : 'pp'}{v.over ? ' — over limit' : ''}
                 </span>
               ))}
               {report.summary.cost && report.summary.cost.computable && (

@@ -572,58 +572,192 @@ export function createNode(opts: {
  *   - page_break: advance to a fresh page
  * Proportional-font average glyph width ≈ 0.45 × font size (Times New Roman body).
  */
-export function estimatePageCount(doc: CanvasDocument): number {
-  const c = doc.canvas;
-  const usableW = c.width - c.margins.left - c.margins.right;
-  const usableH = c.height - c.margins.top - c.margins.bottom
-    - (c.header?.height ?? 0) - (c.footer?.height ?? 0);
-  if (usableW <= 0 || usableH <= 0) return 1;
+/** Per-format usable geometry + flow metrics (points) — shared by the page, slide, and section rulers. */
+function flowMetrics(c: CanvasDocument['canvas']) {
+  const usableW = Math.max(1, c.width - c.margins.left - c.margins.right);
+  const usableH = Math.max(1, c.height - c.margins.top - c.margins.bottom - (c.header?.height ?? 0) - (c.footer?.height ?? 0));
   const fs = c.font_default.size;
   const bodyLineH = fs * c.line_spacing;
-  const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated)
+  const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated to the exporter)
   const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
-  const linesFor = (chars: number, charsPerLine: number) => Math.max(1, Math.ceil(chars / charsPerLine));
+  return { usableW, usableH, fs, bodyLineH, CHAR_W, cpl };
+}
 
-  let heightPt = 0;
-  for (const node of docNodes(doc)) {
-    switch (node.type) {
-      case 'page_break':
-        heightPt = Math.ceil((heightPt + 0.01) / usableH) * usableH; // start a fresh page
-        break;
-      case 'toc':
-        break;
-      case 'spacer': {
-        const h = (node.content as { height?: number } | undefined)?.height;
-        heightPt += typeof h === 'number' && h > 0 ? h : bodyLineH;
-        break;
-      }
-      case 'heading': {
-        const level = (node.content as HeadingContent).level ?? 1;
-        const hfs = fs * (level <= 1 ? 2.5 : level === 2 ? 1.45 : 1.2);
-        const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
-        heightPt += linesFor(getNodeText(node).length, hcpl) * hfs * 1.15 + fs * 0.7 + fs * 0.25;
-        break;
-      }
-      case 'image':
-      case 'chart': {
-        const styleH = (node.style as { height?: number } | undefined)?.height;
-        heightPt += (typeof styleH === 'number' && styleH > 0 ? styleH : fs * 15.5) + bodyLineH;
-        break;
-      }
-      case 'table': {
-        const t = node.content as TableContent;
-        const rows = (Array.isArray(t.headers) && t.headers.length ? 1 : 0) + (t.rows?.length ?? 0);
-        heightPt += Math.max(1, rows) * bodyLineH * 1.35;
-        break;
-      }
-      case 'caption':
-        heightPt += bodyLineH;
-        break;
-      default:
-        heightPt += linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
+/** Vertical height (pt) a single node occupies in normal flow. page_break / toc contribute nothing. */
+function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>): number {
+  const { usableW, fs, bodyLineH, CHAR_W, cpl } = m;
+  const linesFor = (chars: number, per: number) => Math.max(1, Math.ceil(chars / per));
+  switch (node.type) {
+    case 'page_break':
+    case 'toc':
+      return 0;
+    case 'spacer': {
+      const h = (node.content as { height?: number } | undefined)?.height;
+      return typeof h === 'number' && h > 0 ? h : bodyLineH;
     }
+    case 'heading': {
+      const level = (node.content as HeadingContent).level ?? 1;
+      const hfs = fs * (level <= 1 ? 2.5 : level === 2 ? 1.45 : 1.2);
+      const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
+      return linesFor(getNodeText(node).length, hcpl) * hfs * 1.15 + fs * 0.7 + fs * 0.25;
+    }
+    case 'image':
+    case 'chart': {
+      const styleH = (node.style as { height?: number } | undefined)?.height;
+      return (typeof styleH === 'number' && styleH > 0 ? styleH : fs * 15.5) + bodyLineH;
+    }
+    case 'table': {
+      const t = node.content as TableContent;
+      const rows = (Array.isArray(t.headers) && t.headers.length ? 1 : 0) + (t.rows?.length ?? 0);
+      return Math.max(1, rows) * bodyLineH * 1.35;
+    }
+    case 'caption':
+      return bodyLineH;
+    default:
+      return linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
   }
-  return Math.max(1, Math.ceil(heightPt / usableH));
+}
+
+/** Total stacked height (pt) of a node run (a section's footprint), ignoring page breaks. */
+function stackHeightPt(nodes: CanvasNode[], m: ReturnType<typeof flowMetrics>): number {
+  let h = 0;
+  for (const n of nodes) h += nodeStackHeightPt(n, m);
+  return h;
+}
+
+/**
+ * estimatePageCount — the rendered PAGE count of a document canvas. Delegates to
+ * paginate(), the ONE flow engine, so the compliance floor, submission-readiness,
+ * the in-editor page readout, AND the live layout gauge all read a single
+ * calibrated number — a document can never say "6 pages" in the editor and "7
+ * pages" at the export gate. A spreadsheet is measured in tabs, not flow pages.
+ */
+export function estimatePageCount(doc: CanvasDocument): number {
+  const c = doc.canvas;
+  if (!c) return 1;
+  if (c.format === 'spreadsheet') return 1;
+  return paginate(doc).totalPages;
+}
+
+/** The slide groups of a deck: one per v2 section, else the flat nodes split on page_break. */
+function slideGroups(doc: CanvasDocument): CanvasNode[][] {
+  if (doc.sections && doc.sections.length) return doc.sections.map((s) => sectionsToNodes([s]));
+  const groups: CanvasNode[][] = [[]];
+  for (const n of doc.nodes ?? []) {
+    if (n.type === 'page_break') { groups.push([]); continue; }
+    groups[groups.length - 1].push(n);
+  }
+  return groups.filter((g, i) => g.length > 0 || i === 0);
+}
+
+/**
+ * Estimate the SLIDE count of a slide-format canvas — the deck ruler, the analog of
+ * estimatePageCount for documents. The pptx exporter renders exactly one slide per v2
+ * section (or per page_break group for a flat v1 deck), so the count is the number of
+ * groups. Overflow (a group too tall for the frame) is a SEPARATE concern — see
+ * overflowingSlides — since the exporter does not reflow a slide.
+ */
+export function estimateSlideCount(doc: CanvasDocument): number {
+  return Math.max(1, slideGroups(doc).length);
+}
+
+/** 0-based indices of slides whose content overflows the slide frame (content will be cut off). */
+export function overflowingSlides(doc: CanvasDocument): number[] {
+  const c = doc.canvas;
+  if (!c) return [];
+  const m = flowMetrics(c);
+  const out: number[] = [];
+  slideGroups(doc).forEach((g, i) => { if (stackHeightPt(g, m) > m.usableH * 1.02) out.push(i); });
+  return out;
+}
+
+/** The page footprint of a single section's nodes (for per-section size budgets + the fill gauge). */
+export function sectionPageSpan(nodes: CanvasNode[], canvas: CanvasDocument['canvas']): number {
+  if (!canvas) return 1;
+  const m = flowMetrics(canvas);
+  return Math.max(1, Math.ceil(stackHeightPt(nodes, m) / m.usableH));
+}
+
+// ─── The single flow-pagination engine ──────────────────────────────
+// paginate() lays the section layer into the frame and reports page usage with the
+// SAME calibrated per-node ruler (flowMetrics + nodeStackHeightPt) estimatePageCount
+// uses — so the live editor gauge and the compliance floor can never disagree.
+// Regular flow content splits across the page edge (like the real renderer); a
+// keep_together group/section moves wholesale when it would straddle the edge
+// (break-inside:avoid). Documents only — slides are one-section-per-slide.
+
+export interface SectionPageInfo {
+  id: string;
+  title?: string;
+  startPage: number;
+  endPage: number;
+  pagesUsed: number;
+  /** the section's own soft page budget, if set. */
+  budget?: number;
+  /** pagesUsed exceeds that budget. */
+  overBudget: boolean;
+}
+
+export interface LayoutResult {
+  totalPages: number;
+  perSection: SectionPageInfo[];
+  /** the frame's max_pages cap and whether the layout exceeds it. */
+  vsMaxPages: { max: number | null; over: boolean };
+}
+
+export function paginate(doc: CanvasDocument): LayoutResult {
+  const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
+  const usableH = m.usableH;
+  const sections = toSections(doc);
+  const perSection: SectionPageInfo[] = [];
+
+  let page = 1;
+  let y = 0; // points consumed on the current page
+  const newPage = () => { page += 1; y = 0; };
+  // Fill the current page, then spill onto as many pages as needed — flow content
+  // splits at the page edge, so pages = ceil(totalHeight / pageHeight) with no
+  // phantom whitespace (matches estimatePageCount exactly for un-broken content).
+  const advance = (h: number) => {
+    let remaining = h;
+    while (remaining > 0) {
+      const room = usableH - y;
+      if (remaining <= room) { y += remaining; return; }
+      remaining -= room;
+      newPage();
+    }
+  };
+  // A keep-together block: if it fits on a page but not in the remaining space,
+  // move it whole to the next page; an oversized block still spills.
+  const fitKeep = (h: number) => {
+    if (y > 0 && h <= usableH && y + h > usableH) newPage();
+    advance(h);
+  };
+
+  sections.forEach((section, i) => {
+    if (section.layout?.break_before && i > 0 && y > 0) newPage();
+    const startPage = page;
+    if (section.layout?.mode === 'keep_together') {
+      fitKeep((section.groups ?? []).reduce((s, g) => s + stackHeightPt(g.nodes ?? [], m), 0));
+    } else {
+      for (const group of section.groups ?? []) {
+        if (group.keep_together) { fitKeep(stackHeightPt(group.nodes ?? [], m)); continue; }
+        for (const node of group.nodes ?? []) {
+          if (node.type === 'page_break') { if (y > 0) newPage(); continue; }
+          advance(nodeStackHeightPt(node, m));
+        }
+      }
+    }
+    const endPage = page;
+    const budget = section.layout?.page_budget;
+    const pagesUsed = endPage - startPage + 1;
+    perSection.push({
+      id: section.id, title: section.title, startPage, endPage, pagesUsed, budget,
+      overBudget: typeof budget === 'number' && pagesUsed > budget,
+    });
+  });
+
+  const max = doc.canvas?.max_pages ?? null;
+  return { totalPages: page, perSection, vsMaxPages: { max, over: max != null && page > max } };
 }
 
 /** Extract plain text from any node type (for search + page estimation). */
@@ -708,6 +842,9 @@ export interface ComplianceViolation {
   code:
     | 'font_too_small'
     | 'over_page_limit'
+    | 'over_slide_limit'
+    | 'slide_overflow'
+    | 'section_over_budget'
     | 'image_not_allowed'
     | 'missing_header'
     | 'missing_footer';
@@ -758,6 +895,51 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
     }
   }
 
+  // Slide cap — a deck is measured in SLIDES, not pages (the analog of the page cap).
+  if (spec.max_slides != null) {
+    const slides = estimateSlideCount(doc);
+    if (slides > spec.max_slides) {
+      out.push({
+        code: 'over_slide_limit',
+        message: `Estimated ${slides} slides exceeds the ${spec.max_slides}-slide limit.`,
+        limit: spec.max_slides,
+        actual: slides,
+      });
+    }
+  }
+
+  // Slide overflow — a slide too tall for its frame is cut off on export, regardless of any cap.
+  if (doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3') {
+    const over = overflowingSlides(doc);
+    if (over.length) {
+      out.push({
+        code: 'slide_overflow',
+        message: `${over.length} slide(s) overflow the frame (slide ${over.map((i) => i + 1).join(', ')}) — content will be cut off; split them.`,
+        actual: over.length,
+      });
+    }
+  }
+
+  // Per-SECTION size budgets — a section that declares a page_budget must fit within it
+  // (e.g. a "Technical Approach ≤ 5 pages" section inside a longer document). Measured with
+  // the same height ruler, so a section limit is enforced as strictly as the whole-doc cap.
+  if (doc.sections?.length && doc.canvas) {
+    for (const s of doc.sections) {
+      const budget = s.layout?.page_budget;
+      if (budget == null || budget <= 0) continue;
+      const nodes = sectionsToNodes([s]);
+      const span = sectionPageSpan(nodes, doc.canvas);
+      if (span > budget) {
+        out.push({
+          code: 'section_over_budget',
+          message: `"${firstHeadingText(nodes) ?? 'Section'}" is estimated at ${span} pages against its ${budget}-page budget.`,
+          limit: budget,
+          actual: span,
+        });
+      }
+    }
+  }
+
   // Images/figures not permitted by the RFP.
   if (spec.images_allowed === false && docNodes(doc).some((n) => n.type === 'image')) {
     out.push({ code: 'image_not_allowed', message: 'This artifact does not permit images/figures.' });
@@ -772,6 +954,38 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   }
 
   return out;
+}
+
+/**
+ * Derive a ComplianceSpec from a canvas's OWN inline rules — the self-declared
+ * size/format floor for a STANDALONE document (a marketing flier, a slide deck, a
+ * library artifact) that carries no RFP-frozen ComplianceSpec. Only the limits the
+ * canvas actually declares are enforced; header/footer/required-sections are RFP
+ * concepts and stay off, so a flier is never failed for lacking a page header.
+ */
+export function specFromCanvasRules(canvas: CanvasRules): ComplianceSpec {
+  return {
+    max_pages: canvas.max_pages ?? null,
+    max_slides: canvas.max_slides ?? null,
+    min_font_size: canvas.min_font_size ?? null,
+    images_allowed: canvas.images_allowed ?? true,
+    required_sections: [],
+    header_required: false,
+    footer_required: false,
+  };
+}
+
+/**
+ * The compliance floor for a STANDALONE document — the SAME size ruler the proposal
+ * export gate uses (page/slide caps, per-section budgets, font floor, images), but
+ * measured against the document's own declared limits. This is the one entry point
+ * every non-proposal create/save/export path calls so "doc, pdf, ppt, xls" — and a
+ * 2-page flier or a 10-slide deck built outside a proposal — is size-checked too.
+ * Advisory: it reports; the caller decides whether to warn or block.
+ */
+export function validateStandaloneCanvas(doc: CanvasDocument): ComplianceViolation[] {
+  if (!doc.canvas) return [];
+  return validateCanvasAgainstSpec(doc, specFromCanvasRules(doc.canvas));
 }
 
 /**

@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -253,14 +253,36 @@ export function CanvasRenderer({
         <span>{metadata.status.replace('_', ' ')}</span>
         <span>&middot;</span>
         <span>{nodes.length} atom{nodes.length !== 1 ? 's' : ''}</span>
-        {canvas.max_pages && (
-          <>
-            <span>&middot;</span>
-            <span>
-              ~{Math.min(canvas.max_pages, estimatePageCount(doc))} of {canvas.max_pages} pages
-            </span>
-          </>
-        )}
+        {/* Size gauge — show the REAL estimate (unclamped, so an over-limit doc reads
+            red at its true count), in the unit that matches the format: slides for a
+            deck, pages for a document. Uses the unified ruler the export gate enforces. */}
+        {canvas.max_slides != null ? (
+          (() => {
+            const slides = estimateSlideCount(doc);
+            const over = slides > canvas.max_slides;
+            return (
+              <>
+                <span>&middot;</span>
+                <span className={over ? 'text-rose-600 font-semibold' : undefined}>
+                  ~{slides} of {canvas.max_slides} slides{over ? ' — over' : ''}
+                </span>
+              </>
+            );
+          })()
+        ) : canvas.max_pages != null ? (
+          (() => {
+            const pages = estimatePageCount(doc);
+            const over = pages > canvas.max_pages;
+            return (
+              <>
+                <span>&middot;</span>
+                <span className={over ? 'text-rose-600 font-semibold' : undefined}>
+                  ~{pages} of {canvas.max_pages} pages{over ? ' — over' : ''}
+                </span>
+              </>
+            );
+          })()
+        ) : null}
         <span>&middot;</span>
         <span>v{metadata.version_number}</span>
       </div>

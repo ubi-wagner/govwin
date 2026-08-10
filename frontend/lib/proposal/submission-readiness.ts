@@ -26,6 +26,8 @@ import { computeBudget } from '@/lib/proposal/cost-model';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
+  estimateSlideCount,
+  overflowingSlides,
   docNodes,
   type CanvasDocument,
   type ComplianceSpec,
@@ -58,8 +60,8 @@ export interface ReadinessReport {
     requirements: { mandatory: number; satisfied: number; unmet: number };
     formatWarnings: number;
     overBudget: number;
-    /** Per page-limited volume: the REAL rendered page count vs its hard cap. */
-    volumes: Array<{ name: string; pages: number; max: number; over: boolean }>;
+    /** Per size-limited volume: the REAL rendered size (pages for docs, slides for decks) vs its hard cap. */
+    volumes: Array<{ name: string; pages: number; max: number; over: boolean; unit: 'pages' | 'slides' }>;
     /** STTR only: the cooperative work-split computed from the Cost Volume (min SB 40% / RI 30%). */
     workSplit?: { sbPct: number; riPct: number; ok: boolean; computable: boolean };
     /** Any cost volume: the total proposed price rolled up by the deterministic burden engine. */
@@ -215,23 +217,36 @@ export async function computeSubmissionReadiness(
   const volumeInfo: ReadinessReport['summary']['volumes'] = [];
   for (const [artifactId, secs] of volSections) {
     const spec = specByArtifact.get(artifactId);
-    const max = spec?.max_pages;
     const meta = metaByArtifact.get(artifactId);
-    if (max == null || secs.length === 0) continue; // needs a page cap
-    if (meta?.artifactType !== 'narrative') continue; // page count is only meaningful for prose volumes
-    let pages: number;
-    try {
-      const doc = assembleArtifactCanvas(secs, meta.artifactType, meta.volumeName ?? 'Volume');
-      pages = estimatePageCount(doc);
-    } catch { continue; } // a measurement failure must never itself block
-    const over = pages > max;
-    volumeInfo.push({ name: meta.volumeName ?? 'Volume', pages, max, over });
+    if (secs.length === 0) continue;
+    let doc: CanvasDocument;
+    try { doc = assembleArtifactCanvas(secs, meta?.artifactType ?? 'narrative', meta?.volumeName ?? 'Volume'); }
+    catch { continue; } // a measurement failure must never itself block
+    // A deck is measured in SLIDES, a prose volume in PAGES; cost spreadsheets / forms have no flow cap.
+    const isSlide = doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3';
+    if (!isSlide && meta?.artifactType !== 'narrative') continue;
+    const unit: 'pages' | 'slides' = isSlide ? 'slides' : 'pages';
+    const max = isSlide ? spec?.max_slides : spec?.max_pages;
+    if (max == null) continue; // needs a cap for this dimension
+    const size = isSlide ? estimateSlideCount(doc) : estimatePageCount(doc);
+    const name = meta?.volumeName ?? 'Volume';
+    const noun = isSlide ? 'slide' : 'page';
+    const over = size > max;
+    volumeInfo.push({ name, pages: size, max, over, unit });
     if (over) {
       overBudget++;
       blockers.push({
         category: 'page_overflow',
         severity: 'blocker',
-        message: `"${meta.volumeName ?? 'Volume'}" is estimated at ${pages} pages against a ${max}-page limit — trim ${pages - max} page(s) before submission (same estimate the export compliance check uses).`,
+        message: `"${name}" is estimated at ${size} ${unit} against a ${max}-${noun} limit — trim ${size - max} ${noun}(s) before submission (same estimate the export compliance check uses).`,
+      });
+    }
+    if (isSlide) {
+      const ov = overflowingSlides(doc);
+      if (ov.length) blockers.push({
+        category: 'page_overflow',
+        severity: 'warning',
+        message: `"${name}": ${ov.length} slide(s) overflow the frame (slide ${ov.map((i) => i + 1).join(', ')}) — content will be cut off.`,
       });
     }
   }

@@ -18,7 +18,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { countNodes } from '@/lib/documents/starter';
-import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { validateStandaloneCanvas, type CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; documentId: string }>;
@@ -127,17 +127,26 @@ export async function PUT(request: Request, ctx: RouteContext) {
       );
     }
 
+    // Size/format compliance floor (advisory) — the SAME ruler proposals use, run
+    // against the document's OWN declared limits (max_pages/max_slides/font/images),
+    // so a "2-page flier" that grew to 3 pages, or a deck over its slide cap, is
+    // flagged WHILE editing. Non-blocking: standalone docs have no lock gate.
+    let complianceWarnings: { code: string; message: string }[] = [];
+    try {
+      complianceWarnings = validateStandaloneCanvas(content).map((v) => ({ code: v.code, message: v.message }));
+    } catch (e) { console.error('[portal/documents/save] compliance check failed (non-fatal):', e); }
+
     try {
       await emitEventSingle({
         namespace: 'library',
         type: 'document.updated',
         actor: userActor(su.id, su.email ?? undefined),
         tenantId,
-        payload: { documentId, title: nextTitle, version: nextVersion },
+        payload: { documentId, title: nextTitle, version: nextVersion, compliant: complianceWarnings.length === 0 },
       });
     } catch (e) { console.error('[portal/documents/save] event emit failed (non-fatal):', e); }
 
-    return NextResponse.json({ data: { documentId, version: nextVersion } });
+    return NextResponse.json({ data: { documentId, version: nextVersion, complianceWarnings } });
   } catch (e) {
     console.error('[portal/documents/save] error:', e);
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
