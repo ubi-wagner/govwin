@@ -36,6 +36,18 @@ const BOX = new Set<NodeType>(['shape', 'text_box', 'callout', 'image', 'chart',
 // Free-placement nodes (content boxes / shapes / floating figures that don't snap to margins).
 const ARRANGE = new Set<NodeType>(['shape', 'text_box', 'image', 'chart', 'video']);
 
+// Node types whose content is a single text/code field a prose library atom can
+// replace WITHOUT destroying the node's shape. "Replace from Library" is hidden for
+// every other type (image/table/chart/list/…) so a swap can never corrupt a node.
+const REPLACEABLE_FROM_LIBRARY = new Set<NodeType>([
+  'text_block', 'heading', 'blockquote', 'callout', 'text_box', 'caption', 'footnote', 'code_block',
+]);
+
+/** Whether "Replace from Library" (prose swap) is safe for this node type. */
+export function canReplaceFromLibrary(type: NodeType): boolean {
+  return REPLACEABLE_FROM_LIBRARY.has(type);
+}
+
 /** Resolve the control groups + the one element-specific control for a node type. */
 export function formatCapabilities(type: NodeType): FormatCaps {
   const element: ElementKind =

@@ -152,7 +152,9 @@ export async function GET(
     const index = await loadIndex();
     const meta = index.find(m => m.id === documentId) || null;
 
-    return NextResponse.json({ data: { document, meta } });
+    // Return the real actor so the editor stamps provenance/history to the signed-in
+    // admin (was hard-coded "Admin") and can key its local autosave draft.
+    return NextResponse.json({ data: { document, meta, actor: { id: authResult.userId, name: authResult.email } } });
   } catch (err) {
     console.error('[admin/documents/[id]] GET error', err);
     return NextResponse.json(

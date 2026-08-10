@@ -150,6 +150,26 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
   }
 }
 
+/**
+ * Replace a node's TEXT with a library atom's prose, PRESERVING the node's content
+ * shape. Returns the new content, or `null` when the node type has no single text
+ * field a prose atom can sensibly fill (image/table/chart/list/…) — in which case the
+ * caller leaves the node untouched instead of destroying its shape. Mirrors
+ * `canReplaceFromLibrary` (lib/canvas/format-controls) which gates the button.
+ */
+function replaceNodeText(content: CanvasNode['content'], type: NodeType, text: string): CanvasNode['content'] | null {
+  const c = (content ?? {}) as Record<string, unknown>;
+  switch (type) {
+    case 'text_block': case 'heading': case 'blockquote':
+    case 'callout': case 'text_box': case 'caption': case 'footnote':
+      return { ...c, text } as CanvasNode['content'];
+    case 'code_block':
+      return { ...c, code: text } as CanvasNode['content'];
+    default:
+      return null; // image / table / chart / list / shape / … — not a text swap
+  }
+}
+
 /** A sensible starting look for a freshly-inserted extended element (so it's
  *  visible on the canvas immediately and has something to format). */
 function defaultStyle(type: NodeType): NodeStyle | undefined {
@@ -544,9 +564,16 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Only replace into a node whose content is a single text/code field — preserving
+        // its shape. A library atom is prose; blindly writing { text } onto an image / table
+        // / chart / list node destroyed its content shape (image lost its storage_key). The
+        // Replace button is also hidden for those types (see canReplaceFromLibrary), so this
+        // is defense-in-depth: an unsupported type is a no-op, never a corruption.
+        const replaced = replaceNodeText(n.content, n.type, atom.content);
+        if (replaced === null) return n; // unsupported node type — leave untouched
         return {
           ...n,
-          content: { text: atom.content } as any,
+          content: replaced,
           provenance: {
             ...n.provenance,
             source: 'library' as const,

@@ -16,6 +16,7 @@ export default function DocumentEditorPage() {
   const documentId = params.documentId as string;
 
   const [document, setDocument] = useState<CanvasDocument | null>(null);
+  const [actor, setActor] = useState<{ id: string; name: string }>({ id: 'admin', name: 'Admin' });
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export default function DocumentEditorPage() {
         const json = await res.json();
         const doc = json.data.document as CanvasDocument;
         setDocument(doc);
+        if (json.data.actor?.id) setActor({ id: json.data.actor.id, name: json.data.actor.name || json.data.actor.id });
         setTitle(doc.metadata.title || 'Untitled');
       } catch {
         setError('Network error loading document');
@@ -175,8 +177,9 @@ export default function DocumentEditorPage() {
           initialDocument={document}
           onSave={handleSave}
           onExport={handleExport}
-          actorId="admin"
-          actorName="Admin"
+          actorId={actor.id}
+          actorName={actor.name}
+          autosaveKey={`admin-document-${documentId}`}
         />
       </div>
     </div>

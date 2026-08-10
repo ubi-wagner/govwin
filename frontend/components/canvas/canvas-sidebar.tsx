@@ -14,6 +14,7 @@ import { CommentThread, type NodeComment } from './collaboration';
 import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
 import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
+import { canReplaceFromLibrary } from '@/lib/canvas/format-controls';
 import { NodeFormatControls } from './node-format-controls';
 
 interface Props {
@@ -604,7 +605,7 @@ export function CanvasSidebar({
                   </>
                 )}
                 <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
-                {onReplaceFromLibrary && (
+                {onReplaceFromLibrary && canReplaceFromLibrary(selectedNode.type) && (
                   <button
                     onClick={() => setShowLibraryPicker((prev) => !prev)}
                     className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
@@ -615,8 +616,8 @@ export function CanvasSidebar({
               </div>
             )}
 
-            {/* Library picker — shown when "Replace from Library" is clicked */}
-            {showLibraryPicker && onReplaceFromLibrary && (
+            {/* Library picker — shown when "Replace from Library" is clicked (text nodes only) */}
+            {showLibraryPicker && onReplaceFromLibrary && canReplaceFromLibrary(selectedNode.type) && (
               <LibraryPicker
                 category={sectionCategory ?? selectedNode.type}
                 query={getNodeText(selectedNode).slice(0, 200) || undefined}

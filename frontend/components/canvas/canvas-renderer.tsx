@@ -521,10 +521,26 @@ function NodeRenderer({
     backgroundColor: node.style.background ?? undefined,
   };
 
+  // Free placement (Arrange): a node with an explicit position + a non-inline wrap is
+  // absolutely placed — matching EXACTLY what the exporters do (lib/export/canvas-html.ts
+  // + pptx-exporter). Rendering it here restores WYSIWYG: previously the editor ignored
+  // node.position, so a positioned node looked in-flow yet exported free-placed. Units are
+  // inches (as the export uses); the page's transform:scale scales them with everything else.
+  const pos = node.position;
+  const freePlaced = !!pos && (pos.wrap === 'float' || pos.wrap === 'behind' || pos.wrap === 'front');
+  const posStyle: React.CSSProperties = freePlaced ? {
+    position: 'absolute',
+    left: typeof pos!.x === 'number' ? `${pos!.x}in` : undefined,
+    top: typeof pos!.y === 'number' ? `${pos!.y}in` : undefined,
+    width: typeof pos!.w === 'number' ? `${pos!.w}in` : undefined,
+    height: typeof pos!.h === 'number' ? `${pos!.h}in` : undefined,
+    zIndex: pos!.wrap === 'behind' ? 0 : (pos!.z ?? 5),
+  } : {};
+
   return (
     <div
-      className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
-      style={nodeStyle}
+      className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
+      style={{ ...nodeStyle, ...posStyle }}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
       draggable={!readOnly}
       onDragStart={(e) => {

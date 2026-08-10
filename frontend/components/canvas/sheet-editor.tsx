@@ -47,6 +47,31 @@ function cellText(cell: string | TableCellType): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
+/**
+ * Build a cell from the committed edit value, preserving existing cell style.
+ *  • A value beginning with `=` is stored as a real `formula` (the xlsx exporter writes
+ *    it as an Excel formula that Excel computes on open) — previously `=A1+B1` was
+ *    silently kept as literal text.
+ *  • A literal on a NUMERIC cell re-derives `value` from the text, so exports + the cost
+ *    readiness roll-up (which read `value`) reflect the edit, not a stale provisioned
+ *    number (the cost-volume numeric-cell sync).
+ *  • A plain literal on a plain cell stays a bare string when it can, and clears any
+ *    prior formula.
+ */
+function buildCell(existing: string | TableCellType | undefined, value: string): string | TableCellType {
+  const isFormula = value.trimStart().startsWith('=');
+  const base: TableCellType = typeof existing === 'object' && existing ? { ...existing, text: value } : { text: value };
+  if (isFormula) return { ...base, formula: value };
+  // literal — drop a stale formula
+  const { formula: _drop, ...rest } = base;
+  // re-derive the numeric value from the edited text for cost-volume cells
+  if (typeof existing === 'object' && existing && isNumericCell(existing)) {
+    const v = parseNumericText(value);
+    (rest as TableCellType).value = v == null ? undefined : v;
+  }
+  return Object.keys(rest).length === 1 ? value : rest;
+}
+
 function getSheets(doc: CanvasDocument): SheetInfo[] {
   const tableNodes = doc.nodes.filter((n) => n.type === 'table');
   return tableNodes.map((node, i) => {
@@ -199,11 +224,7 @@ export function SheetEditor({
     if (editingCell.row === -1) {
       // Editing header — preserve existing cell styles
       const newHeaders = [...content.headers];
-      const existing = newHeaders[editingCell.col];
-      const styledCell = typeof existing === 'string'
-        ? editValue
-        : { ...existing, text: editValue };
-      newHeaders[editingCell.col] = styledCell;
+      newHeaders[editingCell.col] = buildCell(newHeaders[editingCell.col], editValue);
       updateNodeContent(currentSheet.nodeId, { ...content, headers: newHeaders });
     } else {
       // Editing data cell — preserve existing cell styles
@@ -216,17 +237,7 @@ export function SheetEditor({
       while (newRows[editingCell.row].length <= editingCell.col) {
         newRows[editingCell.row].push('');
       }
-      const existing = newRows[editingCell.row][editingCell.col];
-      let styledCell: typeof existing;
-      if (typeof existing === 'string') {
-        styledCell = editValue;
-      } else {
-        styledCell = { ...existing, text: editValue };
-        // Re-derive the numeric `value` from the edited text so exports + the cost readiness
-        // roll-up (which read `value`) reflect the edit instead of a stale provisioned number.
-        if (isNumericCell(existing)) { const v = parseNumericText(editValue); styledCell.value = v == null ? undefined : v; }
-      }
-      newRows[editingCell.row][editingCell.col] = styledCell;
+      newRows[editingCell.row][editingCell.col] = buildCell(newRows[editingCell.row][editingCell.col], editValue);
       updateNodeContent(currentSheet.nodeId, { ...content, rows: newRows });
     }
 
@@ -750,9 +761,10 @@ export function SheetEditor({
             <button onClick={() => setCellBg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
           )}
 
-          {/* Font size */}
+          {/* Sheet-wide defaults (NOT per-cell) — labelled so they aren't mistaken for the
+              per-cell controls beside them. The cell model has no per-cell font size/family. */}
           <span className="w-px h-4 bg-gray-300 mx-1" />
-          <label className="text-[10px] text-gray-500">Size:</label>
+          <label className="text-[10px] text-gray-500">Sheet font:</label>
           <select
             value={doc.canvas.font_default.size}
             onChange={(e) => {
