@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  estimatePageCount,
   estimateSlideCount,
   overflowingSlides,
   sectionPageSpan,
   validateCanvasAgainstSpec,
+  CANVAS_PRESETS,
   type ComplianceSpec,
 } from '@/lib/types/canvas-document';
 
@@ -32,6 +34,7 @@ const base = () => ({ id: `n${seq++}`, style: {}, provenance: { source: 'test' }
 const text = (chars: number) => ({ ...base(), type: 'text_block', content: { text: 'word '.repeat(Math.ceil(chars / 5)).slice(0, chars) } });
 const heading = (t: string, level = 1) => ({ ...base(), type: 'heading', content: { text: t, level } });
 const pageBreak = () => ({ ...base(), type: 'page_break', content: {} });
+const table = (rows: number) => ({ ...base(), type: 'table', content: { headers: [{ text: 'a' }, { text: 'b' }], rows: Array.from({ length: rows }, () => [{ text: 'x' }, { text: 'y' }]) } });
 
 const section = (nodes: unknown[], opts: { title?: string; budget?: number } = {}) => ({
   id: `s${seq++}`,
@@ -153,5 +156,22 @@ describe('validateCanvasAgainstSpec — slide + section limits', () => {
   it('a section within its budget is clean', () => {
     const doc = v2(letterCanvas, [section([heading('Intro'), text(400)], { budget: 2 })]);
     expect(validateCanvasAgainstSpec(doc, spec()).filter((x) => x.code === 'section_over_budget')).toEqual([]);
+  });
+});
+
+// ── Spreadsheet (xls) — not flow-paginated: the page/slide caps are a clean no-op ──
+describe('validateCanvasAgainstSpec — spreadsheet is measured in tabs, not flow pages', () => {
+  const sheetCanvas = { ...CANVAS_PRESETS.spreadsheet };
+  it('estimatePageCount returns 1 for a spreadsheet (never a bogus flow count)', () => {
+    const doc = v1(sheetCanvas, [table(200)]);
+    expect(estimatePageCount(doc)).toBe(1);
+  });
+  it('a workbook never trips a page/slide/overflow violation', () => {
+    const doc = v1(sheetCanvas, [table(500)]);
+    // Even if a stray cap were set, a spreadsheet is not paginated → no page/slide flags.
+    const codes = validateCanvasAgainstSpec(doc, spec({ max_pages: 1, max_slides: 1 })).map((x) => x.code);
+    expect(codes).not.toContain('over_page_limit');
+    expect(codes).not.toContain('over_slide_limit');
+    expect(codes).not.toContain('slide_overflow');
   });
 });
