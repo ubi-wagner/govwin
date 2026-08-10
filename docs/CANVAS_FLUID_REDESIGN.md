@@ -38,7 +38,7 @@ scroll:
 | Phase | Ships | Status |
 |---|---|---|
 | **F0 · Selection spine + first actions** | `data-node-id` anchors + `selectionToModel` (Range→model, pure, unit-tested) + a floating `SelectionToolbar` + the actions **Atomize** (span → library atom w/ lineage) and **Regenerate** (AI re-draft the spanned nodes). | **in progress** |
-| **F1 · Fluid document view** | Continuous scroll render of the whole document (all sections inline), page *markers* not boxes, sections as boundary chips + a left outline rail. Opt-in "Document view". | planned |
+| **F1 · Fluid document view** | Continuous scroll render of the whole document (all sections inline), page *markers* not boxes, sections as boundary chips + a left outline rail. Opt-in "Document view". | **shipped** |
 | **F2 · Selection actions ++** | Annotate/comment on a span, Reuse-from-library, Compliance-check-this. | planned |
 | **F3 · Overlay layers** | Togglable Structure / Provenance (atom·cocoon lineage heatmap) / Compliance overlays over the fluid doc. | planned |
 | **F4 · Multi-target ops** | A selection spanning N sections → regen all N / atomize into N atoms. | planned |
@@ -55,3 +55,35 @@ scroll:
   model → places at the selection rect; actions are host callbacks).
 - Wiring (atomize → library-atom route; regenerate → the existing AI-revision path) +
   editor mount + live verification: see the commits + the section below.
+
+## F1 build record
+
+The whole proposal now reads as **one continuous fluid document** behind an opt-in
+**Document** tab on the proposal workspace (tenant-member surface), replacing the
+section-by-section cocoon cards for reading/scanning.
+
+- `lib/canvas/assemble-proposal.ts` — `assembleProposalDocument(sections) → { doc,
+  sectionOf, outline }`. Concatenates every section's canvas into ONE `CanvasDocument`,
+  prepends each section's inline title heading (the fluid "boundary" + scroll anchor
+  `sec:<sectionId>`), re-keys body node ids (`<sectionId>__<nodeId>`) so they stay unique,
+  and maps every node id → its owning section (`sectionOf`) for action routing. Adopts a
+  narrative section's frame (margins/header/font); ignores slide/sheet frames. 5 unit tests
+  (`__tests__/unit/assemble-proposal.test.ts`).
+- `components/canvas/fluid-document-view.tsx` — `FluidDocumentView`. Renders the aggregate
+  via `CanvasRenderer` **read-only** (full node fidelity, `data-node-id` anchors intact),
+  wrapped in `userSelect:text` so the read view stays selectable. Left **outline rail**
+  (click-to-scroll + active-section-on-scroll via `IntersectionObserver`, grouped by
+  volume). Mounts the F0 `SelectionToolbar` across the whole doc: highlight any span → the
+  **Atomize** action, routed to the span's OWNING section via `sectionOf` (original
+  in-section node id recovered for lineage). Additive/safe only — regenerate/annotate over
+  a span are F2 (they need the aggregate review-and-land flow).
+- `app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts` — `GET` assembles
+  server-side: tenant-gated (tenant_user+ · `verifyTenantAccess` · proposal-ownership ·
+  `enterTenant`), reads every section (`volume → sort_index → section_number`, matching the
+  workspace + package export), returns `{ data: AssembledProposal }`.
+- `components/portal/fluid-document-tab.tsx` — the **Document** tab: lazily fetches the
+  assembled doc on first open, then renders `FluidDocumentView` (loading/empty/error
+  states). Mounted in `proposal-workspace.tsx` via `next/dynamic({ ssr:false })` (no ref
+  forwarded), tab shown to the full-proposal audience (`userRole === 'admin'`).
+
+Verified: `tsc` 0 · `vitest` 998 pass; live drive + screenshots on the standalone build.

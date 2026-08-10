@@ -2,7 +2,15 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { DraftAllSections } from '@/components/canvas/draft-all-sections';
+
+// The fluid whole-proposal "Document" view pulls in the full canvas renderer — load it
+// only when the reader opens the tab (no ref is forwarded, so ssr:false is safe here).
+const FluidDocumentTab = dynamic(
+  () => import('./fluid-document-tab').then((m) => m.FluidDocumentTab),
+  { ssr: false, loading: () => <div className="py-20 text-center text-sm text-gray-400">Loading document view…</div> },
+);
 import { ProposalAdminPanel } from './proposal-admin-panel';
 import { ProposalContributorView } from './proposal-contributor-view';
 import { ProposalTimeline } from './proposal-timeline';
@@ -156,7 +164,7 @@ export function ProposalWorkspace({
   const router = useRouter();
   const [sections, setSections] = useState(initialSections);
   const [showDrafter, setShowDrafter] = useState(hasEmptySections && userRole === 'admin');
-  const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'my-sections' | 'timeline'>(
+  const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'my-sections' | 'document' | 'timeline'>(
     userRole !== 'admin' ? 'my-sections' : 'workspace',
   );
 
@@ -204,6 +212,8 @@ export function ProposalWorkspace({
         {([
           { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },
           { key: 'my-sections' as const, label: 'My Sections' },
+          // Whole-proposal fluid document view — the reader surface (tenant members).
+          ...(userRole === 'admin' ? [{ key: 'document' as const, label: 'Document' }] : []),
           { key: 'timeline' as const, label: 'Timeline' },
         ]).map((tab) => (
           <button
@@ -317,6 +327,11 @@ export function ProposalWorkspace({
           </div>
         );
       })()}
+
+      {/* ─── Document Tab (fluid whole-proposal view) ────────────────── */}
+      {workspaceTab === 'document' && (
+        <FluidDocumentTab tenantSlug={tenantSlug} proposalId={proposalId} />
+      )}
 
       {/* ─── Workspace Tab ───────────────────────────────────────────── */}
       {workspaceTab === 'workspace' && <>
