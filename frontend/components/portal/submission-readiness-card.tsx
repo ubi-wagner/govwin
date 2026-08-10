@@ -15,7 +15,8 @@ const CATEGORY_LABEL: Record<BlockerCategory, string> = {
   empty_section: 'Not drafted',
   unlocked_section: 'Not locked',
   orphan_requirement: 'Requirement',
-  page_budget: 'Over budget',
+  page_overflow: 'Over page limit',
+  work_split: 'Work-split',
   format_floor: 'Format',
 };
 
@@ -108,6 +109,22 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
               {report.summary.requirements.satisfied}/{report.summary.requirements.mandatory} requirements met
             </span>
           </div>
+
+          {/* Hard-compliance gauges: rendered page count per volume + STTR work-split */}
+          {((report.summary.volumes && report.summary.volumes.length > 0) || report.summary.workSplit) && (
+            <div className="flex flex-wrap gap-3 text-xs mb-3 border-t border-gray-100 pt-3">
+              {(report.summary.volumes ?? []).map((v, i) => (
+                <span key={i} className={v.over ? 'text-red-600 font-semibold' : 'text-gray-600 font-medium'}>
+                  {v.name}: {v.pages}/{v.max}pp{v.over ? ' — over limit' : ''}
+                </span>
+              ))}
+              {report.summary.workSplit && (
+                <span className={report.summary.workSplit.ok ? 'text-gray-600 font-medium' : 'text-red-600 font-semibold'}>
+                  Work-split SB {report.summary.workSplit.sbPct}% / RI {report.summary.workSplit.riPct}% (min 40 / 30)
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Blocker list */}
           {hardBlockers.length > 0 && (

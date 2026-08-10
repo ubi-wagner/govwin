@@ -19,6 +19,9 @@
  */
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
+import { paginate } from '@/lib/export/paginate';
+import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
+import { computeSttrSplit } from '@/lib/proposal/sttr-split';
 import {
   validateCanvasAgainstSpec,
   docNodes,
@@ -30,7 +33,8 @@ export type BlockerCategory =
   | 'empty_section'
   | 'unlocked_section'
   | 'orphan_requirement'
-  | 'page_budget'
+  | 'page_overflow'
+  | 'work_split'
   | 'format_floor';
 
 export interface ReadinessBlocker {
@@ -52,6 +56,10 @@ export interface ReadinessReport {
     requirements: { mandatory: number; satisfied: number; unmet: number };
     formatWarnings: number;
     overBudget: number;
+    /** Per page-limited volume: the REAL rendered page count vs its hard cap. */
+    volumes: Array<{ name: string; pages: number; max: number; over: boolean }>;
+    /** STTR only: the cooperative work-split computed from the Cost Volume (min SB 40% / RI 30%). */
+    workSplit?: { sbPct: number; riPct: number; ok: boolean; computable: boolean };
   };
   blockers: ReadinessBlocker[];
 }
@@ -73,14 +81,17 @@ interface MatrixRow {
 interface ArtifactRow {
   id: string;
   complianceSpec: unknown;
+  artifactType: string | null;
+  volumeName: string | null;
 }
 
 const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   empty_section: 0,
   unlocked_section: 1,
   orphan_requirement: 2,
-  page_budget: 3,
-  format_floor: 4,
+  page_overflow: 3,
+  work_split: 4,
+  format_floor: 5,
 };
 
 /**
@@ -91,10 +102,14 @@ export async function computeSubmissionReadiness(
   proposalId: string,
   tenantId: string,
 ): Promise<ReadinessReport | null> {
-  const [proposal] = await sql<{ id: string }[]>`
-    SELECT id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
+  const [proposal] = await sql<{ id: string; programType: string | null }[]>`
+    SELECT p.id, o.program_type AS "programType"
+    FROM proposals p
+    LEFT JOIN opportunities o ON o.id = p.opportunity_id
+    WHERE p.id = ${proposalId}::uuid AND p.tenant_id = ${tenantId}::uuid LIMIT 1
   `;
   if (!proposal) return null;
+  const isSttr = /sttr/i.test(proposal.programType ?? '');
 
   const sections = await sql<SectionRow[]>`
     SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId",
@@ -109,15 +124,20 @@ export async function computeSubmissionReadiness(
     WHERE proposal_id = ${proposalId}::uuid AND is_mandatory = true
   `;
   const artifacts = await sql<ArtifactRow[]>`
-    SELECT id, compliance_spec AS "complianceSpec"
+    SELECT id, compliance_spec AS "complianceSpec",
+           artifact_type AS "artifactType", volume_name AS "volumeName"
     FROM proposal_artifacts
     WHERE proposal_id = ${proposalId}::uuid
   `;
   const specByArtifact = new Map<string, ComplianceSpec>();
+  const metaByArtifact = new Map<string, { artifactType: string | null; volumeName: string | null }>();
   for (const a of artifacts) {
     const spec = coerceJsonb<ComplianceSpec | null>(a.complianceSpec, null);
     if (spec) specByArtifact.set(a.id, spec);
+    metaByArtifact.set(a.id, { artifactType: a.artifactType, volumeName: a.volumeName });
   }
+  // Sections collected per artifact (volume), in flow order, for the real rendered-page-count gate.
+  const volSections = new Map<string, Array<{ title: string | null; content: string | null }>>();
 
   const blockers: ReadinessBlocker[] = [];
 
@@ -155,19 +175,14 @@ export async function computeSubmissionReadiness(
     const nodeCount = docNodes(doc).length;
     if (nodeCount === 0) continue;
 
-    // Page budget (advisory estimate — mirrors the overview's per-section gauge, ~3 nodes/page).
-    if ((s.pageAllocation ?? 0) > 0) {
-      const pageEst = Math.ceil(nodeCount / 3);
-      if (pageEst > (s.pageAllocation as number)) {
-        overBudget++;
-        blockers.push({
-          category: 'page_budget',
-          severity: 'warning',
-          message: `"${s.title ?? 'Section'}" runs ~${pageEst}pp against a ${s.pageAllocation}pp budget (estimate — confirm at export).`,
-          sectionId: s.id,
-          sectionTitle: s.title ?? undefined,
-        });
-      }
+    // Collect the drafted section into its volume for the REAL rendered-page-count gate (below).
+    // The DSIP page limit is per-VOLUME, and it is HARD — an over-limit Technical Volume is rejected
+    // outright — so we measure the assembled volume with the same layout engine the exporter uses
+    // (paginate over assembleArtifactCanvas), not a per-section node estimate.
+    if (s.artifactId) {
+      const list = volSections.get(s.artifactId) ?? [];
+      list.push({ title: s.title, content: s.content });
+      volSections.set(s.artifactId, list);
     }
 
     // Format floor (advisory) — only the per-section-meaningful rules, from the section's artifact spec.
@@ -182,6 +197,56 @@ export async function computeSubmissionReadiness(
         message: `"${s.title ?? 'Section'}": ${v.message}`,
         sectionId: s.id,
         sectionTitle: s.title ?? undefined,
+      });
+    }
+  }
+
+  // ── Rendered page-count gate (per volume) — the real, HARD DSIP limit ───────
+  // Assemble each volume exactly as the exporter does and measure with the layout engine, then gate
+  // on the artifact's compliance max_pages. This is a BLOCKER, not an estimate warning: an over-limit
+  // Technical Volume is rejected outright on DSIP, so a customer must never pass GO while over.
+  const volumeInfo: ReadinessReport['summary']['volumes'] = [];
+  for (const [artifactId, secs] of volSections) {
+    const spec = specByArtifact.get(artifactId);
+    const max = spec?.max_pages;
+    if (max == null || secs.length === 0) continue; // only page-based volumes that carry a cap
+    const meta = metaByArtifact.get(artifactId);
+    let totalPages: number;
+    try {
+      const doc = assembleArtifactCanvas(secs, meta?.artifactType ?? null, meta?.volumeName ?? 'Volume');
+      totalPages = paginate(doc).totalPages;
+    } catch { continue; } // a measurement failure must never itself block
+    const over = totalPages > max;
+    volumeInfo.push({ name: meta?.volumeName ?? 'Volume', pages: totalPages, max, over });
+    if (over) {
+      overBudget++;
+      blockers.push({
+        category: 'page_overflow',
+        severity: 'blocker',
+        message: `"${meta?.volumeName ?? 'Volume'}" renders ${totalPages} pages against a hard ${max}-page limit — trim ${totalPages - max} page(s) before submission.`,
+      });
+    }
+  }
+
+  // ── STTR cooperative work-split (SB≥40% / RI≥30% by cost) — computed, not asserted ──────────
+  let workSplit: ReadinessReport['summary']['workSplit'];
+  if (isSttr) {
+    const costArtifactId = [...metaByArtifact].find(([, m]) => m.artifactType === 'cost')?.[0];
+    const costSecs = costArtifactId ? volSections.get(costArtifactId) : undefined;
+    const split = computeSttrSplit(costSecs ?? []);
+    const ok = split.found && split.sbPct >= 40 && split.riPct >= 30;
+    workSplit = { sbPct: Math.round(split.sbPct), riPct: Math.round(split.riPct), ok, computable: split.found };
+    if (!split.found) {
+      blockers.push({
+        category: 'work_split',
+        severity: 'warning',
+        message: 'STTR work-split not computable — add a Cost Volume with labeled Small Business and Research Institution totals so the 40% / 30% split can be verified.',
+      });
+    } else if (!ok) {
+      blockers.push({
+        category: 'work_split',
+        severity: 'blocker',
+        message: `STTR work-split out of bounds by cost: small business ${Math.round(split.sbPct)}% (min 40%), research institution ${Math.round(split.riPct)}% (min 30%). Rebalance the Cost Volume before submission.`,
       });
     }
   }
@@ -216,6 +281,8 @@ export async function computeSubmissionReadiness(
       requirements: { mandatory: matrix.length, satisfied: satisfiedReq, unmet: matrix.length - satisfiedReq },
       formatWarnings,
       overBudget,
+      volumes: volumeInfo,
+      ...(workSplit ? { workSplit } : {}),
     },
     blockers,
   };
