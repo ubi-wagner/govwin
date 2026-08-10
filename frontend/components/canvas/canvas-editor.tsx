@@ -18,6 +18,9 @@ import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 import { CanvasToolbar } from './canvas-toolbar';
+import { SelectionToolbar } from './selection-toolbar';
+import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
+import { toast } from '@/lib/toast';
 import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
 import { DocumentPreview } from './document-preview';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
@@ -849,6 +852,59 @@ function CanvasEditorInner({
     [tenantSlug, proposalId, sectionId, doc.nodes],
   );
 
+  // ── Selection-as-verb (fluid-canvas F0): act on a highlighted span ──────────
+  const [selBusy, setSelBusy] = useState(false);
+
+  /** Atomize a highlighted span → one reusable library atom (lineage from the section). */
+  const selectionAtomize = useCallback(async (sel: CanvasSelection) => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    const text = sel.text.trim();
+    if (text.length < 20) { toast.info('Select a bit more text to atomize (≥ 20 characters).'); return; }
+    setSelBusy(true);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/atomize-node`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: sel.nodeIds[0], heading: selectionLabel(sel), text, tags: [] }),
+        },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) toast.success(j?.data?.deduped ? 'Matched an existing library atom.' : 'Saved as a library atom.');
+      else toast.error(j?.error ?? 'Could not atomize the selection.');
+    } catch { toast.error('Could not atomize the selection.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [tenantSlug, proposalId, sectionId]);
+
+  /** Regenerate a highlighted span with AI — re-draft it and land it as a reviewable
+   *  ai_revision on the first block (Accept/Revert as usual). Reuses proposal.draft_section. */
+  const selectionRegenerate = useCallback(async (sel: CanvasSelection) => {
+    if (!proposalId) return;
+    setSelBusy(true);
+    try {
+      const res = await fetch('/api/tools/proposal.draft_section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: {
+          proposalId,
+          sectionTitle: selectionLabel(sel) || 'Selection',
+          instruction: `REVISE the following existing text, preserving its intent but improving clarity and specificity:\n\n<user_content>${sel.text}</user_content>`,
+          pageLimit: 1,
+        } }),
+      });
+      const j = await res.json().catch(() => ({}));
+      const newContent = j?.data?.nodes?.[0]?.content;
+      if (res.ok && newContent) {
+        handleReviseNode(sel.nodeIds[0], newContent, { source: 'ai_revision', aiInstruction: 'selection regenerate' });
+        toast.success('AI revision staged — Accept or Revert on the block.');
+      } else {
+        toast.error(j?.error ?? 'Could not regenerate the selection.');
+      }
+    } catch { toast.error('Could not regenerate the selection.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [proposalId, handleReviseNode]);
+
   const railAcceptAll = useCallback(async () => {
     const pending = atomItems.filter((i) => i.status !== 'approved');
     for (const it of pending) {
@@ -1055,6 +1111,16 @@ function CanvasEditorInner({
             variables={variables}
             readOnly={readOnly}
             onMoveNodeToIndex={handleMoveNodeToIndex}
+          />
+        )}
+        {/* Fluid-canvas F0: highlight a span → floating Atomize / Regenerate menu. Only in the
+            flow doc renderer (not slide/sheet forks), and only for an editable proposal section. */}
+        {!readOnly && doc.canvas.format !== 'spreadsheet' && (proposalId || sectionId) && (
+          <SelectionToolbar
+            doc={doc}
+            busy={selBusy}
+            onAtomize={tenantSlug && proposalId && sectionId ? selectionAtomize : undefined}
+            onRegenerate={proposalId ? selectionRegenerate : undefined}
           />
         )}
       </div>
