@@ -585,6 +585,42 @@ sec(id="export", toc="15 · Export & deliver", heading="Export — your submissi
         "Recording <b>Won</b> starts a <b>contract</b> and drops a <b>kickoff task</b> in your queue; every outcome also feeds your "
         "library so winning content ranks higher next time."}])
 
+# ── 16. Worked example: build a real DoD proposal to submission-ready ──────────
+sec(id="worked-dod", toc="16 · Worked example — build a DoD proposal", heading="Worked example — build a DoD proposal to submission-ready (DoW 2026 SBIR)",
+    where="Opportunities → Purchase → the build workspace",
+    lead="<p>This walks a real build end-to-end on a solicitation an RFP admin authored from the uploaded DoW 2026 SBIR BAA "
+         "(Navy Phase I). When you procure a portal off the opportunity list, your workspace is <b>provisioned to that "
+         "solicitation&rsquo;s exact spec</b> — the six DSIP volumes, the 10-page Technical limit, the 10-point / 1-inch / "
+         "single-column format floor — nothing to configure.</p>",
+    img=TS+"dow-sbir-build.png",
+    caption="The provisioned DoW 2026 SBIR build — six DSIP volumes, the 12-section Technical Volume bounded to 10 pages, the Cost Volume, CCR, Supporting Documents, and the Fraud/Waste/Abuse Training volume.",
+    subs=[
+      {"id":"dod-provision","heading":"Procure → provision against the spec","toc":"16.1 · Procure & provision",
+       "steps":[
+         S("Open the opportunity card and <b>Purchase</b> a portal with your comp code — it lands <code>curation_pending</code>; "
+           "an RFP admin releases it <b>unlocked</b>, with the compliance matrix pre-loaded from the solicitation."),
+         S("Your workspace opens with <b>every volume and section already defined by the solicitation</b> — sections numbered in "
+           "order, each item&rsquo;s icon set by its authored type (a Word narrative, a cost spreadsheet, a form, a PDF), and each "
+           "Technical section bounded to the 10-page limit."),
+       ],
+       "callouts":[{"kind":"note","html":"You never pick a template or set a page limit — the build inherits the solicitation&rsquo;s "
+         "bounding parameters. Draft into the sections the RFP admin defined."}]},
+      {"id":"dod-readiness","heading":"Draft, lock, and clear the readiness gate","toc":"16.2 · Draft → lock → GO",
+       "lead":"<p>Draft each section (from the library, the Studio, or by hand), then <b>Accept &amp; Lock</b> it — locking advances "
+              "its compliance-matrix row. When every section is locked and the matrix is satisfied, the <b>submission-readiness</b> "
+              "verdict flips to <b>GO</b>.</p>",
+       "figures":[F(TS+"dow-sbir-submitted.png","The submitted SBIR build — every section LOCKED & APPROVED (1/1 each), the readiness gate cleared, and the header showing 'Locked · Download available'.","full")]},
+      {"id":"dod-package","heading":"Download the compliant package","toc":"16.3 · Package",
+       "lead":"<p>A locked/submitted proposal downloads as a compliant package — the combined <b>.docx</b> and print-fidelity "
+              "<b>.pdf</b>, or a <b>per-volume-native .zip</b> (the Technical/CCR/Supporting volumes as .docx, the Cost Volume as "
+              "a native .xlsx).</p>"},
+      {"id":"dod-sttr","heading":"The STTR Direct-to-Phase-II variant","toc":"16.4 · STTR D2P2 build",
+       "lead":"<p>A DoW 2026 STTR Direct-to-Phase-II portal provisions a structurally different build from the same primitive — a "
+              "<b>30-page</b> Technical Volume split into Phase-I Proof of Feasibility and a Phase-II snapshot, a Cost Volume that "
+              "reflects the <b>SB≥40% / RI≥30%</b> work-split, and the SBC↔RI Allocation-of-Rights in Supporting Documents.</p>",
+       "figures":[F(TS+"dow-sttr-build.png","The STTR D2P2 build — the 30-page Technical Volume (Proof of Feasibility + Phase II snapshot), the Cooperative Work-Split section, and the Allocation-of-Rights in Vol 5.","full")]},
+    ])
+
 spec = {
   "slug": "customer-admin",
   "title": "Customer Admin Guide — Build a Winning Proposal",

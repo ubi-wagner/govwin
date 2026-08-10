@@ -552,6 +552,55 @@ sec(id="site", toc="18 · Site Content", heading="Site Content — the dynamic-c
          "multi-format <b>Export</b> (docx/pptx/xlsx), and version <b>History</b> (restore any prior save).</p>"},
     ])
 
+# ── 19. Worked example: author a real DoD solicitation end-to-end ─────────────
+sec(id="worked-dod", toc="19 · Worked example — author a real DoD solicitation",
+    heading="Worked example — author a real DoD solicitation (DoW 2026 SBIR & STTR)",
+    where="/admin/rfp-curation/<solId>",
+    lead="<p>This ties the curation cockpit (§6) together on two <b>real</b> solicitations, ingested from the uploaded "
+         "DoW 2026 BAAs (Department of War — the renamed DoD). Each solicitation is unique — you build <b>its own</b> "
+         "compliance matrix, volume definitions and document templates from the BAA text, then <b>Push</b>. The two below "
+         "are structurally different documents produced from one canvas primitive.</p>",
+    img=SHOT+"dow-sbir-curation.png",
+    caption="The DoW 2026 SBIR (Navy Phase I) curation workspace — the authored Compliance Matrix (Technical 10pp, Times New Roman 11pt, 1-inch margins, DSIP single-column) and all six DSIP Response Volumes.",
+    subs=[
+      {"id":"dod-compliance","heading":"Build the compliance matrix from the BAA","toc":"19.1 · Compliance from the BAA",
+       "lead":"<p>Read the real requirements off the BAA and set them in the <b>Compliance Matrix</b> rail — these are the "
+              "bounding parameters every volume inherits and the export gate enforces.</p>",
+       "steps":[
+         S("<b>Page limit is component-specific.</b> The DoW 2026 SBIR BAA sets the Technical Volume limit per Service — "
+           "e.g. <b>Navy (DON) Phase I = 10 pages</b>. Set <b>Page Limit (Technical)</b> to the value your topic&rsquo;s component states."),
+         S("<b>Format floor</b> (BAA §1.4.b): <b>no font smaller than 10-point</b>, 8.5&times;11 paper, <b>one-inch margins</b>, single "
+           "column, single-spaced, a per-page header (SBC name · topic # · DSIP #). Set Font, Margins, Line Spacing and Header Required to match."),
+         S("The <b>AI</b> pills mark fields Ingest Assist can pre-fill from an uploaded BAA — you confirm every value before Push."),
+       ],
+       "callouts":[{"kind":"note","html":"Compliance is built <b>per solicitation at ingest</b>, never from a generic preset. "
+         "A preset is only a cold-start scaffold — the canvas can bound any document to any solicitation&rsquo;s parameters."}]},
+      {"id":"dod-volumes","heading":"Define the volumes and required items","toc":"19.2 · Volume definitions",
+       "lead":"<p>Build the <b>Response Volumes</b> skeleton the proposer must produce — for DoW SBIR/STTR that is the full "
+              "<b>six-volume DSIP set</b> (the sixth, FWA Training, is easy to miss).</p>",
+       "table":{"title":"DoW 2026 SBIR — the six DSIP volumes","headers":["Vol","Volume","Items"],"rows":[
+         ["1","Proposal Cover Sheet","DSIP webform"],
+         ["2","Technical Volume","12 sections — Identification &amp; Significance → … → assertion of data-rights restrictions (10-page limit)"],
+         ["3","Cost Volume","DSIP cost form"],
+         ["4","Company Commercialization Report","CCR webform"],
+         ["5","Supporting Documents","optional attachments"],
+         ["6","Fraud, Waste and Abuse Training","required for Phase I <i>and</i> Direct-to-Phase-II"]]},
+       "figures":[F(SHOT+"dow-templates.png","The per-solicitation Technical document templates the builder authors (N261-EXP01, N26D-CAM07) — the section headings + the correct canvas bounds.","full")]},
+      {"id":"dod-sttr","heading":"The STTR Direct-to-Phase-II variant","toc":"19.3 · STTR D2P2 differences",
+       "lead":"<p>The DoW 2026 STTR BAA produces a structurally different document — the same six volumes, but:</p>",
+       "steps":[
+         S("<b>Technical Volume = 30 pages</b>, split into a <b>Phase I Proof of Feasibility</b> portion (&le;20pp) and a "
+           "<b>Snapshot of Proposed Phase II Effort</b> (&le;10pp)."),
+         S("<b>STTR work-split</b> in the compliance custom variables: a minimum <b>40%</b> of the work by the small business "
+           "and <b>30%</b> by the single research institution, measured by direct + indirect costs (BAA §1.3)."),
+         S("Vol 5 carries the required <b>SBC&harr;RI Allocation-of-Rights</b> agreement."),
+       ]},
+      {"id":"dod-publish","heading":"Adversarial review, then Push","toc":"19.4 · Review & Push",
+       "lead":"<p>Before releasing, sanity-check the authored numbers against the BAA (page limit, font floor, volume count, "
+              "the STTR split). Then <b>Push</b> — the fan-out puts the OPP card on every activated tenant&rsquo;s pipeline.</p>",
+       "figures":[F(SHOT+"dow-opportunities.png","The two DoW OPP cards on the opportunity list after Push — SBIR (Navy Phase I) and STTR (Direct to Phase II).","full")]},
+    ])
+
 spec = {
   "slug": "rfp-admin",
   "title": "RFP-Admin Operations Guide — Run the Platform",
