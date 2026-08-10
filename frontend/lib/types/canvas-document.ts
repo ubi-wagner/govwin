@@ -271,7 +271,8 @@ export interface BlockquoteContent {
 }
 
 export interface ChartContent {
-  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'doughnut';
+  /** gantt = horizontal timeline (series[0]=start month, series[1]=end month per category). */
+  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'doughnut' | 'gantt';
   categories: string[];
   series: Array<{ name: string; data: number[]; color?: string }>;
   title?: string;

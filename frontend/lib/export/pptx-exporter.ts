@@ -76,6 +76,7 @@ const SHAPE_MAP: Record<ShapeKind, PptxGenJS.SHAPE_NAME> = {
 // scatter has no shared data shape here (needs numeric X) → approximate with a line.
 const CHART_MAP: Record<ChartContent['chart_type'], PptxGenJS.CHART_NAME> = {
   bar: 'bar', line: 'line', pie: 'pie', scatter: 'line', area: 'area', doughnut: 'doughnut',
+  gantt: 'bar', // native pptx has no gantt; docx/pdf rasterize the real Gantt from renderChartSvg
 };
 const CHART_COLORS: string[] = ['1F4E79', '2E75B6', '9DC3E6', 'C55A11', 'ED7D31', 'FFC000', '70AD47', 'A5A5A5'];
 const CALLOUT_COLORS: Record<string, { bg: string; fg: string }> = {
