@@ -223,3 +223,25 @@ Tiered so each tier is independently shippable. Nothing below is built yet.
 **Recommendation:** do **P0 now** (they are proven bugs), then decide P1 vs P2 by whether the
 priority is *human authoring polish* or *machine authoring reach*. I can turn any tier into a
 worked, tested change set on approval.
+
+---
+
+## 7. Implementation ledger — P0 + P1 SHIPPED (for launch)
+
+Signed off for launch as "P0 + P1 100%." All landed on `claude/nice-hamilton-kBqtD`, each
+`tsc --noEmit` 0 · `vitest` 987 green, committed + pushed.
+
+| Item | What shipped | Commit |
+|---|---|---|
+| **P0.1** | Replace-from-Library maps a prose atom into a node's EXISTING text/code field and no-ops (returns null) for image/table/chart/list; button hidden for those types (`canReplaceFromLibrary`). No more shape corruption. | `6d3dce3` |
+| **P0.2** | `NodeRenderer` renders `node.position` (absolute left/top/w/h in inches + z-index) for a non-inline wrap — mirroring the exporters. Arrange is WYSIWYG, not a silent no-op. | `6d3dce3` |
+| **P0.3** | SheetEditor fx bar stores a real `formula` for `=`-values (xlsx exports a live Excel formula) while keeping the cost-volume numeric-value sync; the doc-wide Size/Font selects relabelled "Sheet font:". | `6d3dce3` |
+| **P0.4** | Admin document editor uses the real signed-in actor (GET returns it) + an `autosaveKey` so autosave/recover works; no more hard-coded "Admin". | `6d3dce3` |
+| **P1.1** | `NodeFormatControls` gains content editors for the 6 insert-and-freeze types — chart (categories + per-series data grid), callout body, code, text_box, blockquote (text + cite), equation (LaTeX + display). | `a3549d4` |
+| **P1.3** | `video` wired into the Elements insert list + a url/caption editor (was a modeled orphan). | `a3549d4` |
+| **P1.2** | Doc-mode table cell styling — a focused-cell toolbar (bold / align / background) writing `TableCellStyle`, which the renderer + all exporters already honor. | `1bf6489` |
+| **P1.4** | The sidebar Add tab is now the ONE categorized insert surface — all 22 node types under Text · Structure · Media & elements (was 12; the extended elements were toolbar-only). | `c7e5231` |
+
+**Deferred to P2/P3** (unchanged from §6): machine coverage (agents emitting rich types +
+styling), the format switcher / custom page size / section-structure editing, and the
+polymorphic-artifact "one canvas" refactor.
