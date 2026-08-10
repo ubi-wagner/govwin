@@ -546,7 +546,15 @@ function NodeRenderer({
       // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,
       // instead of a drag-reorder. Reorder still works from the ⠿ grip.
       style={{ ...nodeStyle, ...posStyle, userSelect: readOnly ? undefined : 'text' }}
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        // A click that ends a text drag-select must NOT swap the node into edit mode — that
+        // would drop the selection and hide the fluid toolbar before you can act on it. Keep
+        // the selection alive when one exists; a plain click (no selection) selects/edits.
+        const s = window.getSelection();
+        if (s && !s.isCollapsed && s.toString().trim()) return;
+        onSelect();
+      }}
     >
       {/* Drag handle — the sole drag initiator */}
       {!readOnly && <DragHandle nodeId={node.id} onDragStart={onDragStart} onDragEnd={onDragEnd} />}
