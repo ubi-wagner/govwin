@@ -13,6 +13,7 @@
 import type { ComplianceSummary, OriginCard } from '@/lib/cards/card';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { bucketLabel, complianceProgress, stageMeta, toneClass } from '@/components/cards/card-format';
+import { oppBrandAccent } from '@/lib/proposal/brand';
 
 export interface OpportunityCardView {
   proposalId: string;
@@ -55,6 +56,8 @@ export function OpportunityCard({ card }: { card: OpportunityCardView }) {
   const bucket = bucketLabel(card.sourceBucket ?? card.origin.bucket?.key ?? null);
   const opp = card.origin.opportunity ?? {};
   const prog = complianceProgress(card.compliance);
+  // OPP-sheet brand accent — lights up for Ohio Third Frontier / TVSF only (null elsewhere).
+  const accent = oppBrandAccent(opp);
 
   const overview = (
     <div>
@@ -132,10 +135,15 @@ export function OpportunityCard({ card }: { card: OpportunityCardView }) {
   ];
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+    <div
+      className="border border-gray-200 rounded-lg p-4 bg-white"
+      style={accent ? { borderTopColor: accent, borderTopWidth: 3, borderTopLeftRadius: 8, borderTopRightRadius: 8 } : undefined}
+    >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-gray-400">Opportunity</div>
+          <div className="text-xs uppercase tracking-wide" style={accent ? { color: accent } : undefined}>
+            {accent ? 'Ohio Third Frontier · Opportunity' : <span className="text-gray-400">Opportunity</span>}
+          </div>
           <div className="font-semibold text-gray-900 truncate">{opp.title || card.title}</div>
         </div>
         <div className="flex flex-wrap items-center gap-1 justify-end">

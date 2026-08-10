@@ -16,6 +16,22 @@ export const TVSF_BRAND = {
   lockedBg: '#DCE6F1', // "unmodifiable" category / total row shade
 } as const;
 
+/**
+ * OPP-card / sheet brand accent. "Add the color to the OPP sheet" (EC / Ohio Third Frontier): the
+ * card lights up with the program brand so a builder recognizes a Third-Frontier/TVSF opportunity at
+ * a glance. Contextual, never global — a DoD/NSF/DOE card gets NO accent (null → default chrome).
+ * Pure + client-safe (type-only imports above are erased), so the client card can call it directly.
+ */
+export function oppBrandAccent(
+  opp: { agency?: string | null; programType?: string | null } | null | undefined,
+): string | null {
+  if (!opp) return null;
+  const a = (opp.agency ?? '').toLowerCase();
+  const p = (opp.programType ?? '').toLowerCase();
+  if (p === 'tvsf' || a.includes('third frontier')) return TVSF_BRAND.headerBg;
+  return null;
+}
+
 /** First-cell text of an UNMODIFIABLE row (fixed category / total) in a mandatory table. */
 export const UNMODIFIABLE_ROW_RE =
   /^\s*(revenues|production expenses|other expenses|total revenues?|gross profit|total other expenses|net profit|equity investment|total(?!\s*other)|subtotal|grand total)\b/i;
