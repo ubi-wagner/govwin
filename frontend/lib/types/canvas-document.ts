@@ -553,26 +553,77 @@ export function createNode(opts: {
   };
 }
 
-/** Compute approximate page count from nodes (for the progress bar). */
+/**
+ * Estimate the rendered page count of a paginated (page-flow) canvas document.
+ *
+ * This is the SINGLE page ruler the whole portal trusts — both the submission-readiness
+ * page gate and the export compliance floor (validateCanvasAgainstSpec) call it — so it
+ * MUST track the actual exported .docx/.pdf, which are laid out with these same page
+ * metrics (page size, margins, header/footer, 11pt body, line spacing). It models real
+ * VERTICAL HEIGHT per node type rather than a flat char total, because the old char-based
+ * heuristic (text.length + 2 lines/node) was dominated by its per-node fudge and barely
+ * moved as prose was added — so a genuinely 7.4-page narrative read as "6", and a
+ * builder could sail past a hard page limit. Height model, calibrated so a real 11pt /
+ * 0.75in-margin narrative matches Word to within a fraction of a page:
+ *   - flow text (text_block, lists, caption, footnote, url): ceil(chars / charsPerLine) lines
+ *   - heading: larger font (h1 ≈ 2.5×, h2 ≈ 1.45× body) + space before/after
+ *   - table: (header + data rows) × 1.35 line-heights
+ *   - image / chart: its declared height, else ~15.5 line-heights (a typical figure)
+ *   - page_break: advance to a fresh page
+ * Proportional-font average glyph width ≈ 0.45 × font size (Times New Roman body).
+ */
 export function estimatePageCount(doc: CanvasDocument): number {
-  const contentHeight = doc.canvas.height - doc.canvas.margins.top - doc.canvas.margins.bottom
-    - (doc.canvas.header?.height ?? 0) - (doc.canvas.footer?.height ?? 0);
-  const lineHeight = doc.canvas.font_default.size * doc.canvas.line_spacing;
-  const linesPerPage = Math.floor(contentHeight / lineHeight);
-  const charsPerLine = Math.floor(
-    (doc.canvas.width - doc.canvas.margins.left - doc.canvas.margins.right)
-    / (doc.canvas.font_default.size * 0.5)
-  );
+  const c = doc.canvas;
+  const usableW = c.width - c.margins.left - c.margins.right;
+  const usableH = c.height - c.margins.top - c.margins.bottom
+    - (c.header?.height ?? 0) - (c.footer?.height ?? 0);
+  if (usableW <= 0 || usableH <= 0) return 1;
+  const fs = c.font_default.size;
+  const bodyLineH = fs * c.line_spacing;
+  const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated)
+  const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
+  const linesFor = (chars: number, charsPerLine: number) => Math.max(1, Math.ceil(chars / charsPerLine));
 
-  let totalChars = 0;
+  let heightPt = 0;
   for (const node of docNodes(doc)) {
-    if (node.type === 'page_break') { totalChars += linesPerPage * charsPerLine; continue; }
-    if (node.type === 'spacer' || node.type === 'toc') continue;
-    const text = getNodeText(node);
-    totalChars += text.length + (charsPerLine * 2);
+    switch (node.type) {
+      case 'page_break':
+        heightPt = Math.ceil((heightPt + 0.01) / usableH) * usableH; // start a fresh page
+        break;
+      case 'toc':
+        break;
+      case 'spacer': {
+        const h = (node.content as { height?: number } | undefined)?.height;
+        heightPt += typeof h === 'number' && h > 0 ? h : bodyLineH;
+        break;
+      }
+      case 'heading': {
+        const level = (node.content as HeadingContent).level ?? 1;
+        const hfs = fs * (level <= 1 ? 2.5 : level === 2 ? 1.45 : 1.2);
+        const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
+        heightPt += linesFor(getNodeText(node).length, hcpl) * hfs * 1.15 + fs * 0.7 + fs * 0.25;
+        break;
+      }
+      case 'image':
+      case 'chart': {
+        const styleH = (node.style as { height?: number } | undefined)?.height;
+        heightPt += (typeof styleH === 'number' && styleH > 0 ? styleH : fs * 15.5) + bodyLineH;
+        break;
+      }
+      case 'table': {
+        const t = node.content as TableContent;
+        const rows = (Array.isArray(t.headers) && t.headers.length ? 1 : 0) + (t.rows?.length ?? 0);
+        heightPt += Math.max(1, rows) * bodyLineH * 1.35;
+        break;
+      }
+      case 'caption':
+        heightPt += bodyLineH;
+        break;
+      default:
+        heightPt += linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
+    }
   }
-
-  return Math.max(1, Math.ceil(totalChars / (linesPerPage * charsPerLine)));
+  return Math.max(1, Math.ceil(heightPt / usableH));
 }
 
 /** Extract plain text from any node type (for search + page estimation). */
