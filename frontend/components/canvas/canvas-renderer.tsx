@@ -1130,6 +1130,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   content: TableContent; readOnly: boolean;
   onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
 }) {
+  const [focusedCell, setFocusedCell] = useState<{ kind: 'h' | 'b'; ri: number; ci: number } | null>(null);
   const outerBorder = tableBorderClass(content.border_style);
   const cellBorder = content.border_style === 'none'
     ? 'px-2 py-1'
@@ -1178,9 +1179,48 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
     onUpdate({ ...content, headers, rows });
   };
 
+  // ── Per-cell styling (doc mode) — bold / align / background on the focused cell.
+  // The renderer + all exporters already honor TableCellStyle; this adds the editing
+  // affordance that doc mode lacked (previously only spreadsheet mode could style cells).
+  const focusedStyle: TableCellStyle | undefined = focusedCell
+    ? resolveTableCell(focusedCell.kind === 'h' ? content.headers[focusedCell.ci] : content.rows[focusedCell.ri]?.[focusedCell.ci]).style
+    : undefined;
+  const styleFocusedCell = (patch: Partial<TableCellStyle>) => {
+    if (!focusedCell) return;
+    if (focusedCell.kind === 'h') {
+      const headers = [...content.headers];
+      const cell = resolveTableCell(headers[focusedCell.ci]);
+      headers[focusedCell.ci] = { ...cell, style: { ...cell.style, ...patch } };
+      onUpdate({ ...content, headers });
+    } else {
+      const rows = (content.rows ?? []).map(r => [...r]);
+      const cell = resolveTableCell(rows[focusedCell.ri][focusedCell.ci]);
+      rows[focusedCell.ri][focusedCell.ci] = { ...cell, style: { ...cell.style, ...patch } };
+      onUpdate({ ...content, rows });
+    }
+  };
+
   if (isSelected && !readOnly) {
+    const cellToolbar = (
+      <div className={`flex items-center gap-1 mb-1 text-xs ${focusedCell ? '' : 'opacity-40 pointer-events-none'}`}>
+        <span className="text-[10px] text-gray-400 mr-1">{focusedCell ? 'Cell:' : 'Select a cell'}</span>
+        <button onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ bold: !focusedStyle?.bold }); }}
+          className={`px-2 py-0.5 font-bold border rounded ${focusedStyle?.bold ? 'bg-blue-100 border-blue-300 text-blue-700' : 'border-gray-200'}`} title="Bold">B</button>
+        {(['left', 'center', 'right'] as const).map(a => (
+          <button key={a} onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ alignment: a }); }}
+            className={`px-2 py-0.5 border rounded ${focusedStyle?.alignment === a ? 'bg-blue-100 border-blue-300' : 'border-gray-200'}`} title={`Align ${a}`}>
+            {a === 'left' ? '⇤' : a === 'right' ? '⇥' : '⇔'}</button>
+        ))}
+        <label className="ml-1 text-[10px] text-gray-500 flex items-center gap-1">Fill
+          <input type="color" value={focusedStyle?.bg || '#ffffff'} onMouseDown={(e) => e.stopPropagation()}
+            onChange={(e) => styleFocusedCell({ bg: e.target.value === '#ffffff' ? undefined : e.target.value })}
+            className="h-5 w-5 border rounded cursor-pointer p-0" title="Cell background" /></label>
+        {focusedStyle?.bg && <button onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ bg: undefined }); }} className="text-[10px] text-rose-500 hover:underline">clear</button>}
+      </div>
+    );
     return (
       <div className="my-2">
+        {cellToolbar}
         <table className={`w-full border-collapse text-sm ${outerBorder || 'border border-gray-300'}`}>
           <thead>
             <tr className="bg-gray-50">
@@ -1190,6 +1230,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
                   <th key={i} className={`text-left font-semibold ${cellBorder}`}>
                     <div className="flex flex-col">
                       <input type="text" value={cell.text} onChange={(e) => updateHeader(i, e.target.value)}
+                        onFocus={() => setFocusedCell({ kind: 'h', ri: -1, ci: i })}
                         className="w-full bg-transparent border-0 outline-none font-semibold text-sm" />
                       {content.headers.length > 1 && (
                         <button
@@ -1212,6 +1253,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
                   return (
                     <td key={ci} className={cellBorder}>
                       <input type="text" value={cell.text} onChange={(e) => updateCell(ri, ci, e.target.value)}
+                        onFocus={() => setFocusedCell({ kind: 'b', ri, ci })}
                         className="w-full bg-transparent border-0 outline-none text-sm" />
                     </td>
                   );
