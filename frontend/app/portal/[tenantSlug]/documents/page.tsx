@@ -251,6 +251,15 @@ export default async function DocumentsPage({ params }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/guides/creating-documents.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors inline-flex items-center gap-1"
+            title="How to create documents — the full illustrated guide"
+          >
+            Guide ↗
+          </a>
           <Link
             href={`${basePath}/atoms?tab=atomize`}
             className="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"

@@ -8,8 +8,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 
 const SRC = '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad';
 const IMGDIR = '/home/user/govwin/docs/user-guides/img';
-const OUT = `${SRC}/creating-documents-guide.html`;
+const PUBDIR = '/home/user/govwin/frontend/public/guides';
+const OUT = `${SRC}/creating-documents-guide.html`;          // artifact body (no doc wrapper)
+const PUBOUT = `${PUBDIR}/creating-documents.html`;          // in-app help (full standalone doc)
 mkdirSync(IMGDIR, { recursive: true });
+mkdirSync(PUBDIR, { recursive: true });
 
 const IMAGES = {
   fluid:      { src: `${SRC}/f1-shots/f1-02-document-fluid.png`,    repo: 'doc-view-fluid' },
@@ -313,4 +316,14 @@ td .mono,th .mono{font-size:.88em}
 </script>`;
 
 writeFileSync(OUT, html);
+
+// In-app help: wrap the same title+style+body in a full standalone HTML document, served
+// from public/ at /guides/creating-documents.html (CSP allows inline style/script + data: img).
+const splitAt = html.indexOf('<header class="hero">');
+const headPart = html.slice(0, splitAt);   // <title> + <style>
+const bodyPart = html.slice(splitAt);      // <header>…<script>
+const standalone = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${headPart}</head><body>${bodyPart}</body></html>`;
+writeFileSync(PUBOUT, standalone);
+
 console.log(`wrote ${OUT} — ${(html.length/1024).toFixed(0)} KB`);
+console.log(`wrote ${PUBOUT} — ${(standalone.length/1024).toFixed(0)} KB (in-app help)`);
