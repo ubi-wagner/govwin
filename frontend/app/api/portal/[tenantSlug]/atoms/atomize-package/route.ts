@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { atomizeDocumentIntoLibrary, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
+import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import type { CreatorKind } from '@/lib/atoms';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
@@ -49,6 +49,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const packageName = (typeof form.get('packageName') === 'string' ? String(form.get('packageName')) : '').trim();
     const ctxTags = contextTags(ctx);
     const actor = { id: u.id, kind: actorKind };
+
+    // Dry-run preview: parse + segment and return EXACTLY what a real run would create,
+    // WITHOUT writing anything (no atoms, no cocoon, no events, no librarian enqueue). The
+    // "Add content" card shows this so the user confirms before the library is written.
+    if (form.get('preview') === '1' || form.get('preview') === 'true') {
+      const previewed = [];
+      let totalPlanned = 0;
+      for (const file of files) {
+        if (file.size > MAX_FILE_BYTES) { previewed.push({ file: file.name, format: '', planned: [], skipped: 0, error: 'file too large (25MB max)' }); continue; }
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags });
+        totalPlanned += plan.planned.length;
+        previewed.push({ file: plan.file, format: plan.format, planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount })), skipped: plan.skipped, error: plan.error });
+      }
+      return NextResponse.json({ data: { preview: true, filesProcessed: previewed.length, totalPlanned, context: ctxTags.map((t) => `${t.dimension}:${t.value}`), docs: previewed } });
+    }
 
     const docs = [];
     let totalAtoms = 0;

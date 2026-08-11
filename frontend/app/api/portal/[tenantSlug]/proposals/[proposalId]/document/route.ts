@@ -66,7 +66,11 @@ export async function GET(
     }
 
     // ---------- Sections (whole proposal, in reading order) ----------
-    let rows: Array<{ id: string; title: string | null; content: unknown; volume_name: string | null }> = [];
+    // NOTE: lib/db.ts applies a global `postgres.toCamel` column transform, so `ps.volume_name`
+    // comes back as `volumeName`. The row type + reads MUST be camelCase — snake_case here
+    // silently yields undefined (tsc can't see through the `sql<typeof rows>` assertion), which
+    // dropped every section's volume grouping from the assembled document.
+    let rows: Array<{ id: string; title: string | null; content: unknown; volumeName: string | null }> = [];
     try {
       rows = await sql<typeof rows>`
         SELECT ps.id, ps.title, ps.content, ps.volume_name
@@ -83,7 +87,7 @@ export async function GET(
       id: r.id,
       title: r.title,
       content: (r.content as ProposalSectionInput['content']) ?? null,
-      volumeName: r.volume_name,
+      volumeName: r.volumeName,
     }));
 
     const assembled = assembleProposalDocument(inputs);
