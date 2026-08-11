@@ -8,7 +8,7 @@ WHO:    Started as a concurrent asyncio task alongside the ingester consumer
 
 WHAT:   Runs memory lifecycle and learning modules on their documented schedules:
         - Daily (3 AM UTC): MemoryDecay, PreferenceExtractor
-        - Weekly (Monday 4 AM UTC): MemoryGC, PatternPromoter
+        - Weekly (Monday 4 AM UTC): MemoryGC, PatternPromoter, DiscoveryDigest
         - Monthly (1st Monday 5 AM UTC): MemoryCompactor, ContradictionResolver, Calibrator
 
 WHY:    Without lifecycle management:
@@ -31,6 +31,8 @@ SCHEDULE:
     Weekly (Monday 4 AM UTC):
         - MemoryGC: Hard-deletes expired archived memories
         - PatternPromoter: Promotes confirmed episodic patterns to semantic
+        - DiscoveryDigest: emits the "your new matches" digest (spotlight_new_topics)
+          for tenants with fresh opportunity cards → CMS sends the opt-in email
 
     Monthly (1st Monday 5 AM UTC):
         - MemoryCompactor: Clusters similar old memories into summaries
@@ -48,6 +50,8 @@ import logging
 from datetime import date, datetime, timezone
 
 import asyncpg
+
+from events import emit_event
 
 logger = logging.getLogger("pipeline.lifecycle")
 
@@ -217,7 +221,71 @@ async def _run_weekly_jobs(conn: asyncpg.Connection) -> None:
     except Exception as e:
         logger.error("pattern promotion setup failed: %s", e)
 
+    # 3. Discovery digest — the weekly "your new matches" re-engagement email (per-tenant, opt-in).
+    await _run_discovery_digest(conn)
+
     logger.info("=== Weekly lifecycle jobs complete ===")
+
+
+async def _run_discovery_digest(conn: asyncpg.Connection) -> None:
+    """Weekly "your new matches" digest.
+
+    Emits ONE ``system:notification.requested`` event carrying the tenants that gained NEW,
+    unpinned, non-dismissed opportunity cards this week (ranked by their spotlight-bucket score).
+    The CMS event listener fans it out per tenant as the ``spotlight_new_topics`` email, gated by
+    each tenant's ``notify_on_new_priority_opp`` preference — the exact same delivery path the
+    admin solicitation-push uses, now on a recurring cadence (the missing re-engagement pull).
+
+    Best-effort: never raises into the scheduler loop; a no-op when nothing is new (no email).
+    """
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT c.tenant_id::text AS tenant_id,
+                   count(*)::int AS n,
+                   (array_agg(c.card->>'title' ORDER BY bs.top_score DESC NULLS LAST))[1:3] AS titles
+            FROM tenant_opportunity_cards c
+            LEFT JOIN LATERAL (
+              SELECT max(s.score) AS top_score FROM tenant_bucket_scores s
+              WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
+            ) bs ON true
+            WHERE c.created_at >= now() - interval '7 days'
+              AND c.lifecycle_status = 'open'
+              AND c.is_pinned = false
+              AND c.pursuit_status <> 'passed'
+              AND c.archived_at IS NULL
+            GROUP BY c.tenant_id
+            HAVING count(*) > 0
+            """
+        )
+        if not rows:
+            logger.info("discovery digest: no new matches this week")
+            return
+        tenant_ids = [r["tenant_id"] for r in rows]
+        digest = {
+            r["tenant_id"]: {"count": r["n"], "titles": [t for t in (r["titles"] or []) if t]}
+            for r in rows
+        }
+        await emit_event(
+            conn,
+            namespace="system",
+            type="notification.requested",
+            phase="single",
+            actor_type="system",
+            actor_id="lifecycle_scheduler",
+            tenant_id=None,  # multi-tenant digest → recipients live in payload.tenant_ids
+            payload={
+                "channel": "email",
+                "template": "spotlight_new_topics",
+                "tenant_ids": tenant_ids,
+                "tenant_pref": "notify_on_new_priority_opp",
+                "window_days": 7,
+                "digest": digest,
+            },
+        )
+        logger.info("discovery digest: emitted for %d tenant(s)", len(tenant_ids))
+    except Exception as e:
+        logger.error("discovery digest failed: %s", e)
 
 
 async def _run_monthly_jobs(conn: asyncpg.Connection) -> None:
