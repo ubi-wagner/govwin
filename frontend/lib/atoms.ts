@@ -16,7 +16,7 @@ import { atomSize, type AtomSize } from '@/lib/atom-size';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 import { upsertAtomEmbedding, atomEmbedText } from '@/lib/atom-embed';
-import { embeddingsEnabled, activeEmbedModel, embedOne, toVectorLiteral } from '@/lib/embeddings';
+import { embeddingsEnabled, activeEmbedModel, embedOne, toVectorLiteral, isUsableVector } from '@/lib/embeddings';
 
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
 export { atomSize, type AtomSize };
@@ -292,7 +292,9 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
       || [String(vol ?? '').replace(/_/g, ' '), ...kinds, ...context].filter(Boolean).join(' ').trim();
     if (queryText) {
       const qv = await embedOne(queryText, 'query');
-      if (qv) qLit = toVectorLiteral(qv);
+      // a degenerate query vector (zero-magnitude → NaN cosine for every atom) drops the semantic
+      // axis entirely rather than NaN-ranking the whole library; falls back to pure tag ranking.
+      if (isUsableVector(qv)) qLit = toVectorLiteral(qv);
     }
   }
   const VEC_WEIGHT = 3; // a perfect cosine match ≈ 1.5 context tags — semantics assist, never override scope
@@ -316,7 +318,9 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
                  -- cosine similarity to the section query. NULL when embeddings are off or this atom has
                  -- no vector. ae is joined ONLY within this tenant + the active model, so a vector from
                  -- another tenant or a different embedding space can never enter the ranking.
-                 ${qLit ? tx`(1 - (ae.embedding <=> ${qLit}::vector))` : tx`NULL::float`} AS "vectorSim",
+                 -- NULLIF(…, 'NaN') so a stored degenerate vector (defense-in-depth) yields NULL → coalesce→0,
+                 -- never a NaN that sorts above every real blend. Postgres treats NaN = NaN, so NULLIF catches it.
+                 ${qLit ? tx`NULLIF(1 - (ae.embedding <=> ${qLit}::vector), 'NaN'::float8)` : tx`NULL::float`} AS "vectorSim",
                  -- a group carries no content of its own; assemble it from its ordered members
                  coalesce(a.content, (
                    SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  EMBED_DIM, hashEmbed, toVectorLiteral, embedContentHash, embeddingsEnabled, embedTexts, activeEmbedModel,
+  EMBED_DIM, hashEmbed, toVectorLiteral, embedContentHash, embeddingsEnabled, embedTexts, activeEmbedModel, isUsableVector,
 } from '@/lib/embeddings';
 
 /** The embedding engine is gated (Voyage key / ATOM_EMBED=local). With neither (sandbox/CI default) it
@@ -53,5 +53,27 @@ describe('embedding helpers', () => {
     expect(embedContentHash('voyage-3.5', 'hello world')).toBe(a);
     expect(embedContentHash('voyage-3.5', 'hello worlds')).not.toBe(a);
     expect(embedContentHash('local-hash-v1', 'hello world')).not.toBe(a);
+  });
+});
+
+describe('degenerate-vector guard (NaN-poisoning defense)', () => {
+  it('isUsableVector rejects zero-magnitude, non-finite, and wrong-length vectors', () => {
+    expect(isUsableVector(hashEmbed('additive manufacturing'))).toBe(true);
+    expect(isUsableVector(new Array(EMBED_DIM).fill(0))).toBe(false);        // zero-magnitude → NaN cosine
+    const withNaN = hashEmbed('additive'); withNaN[0] = NaN;
+    expect(isUsableVector(withNaN)).toBe(false);                              // non-finite
+    expect(isUsableVector(new Array(512).fill(0.1))).toBe(false);            // wrong dim
+    expect(isUsableVector(null)).toBe(false);
+  });
+  it('text with no [a-z0-9] tokens embeds to a zero vector that isUsableVector rejects', () => {
+    // the exact poisoning input from the adversarial review: a non-Latin / symbol-only atom
+    for (const t of ['日本語のテキスト', 'Кириллица', '!!! ??? ---', '   ']) {
+      const v = hashEmbed(t);
+      expect(v.every((x) => x === 0)).toBe(true);
+      expect(isUsableVector(v)).toBe(false); // → never stored, never used as a query
+    }
+  });
+  it('embedTexts([]) returns null when disabled (contract honored even for an empty batch)', async () => {
+    if (!engineOn) expect(await embedTexts([])).toBeNull();
   });
 });

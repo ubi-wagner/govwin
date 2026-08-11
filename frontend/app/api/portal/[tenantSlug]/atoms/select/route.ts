@@ -38,10 +38,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     // Sanitize limit: a non-numeric/negative value must not reach `LIMIT` as NaN (→ 500).
     const rawLimit = Number(url.searchParams.get('limit'));
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(50, Math.floor(rawLimit)) : undefined;
+    // `text` is the human-readable section title/prompt — the semantic query for the vector axis
+    // (selectForSection embeds it when an engine is on; ignored when off). Capped defensively.
+    const text = (url.searchParams.get('text') ?? '').trim().slice(0, 500) || undefined;
     const atoms = await selectForSection(tenantId, {
       vol: url.searchParams.get('vol') ?? null,
       kinds: csv('kinds'),
       context: csv('context'),
+      text,
       limit,
     }, viewerFromRole(u.id, role));
 

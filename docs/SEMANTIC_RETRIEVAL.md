@@ -24,6 +24,14 @@ Every vector is stored with its `model`, and the selector only ever compares **w
 `local-hash-v1` vector is never cosine-compared against a `voyage-3.5` one. Best-effort everywhere: a
 failed embed yields `null` and the caller degrades — it never throws into a request path.
 
+**Degenerate-vector guard (NaN defense).** A zero-magnitude vector (e.g. `hashEmbed` of a non-Latin or
+symbol-only atom, whose tokenizer matches nothing) makes pgvector's `<=>` return `NaN`, which
+`coalesce(…,0)` does **not** catch and Postgres sorts **above every finite score** — it would poison
+rank #1 for the whole tenant. Defended three ways: `isUsableVector` rejects such a vector **on write**
+(never stored) and **as a query** (drops the semantic axis → tag ranking), and the read wraps the cosine
+in `NULLIF(…, 'NaN')` so any already-stored degenerate row yields `NULL`→0. Proven end-to-end in
+`verify-embeddings.mts` (a forced zero-vector atom gets `vectorSim=null`, a finite score, and never #1).
+
 ## Schema (mig 171 `atom_embeddings`)
 
 One row per atom: `atom_id` PK → `library_atoms` (ON DELETE CASCADE), `tenant_id`, `model`, `dim`,
@@ -61,6 +69,12 @@ blend = cosine(atom, query) · 3   +   ctxMatches · 2   +   outcome_score   +  
 Context stays authoritative (a perfect cosine ≈ 1.5 context tags); semantics **assist, never override**
 scope. With embeddings **off**, `blend`'s vector term is 0 and the `ORDER BY` falls back to the exact
 pre-vector tiebreakers — **zero regression**. `RankedAtom.vectorSim` carries the cosine (or `null`).
+
+**Query text sources.** Every caller of `/atoms/select` now passes the human-readable section text as
+`?text=` so the vector axis gets a real query, not just the slugified `vol`: the frontend **Draft-All**
+drafter (`draft-all-sections.tsx` → `sec.title`, so semantically-matched atoms flow into the generated
+draft), the manual **insert panel** (`sectionTitle`, and it renders a `◈ semantic N%` badge on each
+candidate), and the node **replace picker** (`category`). The route caps `text` at 500 chars.
 
 ## Writing vectors
 

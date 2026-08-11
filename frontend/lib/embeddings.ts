@@ -4,7 +4,7 @@
  * The tag/context selector (lib/atoms.selectForSection) finds atoms whose taxonomy literally
  * matches a section. This adds a semantic axis: an atom about "additive manufacturing throughput"
  * can surface for a section on "print speed" even with zero shared tags. One vector per atom lives
- * in atom_embeddings (mig 170, tenant-scoped + forced RLS); selectForSection blends cosine similarity
+ * in atom_embeddings (mig 171, tenant-scoped + forced RLS); selectForSection blends cosine similarity
  * into the score.
  *
  * TWO engines, gated exactly like vision/OCR — inert by default:
@@ -50,6 +50,16 @@ export function embedContentHash(model: string, text: string): string {
 /** postgres literal for a pgvector column: '[0.1,0.2,…]'. Non-finite → 0 (defensive). */
 export function toVectorLiteral(v: number[]): string {
   return '[' + v.map((x) => (Number.isFinite(x) ? x : 0)).join(',') + ']';
+}
+
+/**
+ * Usable for cosine ranking ONLY if right-length, all-finite, and NON-zero. A zero-magnitude vector
+ * (e.g. hashEmbed of text with no [a-z0-9] tokens — a non-Latin or symbol-only atom) makes pgvector's
+ * `<=>` return NaN, which coalesce(…,0) does NOT catch and Postgres sorts ABOVE every finite score —
+ * so a poisoned atom would rank #1 for the whole tenant. Reject such vectors on write AND as a query.
+ */
+export function isUsableVector(v: number[] | null | undefined): v is number[] {
+  return Array.isArray(v) && v.length === EMBED_DIM && v.some((x) => x !== 0) && v.every((x) => Number.isFinite(x));
 }
 
 // ── local deterministic embedder (lexical; no deps, no network) ───────────────────────────
@@ -117,11 +127,11 @@ async function voyageEmbed(texts: string[], inputType: EmbedInputType): Promise<
  * `inputType` lets an asymmetric provider (Voyage) distinguish the stored document from the query.
  */
 export async function embedTexts(texts: string[], inputType: EmbedInputType = 'document'): Promise<number[][] | null> {
+  if (!VOYAGE_ON && !LOCAL_ON) return null; // disabled — honor "null when off" even for an empty batch
   const clean = texts.map((t) => (t || '').slice(0, 8000));
   if (clean.length === 0) return [];
   if (VOYAGE_ON) return voyageEmbed(clean, inputType);
-  if (LOCAL_ON) return clean.map(hashEmbed);
-  return null; // disabled
+  return clean.map(hashEmbed); // LOCAL_ON
 }
 
 /** Single-text convenience. null when disabled/failed. */

@@ -55,6 +55,7 @@ export function LibraryPicker({ category, tenantSlug, sectionId, onSelect, onClo
       setFetching(true);
       try {
         const qs = new URLSearchParams({ vol: slugVol(category), limit: '15' });
+        if (category) qs.set('text', category); // semantic query (section context) for the vector axis
         if (sectionId) qs.set('sectionId', sectionId);
         const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
         if (cancelled) return;

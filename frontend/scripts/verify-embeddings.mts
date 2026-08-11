@@ -1,4 +1,4 @@
-/** Live proof for the semantic-retrieval spine (mig 170 + lib/embeddings + hybrid selectForSection).
+/** Live proof for the semantic-retrieval spine (mig 171 + lib/embeddings + hybrid selectForSection).
  *  Runs with the LOCAL engine so it needs no key. Proves, in order:
  *    1. AT-REST isolation — no embedding row's tenant_id ever differs from its atom's tenant_id.
  *    2. RLS layer — as the NOBYPASSRLS app role (govtech_app), atom_embeddings is invisible with no
@@ -67,6 +67,40 @@ try {
   A('…with a clearly-meaningful self-similarity (vectorSim > 0.25, noise ≈ 0)', (top?.vectorSim ?? 0) > 0.25, `sim=${top?.vectorSim?.toFixed(3)}`);
   const worst = Math.min(...byTitle.map((r) => r.vectorSim ?? 1));
   A('…and it out-scores the field on the semantic axis (top sim ≥ every other candidate)', (top?.vectorSim ?? 0) >= Math.max(...byTitle.slice(1).map((r) => r.vectorSim ?? 0)), `top=${top?.vectorSim?.toFixed(3)} worst=${worst.toFixed(3)}`);
+
+  // ── 5. the query TEXT steers ranking (SEM-WIRE payoff) — two different section texts rank two
+  //    different atoms first, from the SAME library. Proves passing the section title actually matters. ──
+  const [p1, p2] = await sql<Array<{ id: string; title: string }>>`
+    SELECT id, title FROM library_atoms WHERE tenant_id=${foun.id}::uuid AND status='approved' AND grain<>'reference'
+      AND title IS NOT NULL AND length(title) > 12 ORDER BY char_count DESC LIMIT 2`;
+  if (p1 && p2 && p1.id !== p2.id) {
+    const r1 = await selectForSection(foun.id, { text: p1.title, limit: 50 }, { userId: foun.id, isAdmin: true });
+    const r2 = await selectForSection(foun.id, { text: p2.title, limit: 50 }, { userId: foun.id, isAdmin: true });
+    const rank = (rs: Array<{ id: string }>, id: string) => rs.findIndex((r) => r.id === id);
+    A('query TEXT steers ranking: section text A ranks atom A above atom B', rank(r1, p1.id) >= 0 && rank(r1, p1.id) < rank(r1, p2.id), `A@${rank(r1, p1.id)} B@${rank(r1, p2.id)}`);
+    A('query TEXT steers ranking: section text B ranks atom B above atom A', rank(r2, p2.id) >= 0 && rank(r2, p2.id) < rank(r2, p1.id), `B@${rank(r2, p2.id)} A@${rank(r2, p1.id)}`);
+  }
+
+  // ── 6. NaN-poisoning DEFENSE (adversarial review) — a stored ZERO-magnitude vector must NOT hijack
+  //    rank #1. Force one in directly (bypassing the write guard) and confirm the read NULLIF neutralizes
+  //    it: vectorSim NULL, a finite blend, and it does not sort above real matches. ──
+  const [owner] = await sql<Array<{ id: string }>>`SELECT id FROM users WHERE email='kate.ulepic@foundation3dp.com'`;
+  const [tmp] = await sql<Array<{ id: string }>>`
+    INSERT INTO library_atoms (tenant_id, grain, title, content, word_count, char_count, status, source, creator_kind, created_by, owner_user_id, visibility)
+    VALUES (${foun.id}::uuid, 'primitive', 'ZZ zero-vector poison test', 'zzz', 1, 3, 'approved', 'manual', 'admin', ${owner.id}::uuid, ${owner.id}::uuid, 'tenant')
+    RETURNING id`;
+  try {
+    await sql`INSERT INTO atom_embeddings (atom_id, tenant_id, model, dim, content_hash, embedding)
+              VALUES (${tmp.id}::uuid, ${foun.id}::uuid, 'local-hash-v1', 1024, 'poison', array_fill(0, ARRAY[1024])::vector)`;
+    const poisoned = await selectForSection(foun.id, { text: 'additive concrete printing throughput', limit: 50 }, { userId: foun.id, isAdmin: true });
+    const pRow = poisoned.find((r) => r.id === tmp.id);
+    A('NaN defense: a stored zero-vector atom yields NULL vectorSim (NaN caught by NULLIF)', pRow != null && pRow.vectorSim == null, `vectorSim=${pRow?.vectorSim}`);
+    A('NaN defense: it does NOT hijack rank #1', poisoned[0]?.id !== tmp.id, `#1="${(poisoned[0]?.title || '').slice(0, 30)}"`);
+    A('NaN defense: its blended score is finite (no NaN)', Number.isFinite(pRow?.score ?? NaN), `score=${pRow?.score}`);
+  } finally {
+    await sql`DELETE FROM atom_embeddings WHERE atom_id = ${tmp.id}::uuid`;
+    await sql`DELETE FROM library_atoms WHERE id = ${tmp.id}::uuid`;
+  }
 } catch (e) { console.error('FAILED:', e); ok = false; }
 finally { await sql.end({ timeout: 5 }); }
 console.log(ok ? '\nPASS — embeddings are tenant-isolated (at rest · RLS · app-layer) and the hybrid selector ranks by meaning within the tenant'

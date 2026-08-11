@@ -1,4 +1,4 @@
-/** Backfill / refresh the semantic index (atom_embeddings, mig 170) for existing atoms.
+/** Backfill / refresh the semantic index (atom_embeddings, mig 171) for existing atoms.
  *  Embeds every approved, non-archived, non-reference atom via the SAME gated helper createAtom uses
  *  (upsertAtomEmbedding), so it's tenant-scoped + idempotent (skips unchanged text). No-op unless an
  *  engine is enabled — run with ATOM_EMBED=local (offline, no key) or a real VOYAGE_API_KEY.

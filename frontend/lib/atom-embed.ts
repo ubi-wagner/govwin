@@ -1,5 +1,5 @@
 /**
- * atom-embed — store an atom's semantic vector (mig 170 atom_embeddings), gated + best-effort.
+ * atom-embed — store an atom's semantic vector (mig 171 atom_embeddings), gated + best-effort.
  *
  * The single write path for the semantic index. Called post-commit from createAtom (so a provider
  * network call never holds a business tx open) and in bulk from scripts/embed-atoms.mts. Everything
@@ -8,7 +8,7 @@
  */
 import { withTenant } from '@/lib/rls';
 import {
-  activeEmbedModel, embedOne, embedContentHash, toVectorLiteral, EMBED_DIM,
+  activeEmbedModel, embedOne, embedContentHash, toVectorLiteral, isUsableVector, EMBED_DIM,
 } from '@/lib/embeddings';
 
 export type EmbedOutcome = 'stored' | 'skipped' | 'disabled' | 'empty' | 'failed';
@@ -36,7 +36,10 @@ export async function upsertAtomEmbedding(tenantId: string, atomId: string, text
     if (existing[0]?.contentHash === hash) return 'skipped';
 
     const vec = await embedOne(t, 'document');
-    if (!vec || vec.length !== EMBED_DIM) return 'failed';
+    // Reject a degenerate (zero-magnitude / non-finite) vector — storing one would make its cosine
+    // NaN, which sorts ABOVE every real score and poisons rank #1 for the whole tenant (adversarial
+    // review). isUsableVector also enforces the dim, so the column can never take a malformed row.
+    if (!isUsableVector(vec)) return 'failed';
     const lit = toVectorLiteral(vec);
     await withTenant(tenantId, async (tx) =>
       tx`INSERT INTO atom_embeddings (atom_id, tenant_id, model, dim, content_hash, embedding, updated_at)
