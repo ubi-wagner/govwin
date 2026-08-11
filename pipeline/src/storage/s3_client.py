@@ -20,7 +20,9 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-BUCKET = os.environ.get("AWS_S3_BUCKET_NAME", "rfp-pipeline-local")
+# Railway's R2/bucket service injects the bucket name as AWS_S3_BUCKET; older config used
+# AWS_S3_BUCKET_NAME. Read AWS_S3_BUCKET first, fall back to the legacy name.
+BUCKET = os.environ.get("AWS_S3_BUCKET") or os.environ.get("AWS_S3_BUCKET_NAME", "rfp-pipeline-local")
 
 _s3_client: Optional[Any] = None
 

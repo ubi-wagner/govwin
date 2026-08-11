@@ -34,7 +34,7 @@ start_server() {
     DATABASE_URL="$DBURL" AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
     NEXTAUTH_URL='http://localhost:3000' AUTH_URL='http://localhost:3000' \
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers PORT=3000 HOSTNAME=0.0.0.0 \
-    STORAGE_DRIVER=local LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-/tmp/govwin-storage}" AWS_S3_BUCKET_NAME=rfp-pipeline-local \
+    STORAGE_DRIVER=local LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-/tmp/govwin-storage}" AWS_S3_BUCKET=rfp-pipeline-local \
     node server.js >> "$SCR/server.log" 2>&1 & )
 }
 start_pg() {

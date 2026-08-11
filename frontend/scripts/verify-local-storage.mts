@@ -1,5 +1,5 @@
 /** Proves the local storage driver round-trips through the SAME s3-client calls prod uses.
- *  STORAGE_DRIVER=local LOCAL_STORAGE_DIR=… AWS_S3_BUCKET_NAME=rfp-pipeline-local \
+ *  STORAGE_DRIVER=local LOCAL_STORAGE_DIR=… AWS_S3_BUCKET=rfp-pipeline-local \
  *    node --import tsx scripts/verify-local-storage.mts */
 import { putObject, getObjectBuffer, objectExists, getSignedGetUrl, copyObject, deleteObject, LOCAL, BUCKET } from '@/lib/storage/s3-client';
 

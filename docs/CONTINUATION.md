@@ -64,7 +64,7 @@ commands above, not a re-diagnosis. NB: a server launched from a *foreground* ca
 
 **Object storage in the sandbox (image atoms / capture / export):** Railway's R2 isn't linked
 here, so the frontend runs the **local storage driver** — `STORAGE_DRIVER=local` +
-`LOCAL_STORAGE_DIR=/tmp/govwin-storage` + `AWS_S3_BUCKET_NAME=rfp-pipeline-local` (the health-manager's
+`LOCAL_STORAGE_DIR=/tmp/govwin-storage` + `AWS_S3_BUCKET=rfp-pipeline-local` (the health-manager's
 `start_server` already sets these). `lib/storage/s3-client.ts` then backs the SAME
 `putObject`/`getSignedGetUrl`/… calls with the filesystem (`<dir>/<bucket>/<key>`), and signed URLs
 resolve to the gated `GET/PUT /api/storage/local/<key>` route — so uploads, box-capture image atoms,

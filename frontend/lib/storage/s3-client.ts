@@ -38,15 +38,20 @@ export const LOCAL = process.env.STORAGE_DRIVER === 'local';
 const LOCAL_DIR = process.env.LOCAL_STORAGE_DIR || '/tmp/govwin-storage';
 const LOCAL_URL_BASE = '/api/storage/local';
 
+// Railway's R2/bucket service injects the bucket name as AWS_S3_BUCKET; older config used
+// AWS_S3_BUCKET_NAME. Read AWS_S3_BUCKET first, fall back to the legacy name — otherwise the
+// code looks for a var Railway never sets and throws below (the recurring prod storage error).
+const _bucketEnv = process.env.AWS_S3_BUCKET || process.env.AWS_S3_BUCKET_NAME;
+
 // Skip the guard during the Next.js "Collecting page data" step at
 // build time — Railway's build container has no runtime secrets.
 // Runtime still throws if the var is missing when the request fires (unless local).
 const _isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-if (!process.env.AWS_S3_BUCKET_NAME && process.env.NODE_ENV === 'production' && !_isBuildPhase && !LOCAL) {
-  throw new Error('[storage/s3-client] AWS_S3_BUCKET_NAME is required in production');
+if (!_bucketEnv && process.env.NODE_ENV === 'production' && !_isBuildPhase && !LOCAL) {
+  throw new Error('[storage/s3-client] AWS_S3_BUCKET (or AWS_S3_BUCKET_NAME) is required in production');
 }
 
-export const BUCKET = process.env.AWS_S3_BUCKET_NAME || 'rfp-pipeline-local';
+export const BUCKET = _bucketEnv || 'rfp-pipeline-local';
 
 const _localPath = (key: string) => join(LOCAL_DIR, BUCKET, key);
 async function _localWrite(key: string, body: Buffer | Uint8Array | string, contentType?: string): Promise<void> {

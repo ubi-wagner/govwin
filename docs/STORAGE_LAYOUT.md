@@ -21,8 +21,10 @@ client sets `forcePathStyle: true` for R2 compatibility (`frontend/lib/storage/s
   `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` env — there is **no endpoint literal in code**.
   ⚠ this doc previously hard-coded `https://t3.storageapi.dev` (Railway object storage); the store
   is now Cloudflare R2, so **trust `AWS_ENDPOINT_URL`, not a literal here.**
-- **Code reads bucket via:** `process.env.AWS_S3_BUCKET_NAME` (TS) or
-  `os.environ['AWS_S3_BUCKET_NAME']` (Python)
+- **Code reads bucket via:** `process.env.AWS_S3_BUCKET` (TS) or `os.environ['AWS_S3_BUCKET']`
+  (Python) — the name **Railway's bucket service injects** — falling back to the legacy
+  `AWS_S3_BUCKET_NAME`. Reading ONLY the legacy name was the recurring prod storage bug (the
+  `AWS_S3_BUCKET_NAME is required in production` throw fired because Railway sets `AWS_S3_BUCKET`).
 
 The AWS SDK (both `@aws-sdk/client-s3` v3+ and `boto3`) auto-reads
 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and
