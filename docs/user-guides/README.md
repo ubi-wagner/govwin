@@ -33,6 +33,7 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | Guide | Audience | Status |
 |---|---|---|
 | [Getting started + portal tour](./getting-started.md) | all customer roles | ✅ written |
+| [Creating documents — canvas, slides, sheets, agents](./creating-documents.md) | rfp_admin, tenant_admin, tenant_user | ✅ written |
 | [Documents — create, template, export](./documents.md) | tenant_admin, tenant_user | ✅ written |
 | [Proposal build — draft → lock → export](./proposal-build.md) | tenant_admin, tenant_user | ✅ written |
 | [Library & atoms — upload, atomize, reuse](./library-atoms.md) | tenant_admin | ✅ written |
