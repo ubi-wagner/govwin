@@ -20,6 +20,18 @@ export interface ImportResult {
   sourceFormat: 'docx' | 'pptx' | 'pdf' | 'txt' | 'md' | 'xlsx';
   totalChars: number;
   metadata: DocumentMetadata;
+  /**
+   * Visual content the text parser could NOT read — scanned/image-only PDF pages, or slide
+   * images (`<p:pic>`) — so the UI can point the user at the box tool (the Capture tab) to grab
+   * them as image atoms instead of silently losing them. Absent when everything extracted cleanly.
+   */
+  unextractable?: UnextractableSignal;
+}
+
+export interface UnextractableSignal {
+  count: number;                                   // how many visual items couldn't be read as text
+  kind: 'scanned_pdf' | 'slide_image';             // what they are (drives the box-tool hint)
+  hint: string;                                    // human sentence pointing at the Capture/box tool
 }
 
 export interface DocumentMetadata {

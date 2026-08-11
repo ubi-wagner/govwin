@@ -60,8 +60,12 @@ export async function readPdf(
 
   const totalChars = rawText.length;
 
-  // Handle scanned PDFs / empty text extraction
+  // Handle scanned PDFs / empty text extraction. The text is gone, but the PAGES aren't —
+  // flag them so the UI can route the user to the box tool (Capture → "Box a PDF page").
   if (rawText.trim().length < MIN_TEXT_LENGTH) {
+    // A scanned PDF always has ≥1 page; some pdf-parse builds report 0 pages when no text
+    // extracts, so floor at 1 (|| not ?? — a real 0 must fall through, not be kept).
+    const pages = Math.max(1, metadata.pageCount || pageCount || 0);
     return {
       atoms: [],
       sourceFilename: filename,
@@ -70,6 +74,11 @@ export async function readPdf(
       metadata: {
         ...metadata,
         title: metadata.title ?? '(scanned PDF - no extractable text)',
+      },
+      unextractable: {
+        count: pages,
+        kind: 'scanned_pdf',
+        hint: `${pages} page(s) hold no selectable text (a scanned or image-only PDF). Open the Capture tab → “Box a PDF page” to grab each page as an image atom.`,
       },
     };
   }

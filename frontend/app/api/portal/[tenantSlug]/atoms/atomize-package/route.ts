@@ -61,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         const buffer = Buffer.from(await file.arrayBuffer());
         const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags });
         totalPlanned += plan.planned.length;
-        previewed.push({ file: plan.file, format: plan.format, planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount })), skipped: plan.skipped, error: plan.error });
+        previewed.push({ file: plan.file, format: plan.format, planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount })), skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable });
       }
       return NextResponse.json({ data: { preview: true, filesProcessed: previewed.length, totalPlanned, context: ctxTags.map((t) => `${t.dimension}:${t.value}`), docs: previewed } });
     }

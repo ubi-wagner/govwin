@@ -9,6 +9,7 @@
  * route stays thin and the behavior is drivable end-to-end in a harness/test.
  */
 import { readDocument } from '@/lib/import';
+import type { UnextractableSignal } from '@/lib/import/types';
 import { textOfNodes } from '@/lib/atom-size';
 import { createAtom, type AtomTagInput, type CreatorKind } from '@/lib/atoms';
 import { withTenant } from '@/lib/rls';
@@ -85,7 +86,7 @@ export interface DocAtomizeResult { file: string; format: string; atoms: number;
 /** One primitive atom the plan proposes to mint (pre-write). */
 export interface PlannedAtom { blockIndex: number; title: string; wordCount: number; content: string; nodes: CanvasNode[]; tags: AtomTagInput[] }
 /** The dry-run plan for one document — exactly what atomize WOULD create, computed with NO DB write. */
-export interface DocPlan { file: string; format: string; fmt: string; fullText: string; allNodes: CanvasNode[]; parsedCount: number; planned: PlannedAtom[]; skipped: number; error?: string }
+export interface DocPlan { file: string; format: string; fmt: string; fullText: string; allNodes: CanvasNode[]; parsedCount: number; planned: PlannedAtom[]; skipped: number; error?: string; unextractable?: UnextractableSignal }
 
 /**
  * Parse + segment one document into the primitives it WOULD atomize into — with NO DB
@@ -105,7 +106,7 @@ export async function planDocumentAtomization(
     console.error('[atomize-package] parse failed', filename, e);
     return { ...empty, error: 'could not parse' };
   }
-  if (parsed.atoms.length === 0) return { ...empty, format: parsed.sourceFormat, error: 'no extractable content' };
+  if (parsed.atoms.length === 0) return { ...empty, format: parsed.sourceFormat, error: 'no extractable content', unextractable: parsed.unextractable };
 
   const fmt = FMT_OF[parsed.sourceFormat] ?? 'doc';
   const allNodes = cleanNodes(parsed.atoms.flatMap((a) => a.nodes) as CanvasNode[]);
@@ -137,7 +138,7 @@ export async function planDocumentAtomization(
       tags,
     });
   }
-  return { file: filename, format: parsed.sourceFormat, fmt, fullText, allNodes, parsedCount: parsed.atoms.length, planned, skipped };
+  return { file: filename, format: parsed.sourceFormat, fmt, fullText, allNodes, parsedCount: parsed.atoms.length, planned, skipped, unextractable: parsed.unextractable };
 }
 
 /**

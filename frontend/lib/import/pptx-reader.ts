@@ -38,12 +38,14 @@ export async function readPptx(
     const atoms: ImportedAtom[] = [];
     let totalChars = 0;
     let charOffset = 0;
+    let picCount = 0; // <p:pic> slide images — dropped by the text pass; flagged for the box tool
 
     for (let i = 0; i < slideEntries.length; i++) {
       try {
         const slidePath = slideEntries[i];
         const slideXml = await zip.file(slidePath)?.async('text');
         if (!slideXml) continue;
+        picCount += (slideXml.match(/<p:pic\b/g) || []).length; // count images the text pass can't read
 
         // Extract title and body text from the slide
         const { title, bodyParagraphs } = parseSlideXml(slideXml);
@@ -148,6 +150,11 @@ export async function readPptx(
       sourceFormat: 'pptx',
       totalChars,
       metadata,
+      unextractable: picCount > 0 ? {
+        count: picCount,
+        kind: 'slide_image',
+        hint: `${picCount} slide image(s) can’t be read as text. Export the slide(s) as PNG and use the Capture tab → “Box an uploaded image”, or screen-capture them to grab as image atoms.`,
+      } : undefined,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error reading PPTX';

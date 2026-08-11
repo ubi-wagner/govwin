@@ -23,7 +23,8 @@ const ALLOWED = ['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'md'];
 const ACCEPT = ALLOWED.map((e) => `.${e}`).join(',');
 
 type PlanItem = { title: string; wordCount: number };
-type PreviewDoc = { file: string; planned: PlanItem[]; skipped: number; error?: string };
+type Unextractable = { count: number; kind: string; hint: string };
+type PreviewDoc = { file: string; planned: PlanItem[]; skipped: number; error?: string; unextractable?: Unextractable };
 type Preview = { totalPlanned: number; docs: PreviewDoc[] } | null;
 type Result = { filesProcessed?: number; totalAtoms?: number } | null;
 
@@ -88,6 +89,7 @@ export function UploadAtomizeCard({ tenantSlug, canBrowseLibrary = true }: { ten
   const cancel = useCallback(() => { setPreview(null); pendingRef.current = []; setError(null); }, []);
 
   const totalSkipped = preview ? preview.docs.reduce((n, d) => n + (d.skipped || 0), 0) : 0;
+  const totalUnextractable = preview ? preview.docs.reduce((n, d) => n + (d.unextractable?.count || 0), 0) : 0;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5">
@@ -109,7 +111,10 @@ export function UploadAtomizeCard({ tenantSlug, canBrowseLibrary = true }: { ten
                 ? <>Ready to atomize — <b>{preview.totalPlanned}</b> atom{preview.totalPlanned === 1 ? '' : 's'}{preview.docs.length > 1 ? ` from ${preview.docs.length} files` : ''}</>
                 : 'Nothing to atomize from that file'}
             </span>
-            {totalSkipped > 0 && <span className="text-[11px] text-amber-600">skipped {totalSkipped} short block{totalSkipped === 1 ? '' : 's'}</span>}
+            <div className="flex items-center gap-2 shrink-0">
+              {totalUnextractable > 0 && <span className="text-[11px] font-medium text-amber-700">⚠ {totalUnextractable} not text-readable</span>}
+              {totalSkipped > 0 && <span className="text-[11px] text-amber-600">skipped {totalSkipped} short block{totalSkipped === 1 ? '' : 's'}</span>}
+            </div>
           </div>
           <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
             {preview.docs.map((d) => (
@@ -130,6 +135,15 @@ export function UploadAtomizeCard({ tenantSlug, canBrowseLibrary = true }: { ten
                     ))}
                     {d.planned.length > 6 && <li className="text-[11px] text-gray-400">+ {d.planned.length - 6} more</li>}
                   </ul>
+                )}
+                {/* BOX-3: visual content the parser couldn't read as text → route to the box tool. */}
+                {d.unextractable && d.unextractable.count > 0 && (
+                  <div className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] leading-snug text-amber-800">
+                    {d.unextractable.hint}{' '}
+                    {canBrowseLibrary && (
+                      <Link href={`/portal/${tenantSlug}/atoms?tab=capture`} className="font-medium underline whitespace-nowrap">Open the box tool →</Link>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
