@@ -14,6 +14,7 @@ import { textOfNodes } from '@/lib/atom-size';
 import { createAtom, type AtomTagInput, type CreatorKind } from '@/lib/atoms';
 import { withTenant } from '@/lib/rls';
 import type { CanvasNode } from '@/lib/types/canvas-document';
+import { cleanText } from '@/lib/clean-text';
 
 export const MAX_FILES = 12;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -34,26 +35,6 @@ const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc',
 
 export const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
-/**
- * Strip bytes Postgres text/jsonb reject — NUL + other C0 control chars (except tab /
- * newline / CR) and lone UTF-16 surrogates — which malformed PDFs (e.g. Type-3 fonts)
- * emit during extraction. Without this the atom INSERT throws 22021 and the doc is lost.
- */
-export function cleanText(s: string): string {
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) continue; // drop C0 controls (keep tab/newline/CR)
-    if (c >= 0xd800 && c <= 0xdbff) { // high surrogate
-      const n = s.charCodeAt(i + 1);
-      if (n >= 0xdc00 && n <= 0xdfff) { out += s[i] + s[i + 1]; i++; continue; } // valid pair
-      continue; // lone high surrogate
-    }
-    if (c >= 0xdc00 && c <= 0xdfff) continue; // lone low surrogate
-    out += s[i];
-  }
-  return out;
-}
 const deepCleanStrings = (v: unknown): unknown =>
   typeof v === 'string' ? cleanText(v)
   : Array.isArray(v) ? v.map(deepCleanStrings)
@@ -70,6 +51,9 @@ const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
  */
 export function contextTags(ctx: Record<string, unknown>): AtomTagInput[] {
   const out: AtomTagInput[] = [];
+  // `JSON.parse("null")` returns null WITHOUT throwing, so the caller's parse-guard misses it —
+  // reading ctx.agency off null would 500 the whole upload. Treat any non-object as no context.
+  if (!ctx || typeof ctx !== 'object') return out;
   const agency = str(ctx.agency), program = str(ctx.program).toLowerCase(), phase = str(ctx.phase).toLowerCase(), sol = str(ctx.sol), topic = str(ctx.topic);
   if (agency) out.push({ dimension: 'agency', value: slug(agency), source: 'auto', confirmed: true, isOther: true });
   const prog = program.match(/sbir|sttr|baa|ota|cso|rif/)?.[0];
@@ -151,6 +135,10 @@ export async function atomizeDocumentIntoLibrary(
   opts: { buffer: Buffer; filename: string; packageName?: string; ctxTags: AtomTagInput[]; actor: { id: string; kind: CreatorKind } },
 ): Promise<DocAtomizeResult> {
   const { buffer, filename, packageName, ctxTags, actor } = opts;
+  // A collaborator (cross-company partner_user) OFFERS content up — it lands DRAFT for the company
+  // to review before it's reuse-eligible, mirroring the capture path. Company staff uploads stay
+  // approved. (selectForSection only pulls status='approved', so draft = not-yet-reusable.)
+  const status = actor.kind === 'collaborator' ? 'draft' : 'approved';
   const plan = await planDocumentAtomization({ buffer, filename, ctxTags });
   if (plan.error) return { file: filename, format: plan.format, atoms: 0, skipped: plan.skipped, cocoonId: null, error: plan.error };
 
@@ -170,7 +158,7 @@ export async function atomizeDocumentIntoLibrary(
     const ref = await createAtom(tenantId, {
       grain: 'reference', title: filename, content: plan.fullText || null, canvasNodes: plan.allNodes.length ? plan.allNodes : null,
       summary: `Uploaded ${plan.format} · ${plan.parsedCount} objects${packageName ? ` · ${packageName}` : ''}`,
-      source: 'upload', status: 'approved', cocoonId,
+      source: 'upload', status, cocoonId,
       tags: [{ dimension: 'fmt', value: plan.fmt, source: 'auto', confirmed: true }, ...ctxTags],
     }, actor);
     referenceId = ref.atomId;
@@ -184,7 +172,7 @@ export async function atomizeDocumentIntoLibrary(
         grain: 'primitive',
         title: p.title,
         content: p.content, canvasNodes: p.nodes.length ? p.nodes : null,
-        summary: null, source: 'upload', status: 'approved', cocoonId,
+        summary: null, source: 'upload', status, cocoonId,
         sourceAnchor: referenceId ? [{ sourceAtomId: referenceId, blockIds: [`b${p.blockIndex}`] }] : undefined,
         tags: p.tags,
       }, actor);

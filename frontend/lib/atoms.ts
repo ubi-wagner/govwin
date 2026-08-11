@@ -133,8 +133,14 @@ export async function createAtom(
       `;
     }
 
-    // members: a container grain (foundation/section/group) aggregates ordered members.
-    const members = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
+    // members: a container grain (foundation/section/group) aggregates ordered members. Defense-in-
+    // depth — only members that belong to THIS tenant compose the container, so a caller-supplied
+    // foreign id can never create cross-tenant composition (the isolation invariant), order preserved.
+    const requestedMembers = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
+    const ownedMembers = requestedMembers.length
+      ? new Set((await tx<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${requestedMembers}::uuid[])`).map((r: { id: string }) => r.id))
+      : new Set<string>();
+    const members = requestedMembers.filter((m) => ownedMembers.has(m));
     for (let i = 0; i < members.length; i++) {
       await tx`
         INSERT INTO atom_members (group_atom_id, member_atom_id, ordinal)
@@ -158,7 +164,7 @@ export async function createAtom(
     // re-harvest of the same section doesn't inflate the source atom's usage.
     for (const p of input.parentAtomIds ?? []) {
       if (p === atomId) continue;
-      const linked = await tx<Array<{ parent_atom_id: string }>>`
+      const linked = await tx<Array<{ parentAtomId: string }>>`
         INSERT INTO atom_lineage (parent_atom_id, child_atom_id, relation)
         VALUES (${p}::uuid, ${atomId}::uuid, 'derived_from')
         ON CONFLICT (parent_atom_id, child_atom_id) DO NOTHING
@@ -191,7 +197,7 @@ export async function confirmTags(
     if (!own) return { updated: 0 };
     let updated = 0;
     for (const t of tags) {
-      const rows = await tx<Array<{ atom_id: string }>>`
+      const rows = await tx<Array<{ atomId: string }>>`
         INSERT INTO atom_tags (atom_id, dimension, value, is_other, tag_source, confirmed, confirmed_by, confirmed_at)
         VALUES (${atomId}::uuid, ${t.dimension}, ${t.value}, ${t.isOther ?? false},
                 ${t.source ?? 'admin'}, ${t.confirmed ?? true}, ${actorId}::uuid, now())
@@ -255,6 +261,7 @@ export interface SectionQuery {
 }
 export interface RankedAtom {
   id: string; title: string | null; summary: string | null; content: string | null; grain: Grain;
+  canvasNodes: CanvasNode[] | null; // the atom's real nodes (image/table/chart) so structured atoms insert faithfully
   wordCount: number; charCount: number; outcomeScore: number; usageCount: number;
   ctxMatches: number; score: number;
 }
@@ -272,11 +279,12 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   // atoms in place to try to generate" (the blank-mold-with-a-prompt path). Raw
   // ${boolean} — never `${cond?'t':'f'}::bool`, which binds text and evaluates false.
   const runQuery = (requireTag: boolean) =>
-    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
+    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; canvasNodes: CanvasNode[] | null; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
       tx`
         SELECT a.id, a.title, a.summary, a.grain,
                a.word_count AS "wordCount", a.char_count AS "charCount",
                a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount",
+               a.canvas_nodes AS "canvasNodes", -- real nodes (image/table/chart) travel with the atom
                -- a group carries no content of its own; assemble it from its ordered members
                coalesce(a.content, (
                  SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)

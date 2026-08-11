@@ -118,6 +118,11 @@ export async function GET(
     // If ?version=<key> is present, load a specific history version
     const versionKey = searchParams.get('version');
     if (versionKey) {
+      // Constrain the client-supplied key to THIS document's prefix — an admin has cross-tenant reach,
+      // but the version param must not be able to read arbitrary objects out of the bucket.
+      if (!versionKey.startsWith(`reference/documents/${documentId}/`)) {
+        return NextResponse.json({ error: 'Invalid version key', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
       const buf = await getObjectBuffer(versionKey);
       if (!buf) {
         return NextResponse.json(

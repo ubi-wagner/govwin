@@ -604,9 +604,16 @@ function CanvasEditorInner({
     updateDoc((prev) => {
       const nodes = [...prev.nodes];
       for (const a of atoms) {
-        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName }));
-        for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
-          nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName }));
+        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+        if (a.nodes && a.nodes.length > 0) {
+          // Structured atom (image / table / chart): insert its REAL nodes so figures + tables survive
+          // into the section AND export — re-id'd via createNode, style + provenance kept. (Its OCR/
+          // vision text lives in `content` for search/reuse ranking, not for re-rendering here.)
+          for (const n of a.nodes) nodes.push(createNode({ type: n.type, content: n.content, style: n.style, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+        } else {
+          for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
+            nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+          }
         }
       }
       return { ...prev, nodes };

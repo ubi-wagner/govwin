@@ -15,6 +15,7 @@ import { createWorker, type Worker } from 'tesseract.js';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { describeImages } from '@/lib/vision';
+import { cleanText } from '@/lib/clean-text';
 
 export type EnrichEngine = 'ocr' | 'vision' | 'ocr+vision' | 'none';
 export interface Enriched { text: string; engine: EnrichEngine }
@@ -34,7 +35,9 @@ function resolveLangPath(): string | null {
 
 /** Squeeze OCR noise into a compact, storable string (single-spaced, capped). */
 export function cleanOcr(raw: string): string {
-  return raw.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').replace(/[^\S\n]*\n[^\S\n]*/g, '\n').trim().slice(0, MAX_CHARS);
+  // cleanText FIRST strips NUL / C0 / lone surrogates that OCR emits — else the atom INSERT throws
+  // Postgres 22021 and the region is silently lost. Then collapse OCR whitespace noise.
+  return cleanText(raw).replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').replace(/[^\S\n]*\n[^\S\n]*/g, '\n').trim().slice(0, MAX_CHARS);
 }
 
 /**

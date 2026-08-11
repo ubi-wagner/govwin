@@ -36,9 +36,11 @@ const CREATOR_KINDS = ['admin', 'ai', 'collaborator', 'system', 'import'];
 export async function GET(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
     const { tenantSlug } = await params;
-    // Read is open to collaborators (partner_user); visibility is enforced by the
-    // viewer predicate in listAtoms. Writes stay at tenant_user (POST below).
-    const g = await gate(tenantSlug, 'partner_user');
+    // Tenant-staff only. A cross-company collaborator (partner_user) passes verifyTenantAccess via
+    // their membership, so WITHOUT this floor they could read the whole tenant library beyond their
+    // assigned sections (leak — matches the by-id download + proposal-detail floors). Collaborators
+    // still OFFER content up through the write routes (atomize-package / capture stay partner_user).
+    const g = await gate(tenantSlug, 'tenant_user');
     if ('error' in g) return g.error;
     const url = new URL(request.url);
     const atoms = await listAtoms(g.tenantId, {
