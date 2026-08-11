@@ -95,7 +95,12 @@ two-voice sender model. It needs **one credential** to switch on.
 ## E. Optional / tuning (sensible defaults — set only to override)
 
 `CLAUDE_MODEL` (default claude-sonnet-4) · `SHREDDER_MODEL` · `EMBEDDINGS_PROVIDER` +
-`OPENAI_API_KEY` (only if you pick the OpenAI embeddings provider) · `IPINFO_TOKEN` (geo
+`OPENAI_API_KEY` (only if you pick the OpenAI embeddings provider) ·
+**image-atom enrichment** (boxed/uploaded images → searchable text): `ATOM_OCR=off` disables the
+offline Tesseract OCR (default on; model vendored in `frontend/ocr-data/`, override dir via
+`OCR_LANG_PATH`/`OCR_CACHE`) · `ATOM_VISION=off` disables the Claude vision-caption that
+complements OCR (default on **when `ANTHROPIC_API_KEY` is present**; picks `VISION_MODEL`, default
+`claude-sonnet-4-20250514`) · `IPINFO_TOKEN` (geo
 enrichment) · `SOFFICE_PATH` / `SOFFICE_TIMEOUT` (LibreOffice doc conversion) · `LOG_LEVEL` ·
 `HEALTH_PORT` · `EVENT_POLL_INTERVAL` / `GENERATION_POLL_INTERVAL` · `USE_STUB_DATA` (dev only) ·
 `RAILWAY_*` (auto-injected) · `AGENT_DATABASE_URL` (the NOBYPASSRLS `govtech_app` role — for the

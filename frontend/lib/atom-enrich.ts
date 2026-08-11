@@ -14,8 +14,9 @@
 import { createWorker, type Worker } from 'tesseract.js';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { describeImages } from '@/lib/vision';
 
-export type EnrichEngine = 'ocr' | 'none';
+export type EnrichEngine = 'ocr' | 'vision' | 'ocr+vision' | 'none';
 export interface Enriched { text: string; engine: EnrichEngine }
 
 const OCR_ENABLED = process.env.ATOM_OCR !== 'off'; // kill switch
@@ -38,36 +39,48 @@ export function cleanOcr(raw: string): string {
 
 /**
  * OCR a batch of image crops with ONE worker (spawn is ~0.8s, so batch don't per-image). Best-effort:
- * returns one `{ text, engine }` per input, in order; failures/opt-out yield `{ text:'', engine:'none' }`.
+ * returns one text per input, in order; failures/opt-out yield ''.
  */
-export async function enrichImages(buffers: Buffer[]): Promise<Enriched[]> {
-  const none = (): Enriched[] => buffers.map(() => ({ text: '', engine: 'none' }));
-  if (!OCR_ENABLED || buffers.length === 0) return none();
+async function ocrImages(buffers: Buffer[]): Promise<string[]> {
+  const empty = (): string[] => buffers.map(() => '');
+  if (!OCR_ENABLED || buffers.length === 0) return empty();
   const langPath = resolveLangPath();
-  if (!langPath) { console.error('[atom-enrich] OCR language data not found (ocr-data/) — skipping'); return none(); }
+  if (!langPath) { console.error('[atom-enrich] OCR language data not found (ocr-data/) — skipping'); return empty(); }
   const cachePath = process.env.OCR_CACHE || '/tmp/atom-ocr-cache';
   try { mkdirSync(cachePath, { recursive: true }); } catch { /* best-effort */ }
 
   let worker: Worker | null = null;
   try {
     worker = await createWorker('eng', 1, { langPath, gzip: true, cachePath });
-    const out: Enriched[] = [];
+    const out: string[] = [];
     for (const buf of buffers) {
-      if (!buf || buf.length < MIN_BYTES || buf.length > MAX_BYTES) { out.push({ text: '', engine: 'none' }); continue; }
-      try {
-        const { data } = await worker.recognize(buf);
-        const text = cleanOcr(data.text);
-        out.push({ text, engine: text ? 'ocr' : 'none' });
-      } catch (e) {
-        console.error('[atom-enrich] recognize failed', e instanceof Error ? e.message : e);
-        out.push({ text: '', engine: 'none' });
-      }
+      if (!buf || buf.length < MIN_BYTES || buf.length > MAX_BYTES) { out.push(''); continue; }
+      try { const { data } = await worker.recognize(buf); out.push(cleanOcr(data.text)); }
+      catch (e) { console.error('[atom-enrich] recognize failed', e instanceof Error ? e.message : e); out.push(''); }
     }
     return out;
   } catch (e) {
     console.error('[atom-enrich] OCR worker unavailable', e instanceof Error ? e.message : e);
-    return none();
+    return empty();
   } finally {
     if (worker) { try { await worker.terminate(); } catch { /* ignore */ } }
   }
+}
+
+/**
+ * Enrich a batch of image crops for the library: OCR (text IN the image) + vision caption (what the
+ * image SHOWS) run concurrently, best-effort, and are combined into one searchable, machine-legible
+ * string per image — caption first, then the verbatim OCR text. Vision is gated (ANTHROPIC_API_KEY);
+ * with no key it's OCR-only, so behavior degrades gracefully. Order preserved.
+ */
+export async function enrichImages(buffers: Buffer[]): Promise<Enriched[]> {
+  if (buffers.length === 0) return [];
+  const [ocr, vision] = await Promise.all([ocrImages(buffers), describeImages(buffers)]);
+  return buffers.map((_, i) => {
+    const t = ocr[i] ?? '';
+    const c = vision[i]?.caption ?? '';
+    const text = [c, t].filter(Boolean).join('\n\n');
+    const engine: EnrichEngine = c && t ? 'ocr+vision' : c ? 'vision' : t ? 'ocr' : 'none';
+    return { text, engine };
+  });
 }
