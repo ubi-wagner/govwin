@@ -150,7 +150,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
               {items.length > 40 && <li className="px-3 py-2 text-[11px] text-gray-400">+ {items.length - 40} more</li>}
             </ul>
             {!meta.archivable && (
-              <p className="text-[11px] text-gray-400 mt-1">These hold real content — tag them in the Library tab so they're findable and reusable.</p>
+              <p className="text-[11px] text-gray-400 mt-1">These hold real content — tag them in the Library tab so they are findable and reusable.</p>
             )}
           </section>
         );

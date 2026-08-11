@@ -37,9 +37,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     }
     enterTenant(tenantId); // RLS choke point
 
+    // NOTE: lib/db.ts applies a global `postgres.toCamel` column transform, so rows come back
+    // camelCased (created_at → createdAt, word_count → wordCount, the AS aliases likewise).
+    // Read camelCase here — snake_case access silently yields undefined (a lurking bug tsc can't
+    // catch through the manual `sql<typeof rows>` assertion).
     let rows: Array<{
-      id: string; title: string | null; content: string | null; word_count: number | null;
-      status: string; grain: string; created_at: Date; tag_count: number; confirmed_tag_count: number;
+      id: string; title: string | null; content: string | null; wordCount: number | null;
+      status: string; grain: string; createdAt: Date | string | null; tagCount: number; confirmedTagCount: number;
     }>;
     try {
       rows = await sql<typeof rows>`
@@ -60,16 +64,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ error: 'Failed to load the library', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    const toIso = (v: Date | string | null): string => {
+      const d = v instanceof Date ? v : new Date(v ?? NaN);
+      return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+    };
     const atoms: ReviewAtom[] = rows.map((r) => ({
       id: r.id,
       title: r.title,
       content: r.content ?? '',
-      wordCount: r.word_count ?? 0,
+      wordCount: r.wordCount ?? 0,
       status: r.status,
       grain: r.grain,
-      tagCount: r.tag_count,
-      confirmedTagCount: r.confirmed_tag_count,
-      createdAt: (r.created_at instanceof Date ? r.created_at : new Date(r.created_at)).toISOString(),
+      tagCount: r.tagCount ?? 0,
+      confirmedTagCount: r.confirmedTagCount ?? 0,
+      createdAt: toIso(r.createdAt),
     }));
 
     return NextResponse.json({ data: computeLibraryReview(atoms) });

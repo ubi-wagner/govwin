@@ -224,6 +224,41 @@ every background, shape, image, number format, and border you set — exactly as
 
 ---
 
+## 8. The other direction — upload, atomize, and review your library
+
+Building a document is one motion; the **inverse** is just as important: take a document you
+already have and **break it down into reusable pieces**. That's atomization.
+
+1. **Upload.** From **Documents → Upload Document** (or the "Add content" card on your
+   landing), drop a prior proposal, capability statement, deck, or workbook
+   (**pdf · docx · pptx · xlsx · txt · md**). The parser reads real structure — headings,
+   paragraphs, lists, tables — not just flat text.
+2. **Atomize.** Each substantive section becomes a tagged, reusable **atom** in your library,
+   anchored back to the document it came from. Machine-guessed tags land **unconfirmed** (a
+   subtle grey) so they never masquerade as reviewed — you confirm them with a click. Blocks
+   too short to be useful are **reported, not silently dropped** ("skipped 3 short blocks").
+3. **Reuse.** Those atoms are what the Studio and the section drafter build your *next*
+   proposal from, and what you hand-pick with **Insert from Library**.
+
+### Keep the library clean — the Review tab
+
+Over time an uploaded-heavy library accumulates duplicates and half-tagged fragments. The
+**Library → Review** tab is a one-stop cleanup:
+
+- **Duplicates** — near-identical atoms grouped, with a one-click **"archive the extras"**
+  (it keeps the best copy and soft-archives the rest — nothing is deleted).
+- **Quality flags** — **empty**, **too short**, **untagged**, and **unconfirmed-tags** atoms,
+  each with a quick action (archive the junk; the tag-needing ones link back to fix).
+
+Everything is reversible (soft-archive), and every cleanup posts an audit event. In the
+**Library** tab, open any atom to **confirm its machine-guessed tags or add new ones inline**
+— tag values autocomplete from what's already in your library, so they stay consistent.
+
+> *Under the hood:* the Review is a deterministic pass (dedup + quality) you can run any time.
+> The pipeline's `librarian` agent adds richer scoring on top when it runs.
+
+---
+
 ### Where to go next
 
 - [Documents — create, template, export](./documents.md) — the standalone-document hub.

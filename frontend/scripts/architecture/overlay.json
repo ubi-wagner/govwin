@@ -57,6 +57,16 @@
         { "plane": "Data",  "label": "fan out flags per proposal", "table": "proposal_amendment_flags" },
         { "plane": "UI",    "label": "tenant banner" },
         { "plane": "API",   "label": "amendment.acknowledged" }
+      ] },
+    { "id": "F", "name": "Library review (dedup + quality)", "kind": "write", "note": "The deterministic librarian, surfaced (the inverse of blank-canvas build-up): GET …/atoms/review computes duplicate groups + quality flags (empty/tiny/untagged/unconfirmed) over the tenant's active atoms; one-click cleanup soft-archives the extras via the audited archive path. Upstream, atomize now lands machine-guessed tags UNconfirmed so the review signal survives. The pipeline librarian agent's richer scoring layers into the same panel once its output is persisted.",
+      "steps": [
+        { "plane": "UI",     "label": "Library → Review tab" },
+        { "plane": "API",    "label": "GET …/atoms/review" },
+        { "plane": "Domain", "label": "computeLibraryReview() — dedup + flags" },
+        { "plane": "Data",   "label": "active atoms + tag counts", "table": "library_atoms" },
+        { "plane": "API",    "label": "POST …/atoms/[id]/archive (cleanup)" },
+        { "plane": "Event",  "label": "library:atom.archived", "table": "system_events" },
+        { "plane": "UI",     "label": "cleaner library" }
       ] }
   ],
 

@@ -159,6 +159,7 @@ td .mono,th .mono{font-size:.88em}
     <li><a href="#admin">5 · The admin side</a></li>
     <li><a href="#agents">6 · Agents &amp; safety</a></li>
     <li><a href="#export">7 · Export</a></li>
+    <li><a href="#atomize">8 · Atomize &amp; review</a></li>
   </ol>
 </nav>
 
@@ -299,6 +300,27 @@ td .mono,th .mono{font-size:.88em}
   </table></div>
   <p>The <b>compliance floor</b> checks the size ruler as you work and again at export — font, page/slide counts, per-section page budgets, images, header/footer — against what the RFP requires. The gauge in the editor and the export gate share one engine, so they can't disagree; over-budget reads red before you ever hit download. And because the editor and the exporters share one model, the file you download carries every background, shape, image, number format, and border you set — exactly as you saw it.</p>
   <p class="rule foot">Related: <a href="#build">Build a proposal</a> · the in-product guides cover <b>Documents</b>, <b>Proposal build</b>, <b>Library atoms</b>, and <b>Getting started</b>.</p>
+</section>
+
+<section id="atomize">
+  <h2 class="serif"><span class="num">8</span>The other direction — upload, atomize, review</h2>
+  <p>Building a document is one motion; the <b>inverse</b> is just as important — take a document you already have and <b>break it into reusable pieces</b>. That's atomization.</p>
+  <ol>
+    <li><b>Upload</b> a prior proposal, capability statement, deck, or workbook (<span class="mono">pdf · docx · pptx · xlsx · txt · md</span>). The parser reads real structure — headings, paragraphs, lists, tables — not flat text.</li>
+    <li><b>Atomize.</b> Each substantive section becomes a tagged, reusable <b>atom</b>, anchored to its source. Machine-guessed tags land <b>unconfirmed</b> (a subtle grey) so they never masquerade as reviewed; blocks too short to be useful are <b>reported, not silently dropped</b>.</li>
+    <li><b>Reuse.</b> Those atoms are what the Studio + the section drafter build your <em>next</em> proposal from, and what you hand-pick with <b>Insert from Library</b>.</li>
+  </ol>
+  <h3>Keep the library clean — the Review tab</h3>
+  <p>An upload-heavy library accumulates duplicates and half-tagged fragments. <b>Library → Review</b> is one-stop cleanup:</p>
+  <div class="chips">
+    <span class="chip"><b>Duplicates</b> — grouped, one-click "archive the extras" (keeps the best copy)</span>
+    <span class="chip"><b>Quality flags</b> — empty · too short · untagged · unconfirmed</span>
+  </div>
+  <p>Everything is reversible (soft-archive) and every cleanup posts an audit event. In the <b>Library</b> tab, open any atom to <b>confirm its machine-guessed tags or add new ones inline</b> — values autocomplete from what's already in your library, so they stay consistent.</p>
+  <div class="agent">
+    <span class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9M12 3v9l6 3"/></svg>Under the hood</span>
+    <p>The Review is a <b>deterministic</b> pass (dedup + quality) you can run any time. The pipeline's <span class="mono">librarian</span> agent adds richer scoring on top when it runs.</p>
+  </div>
 </section>
 
 </main>

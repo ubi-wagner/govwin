@@ -12,6 +12,13 @@ This is an engineering read of the biggest + cheapest wins, grouped by the atomi
 pipeline stage, tagged by lens (**capability / style / ease-of-use**) and effort
 (**trivial / small / medium / big-bet**). File:line anchors are the fix sites.
 
+> **✅ Shipped 2026-08-11** — the ★ (Library Review) + the six quick wins below are built,
+> tested, and live: `lib/atom-review.ts` (+ tests) → `GET /atoms/review` →
+> `components/portal/library-review.tsx` (the **Review** tab: dedup + quality flags +
+> one-click, audited cleanup); auto-tags now land unconfirmed; the double-archive is
+> collapsed; legacy `.doc/.ppt/.xls` dropped; bulk-tag is a datalist; the detail drawer edits
+> tags inline; atomize reports skipped short blocks. The **big bets** remain open.
+
 ---
 
 ## ★ The one standout — a finished brain that's unplugged
