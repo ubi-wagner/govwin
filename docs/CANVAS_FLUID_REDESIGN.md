@@ -43,7 +43,7 @@ scroll:
 | **F3 · Overlay layers** | Togglable Structure / Provenance (atom·cocoon lineage heatmap) / Compliance overlays over the fluid doc. | planned |
 | **F4 · Multi-target ops** | A selection spanning N sections → regen all N / atomize into N atoms. | planned |
 | **SLIDES-clean** | Slide-frame control (size/ratio/count) + backgrounds + clean discrete WYSIWYG. | **shipped** |
-| **SHEETS-clean** | Continue the fancy-table cleanup (cell styles, formulas). | started (P0.3) |
+| **SHEETS-clean** | Continue the fancy-table cleanup (cell styles, formulas, number formats). | **shipped** |
 
 ## F0 build record
 
