@@ -718,6 +718,27 @@ await sql`SELECT item_number FROM volume_required_items`
 
 **Rule:** Before writing any SQL, look up the table in section 1 above.
 
+### Mistake 1b: snake_case field on a `sql<typeof rows>` result (tsc-blind)
+The READ-side mirror of Mistake 1. Because postgres.js camelCases results, a manual row-type
+assertion whose fields are snake_case **compiles** but reads `undefined` at runtime — tsc trusts
+the assertion, so it can't catch it. Shipped **twice** (Aug 2026): `atoms/review` (`r.created_at`
+→ `new Date(undefined).toISOString()` → "Invalid time value" 500) and `proposals/[p]/document`
+(`r.volume_name` → undefined → every section's volume grouping dropped from the assembled doc).
+
+```typescript
+// WRONG — compiles, undefined at runtime
+let rows: Array<{ created_at: Date; volume_name: string | null }>;
+rows = await sql<typeof rows>`SELECT created_at, volume_name FROM …`;
+new Date(rows[0].created_at)          // undefined → Invalid Date → throws on .toISOString()
+// RIGHT — declare + read camelCase (the SQL text stays snake_case)
+let rows: Array<{ createdAt: Date; volumeName: string | null }>;
+rows = await sql<typeof rows>`SELECT created_at, volume_name FROM …`;
+new Date(rows[0].createdAt)
+```
+
+**Rule:** `sql<typeof rows>` field names are camelCase. When a 500 or an inexplicable `undefined`
+appears in a route, grep it for snake_case property reads off a sql result.
+
 ### Mistake 2: Portal route calling admin endpoint
 The canvas editor page was hard-coded to call `/api/admin/proposals/...`
 even when rendered in the portal context. This bypassed tenant isolation.

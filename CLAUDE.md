@@ -177,6 +177,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.
 
 ## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
+- **camelCase results (`postgres.toCamel`) — the #1 runtime-crash class:** `lib/db.ts` applies
+  `transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } }` to BOTH `sql` and
+  `sqlBypass`, so EVERY row comes back **camelCased** — `created_at`→`createdAt`,
+  `word_count`→`wordCount`, an `AS tag_count` alias→`tagCount`. **Read camelCase in JS**
+  (`r.createdAt`); a snake_case access silently yields `undefined`. The SQL text itself still uses
+  snake_case column names. ⚠️ **The `sql<typeof rows>` trap:** a manual row-type assertion whose
+  fields are declared snake_case COMPILES (tsc trusts the assertion) yet every read is `undefined`
+  at runtime — this shipped **twice this session** (`atoms/review` → `new Date(undefined).toISOString()`
+  → "Invalid time value" 500; `proposals/[p]/document` → `r.volume_name` undefined → every section's
+  volume grouping silently dropped from the assembled doc). Declare the `sql<typeof rows>` field names
+  **camelCase**, matching the runtime, and read them camelCase.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
   On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).
