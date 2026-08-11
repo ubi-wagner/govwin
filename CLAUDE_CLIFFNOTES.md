@@ -1579,7 +1579,8 @@ library_atoms  (RLS FORCE — the greenfield atom store; the SOLE customer libra
   outcome CHECK IN ('pending','awarded','rejected','withdrawn'), outcome_score (REAL), usage_count,
   source CHECK IN ('upload','harvest','download_derivative','manual'),
   cocoon_id (FK document_cocoons), origin_proposal_id, origin_section_id,
-  embedding (vector(1536) — NULL until vectorized),
+  embedding (vector(1536) — DEAD/never-populated; SUPERSEDED by the atom_embeddings table below,
+    which is model-tagged + tenant-RLS'd. Do NOT read/write this inline column; use atom_embeddings.),
   owner_user_id (FK users),
   visibility CHECK IN ('tenant','owner_only','shared_for_proposal','admin_only') DEFAULT 'tenant',
   creator_kind CHECK IN ('admin','ai','collaborator','system','import') DEFAULT 'admin' (mig 102),
@@ -1596,6 +1597,15 @@ atom_members  (PK (group_atom_id, member_atom_id); CHECK group<>member) — a gr
 atom_lineage  (PK (parent_atom_id, child_atom_id); CHECK parent<>child) — parent→child DAG
   parent_atom_id (FK CASCADE), child_atom_id (FK CASCADE),
   relation CHECK IN ('derived_from','reused_from'), created_at
+
+atom_embeddings  (mig 171 — RLS FORCE; the SEMANTIC-retrieval index. One row per atom, GATED +
+                 inert until an engine is on. docs/SEMANTIC_RETRIEVAL.md; lib/embeddings.ts + lib/atom-embed.ts)
+  atom_id (PK, FK library_atoms CASCADE), tenant_id (FK tenants CASCADE),
+  model (engine id: 'voyage-3.5' | 'local-hash-v1' — selectForSection compares ONLY within one model),
+  dim (int), content_hash (sha256(model‖text) — skip re-embed when unchanged),
+  embedding (vector(1024) — both engines emit EMBED_DIM), created_at, updated_at
+  Indexes: (tenant_id), (tenant_id, model), HNSW (embedding vector_cosine_ops).
+  Writes: createAtom post-commit (best-effort) + scripts/embed-atoms.mts backfill. Always via withTenant.
 
 taxonomy_terms  (the ONE curated vocabulary — UNIQUE (dimension, value))
   id, dimension (curated: vol|kind|grain|fmt|dept|agency|program|phase|party_role|access;

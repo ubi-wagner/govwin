@@ -11,6 +11,11 @@ fans EVERY activated opportunity (umbrella + all topics) onto the forward-only
 `opportunity_bridge` → a denormalized `tenant_opportunity_cards` row per tenant, ranked by
 `tenant_spotlight_buckets`/`tenant_bucket_scores` (auto-scored on arrival), and drafted from
 the unified `library_atoms` library (visibility-enforced, taxonomy-tagged, upload→atomize→select).
+Atom retrieval is now **hybrid**: the tag/context selector (`selectForSection`) blends in **semantic
+cosine similarity** off a per-atom pgvector index (`atom_embeddings`, mig 171, tenant-scoped + FORCE-RLS)
+when a **gated** engine is on — Voyage in prod (`VOYAGE_API_KEY`) or a dependency-free local-hash
+embedder (`ATOM_EMBED=local`); **inert by default** → byte-for-byte the pre-vector selector, zero
+regression. Isolation proven at rest · RLS · app-layer (docs/SEMANTIC_RETRIEVAL.md; `lib/embeddings.ts`).
 The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and now **DROPPED**
 (mig 125, alongside 11 other superseded tables; the `library_units` family went in mig 121) —
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
