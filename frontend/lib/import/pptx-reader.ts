@@ -4,6 +4,7 @@ import {
   type CanvasNode,
   type HeadingContent,
   type TextBlockContent,
+  type TableContent,
 } from '@/lib/types/canvas-document';
 import type { ImportResult, ImportedAtom, DocumentMetadata } from './types';
 import { inferCategory, inferCategoryFromFilename } from './types';
@@ -75,6 +76,18 @@ export async function readPptx(
           nodes.push(createNode({
             type: 'text_block',
             content: { text: trimmed } satisfies TextBlockContent,
+            source: 'imported',
+            actorId: SYSTEM_ACTOR.id,
+            actorName: SYSTEM_ACTOR.name,
+          }));
+        }
+
+        // Tables — a deck's data/cost tables (in <p:graphicFrame><a:tbl>) were dropped before;
+        // only <p:sp> text shapes were read. Extract each as a real table node so it atomizes.
+        for (const t of parseSlideTables(slideXml)) {
+          nodes.push(createNode({
+            type: 'table',
+            content: { headers: t.headers, rows: t.rows } satisfies TableContent,
             source: 'imported',
             actorId: SYSTEM_ACTOR.id,
             actorName: SYSTEM_ACTOR.name,
@@ -190,6 +203,50 @@ function parseSlideXml(xml: string): SlideContent {
   }
 
   return { title, bodyParagraphs };
+}
+
+/** Decode the five XML predefined entities in extracted cell text. */
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&'); // last, so "&amp;lt;" doesn't double-decode
+}
+
+/**
+ * Extract every table on a slide. Tables live in
+ * <p:graphicFrame>…<a:graphicData …table><a:tbl> — NOT in <p:sp> — so the text pass misses
+ * them. Rows are <a:tr>, cells <a:tc>, cell text the <a:t> runs. First row → headers, rest →
+ * rows (merged-cell continuations read as empty cells). Exported for unit testing.
+ */
+export function parseSlideTables(xml: string): Array<{ headers: string[]; rows: string[][] }> {
+  const tables: Array<{ headers: string[]; rows: string[][] }> = [];
+  const tblRegex = /<a:tbl\b[^>]*>[\s\S]*?<\/a:tbl>/g;
+  let tblMatch: RegExpExecArray | null;
+  while ((tblMatch = tblRegex.exec(xml)) !== null) {
+    const tblXml = tblMatch[0];
+    const allRows: string[][] = [];
+    const trRegex = /<a:tr\b[^>]*>[\s\S]*?<\/a:tr>/g;
+    let trMatch: RegExpExecArray | null;
+    while ((trMatch = trRegex.exec(tblXml)) !== null) {
+      const cells: string[] = [];
+      const tcRegex = /<a:tc\b[^>]*>[\s\S]*?<\/a:tc>/g;
+      let tcMatch: RegExpExecArray | null;
+      while ((tcMatch = tcRegex.exec(trMatch[0])) !== null) {
+        const runs: string[] = [];
+        const textRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
+        let tMatch: RegExpExecArray | null;
+        while ((tMatch = textRegex.exec(tcMatch[0])) !== null) runs.push(tMatch[1]);
+        cells.push(decodeXmlEntities(runs.join('').trim()));
+      }
+      if (cells.length) allRows.push(cells);
+    }
+    if (allRows.length) {
+      const [headers, ...rows] = allRows;
+      tables.push({ headers, rows });
+    }
+  }
+  return tables;
 }
 
 /**
@@ -315,6 +372,11 @@ function getNodeText(node: CanvasNode): string {
   switch (node.type) {
     case 'heading': return (node.content as HeadingContent).text;
     case 'text_block': return (node.content as TextBlockContent).text;
+    case 'table': {
+      const t = node.content as TableContent;
+      const cell = (c: string | { text?: string }) => (typeof c === 'string' ? c : c?.text ?? '');
+      return [...(t.headers ?? []).map(cell), ...(t.rows ?? []).flat().map(cell)].join(' ');
+    }
     default: return '';
   }
 }

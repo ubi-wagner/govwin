@@ -71,9 +71,12 @@ actions. This single wire-up delivers **dedup, quality-gating, and library de-bl
   `atoms/upload` (single-file, manual hand-select) are different routes with different
   behavior and different UIs (the "Upload package" tab vs the "Atomize" tab). Unify to one
   upload → preview → (auto or hand-pick) flow. *(ease · consistency)*
-- **PPTX loses tables + images on ingest** — only slide title + body text become nodes, so a
-  deck's data tables and figures never make it into atoms. *(capability)* —
-  `lib/import/pptx-reader.ts:63-95`.
+- **PPTX ingest — ✅ tables shipped, images still open.** Slide **tables** (`<p:graphicFrame>
+  <a:tbl>`) now extract into real table nodes (`parseSlideTables`, unit + integration tested),
+  so a deck's cost/data tables become reusable atoms. **Images** (`<p:pic>`) are still dropped —
+  they need S3-upload plumbing on the ingest path (readers are pure buffer→nodes today, and
+  `ImageContent` requires a `storage_key`); that's the remaining, larger piece. *(capability)* —
+  `lib/import/pptx-reader.ts`.
 - **Two overlapping *reuse* surfaces.** `LibraryInsertPanel` (multi-insert) and
   `LibraryPicker` (single-node replace) are separate components with different data shapes;
   `LibraryPicker` even throws the atom's tags away (`library-picker.tsx:66`). Consolidate. *(consistency)*
