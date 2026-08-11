@@ -49,6 +49,19 @@ commit is pushed. Recover: `git fetch origin && git reset --hard origin/<branch>
 `.next/static`+`public`, then `node server.js`; auth on `localhost:3000`, env `AUTH_TRUST_HOST=true` +
 `AUTH_SECRET`). Re-arm the scratchpad heartbeat to keep the box alive during live drives.
 
+**Update 2026-08-11 — one-command recovery + a keep-alive manager (supersedes the PG recipe above
+for the current env):** the sandbox Postgres is now the **system PG16 cluster on :5432** (role
+`govtech`/`changeme`, db `govtech_intel`), NOT `/tmp/pgs_gov:5433`. After a reclaim, run
+**`bash frontend/scripts/rehydrate-sandbox.sh`** — it starts PG, ensures the role+db, runs migrations
+(169/170 self-seed the Foundation demo), builds if the standalone is gone, and stages `static`+`public`.
+Then launch **`frontend/scripts/health-manager.sh`** as a **background task**
+(`SCR=<scratchpad> INTERVAL=60 bash frontend/scripts/health-manager.sh` via run_in_background) — it pings
+server+DB+pad every 60s and auto-restarts the server/PG *within a live VM*. Neither can prevent or survive
+a VM reclaim (that's a platform inactivity behavior, no reserve/pin option — docs/en/claude-code-on-the-web
+"Environment expired"); the manager just flags `needs-rebuild` when one happened so recovery is the two
+commands above, not a re-diagnosis. NB: a server launched from a *foreground* call gets reaped — the manager
+(a persistent background task) is what owns the running server.
+
 **Verified demo accounts:** `kate.ulepic@foundation3dp.com` / `DemoPass123!` (Foundation tenant_admin) ·
 `eric@rfppipeline.com` / `RFPAdmin2026!` (rfp_admin). Foundation TVSF proposal `c3db60b1-…` (submitted/locked;
 `scripts/rebuild-tvsf.mjs` restores it to canonical — run with `NODE_PATH=frontend/node_modules`).
