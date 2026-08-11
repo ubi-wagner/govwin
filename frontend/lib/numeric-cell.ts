@@ -33,3 +33,50 @@ export function isNumericCell(cell: { cell_type?: string; number_format?: string
   if (cell.cell_type && ['number', 'currency', 'percent', 'formula'].includes(cell.cell_type)) return true;
   return !!cell.number_format;
 }
+
+/**
+ * The number-format presets the sheet UI offers. `code` is an Excel format code, so the SAME
+ * value carries straight into the .xlsx export (the xlsx exporter already applies
+ * `cell.number_format` as `numFmt`) — one source of truth, no display-vs-export drift.
+ */
+export const NUMBER_FORMATS: { label: string; code: string }[] = [
+  { label: 'Plain',        code: '' },
+  { label: 'Number 1,000', code: '#,##0' },
+  { label: 'Number 1,000.00', code: '#,##0.00' },
+  { label: 'Currency $',   code: '$#,##0.00' },
+  { label: 'Currency $0',  code: '$#,##0' },
+  { label: 'Percent %',    code: '0%' },
+  { label: 'Percent 0.0%', code: '0.0%' },
+];
+
+/**
+ * Format a numeric value for DISPLAY per a (subset of) Excel format code — the presets above
+ * plus any code shaped like them (`$` → currency, `%` → percent×100, `.00`/`.0` → decimals,
+ * `,` → grouping). Not a full Excel engine; an unknown code falls back to a grouped number so
+ * we never show something worse than the raw value.
+ */
+export function formatByCode(value: number, code: string | undefined): string {
+  if (!code) return String(value);
+  const isPct = code.includes('%');
+  const hasCurrency = code.includes('$');
+  const grouped = code.includes(',');
+  const decimals = /\.0{2,}/.test(code) ? 2 : /\.0/.test(code) ? 1 : 0;
+  const n = isPct ? value * 100 : value;
+  const neg = n < 0;
+  const body = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: grouped,
+  });
+  return `${neg ? '-' : ''}${hasCurrency ? '$' : ''}${body}${isPct ? '%' : ''}`;
+}
+
+/**
+ * The text a table cell should SHOW (read view / grid, not while editing): a number-formatted
+ * cell with a numeric `value` renders formatted; everything else shows its raw `text`.
+ */
+export function formatCellDisplay(cell: { text?: string; number_format?: string; value?: number | null } | string): string {
+  if (typeof cell === 'string') return cell;
+  if (cell.number_format && typeof cell.value === 'number') return formatByCode(cell.value, cell.number_format);
+  return cell.text ?? '';
+}

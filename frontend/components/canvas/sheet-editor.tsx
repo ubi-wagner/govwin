@@ -17,7 +17,7 @@ import type {
   TableCellStyle,
 } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
-import { parseNumericText, isNumericCell } from '@/lib/numeric-cell';
+import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -453,6 +453,40 @@ export function SheetEditor({
     updateCellStyle({ bg });
   }
 
+  // ── Number format (currency / percent / thousands) — lives on the cell (not `style`),
+  // and is the SAME Excel code the .xlsx export writes, so display == export.
+  function getActiveCellNumberFormat(): string {
+    if (!activeCell || !currentSheet) return '';
+    const { row, col } = activeCell;
+    const cv = row === -1 ? currentSheet.content.headers[col] : currentSheet.content.rows[row]?.[col];
+    return cv && typeof cv !== 'string' ? cv.number_format ?? '' : '';
+  }
+
+  function setCellNumberFormat(code: string) {
+    if (!activeCell || !currentSheet || readOnly) return;
+    const { row, col } = activeCell;
+    const patch = (c: string | TableCellType): TableCellType => {
+      const cell: TableCellType = typeof c === 'string' ? { text: c } : { ...c };
+      if (code) {
+        cell.number_format = code;
+        // Ensure there's a numeric value to format (derive from the shown text if needed).
+        if (typeof cell.value !== 'number') { const v = parseNumericText(cell.text); if (v != null) cell.value = v; }
+      } else {
+        delete cell.number_format;
+      }
+      return cell;
+    };
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== currentSheet.nodeId) return n;
+        const tc = n.content as TableContent;
+        if (row === -1) return { ...n, content: { ...tc, headers: tc.headers.map((h, i) => i === col ? patch(h) : h) } };
+        return { ...n, content: { ...tc, rows: tc.rows.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? patch(c) : c) : r) } };
+      }),
+    }));
+  }
+
   // ─── Undo / Redo ───────────────────────────────────────────────────
 
   const handleUndo = useCallback(() => {
@@ -761,6 +795,21 @@ export function SheetEditor({
             <button onClick={() => setCellBg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
           )}
 
+          {/* Number format (per cell) — currency / percent / thousands. */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Number:</label>
+          <select
+            value={getActiveCellNumberFormat()}
+            onChange={(e) => setCellNumberFormat(e.target.value)}
+            disabled={!activeCell}
+            className="text-xs border rounded px-1 py-0.5 disabled:opacity-40"
+            title="Number format (also carried into the .xlsx export)"
+          >
+            {NUMBER_FORMATS.map(f => (
+              <option key={f.label} value={f.code}>{f.label}</option>
+            ))}
+          </select>
+
           {/* Sheet-wide defaults (NOT per-cell) — labelled so they aren't mistaken for the
               per-cell controls beside them. The cell model has no per-cell font size/family. */}
           <span className="w-px h-4 bg-gray-300 mx-1" />
@@ -900,7 +949,7 @@ export function SheetEditor({
                           startEdit(-1, ci, h != null ? cellText(h) : '')
                         }
                       >
-                        {h != null ? cellText(h) : ''}
+                        {h != null ? formatCellDisplay(h) : ''}
                       </span>
                     )}
                   </td>
@@ -965,7 +1014,7 @@ export function SheetEditor({
                             startEdit(ri, ci, c != null ? cellText(c) : '')
                           }
                         >
-                          {c != null ? cellText(c) : ''}
+                          {c != null ? formatCellDisplay(c) : ''}
                         </span>
                       )}
                     </td>

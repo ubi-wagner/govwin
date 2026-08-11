@@ -35,6 +35,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { formatByCode } from '@/lib/numeric-cell';
 
 function esc(s: unknown): string {
   return String(s ?? '')
@@ -161,6 +162,9 @@ function renderList(list: ListContent, ordered: boolean, vars: Record<string, st
 }
 
 function fmtCellValue(c: TableCell): string {
+  // Prefer an explicit Excel number_format (set in the sheet editor + written to the .xlsx),
+  // so pdf/docx match the on-screen + spreadsheet rendering.
+  if (c.number_format && typeof c.value === 'number') return esc(formatByCode(c.value, c.number_format));
   if (c.cell_type === 'currency' && typeof c.value === 'number') {
     return '$' + c.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   }
@@ -176,7 +180,7 @@ function cellStyle(c: TableCell): string {
   if (st.fg) bits.push(`color:${st.fg}`);
   if (st.bold) bits.push('font-weight:700');
   if (st.alignment) bits.push(`text-align:${st.alignment}`);
-  if (c.cell_type === 'currency' || c.cell_type === 'number' || c.cell_type === 'percent') bits.push('text-align:right');
+  if (c.number_format || c.cell_type === 'currency' || c.cell_type === 'number' || c.cell_type === 'percent') bits.push('text-align:right');
   return ` style="${bits.join(';')}"`;
 }
 

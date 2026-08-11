@@ -38,7 +38,7 @@ import type {
 } from '@/lib/types/canvas-document';
 import { estimatePageCount, estimateSlideCount } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
-import { parseNumericText, isNumericCell } from '@/lib/numeric-cell';
+import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 
@@ -1298,7 +1298,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
             {row.map((c, ci) => {
               const cell = resolveTableCell(c);
               const styleProps = tableCellStyleProps(cell.style);
-              return (<td key={ci} className={cellBorder} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{cell.text}</td>);
+              return (<td key={ci} className={cellBorder} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{formatCellDisplay(cell)}</td>);
             })}
           </tr>
         ))}
