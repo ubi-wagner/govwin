@@ -111,8 +111,12 @@ actions. This single wire-up delivers **dedup, quality-gating, and library de-bl
   **self-hosted in `/public/pdfjs`** and loaded via a `webpackIgnore` native import (webpack's ESM
   interop crashes on pdfjs `pdf.mjs`; and pdfjs 5.6 needs a `Map` method the sandbox Chromium
   lacks — so we pin react-pdf's **5.4.296** build + cmaps + standard-fonts). `capture-atomizer.tsx`.
-  Still open: box-select *inside* the document-atomize (checkbox) flow (`atomizer.tsx`), and
-  **machine-proposed** boxes / un-extractable-content flags (BOX-2 / BOX-3).
+  **✅ The machine now helps too:** it **proposes** regions (BOX-2 — a "✨ Suggest regions" button
+  that pre-populates figure/table boxes the human confirms; vision-gated, deterministic demo-seeded
+  via `/atoms/propose-regions` since this LLM is noop, drop-in for a real detector), and it **flags
+  what it couldn't read** (BOX-3, above) and routes you here. Still open: box-select *inside* the
+  document-atomize (checkbox) flow (`atomizer.tsx`), and wiring a real **vision** model behind the
+  proposer. `lib/propose-regions.ts`, `components/portal/capture-atomizer.tsx`.
 - **Semantic/vector reuse ranking.** Selection ranking is pre-vector — tag overlap +
   `content ILIKE` (`lib/atoms.ts:249,262`) — so it misses paraphrases. Embeddings would make
   reuse actually find the right prior content.

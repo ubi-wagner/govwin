@@ -148,6 +148,34 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
     if (hasFrame && src && dst) { dst.width = dims.w; dst.height = dims.h; dst.getContext('2d')?.drawImage(src, 0, 0); }
   }, [hasFrame, frameVersion, dims.w, dims.h]);
 
+  // ── BOX-2: let the machine draw the boxes ──────────────────────────────────
+  // Ask the vision-gated proposer for regions and PRE-POPULATE them as boxes. Advisory: they're
+  // ordinary editable boxes — the human adjusts/removes and confirms before Atomize writes anything.
+  const suggest = useCallback(async () => {
+    if (!hasFrame || busy) return;
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/propose-regions`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ width: dims.w, height: dims.h }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Could not propose regions');
+      const proposed: Array<{ x: number; y: number; w: number; h: number; title: string; kind: string }> = json.data?.regions ?? [];
+      if (proposed.length === 0) { setMsg('No regions suggested for this frame.'); return; }
+      const added: Box[] = proposed.map((r, i) => ({
+        id: `box_ai_${i}_${Math.round(r.x)}_${Math.round(r.y)}`,
+        x: r.x, y: r.y, w: r.w, h: r.h, title: r.title,
+        tags: r.kind ? [{ dimension: 'kind', value: r.kind }] : [],
+      }));
+      setBoxes((b) => [...b.filter((x) => x.id !== '__draft'), ...added]);
+      setActive(added[0]?.id ?? null);
+      setMsg(`Suggested ${added.length} region(s) — review, adjust, then Atomize.`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not propose regions');
+    } finally { setBusy(false); }
+  }, [hasFrame, busy, dims.w, dims.h, tenantSlug]);
+
   // ── Box drawing on the frozen frame ────────────────────────────────────────
   const toCanvasCoords = (e: React.MouseEvent) => {
     const el = overlayRef.current!; const r = el.getBoundingClientRect();
@@ -258,6 +286,11 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
               <span>Drag to box a region · {realBoxes.length} region(s)</span>
+              <button onClick={suggest} disabled={busy}
+                className="rounded bg-violet-600 px-2 py-0.5 font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                title="Let the machine propose figure/table regions to confirm">
+                {busy ? 'Suggesting…' : '✨ Suggest regions'}
+              </button>
               {pdfPages > 1 && (
                 <span className="flex items-center gap-1.5">
                   <button onClick={() => goPdfPage(pdfPage - 1)} disabled={busy || pdfPage <= 1}
