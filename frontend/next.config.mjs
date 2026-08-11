@@ -23,7 +23,12 @@ const securityHeaders = [
 
 const nextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['postgres', 'bcryptjs', 'mammoth', 'pdf-parse', 'pdfjs-dist', '@napi-rs/canvas', 'googleapis'],
+  serverExternalPackages: ['postgres', 'bcryptjs', 'mammoth', 'pdf-parse', 'pdfjs-dist', '@napi-rs/canvas', 'googleapis', 'tesseract.js'],
+  // tesseract.js loads its core wasm + our OCR language data by PATH at runtime (not via require),
+  // so Next's tracer misses them — force them into the standalone so OCR works on any deploy.
+  outputFileTracingIncludes: {
+    '/api/portal/[tenantSlug]/atoms/capture': ['./node_modules/tesseract.js-core/**/*', './ocr-data/**/*'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',

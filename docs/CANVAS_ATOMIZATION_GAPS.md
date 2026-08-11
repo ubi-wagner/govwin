@@ -114,9 +114,13 @@ actions. This single wire-up delivers **dedup, quality-gating, and library de-bl
   **✅ The machine now helps too:** it **proposes** regions (BOX-2 — a "✨ Suggest regions" button
   that pre-populates figure/table boxes the human confirms; vision-gated, deterministic demo-seeded
   via `/atoms/propose-regions` since this LLM is noop, drop-in for a real detector), and it **flags
-  what it couldn't read** (BOX-3, above) and routes you here. Still open: box-select *inside* the
+  what it couldn't read** (BOX-3, above) and routes you here. And it **reads the boxed image back**
+  (ENRICH — every crop is OCR'd on create, its text written into the atom's content + summary, so a
+  boxed cost table is searchable by a human AND legible to the reuse ranker / AI drafter instead of
+  being a content-less picture; TESSERACT engine, no API key, model self-hosted in `ocr-data/`,
+  vision-caption the drop-in upgrade — `lib/atom-enrich.ts`). Still open: box-select *inside* the
   document-atomize (checkbox) flow (`atomizer.tsx`), and wiring a real **vision** model behind the
-  proposer. `lib/propose-regions.ts`, `components/portal/capture-atomizer.tsx`.
+  proposer/enricher. `lib/propose-regions.ts`, `lib/atom-enrich.ts`, `components/portal/capture-atomizer.tsx`.
 - **Semantic/vector reuse ranking.** Selection ranking is pre-vector — tag overlap +
   `content ILIKE` (`lib/atoms.ts:249,262`) — so it misses paraphrases. Embeddings would make
   reuse actually find the right prior content.
