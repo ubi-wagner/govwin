@@ -17,7 +17,16 @@ pipeline stage, tagged by lens (**capability / style / ease-of-use**) and effort
 > `components/portal/library-review.tsx` (the **Review** tab: dedup + quality flags +
 > one-click, audited cleanup); auto-tags now land unconfirmed; the double-archive is
 > collapsed; legacy `.doc/.ppt/.xls` dropped; bulk-tag is a datalist; the detail drawer edits
-> tags inline; atomize reports skipped short blocks. The **big bets** remain open.
+> tags inline; atomize reports skipped short blocks.
+>
+> **✅ Also shipped (follow-up)** — **preview-before-atomize**: the drop card no longer writes
+> on drop; a dry-run (`atomize-package?preview=1`) shows exactly what would be created (title +
+> word count per atom, short blocks skipped) and you **confirm** before anything lands. Shared
+> `planDocumentAtomization` (pure, unit-tested) is the single brain behind preview + commit, so
+> the preview can't lie. Live-verified (drop → "Ready to atomize — 2 atoms · skipped 1" →
+> Create → +3 rows, one `package.atomized` event). A `toCamel` row-mapping sweep also fixed a
+> latent bug in the whole-proposal document assembly (`document/route.ts` read `r.volume_name`
+> → undefined → volume grouping dropped). The **big bets** remain open.
 
 ---
 
@@ -53,10 +62,11 @@ actions. This single wire-up delivers **dedup, quality-gating, and library de-bl
 
 ## Atomization — bigger, still-tractable (medium)
 
-- **Preview/confirm before auto-atomizing on drop.** The "Add content" card writes atoms to
-  the library **the instant you drop a file** — zero preview, no undo before creation. Route
-  the drop through the block-preview the `/atoms/upload` path *already returns*, so you see
-  what will be created first. *(ease)* — `components/portal/upload-atomize-card.tsx:35`.
+- ✅ **Shipped** — **Preview/confirm before auto-atomizing on drop.** The "Add content" card
+  used to write atoms the instant you drop a file. It now runs a dry-run
+  (`atomize-package?preview=1`) and shows the exact plan (per-atom title + word count, short
+  blocks skipped) for you to **confirm or cancel** before anything lands —
+  `components/portal/upload-atomize-card.tsx` + `lib/atomize-package.ts` (`planDocumentAtomization`).
 - **Two overlapping upload paths.** `atomize-package` (multi-file, auto, immediate) vs
   `atoms/upload` (single-file, manual hand-select) are different routes with different
   behavior and different UIs (the "Upload package" tab vs the "Atomize" tab). Unify to one
