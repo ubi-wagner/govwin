@@ -62,6 +62,15 @@ a VM reclaim (that's a platform inactivity behavior, no reserve/pin option — d
 commands above, not a re-diagnosis. NB: a server launched from a *foreground* call gets reaped — the manager
 (a persistent background task) is what owns the running server.
 
+**Object storage in the sandbox (image atoms / capture / export):** Railway's R2 isn't linked
+here, so the frontend runs the **local storage driver** — `STORAGE_DRIVER=local` +
+`LOCAL_STORAGE_DIR=/tmp/govwin-storage` + `AWS_S3_BUCKET_NAME=rfp-pipeline-local` (the health-manager's
+`start_server` already sets these). `lib/storage/s3-client.ts` then backs the SAME
+`putObject`/`getSignedGetUrl`/… calls with the filesystem (`<dir>/<bucket>/<key>`), and signed URLs
+resolve to the gated `GET/PUT /api/storage/local/<key>` route — so uploads, box-capture image atoms,
+and export image-inlining all work end-to-end. Prod (no flag) is unchanged (real R2). Verify with
+`frontend/scripts/verify-local-storage.mts` (driver) + `verify-storage-server.mts` (upload→serve).
+
 **Verified demo accounts:** `kate.ulepic@foundation3dp.com` / `DemoPass123!` (Foundation tenant_admin) ·
 `eric@rfppipeline.com` / `RFPAdmin2026!` (rfp_admin). Foundation TVSF proposal `c3db60b1-…` (submitted/locked;
 `scripts/rebuild-tvsf.mjs` restores it to canonical — run with `NODE_PATH=frontend/node_modules`).
