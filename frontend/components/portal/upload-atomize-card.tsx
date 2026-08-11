@@ -12,7 +12,9 @@
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 
-const ALLOWED = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md', 'xlsx'];
+// Only the modern OOXML formats parse cleanly; legacy .doc/.ppt/.xls are dropped rather than
+// advertised-then-silently-emptied (the parser reads OOXML only).
+const ALLOWED = ['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'md'];
 const ACCEPT = ALLOWED.map((e) => `.${e}`).join(',');
 
 type Result = { filesProcessed?: number; totalAtoms?: number } | null;

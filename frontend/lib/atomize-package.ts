@@ -80,7 +80,7 @@ export function contextTags(ctx: Record<string, unknown>): AtomTagInput[] {
   return out;
 }
 
-export interface DocAtomizeResult { file: string; format: string; atoms: number; cocoonId: string | null; reference?: boolean; error?: string }
+export interface DocAtomizeResult { file: string; format: string; atoms: number; skipped?: number; cocoonId: string | null; reference?: boolean; error?: string }
 
 /**
  * Atomize a single uploaded document into the library. Best-effort per step —
@@ -128,16 +128,19 @@ export async function atomizeDocumentIntoLibrary(
 
   // 3) Auto-atomize each substantive block into a tagged, anchored primitive.
   let made = 0;
+  let skipped = 0; // substantive-looking blocks dropped for being under MIN_ATOM_WORDS — surfaced, not silent.
   for (let i = 0; i < parsed.atoms.length && made < MAX_ATOMS_PER_DOC; i++) {
     const a = parsed.atoms[i];
     const text = cleanText(textOfNodes(a.nodes)).trim();
-    if (!text || text.split(/\s+/).length < MIN_ATOM_WORDS) continue;
+    if (!text || text.split(/\s+/).length < MIN_ATOM_WORDS) { if (text) skipped++; continue; }
     const vol = CATEGORY_TO_VOL[a.suggestedCategory];
     const kind = CATEGORY_TO_KIND[a.suggestedCategory] ?? 'narrative';
+    // Machine-guessed tags land UNconfirmed (a human confirms in the Library) — so auto guesses
+    // don't masquerade as reviewed. The uploader's own context tags (ctxTags) keep their setting.
     const tags: AtomTagInput[] = [
-      { dimension: 'kind', value: kind, source: 'auto', confirmed: true },
-      { dimension: 'fmt', value: fmt, source: 'auto', confirmed: true },
-      ...(vol ? [{ dimension: 'vol', value: vol, source: 'auto' as const, confirmed: true }] : []),
+      { dimension: 'kind', value: kind, source: 'auto', confirmed: false },
+      { dimension: 'fmt', value: fmt, source: 'auto', confirmed: false },
+      ...(vol ? [{ dimension: 'vol', value: vol, source: 'auto' as const, confirmed: false }] : []),
       ...ctxTags,
     ];
     try {
@@ -152,5 +155,5 @@ export async function atomizeDocumentIntoLibrary(
       made++;
     } catch (e) { console.error('[atomize-package] primitive create failed', filename, i, e); }
   }
-  return { file: filename, format: parsed.sourceFormat, atoms: made, cocoonId, reference: !!referenceId };
+  return { file: filename, format: parsed.sourceFormat, atoms: made, skipped, cocoonId, reference: !!referenceId };
 }

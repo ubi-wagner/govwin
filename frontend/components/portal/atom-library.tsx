@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Atom library — browse/curate the tenant's atoms: filter by tag/status/grain,
@@ -49,6 +49,9 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const [groupTitle, setGroupTitle] = useState('');
   const [bulkTagDim, setBulkTagDim] = useState('agency');
   const [bulkTagVal, setBulkTagVal] = useState('');
+  // Detail-drawer inline add-tag form.
+  const [dTagDim, setDTagDim] = useState('vol');
+  const [dTagVal, setDTagVal] = useState('');
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AtomDetail | null>(null);
@@ -89,6 +92,36 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
       const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
       if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? `Could not ${action} atom`); return; }
       setSel((p) => { const n = new Set(p); n.delete(id); return n; });
+      await load();
+    } catch { setErr('Network error'); } finally { setBusy(false); }
+  }, [tenantSlug, load]);
+
+  // Existing tag values per dimension (from the loaded atoms) — drives the bulk-tag + drawer
+  // suggestions so values stay consistent (no "Navy" / "navy" / "US Navy" drift).
+  const tagVocab = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    const seen: Record<string, Set<string>> = {};
+    for (const a of atoms) for (const t of a.tags ?? []) {
+      const i = t.indexOf(':'); if (i <= 0) continue;
+      const d = t.slice(0, i), v = t.slice(i + 1);
+      (seen[d] ??= new Set()); if (!seen[d].has(v)) { seen[d].add(v); (m[d] ??= []).push(v); }
+    }
+    return m;
+  }, [atoms]);
+
+  // Add / confirm one taxonomy tag on a single atom (reuses the audited bulk route). Used by the
+  // detail drawer to confirm machine-guessed tags + add missing ones inline.
+  const tagAtom = useCallback(async (atomId: string, dimension: string, value: string) => {
+    if (!value.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/bulk`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ atomIds: [atomId], addTag: { dimension, value: value.trim() } }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not tag'); return; }
+      const d = await fetch(`/api/portal/${tenantSlug}/atoms/${atomId}`);
+      if (d.ok) setDetail((await d.json()).data?.atom as AtomDetail);
       await load();
     } catch { setErr('Network error'); } finally { setBusy(false); }
   }, [tenantSlug, load]);
@@ -193,7 +226,7 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
             <select value={bulkTagDim} onChange={(e) => setBulkTagDim(e.target.value)} className="border border-indigo-200 rounded px-2 py-1.5 text-xs bg-white">
               {['agency', 'program', 'phase', 'tech', 'dept', 'kind', 'vol'].map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
-            <input value={bulkTagVal} onChange={(e) => setBulkTagVal(e.target.value)} placeholder="tag value (e.g. Navy)" className="border border-indigo-200 rounded px-2 py-1 text-xs w-40" />
+            <input value={bulkTagVal} onChange={(e) => setBulkTagVal(e.target.value)} list={`vocab-${bulkTagDim}`} placeholder="tag value (e.g. Navy)" className="border border-indigo-200 rounded px-2 py-1 text-xs w-40" />
             <button onClick={() => bulkCurate({ addTag: { dimension: bulkTagDim, value: bulkTagVal.trim() } })} disabled={busy || !bulkTagVal.trim()} className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded px-3 py-1.5 disabled:opacity-50">Tag all</button>
           </div>
           {/* Compose a new group atom from the selection (needs ≥2). */}
@@ -206,6 +239,11 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
           )}
         </div>
       )}
+
+      {/* Tag-value suggestions per dimension (shared by the bulk bar + the detail drawer). */}
+      {['agency', 'program', 'phase', 'tech', 'dept', 'kind', 'vol'].map((d) => (
+        <datalist id={`vocab-${d}`} key={d}>{(tagVocab[d] ?? []).map((v) => <option key={v} value={v} />)}</datalist>
+      ))}
 
       <div className="space-y-2">
         {atoms.map((a) => {
@@ -247,25 +285,38 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                   <button onClick={() => softArchive(a.id, 'restore')} disabled={busy} className="text-xs font-medium text-indigo-700 border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-50 disabled:opacity-50">Restore</button>
                 ) : (
                   // Active view: the soft-archive (archived_at) — hides from library + drafting, reversible.
+                  // (One archive concept only — the redundant curation-status 'archive' button was removed.)
                   <button onClick={() => softArchive(a.id, 'archive')} disabled={busy} title="Archive — hide from the active library and from drafting (reversible)" className="text-[10px] font-medium text-gray-400 hover:text-amber-600 disabled:opacity-50">Archive</button>
                 )}
-                {!showArchived && a.status !== 'archived' && <button onClick={() => setStatusOf(a.id, 'archived')} disabled={busy} title="Set curation status to 'archived' (the atom stays listed in the library)" className="text-[10px] text-gray-300 hover:text-rose-600">status: archive</button>}
               </div>
             </div>
             {openId === a.id && (
               <div className="border-t border-gray-100 px-3 py-3 bg-gray-50 text-xs space-y-2">
                 {!detail ? <p className="text-gray-400">Loading…</p> : (
                   <>
-                    {detail.tags.length > 0 && (
-                      <div>
-                        <span className="text-gray-400">tags: </span>
-                        {detail.tags.map((t, i) => (
-                          <span key={i} className={`inline-block mr-1 mb-1 rounded px-1.5 py-0.5 ${t.confirmed ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
-                            {t.dimension}:{t.value}{t.isOther ? '*' : ''}
-                          </span>
-                        ))}
+                    <div>
+                      <span className="text-gray-400">tags: </span>
+                      {detail.tags.length === 0 && <span className="text-gray-400 italic">none — add one below</span>}
+                      {detail.tags.map((t, i) => (
+                        <button
+                          key={i}
+                          onClick={() => { if (!t.confirmed) tagAtom(detail.id, t.dimension, t.value); }}
+                          disabled={t.confirmed || busy}
+                          title={t.confirmed ? 'confirmed' : 'click to confirm this machine-guessed tag'}
+                          className={`inline-block mr-1 mb-1 rounded px-1.5 py-0.5 ${t.confirmed ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500 hover:bg-emerald-100 hover:text-emerald-700 cursor-pointer'}`}
+                        >
+                          {t.dimension}:{t.value}{t.isOther ? '*' : ''}{!t.confirmed && ' ✓?'}
+                        </button>
+                      ))}
+                      {/* Inline add-tag (reuses the audited bulk route). */}
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <select value={dTagDim} onChange={(e) => setDTagDim(e.target.value)} className="border border-gray-200 rounded px-1 py-0.5 text-[11px] bg-white">
+                          {['agency', 'program', 'phase', 'tech', 'dept', 'kind', 'vol'].map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <input value={dTagVal} onChange={(e) => setDTagVal(e.target.value)} list={`vocab-${dTagDim}`} placeholder="value" className="border border-gray-200 rounded px-1 py-0.5 text-[11px] w-28" />
+                        <button onClick={() => { tagAtom(detail.id, dTagDim, dTagVal); setDTagVal(''); }} disabled={busy || !dTagVal.trim()} className="text-[11px] text-indigo-600 hover:underline disabled:opacity-40">+ add</button>
                       </div>
-                    )}
+                    </div>
                     {(detail.parents.length > 0 || detail.children.length > 0) && (
                       <div className="text-gray-500">
                         {detail.parents.length > 0 && <div>↖ derived from: {detail.parents.map((p) => p.title || 'atom').join(', ')}</div>}
