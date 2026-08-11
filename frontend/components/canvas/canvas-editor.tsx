@@ -905,6 +905,26 @@ function CanvasEditorInner({
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
   }, [proposalId, handleReviseNode]);
 
+  /** Annotate a highlighted span — attach a note (comment) to THIS section, quoting the span. */
+  const selectionAnnotate = useCallback(async (sel: CanvasSelection) => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    const note = typeof window !== 'undefined' ? window.prompt(`Add a note on “${selectionLabel(sel)}”:`) : null;
+    if (!note || !note.trim()) return;
+    const snippet = sel.text.slice(0, 140) + (sel.text.length > 140 ? '…' : '');
+    setSelBusy(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: sectionId, text: `“${snippet}” — ${note.trim()}` }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) toast.success('Note added to this section.');
+      else toast.error(j?.error ?? 'Could not add the note.');
+    } catch { toast.error('Could not add the note.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [tenantSlug, proposalId, sectionId]);
+
   const railAcceptAll = useCallback(async () => {
     const pending = atomItems.filter((i) => i.status !== 'approved');
     for (const it of pending) {
@@ -1122,6 +1142,7 @@ function CanvasEditorInner({
             busy={selBusy}
             onAtomize={tenantSlug && proposalId && sectionId ? selectionAtomize : undefined}
             onRegenerate={proposalId ? selectionRegenerate : undefined}
+            onAnnotate={tenantSlug && proposalId && sectionId ? selectionAnnotate : undefined}
           />
         )}
       </div>

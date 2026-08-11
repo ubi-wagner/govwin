@@ -39,7 +39,7 @@ scroll:
 |---|---|---|
 | **F0 · Selection spine + first actions** | `data-node-id` anchors + `selectionToModel` (Range→model, pure, unit-tested) + a floating `SelectionToolbar` + the actions **Atomize** (span → library atom w/ lineage) and **Regenerate** (AI re-draft the spanned nodes). | **in progress** |
 | **F1 · Fluid document view** | Continuous scroll render of the whole document (all sections inline), page *markers* not boxes, sections as boundary chips + a left outline rail. Opt-in "Document view". | **shipped** |
-| **F2 · Selection actions ++** | Annotate/comment on a span, Reuse-from-library, Compliance-check-this. | planned |
+| **F2 · Selection actions ++** | **Annotate/comment on a span shipped** (→ the owning section's comments, quoting the span; fluid view + section editor). Reuse-from-library, Compliance-check-this still planned. | in progress |
 | **F3 · Overlay layers** | Togglable Structure / Provenance (atom·cocoon lineage heatmap) / Compliance overlays over the fluid doc. | planned |
 | **F4 · Multi-target ops** | A selection spanning N sections → regen all N / atomize into N atoms. | planned |
 | **SLIDES-clean** | Slide-frame control (size/ratio/count) + backgrounds + clean discrete WYSIWYG. | **shipped** |

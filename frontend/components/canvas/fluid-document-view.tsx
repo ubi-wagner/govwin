@@ -112,6 +112,33 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
     [sectionOf, tenantSlug, proposalId],
   );
 
+  const selectionAnnotate = useCallback(
+    async (sel: CanvasSelection) => {
+      const owner = sectionOf[sel.nodeIds[0]];
+      if (!owner) { toast.error('Could not resolve the section for this selection.'); return; }
+      const note = typeof window !== 'undefined' ? window.prompt(`Add a note on “${selectionLabel(sel)}”:`) : null;
+      if (!note || !note.trim()) return;
+      const snippet = sel.text.slice(0, 140) + (sel.text.length > 140 ? '…' : '');
+      setSelBusy(true);
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: owner.id, text: `“${snippet}” — ${note.trim()}` }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok) toast.success(`Note added to “${owner.title}”.`);
+        else toast.error(j?.error ?? 'Could not add the note.');
+      } catch {
+        toast.error('Could not add the note.');
+      } finally {
+        setSelBusy(false);
+        window.getSelection()?.removeAllRanges();
+      }
+    },
+    [sectionOf, tenantSlug, proposalId],
+  );
+
   return (
     <div className="flex gap-4 h-full min-h-0">
       {/* Outline rail */}
@@ -155,7 +182,7 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
           variables={variables}
           readOnly
         />
-        {canAct && <SelectionToolbar doc={doc} busy={selBusy} onAtomize={selectionAtomize} />}
+        {canAct && <SelectionToolbar doc={doc} busy={selBusy} onAtomize={selectionAtomize} onAnnotate={selectionAnnotate} />}
       </div>
     </div>
   );
