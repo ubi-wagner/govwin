@@ -18,6 +18,7 @@ import type {
 } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
 import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
+import { SheetMediaStrip } from './sheet-media-strip';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -93,6 +94,13 @@ function colLetter(index: number): string {
     n = Math.floor(n / 26) - 1;
   }
   return result;
+}
+
+/** Per-cell border override for the grid (the base class draws a thin grid line). */
+function borderCss(border?: 'none' | 'thin' | 'thick'): React.CSSProperties {
+  if (border === 'none') return { borderColor: 'transparent' };
+  if (border === 'thick') return { borderWidth: 2, borderColor: '#334155' };
+  return {};
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -377,6 +385,31 @@ export function SheetEditor({
     }
   }, [sheets, readOnly, updateDoc, activeSheet]);
 
+  // ── Media (images + shapes) — a workbook logo / figure / shape. The xlsx exporter
+  // already renders image + shape nodes as floating pictures; these add/remove them.
+  const handleAddImageNode = useCallback((storageKey: string, w: number, h: number, alt: string) => {
+    const newNode = createNode({
+      type: 'image',
+      content: { storage_key: storageKey, width: Math.min(w, 480), height: Math.min(h, 360), alt_text: alt } as unknown as CanvasNode['content'],
+      source: 'manual', actorId, actorName,
+    });
+    updateDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+  }, [updateDoc, actorId, actorName]);
+
+  const handleAddShapeNode = useCallback(() => {
+    const newNode = createNode({
+      type: 'shape',
+      content: { shape: 'rectangle', text: '' } as unknown as CanvasNode['content'],
+      style: { fill: { color: '#DCE6F1' }, border: { color: '#94A3B8', width: 1 } } as unknown as CanvasNode['style'],
+      source: 'manual', actorId, actorName,
+    });
+    updateDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+  }, [updateDoc, actorId, actorName]);
+
+  const handleDeleteMediaNode = useCallback((nodeId: string) => {
+    updateDoc((prev) => ({ ...prev, nodes: prev.nodes.filter((n) => n.id !== nodeId) }));
+  }, [updateDoc]);
+
   const commitSheetRename = useCallback((sheetIndex: number, newName: string) => {
     const sheet = sheets[sheetIndex];
     if (!sheet || !newName.trim()) return;
@@ -451,6 +484,14 @@ export function SheetEditor({
 
   function setCellBg(bg: string | undefined) {
     updateCellStyle({ bg });
+  }
+
+  function setCellFg(fg: string | undefined) {
+    updateCellStyle({ fg });
+  }
+
+  function setCellBorder(border: TableCellStyle['border']) {
+    updateCellStyle({ border });
   }
 
   // ── Number format (currency / percent / thousands) — lives on the cell (not `style`),
@@ -795,6 +836,36 @@ export function SheetEditor({
             <button onClick={() => setCellBg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
           )}
 
+          {/* Text color (fg) */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500 flex items-center gap-1">A
+            <input
+              type="color"
+              value={getActiveCellStyle()?.fg || '#111827'}
+              onChange={(e) => setCellFg(e.target.value)}
+              className="w-6 h-6 border rounded cursor-pointer"
+              title="Text color"
+            />
+          </label>
+          {getActiveCellStyle()?.fg && (
+            <button onClick={() => setCellFg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
+          )}
+
+          {/* Border (per cell) */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Border:</label>
+          <select
+            value={getActiveCellStyle()?.border ?? 'thin'}
+            onChange={(e) => setCellBorder(e.target.value as TableCellStyle['border'])}
+            disabled={!activeCell}
+            className="text-xs border rounded px-1 py-0.5 disabled:opacity-40"
+            title="Cell border (also exported to .xlsx)"
+          >
+            <option value="none">None</option>
+            <option value="thin">Thin</option>
+            <option value="thick">Thick</option>
+          </select>
+
           {/* Number format (per cell) — currency / percent / thousands. */}
           <span className="w-px h-4 bg-gray-300 mx-1" />
           <label className="text-[10px] text-gray-500">Number:</label>
@@ -854,6 +925,15 @@ export function SheetEditor({
           </select>
         </div>
       )}
+
+      {/* ── Media strip (images + shapes) ── */}
+      <SheetMediaStrip
+        nodes={doc.nodes}
+        readOnly={readOnly}
+        onAddImage={handleAddImageNode}
+        onAddShape={handleAddShapeNode}
+        onDelete={handleDeleteMediaNode}
+      />
 
       {/* ── Grid ── */}
       <div className="flex-1 overflow-auto">
@@ -916,8 +996,10 @@ export function SheetEditor({
                     }`}
                     style={{
                       backgroundColor: !isActive && typeof h !== 'string' && h?.style?.bg ? h.style.bg : undefined,
+                      color: typeof h !== 'string' && h?.style?.fg ? h.style.fg : undefined,
                       fontWeight: typeof h !== 'string' && h?.style?.bold ? 'bold' : undefined,
                       textAlign: typeof h !== 'string' ? h?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
+                      ...(typeof h !== 'string' ? borderCss(h?.style?.border) : {}),
                     }}
                     onClick={() => setActiveCell({ row: -1, col: ci })}
                     onKeyDown={(e) => handleCellKeyDown(e, -1, ci)}
@@ -981,8 +1063,10 @@ export function SheetEditor({
                       }`}
                       style={{
                         backgroundColor: !isActive && typeof c !== 'string' && c?.style?.bg ? c.style.bg : undefined,
+                        color: typeof c !== 'string' && c?.style?.fg ? c.style.fg : undefined,
                         fontWeight: typeof c !== 'string' && c?.style?.bold ? 'bold' : undefined,
                         textAlign: typeof c !== 'string' ? c?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
+                        ...(typeof c !== 'string' ? borderCss(c?.style?.border) : {}),
                       }}
                       onClick={() => setActiveCell({ row: ri, col: ci })}
                       onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}

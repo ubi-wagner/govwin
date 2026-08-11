@@ -1123,8 +1123,11 @@ function tableCellStyleProps(style?: TableCellStyle, fallback?: TableCellStyle):
   const merged = { ...fallback, ...style };
   return {
     backgroundColor: merged.bg ?? undefined,
+    color: merged.fg ?? undefined,
     fontWeight: merged.bold ? 'bold' : undefined,
     textAlign: merged.alignment ?? undefined,
+    ...(merged.border === 'none' ? { borderColor: 'transparent' }
+      : merged.border === 'thick' ? { borderWidth: 2, borderColor: '#334155' } : {}),
   };
 }
 

@@ -175,7 +175,11 @@ function fmtCellValue(c: TableCell): string {
 
 function cellStyle(c: TableCell): string {
   const st = c.style ?? {};
-  const bits = ['border:1px solid #cbd5e1', 'padding:4px 8px'];
+  // Per-cell border: 'none' → no rule; 'thick' → a heavier rule; default → thin.
+  const bdr = st.border === 'none' ? 'border:0'
+    : st.border === 'thick' ? 'border:2px solid #334155'
+    : 'border:1px solid #cbd5e1';
+  const bits = [bdr, 'padding:4px 8px'];
   if (st.bg) bits.push(`background:${st.bg}`);
   if (st.fg) bits.push(`color:${st.fg}`);
   if (st.bold) bits.push('font-weight:700');

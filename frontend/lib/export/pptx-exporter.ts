@@ -90,11 +90,13 @@ function transparencyOf(opacity?: number): number | undefined {
   if (opacity == null) return undefined;
   return Math.round((1 - Math.max(0, Math.min(1, opacity))) * 100);
 }
-/** node.style.fill → a pptx shape fill (color + transparency), or undefined if none. */
+/** node.style.fill → a pptx shape fill (color + transparency), or undefined if none.
+ *  Whole-node `style.opacity` acts as a fallback for fill transparency (pptx shapes have no
+ *  single whole-shape opacity), so a shape/box set to 50% exports with a 50%-transparent fill. */
 function fillFrom(style: NodeStyle): PptxGenJS.ShapeFillProps | undefined {
   const color = hex(style.fill?.color);
   if (!color) return undefined;
-  const t = transparencyOf(style.fill?.opacity);
+  const t = transparencyOf(style.fill?.opacity ?? style.opacity);
   return { color, ...(t != null ? { transparency: t } : {}) };
 }
 /** node.style.border → a pptx line spec (color/width/dash + transparency), or undefined. */
@@ -391,16 +393,31 @@ function addNodeToSlide(
       const r = raster.get(node);
       const alt = (node.content as { alt_text?: string })?.alt_text ?? 'image';
       const capText = (node.content as { caption?: string })?.caption;
+      // Honor free placement (Arrange x/y/w/h). placeBox gives the box + whether it's pinned.
+      const pinned = !!(node.position && (node.position.x != null || node.position.y != null));
+      const b = placeBox(node, x, y, w, Math.min(3, maxH), maxH);
       if (!r) {
-        slide.addText(`[Image: ${alt}]`, { x, y, w, h: 0.4, fontSize: fontSize - 2, fontFace: font, italic: true, color: '999999', align: 'center' });
-        return 0.45;
+        slide.addText(`[Image: ${alt}]`, { x: b.x, y: b.y, w: b.w, h: 0.4, fontSize: fontSize - 2, fontFace: font, italic: true, color: '999999', align: 'center' });
+        return pinned ? 0 : 0.45;
       }
-      const box = fitBox(r.width, r.height, Math.min(w, MAX_FIG_W), Math.max(1.2, maxH - (capText ? 0.35 : 0)));
-      const cx = x + (w - box.w) / 2; // center horizontally
-      slide.addImage({ data: r.dataUri, x: cx, y, w: box.w, h: box.h });
-      let consumed = box.h + 0.1;
-      if (capText) {
-        slide.addText(sub(capText), { x, y: y + box.h + 0.05, w, h: 0.3, fontSize: Math.max(9, fontSize - 5), fontFace: font, italic: true, color: MUTED, align: 'center' });
+      const box = fitBox(r.width, r.height, Math.min(b.w, MAX_FIG_W), Math.max(1.2, (pinned ? b.h : maxH) - (capText ? 0.35 : 0)));
+      const cx = pinned ? b.x : b.x + (b.w - box.w) / 2; // pinned: exact; flow: center
+      const cy = b.y;
+      const rot = clampRotate(node.style.rotation);
+      const tImg = transparencyOf(node.style.opacity);
+      slide.addImage({
+        data: r.dataUri, x: cx, y: cy, w: box.w, h: box.h,
+        ...(rot ? { rotate: rot } : {}),
+        ...(tImg != null ? { transparency: tImg } : {}),
+      });
+      // addImage has no border option — overlay a rect when the image is styled with one.
+      const line = lineFrom(node.style);
+      if (line && line.type !== 'none') {
+        slide.addShape('rect', { x: cx, y: cy, w: box.w, h: box.h, fill: { type: 'none' }, line });
+      }
+      let consumed = pinned ? 0 : box.h + 0.1;
+      if (capText && !pinned) {
+        slide.addText(sub(capText), { x: b.x, y: cy + box.h + 0.05, w: b.w, h: 0.3, fontSize: Math.max(9, fontSize - 5), fontFace: font, italic: true, color: MUTED, align: 'center' });
         consumed += 0.35;
       }
       return consumed;

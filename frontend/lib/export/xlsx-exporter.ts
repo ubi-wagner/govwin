@@ -231,6 +231,16 @@ export async function exportToXlsx(
         if (resolved.style?.alignment) {
           excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
         }
+        // Per-cell border override (default is thin all around). 'none' clears it; 'thick' = a
+        // heavier rule (e.g. a bordered total row) — matches what the editor grid shows.
+        if (resolved.style?.border) {
+          if (resolved.style.border === 'none') {
+            excelCell.border = {};
+          } else {
+            const st = resolved.style.border === 'thick' ? 'thick' : 'thin';
+            excelCell.border = { top: { style: st }, left: { style: st }, bottom: { style: st }, right: { style: st } };
+          }
+        }
       });
     }
 
