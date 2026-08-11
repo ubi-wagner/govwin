@@ -99,11 +99,16 @@ actions. This single wire-up delivers **dedup, quality-gating, and library de-bl
 - **AI-suggested segmentation at ingest.** Today the split is heuristic (headings/regex) at
   ingest; the smart pass (librarian) only runs *after*. An LLM segmentation suggestion at
   atomize time would cut manual cleanup dramatically.
-- **Box-on-the-rendered-document atomizer.** Document atomization is a **flat checkbox list**
-  (`atomizer.tsx:217-229`) — you never see the doc *as a doc*. The spatial "draw a box"
-  interaction only exists for screen-capture (`capture-atomizer.tsx`). Bringing box-select to
-  the rendered upload would be the single biggest ease-of-use leap (it's the direct inverse of
-  the fluid canvas's "highlight → atomize").
+- **Box-on-the-rendered-document atomizer — ✅ image + PDF-page sources shipped (BOX-1/BOX-1b).**
+  The spatial "draw a box" interaction used to exist only for screen-capture. The Capture tab's
+  box tool now accepts **three frame sources** — a screen grab, an **uploaded image**, and a
+  **rendered PDF page** (pdfjs, page-nav) — so a figure/table you can't pull from a file's XML
+  can be boxed → cropped → draft **image atom** (storage-backed; DB-verified). pdfjs is
+  **self-hosted in `/public/pdfjs`** and loaded via a `webpackIgnore` native import (webpack's ESM
+  interop crashes on pdfjs `pdf.mjs`; and pdfjs 5.6 needs a `Map` method the sandbox Chromium
+  lacks — so we pin react-pdf's **5.4.296** build + cmaps + standard-fonts). `capture-atomizer.tsx`.
+  Still open: box-select *inside* the document-atomize (checkbox) flow (`atomizer.tsx`), and
+  **machine-proposed** boxes / un-extractable-content flags (BOX-2 / BOX-3).
 - **Semantic/vector reuse ranking.** Selection ranking is pre-vector — tag overlap +
   `content ILIKE` (`lib/atoms.ts:249,262`) — so it misses paraphrases. Embeddings would make
   reuse actually find the right prior content.

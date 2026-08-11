@@ -8,6 +8,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// Type-only handles onto pdfjs (erased at compile). The RUNTIME is self-hosted from /public and
+// loaded via a webpackIgnore native import (see loadPdfFile) — webpack's ESM interop chokes on
+// pdfjs-dist's pdf.mjs ("Object.defineProperty called on non-object"), so we bypass the bundler.
+type PdfjsModule = typeof import('pdfjs-dist');
+type PdfDoc = Awaited<ReturnType<PdfjsModule['getDocument']>['promise']>;
+
 const CURATED: Record<string, string[]> = {
   vol: ['technical', 'cost', 'past_performance', 'key_personnel', 'management', 'commercialization'],
   kind: ['figure', 'table', 'bio', 'narrative', 'metric', 'diagram'],
@@ -27,6 +33,13 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
   const getFrame = () => { if (!frameRef.current) frameRef.current = document.createElement('canvas'); return frameRef.current; };
   const [hasFrame, setHasFrame] = useState(false);
   const [dims, setDims] = useState({ w: 0, h: 0 });
+  // A loaded PDF stays resident so page nav re-renders another page into the frame without re-parsing.
+  const pdfDocRef = useRef<PdfDoc | null>(null);
+  const [pdfPages, setPdfPages] = useState(0);
+  const [pdfPage, setPdfPage] = useState(1);
+  // Bumped on every new frame drawn to the offscreen canvas. The blit effect keys off it so a new
+  // frame with the SAME dimensions (e.g. PDF page 1→2, or recapturing at the same size) still re-blits.
+  const [frameVersion, setFrameVersion] = useState(0);
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
@@ -53,7 +66,8 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(video, 0, 0, w, h);
       stream.getTracks().forEach((t) => t.stop()); // release immediately — one-way, no lingering access
-      setDims({ w, h }); setBoxes([]); setHasFrame(true);
+      pdfDocRef.current = null; setPdfPages(0); setPdfPage(1);
+      setDims({ w, h }); setBoxes([]); setHasFrame(true); setFrameVersion((v) => v + 1);
     } catch (e) {
       setErr(e instanceof Error && e.name === 'NotAllowedError' ? 'Capture cancelled.' : 'Could not capture the screen.');
     }
@@ -71,17 +85,68 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
-      setDims({ w, h }); setBoxes([]); setHasFrame(true);
+      pdfDocRef.current = null; setPdfPages(0); setPdfPage(1);
+      setDims({ w, h }); setBoxes([]); setHasFrame(true); setFrameVersion((v) => v + 1);
     };
     img.onerror = () => { URL.revokeObjectURL(url); setErr('Could not read that image.'); };
     img.src = url;
   }, []);
 
-  // Blit the offscreen frame onto the visible overlay canvas once it mounts (hasFrame flips it in).
+  // ── Load an uploaded PDF, render one page as the frame (scanned tables / figure-heavy docs) ──
+  const renderPdfPage = useCallback(async (doc: PdfDoc, n: number) => {
+    const page = await doc.getPage(n);
+    const base = page.getViewport({ scale: 1 });
+    // Render crisp (~1600px wide, capped 2.5×) so boxed crops are legible, not blurry.
+    const scale = Math.min(2.5, Math.max(1, 1600 / base.width));
+    const viewport = page.getViewport({ scale });
+    const canvas = getFrame();
+    canvas.width = Math.floor(viewport.width); canvas.height = Math.floor(viewport.height);
+    await page.render({ canvas, viewport, background: '#ffffff' }).promise; // white bg — PDFs are transparent
+    setDims({ w: canvas.width, h: canvas.height }); setBoxes([]); setHasFrame(true); setFrameVersion((v) => v + 1);
+  }, []);
+
+  const loadPdfFile = useCallback(async (file: File) => {
+    setErr(null); setMsg(null);
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { setErr('Pick a PDF file.'); return; }
+    setBusy(true);
+    try {
+      // Load pdfjs from /public via a NATIVE dynamic import (webpackIgnore) — the browser fetches
+      // the ES module directly, bypassing webpack's ESM interop, which throws "Object.defineProperty
+      // called on non-object" on pdfjs-dist's pdf.mjs. The /pdfjs build + worker are the same version.
+      // Non-literal specifier so TS doesn't try to resolve the /public URL as a module path.
+      const pdfjsUrl = '/pdfjs/pdf.min.mjs';
+      const pdfjs = (await import(/* webpackIgnore: true */ pdfjsUrl)) as PdfjsModule;
+      pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
+      const data = new Uint8Array(await file.arrayBuffer());
+      const doc = await pdfjs.getDocument({
+        data,
+        cMapUrl: '/pdfjs/cmaps/', cMapPacked: true,      // self-hosted — legible CJK/encoded text in crops
+        standardFontDataUrl: '/pdfjs/standard_fonts/',   // self-hosted — legible non-embedded standard fonts
+      }).promise;
+      pdfDocRef.current = doc; setPdfPages(doc.numPages); setPdfPage(1);
+      await renderPdfPage(doc, 1);
+    } catch (e) {
+      console.error('[capture] PDF render failed', e);
+      setErr(`Could not read that PDF — ${e instanceof Error ? e.message : 'unknown error'}`);
+    } finally { setBusy(false); }
+  }, [renderPdfPage]);
+
+  // Navigate pages — each page is its own frame, so boxes reset (they are page-local coordinates).
+  const goPdfPage = useCallback(async (n: number) => {
+    const doc = pdfDocRef.current; if (!doc || busy) return;
+    const clamped = Math.min(doc.numPages, Math.max(1, n));
+    setBusy(true);
+    try { setPdfPage(clamped); await renderPdfPage(doc, clamped); }
+    catch { setErr('Could not render that page.'); }
+    finally { setBusy(false); }
+  }, [busy, renderPdfPage]);
+
+  // Blit the offscreen frame onto the visible overlay canvas. Keyed on frameVersion (not just dims)
+  // so a same-size new frame — PDF page 1→2, or recapturing at the same resolution — still repaints.
   useEffect(() => {
     const src = frameRef.current, dst = canvasRef.current;
     if (hasFrame && src && dst) { dst.width = dims.w; dst.height = dims.h; dst.getContext('2d')?.drawImage(src, 0, 0); }
-  }, [hasFrame, dims.w, dims.h]);
+  }, [hasFrame, frameVersion, dims.w, dims.h]);
 
   // ── Box drawing on the frozen frame ────────────────────────────────────────
   const toCanvasCoords = (e: React.MouseEvent) => {
@@ -143,6 +208,7 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       if (!res.ok) throw new Error(json?.error || 'Capture failed');
       setMsg(`Atomized ${json.data.atoms} region(s) into draft atoms${json.data.groupId ? ' + a section' : ''}. Review in Library.`);
       setBoxes([]); setHasFrame(false); setGroupName('');
+      pdfDocRef.current = null; setPdfPages(0); setPdfPage(1);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Capture failed');
     } finally { setBusy(false); }
@@ -153,9 +219,10 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-        <b>Capture from your screen — or box an uploaded image</b> (a slide exported as PNG, a figure, a
-        scanned table — anything the parser can&apos;t pull from a file&apos;s XML). Grab a window/tab/screen or
-        drop an image, box the parts worth keeping, tag them, and each becomes a draft library atom.
+        <b>Capture from your screen — or box an uploaded image or PDF page</b> (a slide exported as PNG, a
+        figure, a scanned table — anything the parser can&apos;t pull from a file&apos;s XML). Grab a
+        window/tab/screen, drop an image, or open a PDF and page to the figure, box the parts worth
+        keeping, tag them, and each becomes a draft library atom.
         <b> One-way:</b> only the crops you send leave your screen — no account link, no lingering access.
       </div>
 
@@ -168,6 +235,11 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
             ▣ Box an uploaded image
             <input type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f); e.currentTarget.value = ''; }} />
+          </label>
+          <label className={`rounded-md border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 ${busy ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+            {busy ? 'Rendering…' : '▣ Box a PDF page'}
+            <input type="file" accept="application/pdf,.pdf" className="hidden" disabled={busy}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadPdfFile(f); e.currentTarget.value = ''; }} />
           </label>
         </div>
       ) : (
@@ -184,10 +256,19 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
                   style={{ left: `${(b.x / dims.w) * 100}%`, top: `${(b.y / dims.h) * 100}%`, width: `${(b.w / dims.w) * 100}%`, height: `${(b.h / dims.h) * 100}%` }} />
               ))}
             </div>
-            <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
               <span>Drag to box a region · {realBoxes.length} region(s)</span>
+              {pdfPages > 1 && (
+                <span className="flex items-center gap-1.5">
+                  <button onClick={() => goPdfPage(pdfPage - 1)} disabled={busy || pdfPage <= 1}
+                    className="rounded border border-slate-300 px-1.5 leading-5 hover:bg-slate-100 disabled:opacity-40">‹</button>
+                  <span className="tabular-nums">page {pdfPage} / {pdfPages}</span>
+                  <button onClick={() => goPdfPage(pdfPage + 1)} disabled={busy || pdfPage >= pdfPages}
+                    className="rounded border border-slate-300 px-1.5 leading-5 hover:bg-slate-100 disabled:opacity-40">›</button>
+                </span>
+              )}
               <button onClick={capture} className="text-blue-600 hover:underline">Recapture</button>
-              <button onClick={() => { setHasFrame(false); setBoxes([]); }} className="text-slate-500 hover:underline">Discard</button>
+              <button onClick={() => { setHasFrame(false); setBoxes([]); pdfDocRef.current = null; setPdfPages(0); setPdfPage(1); }} className="text-slate-500 hover:underline">Discard</button>
             </div>
           </div>
 
