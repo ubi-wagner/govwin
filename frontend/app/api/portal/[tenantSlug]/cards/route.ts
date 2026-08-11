@@ -11,6 +11,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
+import { reconcileTenant } from '@/lib/opportunity-bridge';
 
 export async function GET(
   request: Request,
@@ -38,6 +39,12 @@ export async function GET(
     if (!(await verifyTenantAccess(sessionUser.id, role, tenantId))) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    // Read-repair: catch this tenant's mirror up to the bridge head before serving. The forward-only
+    // fan-out only reaches tenants that existed at push time, so a tenant created after a push (or
+    // whose creation-time backfill failed) would otherwise show a permanently empty feed. Idempotent
+    // + cheap (usually zero missed heads); best-effort so it never blocks the feed.
+    try { await reconcileTenant(tenantId); } catch (e) { console.error('[portal/cards] reconcile (non-fatal)', e); }
 
     const url = new URL(request.url);
     const includeClosed = url.searchParams.get('includeClosed') === 'true';

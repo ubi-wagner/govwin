@@ -337,3 +337,64 @@ export async function backfillTenant(tenantId: string): Promise<number> {
   }
   return applied;
 }
+
+/**
+ * Forward-only CATCH-UP: apply only the bridge heads this tenant is BEHIND on — i.e. an opp with
+ * no card yet, or a card older than the opp's current bridge version. This is the self-healing
+ * consumer the forward-only bridge was missing: a tenant that missed a push (created after it, was
+ * suspended, or whose creation-time backfill silently failed) can never be permanently stale/empty
+ * — its mirror reconciles to the bridge head. Idempotent + cheap (usually zero missed heads → a
+ * near-no-op), and it reuses applyToTenant so scoring re-fires via capture:card.applied.
+ * Returns the number of cards advanced.
+ */
+export async function reconcileTenant(tenantId: string): Promise<number> {
+  let behind: Array<{ id: string; opportunityId: string; version: number; eventType: BridgeEventType; card: OppCard }> = [];
+  try {
+    // Per opp, the head bridge version — kept only when the tenant has no card or a stale one.
+    // WHERE runs before DISTINCT ON, so this narrows to opps the tenant is behind on, then picks
+    // each opp's newest missed version.
+    behind = await sql`
+      SELECT DISTINCT ON (b.opportunity_id)
+             b.id, b.opportunity_id AS "opportunityId", b.version, b.event_type AS "eventType", b.card
+      FROM opportunity_bridge b
+      LEFT JOIN tenant_opportunity_cards c
+        ON c.tenant_id = ${tenantId}::uuid AND c.opportunity_id = b.opportunity_id
+      WHERE c.opportunity_id IS NULL OR b.version > c.bridge_version
+      ORDER BY b.opportunity_id, b.version DESC
+    ` as typeof behind;
+  } catch (e) {
+    console.error('[bridge] reconcile head query failed', tenantId, e);
+    return 0;
+  }
+  let applied = 0;
+  for (const h of behind) {
+    try {
+      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: h.card });
+      applied++;
+    } catch (e) {
+      console.error('[bridge] reconcile apply failed', h.opportunityId, e);
+    }
+  }
+  if (applied > 0) console.info('[bridge] reconciled tenant %s: %d card(s) caught up to head', tenantId, applied);
+  return applied;
+}
+
+/**
+ * Reconcile EVERY active/trial tenant to the bridge head — the scheduled/manual sweep that heals
+ * tenants which never load their feed (so the digest + admin views are accurate too). Same set the
+ * fan-out targets. Returns per-tenant applied counts.
+ */
+export async function reconcileActiveTenants(): Promise<{ tenantId: string; applied: number }[]> {
+  let tenants: Array<{ id: string }> = [];
+  try {
+    tenants = await sql<Array<{ id: string }>>`SELECT id FROM tenants WHERE status IN ('active','trial')`;
+  } catch (e) {
+    console.error('[bridge] reconcileActiveTenants tenant list failed', e);
+    return [];
+  }
+  const out: { tenantId: string; applied: number }[] = [];
+  for (const t of tenants) {
+    out.push({ tenantId: t.id, applied: await reconcileTenant(t.id) });
+  }
+  return out;
+}

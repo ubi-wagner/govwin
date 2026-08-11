@@ -153,6 +153,42 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
                 log.error("failed to emit cron event for %s: %s", source, e)
             continue
 
+        # Web Source Scout schedule → enqueue an all-due scout job (kind='scout_source', no
+        # source_id → scouts every auto_crawl-enabled, due source_profile). Without this the scout
+        # ran on the manual "Scout Now" button only; this puts new-source discovery on the shared
+        # cron, so newly-published solicitations on watched sites are found → drafted → curated →
+        # released automatically. CAS-claim the tick, then dedup on an in-flight scout job.
+        if source == "scout_source":
+            try:
+                next_run = compute_next_run(sched["cron_expression"], sched["run_type"], now)
+                claimed = await conn.fetchval(
+                    """
+                    UPDATE pipeline_schedules SET next_run_at = $1, last_run_at = now()
+                    WHERE id = $2 AND (next_run_at IS NULL OR next_run_at <= $3) RETURNING id
+                    """,
+                    next_run, sched["id"], now,
+                )
+                if claimed is None:
+                    continue  # another tick/replica already claimed this schedule
+                existing = await conn.fetchval(
+                    "SELECT 1 FROM pipeline_jobs WHERE kind = 'scout_source' AND status IN ('pending','running') LIMIT 1"
+                )
+                if existing:
+                    log.debug("scout_source due, but a scout job is already pending/running")
+                    continue
+                await conn.execute(
+                    """
+                    INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
+                    VALUES ('scout_source', 'scout_source', 'pending', 5, $1::jsonb)
+                    """,
+                    json.dumps({"triggered_by": "cron", "all_due": True}),
+                )
+                inserted += 1
+                log.info("scheduled scout_source job (next %s)", next_run.isoformat())
+            except Exception as e:
+                log.error("failed to schedule scout_source job: %s", e)
+            continue
+
         if source not in INGESTERS:
             # Skip non-ingester schedules (scoring, memory_decay, etc.)
             continue
