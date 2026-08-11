@@ -21,6 +21,7 @@ import { TaskQueue } from '@/components/tasks/task-queue';
 import { UploadAtomizeCard } from './upload-atomize-card';
 import PipelineCards from './pipeline-cards';
 import SpotlightBuckets from './spotlight-buckets';
+import { PendingBuildBanner, type PendingBuild } from './pending-build-banner';
 
 export interface CockpitProposal {
   id: string;
@@ -36,6 +37,7 @@ interface CockpitProps {
   role: Role;
   grants: { canSeeOpps: boolean; canManageBuckets: boolean };
   proposals: CockpitProposal[];
+  pendingBuilds: PendingBuild[];
   counts: { opps: number; todos: number; buckets: number; library: number };
   activity: Array<{ id: string; label: string; at: string }>;
   getStarted: React.ReactNode;
@@ -51,7 +53,7 @@ const STAGE: Record<string, { label: string; cls: string }> = {
 };
 
 export function Cockpit({
-  tenantSlug, companyName, basePath, role, grants, proposals, counts, activity, getStarted,
+  tenantSlug, companyName, basePath, role, grants, proposals, pendingBuilds, counts, activity, getStarted,
 }: CockpitProps) {
   const [active, setActive] = useState<string | null>(null);
   const close = () => setActive(null);
@@ -70,6 +72,7 @@ export function Cockpit({
 
   const summary = [
     `${proposals.length} active build${proposals.length === 1 ? '' : 's'}`,
+    pendingBuilds.length ? `${pendingBuilds.length} in preparation` : null,
     grants.canSeeOpps ? `${counts.opps} opportunit${counts.opps === 1 ? 'y' : 'ies'}` : null,
     `${counts.todos} to-do${counts.todos === 1 ? '' : 's'}`,
   ].filter(Boolean).join(' · ');
@@ -78,7 +81,10 @@ export function Cockpit({
     <div className="flex gap-6">
       <div className="flex-1 min-w-0">
         <h1 className="text-2xl font-bold">Welcome back, {companyName}</h1>
-        <p className="text-sm text-gray-500 mt-1 mb-6">{summary}</p>
+        <p className="text-sm text-gray-500 mt-1 mb-4">{summary}</p>
+
+        {/* In-flight purchases (curation/guardrails pending) — visible whether or not there are active builds */}
+        <PendingBuildBanner builds={pendingBuilds} basePath={basePath} />
 
         {proposals.length > 0 ? (
           <>

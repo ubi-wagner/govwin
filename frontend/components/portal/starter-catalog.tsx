@@ -49,8 +49,21 @@ export function StarterCatalog({ tenantSlug }: { tenantSlug: string }) {
     } catch { setError('Network error — try again.'); } finally { setBusy(false); }
   }, [tenantSlug]);
 
-  // Nothing to offer until we know both counts and the catalog is non-empty.
-  if (foundations === null || catalog === null || catalog.length === 0) return null;
+  // Nothing to render until both counts are known (avoids a flash).
+  if (foundations === null || catalog === null) return null;
+  // No system catalog seeded for this tenant: the prominent "add starter set" CTA would vanish and
+  // leave an EMPTY library as a silent blank. Give it a first-step upload CTA instead. (A library
+  // that already has content needs no CTA here.)
+  if (catalog.length === 0) {
+    if (foundations > 0) return null;
+    return (
+      <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <p className="text-sm font-semibold text-blue-900">Your library is empty</p>
+        <p className="text-xs text-blue-700/90 mt-1 mb-3">Upload a past proposal or company documents — we shred them into reusable, taggable atoms your drafts and AI pull from.</p>
+        <a href={`/portal/${tenantSlug}/atoms?tab=atomize`} className="inline-block text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-2">Upload your first documents →</a>
+      </div>
+    );
+  }
 
   // Compact add-anytime affordance once the library already holds foundations.
   if (foundations > 0) {
