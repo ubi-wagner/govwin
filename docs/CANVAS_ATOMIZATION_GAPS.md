@@ -30,9 +30,20 @@ pipeline stage, tagged by lens (**capability / style / ease-of-use**) and effort
 
 ---
 
-## ★ The one standout — a finished brain that's unplugged
+## ★ The one standout — ✅ NOW PLUGGED IN (was: a finished brain, unplugged)
 
 **Surface the `librarian` agent's catalog recommendations.** *(capability · medium · highest ROI)*
+
+> **✅ Shipped 2026-08-11** — the librarian's persisted-but-unread output is now surfaced. The
+> catalog lands as a raw string at `agent_task_results.output.result.text`; `GET …/atoms/review`
+> reads the latest completed librarian result, `parseLibrarianCatalog` (pure, unit-tested)
+> parses + **validates every atom_id against the tenant's real atoms** (dropping hallucinated
+> ids, using real titles), and the **Review** tab renders an "✦ Librarian — AI catalog" layer:
+> per-atom keep/retag/merge/reject with quality+relevance scores, freshness, reason, package
+> notes, and a one-click "Archive N recommended rejects" (reusing the audited archive route).
+> Advisory only — nothing auto-applies. No migration (read-path). Live-verified with a
+> hand-crafted result row (sandbox LLM is `sk-noop`). Durable per-atom *disposition* state
+> (dismissed/applied) would need a new table — deferred.
 
 The pipeline `librarian` (`pipeline/src/agents/archetypes/librarian.py`) is a fully-built
 adversarial cataloger: per-atom quality + relevance scores, **`duplicate_candidates`**,

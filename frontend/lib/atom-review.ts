@@ -47,6 +47,28 @@ export interface LibraryReview {
     flagged: number;          // distinct atoms with ≥1 flag
     clean: number;            // atoms with no duplicate + no flag
   };
+  /** The pipeline librarian's richer AI catalog, when a result has been persisted (else null).
+   *  Advisory — layered on top of the deterministic dedup/quality above. */
+  librarian?: LibrarianLayer | null;
+}
+
+export type LibrarianAction = 'keep' | 'retag' | 'merge' | 'reject';
+export interface LibrarianAssessment {
+  atomId: string;
+  title: string | null;         // from the REAL atom (never the model's echo)
+  qualityScore: number | null;  // 0..1
+  relevanceScore: number | null; // 0..1
+  freshness: string | null;     // current | aging | stale
+  action: LibrarianAction | null;
+  reason: string | null;
+  mergeIntoAtomId: string | null; // validated to a real tenant atom, else null
+  summary: string | null;
+}
+export interface LibrarianLayer {
+  assessments: LibrarianAssessment[];
+  packageNotes: string | null;
+  recommendedRejectIds: string[]; // validated
+  generatedAt: string;            // ISO — when the catalog was produced
 }
 
 /** Normalize text so copy-paste / re-upload duplicates collide: lowercase, strip punctuation,
@@ -118,4 +140,61 @@ export function computeLibraryReview(atoms: ReviewAtom[]): LibraryReview {
     flags,
     stats: { total: atoms.length, duplicateAtoms: dupNonKeepers.size, flagged: flagged.size, clean },
   };
+}
+
+// ── Librarian catalog (the pipeline agent's richer, AI-produced scoring) ──────────────────
+
+const _num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const _str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+const _ACTIONS: LibrarianAction[] = ['keep', 'retag', 'merge', 'reject'];
+
+/**
+ * Parse the librarian agent's catalog JSON (model-produced, UNVALIDATED — it arrives as a raw
+ * string at agent_task_results.output.result.text) into a clean, safe layer. Every atom_id is
+ * validated against the real tenant atoms (`validAtoms`: id → title); anything the model
+ * hallucinated or that belongs to another tenant is dropped. Titles come from the real atom,
+ * never the model's echo. Pure — unit-testable, no DB. Returns null if there's nothing usable.
+ */
+export function parseLibrarianCatalog(
+  rawText: string | null | undefined,
+  validAtoms: Map<string, string | null>,
+  generatedAt: string,
+): LibrarianLayer | null {
+  if (!rawText) return null;
+  let cat: unknown;
+  try { cat = JSON.parse(rawText); } catch { return null; }
+  if (!cat || typeof cat !== 'object') return null;
+  const c = cat as Record<string, unknown>;
+
+  const assessments: LibrarianAssessment[] = [];
+  const rawList = Array.isArray(c.assessments) ? c.assessments : [];
+  for (const raw of rawList) {
+    if (!raw || typeof raw !== 'object') continue;
+    const a = raw as Record<string, unknown>;
+    const id = _str(a.atom_id);
+    if (!id || !validAtoms.has(id)) continue; // validate against real tenant atoms
+    const rec = (a.recommendation && typeof a.recommendation === 'object' ? a.recommendation : {}) as Record<string, unknown>;
+    const actionRaw = _str(rec.action);
+    const action = actionRaw && (_ACTIONS as string[]).includes(actionRaw) ? (actionRaw as LibrarianAction) : null;
+    const mergeInto = _str(rec.merge_into_atom_id);
+    assessments.push({
+      atomId: id,
+      title: validAtoms.get(id) ?? null,
+      qualityScore: _num(a.quality_score),
+      relevanceScore: _num(a.relevance_score),
+      freshness: _str(a.freshness),
+      action,
+      reason: _str(rec.reason),
+      mergeIntoAtomId: mergeInto && validAtoms.has(mergeInto) ? mergeInto : null,
+      summary: _str(a.summary),
+    });
+  }
+
+  const recommendedRejectIds = (Array.isArray(c.recommended_rejects) ? c.recommended_rejects : [])
+    .map(_str)
+    .filter((x): x is string => !!x && validAtoms.has(x));
+  const packageNotes = _str(c.package_notes);
+
+  if (assessments.length === 0 && !packageNotes && recommendedRejectIds.length === 0) return null;
+  return { assessments, packageNotes, recommendedRejectIds, generatedAt };
 }

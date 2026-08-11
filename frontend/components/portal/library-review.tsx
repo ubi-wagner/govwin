@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/lib/toast';
-import type { LibraryReview as Review, FlagKind } from '@/lib/atom-review';
+import type { LibraryReview as Review, FlagKind, LibrarianAction } from '@/lib/atom-review';
 
 const FLAG_META: Record<FlagKind, { label: string; tone: string; archivable: boolean }> = {
   empty:       { label: 'Empty',        tone: 'text-rose-700 bg-rose-50 border-rose-200',      archivable: true },
@@ -17,6 +17,14 @@ const FLAG_META: Record<FlagKind, { label: string; tone: string; archivable: boo
   untagged:    { label: 'Untagged',     tone: 'text-indigo-700 bg-indigo-50 border-indigo-200', archivable: false },
   unconfirmed: { label: 'Unconfirmed tags', tone: 'text-sky-700 bg-sky-50 border-sky-200',     archivable: false },
 };
+
+const ACTION_META: Record<LibrarianAction, { label: string; tone: string }> = {
+  keep:   { label: 'keep',   tone: 'bg-emerald-100 text-emerald-700' },
+  retag:  { label: 'retag',  tone: 'bg-indigo-100 text-indigo-700' },
+  merge:  { label: 'merge',  tone: 'bg-amber-100 text-amber-700' },
+  reject: { label: 'reject', tone: 'bg-rose-100 text-rose-700' },
+};
+const pct = (n: number | null) => (n == null ? '—' : `${Math.round(n * 100)}%`);
 
 export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
   const [review, setReview] = useState<Review | null>(null);
@@ -58,11 +66,11 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
   if (state === 'error') return <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center text-sm text-rose-600">Could not review the library. Try reloading.</div>;
   if (!review) return null;
 
-  const { duplicateGroups, flags, stats } = review;
+  const { duplicateGroups, flags, stats, librarian } = review;
   const flagsByKind = (['empty', 'tiny', 'untagged', 'unconfirmed'] as FlagKind[])
     .map((k) => ({ kind: k, items: flags.filter((f) => f.kind === k) }))
     .filter((g) => g.items.length > 0);
-  const nothing = duplicateGroups.length === 0 && flags.length === 0;
+  const nothing = duplicateGroups.length === 0 && flags.length === 0 && !librarian;
 
   return (
     <div className="space-y-6">
@@ -80,6 +88,42 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
           </div>
         ))}
       </div>
+
+      {/* Librarian — the pipeline agent's richer AI catalog, when a result has been persisted. */}
+      {librarian && (
+        <section className="border border-violet-200 bg-violet-50/40 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-violet-900">✦ Librarian — AI catalog
+              <span className="ml-2 text-[11px] font-normal text-violet-500">{librarian.assessments.length} assessed · advisory</span>
+            </h3>
+            {librarian.recommendedRejectIds.length > 0 && (
+              <button onClick={() => archive(librarian.recommendedRejectIds)} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-md bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50">
+                Archive {librarian.recommendedRejectIds.length} recommended reject{librarian.recommendedRejectIds.length > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+          {librarian.packageNotes && <p className="text-xs text-violet-800 mb-2 italic">“{librarian.packageNotes}”</p>}
+          <ul className="space-y-1.5">
+            {librarian.assessments.slice(0, 40).map((a) => {
+              const meta = a.action ? ACTION_META[a.action] : null;
+              return (
+                <li key={a.atomId} className="bg-white border border-violet-100 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {meta && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${meta.tone}`}>{meta.label}</span>}
+                    <span className="text-sm text-gray-800 truncate flex-1">{a.title || '(untitled)'}</span>
+                    <span className="text-[11px] text-gray-400 tabular-nums shrink-0">Q {pct(a.qualityScore)} · R {pct(a.relevanceScore)}{a.freshness ? ` · ${a.freshness}` : ''}</span>
+                    {a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0">archive</button>}
+                  </div>
+                  {a.reason && <p className="text-[11px] text-gray-500 mt-0.5">{a.reason}</p>}
+                </li>
+              );
+            })}
+            {librarian.assessments.length > 40 && <li className="text-[11px] text-violet-400">+ {librarian.assessments.length - 40} more</li>}
+          </ul>
+          <p className="text-[10px] text-violet-400 mt-2">From the pipeline librarian agent · advisory only — nothing is applied automatically.</p>
+        </section>
+      )}
 
       {nothing && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center">

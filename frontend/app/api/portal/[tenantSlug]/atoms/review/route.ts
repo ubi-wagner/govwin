@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { computeLibraryReview, type ReviewAtom } from '@/lib/atom-review';
+import { computeLibraryReview, parseLibrarianCatalog, type ReviewAtom, type LibrarianLayer } from '@/lib/atom-review';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -80,7 +80,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
       createdAt: toIso(r.createdAt),
     }));
 
-    return NextResponse.json({ data: computeLibraryReview(atoms) });
+    // Layer the pipeline librarian's richer AI catalog on top, if a result has been persisted.
+    // The catalog JSON lands as a raw string in agent_task_results.output.result.text; we parse +
+    // VALIDATE every atom_id against the real atoms above (in atom-review) before surfacing it.
+    // Advisory + read-only here; non-fatal (the deterministic review stands on its own).
+    let librarian: LibrarianLayer | null = null;
+    try {
+      const lrRows = await sql<Array<{ output: unknown; createdAt: Date | string | null }>>`
+        SELECT r.output, r.created_at
+        FROM agent_task_results r
+        JOIN agent_task_queue q ON q.id = r.task_id
+        WHERE q.tenant_id = ${tenantId}::uuid
+          AND q.agent_role = 'librarian' AND q.task_type = 'catalog' AND q.status = 'completed'
+        ORDER BY r.created_at DESC
+        LIMIT 1
+      `;
+      const lr = lrRows[0];
+      if (lr?.output) {
+        const out = lr.output as { result?: { text?: unknown } };
+        const rawText = typeof out?.result?.text === 'string' ? out.result.text : null;
+        const validAtoms = new Map(rows.map((r) => [r.id, r.title] as [string, string | null]));
+        librarian = parseLibrarianCatalog(rawText, validAtoms, toIso(lr.createdAt));
+      }
+    } catch (e) {
+      console.error('[atoms/review] librarian layer failed (non-fatal)', e);
+    }
+
+    return NextResponse.json({ data: { ...computeLibraryReview(atoms), librarian } });
   } catch (err) {
     console.error('[atoms/review] error', err);
     return NextResponse.json({ error: 'Failed to review the library', code: 'DB_ERROR' }, { status: 500 });
