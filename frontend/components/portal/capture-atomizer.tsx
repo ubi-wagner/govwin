@@ -6,7 +6,7 @@
  * atom in the library (anchored to a reference of the whole frame, optionally grouped into a
  * section). ONE-WAY: nothing but the crops you send ever leaves your screen.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const CURATED: Record<string, string[]> = {
   vol: ['technical', 'cost', 'past_performance', 'key_personnel', 'management', 'commercialization'],
@@ -19,6 +19,12 @@ interface Box { id: string; x: number; y: number; w: number; h: number; title: s
 export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Offscreen full-res frame — the single source of the pixels, whatever put them there
+  // (a screen grab OR an uploaded image OR a rendered PDF page). The visible overlay canvas
+  // is only mounted once hasFrame, so drawing straight to it (as the old capture did) hit a
+  // null ref; we draw here and blit to the overlay on mount.
+  const frameRef = useRef<HTMLCanvasElement | null>(null);
+  const getFrame = () => { if (!frameRef.current) frameRef.current = document.createElement('canvas'); return frameRef.current; };
   const [hasFrame, setHasFrame] = useState(false);
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const [boxes, setBoxes] = useState<Box[]>([]);
@@ -43,7 +49,7 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       await video.play();
       await new Promise((r) => setTimeout(r, 250)); // let a frame paint
       const w = video.videoWidth || 1280, h = video.videoHeight || 720;
-      const canvas = canvasRef.current!;
+      const canvas = getFrame();
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(video, 0, 0, w, h);
       stream.getTracks().forEach((t) => t.stop()); // release immediately — one-way, no lingering access
@@ -52,6 +58,30 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       setErr(e instanceof Error && e.name === 'NotAllowedError' ? 'Capture cancelled.' : 'Could not capture the screen.');
     }
   }, []);
+
+  // ── Load an uploaded IMAGE as the frame (the box-on-upload path) ────────────
+  const loadImageFile = useCallback((file: File) => {
+    setErr(null); setMsg(null);
+    if (!file.type.startsWith('image/')) { setErr('Pick an image file (PNG, JPG, WebP).'); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || 1280, h = img.naturalHeight || 720;
+      const canvas = getFrame();
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      setDims({ w, h }); setBoxes([]); setHasFrame(true);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setErr('Could not read that image.'); };
+    img.src = url;
+  }, []);
+
+  // Blit the offscreen frame onto the visible overlay canvas once it mounts (hasFrame flips it in).
+  useEffect(() => {
+    const src = frameRef.current, dst = canvasRef.current;
+    if (hasFrame && src && dst) { dst.width = dims.w; dst.height = dims.h; dst.getContext('2d')?.drawImage(src, 0, 0); }
+  }, [hasFrame, dims.w, dims.h]);
 
   // ── Box drawing on the frozen frame ────────────────────────────────────────
   const toCanvasCoords = (e: React.MouseEvent) => {
@@ -88,13 +118,13 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
 
   // ── Crop each box client-side → commit to /atoms/capture ───────────────────
   const cropBlob = (box: Box): Promise<Blob> => new Promise((resolve, reject) => {
-    const src = canvasRef.current!;
+    const src = getFrame(); // full-res offscreen frame, in the same coord space as the boxes
     const c = document.createElement('canvas'); c.width = Math.max(1, box.w | 0); c.height = Math.max(1, box.h | 0);
     c.getContext('2d')!.drawImage(src, box.x, box.y, box.w, box.h, 0, 0, c.width, c.height);
     c.toBlob((bl) => (bl ? resolve(bl) : reject(new Error('crop failed'))), 'image/png');
   });
   const fullBlob = (): Promise<Blob> => new Promise((resolve, reject) =>
-    canvasRef.current!.toBlob((bl) => (bl ? resolve(bl) : reject(new Error('frame failed'))), 'image/png'));
+    getFrame().toBlob((bl) => (bl ? resolve(bl) : reject(new Error('frame failed'))), 'image/png'));
 
   const commit = useCallback(async () => {
     const real = boxes.filter((b) => b.id !== '__draft' && b.w > 12 && b.h > 12);
@@ -123,15 +153,23 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-        <b>Capture from screen</b> — grab a window, tab, or screen (a Google Doc, a data sheet, a web page),
-        box the parts worth keeping, tag them, and they become draft library atoms. <b>One-way:</b> only the
-        crops you send leave your screen — no account link, no lingering access.
+        <b>Capture from your screen — or box an uploaded image</b> (a slide exported as PNG, a figure, a
+        scanned table — anything the parser can&apos;t pull from a file&apos;s XML). Grab a window/tab/screen or
+        drop an image, box the parts worth keeping, tag them, and each becomes a draft library atom.
+        <b> One-way:</b> only the crops you send leave your screen — no account link, no lingering access.
       </div>
 
       {!hasFrame ? (
-        <button onClick={capture} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-          ▣ Capture from screen
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={capture} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            ▣ Capture from screen
+          </button>
+          <label className="rounded-md border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 cursor-pointer">
+            ▣ Box an uploaded image
+            <input type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f); e.currentTarget.value = ''; }} />
+          </label>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
           {/* ── the frozen frame + box overlay ── */}
