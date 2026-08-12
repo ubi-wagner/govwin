@@ -51,18 +51,38 @@ const lastUserText = (req) => {
   return typeof u.content === 'string' ? u.content : (u.content || []).map((b) => b.text || '').join('\n');
 };
 
-// Fill a tool's required string params with plausible-but-generic content from its input_schema, so a
-// generic tool-using agent completes its loop. Specific agents get hand-crafted responders above this.
-function genericToolInput(tool) {
+// The full request text (system + every message) — where the workflow's real inputs (proposal_id,
+// tenant_id, section_id …) live, so tool calls can pass REAL uuids instead of fabricated strings.
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+function reqText(req) {
+  const parts = [systemText(req)];
+  for (const m of req.messages || []) {
+    if (typeof m.content === 'string') parts.push(m.content);
+    else for (const b of m.content || []) parts.push(b.text || (b.content && JSON.stringify(b.content)) || (b.input && JSON.stringify(b.input)) || '');
+  }
+  return parts.join('\n');
+}
+// A uuid labelled with this param name anywhere in the request (e.g. `"proposal_id": "bbd6…"`).
+function findLabeledUuid(text, name) {
+  const m = text.match(new RegExp(name.replace(/[^a-z_]/gi, '') + '["\\s:=)}\\]]{0,8}("?)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', 'i'));
+  return m ? m[2] : null;
+}
+// Fill a tool's required params from its input_schema. Id-like params get a REAL uuid pulled from the
+// request context; other strings get representative content. Specific agents can still be hand-crafted.
+function genericToolInput(tool, req) {
+  const text = reqText(req);
+  const anyUuid = (text.match(UUID_RE) || [])[0] || null;
   const schema = tool?.input_schema || {};
   const props = schema.properties || {};
-  const req = new Set(schema.required || Object.keys(props));
+  const required = new Set(schema.required || Object.keys(props));
   const out = {};
   for (const [k, spec] of Object.entries(props)) {
-    if (!req.has(k)) continue;
+    if (!required.has(k)) continue;
     const t = spec?.type;
-    if (t === 'string') out[k] = spec.enum?.[0] ?? `Emulated ${k} — representative content authored by the emulated model for end-to-end wiring verification.`;
-    else if (t === 'number' || t === 'integer') out[k] = spec.minimum ?? 1;
+    if (t === 'string') {
+      if (/(_id$|^id$|_uuid$)/i.test(k)) out[k] = findLabeledUuid(text, k) || anyUuid || `emu-${k}`;
+      else out[k] = spec.enum?.[0] ?? `Emulated ${k} — representative content authored by the emulated model.`;
+    } else if (t === 'number' || t === 'integer') out[k] = spec.minimum ?? 1;
     else if (t === 'boolean') out[k] = true;
     else if (t === 'array') out[k] = [];
     else if (t === 'object') out[k] = {};
@@ -97,16 +117,23 @@ const RESPONDERS = [
       return textMsg(req.model, JSON.stringify(arr)); // the route JSON.parses the text block directly
     },
   },
-  // Generic tool-using agent: on the FIRST turn call the (forced/first) tool; on the tool_result turn, finish.
+  // Generic tool-using agent: walk the WHOLE tool loop — read/query tools first, the OUTPUT tool
+  // (emit_/save_/publish_/…) LAST so the agent's result actually lands — one tool per turn until every
+  // tool has run, then finish with text. Id params get real uuids from the request context.
   {
     name: 'tool-agent',
     match: (req) => (req.tools || []).length > 0,
     respond: (req) => {
-      if (hasToolResult(req)) return textMsg(req.model, 'Done — the emulated model completed the tool loop and returns its final advisory result.');
-      const choice = req.tool_choice;
-      const forced = choice && choice.type === 'tool' ? choice.name : null;
-      const tool = (req.tools || []).find((t) => t.name === forced) || (req.tools || [])[0];
-      return toolUseMsg(req.model, tool.name, genericToolInput(tool));
+      const tools = req.tools || [];
+      const isOutput = (n) => /^(emit_|save_|publish_|store_|submit_|apply_|write_|record_|create_)/i.test(n) || /draft_plan|candidates|revision/i.test(n);
+      const ordered = [...tools].sort((a, b) => (isOutput(a.name) ? 1 : 0) - (isOutput(b.name) ? 1 : 0));
+      const done = (req.messages || []).flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((b) => b?.type === 'tool_result').length;
+      if (done === 0 && req.tool_choice?.type === 'tool') {
+        const forced = tools.find((t) => t.name === req.tool_choice.name);
+        if (forced) return toolUseMsg(req.model, forced.name, genericToolInput(forced, req));
+      }
+      if (done >= ordered.length) return textMsg(req.model, 'Done — the emulated model completed its tool loop.');
+      return toolUseMsg(req.model, ordered[done].name, genericToolInput(ordered[done], req));
     },
   },
   // Plain-text agent / AI route: a concise, structured completion.
