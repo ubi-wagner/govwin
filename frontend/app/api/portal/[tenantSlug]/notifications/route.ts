@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { describeEvent } from '@/lib/event-labels';
 
@@ -66,6 +66,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    // RLS choke point (docs/RLS_CUTOVER.md): pin tenant context in the handler's own frame
+    // so the notification_read_state + proposal_sections (both RLS'd) reads scope to this
+    // tenant under govtech_app. Without it, the for-you routing silently returns nothing and
+    // the read-state query DENY-ALLs post-flip.
+    enterTenant(tenantId);
 
     // ── Parse query params ───────────────────────────────────────
     const url = new URL(request.url);
@@ -193,6 +198,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS: the read-state upsert writes under this tenant's scope (govtech_app)
     try {
       await sql`
         INSERT INTO notification_read_state (user_id, tenant_id, last_read_at, updated_at)
