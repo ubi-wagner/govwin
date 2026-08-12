@@ -10,6 +10,10 @@
  * for every patched route, that partner_user → 403 FORBIDDEN (blocked at the floor, before DB),
  * and that tenant_user gets PAST the floor (reaches the tenant lookup → 404 on our null mock).
  * rbac is intentionally NOT mocked — its role logic is what's under test.
+ *
+ * 2026-08-12: +GET proposals/[id]/readiness — same class (it gated on verifyProposalAccess, the coarse
+ * gate that admits an accepted partner_user collaborator, with no tenant_user floor), so the whole-
+ * proposal readiness roll-up incl. total price + STTR work-split leaked to a stage-scoped partner.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -28,6 +32,7 @@ vi.mock('@/lib/db', () => ({
 // Import AFTER mocks are registered.
 import { GET as proposalGet } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/route';
 import { GET as complianceGet } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/compliance/route';
+import { GET as readinessGet } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/readiness/route';
 import { GET as stageGet } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route';
 import { GET as collaboratorsGet } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route';
 import { GET as storageGet } from '@/app/api/portal/[tenantSlug]/storage/route';
@@ -48,6 +53,7 @@ describe('partner-containment: patched routes block partner_user at the tenant_u
   const cases: Array<{ name: string; invoke: () => Promise<Response> }> = [
     { name: 'GET proposals/[id]',               invoke: () => proposalGet(new Request('http://x/'), proposalCtx as never) },
     { name: 'GET proposals/[id]/compliance',    invoke: () => complianceGet(new Request('http://x/'), proposalCtx as never) },
+    { name: 'GET proposals/[id]/readiness',     invoke: () => readinessGet(new Request('http://x/'), proposalCtx as never) },
     { name: 'GET proposals/[id]/stage',         invoke: () => stageGet(new Request('http://x/'), proposalCtx as never) },
     { name: 'GET proposals/[id]/collaborators', invoke: () => collaboratorsGet(new Request('http://x/'), proposalCtx as never) },
     { name: 'GET storage',                      invoke: () => storageGet(new Request('http://x/?download=customers/acme-navy-systems/x') as never, tenantCtx as never) },

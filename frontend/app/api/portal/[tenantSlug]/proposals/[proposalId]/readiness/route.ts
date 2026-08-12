@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
 
@@ -10,7 +10,13 @@ export const dynamic = 'force-dynamic';
 /**
  * GET — the submission-readiness verdict for a proposal: a go / not-ready roll-up over section
  * lock state, requirement coverage, and the advisory format floor, with an actionable blocker list.
- * Read-only + advisory (computes; never locks/submits). Any member with access to the proposal.
+ * Read-only + advisory (computes; never locks/submits).
+ *
+ * This is a WHOLE-PROPOSAL aggregate (all section states, every mandatory requirement text, per-volume
+ * page counts, the total proposed price + STTR work-split) — so it is for tenant members (tenant_user+)
+ * ONLY, exactly like the compliance/document/preview/detail siblings. An external collaborator
+ * (partner_user) passes verifyProposalAccess on their accepted-collaborator row, so a role floor is
+ * REQUIRED to keep the proposal-wide roll-up (esp. cost/pricing) out of a stage-scoped partner's hands.
  */
 export async function GET(
   _request: Request,
@@ -30,6 +36,13 @@ export async function GET(
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    // Partner-containment: a whole-proposal roll-up is for tenant members (tenant_user+); an external
+    // collaborator (partner_user) reaches only their granted sections and must NOT pull the proposal-wide
+    // verdict + pricing. Mirrors the compliance/document/preview siblings; verifyProposalAccess below is
+    // the coarse "may touch this proposal" gate and admits collaborators, so it is NOT sufficient alone.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const tenant = await getTenantBySlug(tenantSlug).catch(() => null);

@@ -45,6 +45,25 @@ async function main() {
     note(`tenant-scoped table "${t.relname}" has NO tenant_isolation policy and is not on the BYPASS allowlist`);
   }
 
+  // 2b) COVERAGE BOUNDARY — proposal-scoped CHILD tables (FK to proposals via `proposal_id`, no direct
+  //     `tenant_id` column) with RLS NOT active are invisible to the tenant_id scan above AND carry no
+  //     schema backstop: they inherit tenant scope only through the app-layer proposal→tenant bind each
+  //     route runs (verifyProposalAccess / a `proposals WHERE tenant_id` belt before the child read).
+  //     Enumerate them so the success line doesn't imply full schema coverage. (Excluded here: children
+  //     that DO carry an active proposal-correlated RLS policy — e.g. proposal_sections, mig 117 —
+  //     `relrowsecurity = false` filters those out because they ARE schema-backstopped.)
+  const fkScoped = await sql`
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute pa ON pa.attrelid = c.oid AND pa.attname = 'proposal_id' AND pa.attnum > 0 AND NOT pa.attisdropped
+    WHERE c.relkind = 'r' AND n.nspname = 'public'
+      AND c.relrowsecurity = false
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_attribute ta
+        WHERE ta.attrelid = c.oid AND ta.attname = 'tenant_id' AND ta.attnum > 0 AND NOT ta.attisdropped)
+    ORDER BY c.relname`;
+
   // 3) govtech_app must be able to touch every base table (else the flip 500s on permission denied).
   if (role) {
     const [{ missing }] = await sql`
@@ -57,12 +76,17 @@ async function main() {
     if (missing > 0) note(`${missing} base table(s) have NO govtech_app SELECT grant`);
   }
 
-  console.log(`[rls-preflight] tenant-scoped tables: ${protectedCount} isolated · ${bypassCount} bypass-by-design · ${problems.length} problem(s)`);
+  console.log(`[rls-preflight] direct-tenant_id tables: ${protectedCount} isolated · ${bypassCount} bypass-by-design · ${problems.length} problem(s)`);
+  console.log(`[rls-preflight] proposal-FK-scoped child tables with NO schema backstop (app-layer proposal→tenant bind only): ${fkScoped.length}`);
+  if (fkScoped.length) console.log(`    ${fkScoped.map((t) => t.relname).join(', ')}`);
   if (problems.length) {
     for (const p of problems) console.log(`  ❌ ${p}`);
     console.log('\n❌ NOT READY to flip DATABASE_URL → govtech_app — close the gaps above first.');
     process.exit(1);
   }
-  console.log('\n✅ RLS CUTOVER DEPLOY-READY — every tenant-scoped table is isolated or bypass-by-design; govtech_app is NOBYPASSRLS + granted.');
+  console.log('\n✅ RLS CUTOVER DEPLOY-READY — every table with a direct tenant_id column is isolated or');
+  console.log(`   bypass-by-design; govtech_app is NOBYPASSRLS + granted. NOTE: the ${fkScoped.length} proposal-FK-scoped`);
+  console.log('   child table(s) above are guarded by the app-layer proposal→tenant bind, not a schema policy');
+  console.log('   (docs/RLS_CUTOVER.md) — verify that bind holds in any new route that reads them.');
 }
 main().then(() => sql.end()).catch(async (e) => { console.error('[rls-preflight] FAILED:', e.message || e); await sql.end(); process.exit(1); });
