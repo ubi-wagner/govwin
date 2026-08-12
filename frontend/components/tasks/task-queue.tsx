@@ -240,11 +240,69 @@ function TaskCompleter({
   // workflow prescribes (e.g. broadcast → acknowledge, review_section → review).
   const kind = taskCompleterKind(task.params, workflow.completer);
   if (kind === 'acknowledge') return <AcknowledgeCompleter busy={busy} onComplete={onComplete} />;
+  if (kind === 'read_receipt') return <ReadReceiptCompleter busy={busy} onComplete={onComplete} />;
+  if (kind === 'text_memo') return <TextMemoCompleter busy={busy} onComplete={onComplete} />;
   if (kind === 'form') return <FormCompleter task={task} busy={busy} onComplete={onComplete} />;
   if (kind === 'upload') {
     return <UploadCompleter openHref={openHref} busy={busy} onComplete={onComplete} />;
   }
   return <ReviewCompleter openHref={openHref} busy={busy} onComplete={onComplete} />;
+}
+
+/**
+ * Broadcast with a READ RECEIPT (HITL): the recipient confirms receipt in one click; the completion
+ * records who + when (the receipt the sender can see). Distinct from a bare acknowledge only in intent
+ * + the receipt payload.
+ */
+function ReadReceiptCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => onComplete({ read: true, readAt: new Date().toISOString() })}
+        disabled={busy}
+        className="rounded border border-emerald-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+      >
+        {busy ? '…' : '✓ Confirm receipt'}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Free-text ToDo (inline chat + tasking): an optional memo response + a close DISPOSITION —
+ * Completed / Delegated / Not completed. The disposition + memo land in the task result (and the
+ * task.completed event) so later automation can trigger off them. All three CLOSE the ToDo.
+ */
+function TextMemoCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
+  const [memo, setMemo] = useState('');
+  const close = (disposition: 'completed' | 'delegated' | 'not_completed') =>
+    onComplete({ disposition, memo: memo.trim() || null, respondedAt: new Date().toISOString() });
+  return (
+    <div className="mt-2 space-y-2">
+      <textarea
+        value={memo}
+        onChange={(e) => setMemo(e.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder="Add a text response (optional)…"
+        className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
+      />
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => close('completed')} disabled={busy}
+          className="rounded border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50">
+          {busy ? '…' : 'Completed'}
+        </button>
+        <button onClick={() => close('delegated')} disabled={busy}
+          className="rounded border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+          Delegated
+        </button>
+        <button onClick={() => close('not_completed')} disabled={busy}
+          className="rounded border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">
+          Not completed
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** manager_request routes to the Team page (its real approve/decline surface), not a queue completer. */

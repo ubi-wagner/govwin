@@ -58,7 +58,7 @@ describe('ToDo catalog has no drift', () => {
       expect(def.steps.length).toBeGreaterThan(0);
       expect(def.actionStep).toBeGreaterThanOrEqual(0);
       expect(def.actionStep).toBeLessThan(def.steps.length);
-      expect(['review', 'upload', 'form', 'acknowledge']).toContain(def.completer);
+      expect(['review', 'upload', 'form', 'acknowledge', 'read_receipt', 'text_memo']).toContain(def.completer);
       expect(def.producedBy.length).toBeGreaterThan(0);
     }
   });

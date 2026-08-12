@@ -6,7 +6,19 @@
  * Pure selection + spec parsing so the rendering component stays declarative and
  * this stays testable.
  */
-export type CompleterKind = 'review' | 'upload' | 'form' | 'acknowledge';
+/**
+ * How a ToDo is completed in the queue.
+ *  - review       : approve / dismiss
+ *  - upload       : go upload, then mark done
+ *  - form         : fill the spec'd fields
+ *  - acknowledge  : read + acknowledge (the atomic broadcast)
+ *  - read_receipt : a broadcast that captures a READ RECEIPT response (who read it, when) — a
+ *                   flavored acknowledge whose completion is the receipt the sender can see.
+ *  - text_memo    : a free-text ToDo — an optional text memo response + a close disposition
+ *                   (Completed / Delegated / Not completed). Inline chat + tasking; the disposition
+ *                   is recorded in the result (and the task.completed event) for future triggers.
+ */
+export type CompleterKind = 'review' | 'upload' | 'form' | 'acknowledge' | 'read_receipt' | 'text_memo';
 
 export interface FormField {
   name: string;
@@ -27,7 +39,8 @@ export function taskCompleterKind(
   fallback: CompleterKind = 'review',
 ): CompleterKind {
   const kind = params && typeof params === 'object' ? (params as { kind?: unknown }).kind : undefined;
-  if (kind === 'upload' || kind === 'form' || kind === 'acknowledge' || kind === 'review') return kind;
+  if (kind === 'upload' || kind === 'form' || kind === 'acknowledge' || kind === 'review'
+      || kind === 'read_receipt' || kind === 'text_memo') return kind;
   return fallback;
 }
 

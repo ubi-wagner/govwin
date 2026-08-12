@@ -14,10 +14,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { Role } from '@/lib/rbac';
+import { type Role, hasRoleAtLeast } from '@/lib/rbac';
 import { Drawer } from '@/components/ui/drawer';
 import { IndicatorRail, type Indicator } from './indicator-rail';
 import { TaskQueue } from '@/components/tasks/task-queue';
+import { AssignTaskForm } from '@/components/tasks/assign-task-form';
 import { UploadAtomizeCard } from './upload-atomize-card';
 import PipelineCards from './pipeline-cards';
 import SpotlightBuckets from './spotlight-buckets';
@@ -56,6 +57,7 @@ export function Cockpit({
   tenantSlug, companyName, basePath, role, grants, proposals, pendingBuilds, counts, activity, getStarted,
 }: CockpitProps) {
   const [active, setActive] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
   const close = () => setActive(null);
 
   const indicators: Indicator[] = [
@@ -120,6 +122,23 @@ export function Cockpit({
       <Drawer open={active === 'todos'} onClose={close} side="right" width="w-96" ariaLabel="To-dos">
         {/* TaskQueue renders its own "Your To-Dos" heading — leave the shell title empty. */}
         <DrawerShell title="" onClose={close}>
+          {hasRoleAtLeast(role, 'tenant_admin') && (
+            <div className="mb-3 border-b pb-3">
+              <button
+                onClick={() => setComposeOpen((v) => !v)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                {composeOpen ? '× Cancel' : '＋ New to-do / broadcast'}
+              </button>
+              {composeOpen && (
+                <div className="mt-2">
+                  {/* Generic (no entity) ToDo — a text task or a broadcast to the team. Inline
+                      chat + tasking; the assignee completes it in their own queue below. */}
+                  <AssignTaskForm tenantSlug={tenantSlug} onAssigned={() => setComposeOpen(false)} />
+                </div>
+              )}
+            </div>
+          )}
           <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
         </DrawerShell>
       </Drawer>

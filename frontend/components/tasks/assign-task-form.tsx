@@ -36,7 +36,7 @@ export function AssignTaskForm({
   // how the assignee completes it (W-M typed completer): a plain review
   // (approve/dismiss), an upload (go do it then mark done), a small form, or a
   // broadcast note (read + acknowledge — the atomic ToDo).
-  const [completion, setCompletion] = useState<'review' | 'upload' | 'form' | 'broadcast'>('review');
+  const [completion, setCompletion] = useState<'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo'>('review');
   // for completion='form': comma-separated field names → params.spec.fields.
   const [formFieldsRaw, setFormFieldsRaw] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -55,12 +55,15 @@ export function AssignTaskForm({
     // matching completer). 'review' is the default — send no params so the task
     // uses the plain approve/dismiss completer.
     let params: Record<string, unknown> | undefined;
-    // A broadcast note is its own defined workflow (read + acknowledge); the
-    // others are delegated_task variants selected by params.kind.
+    // A broadcast note is its own defined workflow; the others are delegated_task variants selected
+    // by params.kind. read_receipt = a broadcast whose completion captures a read receipt; text_memo
+    // = a free-text ToDo answered with an optional memo + a close disposition.
     let taskType = 'delegated_task';
-    if (completion === 'broadcast') {
+    if (completion === 'read_receipt') {
       taskType = 'broadcast';
-      params = { kind: 'acknowledge' };
+      params = { kind: 'read_receipt' };
+    } else if (completion === 'text_memo') {
+      params = { kind: 'text_memo' };
     } else if (completion === 'upload') {
       params = { kind: 'upload' };
     } else if (completion === 'form') {
@@ -157,13 +160,14 @@ export function AssignTaskForm({
           <label className="block text-xs font-medium text-gray-500 mb-1">Completion</label>
           <select
             value={completion}
-            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form' | 'broadcast')}
+            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo')}
             className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white"
           >
             <option value="review">Review &amp; approve</option>
+            <option value="text_memo">Text response (memo + Completed/Delegated/Not-completed)</option>
+            <option value="read_receipt">Broadcast (read receipt)</option>
             <option value="upload">Upload a file</option>
             <option value="form">Fill a form</option>
-            <option value="broadcast">Broadcast note (acknowledge)</option>
           </select>
         </div>
         <div>

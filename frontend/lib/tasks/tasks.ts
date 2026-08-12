@@ -388,12 +388,18 @@ export async function completeTask(opts: {
 
   // Audit the completion (the counterpart to createTask's proposal:task.assigned).
   // A plain human-delegated task otherwise closes with no event on the queue.
+  // Surface the disposition (text_memo: completed/delegated/not_completed) + read receipt so future
+  // automation can trigger off a ToDo's outcome, and the sender can see it in the audit stream.
+  const r = (result ?? {}) as Record<string, unknown>;
   await emitEventSingle({
     namespace: 'proposal',
     type: 'task.completed',
     actor: userActor(actor.id, actor.email ?? undefined),
     tenantId: task.tenantId,
-    payload: { taskId, taskType: task.taskType, resumed, completedBy: actor.id },
+    payload: {
+      taskId, taskType: task.taskType, resumed, completedBy: actor.id,
+      disposition: typeof r.disposition === 'string' ? r.disposition : (r.read === true ? 'read' : null),
+    },
   });
 
   return { ok: true, data: { taskId, resumed } };
