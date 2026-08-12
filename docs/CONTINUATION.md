@@ -5,6 +5,31 @@
 
 ---
 
+## ⭐ SOP — LAUNCH FIRST every session (keep-alive + verify-agents)
+
+**1. Heartbeat keep-alive.** Before any long drive, launch the heartbeat manager as a BACKGROUND task and
+leave it running the whole session. It pings the DB + services every ~20s and auto-repairs PG / the server /
+the emulator, so the sandbox stays active + the DB stays hydrated and a mid-drive idle-reap can't interrupt work:
+
+    Bash(run_in_background):  INTERVAL=20 SCR=<scratchpad> bash frontend/scripts/sandbox-heartbeat.sh
+    # add EMULATE=1 to also own the emulated-Claude endpoint (:8787) for AI-gated end-to-end tests
+
+Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't prevent a full VM reclaim
+(platform inactivity, no pin) — on one it writes `needs-rehydrate`; recovery is
+`bash frontend/scripts/rehydrate-sandbox.sh`.
+
+**2. Verify dispatched agents.** ALWAYS re-derive a sub-agent's finding against the actual code/schema before
+acting on it — agents have returned stale/incomplete generation (this session: a "readiness uses the cheap
+page estimate" gap that was already closed; inconsistent agent live/dormant counts). Trust nothing an agent
+returns until it's proven against the source.
+
+**AI-gated end-to-end testing (no live key):** `frontend/scripts/test-harness/emulated-claude.mjs` is an
+Anthropic-Messages-compatible endpoint that lets this session BE the model (both services honor
+`ANTHROPIC_BASE_URL` + gate on a non-`sk-noop` key). Prod uses the real Railway key + the identical wiring;
+this closes the sandbox's AI gap. Per-agent RESPONDER registry returns each agent's exact expected shape.
+
+---
+
 ## 0. LATEST — 2026-08-09 (workflow viz + compliance + full-draft landing; MERGED + DEPLOYED; READ THIS FIRST)
 
 Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162**. `tsc 0 · vitest 899`.
