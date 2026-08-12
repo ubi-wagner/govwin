@@ -29,7 +29,10 @@ async function resolveActor(tenantSlug: string) {
   if (!role || !u.id) {
     return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   }
-  if (!hasRoleAtLeast(role, 'tenant_user')) {
+  // partner_user+ — a collaborator may see + complete THEIR OWN ToDos in this tenant (HITL G4). The
+  // tenant branch of listOpenTasksForActor scopes partner_user to the partner_user bucket + own-id,
+  // and completeTask's cross-tenant + hierarchical guards keep them to their own tenant + role.
+  if (!hasRoleAtLeast(role, 'partner_user')) {
     return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
   }
   const tenant = await getTenantBySlug(tenantSlug);

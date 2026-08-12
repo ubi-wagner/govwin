@@ -131,6 +131,9 @@ export default async function PortalLayout({
               </>
             )}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
+            {/* A direct ToDo surface for every role — the only ToDo view a partner_user has (they
+                have no cockpit drawer); tenant users also keep the cockpit drawer. */}
+            <PortalNavLink href={`${basePath}/todos`}>To-dos</PortalNavLink>
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/processes`}>Processes</PortalNavLink>
