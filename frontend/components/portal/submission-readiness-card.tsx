@@ -12,6 +12,7 @@ interface Props {
 }
 
 const CATEGORY_LABEL: Record<BlockerCategory, string> = {
+  deadline: 'Deadline',
   empty_section: 'Not drafted',
   unlocked_section: 'Not locked',
   orphan_requirement: 'Requirement',
@@ -102,6 +103,17 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
 
           {/* Summary chips */}
           <div className="flex flex-wrap gap-3 text-xs mb-3">
+            {(() => {
+              const d = report.summary.deadline;
+              if (!d.closeDate) return <span className="text-gray-400 font-medium">⏱ no deadline set</span>;
+              const dr = d.daysRemaining ?? 0;
+              const label = d.past
+                ? `closed ${Math.abs(dr)}d ago${d.estimated ? ' (est.)' : ''}`
+                : `closes in ${dr}d${d.estimated ? ' (est.)' : ''}`;
+              const cls = d.past ? 'text-red-600' : dr <= 7 ? 'text-amber-600' : 'text-gray-600';
+              return <span className={`${cls} font-medium`} title={new Date(d.closeDate).toLocaleDateString()}>⏱ {label}</span>;
+            })()}
+            <span className="text-gray-400">·</span>
             <span className="text-emerald-600 font-medium">{report.summary.sections.locked} locked</span>
             <span className="text-amber-600 font-medium">{report.summary.sections.drafted_unlocked} to lock</span>
             <span className="text-red-600 font-medium">{report.summary.sections.empty} empty</span>

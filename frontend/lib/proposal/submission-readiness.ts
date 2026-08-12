@@ -34,6 +34,7 @@ import {
 } from '@/lib/types/canvas-document';
 
 export type BlockerCategory =
+  | 'deadline'
   | 'empty_section'
   | 'unlocked_section'
   | 'orphan_requirement'
@@ -58,6 +59,9 @@ export interface ReadinessReport {
   warningCount: number;
   summary: {
     sections: { total: number; locked: number; drafted_unlocked: number; empty: number };
+    /** Submission deadline (opportunity close). daysRemaining is negative once past; estimated = the
+     *  close date is a platform estimate, not yet confirmed from the solicitation. */
+    deadline: { closeDate: string | null; daysRemaining: number | null; past: boolean; estimated: boolean };
     requirements: { mandatory: number; satisfied: number; unmet: number };
     /** Required supporting docs/forms (SF424, reps & certs, letters): provided vs still missing. */
     documents: { required: number; provided: number; missing: number };
@@ -96,13 +100,14 @@ interface ArtifactRow {
 }
 
 const CATEGORY_ORDER: Record<BlockerCategory, number> = {
-  empty_section: 0,
-  unlocked_section: 1,
-  orphan_requirement: 2,
-  missing_document: 3,
-  page_overflow: 4,
-  work_split: 5,
-  format_floor: 6,
+  deadline: 0,
+  empty_section: 1,
+  unlocked_section: 2,
+  orphan_requirement: 3,
+  missing_document: 4,
+  page_overflow: 5,
+  work_split: 6,
+  format_floor: 7,
 };
 
 /**
@@ -113,14 +118,31 @@ export async function computeSubmissionReadiness(
   proposalId: string,
   tenantId: string,
 ): Promise<ReadinessReport | null> {
-  const [proposal] = await sql<{ id: string; programType: string | null }[]>`
-    SELECT p.id, o.program_type AS "programType"
+  const [proposal] = await sql<{ id: string; programType: string | null; closeDate: string | Date | null; datesEstimated: boolean | null }[]>`
+    SELECT p.id, o.program_type AS "programType", o.close_date AS "closeDate", o.dates_estimated AS "datesEstimated"
     FROM proposals p
     LEFT JOIN opportunities o ON o.id = p.opportunity_id
     WHERE p.id = ${proposalId}::uuid AND p.tenant_id = ${tenantId}::uuid LIMIT 1
   `;
   if (!proposal) return null;
   const isSttr = /sttr/i.test(proposal.programType ?? '');
+
+  const blockers: ReadinessBlocker[] = [];
+
+  // ── Submission deadline (opportunity close) ─────────────────────────────────
+  // A solicitation that has already CLOSED cannot be submitted to — a hard blocker when the close
+  // date is confirmed, a warning when it is a platform estimate (never hard-fail on a guessed date).
+  const closeMs = proposal.closeDate ? new Date(proposal.closeDate).getTime() : null;
+  const estimated = proposal.datesEstimated === true;
+  const daysRemaining = closeMs != null ? Math.ceil((closeMs - Date.now()) / 86_400_000) : null;
+  const past = closeMs != null && closeMs < Date.now();
+  const deadline = { closeDate: closeMs != null ? new Date(closeMs).toISOString() : null, daysRemaining, past, estimated };
+  if (past && closeMs != null) {
+    const dateStr = new Date(closeMs).toISOString().slice(0, 10);
+    blockers.push(estimated
+      ? { category: 'deadline', severity: 'warning', message: `Estimated close (${dateStr}) has passed — confirm the solicitation's actual deadline before relying on this proposal.` }
+      : { category: 'deadline', severity: 'blocker', message: `The solicitation closed on ${dateStr} — submissions are no longer accepted.` });
+  }
 
   const sections = await sql<SectionRow[]>`
     SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId",
@@ -156,8 +178,6 @@ export async function computeSubmissionReadiness(
   }
   // Sections collected per artifact (volume), in flow order, for the real rendered-page-count gate.
   const volSections = new Map<string, Array<{ title: string | null; content: string | null }>>();
-
-  const blockers: ReadinessBlocker[] = [];
 
   // ── Section state ──────────────────────────────────────────────────────────
   let locked = 0, emptyN = 0, draftedUnlocked = 0, formatViolations = 0, overBudget = 0;
@@ -365,6 +385,7 @@ export async function computeSubmissionReadiness(
     warningCount,
     summary: {
       sections: { total: sections.length, locked, drafted_unlocked: draftedUnlocked, empty: emptyN },
+      deadline,
       requirements: { mandatory: matrix.length, satisfied: satisfiedReq, unmet: matrix.length - satisfiedReq },
       documents: { required: requiredDocs.length, provided: docsProvided, missing: requiredDocs.length - docsProvided },
       formatViolations,
