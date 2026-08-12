@@ -15,6 +15,7 @@ const CATEGORY_LABEL: Record<BlockerCategory, string> = {
   empty_section: 'Not drafted',
   unlocked_section: 'Not locked',
   orphan_requirement: 'Requirement',
+  missing_document: 'Missing form',
   page_overflow: 'Over page limit',
   work_split: 'Work-split',
   format_floor: 'Format',
@@ -108,6 +109,14 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
             <span className="text-gray-600 font-medium">
               {report.summary.requirements.satisfied}/{report.summary.requirements.mandatory} requirements met
             </span>
+            {report.summary.documents.required > 0 && (
+              <>
+                <span className="text-gray-400">·</span>
+                <span className={report.summary.documents.missing > 0 ? 'text-red-600 font-medium' : 'text-emerald-600 font-medium'}>
+                  {report.summary.documents.provided}/{report.summary.documents.required} forms provided
+                </span>
+              </>
+            )}
           </div>
 
           {/* Hard-compliance gauges: rendered page count per volume + cost total + STTR work-split */}

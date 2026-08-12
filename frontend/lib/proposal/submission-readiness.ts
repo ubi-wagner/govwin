@@ -37,6 +37,7 @@ export type BlockerCategory =
   | 'empty_section'
   | 'unlocked_section'
   | 'orphan_requirement'
+  | 'missing_document'
   | 'page_overflow'
   | 'work_split'
   | 'format_floor';
@@ -58,6 +59,8 @@ export interface ReadinessReport {
   summary: {
     sections: { total: number; locked: number; drafted_unlocked: number; empty: number };
     requirements: { mandatory: number; satisfied: number; unmet: number };
+    /** Required supporting docs/forms (SF424, reps & certs, letters): provided vs still missing. */
+    documents: { required: number; provided: number; missing: number };
     formatWarnings: number;
     overBudget: number;
     /** Per size-limited volume: the REAL rendered size (pages for docs, slides for decks) vs its hard cap. */
@@ -95,9 +98,10 @@ const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   empty_section: 0,
   unlocked_section: 1,
   orphan_requirement: 2,
-  page_overflow: 3,
-  work_split: 4,
-  format_floor: 5,
+  missing_document: 3,
+  page_overflow: 4,
+  work_split: 5,
+  format_floor: 6,
 };
 
 /**
@@ -134,6 +138,13 @@ export async function computeSubmissionReadiness(
            artifact_type AS "artifactType", volume_name AS "volumeName"
     FROM proposal_artifacts
     WHERE proposal_id = ${proposalId}::uuid
+  `;
+  // Mandatory supporting documents/forms (SF424, reps & certs, required letters). Seeded at provision
+  // from the solicitation's required_documents; the tenant uploads or an admin waives each.
+  const requiredDocs = await sql<{ requirementLabel: string | null; status: string }[]>`
+    SELECT requirement_label AS "requirementLabel", status
+    FROM proposal_supporting_docs
+    WHERE proposal_id = ${proposalId}::uuid AND is_required = true
   `;
   const specByArtifact = new Map<string, ComplianceSpec>();
   const metaByArtifact = new Map<string, { artifactType: string | null; volumeName: string | null }>();
@@ -322,6 +333,20 @@ export async function computeSubmissionReadiness(
     }
   }
 
+  // ── Required document/form coverage — the #1 avoidable administrative DQ ─────
+  // A mandatory supporting doc (SF424, reps & certs, a required letter) still 'missing' is a HARD
+  // blocker: a submission missing a required form is rejected without evaluation. 'waived' is an admin
+  // decision the form is not needed; 'uploaded'/'reviewed'/'approved' all mean it is provided.
+  let docsProvided = 0;
+  for (const d of requiredDocs) {
+    if (d.status !== 'missing') { docsProvided++; continue; }
+    blockers.push({
+      category: 'missing_document',
+      severity: 'blocker',
+      message: `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
+    });
+  }
+
   blockers.sort((a, b) => CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category]);
   const blockerCount = blockers.filter((b) => b.severity === 'blocker').length;
   const warningCount = blockers.filter((b) => b.severity === 'warning').length;
@@ -334,6 +359,7 @@ export async function computeSubmissionReadiness(
     summary: {
       sections: { total: sections.length, locked, drafted_unlocked: draftedUnlocked, empty: emptyN },
       requirements: { mandatory: matrix.length, satisfied: satisfiedReq, unmet: matrix.length - satisfiedReq },
+      documents: { required: requiredDocs.length, provided: docsProvided, missing: requiredDocs.length - docsProvided },
       formatWarnings,
       overBudget,
       volumes: volumeInfo,
