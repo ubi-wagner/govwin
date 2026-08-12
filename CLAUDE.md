@@ -129,9 +129,19 @@ trigger+step templates, the start→end event gate, and the two stateless reconc
 orchestration pattern.
 
 ## Services
-1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
+1. **Frontend** (Next.js 15): Portal UI + API routes + **all front-facing content** → `frontend/`.
+   Front-facing content is **frontend-owned in the main DB**: the unified versioned `content_pages`
+   store (canonical; legacy `cms_content` is a read-fallback during transition) drives both the
+   **documents** (`blog_post`/`resource`/`guide`/`testimonial`/`team_member`) and the **dynamic pages**
+   (the page-block editor, `content_type='page'`) at `/admin/site` — draft→publish→archive
+   (`lib/content-admin.ts`), read via `lib/cms.ts`. Content is now authored **canvas-native** (the
+   proposal Canvas): the CanvasDocument is the source of truth in `metadata.canvas`; the server
+   projects the public HTML body from it on save (docs/CONTENT_STUDIO_DESIGN.md).
 2. **Pipeline** (Python 3.12): Ingestion, scoring, workers, agents → `pipeline/`
-3. **CMS/CRM** (FastAPI): Live — email automation, content pipeline, social, page-block editor; own `govtech_cms` DB → `services/cms/`
+3. **CMS/CRM** (FastAPI): Live — **email automation** (Gmail send) + social; own `govtech_cms` DB →
+   `services/cms/`. Its content/page-block routers are **superseded** for front-facing content (moved to
+   the frontend per above) — the service's forward scope is **CRM** (customer identification / acquisition
+   / management), still to be built.
 
 Frontend + Pipeline share one PostgreSQL database (govtech_intel); CMS/CRM has its own (govtech_cms)
 and bridges via the shared `system_events` table. Object storage is S3-compatible (Cloudflare R2) —
