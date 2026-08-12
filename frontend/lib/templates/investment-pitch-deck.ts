@@ -5,16 +5,21 @@
  * Title → Problem → Solution → Product → Market → Business Model →
  * Traction → Competition → Team → Financials → The Ask.
  *
- * Arial 18pt, 16:9 widescreen (slide_cso). Each slide is a page_break-delimited
- * section with a heading and structured content. {merge_field} placeholders
- * interpolate at provisioning; [bracketed prompts] mark the specifics — and the
- * italic tip lines are coaching notes the founder deletes before sending.
+ * Arial 18pt, 16:9 widescreen on the `slide_deck` preset (subtle footer
+ * '{company_name} · {n} / {N}', images enabled). Each slide is a page_break-
+ * delimited section with a heading, a structured cluster, and — on the title
+ * and three content slides — a sized `image` placeholder (empty storage_key)
+ * where a visual belongs: hero banner, solution overview, product screenshot,
+ * and the up-and-to-the-right traction chart. {merge_field} placeholders
+ * interpolate at provisioning; [bracketed prompts] mark the specifics
+ * (including each figure's caption) — and the italic tip lines are coaching
+ * notes the founder deletes before sending.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.slide_cso;
+const PRESET: CanvasRules = CANVAS_PRESETS.slide_deck;
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -49,21 +54,27 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
     node('s1-title', {
       type: 'heading',
       content: { level: 1, text: '{company_name}' },
-      style: { alignment: 'center', space_before: 80, size: 28, weight: 'bold' },
+      style: { alignment: 'center', space_before: 72, size: 28, weight: 'bold' },
     }),
     node('s1-tagline', {
       type: 'text_block',
       content: { text: '{tagline}' },
       style: { alignment: 'center', size: 20, style: 'italic' },
     }),
-    node('s1-category', {
-      type: 'text_block',
-      content: { text: 'Investor Presentation — Seed / Series [X]' },
-      style: { alignment: 'center', size: 16, space_before: 32 },
+    node('s1-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Company logo or hero product image',
+        width: 760,
+        height: 200,
+        caption: '[Company logo or hero product image — drop in your brand banner]',
+      },
+      style: { alignment: 'center', space_before: 20 },
     }),
-    node('s1-contact', {
+    node('s1-info', {
       type: 'text_block',
-      content: { text: '{contact_email}    ·    [City, State]    ·    [Month YYYY]' },
+      content: { text: 'Investor Presentation · Seed / Series [X] · {contact_email} · [City, State] · [Month YYYY]' },
       style: { alignment: 'center', size: 14, space_before: 16 },
     }),
     node('s1-break', { type: 'page_break', content: null }),
@@ -104,17 +115,23 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
       content: {
         items: [
           { text: '{company_name} is {tagline}.' },
-          { text: '[One sentence: what the product does and the outcome it creates].' },
-          { text: 'Customers get [benefit 1], [benefit 2], and [benefit 3] — in one platform.' },
-          { text: 'Unlike the alternatives, we [the core differentiator only you can claim].' },
+          { text: '[One sentence: what the product does and the outcome].' },
+          { text: 'Customers get [benefit 1], [benefit 2], [benefit 3] — one platform.' },
+          { text: 'Unlike the alternatives, we [your core differentiator].' },
         ],
       },
       style: { size: 16 },
     }),
-    node('s3-note', {
-      type: 'text_block',
-      content: { text: 'One idea per slide: the "aha." Save the how for the Product slide.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s3-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Solution overview',
+        width: 640,
+        height: 280,
+        caption: '[Solution overview graphic — the "before → after" your product creates]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s3-break', { type: 'page_break', content: null }),
 
@@ -136,10 +153,16 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s4-note', {
-      type: 'text_block',
-      content: { text: 'Show, don\'t tell — drop a product screenshot, demo frame, or architecture diagram here.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s4-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Product screenshot',
+        width: 600,
+        height: 300,
+        caption: '[Product screenshot, demo frame, or architecture diagram — show it in action]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s4-break', { type: 'page_break', content: null }),
 
@@ -212,10 +235,16 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s7-note', {
-      type: 'text_block',
-      content: { text: 'Charts beat adjectives — show the up-and-to-the-right revenue or usage curve here.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s7-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Traction growth chart',
+        width: 620,
+        height: 300,
+        caption: '[Revenue / usage growth chart — the up-and-to-the-right curve that beats adjectives]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s7-break', { type: 'page_break', content: null }),
 

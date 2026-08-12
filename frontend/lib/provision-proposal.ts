@@ -80,7 +80,7 @@ export async function provisionProposalForPortal(opts: {
   }
 
   const templateVariables: Record<string, string> = {
-    company_name: tenantName, topic_number: t.topicNumber ?? '', topic_title: t.title,
+    company_name: tenantName, project_title: proposalTitle, topic_number: t.topicNumber ?? '', topic_title: t.title,
     solicitation_number: t.solicitationNumber ?? '', pi_name: '{pi_name}', pi_email: '{pi_email}', cage_code: '{cage_code}', uei: '{uei}',
   };
 

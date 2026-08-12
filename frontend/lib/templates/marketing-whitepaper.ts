@@ -227,6 +227,24 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
       },
     }),
 
+    // ─── Key Takeaways (recap) ──────────────────────────────────
+    node('s5-takeaways-h', {
+      type: 'heading',
+      content: { level: 2, text: 'Key Takeaways' },
+      style: { space_before: 8 },
+    }),
+    node('s5-takeaways', {
+      type: 'bulleted_list',
+      content: {
+        items: [
+          { text: 'The capability gap is widening — standing still compounds cost, risk, and mission shortfall every year.' },
+          { text: 'Modernization is achievable within government constraints when security and interoperability are designed in from day one.' },
+          { text: 'Incremental delivery turns a risky multi-year program into a series of small, verifiable, momentum-building wins.' },
+          { text: 'The organizations that pull ahead treat modernization as a continuous discipline, not a one-time project.' },
+        ],
+      },
+    }),
+
     // ─── 6. About the Company ───────────────────────────────────
     node('s6-h', {
       type: 'heading',
@@ -240,6 +258,16 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
       type: 'text_block',
       content: { text: 'To learn more or discuss your mission, contact us at {contact_email} or visit {website}.' },
       style: { weight: 'bold', color: '#1f3a5f', space_before: 6 },
+    }),
+    node('closing-rule', {
+      type: 'divider',
+      content: { thickness: 1, color: '#1f3a5f', line_style: 'solid' },
+      style: { space_before: 8 },
+    }),
+    node('closing-cta', {
+      type: 'text_block',
+      content: { text: 'Ready to close your capability gap? {company_name} partners with agencies to turn this strategy into fielded, defensible capability — one verifiable increment at a time. Start the conversation at {contact_email}.' },
+      style: { alignment: 'center', weight: 'bold', color: '#1f3a5f', space_before: 8 },
     }),
   ],
 };

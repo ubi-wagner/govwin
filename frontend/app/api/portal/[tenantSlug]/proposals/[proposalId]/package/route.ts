@@ -273,7 +273,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", volume_number AS "volumeNumber"
         FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid
         ORDER BY volume_number, volume_name`;
-      const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', topic_number: '' };
+      const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', project_title: prop.title ?? '', topic_number: '' };
       const zip = new JSZip();
       const failed: string[] = [];
       let fileCount = 0;
@@ -532,6 +532,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       const vars: Record<string, string> = {
         company_name:
           (tenant as { name?: string }).name ?? 'Your Company',
+        project_title: proposal.title ?? 'TBD',
         topic_number: proposal.title ?? 'TBD',
       };
 
