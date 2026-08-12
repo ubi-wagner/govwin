@@ -85,11 +85,17 @@ async function activeDocs(types: string[], limit?: number): Promise<ContentRow[]
   return rows.map(docRowToContentRow);
 }
 
-/** Single active document by slug (page_key), excluding marketing pages. */
+/**
+ * Single active ARTICLE by slug (page_key). Restricted to the three article types that have a
+ * public detail page (/resources/[slug]) — NOT team_member/testimonial (list-only) nor 'page'
+ * (a marketing page), so those are never reachable/indexable as a generic article at that route.
+ */
+const ARTICLE_TYPES = ['resource', 'guide', 'blog_post'] as const;
 async function activeDocBySlug(slug: string): Promise<ContentRow | null> {
   const [row] = await sql<Record<string, unknown>[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${slug} AND status = 'active' AND content_type <> 'page'
+    WHERE page_key = ${slug} AND status = 'active'
+      AND content_type = ANY(${ARTICLE_TYPES as unknown as string[]})
     ORDER BY published_at DESC NULLS LAST
     LIMIT 1
   `;
