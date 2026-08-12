@@ -118,17 +118,20 @@ export function LibrarySeedPanel({ tenantSlug, proposalId }: Props) {
     setBusy(true);
     setError(null);
     try {
-      // Mark the job as skipped via a direct decide call with empty decisions then apply
-      await fetch(`${baseUrl}/decide`, {
+      // Persist status='skipped' server-side (the dedicated /skip route CAS-updates from
+      // awaiting_selection OR awaiting_review). The old path POSTed empty decisions to /decide,
+      // which never writes status — so Skip was cosmetic and the seed re-prompted on reload.
+      const res = await fetch(`${baseUrl}/skip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seedJobId: job.id, decisions: {} }),
+        body: JSON.stringify({ seedJobId: job.id }),
       });
-      // Optimistic update
-      setJob((prev) => prev ? { ...prev, status: 'skipped' } : prev);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(json.error ?? 'Skip failed'); return; }
+      await fetchJob(); // re-read the persisted 'skipped' state → renders the empty state
     } catch { setError('Network error'); }
     finally { setBusy(false); }
-  }, [job, baseUrl]);
+  }, [job, baseUrl, fetchJob]);
 
   const handleDecideAtom = useCallback((sectionId: string, atomId: string, action: string) => {
     setDecisions((prev) => ({

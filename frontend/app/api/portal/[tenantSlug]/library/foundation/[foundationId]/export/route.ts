@@ -11,7 +11,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { renderCanvas, type ExportFormat } from '@/lib/export/artifact-export';
-import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { validateStandaloneCanvas, type CanvasDocument } from '@/lib/types/canvas-document';
 
 const MIME: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -43,10 +43,19 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
     if (!format || !FORMATS.has(format)) return NextResponse.json({ error: 'format must be docx|pptx|xlsx|pdf', code: 'VALIDATION_ERROR' }, { status: 400 });
     if (!body.document || typeof body.document !== 'object') return NextResponse.json({ error: 'document (CanvasDocument) is required', code: 'VALIDATION_ERROR' }, { status: 400 });
 
-    const buf = await renderCanvas(format as ExportFormat, body.document as CanvasDocument, { company_name: 'Your Company', topic_number: 'TBD' });
+    const doc = body.document as CanvasDocument;
+    // Advisory size/format compliance floor — same ruler as proposals, against the
+    // foundation's own declared limits. Surfaced via header; never blocks.
+    let violationCodes = 'none';
+    try {
+      const v = validateStandaloneCanvas(doc).map((x) => x.code);
+      if (v.length) violationCodes = v.join(',');
+    } catch (e) { console.error('[library/foundation export] compliance check failed (non-fatal):', e); }
+
+    const buf = await renderCanvas(format as ExportFormat, doc, { company_name: 'Your Company', topic_number: 'TBD' });
     return new NextResponse(new Uint8Array(buf), {
       status: 200,
-      headers: { 'Content-Type': MIME[format], 'Content-Disposition': `attachment; filename="canvas.${format}"` },
+      headers: { 'Content-Type': MIME[format], 'Content-Disposition': `attachment; filename="canvas.${format}"`, 'X-Compliance-Violations': violationCodes },
     });
   } catch (e) {
     console.error('[library/foundation export]', e);

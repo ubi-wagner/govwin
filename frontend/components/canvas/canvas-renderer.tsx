@@ -36,8 +36,9 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
+import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 
@@ -123,7 +124,8 @@ export function CanvasRenderer({
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-4 py-4 bg-gray-200 min-h-[600px] overflow-x-hidden">
-      {/* Page */}
+      {/* Page — honors canvas.background (deck/page fill) so what you see == what exports
+          (pptx slide.background + the html/pdf page); falls back to the bg-white class. */}
       <div
         className="bg-white shadow-lg relative"
         style={{
@@ -132,6 +134,7 @@ export function CanvasRenderer({
           padding: `${canvas.margins.top * scale}px ${canvas.margins.right * scale}px ${canvas.margins.bottom * scale}px ${canvas.margins.left * scale}px`,
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
+          background: canvas.background || undefined,
         }}
       >
         {/* Watermark overlay — behind content */}
@@ -252,14 +255,36 @@ export function CanvasRenderer({
         <span>{metadata.status.replace('_', ' ')}</span>
         <span>&middot;</span>
         <span>{nodes.length} atom{nodes.length !== 1 ? 's' : ''}</span>
-        {canvas.max_pages && (
-          <>
-            <span>&middot;</span>
-            <span>
-              ~{Math.min(canvas.max_pages, estimatePageCount(doc))} of {canvas.max_pages} pages
-            </span>
-          </>
-        )}
+        {/* Size gauge — show the REAL estimate (unclamped, so an over-limit doc reads
+            red at its true count), in the unit that matches the format: slides for a
+            deck, pages for a document. Uses the unified ruler the export gate enforces. */}
+        {canvas.max_slides != null ? (
+          (() => {
+            const slides = estimateSlideCount(doc);
+            const over = slides > canvas.max_slides;
+            return (
+              <>
+                <span>&middot;</span>
+                <span className={over ? 'text-rose-600 font-semibold' : undefined}>
+                  ~{slides} of {canvas.max_slides} slides{over ? ' — over' : ''}
+                </span>
+              </>
+            );
+          })()
+        ) : canvas.max_pages != null ? (
+          (() => {
+            const pages = estimatePageCount(doc);
+            const over = pages > canvas.max_pages;
+            return (
+              <>
+                <span>&middot;</span>
+                <span className={over ? 'text-rose-600 font-semibold' : undefined}>
+                  ~{pages} of {canvas.max_pages} pages{over ? ' — over' : ''}
+                </span>
+              </>
+            );
+          })()
+        ) : null}
         <span>&middot;</span>
         <span>v{metadata.version_number}</span>
       </div>
@@ -286,9 +311,17 @@ function DropZone({ onDrop }: { onDrop: () => void }) {
 
 // ─── Drag handle icon ───────────────────────────────────────────────
 
-function DragHandle() {
+function DragHandle({ nodeId, onDragStart, onDragEnd }: { nodeId: string; onDragStart: () => void; onDragEnd: () => void }) {
   return (
-    <div className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-opacity">
+    <div
+      // The grip is the ONLY drag initiator now — so dragging across the node's TEXT
+      // makes a text selection (which pops the selection toolbar) instead of a reorder.
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', nodeId); e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
+      onDragEnd={onDragEnd}
+      title="Drag to reorder"
+      className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-opacity"
+    >
       <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
         <circle cx="3" cy="2" r="1.5" />
         <circle cx="9" cy="2" r="1.5" />
@@ -328,15 +361,8 @@ function TocRenderer({ nodes, isSelected, onSelect, readOnly, nodeId, isDragging
     <div
       className={`relative rounded px-1 cursor-pointer transition-all py-2 group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      draggable={!readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', nodeId);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
     >
-      {!readOnly && <DragHandle />}
+      {!readOnly && <DragHandle nodeId={nodeId} onDragStart={onDragStart} onDragEnd={onDragEnd} />}
       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Table of Contents</div>
       {headings.length === 0 ? (
         <div className="text-xs text-gray-400 italic">No headings in document. Add Heading nodes to populate the TOC.</div>
@@ -498,21 +524,42 @@ function NodeRenderer({
     backgroundColor: node.style.background ?? undefined,
   };
 
+  // Free placement (Arrange): a node with an explicit position + a non-inline wrap is
+  // absolutely placed — matching EXACTLY what the exporters do (lib/export/canvas-html.ts
+  // + pptx-exporter). Rendering it here restores WYSIWYG: previously the editor ignored
+  // node.position, so a positioned node looked in-flow yet exported free-placed. Units are
+  // inches (as the export uses); the page's transform:scale scales them with everything else.
+  const pos = node.position;
+  const freePlaced = !!pos && (pos.wrap === 'float' || pos.wrap === 'behind' || pos.wrap === 'front');
+  const posStyle: React.CSSProperties = freePlaced ? {
+    position: 'absolute',
+    left: typeof pos!.x === 'number' ? `${pos!.x}in` : undefined,
+    top: typeof pos!.y === 'number' ? `${pos!.y}in` : undefined,
+    width: typeof pos!.w === 'number' ? `${pos!.w}in` : undefined,
+    height: typeof pos!.h === 'number' ? `${pos!.h}in` : undefined,
+    zIndex: pos!.wrap === 'behind' ? 0 : (pos!.z ?? 5),
+  } : {};
+
   return (
     <div
-      className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
-      style={nodeStyle}
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      draggable={!readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', node.id);
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart();
+      data-node-id={node.id}
+      className={`relative rounded px-1 cursor-text transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
+      // The node body is NOT draggable (only the grip is) and the text is selectable, so a
+      // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,
+      // instead of a drag-reorder. Reorder still works from the ⠿ grip.
+      style={{ ...nodeStyle, ...posStyle, userSelect: readOnly ? undefined : 'text' }}
+      onClick={(e) => {
+        e.stopPropagation();
+        // A click that ends a text drag-select must NOT swap the node into edit mode — that
+        // would drop the selection and hide the fluid toolbar before you can act on it. Keep
+        // the selection alive when one exists; a plain click (no selection) selects/edits.
+        const s = window.getSelection();
+        if (s && !s.isCollapsed && s.toString().trim()) return;
+        onSelect();
       }}
-      onDragEnd={onDragEnd}
     >
-      {/* Drag handle */}
-      {!readOnly && <DragHandle />}
+      {/* Drag handle — the sole drag initiator */}
+      {!readOnly && <DragHandle nodeId={node.id} onDragStart={onDragStart} onDragEnd={onDragEnd} />}
 
       {/* Provenance badge */}
       {provenanceBadge && isSelected && (
@@ -1076,8 +1123,11 @@ function tableCellStyleProps(style?: TableCellStyle, fallback?: TableCellStyle):
   const merged = { ...fallback, ...style };
   return {
     backgroundColor: merged.bg ?? undefined,
+    color: merged.fg ?? undefined,
     fontWeight: merged.bold ? 'bold' : undefined,
     textAlign: merged.alignment ?? undefined,
+    ...(merged.border === 'none' ? { borderColor: 'transparent' }
+      : merged.border === 'thick' ? { borderWidth: 2, borderColor: '#334155' } : {}),
   };
 }
 
@@ -1091,6 +1141,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   content: TableContent; readOnly: boolean;
   onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
 }) {
+  const [focusedCell, setFocusedCell] = useState<{ kind: 'h' | 'b'; ri: number; ci: number } | null>(null);
   const outerBorder = tableBorderClass(content.border_style);
   const cellBorder = content.border_style === 'none'
     ? 'px-2 py-1'
@@ -1108,7 +1159,11 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
   const updateCell = (ri: number, ci: number, text: string) => {
     const rows = (content.rows ?? []).map(r => [...r]);
     const cell = resolveTableCell(rows[ri][ci]);
-    rows[ri][ci] = { ...cell, text };
+    const next: TableCellType = { ...cell, text };
+    // Keep a numeric cell's machine `value` in sync with the edited text — exports (docx/xlsx/pdf)
+    // and the cost readiness roll-up read `value`, so a stale value silently ignores the edit.
+    if (isNumericCell(cell)) { const v = parseNumericText(text); next.value = v == null ? undefined : v; }
+    rows[ri][ci] = next;
     onUpdate({ ...content, rows });
   };
 
@@ -1135,9 +1190,48 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
     onUpdate({ ...content, headers, rows });
   };
 
+  // ── Per-cell styling (doc mode) — bold / align / background on the focused cell.
+  // The renderer + all exporters already honor TableCellStyle; this adds the editing
+  // affordance that doc mode lacked (previously only spreadsheet mode could style cells).
+  const focusedStyle: TableCellStyle | undefined = focusedCell
+    ? resolveTableCell(focusedCell.kind === 'h' ? content.headers[focusedCell.ci] : content.rows[focusedCell.ri]?.[focusedCell.ci]).style
+    : undefined;
+  const styleFocusedCell = (patch: Partial<TableCellStyle>) => {
+    if (!focusedCell) return;
+    if (focusedCell.kind === 'h') {
+      const headers = [...content.headers];
+      const cell = resolveTableCell(headers[focusedCell.ci]);
+      headers[focusedCell.ci] = { ...cell, style: { ...cell.style, ...patch } };
+      onUpdate({ ...content, headers });
+    } else {
+      const rows = (content.rows ?? []).map(r => [...r]);
+      const cell = resolveTableCell(rows[focusedCell.ri][focusedCell.ci]);
+      rows[focusedCell.ri][focusedCell.ci] = { ...cell, style: { ...cell.style, ...patch } };
+      onUpdate({ ...content, rows });
+    }
+  };
+
   if (isSelected && !readOnly) {
+    const cellToolbar = (
+      <div className={`flex items-center gap-1 mb-1 text-xs ${focusedCell ? '' : 'opacity-40 pointer-events-none'}`}>
+        <span className="text-[10px] text-gray-400 mr-1">{focusedCell ? 'Cell:' : 'Select a cell'}</span>
+        <button onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ bold: !focusedStyle?.bold }); }}
+          className={`px-2 py-0.5 font-bold border rounded ${focusedStyle?.bold ? 'bg-blue-100 border-blue-300 text-blue-700' : 'border-gray-200'}`} title="Bold">B</button>
+        {(['left', 'center', 'right'] as const).map(a => (
+          <button key={a} onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ alignment: a }); }}
+            className={`px-2 py-0.5 border rounded ${focusedStyle?.alignment === a ? 'bg-blue-100 border-blue-300' : 'border-gray-200'}`} title={`Align ${a}`}>
+            {a === 'left' ? '⇤' : a === 'right' ? '⇥' : '⇔'}</button>
+        ))}
+        <label className="ml-1 text-[10px] text-gray-500 flex items-center gap-1">Fill
+          <input type="color" value={focusedStyle?.bg || '#ffffff'} onMouseDown={(e) => e.stopPropagation()}
+            onChange={(e) => styleFocusedCell({ bg: e.target.value === '#ffffff' ? undefined : e.target.value })}
+            className="h-5 w-5 border rounded cursor-pointer p-0" title="Cell background" /></label>
+        {focusedStyle?.bg && <button onMouseDown={(e) => { e.preventDefault(); styleFocusedCell({ bg: undefined }); }} className="text-[10px] text-rose-500 hover:underline">clear</button>}
+      </div>
+    );
     return (
       <div className="my-2">
+        {cellToolbar}
         <table className={`w-full border-collapse text-sm ${outerBorder || 'border border-gray-300'}`}>
           <thead>
             <tr className="bg-gray-50">
@@ -1147,6 +1241,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
                   <th key={i} className={`text-left font-semibold ${cellBorder}`}>
                     <div className="flex flex-col">
                       <input type="text" value={cell.text} onChange={(e) => updateHeader(i, e.target.value)}
+                        onFocus={() => setFocusedCell({ kind: 'h', ri: -1, ci: i })}
                         className="w-full bg-transparent border-0 outline-none font-semibold text-sm" />
                       {content.headers.length > 1 && (
                         <button
@@ -1169,6 +1264,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
                   return (
                     <td key={ci} className={cellBorder}>
                       <input type="text" value={cell.text} onChange={(e) => updateCell(ri, ci, e.target.value)}
+                        onFocus={() => setFocusedCell({ kind: 'b', ri, ci })}
                         className="w-full bg-transparent border-0 outline-none text-sm" />
                     </td>
                   );
@@ -1205,7 +1301,7 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
             {row.map((c, ci) => {
               const cell = resolveTableCell(c);
               const styleProps = tableCellStyleProps(cell.style);
-              return (<td key={ci} className={cellBorder} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{cell.text}</td>);
+              return (<td key={ci} className={cellBorder} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{formatCellDisplay(cell)}</td>);
             })}
           </tr>
         ))}

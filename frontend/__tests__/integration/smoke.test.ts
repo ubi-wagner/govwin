@@ -146,9 +146,23 @@ describe('Smoke 2 — Proposal provisioning round-trip', () => {
     expect(key).toBe('dod-cso-phase1-briefing');
   });
 
+  it('resolveTemplateKey() maps sbir_phase_1 + spreadsheet to the cost template', () => {
+    // A SBIR Phase I cost volume (spreadsheet) gets the cost template, not the narrative one.
+    expect(resolveTemplateKey('sbir_phase_1', 'spreadsheet')).toBe('dod-sbir-phase1-cost');
+  });
+
+  it('resolveTemplateKey() never templates form/cover-sheet items (the 15/1p guard)', () => {
+    // Name-guarded auto/form volumes must never inherit a template even when their itemType
+    // would otherwise resolve one — a Cover Sheet (word_doc) and a Cost Sheet (spreadsheet) both null out.
+    expect(resolveTemplateKey('sbir_phase_1', 'word_doc', 'Proposal Cover Sheet')).toBeNull();
+    expect(resolveTemplateKey('sbir_phase_1', 'spreadsheet', 'Cost Sheet')).toBeNull();
+    expect(resolveTemplateKey('sbir_phase_1', 'word_doc', 'Company Commercialization Report')).toBeNull();
+  });
+
   it('resolveTemplateKey() returns null for unknown combinations', () => {
     expect(resolveTemplateKey('unknown_program', 'word_doc')).toBeNull();
-    expect(resolveTemplateKey('sbir_phase_1', 'spreadsheet')).toBeNull();
+    expect(resolveTemplateKey('sbir_phase_1', 'text')).toBeNull();
+    expect(resolveTemplateKey('baa', 'spreadsheet')).toBeNull();
   });
 
   it('resolveTemplateKey() returns key for sbir_phase_2', () => {

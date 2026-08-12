@@ -144,6 +144,13 @@ export default async function ProposalsListPage({ params }: Props) {
           <p className="text-sm text-gray-500 mt-1">
             {emptyStateCopy}
           </p>
+          {/* A build starts at the opportunity feed (pin → purchase). Give the empty state a real
+              forward action instead of a dead "go purchase" pointer. */}
+          {canPurchase && (
+            <a href={`/portal/${tenantSlug}/cards`} className="inline-block mt-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-2">
+              Browse opportunities →
+            </a>
+          )}
         </div>
       ) : (
         <>

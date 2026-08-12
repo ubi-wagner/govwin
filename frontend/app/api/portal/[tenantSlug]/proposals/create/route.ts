@@ -274,6 +274,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const tenantName = (tenant.name as string) ?? '';
     const templateVariables: Record<string, string> = {
       company_name: tenantName,
+      project_title: proposalTitle,
       topic_number: topic.topicNumber ?? '',
       topic_title: topic.title,
       solicitation_number: topic.solicitationNumber ?? '',
@@ -433,7 +434,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             }
           }
           if (!templateDoc) {
-            const templateKey = resolveTemplateKey(programType, item.itemType);
+            const templateKey = resolveTemplateKey(programType, item.itemType, item.itemName);
             if (templateKey) templateDoc = getTemplate(templateKey);
           }
           if (templateDoc) {

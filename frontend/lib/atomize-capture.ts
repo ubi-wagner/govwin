@@ -15,6 +15,8 @@ import { withTenant } from '@/lib/rls';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerImagePath } from '@/lib/storage/paths';
+import { enrichImages, type Enriched } from '@/lib/atom-enrich';
+import { cleanText } from '@/lib/clean-text';
 
 export const MAX_REGIONS = 24;
 export const MAX_CAPTURE_BYTES = 12 * 1024 * 1024; // 12MB per image
@@ -82,9 +84,9 @@ const defaultStore: StoreFn = async (tenantSlug, img) => {
 function provenanceLine(sourceUrl?: string, note?: string): string {
   const host = (() => { try { return sourceUrl ? new URL(sourceUrl).host : ''; } catch { return sourceUrl ?? ''; } })();
   const parts = ['Screen capture'];
-  if (host) parts.push(`from ${host}`);
+  if (host) parts.push(`from ${cleanText(host)}`);
   parts.push(`· ${new Date().toISOString()}`);
-  if (note) parts.push(`· ${note.slice(0, 200)}`);
+  if (note) parts.push(`· ${cleanText(note).slice(0, 200)}`); // sanitize user note → DB-safe (no 22021)
   return parts.join(' ');
 }
 
@@ -92,11 +94,18 @@ export async function atomizeCaptureIntoLibrary(
   tenantId: string,
   tenantSlug: string,
   input: CaptureInput,
-  opts?: { store?: StoreFn },
+  opts?: { store?: StoreFn; enrich?: (buffers: Buffer[]) => Promise<Enriched[]> },
 ): Promise<CaptureResult> {
   const { full, regions, sourceUrl, note, groupName, ctxTags, actor } = input;
   const doStore = opts?.store ?? defaultStore;
+  const doEnrich = opts?.enrich ?? enrichImages;
   const prov = provenanceLine(sourceUrl, note);
+
+  // OCR every region up front (one worker for the whole batch) so each image atom carries searchable,
+  // machine-legible text. Best-effort — a failure just leaves the atoms text-less, never aborts.
+  let enriched: Enriched[] = regions.map(() => ({ text: '', engine: 'none' }));
+  try { enriched = await doEnrich(regions.map((r) => r.buffer)); }
+  catch (e) { console.error('[atomize-capture] enrich failed (non-fatal)', e); }
 
   // 1) Foundational cocoon for this capture.
   let cocoonId: string | null = null;
@@ -115,9 +124,9 @@ export async function atomizeCaptureIntoLibrary(
       const { key } = await doStore(tenantSlug, full);
       const ref = await createAtom(tenantId, {
         grain: 'reference',
-        title: `Screen capture ${sourceUrl ? `(${(() => { try { return new URL(sourceUrl).host; } catch { return sourceUrl; } })()})` : ''}`.trim(),
+        title: cleanText(`Screen capture ${sourceUrl ? `(${(() => { try { return new URL(sourceUrl).host; } catch { return sourceUrl; } })()})` : ''}`.trim()),
         content: null,
-        canvasNodes: [imageNode(key, { alt: 'screen capture', caption: note, width: full.width, height: full.height })],
+        canvasNodes: [imageNode(key, { alt: 'screen capture', caption: note ? cleanText(note) : undefined, width: full.width, height: full.height })],
         summary: prov,
         source: 'upload',
         status: 'draft',
@@ -134,13 +143,14 @@ export async function atomizeCaptureIntoLibrary(
     const r = regions[i];
     try {
       const { key } = await doStore(tenantSlug, r);
-      const title = (r.title || `Region ${i + 1}`).slice(0, 120);
+      const title = cleanText(r.title || `Region ${i + 1}`).slice(0, 120); // sanitize user title → DB-safe
+      const ocr = enriched[i]?.text ?? ''; // extracted text → searchable (summary) + machine-legible (content)
       const created = await createAtom(tenantId, {
         grain: 'primitive',
         title,
-        content: null,
-        canvasNodes: [imageNode(key, { alt: title, caption: r.title, width: r.width, height: r.height })],
-        summary: prov,
+        content: ocr || null,
+        canvasNodes: [imageNode(key, { alt: title, caption: r.title ? cleanText(r.title) : undefined, width: r.width, height: r.height })],
+        summary: ocr ? `${prov} — ${ocr.slice(0, 200)}` : prov,
         source: 'upload',
         status: 'draft',
         cocoonId,
@@ -157,7 +167,7 @@ export async function atomizeCaptureIntoLibrary(
     try {
       const grp = await createAtom(tenantId, {
         grain: 'group',
-        title: groupName.trim().slice(0, 120),
+        title: cleanText(groupName.trim()).slice(0, 120),
         content: null,
         summary: prov,
         source: 'upload',

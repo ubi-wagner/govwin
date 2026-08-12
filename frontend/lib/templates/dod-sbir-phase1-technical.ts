@@ -46,9 +46,14 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover Page ─────────────────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 468, height: 96, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 18 },
+    }),
     node('cover-title', {
       type: 'heading', content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', space_before: 120 },
+      style: { alignment: 'center', space_before: 24 },
     }),
     node('cover-subtitle', {
       type: 'text_block', content: { text: 'SBIR Phase I Technical Volume' },
@@ -110,6 +115,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[Describe your proposed innovation and how it addresses the stated need. What is novel about your approach compared to the state of the art? What specific technical challenges will you overcome? Be specific about the innovation — reviewers score novelty heavily. 2-3 paragraphs.]' },
     }),
 
+    node('figure-1', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'System architecture and solution concept diagram', width: 400, height: 250, caption: 'Figure 1: [System architecture / solution concept]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s1-3-heading', {
       type: 'heading', content: { level: 2, text: '1.3 Technical Objectives', numbering: '1.3' },
     }),
@@ -136,6 +146,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[This is the core of the proposal. Describe your technical approach in detail: the methods, algorithms, processes, or experimental design you will use to achieve each objective. Include preliminary data or proof-of-concept results if available. Reference specific technical literature. Explain why this approach will work and what risks exist. 3-5 paragraphs with figures/tables as needed.]' },
     }),
 
+    node('figure-2', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I feasibility results plot', width: 400, height: 250, caption: 'Figure 2: [Phase I feasibility results / preliminary data]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s1-5-heading', {
       type: 'heading', content: { level: 2, text: '1.5 Schedule & Milestones', numbering: '1.5' },
     }),
@@ -255,6 +270,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[How will this technology transition from Phase I feasibility to Phase II prototype to Phase III production/deployment? Identify specific DoD programs of record, prime contractors, or commercial customers who would adopt this technology. Include any Letters of Intent or existing relationships.]' },
     }),
 
+    node('figure-3', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I to Phase III transition timeline', width: 400, height: 240, caption: 'Figure 3: [Phase I to II to III transition timeline]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s5-3-heading', {
       type: 'heading', content: { level: 2, text: '5.3 Intellectual Property', numbering: '5.3' },
     }),

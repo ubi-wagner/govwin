@@ -1,5 +1,14 @@
 # Automation Spine — End-to-End Map (for review, 2026-07-22)
 
+> **2026-08-09:** the workflows here are now visualized at `/admin/workflows` (by-spine Workflow Map + live
+> instance DAGs; operator guide **docs/WORKFLOW_ADMIN_GUIDE.md**), and the full-draft cohort's staged output
+> lands via a frontend read-on-review route (**docs/FULL_DRAFT_LANDING_DESIGN.md** — the engine forbids a
+> pipeline consumer of agent output).
+
+> **See also — the full-stack view.** This map is the *engine's* internals (triggers · step DAGs · the two
+> reconcilers). For where the engine sits in the whole request path — the seven planes from UI to DB and the
+> return loop back to the surface, with end-to-end traces — see **docs/DATA_FLOW.md** (the platform in section).
+
 > **As-built correction (deepest-review sweep).** The authoritative, `file:line`-verified spine is now
 > **docs/START_END_FRAMEWORK.md**. Corrected here: the trigger keys `proposal:outcome.recorded:end` and
 > `finder:solicitation.triaged:end` (the earlier `proposal:proposal.outcome_recorded` /

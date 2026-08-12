@@ -10,7 +10,7 @@
 
 import ExcelJS from 'exceljs';
 import { docNodes } from '@/lib/types/canvas-document';
-import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { rasterizeDataUri, resolveImageDataUri, type RasterPng } from '@/lib/export/image-raster';
 import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
 import type {
   CanvasDocument,
@@ -169,8 +169,8 @@ export async function exportToXlsx(
           fgColor: { argb: 'FF' + resolved.style.bg.replace('#', '') },
         };
       }
-      if (resolved.style?.bold !== undefined) {
-        excelCell.font = { ...excelCell.font, bold: resolved.style.bold };
+      if (resolved.style?.bold !== undefined || resolved.style?.fg) {
+        excelCell.font = { ...excelCell.font, ...(resolved.style.bold !== undefined ? { bold: resolved.style.bold } : {}), ...(resolved.style.fg ? { color: { argb: 'FF' + resolved.style.fg.replace('#', '') } } : {}) };
       }
       if (resolved.style?.alignment) {
         excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
@@ -218,8 +218,8 @@ export async function exportToXlsx(
         if (isNumeric && !resolved.style?.alignment) {
           excelCell.alignment = { ...excelCell.alignment, horizontal: 'right', wrapText: false };
         }
-        if (resolved.style?.bold) {
-          excelCell.font = { ...excelCell.font, bold: true };
+        if (resolved.style?.bold || resolved.style?.fg) {
+          excelCell.font = { ...excelCell.font, ...(resolved.style.bold ? { bold: true } : {}), ...(resolved.style.fg ? { color: { argb: 'FF' + resolved.style.fg.replace('#', '') } } : {}) };
         }
         if (resolved.style?.bg) {
           excelCell.fill = {
@@ -230,6 +230,16 @@ export async function exportToXlsx(
         }
         if (resolved.style?.alignment) {
           excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
+        }
+        // Per-cell border override (default is thin all around). 'none' clears it; 'thick' = a
+        // heavier rule (e.g. a bordered total row) — matches what the editor grid shows.
+        if (resolved.style?.border) {
+          if (resolved.style.border === 'none') {
+            excelCell.border = {};
+          } else {
+            const st = resolved.style.border === 'thick' ? 'thick' : 'thin';
+            excelCell.border = { top: { style: st }, left: { style: st }, bottom: { style: st }, right: { style: st } };
+          }
         }
       });
     }
@@ -283,7 +293,7 @@ export async function exportToXlsx(
     await Promise.all(
       nonTableNodes.filter((n) => n.type === 'image' || n.type === 'chart' || n.type === 'shape').map(async (n) => {
         const uri = n.type === 'image'
-          ? (n.content as ImageContent)?.storage_key
+          ? await resolveImageDataUri((n.content as ImageContent)?.storage_key)
           : n.type === 'chart'
             ? svgDataUri(renderChartSvg(n.content as ChartContent))
             : svgDataUri(renderShapeSvg(n));

@@ -246,12 +246,20 @@ def test_solicitation_push_emits_pushed_after_fanout_for_digest_ordering():
     assert pushed > fanout, "solicitation.pushed must be emitted after the fan-out block"
 
 
-def test_buckets_routes_emit_buckets_updated_not_inline_rank():
-    """Bucket create/edit/rank emit capture:buckets.updated (pipeline rescore), no inline rankBucket."""
+def test_buckets_routes_emit_buckets_updated_for_tenant_side_rescore():
+    """Bucket create/edit/rank must emit capture:buckets.updated so the tenant-side agent path
+    (OnBucketsUpdated -> rescore.py + scoring_strategist) ALWAYS fires. That event — not the
+    absence of an inline call — is what guarantees "ranking happens inside the tenant space by
+    their agents": it catches the real regression (a route that ranks inline but forgets to
+    announce the change, so the pipeline never rescores).
+
+    A supplementary, tenant-scoped (withTenant / WHERE tenant_id) inline rankBucket at CREATE is
+    ALLOWED and intentional — it makes a brand-new bucket show a ranked list instantly, the same
+    immediate "auto-scored on arrival" pattern used at tenant provision (lib/cards/score-tenant.ts).
+    It never replaces the event and never crosses tenants, so it does not violate the invariant."""
     for rel in (
         "app/api/portal/[tenantSlug]/buckets/route.ts",
         "app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts",
     ):
         src = _read_frontend(rel)
-        assert "'buckets.updated'" in src
-        assert "rankBucket" not in src, f"{rel} must not call rankBucket inline"
+        assert "'buckets.updated'" in src, f"{rel} must emit capture:buckets.updated (the tenant-side rescore trigger)"

@@ -30,7 +30,7 @@ import {
   ImageRun,
   convertInchesToTwip,
 } from 'docx';
-import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { rasterizeDataUri, resolveImageDataUri, type RasterPng } from '@/lib/export/image-raster';
 import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
 import { docNodes } from '@/lib/types/canvas-document';
 import type {
@@ -177,7 +177,7 @@ export async function exportToDocx(
   await Promise.all(
     nodes.filter(needsRaster).map(async (n) => {
       const uri = n.type === 'image'
-        ? (n.content as { storage_key?: string })?.storage_key
+        ? await resolveImageDataUri((n.content as { storage_key?: string })?.storage_key)
         : n.type === 'chart'
           ? svgDataUri(renderChartSvg(n.content as ChartContent))
           : svgDataUri(renderShapeSvg(n));
@@ -408,6 +408,7 @@ function nodeToDocx(
               children: [new TextRun({
                 text: cell.text,
                 bold: mergedStyle.bold !== false,
+                color: mergedStyle.fg ? mergedStyle.fg.replace('#', '') : undefined,
                 font,
                 size,
               })],
@@ -434,6 +435,7 @@ function nodeToDocx(
                 children: [new TextRun({
                   text: cell.text,
                   bold: cellStyle?.bold ?? false,
+                  color: cellStyle?.fg ? cellStyle.fg.replace('#', '') : undefined,
                   font,
                   size,
                 })],

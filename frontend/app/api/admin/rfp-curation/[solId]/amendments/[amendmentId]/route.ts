@@ -9,6 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { enterBypass } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
 import { confirmAmendment, dismissAmendment } from '@/lib/amendments';
 
@@ -28,6 +29,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     if ((user.role !== 'rfp_admin' && user.role !== 'master_admin') || !user.id) {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
+    // confirmAmendment fans a flag out across EVERY affected tenant's proposals (cross-tenant
+    // read of proposals + write of proposal_amendment_flags, both RLS'd) → run the lib helpers
+    // on the owner/bypass pool (docs/RLS_CUTOVER.md); they inherit this frame's context.
+    enterBypass();
     const { solId, amendmentId } = await ctx.params;
     if (!UUID_RE.test(solId) || !UUID_RE.test(amendmentId)) {
       return NextResponse.json({ error: 'Invalid ID', code: 'VALIDATION_ERROR' }, { status: 400 });

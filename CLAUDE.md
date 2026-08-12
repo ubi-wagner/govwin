@@ -11,6 +11,11 @@ fans EVERY activated opportunity (umbrella + all topics) onto the forward-only
 `opportunity_bridge` → a denormalized `tenant_opportunity_cards` row per tenant, ranked by
 `tenant_spotlight_buckets`/`tenant_bucket_scores` (auto-scored on arrival), and drafted from
 the unified `library_atoms` library (visibility-enforced, taxonomy-tagged, upload→atomize→select).
+Atom retrieval is now **hybrid**: the tag/context selector (`selectForSection`) blends in **semantic
+cosine similarity** off a per-atom pgvector index (`atom_embeddings`, mig 171, tenant-scoped + FORCE-RLS)
+when a **gated** engine is on — Voyage in prod (`VOYAGE_API_KEY`) or a dependency-free local-hash
+embedder (`ATOM_EMBED=local`); **inert by default** → byte-for-byte the pre-vector selector, zero
+regression. Isolation proven at rest · RLS · app-layer (docs/SEMANTIC_RETRIEVAL.md; `lib/embeddings.ts`).
 The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and now **DROPPED**
 (mig 125, alongside 11 other superseded tables; the `library_units` family went in mig 121) —
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
@@ -21,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 855 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 987 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -30,7 +35,15 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **162** — the **V1 UI-wiring pass** (145–148)
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **169** — migs 163–167 per below;
+the **cost-volume common-form pass** added migs **168–169** (the Ohio TVSF Round-45 OPP card + the final Foundation
+3DCP proposal off it, for deployment verification). The cost/budget volume is now COMPUTED + agency-neutral: one
+deterministic burden engine (`lib/proposal/cost-model.ts`, a TS port of `pipeline/…/budget_model.py`, parity to the
+cent) rendered in the common government FORM the solicitation requires — `burden_waterfall` (DoW/DoD SBIR·STTR),
+`sf424a` (NSF/DOE grants), or `otf_state_budget` (Ohio TVSF / state EDA) — via `resolveCostForm`/`buildCostVolume`
+(`lib/proposal/cost-forms.ts`); readiness rolls up the computed price + work-split, and one shared numeric-cell parser
+(`lib/numeric-cell.ts`) keeps edited cell `value`s in sync so tenant edits drive the roll-up + exports. Canonical:
+**docs/COST_VOLUME_FORMS.md**. — the **V1 UI-wiring pass** (145–148)
 added: mig 145 `notification_read_state` (per-user read watermark), mig 146 `solicitation_amendments` +
 `proposal_amendment_flags` (the amendment detect→confirm→fan-out→acknowledge engine), mig 147
 `proposals.archived_at`, and mig 148 `archived_at` on `process_instances`/`tenant_opportunity_cards`/
@@ -92,7 +105,24 @@ in schema** — mig 116 forced RLS on `episodic_memories`, and mig 136_rls_cutov
 (`govtech_app` app / `rfp_agent` agents), `tenant_isolation` policies, and the per-request `SET app.tenant_id`
 context layer (mig 137 validates the namespace CHECK); it stays **inert until the one-op prod `DATABASE_URL`
 flip** off the owner role (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
-per-tenant usage, forward-only bridge).
+per-tenant usage, forward-only bridge). **Workflow visualization + compliance + full-draft landing (2026-08,
+merged via PR #205 + deployed):** `/admin/workflows` renders a dependency-free **Workflow Map** — all 29
+templates as DAGs, grouped by the two spines + platform — plus **live instance graphs** (per-step status
+overlay) and a sortable/filterable/Live monitor (operator guide: docs/WORKFLOW_ADMIN_GUIDE.md;
+`app/admin/workflows/workflow-{graph,shapes,map}.tsx`). The **compliance floor** `validateCanvasAgainstSpec`
+(`lib/types/canvas-document.ts`) checks font/**pages**/**slides**/**per-section page budgets**/images/header-footer
+across ALL canvas types (doc·pdf·ppt·xls) — the size ruler is now **one calibrated engine**: `estimatePageCount`
+delegates to `paginate()` (moved into `canvas-document.ts`; `lib/export/paginate.ts` re-exports it) so the live
+editor gauge and the export gate can never disagree, and `estimateSlideCount`/`overflowingSlides`/`sectionPageSpan`
+extend it to decks + section limits. It is enforced at the artifact export gate (`X-Compliance-Violations` header +
+`proposal:artifact.exported {compliant}`) and on section save (`data.complianceWarnings`, non-blocking), AND on
+**standalone (non-proposal) documents** — the portal/admin document + library-foundation save/export routes call
+`validateStandaloneCanvas` (a self-declared floor read off `doc.canvas`), so a 2-page flier or a 10-slide deck built
+outside a proposal is size-checked too. The full-draft cohort's staged output LANDS via a **read-on-review**
+route (`POST …/proposals/[p]/land-revisions` + the "Apply AI-proposed revisions" button in
+`proposal-ai-actions.tsx`) that writes proposed `ai_revision` `canvas_versions` the builder reviews + restores
+— the workflow engine's invariants FORBID a pipeline consumer of agent output, so the landing is frontend +
+human-triggered (docs/FULL_DRAFT_LANDING_DESIGN.md).
 `opportunity_id` keys the spine (mig 088). **The workflow engine the agents plug into — the declarative
 trigger+step templates, the start→end event gate, and the two stateless reconcilers — is mapped in
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
@@ -144,7 +174,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (855 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (987 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
@@ -152,6 +182,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.
 
 ## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
+- **camelCase results (`postgres.toCamel`) — the #1 runtime-crash class:** `lib/db.ts` applies
+  `transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } }` to BOTH `sql` and
+  `sqlBypass`, so EVERY row comes back **camelCased** — `created_at`→`createdAt`,
+  `word_count`→`wordCount`, an `AS tag_count` alias→`tagCount`. **Read camelCase in JS**
+  (`r.createdAt`); a snake_case access silently yields `undefined`. The SQL text itself still uses
+  snake_case column names. ⚠️ **The `sql<typeof rows>` trap:** a manual row-type assertion whose
+  fields are declared snake_case COMPILES (tsc trusts the assertion) yet every read is `undefined`
+  at runtime — this shipped **twice this session** (`atoms/review` → `new Date(undefined).toISOString()`
+  → "Invalid time value" 500; `proposals/[p]/document` → `r.volume_name` undefined → every section's
+  volume grouping silently dropped from the assembled doc). Declare the `sql<typeof rows>` field names
+  **camelCase**, matching the runtime, and read them camelCase.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
   On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).
@@ -170,6 +211,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `proposal_portals.opportunity_id` does not).
 - **Dropping tables:** drop ONLY when superseded-with-a-successor AND zero live code refs. "Empty in the
   sandbox" is NOT a drop signal — most empty tables are live-but-unused.
+- **canvas_versions numbering:** `proposal_sections.version` MUST stay `> MAX(canvas_versions.version_number)`
+  per section. A new version row numbers at the section's CURRENT `version` and ADVANCES the counter (CAS
+  `version = version + 1`), like `lib/proposal/lock-section.ts` / `lib/proposal-advance.ts` / the save route.
+  Numbering at `MAX+1` WITHOUT advancing makes the next human-save's archive collide on the slot →
+  `ON CONFLICT (section_id, version_number) DO NOTHING` silently drops it → undo/history content-loss. (The
+  full-draft read-on-review landing route follows this; found via a live staging scenario, docs/FULL_DRAFT_LANDING_DESIGN.md.)
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
@@ -204,9 +251,27 @@ See CLAUDE_CLIFFNOTES.md for:
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
-docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow.
+docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow. For the
+**UI→DB→back request path** — the seven planes (UI · API · domain · data · events · engine · agents) and
+the canonical end-to-end traces (section save · discovery fan-out · build→package · agent land-or-review ·
+amendment fan-out) with their invariants — see **docs/DATA_FLOW.md** (the *static* cross-section; the *live*
+per-instance DAGs are the `/admin/workflows` Workflow Map).
 
 **Continuity:** `docs/CONTINUATION.md` is the durable "start here" memory — current
 sprint state, how to spin up the sandbox, verified demo accounts, the live gap list, and
 the recurring bug-classes. Read it first when resuming; the identity model is in
 docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+
+**Common-Canvas redesign (2026-08):** the four-phase analysis (`docs/CANVAS_ARCHITECTURE.md` →
+`CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` → `CANVAS_REDESIGN_PLAN.md`) drove a
+signed-off MVP + admin-plane build recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
+hub** — a writable section restore path (`…/sections/[s]/versions` POST, CAS-safe, mig 163
+`content_source`), local-draft **autosave**/recover + Ctrl-S, and one-click **Accept AI drafts**
+(`accept-ai-revisions`) that lands the staged full-draft workforce onto the page; a **non-destructive
+409** (explicit-overwrite confirm, no more silent last-write-wins); real **Accept/Revert** node
+buttons; **self-serve reuse** (seed-job routes opened to tenant_admin + `verifyTenantAccess`) and
+**verbatim reuse** of an uploaded past proposal (`reuse-past`); **images survive export** (S3 keys
+inlined to data: URIs across docx/pptx/xlsx/pdf); **notification routing** (self-excluded + "for you");
+and **Studio publish-to-library** (PATCH `publish` flips `is_system=true`, no orphans). Deferred (scoped
+in the build log): the polymorphic artifact key / one-canvas refactor, whole-proposal
+submission-readiness, the shared *atom* library, and the rest of the admin enable plane.

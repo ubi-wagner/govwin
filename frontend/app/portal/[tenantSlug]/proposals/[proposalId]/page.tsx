@@ -179,6 +179,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     volumeNumber: number | null;
     artifactId: string | null;
     expertNotes: string | null;
+    itemType: string | null;
   }[] = [];
 
   try {
@@ -199,6 +200,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.volume_number,
         ps.artifact_id,
         ps.meta->>'expertNotes' AS expert_notes,
+        ps.meta->>'itemType' AS item_type,
         u.name AS accepted_by_name,
         CASE
           WHEN ps.content IS NOT NULL AND ps.content::text != 'null' AND ps.content::text != ''
@@ -451,6 +453,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       volumeNumber: s.volumeNumber ?? null,
       artifactId: s.artifactId ?? null,
       expertNotes: s.expertNotes ?? null,
+      itemType: s.itemType ?? null,
       isEditable: !s.isLocked && (s.completedStage === null || s.completedStage === proposal.stage),
     };
   });

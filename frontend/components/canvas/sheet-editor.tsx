@@ -17,6 +17,8 @@ import type {
   TableCellStyle,
 } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
+import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
+import { SheetMediaStrip } from './sheet-media-strip';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -46,6 +48,31 @@ function cellText(cell: string | TableCellType): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
+/**
+ * Build a cell from the committed edit value, preserving existing cell style.
+ *  • A value beginning with `=` is stored as a real `formula` (the xlsx exporter writes
+ *    it as an Excel formula that Excel computes on open) — previously `=A1+B1` was
+ *    silently kept as literal text.
+ *  • A literal on a NUMERIC cell re-derives `value` from the text, so exports + the cost
+ *    readiness roll-up (which read `value`) reflect the edit, not a stale provisioned
+ *    number (the cost-volume numeric-cell sync).
+ *  • A plain literal on a plain cell stays a bare string when it can, and clears any
+ *    prior formula.
+ */
+function buildCell(existing: string | TableCellType | undefined, value: string): string | TableCellType {
+  const isFormula = value.trimStart().startsWith('=');
+  const base: TableCellType = typeof existing === 'object' && existing ? { ...existing, text: value } : { text: value };
+  if (isFormula) return { ...base, formula: value };
+  // literal — drop a stale formula
+  const { formula: _drop, ...rest } = base;
+  // re-derive the numeric value from the edited text for cost-volume cells
+  if (typeof existing === 'object' && existing && isNumericCell(existing)) {
+    const v = parseNumericText(value);
+    (rest as TableCellType).value = v == null ? undefined : v;
+  }
+  return Object.keys(rest).length === 1 ? value : rest;
+}
+
 function getSheets(doc: CanvasDocument): SheetInfo[] {
   const tableNodes = doc.nodes.filter((n) => n.type === 'table');
   return tableNodes.map((node, i) => {
@@ -67,6 +94,13 @@ function colLetter(index: number): string {
     n = Math.floor(n / 26) - 1;
   }
   return result;
+}
+
+/** Per-cell border override for the grid (the base class draws a thin grid line). */
+function borderCss(border?: 'none' | 'thin' | 'thick'): React.CSSProperties {
+  if (border === 'none') return { borderColor: 'transparent' };
+  if (border === 'thick') return { borderWidth: 2, borderColor: '#334155' };
+  return {};
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -198,11 +232,7 @@ export function SheetEditor({
     if (editingCell.row === -1) {
       // Editing header — preserve existing cell styles
       const newHeaders = [...content.headers];
-      const existing = newHeaders[editingCell.col];
-      const styledCell = typeof existing === 'string'
-        ? editValue
-        : { ...existing, text: editValue };
-      newHeaders[editingCell.col] = styledCell;
+      newHeaders[editingCell.col] = buildCell(newHeaders[editingCell.col], editValue);
       updateNodeContent(currentSheet.nodeId, { ...content, headers: newHeaders });
     } else {
       // Editing data cell — preserve existing cell styles
@@ -215,11 +245,7 @@ export function SheetEditor({
       while (newRows[editingCell.row].length <= editingCell.col) {
         newRows[editingCell.row].push('');
       }
-      const existing = newRows[editingCell.row][editingCell.col];
-      const styledCell = typeof existing === 'string'
-        ? editValue
-        : { ...existing, text: editValue };
-      newRows[editingCell.row][editingCell.col] = styledCell;
+      newRows[editingCell.row][editingCell.col] = buildCell(newRows[editingCell.row][editingCell.col], editValue);
       updateNodeContent(currentSheet.nodeId, { ...content, rows: newRows });
     }
 
@@ -359,6 +385,31 @@ export function SheetEditor({
     }
   }, [sheets, readOnly, updateDoc, activeSheet]);
 
+  // ── Media (images + shapes) — a workbook logo / figure / shape. The xlsx exporter
+  // already renders image + shape nodes as floating pictures; these add/remove them.
+  const handleAddImageNode = useCallback((storageKey: string, w: number, h: number, alt: string) => {
+    const newNode = createNode({
+      type: 'image',
+      content: { storage_key: storageKey, width: Math.min(w, 480), height: Math.min(h, 360), alt_text: alt } as unknown as CanvasNode['content'],
+      source: 'manual', actorId, actorName,
+    });
+    updateDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+  }, [updateDoc, actorId, actorName]);
+
+  const handleAddShapeNode = useCallback(() => {
+    const newNode = createNode({
+      type: 'shape',
+      content: { shape: 'rectangle', text: '' } as unknown as CanvasNode['content'],
+      style: { fill: { color: '#DCE6F1' }, border: { color: '#94A3B8', width: 1 } } as unknown as CanvasNode['style'],
+      source: 'manual', actorId, actorName,
+    });
+    updateDoc((prev) => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+  }, [updateDoc, actorId, actorName]);
+
+  const handleDeleteMediaNode = useCallback((nodeId: string) => {
+    updateDoc((prev) => ({ ...prev, nodes: prev.nodes.filter((n) => n.id !== nodeId) }));
+  }, [updateDoc]);
+
   const commitSheetRename = useCallback((sheetIndex: number, newName: string) => {
     const sheet = sheets[sheetIndex];
     if (!sheet || !newName.trim()) return;
@@ -433,6 +484,48 @@ export function SheetEditor({
 
   function setCellBg(bg: string | undefined) {
     updateCellStyle({ bg });
+  }
+
+  function setCellFg(fg: string | undefined) {
+    updateCellStyle({ fg });
+  }
+
+  function setCellBorder(border: TableCellStyle['border']) {
+    updateCellStyle({ border });
+  }
+
+  // ── Number format (currency / percent / thousands) — lives on the cell (not `style`),
+  // and is the SAME Excel code the .xlsx export writes, so display == export.
+  function getActiveCellNumberFormat(): string {
+    if (!activeCell || !currentSheet) return '';
+    const { row, col } = activeCell;
+    const cv = row === -1 ? currentSheet.content.headers[col] : currentSheet.content.rows[row]?.[col];
+    return cv && typeof cv !== 'string' ? cv.number_format ?? '' : '';
+  }
+
+  function setCellNumberFormat(code: string) {
+    if (!activeCell || !currentSheet || readOnly) return;
+    const { row, col } = activeCell;
+    const patch = (c: string | TableCellType): TableCellType => {
+      const cell: TableCellType = typeof c === 'string' ? { text: c } : { ...c };
+      if (code) {
+        cell.number_format = code;
+        // Ensure there's a numeric value to format (derive from the shown text if needed).
+        if (typeof cell.value !== 'number') { const v = parseNumericText(cell.text); if (v != null) cell.value = v; }
+      } else {
+        delete cell.number_format;
+      }
+      return cell;
+    };
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== currentSheet.nodeId) return n;
+        const tc = n.content as TableContent;
+        if (row === -1) return { ...n, content: { ...tc, headers: tc.headers.map((h, i) => i === col ? patch(h) : h) } };
+        return { ...n, content: { ...tc, rows: tc.rows.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? patch(c) : c) : r) } };
+      }),
+    }));
   }
 
   // ─── Undo / Redo ───────────────────────────────────────────────────
@@ -743,9 +836,55 @@ export function SheetEditor({
             <button onClick={() => setCellBg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
           )}
 
-          {/* Font size */}
+          {/* Text color (fg) */}
           <span className="w-px h-4 bg-gray-300 mx-1" />
-          <label className="text-[10px] text-gray-500">Size:</label>
+          <label className="text-[10px] text-gray-500 flex items-center gap-1">A
+            <input
+              type="color"
+              value={getActiveCellStyle()?.fg || '#111827'}
+              onChange={(e) => setCellFg(e.target.value)}
+              className="w-6 h-6 border rounded cursor-pointer"
+              title="Text color"
+            />
+          </label>
+          {getActiveCellStyle()?.fg && (
+            <button onClick={() => setCellFg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
+          )}
+
+          {/* Border (per cell) */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Border:</label>
+          <select
+            value={getActiveCellStyle()?.border ?? 'thin'}
+            onChange={(e) => setCellBorder(e.target.value as TableCellStyle['border'])}
+            disabled={!activeCell}
+            className="text-xs border rounded px-1 py-0.5 disabled:opacity-40"
+            title="Cell border (also exported to .xlsx)"
+          >
+            <option value="none">None</option>
+            <option value="thin">Thin</option>
+            <option value="thick">Thick</option>
+          </select>
+
+          {/* Number format (per cell) — currency / percent / thousands. */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Number:</label>
+          <select
+            value={getActiveCellNumberFormat()}
+            onChange={(e) => setCellNumberFormat(e.target.value)}
+            disabled={!activeCell}
+            className="text-xs border rounded px-1 py-0.5 disabled:opacity-40"
+            title="Number format (also carried into the .xlsx export)"
+          >
+            {NUMBER_FORMATS.map(f => (
+              <option key={f.label} value={f.code}>{f.label}</option>
+            ))}
+          </select>
+
+          {/* Sheet-wide defaults (NOT per-cell) — labelled so they aren't mistaken for the
+              per-cell controls beside them. The cell model has no per-cell font size/family. */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Sheet font:</label>
           <select
             value={doc.canvas.font_default.size}
             onChange={(e) => {
@@ -786,6 +925,15 @@ export function SheetEditor({
           </select>
         </div>
       )}
+
+      {/* ── Media strip (images + shapes) ── */}
+      <SheetMediaStrip
+        nodes={doc.nodes}
+        readOnly={readOnly}
+        onAddImage={handleAddImageNode}
+        onAddShape={handleAddShapeNode}
+        onDelete={handleDeleteMediaNode}
+      />
 
       {/* ── Grid ── */}
       <div className="flex-1 overflow-auto">
@@ -848,8 +996,10 @@ export function SheetEditor({
                     }`}
                     style={{
                       backgroundColor: !isActive && typeof h !== 'string' && h?.style?.bg ? h.style.bg : undefined,
+                      color: typeof h !== 'string' && h?.style?.fg ? h.style.fg : undefined,
                       fontWeight: typeof h !== 'string' && h?.style?.bold ? 'bold' : undefined,
                       textAlign: typeof h !== 'string' ? h?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
+                      ...(typeof h !== 'string' ? borderCss(h?.style?.border) : {}),
                     }}
                     onClick={() => setActiveCell({ row: -1, col: ci })}
                     onKeyDown={(e) => handleCellKeyDown(e, -1, ci)}
@@ -881,7 +1031,7 @@ export function SheetEditor({
                           startEdit(-1, ci, h != null ? cellText(h) : '')
                         }
                       >
-                        {h != null ? cellText(h) : ''}
+                        {h != null ? formatCellDisplay(h) : ''}
                       </span>
                     )}
                   </td>
@@ -913,8 +1063,10 @@ export function SheetEditor({
                       }`}
                       style={{
                         backgroundColor: !isActive && typeof c !== 'string' && c?.style?.bg ? c.style.bg : undefined,
+                        color: typeof c !== 'string' && c?.style?.fg ? c.style.fg : undefined,
                         fontWeight: typeof c !== 'string' && c?.style?.bold ? 'bold' : undefined,
                         textAlign: typeof c !== 'string' ? c?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
+                        ...(typeof c !== 'string' ? borderCss(c?.style?.border) : {}),
                       }}
                       onClick={() => setActiveCell({ row: ri, col: ci })}
                       onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
@@ -946,7 +1098,7 @@ export function SheetEditor({
                             startEdit(ri, ci, c != null ? cellText(c) : '')
                           }
                         >
-                          {c != null ? cellText(c) : ''}
+                          {c != null ? formatCellDisplay(c) : ''}
                         </span>
                       )}
                     </td>

@@ -31,8 +31,9 @@ async function gate(tenantSlug: string, atomId: string, minRole: Role) {
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; atomId: string }> }) {
   try {
     const { tenantSlug, atomId } = await params;
-    // Read open to collaborators; getAtom enforces visibility via the viewer.
-    const g = await gate(tenantSlug, atomId, 'partner_user');
+    // Tenant-staff only — a partner_user membership passes verifyTenantAccess, so floor here to keep
+    // a collaborator from reading atom details beyond their section scope (matches the download route).
+    const g = await gate(tenantSlug, atomId, 'tenant_user');
     if ('error' in g) return g.error;
     const atom = await getAtom(g.tenantId, atomId, viewerFromRole(g.userId, g.role));
     if (!atom) return NextResponse.json({ error: 'Atom not found', code: 'NOT_FOUND' }, { status: 404 });

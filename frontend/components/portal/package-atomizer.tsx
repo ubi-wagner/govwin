@@ -10,10 +10,10 @@ import { useCallback, useState } from 'react';
  * it's immediately reusable — and rank-matched — for the next proposal.
  */
 
-interface DocResult { file: string; format: string; atoms: number; reference?: boolean; error?: string }
+interface DocResult { file: string; format: string; atoms: number; skipped?: number; reference?: boolean; error?: string }
 interface PackageResult { packageName: string | null; filesProcessed: number; totalAtoms: number; context: string[]; docs: DocResult[] }
 
-const ACCEPT = '.pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md';
+const ACCEPT = '.pdf,.docx,.pptx,.xlsx,.txt,.md';
 const PROGRAMS = ['', 'sbir', 'sttr', 'baa', 'ota', 'cso', 'rif'];
 const PHASES = ['', '1', '2', '3'];
 
@@ -105,7 +105,7 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
             {result.context.length > 0 && <p className="mt-1 text-xs text-emerald-700">Context stamped on every atom: {result.context.join(' · ')}</p>}
             <ul className="mt-2 space-y-0.5 text-xs text-emerald-800">
               {result.docs.map((d, i) => (
-                <li key={i}>• {d.file} — {d.error ? <span className="text-rose-600">{d.error}</span> : d.atoms === 0 && d.reference ? `registered as a foundational document (no sections long enough to atomize)` : `${d.atoms} atoms (${d.format})`}</li>
+                <li key={i}>• {d.file} — {d.error ? <span className="text-rose-600">{d.error}</span> : d.atoms === 0 && d.reference ? `registered as a foundational document (no sections long enough to atomize)` : <>{d.atoms} atoms ({d.format}){d.skipped ? <span className="text-emerald-600/70"> · skipped {d.skipped} short block{d.skipped > 1 ? 's' : ''}</span> : null}</>}</li>
               ))}
             </ul>
             <p className="mt-2 text-xs text-emerald-700">Switch to the Library tab to browse them, or refine any atom in the Atomize tab.</p>

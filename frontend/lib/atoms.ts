@@ -15,6 +15,8 @@ import { withTenant } from '@/lib/rls';
 import { atomSize, type AtomSize } from '@/lib/atom-size';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import type { CanvasNode } from '@/lib/types/canvas-document';
+import { upsertAtomEmbedding, atomEmbedText } from '@/lib/atom-embed';
+import { embeddingsEnabled, activeEmbedModel, embedOne, toVectorLiteral, isUsableVector } from '@/lib/embeddings';
 
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
 export { atomSize, type AtomSize };
@@ -72,7 +74,7 @@ export async function createAtom(
   const size = atomSize({ content: input.content, canvasNodes: input.canvasNodes });
   const creatorKind = input.creatorKind ?? actor.kind ?? 'admin';
 
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     // Idempotent-by-section: when asked, refresh the section's existing derivative
     // in place (matched on origin_section_id + source) rather than inserting a
     // duplicate on re-lock. Falls through to INSERT when there's no prior atom.
@@ -133,8 +135,14 @@ export async function createAtom(
       `;
     }
 
-    // members: a container grain (foundation/section/group) aggregates ordered members.
-    const members = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
+    // members: a container grain (foundation/section/group) aggregates ordered members. Defense-in-
+    // depth — only members that belong to THIS tenant compose the container, so a caller-supplied
+    // foreign id can never create cross-tenant composition (the isolation invariant), order preserved.
+    const requestedMembers = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
+    const ownedMembers = requestedMembers.length
+      ? new Set((await tx<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${requestedMembers}::uuid[])`).map((r: { id: string }) => r.id))
+      : new Set<string>();
+    const members = requestedMembers.filter((m) => ownedMembers.has(m));
     for (let i = 0; i < members.length; i++) {
       await tx`
         INSERT INTO atom_members (group_atom_id, member_atom_id, ordinal)
@@ -158,7 +166,7 @@ export async function createAtom(
     // re-harvest of the same section doesn't inflate the source atom's usage.
     for (const p of input.parentAtomIds ?? []) {
       if (p === atomId) continue;
-      const linked = await tx<Array<{ parent_atom_id: string }>>`
+      const linked = await tx<Array<{ parentAtomId: string }>>`
         INSERT INTO atom_lineage (parent_atom_id, child_atom_id, relation)
         VALUES (${p}::uuid, ${atomId}::uuid, 'derived_from')
         ON CONFLICT (parent_atom_id, child_atom_id) DO NOTHING
@@ -171,6 +179,13 @@ export async function createAtom(
 
     return { atomId, size };
   });
+
+  // Semantic index (gated + best-effort): embed the atom's text AFTER the tx commits, so a provider
+  // network call never holds the business transaction open. Disabled by default → a pure no-op.
+  try {
+    await upsertAtomEmbedding(tenantId, result.atomId, atomEmbedText({ title: input.title, summary: input.summary, content: input.content }));
+  } catch { /* non-fatal — the atom exists without a vector; selectForSection degrades to tags */ }
+  return result;
 }
 
 // ── tag confirmation ──
@@ -191,7 +206,7 @@ export async function confirmTags(
     if (!own) return { updated: 0 };
     let updated = 0;
     for (const t of tags) {
-      const rows = await tx<Array<{ atom_id: string }>>`
+      const rows = await tx<Array<{ atomId: string }>>`
         INSERT INTO atom_tags (atom_id, dimension, value, is_other, tag_source, confirmed, confirmed_by, confirmed_at)
         VALUES (${atomId}::uuid, ${t.dimension}, ${t.value}, ${t.isOther ?? false},
                 ${t.source ?? 'admin'}, ${t.confirmed ?? true}, ${actorId}::uuid, now())
@@ -246,17 +261,19 @@ export function viewerFromRole(userId: string, role: Role): Viewer {
   return { userId, isAdmin: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' };
 }
 
-// ── the scored selector (pre-vector): scope → context boost → quality ──
+// ── the scored selector: scope → context boost → SEMANTIC similarity (gated) → quality ──
 export interface SectionQuery {
   vol?: string | null;
   kinds?: string[];
   context?: string[];     // the opp card's values: agency/program/phase/tech/dept slugs
+  text?: string;          // explicit semantic query (section title/prompt); else derived from vol+kinds+context
   limit?: number;
 }
 export interface RankedAtom {
   id: string; title: string | null; summary: string | null; content: string | null; grain: Grain;
+  canvasNodes: CanvasNode[] | null; // the atom's real nodes (image/table/chart) so structured atoms insert faithfully
   wordCount: number; charCount: number; outcomeScore: number; usageCount: number;
-  ctxMatches: number; score: number;
+  ctxMatches: number; vectorSim: number | null; score: number; // vectorSim: cosine to the query (null = no semantic axis)
 }
 
 export async function selectForSection(tenantId: string, q: SectionQuery, viewer: Viewer): Promise<RankedAtom[]> {
@@ -265,6 +282,23 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   const context = q.context ?? [];
   const limit = Math.min(50, q.limit ?? 8);
 
+  // Semantic axis (gated): embed the section's query text so an atom can rank by MEANING, not just
+  // shared tags. Off / no key / embed-failed → qLit stays null and this is EXACTLY the pre-vector
+  // selector (identical ordering), so the feature is a pure additive assist with zero regression.
+  const model = embeddingsEnabled() ? activeEmbedModel() : null;
+  let qLit: string | null = null;
+  if (model) {
+    const queryText = (q.text && q.text.trim())
+      || [String(vol ?? '').replace(/_/g, ' '), ...kinds, ...context].filter(Boolean).join(' ').trim();
+    if (queryText) {
+      const qv = await embedOne(queryText, 'query');
+      // a degenerate query vector (zero-magnitude → NaN cosine for every atom) drops the semantic
+      // axis entirely rather than NaN-ranking the whole library; falls back to pure tag ranking.
+      if (isUsableVector(qv)) qLit = toVectorLiteral(qv);
+    }
+  }
+  const VEC_WEIGHT = 3; // a perfect cosine match ≈ 1.5 context tags — semantics assist, never override scope
+
   // `requireTag=true` scopes to the section's vol/kind atoms; `false` drops that
   // filter → ALL of the tenant's approved atoms (still context-ranked). We run the
   // scoped pass first, then fall back to the broad pass when the section has no
@@ -272,45 +306,61 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   // atoms in place to try to generate" (the blank-mold-with-a-prompt path). Raw
   // ${boolean} — never `${cond?'t':'f'}::bool`, which binds text and evaluates false.
   const runQuery = (requireTag: boolean) =>
-    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
+    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; canvasNodes: CanvasNode[] | null; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number; vectorSim: number | null; blend: number }>>(tenantId, async (tx) =>
       tx`
-        SELECT a.id, a.title, a.summary, a.grain,
-               a.word_count AS "wordCount", a.char_count AS "charCount",
-               a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount",
-               -- a group carries no content of its own; assemble it from its ordered members
-               coalesce(a.content, (
-                 SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
-                 FROM atom_members am JOIN library_atoms m ON m.id = am.member_atom_id
-                 WHERE am.group_atom_id = a.id
-               )) AS content,
-               (SELECT count(*)::int FROM atom_tags t
-                  WHERE t.atom_id = a.id
-                    AND t.dimension IN ('agency','program','phase','tech','dept')
-                    AND t.value = ANY(${context}::text[])) AS "ctxMatches"
-        FROM library_atoms a
-        WHERE a.tenant_id = ${tenantId}::uuid
-          AND a.vault_id IS NULL
-          AND a.archived_at IS NULL
-          AND a.status = 'approved'
-          AND a.grain <> 'reference'
-          AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
-          AND (${!requireTag} OR EXISTS (
-            SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
-              (${vol}::text IS NOT NULL AND t.dimension = 'vol' AND t.value = ${vol})
-              OR (t.dimension = 'kind' AND t.value = ANY(${kinds}::text[]))
-            )
-          ))
-        ORDER BY "ctxMatches" DESC, a.outcome_score DESC, a.usage_count DESC, a.created_at DESC
+        SELECT s.*,
+               (coalesce(s."vectorSim", 0) * ${VEC_WEIGHT} + s."ctxMatches" * 2 + s."outcomeScore" + ln(1 + s."usageCount") * 0.1) AS "blend"
+        FROM (
+          SELECT a.id, a.title, a.summary, a.grain,
+                 a.word_count AS "wordCount", a.char_count AS "charCount",
+                 a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount", a.created_at AS "createdAt",
+                 a.canvas_nodes AS "canvasNodes", -- real nodes (image/table/chart) travel with the atom
+                 -- cosine similarity to the section query. NULL when embeddings are off or this atom has
+                 -- no vector. ae is joined ONLY within this tenant + the active model, so a vector from
+                 -- another tenant or a different embedding space can never enter the ranking.
+                 -- NULLIF(…, 'NaN') so a stored degenerate vector (defense-in-depth) yields NULL → coalesce→0,
+                 -- never a NaN that sorts above every real blend. Postgres treats NaN = NaN, so NULLIF catches it.
+                 ${qLit ? tx`NULLIF(1 - (ae.embedding <=> ${qLit}::vector), 'NaN'::float8)` : tx`NULL::float`} AS "vectorSim",
+                 -- a group carries no content of its own; assemble it from its ordered members
+                 coalesce(a.content, (
+                   SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
+                   FROM atom_members am JOIN library_atoms m ON m.id = am.member_atom_id
+                   WHERE am.group_atom_id = a.id
+                 )) AS content,
+                 (SELECT count(*)::int FROM atom_tags t
+                    WHERE t.atom_id = a.id
+                      AND t.dimension IN ('agency','program','phase','tech','dept')
+                      AND t.value = ANY(${context}::text[])) AS "ctxMatches"
+          FROM library_atoms a
+          ${qLit ? tx`LEFT JOIN atom_embeddings ae ON ae.atom_id = a.id AND ae.tenant_id = a.tenant_id AND ae.model = ${model}` : tx``}
+          WHERE a.tenant_id = ${tenantId}::uuid
+            AND a.vault_id IS NULL
+            AND a.archived_at IS NULL
+            AND a.status = 'approved'
+            AND a.grain <> 'reference'
+            AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
+            AND (${!requireTag} OR EXISTS (
+              SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
+                (${vol}::text IS NOT NULL AND t.dimension = 'vol' AND t.value = ${vol})
+                OR (t.dimension = 'kind' AND t.value = ANY(${kinds}::text[]))
+              )
+            ))
+        ) s
+        -- with the semantic axis live, the blended score leads; the tag tiebreakers are the EXACT
+        -- pre-vector ordering, so with embeddings OFF the result is identical to the old selector.
+        ORDER BY ${qLit ? tx`"blend" DESC,` : tx``} s."ctxMatches" DESC, s."outcomeScore" DESC, s."usageCount" DESC, s."createdAt" DESC
         LIMIT ${limit}
       `,
     );
 
   let rows = await runQuery(true);
   if (rows.length === 0) rows = await runQuery(false); // fallback: all proposal atoms
-  // final blended score (context is authoritative; quality/usage break ties)
+  // score = the SQL blend (context authoritative, semantics assist, quality/usage break ties)
   return rows.map((r) => ({
-    ...r,
-    score: Math.round((r.ctxMatches * 2 + r.outcomeScore + Math.log1p(r.usageCount) * 0.1) * 1000) / 1000,
+    id: r.id, title: r.title, summary: r.summary, content: r.content, grain: r.grain,
+    canvasNodes: r.canvasNodes, wordCount: r.wordCount, charCount: r.charCount,
+    outcomeScore: r.outcomeScore, usageCount: r.usageCount, ctxMatches: r.ctxMatches,
+    vectorSim: r.vectorSim ?? null, score: Math.round((r.blend ?? 0) * 1000) / 1000,
   }));
 }
 

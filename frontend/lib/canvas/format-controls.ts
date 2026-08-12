@@ -12,7 +12,8 @@
 import type { NodeType, ShapeKind } from '@/lib/types/canvas-document';
 
 export type ElementKind =
-  | 'shape' | 'callout' | 'chart' | 'divider' | 'code' | 'signature' | 'equation' | 'video' | 'heading' | 'list' | null;
+  | 'shape' | 'callout' | 'chart' | 'divider' | 'code' | 'signature' | 'equation' | 'video'
+  | 'textbox' | 'blockquote' | 'heading' | 'list' | null;
 
 export interface FormatCaps {
   /** run styling applies (the node bears text) */
@@ -36,6 +37,18 @@ const BOX = new Set<NodeType>(['shape', 'text_box', 'callout', 'image', 'chart',
 // Free-placement nodes (content boxes / shapes / floating figures that don't snap to margins).
 const ARRANGE = new Set<NodeType>(['shape', 'text_box', 'image', 'chart', 'video']);
 
+// Node types whose content is a single text/code field a prose library atom can
+// replace WITHOUT destroying the node's shape. "Replace from Library" is hidden for
+// every other type (image/table/chart/list/…) so a swap can never corrupt a node.
+const REPLACEABLE_FROM_LIBRARY = new Set<NodeType>([
+  'text_block', 'heading', 'blockquote', 'callout', 'text_box', 'caption', 'footnote', 'code_block',
+]);
+
+/** Whether "Replace from Library" (prose swap) is safe for this node type. */
+export function canReplaceFromLibrary(type: NodeType): boolean {
+  return REPLACEABLE_FROM_LIBRARY.has(type);
+}
+
 /** Resolve the control groups + the one element-specific control for a node type. */
 export function formatCapabilities(type: NodeType): FormatCaps {
   const element: ElementKind =
@@ -47,9 +60,11 @@ export function formatCapabilities(type: NodeType): FormatCaps {
               : type === 'signature' ? 'signature'
                 : type === 'equation' ? 'equation'
                   : type === 'video' ? 'video'
-                    : type === 'heading' ? 'heading'
-                      : (type === 'bulleted_list' || type === 'numbered_list') ? 'list'
-                        : null;
+                    : type === 'text_box' ? 'textbox'
+                      : type === 'blockquote' ? 'blockquote'
+                        : type === 'heading' ? 'heading'
+                          : (type === 'bulleted_list' || type === 'numbered_list') ? 'list'
+                            : null;
   return { text: TEXT_RUN.has(type), box: BOX.has(type), arrange: ARRANGE.has(type), element };
 }
 
@@ -82,5 +97,6 @@ export const INSERT_ELEMENTS: ReadonlyArray<{ type: NodeType; label: string; ico
   { type: 'code_block', label: 'Code', icon: '</>' },
   { type: 'blockquote', label: 'Quote', icon: '❝' },
   { type: 'equation', label: 'Equation', icon: '∑' },
+  { type: 'video', label: 'Video', icon: '▶' },
   { type: 'signature', label: 'Signature', icon: '✍' },
 ];

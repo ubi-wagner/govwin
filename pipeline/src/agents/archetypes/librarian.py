@@ -52,7 +52,7 @@ class LibrarianArchetype(BaseArchetype):
 
     @property
     def system_prompt(self) -> str:
-        return """You are an expert content librarian for a government proposal atom library. Content lives as ATOMS (reusable units) tagged against one taxonomy. You catalog, score, dedupe, and assess freshness so a company can reuse its best content across SBIR/STTR/BAA/OTA proposals.
+        return """You are an ADVERSARIAL content librarian for a government proposal atom library. Content lives as ATOMS (reusable units) tagged against one taxonomy. Auto-atomization is mechanical — it cuts one atom per block of an uploaded doc — so it OVER-produces: raw ingest noise (URLs, page/slide chrome, "[Speaker Notes]" dumps), boilerplate, fragments, and near-duplicates all land as atoms. Your job is to be the skeptical gate: an atom must EARN its place in the library. You catalog, score, dedupe, assess freshness, AND recommend a disposition (keep/retag/merge/reject) for every atom, defaulting to skeptical.
 
 The taxonomy is dimension:value tags:
 - kind: narrative | figure | table | list | form
@@ -65,9 +65,20 @@ For each atom in the package you are cataloging:
 3. RELEVANCE (0.0-1.0): fit to the company's focus areas (from its library + past proposals).
 4. DUPLICATES: compare CONTENT (not just titles) against existing atoms; flag candidates by atom id (exact | substantial | partial).
 5. FRESHNESS: current | aging | stale (personnel moves, old dates, deprecated tech).
+6. DISQUALIFIER AUDIT (adversarial — assume the atom does NOT belong until it proves it does). Flag every disqualifier that applies:
+   - ingest_noise: a URL, slide/page number, header/footer, "[Speaker Notes]" or nav chrome — not proposal content.
+   - boilerplate: generic filler ("we are committed to excellence") with no company-specific, reusable specificity.
+   - fragment: not a self-contained unit — a dangling sentence, a table row torn from its table, a heading alone.
+   - duplicate: substantially covered by an existing atom (name it).
+   - stale: superseded facts (old personnel, old dates, deprecated tech).
+7. RECOMMENDATION — one disposition per atom, the "auto-library option" a tenant admin one-clicks:
+   - reject: any ingest_noise / boilerplate / unusable fragment. Be willing to reject; a smaller high-signal library beats a bloated one.
+   - merge: a near/partial duplicate — give the atom id to merge INTO.
+   - retag: worth keeping, but the vol/kind is wrong.
+   - keep: a self-contained, specific, reusable unit with no disqualifier.
 
 Use search_atoms to find existing similar atoms for dedup. Use get_tenant_profile for the company's focus areas. Use search_memory for past cataloging decisions (consistency). Use match_section_skeleton to classify each atom against the reusable section skeleton (the starter templates' sections, e.g. "this looks like a Technical Approach section").
-NEVER recommend auto-approving or deleting — your output is advisory for a tenant admin."""
+Your recommendations are ADVISORY: you never auto-approve, delete, or write business tables — a tenant admin reviews and applies. Recommend decisively anyway (that is the value); the human gate is the safety, not your hedging."""
 
     @property
     def tools(self) -> list[str]:
@@ -161,18 +172,25 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
         user_content += (
             "Steps: (1) get_tenant_profile for focus areas; (2) match_section_skeleton to load the "
             "reusable section skeleton; (3) for each atom, search_atoms to find existing similar atoms "
-            "(dedup) and classify it against the section skeleton; (4) search_memory for prior decisions.\n\n"
+            "(dedup) and classify it against the section skeleton; (4) search_memory for prior decisions; "
+            "(5) run the DISQUALIFIER AUDIT and decide a keep/retag/merge/reject recommendation.\n\n"
             "Then output JSON:\n"
             "{\n"
             '  "assessments": [\n'
             '    {"atom_id": "...", "vol": "...", "kind": "...", "quality_score": 0.0, "relevance_score": 0.0,\n'
             '     "suggested_tags": ["dimension:value"], "duplicate_candidates": [{"atom_id": "...", "similarity": "exact|substantial|partial"}],\n'
             '     "section_match": {"section_atom_id": "...", "section_title": "...", "confidence": 0.0},\n'
-            '     "freshness": "current|aging|stale", "summary": "1 sentence"}\n'
+            '     "freshness": "current|aging|stale",\n'
+            '     "disqualifiers": ["ingest_noise|boilerplate|fragment|duplicate|stale"],\n'
+            '     "recommendation": {"action": "keep|retag|merge|reject", "merge_into_atom_id": "... or null", "reason": "1 sentence"},\n'
+            '     "summary": "1 sentence"}\n'
             "  ],\n"
-            '  "package_notes": "overall observations for the tenant admin"\n'
+            '  "package_notes": "overall observations for the tenant admin",\n'
+            '  "recommended_rejects": ["atom_id", "..."]\n'
             "}\n"
-            "section_match is the skeleton section this atom best fits (null if none fits)."
+            "section_match is the skeleton section this atom best fits (null if none fits). disqualifiers is "
+            "empty for a clean atom. Every atom MUST carry a recommendation; default to reject for ingest "
+            "noise/boilerplate/unusable fragments (a lean high-signal library beats a bloated one)."
         )
         messages.append({"role": "user", "content": user_content})
         return messages
@@ -327,8 +345,16 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
         try:
             parsed = json.loads(text) if isinstance(text, str) else text
             if isinstance(parsed, dict):
-                n = len(parsed.get("assessments", []))
-                return f"Cataloged {n} atom(s): scored quality/relevance, flagged duplicates, assessed freshness."
+                assessments = parsed.get("assessments", [])
+                n = len(assessments)
+                def _act(a):
+                    return (a.get("recommendation") or {}).get("action")
+                rej = sum(1 for a in assessments if _act(a) == "reject")
+                mrg = sum(1 for a in assessments if _act(a) == "merge")
+                return (
+                    f"Cataloged {n} atom(s) adversarially: quality/relevance scored, duplicates + freshness "
+                    f"assessed; recommends reject {rej}, merge {mrg}, keep/retag {n - rej - mrg} (advisory — admin applies)."
+                )
         except (json.JSONDecodeError, TypeError, KeyError):
             pass
         return f"Cataloged package: {str(text)[:150]}"

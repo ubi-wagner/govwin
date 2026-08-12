@@ -49,3 +49,7 @@ services/cms/static/
 
 # Local scratch/working directory (transient: logs, figure crops, working notes)
 scratchpad/
+
+# sandbox test-harness runtime logs
+frontend/scripts/test-harness/*.log.jsonl
+frontend/scripts/test-harness/*.out

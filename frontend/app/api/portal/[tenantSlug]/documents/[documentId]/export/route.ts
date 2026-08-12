@@ -16,7 +16,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
-import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { validateStandaloneCanvas, type CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; documentId: string }>;
@@ -84,6 +84,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       topic_number: doc.metadata?.title ?? 'TBD',
     };
 
+    // Size/format compliance floor (advisory) — the SAME ruler proposals run at the
+    // export gate, against the document's OWN declared limits. Surfaced via the
+    // X-Compliance-Violations header + the audit event; never blocks the download.
+    let violations: { code: string; message: string }[] = [];
+    try {
+      violations = validateStandaloneCanvas(doc).map((v) => ({ code: v.code, message: v.message }));
+    } catch (e) { console.error('[portal/documents/export] compliance check failed (non-fatal):', e); }
+
     let buffer: Buffer;
     if (format === 'pptx') {
       const { exportToPptx } = await import('@/lib/export/pptx-exporter');
@@ -109,7 +117,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         type: 'document.exported',
         actor: userActor(su.id, su.email ?? undefined),
         tenantId,
-        payload: { documentId, format, title },
+        payload: { documentId, format, title, compliant: violations.length === 0, complianceViolations: violations.map((v) => v.code) },
       });
     } catch (e) { console.error('[portal/documents/export] event emit failed (non-fatal):', e); }
 
@@ -129,6 +137,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         'Content-Type': contentTypes[format],
         'Content-Disposition': `attachment; filename="${safe}.${format}"`,
         'Content-Length': String(buffer.length),
+        'X-Compliance-Violations': violations.map((v) => v.code).join(',') || 'none',
       },
     });
   } catch (e) {

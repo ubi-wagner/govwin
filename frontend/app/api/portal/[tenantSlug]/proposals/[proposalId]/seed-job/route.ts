@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, enterTenant } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { sql, getTenantBySlug, enterTenant, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +16,18 @@ export async function GET(_req: Request, { params }: Params) {
 
   const sessionUser = session.user as { id?: string; role?: unknown; tenantId?: string | null };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
-  if (!role || !['master_admin', 'rfp_admin'].includes(role)) {
+  // Reuse is now self-serve: tenant_admin+ (own tenant, verified below) — was rfp/master only.
+  if (!role || !sessionUser.id || !hasRoleAtLeast(role, 'tenant_admin')) {
     return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   const tenant = await getTenantBySlug(tenantSlug).catch(() => null);
   if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
   const tenantId = tenant.id as string;
+
+  if (!(await verifyTenantAccess(sessionUser.id, role, tenantId))) {
+    return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+  }
 
   enterTenant(tenantId);
 

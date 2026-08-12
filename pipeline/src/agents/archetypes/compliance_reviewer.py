@@ -527,16 +527,23 @@ Output a JSON object with:
             parsed = json.loads(text) if isinstance(text, str) else text
             if isinstance(parsed, dict) and "summary" in parsed:
                 s = parsed["summary"]
-                total = s.get("total_variables", 0)
-                passed = s.get("pass_count", 0)
-                failed = s.get("fail_count", 0)
-                partial = s.get("partial_count", 0)
-                pct = s.get("overall_compliance_pct", 0)
-                return (
-                    f"Compliance check: {passed}/{total} pass, "
-                    f"{partial} partial, {failed} fail ({pct}% compliant)"
-                )
-        except (json.JSONDecodeError, TypeError, KeyError):
+                # The model may return `summary` as the structured object OR as a
+                # plain string. Only index it when it is actually a dict — a string
+                # summary must not crash the whole agent run (AttributeError was not
+                # caught below, so it propagated out of invoke_agent as status=error).
+                if isinstance(s, dict):
+                    total = s.get("total_variables", 0)
+                    passed = s.get("pass_count", 0)
+                    failed = s.get("fail_count", 0)
+                    partial = s.get("partial_count", 0)
+                    pct = s.get("overall_compliance_pct", 0)
+                    return (
+                        f"Compliance check: {passed}/{total} pass, "
+                        f"{partial} partial, {failed} fail ({pct}% compliant)"
+                    )
+                if isinstance(s, str) and s.strip():
+                    return f"Compliance review: {s[:150]}"
+        except (json.JSONDecodeError, TypeError, KeyError, AttributeError):
             pass
 
         if "pass" in text.lower() or "fail" in text.lower():

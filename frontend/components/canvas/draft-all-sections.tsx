@@ -120,6 +120,8 @@ export function DraftAllSections({
           const qs = new URLSearchParams({ vol, limit: '5', sectionId: sec.id });
           if (kinds.length) qs.set('kinds', kinds.join(','));
           if (context.length) qs.set('context', context.join(','));
+          // the section title is the semantic query — ranks atoms by MEANING when embeddings are on
+          if (sec.title) qs.set('text', sec.title);
           // sectionId lets the selector record these as the section's source atoms,
           // so the atom return at lock can set lineage back to them.
           const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);

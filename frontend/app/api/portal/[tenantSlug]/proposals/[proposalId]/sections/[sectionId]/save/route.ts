@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { resolveUserAccess } from '@/lib/proposal-access';
-import { validateCanvasAgainstSpec, type ComplianceSpec, type CanvasDocument } from '@/lib/types/canvas-document';
+import { validateCanvasAgainstSpec, getNodeText, type ComplianceSpec, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -146,10 +146,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; complianceSpec: ComplianceSpec | null }[]>`
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null }[]>`
         SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
+               ps.content_source AS "contentSource",
                pa.compliance_spec
         FROM proposal_sections ps
         LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
@@ -189,8 +190,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Save current version to canvas_versions before overwriting ──
-    // Archive the PREVIOUS content with source='human_edit' (safe default for what was there before).
-    // The body's source/aiInstruction describe the INCOMING change, not the archived snapshot.
+    // Archive the PREVIOUS content with ITS OWN provenance (proposal_sections.content_source), not a
+    // hard-coded 'human_edit' — so history honestly labels which past versions were AI-authored. The
+    // body's source/aiInstruction describe the INCOMING change (recorded on content_source below).
     {
       const currentContent = section.content;
       // Compute char/word counts from extracted text, not raw JSON
@@ -240,7 +242,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
             ${section.version},
             ${sql.json(archiveJson)},
             'save',
-            'human_edit',
+            ${section.contentSource ?? 'human_edit'},
             ${sessionUser.id}::uuid,
             ${archiveCharCount},
             ${archiveWordCount},
@@ -274,15 +276,37 @@ export async function PUT(request: Request, ctx: RouteContext) {
       ? body.baseVersion
       : section.version;
     const nextVersion = base + 1;
+    // Provenance of the INCOMING content (client __revisionMeta.source, if any). Recorded on the
+    // section so the NEXT archive labels this version honestly. MUST be the whitelist-validated
+    // `source` (computed above) — writing the raw client value lets an arbitrary string land in
+    // content_source, and the next archive copies it into canvas_versions.source (CHECK-constrained),
+    // which throws → the snapshot is silently dropped (content-loss). Defaults to human_edit.
+    const contentSource = source;
+
+    // Auto-advance an untouched 'empty' section to 'in_progress' the instant real content
+    // lands. The client rarely sends an explicit status on a plain content save, so without
+    // this a drafted-but-not-locked section stays status='empty' forever — and the submission
+    // readiness rollup (which treats status='empty' as "nothing drafted yet") under-counts the
+    // work. Only fires when the caller didn't set a status AND the incoming canvas carries text.
+    let effectiveStatus: string | null = newStatus;
+    if (!effectiveStatus && section.status === 'empty') {
+      let incomingText = '';
+      try {
+        const nodes = (body.content as { nodes?: CanvasNode[] } | null)?.nodes;
+        if (Array.isArray(nodes)) incomingText = nodes.map(getNodeText).join('').trim();
+      } catch { incomingText = ''; }
+      if (incomingText.length > 0) effectiveStatus = 'in_progress';
+    }
 
     let updateResult;
     try {
-      if (newStatus) {
+      if (effectiveStatus) {
         updateResult = await sql`
           UPDATE proposal_sections
           SET content = ${contentJson},
-              status = ${newStatus},
+              status = ${effectiveStatus},
               version = ${nextVersion},
+              content_source = ${contentSource},
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -295,6 +319,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           UPDATE proposal_sections
           SET content = ${contentJson},
               version = ${nextVersion},
+              content_source = ${contentSource},
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -340,7 +365,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           sectionId,
           sectionTitle: section.title,
           version: nextVersion,
-          status: newStatus ?? undefined,
+          status: effectiveStatus ?? undefined,
         },
       });
     } catch (evtErr) {
@@ -381,7 +406,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
       data: {
         sectionId,
         version: nextVersion,
-        status: newStatus ?? section.status,
+        status: effectiveStatus ?? section.status,
         complianceWarnings,
       },
     });

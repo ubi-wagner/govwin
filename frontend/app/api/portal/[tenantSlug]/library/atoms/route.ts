@@ -22,7 +22,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const u = session.user as { id?: string; role?: unknown };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
-    if (!hasRoleAtLeast(role, 'partner_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    // Tenant-staff only — floor above partner_user so a collaborator's tenant membership can't read
+    // the whole tenant library beyond their assigned sections (leak; matches /atoms + the download route).
+    if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;

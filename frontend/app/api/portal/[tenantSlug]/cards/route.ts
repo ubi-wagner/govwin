@@ -11,6 +11,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
+import { reconcileTenant } from '@/lib/opportunity-bridge';
 
 export async function GET(
   request: Request,
@@ -39,8 +40,15 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
+    // Read-repair: catch this tenant's mirror up to the bridge head before serving. The forward-only
+    // fan-out only reaches tenants that existed at push time, so a tenant created after a push (or
+    // whose creation-time backfill failed) would otherwise show a permanently empty feed. Idempotent
+    // + cheap (usually zero missed heads); best-effort so it never blocks the feed.
+    try { await reconcileTenant(tenantId); } catch (e) { console.error('[portal/cards] reconcile (non-fatal)', e); }
+
     const url = new URL(request.url);
     const includeClosed = url.searchParams.get('includeClosed') === 'true';
+    const includePassed = url.searchParams.get('includePassed') === 'true';
     const pinnedOnly = url.searchParams.get('pinned') === 'true';
 
     try {
@@ -53,7 +61,8 @@ export async function GET(
           SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
                  c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
                  bs.top_score, bs.top_bucket_id,
-                 COALESCE(rk.rankings, '[]'::json) AS rankings
+                 COALESCE(rk.rankings, '[]'::json) AS rankings,
+                 fit.fit_output AS "fitOutput"
           FROM tenant_opportunity_cards c
           LEFT JOIN LATERAL (
             SELECT s.score AS top_score, s.bucket_id AS top_bucket_id
@@ -71,8 +80,19 @@ export async function GET(
             JOIN tenant_spotlight_buckets b ON b.id = s.bucket_id AND b.is_active
             WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
           ) rk ON true
+          LEFT JOIN LATERAL (
+            -- The latest opportunity_analyst "why it fits" assessment for this card (its output.text
+            -- is a match analysis). Null until the pipeline runs the agent on deploy — the card
+            -- degrades gracefully. Tenant-scoped via q.tenant_id + the withTenant RLS context.
+            SELECT r.output AS fit_output
+            FROM agent_task_queue q JOIN agent_task_results r ON r.task_id = q.id
+            WHERE q.tenant_id = c.tenant_id AND q.agent_role = 'opportunity_analyst' AND q.status = 'completed'
+              AND q.input->>'opportunityId' = c.opportunity_id::text
+            ORDER BY r.created_at DESC LIMIT 1
+          ) fit ON true
           WHERE c.tenant_id = ${tenantId}::uuid
             ${includeClosed ? tx`` : tx`AND c.lifecycle_status <> 'archived'`}
+            ${includePassed ? tx`` : tx`AND c.pursuit_status <> 'passed'`}
             ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}
           ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
           LIMIT 1000

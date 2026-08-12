@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { validateStandaloneCanvas, type CanvasDocument } from '@/lib/types/canvas-document';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,12 +101,21 @@ export async function POST(
 
     const filename = `${document.metadata?.title || 'document'}.${extension}`.replace(/[^\w\s.-]/g, '_');
 
+    // Advisory size/format compliance floor — the SAME ruler proposals use, against
+    // the document's own declared limits. Surfaced via header; never blocks.
+    let violationCodes = 'none';
+    try {
+      const v = validateStandaloneCanvas(document).map((x) => x.code);
+      if (v.length) violationCodes = v.join(',');
+    } catch (e) { console.error('[admin/documents/[id]/export] compliance check failed (non-fatal):', e); }
+
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': String(buffer.length),
+        'X-Compliance-Violations': violationCodes,
       },
     });
   } catch (err) {

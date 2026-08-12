@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Props = {
@@ -42,7 +42,6 @@ export function ProposalAiActions({
   isLocked,
 }: Props) {
   const router = useRouter();
-  const [draftLoading, setDraftLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
@@ -59,6 +58,11 @@ export function ProposalAiActions({
   const [adversarialPolicy, setAdversarialPolicy] = useState<'hitl' | 'auto'>('hitl');
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [landLoading, setLandLoading] = useState(false);
+  const [acceptLoading, setAcceptLoading] = useState(false);
+  // Direct verbatim reuse of an uploaded past proposal into empty sections (W3.2).
+  const [pastProposals, setPastProposals] = useState<{ id: string; name: string; sectionCount: number }[]>([]);
+  const [reuseCocoonId, setReuseCocoonId] = useState('');
+  const [reuseLoading, setReuseLoading] = useState(false);
   const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -80,52 +84,15 @@ export function ProposalAiActions({
 
   const isAdmin = userRole === 'admin';
 
-  // AI Draft: available for admin when not locked
+  // Full-draft + research controls: available for admin when the proposal is unlocked.
   const canDraft = isAdmin && !isLocked;
+
   // Outcome: available for admin only when the proposal is in a stage the
   // outcome route accepts as a precondition (submitted | final). It 409s on
   // 'archived' (outcome already recorded) and 400s on any other stage, so
   // those must not surface the panel.
   const canRecordOutcome =
     isAdmin && ['submitted', 'final'].includes(stage);
-
-  const handleDraft = useCallback(async () => {
-    if (!canDraft || draftLoading) return;
-    setDraftLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/ai/draft`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Failed' }));
-        setMessage({ type: 'error', text: err.error || 'Draft failed' });
-      } else {
-        const json = await res.json();
-        const count = json.data?.sections_queued ?? 0;
-        if (count === 0) {
-          setMessage({
-            type: 'success',
-            text: 'No empty sections to draft.',
-          });
-        } else {
-          setMessage({
-            type: 'success',
-            text: `AI drafting queued for ${count} section${count > 1 ? 's' : ''}. Content will update shortly.`,
-          });
-        }
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setDraftLoading(false);
-    }
-  }, [canDraft, draftLoading, tenantSlug, proposalId]);
 
   // AI color-team review — enqueues a color_team_reviewer task per section with content; each
   // review posts back as an `ai_review` recommendation in the section's context-box thread.
@@ -229,7 +196,7 @@ export function ProposalAiActions({
           type: 'success',
           text:
             n > 0
-              ? `Landed ${n} AI-proposed revision${n > 1 ? 's' : ''} — review + restore them in each section's version history.`
+              ? `Staged ${n} AI revision${n > 1 ? 's' : ''} for review — Restore any from a section's history, or Accept all into the document below.`
               : reason === 'no_full_draft_run'
                 ? 'No full-draft run found yet — run a full draft first, then apply its revisions.'
                 : 'No new AI-proposed revisions to apply (already landed, or the run staged none yet).',
@@ -242,6 +209,85 @@ export function ProposalAiActions({
       setLandLoading(false);
     }
   }, [canDraft, landLoading, tenantSlug, proposalId, router]);
+
+  // Accept AI drafts INTO the document — the one-click apply. Takes each section's latest staged
+  // ai_revision and writes it to LIVE content (archive-first + CAS advance, like a save). For the
+  // builder who has reviewed and wants the whole draft on the page at once. Fully undoable.
+  const handleAcceptAi = useCallback(async () => {
+    if (!canDraft || acceptLoading) return;
+    if (!window.confirm(
+      "Accept the AI drafts into the document? This replaces each section's current content with its " +
+      'latest AI revision. The current content of each is saved to history first, so you can undo it.',
+    )) return;
+    setAcceptLoading(true);
+    setFullDraftMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/accept-ai-revisions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFullDraftMsg({ type: 'error', text: json.error || 'Failed to accept AI drafts' });
+      } else {
+        const n = json.data?.applied ?? 0;
+        setFullDraftMsg({
+          type: 'success',
+          text: n > 0
+            ? `Accepted ${n} AI draft${n > 1 ? 's' : ''} into the document. Open any section to review — the previous content is in its history.`
+            : json.data?.reason === 'no_ai_revisions'
+              ? 'No staged AI revisions to accept — run a full draft and Stage its revisions first.'
+              : 'No new AI drafts to accept (already applied, or sections are locked).',
+        });
+        router.refresh();
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setAcceptLoading(false);
+    }
+  }, [canDraft, acceptLoading, tenantSlug, proposalId, router]);
+
+  // Load the tenant's uploaded past proposals (for verbatim reuse into this build).
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    fetch(`/api/portal/${tenantSlug}/library/past-proposals`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.data?.pastProposals) setPastProposals(j.data.pastProposals); })
+      .catch(() => { /* non-fatal */ });
+  }, [tenantSlug, userRole]);
+
+  const handleReusePast = useCallback(async () => {
+    if (!canDraft || reuseLoading || !reuseCocoonId) return;
+    if (!window.confirm(
+      "Reuse this past proposal verbatim into the build's EMPTY matching sections? " +
+      'Existing content is untouched; imported text is marked red-italic and stays editable.',
+    )) return;
+    setReuseLoading(true);
+    setFullDraftMsg(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/reuse-past`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cocoonId: reuseCocoonId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFullDraftMsg({ type: 'error', text: json.error || 'Reuse failed' });
+      } else {
+        const n = json.data?.applied ?? 0;
+        const um = (json.data?.unmatched ?? []).length;
+        setFullDraftMsg({
+          type: 'success',
+          text: n > 0
+            ? `Reused past content into ${n} empty section${n > 1 ? 's' : ''}${um ? ` (${um} had no title match)` : ''}. Open a section to review — imported text is red-italic.`
+            : 'No empty sections matched this past proposal by title (existing content is never overwritten).',
+        });
+        router.refresh();
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setReuseLoading(false);
+    }
+  }, [canDraft, reuseLoading, reuseCocoonId, tenantSlug, proposalId, router]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -357,24 +403,12 @@ export function ProposalAiActions({
           AI Actions
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          Direct AI controls — draft empty sections or run a color-team review. For a guided,
-          reviewable draft in three loops (draft → refine → compliance), use{' '}
-          <span className="font-medium text-indigo-700">Proposal Studio</span> above — the recommended path.
+          Run a color-team review of every drafted section. To draft or refine content, use{' '}
+          <span className="font-medium text-indigo-700">Proposal Studio</span> above (the recommended
+          guided path — draft → refine → compliance), or <span className="font-medium text-indigo-700">Draft
+          All Sections</span> on the workspace.
         </p>
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleDraft}
-            disabled={!canDraft || draftLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {draftLoading ? (
-              <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
-            ) : (
-              <span className="text-indigo-400">&#x2726;</span>
-            )}
-            {draftLoading ? 'Drafting...' : 'Draft with AI'}
-          </button>
-
           {/* AI color-team review — queues a per-section color_team_reviewer pass whose
               recommendations post into each section's context-box thread (recommendation_type
               'ai_review'). The same path the on-advance auto-review uses, triggered manually. */}
@@ -542,13 +576,13 @@ export function ProposalAiActions({
             {fullDraftLoading ? 'Requesting…' : `Run full draft (Mode ${fullDraftMode.toUpperCase()})`}
           </button>
 
-          {/* Read-on-review landing: after a full-draft run completes, land its staged AI
-              revisions as proposed versions in each section's history (review + restore). */}
+          {/* Read-on-review landing: after a full-draft run completes, STAGE its AI revisions as
+              proposed versions in each section's history (review-first — Restore any, or Accept all). */}
           <button
             type="button"
             onClick={handleLandRevisions}
             disabled={!canDraft || landLoading}
-            title="Land the latest full-draft run's AI revisions as proposed versions in each section's history."
+            title="Stage the latest full-draft run's AI revisions as proposed versions in each section's history (review-first)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {landLoading ? (
@@ -556,7 +590,24 @@ export function ProposalAiActions({
             ) : (
               <span className="text-gray-400">&#x21A9;</span>
             )}
-            {landLoading ? 'Applying…' : 'Apply AI-proposed revisions'}
+            {landLoading ? 'Staging…' : 'Stage AI revisions for review'}
+          </button>
+
+          {/* One-click apply: write each section's latest staged ai_revision to LIVE content
+              (archive-first + CAS, fully undoable). The payoff of the full-draft workforce. */}
+          <button
+            type="button"
+            onClick={handleAcceptAi}
+            disabled={!canDraft || acceptLoading}
+            title="Accept the staged AI drafts into the document — writes each section's latest AI revision to live content (undoable via each section's history)."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-emerald-200 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {acceptLoading ? (
+              <span className="w-4 h-4 border-2 border-emerald-200 border-t-white rounded-full animate-spin" />
+            ) : (
+              <span>&#x2713;</span>
+            )}
+            {acceptLoading ? 'Accepting…' : 'Accept AI drafts into document'}
           </button>
         </div>
         {isLocked && (
@@ -574,6 +625,36 @@ export function ProposalAiActions({
             }`}
           >
             {fullDraftMsg.text}
+          </div>
+        )}
+
+        {pastProposals.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs font-medium text-gray-600 mb-0.5">Reuse a past proposal (verbatim)</p>
+            <p className="text-xs text-gray-400 mb-2">
+              Pull an uploaded past win&apos;s content straight into this build&apos;s EMPTY matching sections
+              (by title). Imported text is marked red-italic; existing content is never overwritten.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={reuseCocoonId}
+                onChange={(e) => setReuseCocoonId(e.target.value)}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 max-w-xs"
+              >
+                <option value="">Select an uploaded past proposal…</option>
+                {pastProposals.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.sectionCount} section{p.sectionCount !== 1 ? 's' : ''})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleReusePast}
+                disabled={!canDraft || reuseLoading || !reuseCocoonId}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border border-amber-200 rounded-lg bg-white text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {reuseLoading ? 'Reusing…' : 'Reuse verbatim'}
+              </button>
+            </div>
           </div>
         )}
       </div>

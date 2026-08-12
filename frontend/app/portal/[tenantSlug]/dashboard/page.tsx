@@ -90,6 +90,21 @@ export default async function DashboardPage({
     console.error('[dashboard] proposals query failed', e);
   }
 
+  // ── In-flight purchases (curation/guardrails pending, no proposal yet) — the dashboard used to
+  //    go blank on these, so a returning customer had no sign their purchase worked. Surface them. ──
+  let pendingBuilds: { id: string; label: string; opportunityId: string; status: string; curationDueAt: string | null }[] = [];
+  try {
+    pendingBuilds = await sql<{ id: string; label: string; opportunityId: string; status: string; curationDueAt: string | null }[]>`
+      SELECT id, label, opportunity_id, status, curation_due_at::text AS curation_due_at
+      FROM proposal_portals
+      WHERE tenant_id = ${tenantId} AND proposal_id IS NULL
+        AND status IN ('curation_pending', 'guardrails_pending')
+      ORDER BY created_at DESC LIMIT 4
+    `;
+  } catch (e) {
+    console.error('[dashboard] pending portals query failed', e);
+  }
+
   // ── Recent activity ──
   interface EventRow { id: string; namespace: string; type: string; phase: string; createdAt: string; payload: Record<string, unknown> }
   let recentEvents: EventRow[] = [];
@@ -120,8 +135,28 @@ export default async function DashboardPage({
   // on it; a base team member with nothing assigned gets an honest "waiting for access"
   // card instead of a redirect-trap that never says "ask your admin".
   const canAct = hasRoleAtLeast(role, 'tenant_admin');
+  // Step 4 is adaptive: a build STARTS at /cards (pin → purchase), NOT /proposals — which is empty
+  // until you've purchased, so the old link dead-ended at "go buy." A pending purchase is its own
+  // in-progress state (track it on the Builds tab); a live build means the step is done.
+  const step4 = proposalCount > 0
+    ? { icon: '☑', tone: 'done' as const, href: `${basePath}/proposals`, label: 'Continue your proposal build' }
+    : pendingBuilds.length > 0
+      ? { icon: '◐', tone: 'pending' as const, href: `${basePath}/portals`, label: 'Your build is being prepared — track it' }
+      : { icon: '☐', tone: 'todo' as const, href: `${basePath}/cards`, label: 'Find an opportunity and start a build' };
+  const step4IconCls = step4.tone === 'done' ? 'text-emerald-500' : step4.tone === 'pending' ? 'text-amber-500' : 'text-gray-400';
+  const step4LinkCls = step4.tone === 'done' ? 'text-gray-500 line-through' : step4.tone === 'pending' ? 'text-amber-700 hover:underline font-medium' : 'text-blue-600 hover:underline';
   const getStarted = canAct ? (
     <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
+      {/* First-run orientation: the buy → curate → build → submit model, so the checklist has context. */}
+      <div className="mb-4 rounded-lg bg-indigo-50 border border-indigo-100 p-3">
+        <p className="text-xs font-semibold text-indigo-900 mb-1">How it works</p>
+        <ol className="text-xs text-indigo-800/90 space-y-0.5 list-decimal list-inside">
+          <li>Find a matching opportunity in your feed</li>
+          <li>Purchase a build for it</li>
+          <li>Our RFP expert prepares your compliance shell (~72h)</li>
+          <li>You draft with your library + AI, then submit</li>
+        </ol>
+      </div>
       <h2 className="text-lg font-semibold mb-1">Get started</h2>
       <p className="text-sm text-gray-500 mb-4">You don&apos;t have an active build yet. A few steps to get rolling:</p>
       <ul className="space-y-3 text-sm">
@@ -138,8 +173,8 @@ export default async function DashboardPage({
           <a href={`${basePath}/cards`} className={oppsCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Review your matched opportunities</a>
         </li>
         <li className="flex items-start gap-2">
-          <span className={`mt-0.5 ${proposalCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{proposalCount > 0 ? '☑' : '☐'}</span>
-          <a href={`${basePath}/proposals`} className={proposalCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Start your first proposal build</a>
+          <span className={`mt-0.5 ${step4IconCls}`}>{step4.icon}</span>
+          <a href={step4.href} className={step4LinkCls}>{step4.label}</a>
         </li>
       </ul>
     </div>
@@ -176,6 +211,7 @@ export default async function DashboardPage({
         role={role}
         grants={grants}
         proposals={proposals}
+        pendingBuilds={pendingBuilds}
         counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount }}
         activity={activity}
         getStarted={getStarted}

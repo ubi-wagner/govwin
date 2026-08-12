@@ -16,6 +16,36 @@ interface Card {
   pinUpdateAvailable: boolean;
   /** Per-bucket ranking array — one card, N scoring lenses (mig 096 · bucket id·name·summary·score). */
   rankings?: { bucketId: string; name: string; summary: string | null; score: number }[];
+  /** Latest opportunity_analyst assessment (its output.text is a match analysis); null until the agent runs. */
+  fitOutput?: Record<string, unknown> | null;
+}
+
+/** Days until `dateStr` (negative if past); null when unparseable. */
+const daysUntil = (dateStr: string | null): number | null => {
+  if (!dateStr) return null;
+  const t = new Date(dateStr).getTime();
+  return Number.isFinite(t) ? Math.ceil((t - Date.now()) / 86_400_000) : null;
+};
+/** Urgency chip for the close date: red ≤3d, amber ≤14d, else gray; "Closed" once past. */
+function closeChip(dateStr: string | null): { label: string; cls: string } | null {
+  const d = daysUntil(dateStr);
+  if (d === null) return null;
+  if (d < 0) return { label: 'Closed', cls: 'bg-gray-100 text-gray-500' };
+  if (d === 0) return { label: 'Closes today', cls: 'bg-rose-100 text-rose-700' };
+  const label = `Closes in ${d}d`;
+  if (d <= 3) return { label, cls: 'bg-rose-100 text-rose-700' };
+  if (d <= 14) return { label, cls: 'bg-amber-100 text-amber-700' };
+  return { label, cls: 'bg-gray-100 text-gray-500' };
+}
+/** Concise AI fit level from the analyst's output.text (matches its summarize_result buckets); null when absent. */
+function fitFromOutput(out: unknown): { label: string; cls: string; full: string } | null {
+  const text = out && typeof out === 'object' && typeof (out as { text?: unknown }).text === 'string' ? (out as { text: string }).text.trim() : '';
+  if (!text) return null;
+  if (/strong match/i.test(text)) return { label: 'Strong fit', cls: 'bg-emerald-100 text-emerald-700', full: text };
+  if (/moderate match/i.test(text)) return { label: 'Moderate fit', cls: 'bg-blue-100 text-blue-700', full: text };
+  if (/weak match/i.test(text)) return { label: 'Weak fit', cls: 'bg-amber-100 text-amber-700', full: text };
+  if (/no match/i.test(text)) return { label: 'Low fit', cls: 'bg-gray-100 text-gray-500', full: text };
+  return { label: 'AI fit noted', cls: 'bg-indigo-100 text-indigo-700', full: text };
 }
 
 type SortKey = 'pinned' | 'close' | 'agency' | 'title';
@@ -52,17 +82,21 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
+  const [includePassed, setIncludePassed] = useState(false);
   const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>('pinned');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/portal/${tenantSlug}/cards${includeClosed ? '?includeClosed=true' : ''}`);
+      const qs = new URLSearchParams();
+      if (includeClosed) qs.set('includeClosed', 'true');
+      if (includePassed) qs.set('includePassed', 'true');
+      const res = await fetch(`/api/portal/${tenantSlug}/cards${qs.toString() ? `?${qs}` : ''}`);
       if (res.ok) { setCards((await res.json()).data?.cards ?? []); setErr(null); }
       else setErr('Could not load your opportunity cards.');
     } catch { setErr('Could not load your opportunity cards.'); } finally { setLoading(false); }
-  }, [tenantSlug, includeClosed]);
+  }, [tenantSlug, includeClosed, includePassed]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -79,6 +113,18 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
     } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
+  // Set pursuit intent — 'passed' = dismiss (drops out of the default feed), 'unreviewed' = restore.
+  const setPursuit = useCallback(async (opp: string, status: string) => {
+    setBusy(opp); setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pursuit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error || 'That could not be completed — please try again.'); return; }
+      await load();
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
+  }, [tenantSlug, load]);
+
   const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
 
   return (
@@ -89,6 +135,9 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       <div className="flex items-center gap-3 mb-4 text-sm">
         <label className="flex items-center gap-1.5 text-gray-600">
           <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} /> Include closed
+        </label>
+        <label className="flex items-center gap-1.5 text-gray-600">
+          <input type="checkbox" checked={includePassed} onChange={(e) => setIncludePassed(e.target.checked)} /> Show passed
         </label>
         <button onClick={load} className="text-blue-600 hover:underline">Refresh</button>
         <span className="text-gray-400">· {cards.length} cards</span>
@@ -120,7 +169,17 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
               )}
             </div>
             <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${str(c, 'programType')}` : ''}</p>
-            {str(c, 'closeDate') && <p className="text-[11px] text-gray-400 mt-1">Closes {new Date(str(c, 'closeDate') as string).toLocaleDateString()}</p>}
+            {(() => {
+              const chip = closeChip(str(c, 'closeDate'));
+              const fit = fitFromOutput(c.fitOutput);
+              if (!chip && !fit) return null;
+              return (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {chip && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chip.cls}`} title={str(c, 'closeDate') ? `Closes ${new Date(str(c, 'closeDate') as string).toLocaleDateString()}` : undefined}>{chip.label}</span>}
+                  {fit && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${fit.cls}`} title={fit.full}>✨ {fit.label}</span>}
+                </div>
+              );
+            })()}
             {Array.isArray(c.rankings) && c.rankings.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1" title="Ranked by your spotlight buckets">
                 {c.rankings.slice(0, 4).map((r) => (
@@ -146,10 +205,18 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                   <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-1">Unpin</button>
                   <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
                 </>
+              ) : c.pursuitStatus === 'passed' ? (
+                <>
+                  <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 font-medium">Passed</span>
+                  <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'unreviewed')} className="text-xs text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">Restore</button>
+                </>
               ) : (
-                <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST')} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50">
-                  {busy === c.opportunityId ? '…' : 'Pin (copy docs)'}
-                </button>
+                <>
+                  <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST')} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50">
+                    {busy === c.opportunityId ? '…' : 'Pin (copy docs)'}
+                  </button>
+                  <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'passed')} className="text-xs text-gray-400 hover:text-gray-700" title="Hide this from your feed — trains your matches">Not interested</button>
+                </>
               )}
               <a href={`/portal/${tenantSlug}/portals?opp=${c.opportunityId}`} className="text-xs text-gray-600 hover:text-gray-900 ml-auto">Build →</a>
             </div>

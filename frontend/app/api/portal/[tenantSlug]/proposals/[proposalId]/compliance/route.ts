@@ -68,42 +68,54 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // Read compliance.json from S3
-    const key = customerProposalPath(tenantSlug, proposalId, 'compliance.json');
-    let compliance: unknown = null;
-
+    // The compliance MATRIX is the LIVE proposal_compliance_matrix: one requirement row
+    // per required item, whose status advances not_addressed → satisfied as sections
+    // lock/unlock. It is the authoritative source (the proposal workspace reads it
+    // directly too), so this endpoint reads it from the DB.
+    //
+    // The frozen compliance.json object-storage snapshot is DIFFERENT data — the
+    // format-rules spec (font/margins/page-limits) captured at provision for audit. It is
+    // NOT a matrix (no items, no live status), so it must never stand in for the matrix:
+    // returning it drops every requirement row and never reflects lock advancement. That
+    // is exactly what happened once real object storage actually persisted the file (the
+    // old S3-first read only ever fell through to the DB because storage was a no-op in
+    // the sandbox). Read the matrix from the DB; attach the frozen format spec alongside
+    // under `formatSpec` so no audit data is lost.
+    let items: Array<{
+      id: string;
+      requirementText: string;
+      status: string;
+      notes: string | null;
+      sectionId: string | null;
+    }> = [];
     try {
-      const buffer = await getObjectBuffer(key);
-      if (buffer) {
-        compliance = JSON.parse(buffer.toString('utf-8'));
-      }
+      items = await sql<{
+        id: string;
+        requirementText: string;
+        status: string;
+        notes: string | null;
+        sectionId: string | null;
+      }[]>`
+        SELECT id, requirement_text, status, notes, section_id
+        FROM proposal_compliance_matrix
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY requirement_text ASC
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/compliance] matrix read error:', dbErr);
+      return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Best-effort: attach the frozen format-rules spec (audit snapshot) if present.
+    let formatSpec: unknown = null;
+    try {
+      const buffer = await getObjectBuffer(customerProposalPath(tenantSlug, proposalId, 'compliance.json'));
+      if (buffer) formatSpec = JSON.parse(buffer.toString('utf-8'));
     } catch (s3Err) {
-      console.error('[api/portal/proposals/compliance] S3 read error:', s3Err);
+      console.error('[api/portal/proposals/compliance] format-spec read error (non-fatal):', s3Err);
     }
 
-    if (!compliance) {
-      // Fall back to DB compliance matrix if S3 snapshot doesn't exist
-      try {
-        const matrix = await sql<{
-          id: string;
-          requirementText: string;
-          status: string;
-          notes: string | null;
-          sectionId: string | null;
-        }[]>`
-          SELECT id, requirement_text, status, notes, section_id
-          FROM proposal_compliance_matrix
-          WHERE proposal_id = ${proposalId}::uuid
-          ORDER BY requirement_text ASC
-        `;
-        compliance = { items: matrix, source: 'database' };
-      } catch (dbErr) {
-        console.error('[api/portal/proposals/compliance] DB fallback error:', dbErr);
-        compliance = { items: [], source: 'empty' };
-      }
-    }
-
-    return NextResponse.json({ data: compliance });
+    return NextResponse.json({ data: { items, source: 'database', formatSpec } });
   } catch (e) {
     console.error('[api/portal/proposals/compliance] GET error:', e);
     return NextResponse.json(

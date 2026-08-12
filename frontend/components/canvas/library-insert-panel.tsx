@@ -12,9 +12,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CanvasNode } from '@/lib/types/canvas-document';
 
-export interface InsertAtom { id: string; title: string | null; content: string }
-interface Ranked { id: string; title: string | null; summary: string | null; content: string | null; grain: string; wordCount: number; ctxMatches: number; score: number }
+export interface InsertAtom { id: string; title: string | null; content: string; nodes?: CanvasNode[] }
+interface Ranked { id: string; title: string | null; summary: string | null; content: string | null; grain: string; canvasNodes?: CanvasNode[] | null; wordCount: number; ctxMatches: number; vectorSim?: number | null; score: number }
 
 const slugVol = (title: string) => title.toLowerCase().trim().replace(/^[0-9.\s]+/, '').replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
@@ -43,9 +44,12 @@ export function LibraryInsertPanel({ tenantSlug, sectionTitle, sectionId, contex
       setLoading(true);
       try {
         const qs = new URLSearchParams({ vol: slugVol(sectionTitle), limit: '30' });
+        if (sectionTitle) qs.set('text', sectionTitle); // semantic query for the vector axis (ranks by meaning)
         if (contextParam) qs.set('context', contextParam);
         const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
-        if (!cancelled && res.ok) setAtoms((((await res.json()).data?.atoms ?? []) as Ranked[]).filter((a) => a.content && a.content.trim()));
+        // Keep atoms that have TEXT or real canvas nodes — an image/table atom (nodes, maybe no text)
+        // must be insertable too, else boxed figures/tables can never reach a section.
+        if (!cancelled && res.ok) setAtoms((((await res.json()).data?.atoms ?? []) as Ranked[]).filter((a) => (a.content && a.content.trim()) || (a.canvasNodes && a.canvasNodes.length > 0)));
       } catch { /* keep */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -68,7 +72,7 @@ export function LibraryInsertPanel({ tenantSlug, sectionTitle, sectionId, contex
       if (sectionId) {
         try { await fetch(`/api/portal/${tenantSlug}/atoms/select`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sectionId, atomIds: chosen.map((a) => a.id) }) }); } catch { /* non-fatal */ }
       }
-      onInsert(chosen.map((a) => ({ id: a.id, title: a.title, content: a.content as string })));
+      onInsert(chosen.map((a) => ({ id: a.id, title: a.title, content: a.content ?? '', nodes: a.canvasNodes ?? undefined })));
     } finally { setBusy(false); }
   }, [atoms, sel, sectionId, tenantSlug, onInsert]);
 
@@ -92,6 +96,7 @@ export function LibraryInsertPanel({ tenantSlug, sectionTitle, sectionId, contex
                 <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
                   <span>{a.wordCount} words</span>
                   {a.ctxMatches > 0 && <span className="text-emerald-600" title="shares this section's context">✦ {a.ctxMatches} context match{a.ctxMatches > 1 ? 'es' : ''}</span>}
+                  {typeof a.vectorSim === 'number' && a.vectorSim > 0.15 && <span className="text-indigo-500" title={`semantic similarity to this section: ${(a.vectorSim * 100).toFixed(0)}%`}>◈ semantic {(a.vectorSim * 100).toFixed(0)}%</span>}
                   {a.grain === 'group' && <span className="text-purple-500">group</span>}
                 </div>
               </div>

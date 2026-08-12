@@ -118,6 +118,11 @@ export async function GET(
     // If ?version=<key> is present, load a specific history version
     const versionKey = searchParams.get('version');
     if (versionKey) {
+      // Constrain the client-supplied key to THIS document's prefix — an admin has cross-tenant reach,
+      // but the version param must not be able to read arbitrary objects out of the bucket.
+      if (!versionKey.startsWith(`reference/documents/${documentId}/`)) {
+        return NextResponse.json({ error: 'Invalid version key', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
       const buf = await getObjectBuffer(versionKey);
       if (!buf) {
         return NextResponse.json(
@@ -152,7 +157,9 @@ export async function GET(
     const index = await loadIndex();
     const meta = index.find(m => m.id === documentId) || null;
 
-    return NextResponse.json({ data: { document, meta } });
+    // Return the real actor so the editor stamps provenance/history to the signed-in
+    // admin (was hard-coded "Admin") and can key its local autosave draft.
+    return NextResponse.json({ data: { document, meta, actor: { id: authResult.userId, name: authResult.email } } });
   } catch (err) {
     console.error('[admin/documents/[id]] GET error', err);
     return NextResponse.json(

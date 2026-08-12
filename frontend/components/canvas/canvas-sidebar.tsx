@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules, NodeType } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
@@ -14,7 +14,41 @@ import { CommentThread, type NodeComment } from './collaboration';
 import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
 import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
+import { canReplaceFromLibrary } from '@/lib/canvas/format-controls';
 import { NodeFormatControls } from './node-format-controls';
+
+/** Every insertable node type, categorized — the single insert surface (the Add tab).
+ *  All 22 types are reachable here (was 12; the extended elements were toolbar-only). */
+const INSERT_CATEGORIES: ReadonlyArray<{ title: string; items: ReadonlyArray<{ type: NodeType; label: string; icon: string }> }> = [
+  { title: 'Text', items: [
+    { type: 'heading', label: 'Heading', icon: 'H' },
+    { type: 'text_block', label: 'Paragraph', icon: 'T' },
+    { type: 'bulleted_list', label: 'Bullet List', icon: '•' },
+    { type: 'numbered_list', label: 'Numbered List', icon: '#' },
+    { type: 'blockquote', label: 'Quote', icon: '❝' },
+    { type: 'url', label: 'Link', icon: '↗' },
+    { type: 'caption', label: 'Caption', icon: 'C' },
+    { type: 'footnote', label: 'Footnote', icon: '†' },
+  ] },
+  { title: 'Structure', items: [
+    { type: 'table', label: 'Table', icon: '⊞' },
+    { type: 'divider', label: 'Divider', icon: '―' },
+    { type: 'page_break', label: 'Page Break', icon: '—' },
+    { type: 'toc', label: 'Contents', icon: '☰' },
+    { type: 'spacer', label: 'Spacer', icon: '⎵' },
+  ] },
+  { title: 'Media & elements', items: [
+    { type: 'image', label: 'Image', icon: '🖼' },
+    { type: 'chart', label: 'Chart', icon: '📊' },
+    { type: 'shape', label: 'Shape', icon: '▭' },
+    { type: 'text_box', label: 'Text box', icon: '⬚' },
+    { type: 'callout', label: 'Callout', icon: '❗' },
+    { type: 'code_block', label: 'Code', icon: '‹›' },
+    { type: 'equation', label: 'Equation', icon: '∑' },
+    { type: 'video', label: 'Video', icon: '▶' },
+    { type: 'signature', label: 'Signature', icon: '✍' },
+  ] },
+];
 
 interface Props {
   document: CanvasDocument;
@@ -167,10 +201,12 @@ function VersionHistorySection({
   proposalId,
   tenantSlug,
   sectionId,
+  canRestore,
 }: {
   proposalId: string;
   tenantSlug: string;
   sectionId: string;
+  canRestore: boolean;
 }) {
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -248,6 +284,38 @@ function VersionHistorySection({
     [proposalId, tenantSlug, sectionId, selectedVersion],
   );
 
+  const [restoring, setRestoring] = useState<number | null>(null);
+  const [restoreErr, setRestoreErr] = useState<string | null>(null);
+
+  const handleRestore = useCallback(
+    async (vn: number) => {
+      if (!window.confirm(
+        `Restore v${vn}? This replaces the current content with this version. ` +
+        `The current content is saved to history first, so you can undo this.`,
+      )) return;
+      setRestoring(vn);
+      setRestoreErr(null);
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/versions`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ versionNumber: vn }) },
+        );
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({ error: 'Restore failed' }));
+          setRestoreErr(json.error || 'Restore failed');
+          setRestoring(null);
+          return;
+        }
+        // Reload so the editor picks up the restored content as the new live version.
+        window.location.reload();
+      } catch {
+        setRestoreErr('Network error');
+        setRestoring(null);
+      }
+    },
+    [tenantSlug, proposalId, sectionId],
+  );
+
   const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     ai_draft: { label: 'AI Draft', color: 'bg-yellow-100 text-yellow-700' },
     human_edit: { label: 'Human Edit', color: 'bg-blue-100 text-blue-700' },
@@ -311,9 +379,24 @@ function VersionHistorySection({
                   )}
                 </button>
                 {isSelected && (
-                  <div className="mx-1 mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                    {contentLoading ? 'Loading...' : versionContent ?? 'No content'}
-                  </div>
+                  <>
+                    <div className="mx-1 mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                      {contentLoading ? 'Loading...' : versionContent ?? 'No content'}
+                    </div>
+                    {canRestore && (
+                      <div className="mx-1 mt-1 flex items-center gap-2">
+                        <button
+                          onClick={() => handleRestore(v.version_number)}
+                          disabled={restoring !== null}
+                          title="Replace the current content with this version (the current content is archived first, so it stays undoable)"
+                          className="px-2 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {restoring === v.version_number ? 'Restoring…' : 'Restore this version'}
+                        </button>
+                        {restoreErr && <span className="text-[10px] text-red-500">{restoreErr}</span>}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -546,10 +629,16 @@ export function CanvasSidebar({
               <div className="flex flex-wrap gap-1">
                 <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
                 <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
-                <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
-                <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                {selectedNode.provenance.source === 'ai_draft' && (
+                  <>
+                    <button onClick={() => onAcceptNode(selectedNode.id)} title="Keep this AI content" className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
+                    {selectedNode.history.some((h) => h.previous_content != null) && (
+                      <button onClick={() => onRevertNode(selectedNode.id)} title="Undo the AI revision — restore your previous content" className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                    )}
+                  </>
+                )}
                 <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
-                {onReplaceFromLibrary && (
+                {onReplaceFromLibrary && canReplaceFromLibrary(selectedNode.type) && (
                   <button
                     onClick={() => setShowLibraryPicker((prev) => !prev)}
                     className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
@@ -560,8 +649,8 @@ export function CanvasSidebar({
               </div>
             )}
 
-            {/* Library picker — shown when "Replace from Library" is clicked */}
-            {showLibraryPicker && onReplaceFromLibrary && (
+            {/* Library picker — shown when "Replace from Library" is clicked (text nodes only) */}
+            {showLibraryPicker && onReplaceFromLibrary && canReplaceFromLibrary(selectedNode.type) && (
               <LibraryPicker
                 category={sectionCategory ?? selectedNode.type}
                 query={getNodeText(selectedNode).slice(0, 200) || undefined}
@@ -804,35 +893,28 @@ export function CanvasSidebar({
           <p className="text-sm text-gray-400 text-center py-8">Click a node on the canvas to see its details</p>
         )}
 
-        {/* ── Add node tab ────────────────────────────────────── */}
+        {/* ── Add node tab — the ONE comprehensive insert surface: every insertable
+              node type, categorized (was 12 of 22 here, the extended elements only on
+              the toolbar — a user hunting for "Chart" never found it). ── */}
         {activeTab === 'add' && (
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Insert Content</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { type: 'heading' as const, label: 'Heading', icon: 'H' },
-                { type: 'text_block' as const, label: 'Paragraph', icon: 'T' },
-                { type: 'bulleted_list' as const, label: 'Bullet List', icon: '•' },
-                { type: 'numbered_list' as const, label: 'Numbered List', icon: '#' },
-                { type: 'image' as const, label: 'Image', icon: 'img' },
-                { type: 'table' as const, label: 'Table', icon: '⊞' },
-                { type: 'caption' as const, label: 'Caption', icon: 'C' },
-                { type: 'footnote' as const, label: 'Footnote', icon: '†' },
-                { type: 'page_break' as const, label: 'Page Break', icon: '—' },
-                { type: 'toc' as const, label: 'TOC', icon: '☰' },
-                { type: 'url' as const, label: 'Link', icon: '↗' },
-                { type: 'spacer' as const, label: 'Spacer', icon: '⎵' },
-              ].map((item) => (
-                <button
-                  key={item.type}
-                  onClick={() => onAddNode(item.type, selectedNode?.id)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs border rounded hover:bg-blue-50 hover:border-blue-200 text-left"
-                >
-                  <span className="w-5 text-center font-bold text-gray-400">{item.icon}</span>
-                  <span className="text-gray-700">{item.label}</span>
-                </button>
-              ))}
-            </div>
+          <div className="space-y-4">
+            {INSERT_CATEGORIES.map((cat) => (
+              <div key={cat.title}>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{cat.title}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {cat.items.map((item) => (
+                    <button
+                      key={item.type}
+                      onClick={() => onAddNode(item.type, selectedNode?.id)}
+                      className="flex items-center gap-2 px-3 py-2 text-xs border rounded hover:bg-blue-50 hover:border-blue-200 text-left"
+                    >
+                      <span className="w-5 text-center font-bold text-gray-400">{item.icon}</span>
+                      <span className="text-gray-700">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -868,6 +950,7 @@ export function CanvasSidebar({
             proposalId={proposalId}
             tenantSlug={tenantSlug}
             sectionId={sectionId}
+            canRestore={!readOnly}
           />
         )}
 

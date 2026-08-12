@@ -1,0 +1,481 @@
+<title>Architecture Explorer — govtech_intel</title>
+<style>
+  :root {
+    --ink:#141922; --paper:#e9edf2; --surface:#f6f8fb; --raised:#ffffff;
+    --muted:#55606e; --faint:#7f8b99; --line:#d3dae2; --line-soft:#e5e9ef;
+    --trace:#0c7280; --trace-ink:#075661; --loop:#5a4fc4; --loop-ink:#443aa6;
+    --good:#2f8f5b;
+    /* subsystem chip lightness/sat, hue supplied inline via --h */
+    --csat:46%; --cbg:92%; --cbd:80%; --ctsat:52%; --ctxt:30%;
+    --shadow:0 1px 2px rgba(20,25,34,.06),0 10px 34px -20px rgba(20,25,34,.30);
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ink:#e7ecf2; --paper:#0d1117; --surface:#141a22; --raised:#1a212b;
+    --muted:#9aa6b4; --faint:#6b7787; --line:#29323e; --line-soft:#212a35;
+    --trace:#35c6cf; --trace-ink:#7fe3e6; --loop:#9a8dff; --loop-ink:#c3baff; --good:#56c98a;
+    --csat:40%; --cbg:21%; --cbd:32%; --ctsat:66%; --ctxt:74%;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 40px -22px rgba(0,0,0,.7);
+  }}
+  :root[data-theme="dark"]{
+    --ink:#e7ecf2; --paper:#0d1117; --surface:#141a22; --raised:#1a212b;
+    --muted:#9aa6b4; --faint:#6b7787; --line:#29323e; --line-soft:#212a35;
+    --trace:#35c6cf; --trace-ink:#7fe3e6; --loop:#9a8dff; --loop-ink:#c3baff; --good:#56c98a;
+    --csat:40%; --cbg:21%; --cbd:32%; --ctsat:66%; --ctxt:74%;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 40px -22px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  a{color:var(--trace-ink);}
+  :focus-visible{outline:2px solid var(--trace);outline-offset:2px;border-radius:3px;}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;}
+  .mono{font-family:var(--font-mono);}
+
+  /* ---- top bar ---- */
+  .top{display:flex;align-items:center;gap:1rem;padding:.6rem 1rem;border-bottom:1px solid var(--line);background:var(--raised);flex-wrap:wrap;flex:0 0 auto;}
+  .brand{display:flex;flex-direction:column;gap:.05rem;margin-right:.4rem;}
+  .brand b{font-size:.95rem;letter-spacing:-.01em;}
+  .brand span{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);}
+  .meta{display:flex;gap:.4rem;flex-wrap:wrap;}
+  .mchip{font-family:var(--font-mono);font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:.16rem .55rem;background:var(--surface);}
+  .tabs{display:flex;gap:.25rem;margin-left:auto;}
+  .tab{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.02em;padding:.36rem .7rem;border-radius:7px;border:1px solid transparent;color:var(--muted);}
+  .tab[aria-selected="true"]{color:var(--trace-ink);border-color:color-mix(in oklab,var(--trace) 40%,var(--line));background:color-mix(in oklab,var(--trace) 9%,transparent);}
+  .tab:hover{color:var(--ink);}
+  .tgl{font-family:var(--font-mono);font-size:.7rem;border:1px solid var(--line);border-radius:7px;padding:.36rem .55rem;color:var(--muted);}
+  .tgl:hover{border-color:var(--trace);color:var(--ink);}
+
+  /* ---- body ---- */
+  .body{flex:1 1 auto;display:flex;min-height:0;}
+  .view{flex:1 1 auto;min-height:0;display:none;}
+  .view.on{display:flex;}
+
+  /* ---- sidebar (schema) ---- */
+  .side{flex:0 0 288px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--raised);}
+  .search{padding:.6rem;border-bottom:1px solid var(--line-soft);}
+  .search input{width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--font-mono);font-size:.8rem;}
+  .search input::placeholder{color:var(--faint);}
+  .subfilter{display:flex;flex-wrap:wrap;gap:.25rem;padding:.5rem .6rem;border-bottom:1px solid var(--line-soft);}
+  .sflag{font-size:.66rem;font-family:var(--font-mono);padding:.14rem .42rem;border-radius:20px;border:1px solid;cursor:pointer;}
+  .list{overflow-y:auto;flex:1 1 auto;padding:.35rem;}
+  .grp{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:.7rem .5rem .3rem;display:flex;align-items:center;gap:.5ch;}
+  .grp .gc{width:.5rem;height:.5rem;border-radius:2px;}
+  .trow{display:flex;align-items:center;gap:.5ch;width:100%;text-align:left;padding:.32rem .5rem;border-radius:6px;font-family:var(--font-mono);font-size:.78rem;color:var(--ink);}
+  .trow:hover{background:color-mix(in oklab,var(--ink) 6%,transparent);}
+  .trow[aria-current="true"]{background:color-mix(in oklab,var(--trace) 13%,transparent);color:var(--trace-ink);}
+  .trow .tdot{width:.5rem;height:.5rem;border-radius:50%;flex:0 0 auto;}
+  .trow .tn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .trow .tm{margin-left:auto;font-size:.66rem;color:var(--faint);}
+
+  /* ---- detail pane ---- */
+  .detail{flex:1 1 auto;overflow-y:auto;padding:1.3rem clamp(1rem,3vw,2rem);min-width:0;}
+  .dhead{display:flex;align-items:center;gap:.7ch;flex-wrap:wrap;}
+  .dhead h2{font-family:var(--font-mono);font-size:1.35rem;letter-spacing:-.01em;margin:0;}
+  .subchip{font-family:var(--font-mono);font-size:.68rem;padding:.16rem .5rem;border-radius:20px;background:hsl(var(--h) var(--csat) var(--cbg));color:hsl(var(--h) var(--ctsat) var(--ctxt));border:1px solid hsl(var(--h) var(--csat) var(--cbd));}
+  .badge{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:.05rem .35rem;}
+  .mchip.live,.badge.live{color:var(--good);border-color:color-mix(in oklab,var(--good) 42%,var(--line));background:color-mix(in oklab,var(--good) 10%,transparent);}
+  .dsub{color:var(--muted);font-size:.85rem;margin:.35rem 0 0;}
+
+  .sectitle{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:1.7rem 0 .6rem;}
+
+  /* neighborhood graph */
+  .graph-wrap{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow-x:auto;box-shadow:var(--shadow);}
+  .graph-wrap svg{display:block;width:100%;height:auto;min-width:640px;}
+  .gnode{height:44px;border-radius:8px;border:1px solid hsl(var(--h) var(--csat) var(--cbd));background:hsl(var(--h) var(--csat) var(--cbg));display:flex;flex-direction:column;justify-content:center;padding:0 .6rem;cursor:pointer;overflow:hidden;font-family:var(--font-mono);}
+  .gnode:hover{filter:brightness(1.04);border-color:hsl(var(--h) var(--ctsat) 50%);}
+  .gnode b{font-size:.74rem;color:hsl(var(--h) var(--ctsat) var(--ctxt));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+  .gnode small{font-size:.6rem;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .gnode.center{background:var(--raised);border:2px solid var(--trace);}
+  .gnode.center b{color:var(--trace-ink);font-size:.82rem;}
+  .gempty{padding:2.2rem;text-align:center;color:var(--faint);font-family:var(--font-mono);font-size:.8rem;}
+
+  /* fields table */
+  .fields{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:.78rem;}
+  .fields th{text-align:left;font-weight:600;color:var(--faint);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;padding:.3rem .6rem;border-bottom:1px solid var(--line);}
+  .fields td{padding:.32rem .6rem;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  .fields tr:hover td{background:color-mix(in oklab,var(--ink) 4%,transparent);}
+  .fields .fn{color:var(--ink);}
+  .fields .ft{color:var(--muted);}
+  .kpk{color:#fff;background:var(--trace);border-radius:4px;padding:.02rem .3rem;font-size:.58rem;letter-spacing:.06em;}
+  .kfk{color:var(--loop-ink);border:1px solid color-mix(in oklab,var(--loop) 45%,var(--line));border-radius:4px;padding:.02rem .3rem;font-size:.58rem;cursor:pointer;}
+  .kfk:hover{background:color-mix(in oklab,var(--loop) 12%,transparent);}
+  .nn{color:var(--faint);font-size:.62rem;}
+  .fwrap{border:1px solid var(--line);border-radius:10px;overflow-x:auto;}
+
+  /* relationship lists */
+  .rels{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;}
+  @media(max-width:680px){.rels{grid-template-columns:1fr;}}
+  .rel h4{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.06em;color:var(--muted);margin:0 0 .5rem;font-weight:600;}
+  .relchips{display:flex;flex-wrap:wrap;gap:.35rem;}
+  .rchip{font-family:var(--font-mono);font-size:.72rem;padding:.2rem .5rem;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;}
+  .rchip:hover{border-color:var(--trace);color:var(--trace-ink);}
+  .rchip .via{color:var(--faint);}
+
+  /* overview (no selection) */
+  .ov{padding:1.6rem clamp(1rem,3vw,2rem);overflow-y:auto;}
+  .ov h3{font-size:1.1rem;letter-spacing:-.01em;margin:0 0 .3rem;}
+  .ov p{color:var(--muted);max-width:64ch;margin:.2rem 0 1.3rem;font-size:.9rem;}
+  .subgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.7rem;}
+  .subcard{border:1px solid var(--line);border-left:3px solid hsl(var(--h) var(--ctsat) 50%);border-radius:10px;padding:.8rem .9rem;background:var(--raised);cursor:pointer;box-shadow:var(--shadow);}
+  .subcard:hover{border-color:hsl(var(--h) var(--ctsat) 50%);}
+  .subcard b{font-size:.9rem;}
+  .subcard .n{font-family:var(--font-mono);font-size:.66rem;color:var(--faint);float:right;}
+
+  /* flows view */
+  .flows{overflow:auto;padding:1.4rem clamp(1rem,3vw,2rem);width:100%;}
+  .trace{border:1px solid var(--line);border-radius:12px;background:var(--raised);margin-bottom:1rem;box-shadow:var(--shadow);overflow:hidden;}
+  .trace>.h{display:flex;align-items:baseline;gap:.8ch;flex-wrap:wrap;padding:.8rem 1rem;border-bottom:1px solid var(--line-soft);border-left:3px solid var(--k,var(--trace));}
+  .trace.loop>.h{--k:var(--loop);}
+  .trace .tg{font-family:var(--font-mono);font-weight:700;font-size:.72rem;color:var(--k,var(--trace));}
+  .trace.loop .tg{color:var(--loop-ink);}
+  .trace .nm{font-weight:650;}
+  .flow{display:flex;align-items:stretch;gap:0;padding:.9rem 1rem;overflow-x:auto;}
+  .fnode{flex:0 0 auto;min-width:9rem;max-width:14rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:.45rem .6rem;display:flex;flex-direction:column;gap:.15rem;}
+  .fnode.tbl{cursor:pointer;border-color:color-mix(in oklab,var(--trace) 40%,var(--line));}
+  .fnode.tbl:hover{background:color-mix(in oklab,var(--trace) 10%,var(--surface));}
+  .fnode .pl{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);}
+  .fnode .id{font-family:var(--font-mono);font-size:.72rem;line-height:1.25;word-break:break-word;}
+  .fnode.tbl .id{color:var(--trace-ink);}
+  .far{flex:0 0 auto;display:grid;place-items:center;width:1.7rem;color:var(--trace);font-family:var(--font-mono);}
+  .trace.loop .far{color:var(--loop);}
+  .tnote{padding:0 1rem .9rem;color:var(--muted);font-size:.82rem;}
+
+  /* uis view */
+  .uis{overflow:auto;padding:1.4rem clamp(1rem,3vw,2rem);width:100%;}
+  .uigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.8rem;}
+  .uicard{border:1px solid var(--line);border-radius:11px;background:var(--raised);padding:.9rem 1rem;box-shadow:var(--shadow);}
+  .uicard b{font-size:.92rem;}
+  .uicard .rt{font-family:var(--font-mono);font-size:.7rem;color:var(--muted);margin:.2rem 0 .6rem;word-break:break-all;}
+  .uicard .relchips{gap:.3rem;}
+
+  .hint{color:var(--faint);font-size:.78rem;font-family:var(--font-mono);margin-top:.8rem;}
+</style>
+
+<div class="top">
+  <div class="brand"><b>Architecture Explorer</b><span id="src">govtech_intel</span></div>
+  <div class="meta" id="meta"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="schema" aria-selected="true">Schema</button>
+    <button class="tab" role="tab" data-view="flows" aria-selected="false">Data flows</button>
+    <button class="tab" role="tab" data-view="uis" aria-selected="false">UI surfaces</button>
+  </div>
+  <button class="tgl" id="tgl" aria-label="Toggle theme">◐</button>
+</div>
+
+<div class="body">
+  <div class="view on" id="v-schema">
+    <aside class="side">
+      <div class="search"><input id="q" type="search" placeholder="search tables + fields…" autocomplete="off" spellcheck="false"></div>
+      <div class="subfilter" id="subfilter"></div>
+      <div class="list" id="list"></div>
+    </aside>
+    <main class="detail" id="detail"><div class="ov" id="overview"></div></main>
+  </div>
+  <div class="view" id="v-flows"><div class="flows" id="flows"></div></div>
+  <div class="view" id="v-uis"><div class="uis" id="uis"></div></div>
+</div>
+
+<script id="arch-model" type="application/json">/*__ARCH_MODEL__*/</script>
+<script>
+"use strict";
+const M = JSON.parse(document.getElementById('arch-model').textContent);
+const SUB = {}; M.subsystems.forEach(s => SUB[s.id] = s);
+const hueOf = t => (SUB[M.tables[t]?.subsystem]?.hue ?? 220);
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let state = { view:'schema', sel:null, sub:null, q:'' };
+let COUNTS = null, COUNT_TOTAL = 0;
+const fmt = n => n==null ? '' : n>=1e6 ? (n/1e6).toFixed(n>=1e7?0:1)+'M' : n>=1e3 ? (n/1e3).toFixed(n>=1e4?0:1)+'k' : String(Math.round(n));
+
+/* ---------- meta + subsystem filter ---------- */
+$('src').textContent = M.meta.source;
+function renderMeta(){
+  let html = [`${M.meta.tableCount} tables`, `${M.meta.fkCount} FKs`, `mig ${M.meta.migrationHead}`]
+    .map(x => `<span class="mchip">${esc(x)}</span>`).join('');
+  if (COUNTS) html += `<span class="mchip live" title="planner row estimates (pg_class.reltuples)">~${fmt(COUNT_TOTAL)} rows · live</span>`;
+  $('meta').innerHTML = html;
+}
+renderMeta();
+
+// When embedded in the app (/admin/architecture), pull live per-table row estimates and merge
+// them in. Same-origin fetch (CSP connect-src 'self'); the iframe carries the admin session.
+// Opened as a file or Claude artifact this 404s and we keep the static schema — graceful.
+async function loadStats(){
+  try {
+    const r = await fetch('/api/admin/architecture/stats', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    const c = j && j.data && j.data.counts;
+    if (!c) return;
+    COUNTS = c; COUNT_TOTAL = (j.data.total != null) ? j.data.total : Object.values(c).reduce((a, b) => a + b, 0);
+    renderMeta(); renderList();
+    if (state.view === 'schema' && state.sel) renderDetail(state.sel);
+  } catch { /* not running in-app — static schema only */ }
+}
+
+function renderSubfilter(){
+  $('subfilter').innerHTML = M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
+    const on = state.sub === s.id;
+    const style = `--h:${s.hue};color:hsl(${s.hue} var(--ctsat) var(--ctxt));border-color:hsl(${s.hue} var(--csat) var(--cbd));background:${on?`hsl(${s.hue} var(--csat) var(--cbg))`:'transparent'}`;
+    return `<button class="sflag" data-sub="${s.id}" style="${style}">${esc(s.label)}</button>`;
+  }).join('');
+}
+renderSubfilter();
+
+// LIVE SCHEMA — when embedded in the app, read the running DB's actual schema and swap it in, so
+// the map reflects new migrations with no regeneration. Same shape as extract.mjs, re-enriched
+// here with the committed overlay (subsystem rules stay embedded; traces/uis unchanged). Fails
+// silently as a file/artifact → the committed snapshot stands.
+function assignSub(name){
+  for (const s of M.subsystems){
+    if (s.id === 'other') continue;
+    if (s.exact && s.exact.includes(name)) return s.id;
+    if (s.match && s.match.some(p => name.startsWith(p))) return s.id;
+  }
+  return 'other';
+}
+function enrichLive(raw){
+  const outBy = {}, inBy = {};
+  for (const f of raw.fks){ (outBy[f.table] ??= []).push(f); (inBy[f.refTable] ??= []).push({ fromTable: f.table, col: f.col }); }
+  const tables = {};
+  for (const [name, t] of Object.entries(raw.tables)){
+    const outs = outBy[name] || [];
+    const byCol = new Map(outs.map(f => [f.col, f]));
+    tables[name] = {
+      subsystem: assignSub(name), isView: name.startsWith('v_'), pk: t.pk,
+      columns: t.columns.map(c => ({ name: c.name, type: c.type, nullable: c.nullable, pk: t.pk.includes(c.name),
+        fk: byCol.has(c.name) ? { refTable: byCol.get(c.name).refTable, refCol: byCol.get(c.name).refCol } : null })),
+      out: outs.map(f => ({ col: f.col, refTable: f.refTable, refCol: f.refCol })),
+      in: (inBy[name] || []).map(e => ({ fromTable: e.fromTable, col: e.col })),
+    };
+  }
+  return tables;
+}
+async function loadLiveSchema(){
+  try {
+    const r = await fetch('/api/admin/architecture/schema', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.data || !j.data.tables) return;
+    M.tables = enrichLive(j.data);
+    M.meta = { ...M.meta, tableCount: Object.keys(M.tables).length, fkCount: j.data.fks.length, live: true };
+    if (state.sel && !M.tables[state.sel]) state.sel = null;
+    renderMeta(); renderSubfilter(); renderList();
+    if (state.view === 'schema') { state.sel ? renderDetail(state.sel) : renderOverview(); }
+  } catch { /* not in-app — keep the committed snapshot */ }
+}
+
+function tablesIn(sub){ return Object.keys(M.tables).filter(t => M.tables[t].subsystem === sub); }
+
+/* ---------- sidebar list ---------- */
+function renderList(){
+  const q = state.q.trim().toLowerCase();
+  const match = t => {
+    if (state.sub && M.tables[t].subsystem !== state.sub) return false;
+    if (!q) return true;
+    if (t.toLowerCase().includes(q)) return true;
+    return M.tables[t].columns.some(c => c.name.toLowerCase().includes(q));
+  };
+  let html = '';
+  for (const s of M.subsystems){
+    const ts = tablesIn(s.id).filter(match).sort();
+    if (!ts.length) continue;
+    html += `<div class="grp"><span class="gc" style="background:hsl(${s.hue} var(--ctsat) 50%)"></span>${esc(s.label)} · ${ts.length}</div>`;
+    for (const t of ts){
+      const tb = M.tables[t];
+      html += `<button class="trow" data-nav="t:${esc(t)}" aria-current="${state.sel===t}">`+
+        `<span class="tdot" style="background:hsl(${s.hue} var(--ctsat) 50%)"></span>`+
+        `<span class="tn">${esc(t)}</span>`+
+        `<span class="tm">${tb.columns.length}c·${tb.out.length}fk${COUNTS&&COUNTS[t]!=null?` · ${fmt(COUNTS[t])}`:''}</span></button>`;
+    }
+  }
+  $('list').innerHTML = html || `<div class="gempty">no match</div>`;
+}
+
+/* ---------- neighborhood graph (deterministic SVG + foreignObject) ---------- */
+function graph(name){
+  const t = M.tables[name];
+  const CAP = 8;
+  const ins = t.in.slice(0, CAP), outs = t.out.slice(0, CAP);
+  const rows = Math.max(ins.length, outs.length, 1);
+  const RH = 58, TOP = 26, NW = 176, NH = 44, W = 960;
+  const H = TOP*2 + (rows-1)*RH + NH;
+  const cy = (H - NH)/2, cx = (W - 180)/2; // center node x
+  const yFor = (i, n) => TOP + (H - TOP*2 - NH)/2 - ((n-1)*RH)/2 + i*RH;
+  const anchorL = 40 + NW, anchorR = cx, aOutL = cx + 180, aOutR = W - 40 - NW;
+  let paths = '', nodes = '';
+  // center
+  nodes += fo(cx, cy, 180, `<div class="gnode center" style="--h:${hueOf(name)}"><b>${esc(name)}</b></div>`);
+  ins.forEach((e, i) => {
+    const y = yFor(i, ins.length);
+    paths += edge(anchorL, y+NH/2, anchorR, cy+NH/2, 'in', e.col);
+    nodes += fo(40, y, NW, gnode(e.fromTable, '.'+e.col+' →'));
+  });
+  outs.forEach((e, i) => {
+    const y = yFor(i, outs.length);
+    paths += edge(aOutL, cy+NH/2, aOutR, y+NH/2, 'out', e.col);
+    nodes += fo(W-40-NW, y, NW, gnode(e.refTable, '→ .'+e.refCol));
+  });
+  const moreI = t.in.length - ins.length, moreO = t.out.length - outs.length;
+  const cap = (moreI>0||moreO>0) ? `<div class="hint">graph shows ${ins.length}/${t.in.length} inbound · ${outs.length}/${t.out.length} outbound — full lists below</div>` : '';
+  if (!ins.length && !outs.length)
+    return `<div class="graph-wrap"><div class="gempty">no foreign-key relationships</div></div>${cap}`;
+  return `<div class="graph-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="foreign-key neighborhood of ${esc(name)}">
+    <defs>
+      <marker id="aIn" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--loop)"/></marker>
+      <marker id="aOut" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--trace)"/></marker>
+    </defs>${paths}${nodes}</svg></div>${cap}`;
+}
+function gnode(tbl, sub){ return `<div class="gnode" style="--h:${hueOf(tbl)}" data-nav="t:${esc(tbl)}"><b>${esc(tbl)}</b><small>${esc(sub)}</small></div>`; }
+function fo(x, y, w, inner){ return `<foreignObject x="${x}" y="${y}" width="${w}" height="44"><div xmlns="http://www.w3.org/1999/xhtml">${inner}</div></foreignObject>`; }
+function edge(x1,y1,x2,y2,dir,label){
+  const mx=(x1+x2)/2, c1=x1+(x2-x1)*0.42, c2=x2-(x2-x1)*0.42;
+  const col = dir==='in' ? 'var(--loop)' : 'var(--trace)';
+  const mk = dir==='in' ? 'aIn' : 'aOut';
+  const lx=(x1+x2)/2, ly=(y1+y2)/2;
+  return `<path d="M${x1},${y1} C${c1},${y1} ${c2},${y2} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="1.4" opacity=".55" marker-end="url(#${mk})"/>`+
+    `<rect x="${lx-label.length*3.4-4}" y="${ly-8}" width="${label.length*6.8+8}" height="15" rx="3" fill="var(--surface)" opacity=".92"/>`+
+    `<text x="${lx}" y="${ly+3}" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--muted)">${esc(label)}</text>`;
+}
+
+/* ---------- table detail ---------- */
+function renderDetail(name){
+  const t = M.tables[name];
+  const rels = (arr, dir) => arr.map(e => {
+    const tbl = dir==='out' ? e.refTable : e.fromTable;
+    const via = dir==='out' ? `${e.col} → .${e.refCol}` : `.${e.col}`;
+    return `<button class="rchip" data-nav="t:${esc(tbl)}">${esc(tbl)} <span class="via">${esc(via)}</span></button>`;
+  }).join('') || `<span class="hint">none</span>`;
+  const fieldRows = t.columns.map(c => {
+    let key = '';
+    if (c.pk) key += `<span class="kpk">PK</span> `;
+    if (c.fk) key += `<span class="kfk" data-nav="t:${esc(c.fk.refTable)}">FK → ${esc(c.fk.refTable)}</span>`;
+    return `<tr><td class="fn">${esc(c.name)}</td><td class="ft">${esc(c.type)}</td>`+
+      `<td>${c.nullable?'<span class="nn">null</span>':'<span class="nn" style="color:var(--good)">not&nbsp;null</span>'}</td>`+
+      `<td>${key}</td></tr>`;
+  }).join('');
+  $('detail').innerHTML = `
+    <div class="dhead">
+      <h2>${esc(name)}</h2>
+      <span class="subchip" style="--h:${hueOf(name)}">${esc(SUB[t.subsystem].label)}</span>
+      ${t.isView?'<span class="badge">view</span>':''}
+      <span class="badge">${t.columns.length} fields</span>
+      <span class="badge">${t.out.length} out · ${t.in.length} in</span>
+      ${COUNTS && COUNTS[name]!=null ? `<span class="badge live">~${fmt(COUNTS[name])} rows</span>` : ''}
+    </div>
+    <div class="sectitle">Foreign-key neighborhood</div>
+    ${graph(name)}
+    <div class="sectitle">Fields</div>
+    <div class="fwrap"><table class="fields"><thead><tr><th>column</th><th>type</th><th>null</th><th>key</th></tr></thead><tbody>${fieldRows}</tbody></table></div>
+    <div class="sectitle">Relationships</div>
+    <div class="rels">
+      <div class="rel"><h4>References (out) → ${t.out.length}</h4><div class="relchips">${rels(t.out,'out')}</div></div>
+      <div class="rel"><h4>Referenced by (in) ← ${t.in.length}</h4><div class="relchips">${rels(t.in,'in')}</div></div>
+    </div>`;
+  $('detail').scrollTop = 0;
+}
+
+function renderOverview(){
+  const cards = M.subsystems.filter(s=>tablesIn(s.id).length).map(s => {
+    const n = tablesIn(s.id).length;
+    return `<button class="subcard" data-sub="${s.id}" style="--h:${s.hue}"><span class="n">${n} tables</span><b>${esc(s.label)}</b></button>`;
+  }).join('');
+  $('detail').innerHTML = `<div class="ov">
+    <h3>${M.meta.tableCount} tables, ${M.meta.fkCount} foreign keys</h3>
+    <p>The live <span class="mono">${esc(M.meta.source)}</span> schema at migration head ${M.meta.migrationHead}, grouped by subsystem. Pick a table to see its fields, its foreign-key neighborhood, and everything that references it — or start from a real data flow.</p>
+    <div class="subgrid">${cards}</div>
+    <p class="hint">Every table, field, type and FK is extracted from the migrated database — re-run <span class="mono">scripts/architecture/{extract,generate}.mjs</span> to refresh.</p>
+  </div>`;
+}
+
+/* ---------- flows ---------- */
+function renderFlows(){
+  $('flows').innerHTML = M.traces.map(tr => {
+    const steps = tr.steps.map((s,i) => {
+      const node = `<div class="fnode ${s.table?'tbl':''}" ${s.table?`data-nav="t:${esc(s.table)}"`:''}><span class="pl">${esc(s.plane)}</span><span class="id">${esc(s.label)}</span></div>`;
+      const arr = i < tr.steps.length-1 ? `<div class="far">${s.plane==='Agents'||tr.steps[i+1]?.plane==='UI'&&tr.kind==='loop'?'↩':'→'}</div>` : '';
+      return node + arr;
+    }).join('');
+    return `<div class="trace ${tr.kind==='loop'?'loop':''}">
+      <div class="h"><span class="tg">TRACE ${esc(tr.id)}</span><span class="nm">${esc(tr.name)}</span></div>
+      <div class="flow">${steps}</div>
+      <p class="tnote">${esc(tr.note)}</p></div>`;
+  }).join('') + `<p class="hint">Table nodes are clickable — they jump to the schema view. Mirrors docs/DATA_FLOW.md.</p>`;
+}
+
+/* ---------- uis ---------- */
+function renderUis(){
+  $('uis').innerHTML = `<div class="uigrid">` + M.uis.map(u => {
+    const chips = u.tables.map(t => M.tables[t]
+      ? `<button class="rchip" data-nav="t:${esc(t)}">${esc(t)}</button>`
+      : `<span class="rchip" style="opacity:.5">${esc(t)}</span>`).join('');
+    return `<div class="uicard"><b>${esc(u.label)}</b><div class="rt">${esc(u.route)}</div><div class="relchips">${chips}</div></div>`;
+  }).join('') + `</div><p class="hint">Key surfaces and the tables they read or write. Click a table to inspect it.</p>`;
+}
+
+/* ---------- view switching ---------- */
+function setView(v){
+  state.view = v;
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('on'));
+  $('v-'+v).classList.add('on');
+  if (v==='flows') renderFlows();
+  if (v==='uis') renderUis();
+  syncHash();
+}
+function select(name){
+  if (!M.tables[name]) return;
+  state.sel = name; state.view='schema';
+  setView('schema');
+  renderList(); renderDetail(name);
+  syncHash();
+  const row = document.querySelector(`.trow[data-nav="t:${cssq(name)}"]`);
+  if (row) row.scrollIntoView({block:'nearest'});
+}
+const cssq = s => s.replace(/["\\]/g,'\\$&');
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const nav = e.target.closest('[data-nav]');
+  if (nav){ const [k,v] = nav.dataset.nav.split(':'); if (k==='t') select(v); return; }
+  const sub = e.target.closest('[data-sub]');
+  if (sub){ state.sub = state.sub===sub.dataset.sub ? null : sub.dataset.sub; state.sel=null; refreshSub(); setView('schema'); renderList(); renderOverview(); return; }
+  const tab = e.target.closest('.tab');
+  if (tab){ setView(tab.dataset.view); return; }
+});
+$('q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
+$('tgl').addEventListener('click', () => {
+  const r = document.documentElement; const cur = r.getAttribute('data-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  r.setAttribute('data-theme', cur==='dark'?'light':'dark');
+});
+function refreshSub(){
+  document.querySelectorAll('.sflag').forEach(b => {
+    const on = b.dataset.sub===state.sub, h = SUB[b.dataset.sub].hue;
+    b.style.background = on ? `hsl(${h} var(--csat) var(--cbg))` : 'transparent';
+  });
+}
+
+/* ---------- hash routing (deep-linkable for review) ---------- */
+function syncHash(){
+  let h = '#'+state.view;
+  if (state.view==='schema' && state.sel) h = '#t/'+state.sel;
+  if (location.hash !== h) history.replaceState(null,'',h);
+}
+function fromHash(){
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('t/')) { select(h.slice(2)); return; }
+  if (h==='flows'||h==='uis') { setView(h); return; }
+  setView('schema'); renderOverview();
+}
+window.addEventListener('hashchange', fromHash);
+
+/* ---------- boot ---------- */
+renderList();
+fromHash();
+loadLiveSchema().then(loadStats);
+
+</script>

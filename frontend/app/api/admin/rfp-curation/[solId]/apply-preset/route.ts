@@ -205,6 +205,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     const partnerMaxPct = (cd.partner_max_pct ?? cd.partnerMaxPct ?? null) as number | null;
     const clearanceRequired = (cd.clearance_required ?? cd.clearanceRequired ?? null) as string | null;
     const itarRequired = (cd.itar_required ?? cd.itarRequired ?? null) as boolean | null;
+    // Previously dropped on the floor — a real compliance-fidelity gap (e.g. the STTR RI 30% / SB 40%
+    // work split lives in custom_variables; the required-documents/sections and min font also matter).
+    const minFontSize = (cd.min_font_size ?? cd.minFontSize ?? null) as number | null;
+    const costSharingRequired = (cd.cost_sharing_required ?? cd.costSharingRequired ?? null) as boolean | null;
+    const requiredSections = (cd.required_sections ?? cd.requiredSections ?? []) as unknown;
+    const requiredDocuments = (cd.required_documents ?? cd.requiredDocuments ?? []) as unknown;
+    const customVariables = (cd.custom_variables ?? cd.customVariables ?? {}) as unknown;
 
     for (const topicId of topicIds) {
       // 1. Upsert solicitation_compliance for this topic
@@ -235,6 +242,11 @@ export async function POST(request: Request, ctx: RouteContext) {
             partner_max_pct = ${partnerMaxPct},
             clearance_required = ${clearanceRequired},
             itar_required = ${itarRequired ?? false},
+            min_font_size = ${minFontSize},
+            cost_sharing_required = ${costSharingRequired ?? false},
+            required_sections = ${sql.json(requiredSections as Parameters<typeof sql.json>[0])},
+            required_documents = ${sql.json(requiredDocuments as Parameters<typeof sql.json>[0])},
+            custom_variables = ${sql.json(customVariables as Parameters<typeof sql.json>[0])},
             verified_by = ${user.id ?? null},
             verified_at = now(),
             updated_at = now()
@@ -250,6 +262,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             submission_format, slides_allowed, slide_limit,
             taba_allowed, pi_must_be_employee, partner_max_pct,
             clearance_required, itar_required,
+            min_font_size, cost_sharing_required, required_sections, required_documents, custom_variables,
             verified_by, verified_at
           ) VALUES (
             ${solId}::uuid, ${topicId}::uuid,
@@ -271,6 +284,11 @@ export async function POST(request: Request, ctx: RouteContext) {
             ${partnerMaxPct},
             ${clearanceRequired},
             ${itarRequired ?? false},
+            ${minFontSize},
+            ${costSharingRequired ?? false},
+            ${sql.json(requiredSections as Parameters<typeof sql.json>[0])},
+            ${sql.json(requiredDocuments as Parameters<typeof sql.json>[0])},
+            ${sql.json(customVariables as Parameters<typeof sql.json>[0])},
             ${user.id ?? null},
             now()
           )
@@ -291,6 +309,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
 
       // 3. Create volumes + items from preset
+      // solicitation_volumes.volume_format is CHECK-constrained to {dsip_standard, l_and_m, custom};
+      // some seed presets (e.g. TVSF) carry descriptive formats like 'tvsf_narrative' that would 500 the
+      // INSERT. Coerce anything outside the enum to 'custom' — the descriptive intent lives in the name.
+      const ALLOWED_VOL_FMT = new Set(['dsip_standard', 'l_and_m', 'custom']);
+      const coerceVolFmt = (f: unknown): string =>
+        typeof f === 'string' && ALLOWED_VOL_FMT.has(f) ? f : 'custom';
       for (const vol of volumesData) {
         const [newVol] = await sql<{ id: string }[]>`
           INSERT INTO solicitation_volumes (
@@ -300,7 +324,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             ${solId}::uuid, ${topicId}::uuid,
             ${vol.volume_number},
             ${vol.volume_name},
-            ${vol.volume_format ?? null},
+            ${coerceVolFmt(vol.volume_format)},
             ${vol.description ?? null},
             ${user.id ?? null}
           )
@@ -314,7 +338,8 @@ export async function POST(request: Request, ctx: RouteContext) {
               INSERT INTO volume_required_items (
                 volume_id, item_number, item_name, item_type, required,
                 page_limit, slide_limit, font_family, font_size,
-                margins, line_spacing, header_format, footer_format
+                margins, line_spacing, header_format, footer_format,
+                required_sections, format_rules, template_id
               ) VALUES (
                 ${newVol.id}::uuid,
                 ${idx + 1},
@@ -328,7 +353,10 @@ export async function POST(request: Request, ctx: RouteContext) {
                 ${item.margins ?? null},
                 ${item.line_spacing ?? null},
                 ${item.header_format ?? null},
-                ${item.footer_format ?? null}
+                ${item.footer_format ?? null},
+                ${sql.json(((item as Record<string, unknown>).required_sections ?? []) as Parameters<typeof sql.json>[0])},
+                ${sql.json(((item as Record<string, unknown>).format_rules ?? {}) as Parameters<typeof sql.json>[0])},
+                ${((item as Record<string, unknown>).template_id as string) ?? null}
               )
             `;
           }

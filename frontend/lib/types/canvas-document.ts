@@ -46,6 +46,9 @@ export interface CanvasRules {
   image_max_width?: number;
   image_max_height?: number;
   watermark?: { text: string; color?: string; opacity?: number };
+  /** Deck/page background fill (hex, e.g. '#0F172A'). Painted behind content in the
+   *  editor AND honored on export (pptx slide.background, html/pdf page). Slides mainly. */
+  background?: string;
 }
 
 /**
@@ -105,6 +108,53 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     line_spacing: 1.2,
     max_pages: null, max_slides: 25,
   },
+  // ── Pristine collateral/agency presets — running header + page-numbered footer + figures enabled,
+  //    so NSF/DOE narratives and marketing/commercialization/investment pieces carry proper page
+  //    furniture (headers-footers, page numbers) and can hold banners/figure placeholders. ──
+  letter_agency: {
+    format: 'letter',
+    width: 612, height: 792,
+    margins: { top: 72, right: 72, bottom: 72, left: 72 },
+    header: { template: '{company_name} — {project_title}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+    footer: { template: '{company_name}  |  Page {n} of {N}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+    font_default: { family: 'Times New Roman', size: 11 }, // NSF PAPPG 11pt floor
+    line_spacing: 1.15,
+    max_pages: null, max_slides: null,
+    min_font_size: 11, images_allowed: true,
+  },
+  letter_collateral: {
+    format: 'letter',
+    width: 612, height: 792,
+    margins: { top: 64, right: 64, bottom: 64, left: 64 },
+    header: { template: '{company_name}', height: 30, font: { family: 'Calibri', size: 9 } },
+    footer: { template: '{company_name}  ·  {website}  |  Page {n} of {N}', height: 30, font: { family: 'Calibri', size: 9 } },
+    font_default: { family: 'Calibri', size: 11 },
+    line_spacing: 1.2,
+    max_pages: null, max_slides: null,
+    images_allowed: true,
+  },
+  letter_onepager: {
+    format: 'letter',
+    width: 612, height: 792,
+    margins: { top: 54, right: 54, bottom: 48, left: 54 },
+    header: null,
+    footer: { template: '{company_name}  ·  {contact_email}  ·  {website}', height: 28, font: { family: 'Calibri', size: 9 } },
+    font_default: { family: 'Calibri', size: 10.5 },
+    line_spacing: 1.12,
+    max_pages: 1, max_slides: null,
+    images_allowed: true,
+  },
+  slide_deck: {
+    format: 'slide_16_9',
+    width: 960, height: 540,
+    margins: { top: 40, right: 40, bottom: 48, left: 40 },
+    header: null,
+    footer: { template: '{company_name}  ·  {n} / {N}', height: 28, font: { family: 'Arial', size: 10 } },
+    font_default: { family: 'Arial', size: 18 },
+    line_spacing: 1.2,
+    max_pages: null, max_slides: 25,
+    images_allowed: true,
+  },
   spreadsheet: {
     format: 'spreadsheet' as CanvasFormat,
     width: 1200, height: 800,
@@ -124,6 +174,13 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     max_pages: null, max_slides: null,
   },
 };
+
+/** Slide frame dimensions (pt) by aspect: 16:9 widescreen (960×540) vs 4:3 standard
+ *  (720×540). Same 540pt height, so switching aspect only reflows width — the canonical
+ *  PowerPoint frames (13.333″×7.5″ / 10″×7.5″ at 72dpi). Used by the slide-frame control. */
+export function slideFrame(format: 'slide_16_9' | 'slide_4_3'): { width: number; height: number } {
+  return format === 'slide_4_3' ? { width: 720, height: 540 } : { width: 960, height: 540 };
+}
 
 // ─── Node types ─────────────────────────────────────────────────────
 
@@ -189,6 +246,7 @@ export interface ImageContent {
 
 export interface TableCellStyle {
   bg?: string;           // hex color for cell background
+  fg?: string;           // hex color for the cell TEXT (e.g. white on a dark branded header)
   bold?: boolean;
   alignment?: 'left' | 'center' | 'right';
   border?: 'none' | 'thin' | 'thick';
@@ -271,7 +329,8 @@ export interface BlockquoteContent {
 }
 
 export interface ChartContent {
-  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'doughnut';
+  /** gantt = horizontal timeline (series[0]=start month, series[1]=end month per category). */
+  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'doughnut' | 'gantt';
   categories: string[];
   series: Array<{ name: string; data: number[]; color?: string }>;
   title?: string;
@@ -551,26 +610,211 @@ export function createNode(opts: {
   };
 }
 
-/** Compute approximate page count from nodes (for the progress bar). */
-export function estimatePageCount(doc: CanvasDocument): number {
-  const contentHeight = doc.canvas.height - doc.canvas.margins.top - doc.canvas.margins.bottom
-    - (doc.canvas.header?.height ?? 0) - (doc.canvas.footer?.height ?? 0);
-  const lineHeight = doc.canvas.font_default.size * doc.canvas.line_spacing;
-  const linesPerPage = Math.floor(contentHeight / lineHeight);
-  const charsPerLine = Math.floor(
-    (doc.canvas.width - doc.canvas.margins.left - doc.canvas.margins.right)
-    / (doc.canvas.font_default.size * 0.5)
-  );
+/**
+ * Estimate the rendered page count of a paginated (page-flow) canvas document.
+ *
+ * This is the SINGLE page ruler the whole portal trusts — both the submission-readiness
+ * page gate and the export compliance floor (validateCanvasAgainstSpec) call it — so it
+ * MUST track the actual exported .docx/.pdf, which are laid out with these same page
+ * metrics (page size, margins, header/footer, 11pt body, line spacing). It models real
+ * VERTICAL HEIGHT per node type rather than a flat char total, because the old char-based
+ * heuristic (text.length + 2 lines/node) was dominated by its per-node fudge and barely
+ * moved as prose was added — so a genuinely 7.4-page narrative read as "6", and a
+ * builder could sail past a hard page limit. Height model, calibrated so a real 11pt /
+ * 0.75in-margin narrative matches Word to within a fraction of a page:
+ *   - flow text (text_block, lists, caption, footnote, url): ceil(chars / charsPerLine) lines
+ *   - heading: larger font (h1 ≈ 2.5×, h2 ≈ 1.45× body) + space before/after
+ *   - table: (header + data rows) × 1.35 line-heights
+ *   - image / chart: its declared height, else ~15.5 line-heights (a typical figure)
+ *   - page_break: advance to a fresh page
+ * Proportional-font average glyph width ≈ 0.45 × font size (Times New Roman body).
+ */
+/** Per-format usable geometry + flow metrics (points) — shared by the page, slide, and section rulers. */
+function flowMetrics(c: CanvasDocument['canvas']) {
+  const usableW = Math.max(1, c.width - c.margins.left - c.margins.right);
+  const usableH = Math.max(1, c.height - c.margins.top - c.margins.bottom - (c.header?.height ?? 0) - (c.footer?.height ?? 0));
+  const fs = c.font_default.size;
+  const bodyLineH = fs * c.line_spacing;
+  const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated to the exporter)
+  const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
+  return { usableW, usableH, fs, bodyLineH, CHAR_W, cpl };
+}
 
-  let totalChars = 0;
-  for (const node of docNodes(doc)) {
-    if (node.type === 'page_break') { totalChars += linesPerPage * charsPerLine; continue; }
-    if (node.type === 'spacer' || node.type === 'toc') continue;
-    const text = getNodeText(node);
-    totalChars += text.length + (charsPerLine * 2);
+/** Vertical height (pt) a single node occupies in normal flow. page_break / toc contribute nothing. */
+function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>): number {
+  const { usableW, fs, bodyLineH, CHAR_W, cpl } = m;
+  const linesFor = (chars: number, per: number) => Math.max(1, Math.ceil(chars / per));
+  switch (node.type) {
+    case 'page_break':
+    case 'toc':
+      return 0;
+    case 'spacer': {
+      const h = (node.content as { height?: number } | undefined)?.height;
+      return typeof h === 'number' && h > 0 ? h : bodyLineH;
+    }
+    case 'heading': {
+      const level = (node.content as HeadingContent).level ?? 1;
+      const hfs = fs * (level <= 1 ? 2.5 : level === 2 ? 1.45 : 1.2);
+      const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
+      return linesFor(getNodeText(node).length, hcpl) * hfs * 1.15 + fs * 0.7 + fs * 0.25;
+    }
+    case 'image':
+    case 'chart': {
+      const styleH = (node.style as { height?: number } | undefined)?.height;
+      return (typeof styleH === 'number' && styleH > 0 ? styleH : fs * 15.5) + bodyLineH;
+    }
+    case 'table': {
+      const t = node.content as TableContent;
+      const rows = (Array.isArray(t.headers) && t.headers.length ? 1 : 0) + (t.rows?.length ?? 0);
+      return Math.max(1, rows) * bodyLineH * 1.35;
+    }
+    case 'caption':
+      return bodyLineH;
+    default:
+      return linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
   }
+}
 
-  return Math.max(1, Math.ceil(totalChars / (linesPerPage * charsPerLine)));
+/** Total stacked height (pt) of a node run (a section's footprint), ignoring page breaks. */
+function stackHeightPt(nodes: CanvasNode[], m: ReturnType<typeof flowMetrics>): number {
+  let h = 0;
+  for (const n of nodes) h += nodeStackHeightPt(n, m);
+  return h;
+}
+
+/**
+ * estimatePageCount — the rendered PAGE count of a document canvas. Delegates to
+ * paginate(), the ONE flow engine, so the compliance floor, submission-readiness,
+ * the in-editor page readout, AND the live layout gauge all read a single
+ * calibrated number — a document can never say "6 pages" in the editor and "7
+ * pages" at the export gate. A spreadsheet is measured in tabs, not flow pages.
+ */
+export function estimatePageCount(doc: CanvasDocument): number {
+  const c = doc.canvas;
+  if (!c) return 1;
+  if (c.format === 'spreadsheet') return 1;
+  return paginate(doc).totalPages;
+}
+
+/** The slide groups of a deck: one per v2 section, else the flat nodes split on page_break. */
+function slideGroups(doc: CanvasDocument): CanvasNode[][] {
+  if (doc.sections && doc.sections.length) return doc.sections.map((s) => sectionsToNodes([s]));
+  const groups: CanvasNode[][] = [[]];
+  for (const n of doc.nodes ?? []) {
+    if (n.type === 'page_break') { groups.push([]); continue; }
+    groups[groups.length - 1].push(n);
+  }
+  return groups.filter((g, i) => g.length > 0 || i === 0);
+}
+
+/**
+ * Estimate the SLIDE count of a slide-format canvas — the deck ruler, the analog of
+ * estimatePageCount for documents. The pptx exporter renders exactly one slide per v2
+ * section (or per page_break group for a flat v1 deck), so the count is the number of
+ * groups. Overflow (a group too tall for the frame) is a SEPARATE concern — see
+ * overflowingSlides — since the exporter does not reflow a slide.
+ */
+export function estimateSlideCount(doc: CanvasDocument): number {
+  return Math.max(1, slideGroups(doc).length);
+}
+
+/** 0-based indices of slides whose content overflows the slide frame (content will be cut off). */
+export function overflowingSlides(doc: CanvasDocument): number[] {
+  const c = doc.canvas;
+  if (!c) return [];
+  const m = flowMetrics(c);
+  const out: number[] = [];
+  slideGroups(doc).forEach((g, i) => { if (stackHeightPt(g, m) > m.usableH * 1.02) out.push(i); });
+  return out;
+}
+
+/** The page footprint of a single section's nodes (for per-section size budgets + the fill gauge). */
+export function sectionPageSpan(nodes: CanvasNode[], canvas: CanvasDocument['canvas']): number {
+  if (!canvas) return 1;
+  const m = flowMetrics(canvas);
+  return Math.max(1, Math.ceil(stackHeightPt(nodes, m) / m.usableH));
+}
+
+// ─── The single flow-pagination engine ──────────────────────────────
+// paginate() lays the section layer into the frame and reports page usage with the
+// SAME calibrated per-node ruler (flowMetrics + nodeStackHeightPt) estimatePageCount
+// uses — so the live editor gauge and the compliance floor can never disagree.
+// Regular flow content splits across the page edge (like the real renderer); a
+// keep_together group/section moves wholesale when it would straddle the edge
+// (break-inside:avoid). Documents only — slides are one-section-per-slide.
+
+export interface SectionPageInfo {
+  id: string;
+  title?: string;
+  startPage: number;
+  endPage: number;
+  pagesUsed: number;
+  /** the section's own soft page budget, if set. */
+  budget?: number;
+  /** pagesUsed exceeds that budget. */
+  overBudget: boolean;
+}
+
+export interface LayoutResult {
+  totalPages: number;
+  perSection: SectionPageInfo[];
+  /** the frame's max_pages cap and whether the layout exceeds it. */
+  vsMaxPages: { max: number | null; over: boolean };
+}
+
+export function paginate(doc: CanvasDocument): LayoutResult {
+  const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
+  const usableH = m.usableH;
+  const sections = toSections(doc);
+  const perSection: SectionPageInfo[] = [];
+
+  let page = 1;
+  let y = 0; // points consumed on the current page
+  const newPage = () => { page += 1; y = 0; };
+  // Fill the current page, then spill onto as many pages as needed — flow content
+  // splits at the page edge, so pages = ceil(totalHeight / pageHeight) with no
+  // phantom whitespace (matches estimatePageCount exactly for un-broken content).
+  const advance = (h: number) => {
+    let remaining = h;
+    while (remaining > 0) {
+      const room = usableH - y;
+      if (remaining <= room) { y += remaining; return; }
+      remaining -= room;
+      newPage();
+    }
+  };
+  // A keep-together block: if it fits on a page but not in the remaining space,
+  // move it whole to the next page; an oversized block still spills.
+  const fitKeep = (h: number) => {
+    if (y > 0 && h <= usableH && y + h > usableH) newPage();
+    advance(h);
+  };
+
+  sections.forEach((section, i) => {
+    if (section.layout?.break_before && i > 0 && y > 0) newPage();
+    const startPage = page;
+    if (section.layout?.mode === 'keep_together') {
+      fitKeep((section.groups ?? []).reduce((s, g) => s + stackHeightPt(g.nodes ?? [], m), 0));
+    } else {
+      for (const group of section.groups ?? []) {
+        if (group.keep_together) { fitKeep(stackHeightPt(group.nodes ?? [], m)); continue; }
+        for (const node of group.nodes ?? []) {
+          if (node.type === 'page_break') { if (y > 0) newPage(); continue; }
+          advance(nodeStackHeightPt(node, m));
+        }
+      }
+    }
+    const endPage = page;
+    const budget = section.layout?.page_budget;
+    const pagesUsed = endPage - startPage + 1;
+    perSection.push({
+      id: section.id, title: section.title, startPage, endPage, pagesUsed, budget,
+      overBudget: typeof budget === 'number' && pagesUsed > budget,
+    });
+  });
+
+  const max = doc.canvas?.max_pages ?? null;
+  return { totalPages: page, perSection, vsMaxPages: { max, over: max != null && page > max } };
 }
 
 /** Extract plain text from any node type (for search + page estimation). */
@@ -655,6 +899,9 @@ export interface ComplianceViolation {
   code:
     | 'font_too_small'
     | 'over_page_limit'
+    | 'over_slide_limit'
+    | 'slide_overflow'
+    | 'section_over_budget'
     | 'image_not_allowed'
     | 'missing_header'
     | 'missing_footer';
@@ -705,6 +952,51 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
     }
   }
 
+  // Slide cap — a deck is measured in SLIDES, not pages (the analog of the page cap).
+  if (spec.max_slides != null) {
+    const slides = estimateSlideCount(doc);
+    if (slides > spec.max_slides) {
+      out.push({
+        code: 'over_slide_limit',
+        message: `Estimated ${slides} slides exceeds the ${spec.max_slides}-slide limit.`,
+        limit: spec.max_slides,
+        actual: slides,
+      });
+    }
+  }
+
+  // Slide overflow — a slide too tall for its frame is cut off on export, regardless of any cap.
+  if (doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3') {
+    const over = overflowingSlides(doc);
+    if (over.length) {
+      out.push({
+        code: 'slide_overflow',
+        message: `${over.length} slide(s) overflow the frame (slide ${over.map((i) => i + 1).join(', ')}) — content will be cut off; split them.`,
+        actual: over.length,
+      });
+    }
+  }
+
+  // Per-SECTION size budgets — a section that declares a page_budget must fit within it
+  // (e.g. a "Technical Approach ≤ 5 pages" section inside a longer document). Measured with
+  // the same height ruler, so a section limit is enforced as strictly as the whole-doc cap.
+  if (doc.sections?.length && doc.canvas) {
+    for (const s of doc.sections) {
+      const budget = s.layout?.page_budget;
+      if (budget == null || budget <= 0) continue;
+      const nodes = sectionsToNodes([s]);
+      const span = sectionPageSpan(nodes, doc.canvas);
+      if (span > budget) {
+        out.push({
+          code: 'section_over_budget',
+          message: `"${firstHeadingText(nodes) ?? 'Section'}" is estimated at ${span} pages against its ${budget}-page budget.`,
+          limit: budget,
+          actual: span,
+        });
+      }
+    }
+  }
+
   // Images/figures not permitted by the RFP.
   if (spec.images_allowed === false && docNodes(doc).some((n) => n.type === 'image')) {
     out.push({ code: 'image_not_allowed', message: 'This artifact does not permit images/figures.' });
@@ -719,6 +1011,38 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   }
 
   return out;
+}
+
+/**
+ * Derive a ComplianceSpec from a canvas's OWN inline rules — the self-declared
+ * size/format floor for a STANDALONE document (a marketing flier, a slide deck, a
+ * library artifact) that carries no RFP-frozen ComplianceSpec. Only the limits the
+ * canvas actually declares are enforced; header/footer/required-sections are RFP
+ * concepts and stay off, so a flier is never failed for lacking a page header.
+ */
+export function specFromCanvasRules(canvas: CanvasRules): ComplianceSpec {
+  return {
+    max_pages: canvas.max_pages ?? null,
+    max_slides: canvas.max_slides ?? null,
+    min_font_size: canvas.min_font_size ?? null,
+    images_allowed: canvas.images_allowed ?? true,
+    required_sections: [],
+    header_required: false,
+    footer_required: false,
+  };
+}
+
+/**
+ * The compliance floor for a STANDALONE document — the SAME size ruler the proposal
+ * export gate uses (page/slide caps, per-section budgets, font floor, images), but
+ * measured against the document's own declared limits. This is the one entry point
+ * every non-proposal create/save/export path calls so "doc, pdf, ppt, xls" — and a
+ * 2-page flier or a 10-slide deck built outside a proposal — is size-checked too.
+ * Advisory: it reports; the caller decides whether to warn or block.
+ */
+export function validateStandaloneCanvas(doc: CanvasDocument): ComplianceViolation[] {
+  if (!doc.canvas) return [];
+  return validateCanvasAgainstSpec(doc, specFromCanvasRules(doc.canvas));
 }
 
 /**
@@ -745,6 +1069,28 @@ export function toEditableFlat(doc: CanvasDocument): CanvasDocument {
     nodes = sectionsToNodes(doc.sections);
   }
   return { ...doc, version: 1, nodes, sections: undefined };
+}
+
+/**
+ * Fill missing `canvas` rules with the letter_standard defaults so the editor never crashes on a
+ * partial/legacy/agent-produced document. Several editor surfaces call `doc.canvas.format.startsWith(…)`
+ * unguarded, so a document persisted without `canvas.format` (e.g. an agent's markdown_to_canvas output
+ * or an older import) would otherwise white-screen the whole section. A document that already carries a
+ * truthy `canvas.format` is returned unchanged (stable identity — no needless re-render for valid docs).
+ */
+export function withCanvasDefaults(doc: CanvasDocument): CanvasDocument {
+  const c = doc.canvas as Partial<CanvasRules> | undefined;
+  // Fast path: a fully-formed canvas is returned UNCHANGED (stable identity, no re-render for valid docs).
+  if (c && c.format && c.width && c.height && c.margins && c.font_default && typeof c.line_spacing === 'number') {
+    return doc;
+  }
+  // Otherwise merge the letter_standard defaults under whatever the doc supplies, so EVERY field the
+  // renderer reads (format, font_default, line_spacing, margins, header/footer, page limits) is present.
+  // Any single missing field (e.g. an agent doc with format but no font_default) would otherwise crash a
+  // downstream `doc.canvas.<field>.<prop>` access and white-screen the section.
+  const canvas = { ...CANVAS_PRESETS.letter_standard, ...(c ?? {}) } as CanvasRules;
+  if (!canvas.format) canvas.format = 'letter';
+  return { ...doc, canvas };
 }
 
 /** Build a group from nodes (optionally a labeled, keep-together, atom-backed group). */

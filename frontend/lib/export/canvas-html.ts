@@ -35,6 +35,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { formatByCode } from '@/lib/numeric-cell';
 
 function esc(s: unknown): string {
   return String(s ?? '')
@@ -161,6 +162,9 @@ function renderList(list: ListContent, ordered: boolean, vars: Record<string, st
 }
 
 function fmtCellValue(c: TableCell): string {
+  // Prefer an explicit Excel number_format (set in the sheet editor + written to the .xlsx),
+  // so pdf/docx match the on-screen + spreadsheet rendering.
+  if (c.number_format && typeof c.value === 'number') return esc(formatByCode(c.value, c.number_format));
   if (c.cell_type === 'currency' && typeof c.value === 'number') {
     return '$' + c.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   }
@@ -171,11 +175,16 @@ function fmtCellValue(c: TableCell): string {
 
 function cellStyle(c: TableCell): string {
   const st = c.style ?? {};
-  const bits = ['border:1px solid #cbd5e1', 'padding:4px 8px'];
+  // Per-cell border: 'none' → no rule; 'thick' → a heavier rule; default → thin.
+  const bdr = st.border === 'none' ? 'border:0'
+    : st.border === 'thick' ? 'border:2px solid #334155'
+    : 'border:1px solid #cbd5e1';
+  const bits = [bdr, 'padding:4px 8px'];
   if (st.bg) bits.push(`background:${st.bg}`);
+  if (st.fg) bits.push(`color:${st.fg}`);
   if (st.bold) bits.push('font-weight:700');
   if (st.alignment) bits.push(`text-align:${st.alignment}`);
-  if (c.cell_type === 'currency' || c.cell_type === 'number' || c.cell_type === 'percent') bits.push('text-align:right');
+  if (c.number_format || c.cell_type === 'currency' || c.cell_type === 'number' || c.cell_type === 'percent') bits.push('text-align:right');
   return ` style="${bits.join(';')}"`;
 }
 
@@ -220,21 +229,50 @@ function renderImage(img: ImageContent): string {
 
 const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
 
-/** A self-contained inline SVG chart (bar / line / area / pie / doughnut). Embeddable
- *  anywhere HTML goes; docx/pptx pick it up as an image, pdf renders it directly. */
+/** A self-contained inline SVG chart (bar / line / area / pie / doughnut / gantt) WITH labels —
+ *  category labels, y-axis value ticks, and a multi-series legend — so it reads as a real graph,
+ *  not an unlabeled picture. Embeddable anywhere HTML goes; docx/pptx pick it up as an image,
+ *  pdf renders it directly. Gantt: horizontal timeline bars, series[0]=start month, series[1]=end. */
 export function renderChartSvg(ch: ChartContent): string {
-  const W = 460, H = 240, pad = 32;
-  const cats = ch.categories ?? [];
+  const cats = (ch.categories ?? []).map((c) => String(c));
   const series = ch.series ?? [];
-  const max = Math.max(1, ...series.flatMap((s) => s.data ?? []));
-  const title = ch.title ? `<text x="${W / 2}" y="16" text-anchor="middle" font-size="12" font-weight="bold">${esc(ch.title)}</text>` : '';
-  let body = '';
-  if (ch.chart_type === 'pie' || ch.chart_type === 'doughnut') {
+  const type = String(ch.chart_type);
+  const fmt = (v: number) => (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 100) / 100));
+  const titleTxt = ch.title ? `<text x="{cx}" y="16" text-anchor="middle" font-size="12" font-weight="bold">${esc(ch.title)}</text>` : '';
+
+  // ── GANTT — horizontal timeline bars per category (start→end month) ──
+  if (type === 'gantt') {
+    const W = 500, padT = ch.title ? 30 : 12, padL = 138, padR = 16, rowH = 24;
+    const starts = series[0]?.data ?? [];
+    const ends = series[1]?.data ?? starts;
+    const maxMonth = Math.max(12, ...ends.map((n) => n || 0), ...starts.map((n) => n || 0));
+    const H = padT + cats.length * rowH + 26;
+    const plotL = padL, plotW = W - padL - padR, plotB = padT + cats.length * rowH;
+    const x = (m: number) => plotL + (m / maxMonth) * plotW;
+    let grid = '';
+    for (let m = 0; m <= maxMonth; m++) {
+      grid += `<line x1="${x(m).toFixed(1)}" y1="${padT}" x2="${x(m).toFixed(1)}" y2="${plotB}" stroke="#e2e8f0" stroke-width="1"/>`;
+      if (m > 0) grid += `<text x="${x(m - 0.5).toFixed(1)}" y="${plotB + 13}" text-anchor="middle" font-size="7.5" fill="#64748b">M${m}</text>`;
+    }
+    const bars = cats.map((c, i) => {
+      const s = Math.max(0, (starts[i] ?? 1) - 1), e = Math.max((ends[i] ?? starts[i] ?? 1), s + 1);
+      const bx = x(s), bw = Math.max(4, x(e) - x(s)), by = padT + i * rowH + 4, col = CHART_PALETTE[i % CHART_PALETTE.length];
+      return `<rect x="${bx.toFixed(1)}" y="${by}" width="${bw.toFixed(1)}" height="${rowH - 8}" rx="2" fill="${col}"/>`
+        + `<text x="${plotL - 6}" y="${(by + (rowH - 8) / 2 + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#334155">${esc(c)}</text>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="gantt">${titleTxt.replace('{cx}', String(W / 2))}${grid}${bars}</svg>`;
+  }
+
+  const W = 480, H = 300;
+  const title = titleTxt.replace('{cx}', String(W / 2));
+
+  // ── PIE / DOUGHNUT (+ slice labels) ──
+  if (type === 'pie' || type === 'doughnut') {
     const vals = series[0]?.data ?? [];
     const total = vals.reduce((a, b) => a + b, 0) || 1;
-    const cx = W / 2, cy = H / 2 + 8, r = 84;
+    const cx = W / 2 - 60, cy = H / 2 + 6, r = 92;
     let a0 = -Math.PI / 2;
-    body = vals.map((v, i) => {
+    const slices = vals.map((v, i) => {
       const a1 = a0 + (v / total) * 2 * Math.PI;
       const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0), x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
       const large = a1 - a0 > Math.PI ? 1 : 0;
@@ -242,26 +280,59 @@ export function renderChartSvg(ch: ChartContent): string {
       a0 = a1;
       return `<path d="${d}" fill="${CHART_PALETTE[i % CHART_PALETTE.length]}"/>`;
     }).join('');
-    if (ch.chart_type === 'doughnut') body += `<circle cx="${cx}" cy="${cy}" r="42" fill="#fff"/>`;
-  } else if (ch.chart_type === 'line' || ch.chart_type === 'area') {
-    const xw = (W - 2 * pad) / Math.max(1, cats.length - 1);
-    body = series.map((s, si) => {
-      const pts = (s.data ?? []).map((v, i) => `${(pad + i * xw).toFixed(1)},${(H - pad - (v / max) * (H - 2 * pad)).toFixed(1)}`);
-      const col = s.color || CHART_PALETTE[si % CHART_PALETTE.length];
-      return `<polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.join(' ')}"/>`;
+    const hole = type === 'doughnut' ? `<circle cx="${cx}" cy="${cy}" r="46" fill="#fff"/>` : '';
+    const legend = cats.map((c, i) => {
+      const pct = Math.round(((vals[i] ?? 0) / total) * 100);
+      return `<rect x="${W - 150}" y="${44 + i * 18}" width="10" height="10" fill="${CHART_PALETTE[i % CHART_PALETTE.length]}"/><text x="${W - 135}" y="${53 + i * 18}" font-size="9" fill="#334155">${esc(c)} (${pct}%)</text>`;
     }).join('');
-  } else { // bar (default)
-    const gw = (W - 2 * pad) / Math.max(1, cats.length);
-    const bw = (gw / Math.max(1, series.length)) * 0.7;
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="${esc(type)}">${title}${slices}${hole}${legend}</svg>`;
+  }
+
+  // ── BAR / LINE / AREA (+ y-axis ticks, x category labels, legend) ──
+  const named = series.filter((s) => s.name);
+  const legendH = named.length > 1 ? 20 : 0;
+  const padL = 52, padR = 16, padT = ch.title ? 30 : 14, padB = 40 + legendH;
+  const plotL = padL, plotR = W - padR, plotT = padT, plotB = H - padB;
+  const plotW = plotR - plotL, plotH = plotB - plotT;
+  const rawMax = Math.max(1, ...series.flatMap((s) => s.data ?? []));
+  const mag = Math.pow(10, Math.floor(Math.log10(rawMax)));
+  const max = Math.ceil(rawMax / mag) * mag; // "nice" ceiling
+  const yFor = (v: number) => plotB - (v / max) * plotH;
+  // y grid + value labels (0, mid, max)
+  const yTicks = [0, max / 2, max].map((v) =>
+    `<line x1="${plotL}" y1="${yFor(v).toFixed(1)}" x2="${plotR}" y2="${yFor(v).toFixed(1)}" stroke="#eef2f7"/><text x="${plotL - 6}" y="${(yFor(v) + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#64748b">${fmt(v)}</text>`).join('');
+  const axes = `<line x1="${plotL}" y1="${plotT}" x2="${plotL}" y2="${plotB}" stroke="#94a3b8"/><line x1="${plotL}" y1="${plotB}" x2="${plotR}" y2="${plotB}" stroke="#94a3b8"/>`;
+  // x category labels (rotate when crowded)
+  const gw = plotW / Math.max(1, cats.length);
+  const rot = cats.length > 6;
+  const xLabels = cats.map((c, i) => {
+    const cxp = plotL + gw * (i + 0.5);
+    return rot
+      ? `<text x="${cxp.toFixed(1)}" y="${(plotB + 12).toFixed(1)}" text-anchor="end" font-size="7.5" fill="#64748b" transform="rotate(-35 ${cxp.toFixed(1)} ${(plotB + 12).toFixed(1)})">${esc(c)}</text>`
+      : `<text x="${cxp.toFixed(1)}" y="${(plotB + 13).toFixed(1)}" text-anchor="middle" font-size="8" fill="#64748b">${esc(c)}</text>`;
+  }).join('');
+  let body = '';
+  if (type === 'line' || type === 'area') {
+    const xw = plotW / Math.max(1, cats.length - 1);
+    body = series.map((s, si) => {
+      const col = s.color || CHART_PALETTE[si % CHART_PALETTE.length];
+      const pts = (s.data ?? []).map((v, i) => `${(plotL + i * xw).toFixed(1)},${yFor(v).toFixed(1)}`);
+      const dots = (s.data ?? []).map((v, i) => `<circle cx="${(plotL + i * xw).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="2.5" fill="${col}"/>`).join('');
+      return `<polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.join(' ')}"/>${dots}`;
+    }).join('');
+  } else { // bar
+    const bw = (gw / Math.max(1, series.length)) * 0.72;
     body = series.map((s, si) => (s.data ?? []).map((v, i) => {
-      const h = (v / max) * (H - 2 * pad);
-      const x = pad + i * gw + si * bw;
-      return `<rect x="${x.toFixed(1)}" y="${(H - pad - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${s.color || CHART_PALETTE[si % CHART_PALETTE.length]}"/>`;
+      const h = (v / max) * plotH, xp = plotL + i * gw + (gw - bw * series.length) / 2 + si * bw;
+      return `<rect x="${xp.toFixed(1)}" y="${yFor(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" fill="${s.color || CHART_PALETTE[si % CHART_PALETTE.length]}"/>`;
     }).join('')).join('');
   }
-  const axes = ch.chart_type === 'pie' || ch.chart_type === 'doughnut' ? ''
-    : `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#94a3b8"/><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="#94a3b8"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="${esc(ch.chart_type)}">${title}${axes}${body}</svg>`;
+  const legend = named.length > 1 ? named.map((s, i) => {
+    const col = s.color || CHART_PALETTE[series.indexOf(s) % CHART_PALETTE.length];
+    const lx = plotL + i * 130;
+    return `<rect x="${lx}" y="${H - 14}" width="11" height="11" fill="${col}"/><text x="${lx + 15}" y="${H - 5}" font-size="9" fill="#334155">${esc(s.name || '')}</text>`;
+  }).join('') : '';
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="${esc(type)}">${title}${yTicks}${axes}${body}${xLabels}${legend}</svg>`;
 }
 
 /** A regular N-pointed star polygon centered at (cx,cy). */
@@ -537,7 +608,7 @@ export function renderCanvasPreviewHtml(doc: CanvasDocument, variables: Record<s
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     html, body { margin: 0; background: #4b5563; }
     ${canvasBaseCss(doc)}
-    .pv-page { width: ${wPx}px; min-height: ${hPx}px; margin: 24px auto; background: #fff;
+    .pv-page { width: ${wPx}px; min-height: ${hPx}px; margin: 24px auto; background: ${c?.background ?? '#fff'};
       padding: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt; box-shadow: 0 4px 24px rgba(0,0,0,.35); }
     .pv-hf { color: #6b7280; font-size: ${c?.header?.font?.size ?? 10}pt; }
     .pv-header { border-bottom: 1px solid #e5e7eb; margin-bottom: 14px; padding-bottom: 6px; }

@@ -8,7 +8,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+import { sql, enterBypass } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
 import { logAmendment, type ComplianceDeltaItem, type AmendmentSeverity } from '@/lib/amendments';
 
@@ -33,6 +33,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!requireAdmin(user.role)) {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
+    // Admin cross-tenant read: the flagged/acknowledged counts scan proposal_amendment_flags
+    // (RLS'd) across ALL tenants → route the context-aware sql to the owner/bypass pool
+    // (docs/RLS_CUTOVER.md), else it DENY-ALLs post-flip.
+    enterBypass();
     const { solId } = await ctx.params;
     if (!UUID_RE.test(solId)) {
       return NextResponse.json({ error: 'Invalid solicitation ID', code: 'VALIDATION_ERROR' }, { status: 400 });
@@ -69,6 +73,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!requireAdmin(user.role) || !user.id) {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterBypass(); // admin (platform-scope) writer → owner/bypass pool (docs/RLS_CUTOVER.md)
     const { solId } = await ctx.params;
     if (!UUID_RE.test(solId)) {
       return NextResponse.json({ error: 'Invalid solicitation ID', code: 'VALIDATION_ERROR' }, { status: 400 });

@@ -10,18 +10,10 @@
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
+import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = {
-  format: 'slide_16_9',
-  width: 960, height: 540,
-  margins: { top: 40, right: 40, bottom: 40, left: 40 },
-  header: null,
-  footer: null,
-  font_default: { family: 'Arial', size: 18 },
-  line_spacing: 1.2,
-  max_pages: null,
-  max_slides: 10,
-};
+// Slide-number footer + images_allowed (the pristine deck preset).
+const PRESET: CanvasRules = CANVAS_PRESETS.slide_deck;
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -118,10 +110,10 @@ export const DOD_CSO_PHASE1_BRIEFING: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-note', {
-      type: 'text_block',
-      content: { text: 'Include a diagram or figure if possible — visual impact scores well in briefings.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Solution concept / product diagram', width: 520, height: 250, caption: 'Figure 1: [Solution concept / product diagram]' },
+      style: { alignment: 'center', space_before: 12 },
     }),
     node('s3-break', { type: 'page_break', content: null }),
 
@@ -142,6 +134,11 @@ export const DOD_CSO_PHASE1_BRIEFING: CanvasDocument = {
         ],
       },
       style: { size: 16 },
+    }),
+    node('s4-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'System architecture / data flow diagram', width: 520, height: 250, caption: 'Figure 2: [System architecture / data flow]' },
+      style: { alignment: 'center', space_before: 12 },
     }),
     node('s4-break', { type: 'page_break', content: null }),
 

@@ -1,0 +1,83 @@
+{
+  "_comment": "Curated layer for the Architecture Explorer. Edit this as the system grows — it is the hand-authored meaning laid over the mechanically-extracted schema (model/schema.json). generate.mjs assigns every table to the FIRST subsystem whose `match` prefix or `exact` name hits it; anything unmatched lands in 'other'. Traces + UIs mirror docs/DATA_FLOW.md.",
+
+  "subsystems": [
+    { "id": "identity",   "label": "Identity & tenancy",      "hue": 222, "match": [], "exact": ["users","tenants","user_memberships","sessions","accounts","verification_tokens","tenant_profiles","shadow_admin_grants","consent_records","applications","waitlist","promo_codes","visitor_sessions"] },
+    { "id": "discovery",  "label": "Discovery · opps → cards", "hue": 188, "match": ["solicitation_","opportunity_","tenant_opportunity","tenant_spotlight","tenant_bucket","tenant_bridge"], "exact": ["opportunities","curated_solicitations","curation_revisions","triage_actions","v_opportunity_rollup"] },
+    { "id": "sources",    "label": "Sources & scouting",       "hue": 158, "match": ["source_","scout_","sbir_"], "exact": [] },
+    { "id": "build",      "label": "Proposal build",           "hue": 265, "match": ["proposal_","purchase","contract","stage_","volume_","compliance_","document_","collaborator_"], "exact": ["proposals","purchases","contracts","section_standards","canvas_versions"] },
+    { "id": "library",    "label": "Library & atoms",          "hue": 32,  "match": ["library_","atom_","taxonomy","collaboration_vault","vault_","tenant_documents"], "exact": [] },
+    { "id": "automation", "label": "Automation & agents",      "hue": 291, "match": ["process_","agent_","automation_","pipeline_","guardrail_","tenant_automation","tenant_agent","platform_agent","api_key","tool_invocation","rate_limit","episodic_","procedural_","semantic_"], "exact": [] },
+    { "id": "events",     "label": "Events & observability",   "hue": 15,  "match": ["system_","page_"], "exact": ["notification_read_state","tasks","deploy_baseline","_migration_history"] },
+    { "id": "content",    "label": "CMS & content",            "hue": 96,  "match": ["cms_","content_","expert_"], "exact": [] },
+    { "id": "other",      "label": "Other",                    "hue": 220, "match": [], "exact": [] }
+  ],
+
+  "traces": [
+    { "id": "A", "name": "Section save", "kind": "write", "note": "Round-trip write, version-safe: snapshot the prior content at the live version, advance the counter, then write — proposal_sections.version > MAX(canvas_versions.version_number).",
+      "steps": [
+        { "plane": "UI",     "label": "CanvasEditorPage" },
+        { "plane": "API",    "label": "PUT …/sections/[s]/save" },
+        { "plane": "Data",   "label": "archive @ version", "table": "canvas_versions" },
+        { "plane": "Data",   "label": "CAS version + 1", "table": "proposal_sections" },
+        { "plane": "Event",  "label": "proposal:section.saved", "table": "system_events" },
+        { "plane": "UI",     "label": "{ version, complianceWarnings } → toast" }
+      ] },
+    { "id": "B", "name": "Discovery fan-out", "kind": "write", "note": "One → many. The bridge is a forward-only, append-only version log; the consumer denormalizes each version into one row per tenant.",
+      "steps": [
+        { "plane": "UI",    "label": "admin approves solicitation", "table": "curated_solicitations" },
+        { "plane": "Event", "label": "finder:solicitation.pushed", "table": "system_events" },
+        { "plane": "Data",  "label": "append card version", "table": "opportunity_bridge" },
+        { "plane": "Data",  "label": "fan out per tenant", "table": "tenant_opportunity_cards" },
+        { "plane": "Data",  "label": "auto-score", "table": "tenant_bucket_scores" },
+        { "plane": "UI",    "label": "customer /cards" }
+      ] },
+    { "id": "C", "name": "Build → package", "kind": "write", "note": "Comp-code purchase → curation_pending portal → RFP-admin release provisions the build UNLOCKED with the compliance matrix + molds. Package downloads as json/docx/pdf/zip.",
+      "steps": [
+        { "plane": "UI",     "label": "comp-code purchase", "table": "purchases" },
+        { "plane": "Data",   "label": "curation_pending", "table": "proposal_portals" },
+        { "plane": "Domain", "label": "provisionProposalForPortal()", "table": "proposals" },
+        { "plane": "Data",   "label": "matrix + molds", "table": "proposal_compliance_matrix" },
+        { "plane": "UI",     "label": "draft · lock sections", "table": "proposal_sections" },
+        { "plane": "API",    "label": "package?format=json|docx|pdf|zip", "table": "proposal_artifacts" }
+      ] },
+    { "id": "D", "name": "Agent land-or-review", "kind": "loop", "note": "The engine forbids a pipeline step from consuming agent output, so the landing is a human-triggered frontend route: staged canvases become PROPOSED versions a builder restores. Advisory, all the way down.",
+      "steps": [
+        { "plane": "UI",     "label": "Run full draft (doorbell / portal)" },
+        { "plane": "Event",  "label": "proposal:full_draft_requested", "table": "system_events" },
+        { "plane": "Engine", "label": "OnFullDraftRequested", "table": "process_instances" },
+        { "plane": "Agents", "label": "cohort stages ai_revision" },
+        { "plane": "API",    "label": "POST …/land-revisions (read-on-review)" },
+        { "plane": "Data",   "label": "proposed versions → restore", "table": "canvas_versions" }
+      ] },
+    { "id": "E", "name": "Amendment fan-out", "kind": "loop", "note": "Detect → confirm → fan-out → acknowledge. Fan-out targets are FK-safe: proposal_id/tenant_id come from proposals, amendment_id from the just-confirmed row. Migration 146.",
+      "steps": [
+        { "plane": "UI",    "label": "admin detects amendment", "table": "solicitation_amendments" },
+        { "plane": "Event", "label": "amendment.confirmed", "table": "system_events" },
+        { "plane": "Data",  "label": "fan out flags per proposal", "table": "proposal_amendment_flags" },
+        { "plane": "UI",    "label": "tenant banner" },
+        { "plane": "API",   "label": "amendment.acknowledged" }
+      ] },
+    { "id": "F", "name": "Library review (dedup + quality)", "kind": "write", "note": "The deterministic librarian, surfaced (the inverse of blank-canvas build-up): GET …/atoms/review computes duplicate groups + quality flags (empty/tiny/untagged/unconfirmed) over the tenant's active atoms; one-click cleanup soft-archives the extras via the audited archive path. Upstream, atomize now lands machine-guessed tags UNconfirmed so the review signal survives. The pipeline librarian agent's richer scoring layers into the same panel once its output is persisted.",
+      "steps": [
+        { "plane": "UI",     "label": "Library → Review tab" },
+        { "plane": "API",    "label": "GET …/atoms/review" },
+        { "plane": "Domain", "label": "computeLibraryReview() — dedup + flags" },
+        { "plane": "Data",   "label": "active atoms + tag counts", "table": "library_atoms" },
+        { "plane": "API",    "label": "POST …/atoms/[id]/archive (cleanup)" },
+        { "plane": "Event",  "label": "library:atom.archived", "table": "system_events" },
+        { "plane": "UI",     "label": "cleaner library" }
+      ] }
+  ],
+
+  "uis": [
+    { "label": "Opportunity cards",   "route": "/portal/[t]/cards",                       "tables": ["tenant_opportunity_cards","tenant_bucket_scores","tenant_spotlight_buckets"] },
+    { "label": "Proposal workspace",  "route": "/portal/[t]/proposals/[p]",               "tables": ["proposals","proposal_sections","proposal_compliance_matrix","proposal_artifacts"] },
+    { "label": "Section editor",      "route": "/portal/[t]/proposals/[p]/sections/[s]",  "tables": ["proposal_sections","canvas_versions"] },
+    { "label": "Library",             "route": "/portal/[t]/atoms",                       "tables": ["library_atoms","atom_tags","atom_lineage","library_seed_jobs"] },
+    { "label": "Workflow map",        "route": "/admin/workflows",                        "tables": ["process_instances","process_templates","process_instance_transitions"] },
+    { "label": "RFP curation",        "route": "/admin/rfp-curation/[solId]",             "tables": ["curated_solicitations","solicitation_documents","solicitation_compliance","solicitation_amendments"] },
+    { "label": "Agent workforce",     "route": "/admin/agents",                           "tables": ["agent_task_queue","agent_task_results","tenant_agent_config","tool_invocation_metrics"] },
+    { "label": "Sources & scouts",    "route": "/admin/sources",                          "tables": ["source_profiles","scout_runs","scout_findings","source_diffs"] }
+  ]
+}

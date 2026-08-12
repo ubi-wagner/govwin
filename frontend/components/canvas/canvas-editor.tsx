@@ -11,13 +11,16 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
-import { createNode, getNodeText, toEditableFlat } from '@/lib/types/canvas-document';
+import { createNode, getNodeText, toEditableFlat, withCanvasDefaults } from '@/lib/types/canvas-document';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 import { CanvasToolbar } from './canvas-toolbar';
+import { SelectionToolbar } from './selection-toolbar';
+import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
+import { toast } from '@/lib/toast';
 import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
 import { DocumentPreview } from './document-preview';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
@@ -66,6 +69,8 @@ interface Props {
   sectionId?: string;
   /** Tenant slug — enables comments API when present */
   tenantSlug?: string;
+  /** Stable per-artifact key for the local recovery draft (the unique save URL is a good key). */
+  autosaveKey?: string;
 
   // ── Ribbon state callbacks (SectionTopRibbon integration) ──────────────
   // When a SectionTopRibbon is mounted above this editor, it needs to reflect
@@ -148,6 +153,26 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
   }
 }
 
+/**
+ * Replace a node's TEXT with a library atom's prose, PRESERVING the node's content
+ * shape. Returns the new content, or `null` when the node type has no single text
+ * field a prose atom can sensibly fill (image/table/chart/list/…) — in which case the
+ * caller leaves the node untouched instead of destroying its shape. Mirrors
+ * `canReplaceFromLibrary` (lib/canvas/format-controls) which gates the button.
+ */
+function replaceNodeText(content: CanvasNode['content'], type: NodeType, text: string): CanvasNode['content'] | null {
+  const c = (content ?? {}) as Record<string, unknown>;
+  switch (type) {
+    case 'text_block': case 'heading': case 'blockquote':
+    case 'callout': case 'text_box': case 'caption': case 'footnote':
+      return { ...c, text } as CanvasNode['content'];
+    case 'code_block':
+      return { ...c, code: text } as CanvasNode['content'];
+    default:
+      return null; // image / table / chart / list / shape / … — not a text swap
+  }
+}
+
 /** A sensible starting look for a freshly-inserted extended element (so it's
  *  visible on the canvas immediately and has something to format). */
 function defaultStyle(type: NodeType): NodeStyle | undefined {
@@ -159,7 +184,7 @@ function defaultStyle(type: NodeType): NodeStyle | undefined {
 export function CanvasEditor(props: Props) {
   // Normalize a v2 (section-layer) doc into a flat, editable doc so its content
   // is visible + editable in the canvas — every editor surface edits `nodes`.
-  const initialDocument = toEditableFlat(props.initialDocument);
+  const initialDocument = toEditableFlat(withCanvasDefaults(props.initialDocument));
 
   // Delegate to SheetEditor for spreadsheet format
   if (initialDocument.canvas.format === 'spreadsheet') {
@@ -191,6 +216,7 @@ function CanvasEditorInner({
   actorName,
   proposalId,
   sectionId,
+  autosaveKey,
   tenantSlug,
   onDirtyChange,
   onSavingChange,
@@ -219,6 +245,52 @@ function CanvasEditorInner({
   const [undoStack, setUndoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
   const [redoStack, setRedoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
+
+  // ── Local draft autosave + recover-on-reload (W1.2) ──────────────────
+  // Every change is debounced to localStorage so a tab-close / crash / reload never loses
+  // work; on mount we offer to restore a newer local draft. The manual Save (button / Ctrl+S)
+  // is still the only SERVER write — this is the local safety net that makes reload safe.
+  // Autosave is scoped to a STABLE per-document key. If the caller supplies none of
+  // autosaveKey/sectionId/proposalId, DISABLE autosave (draftKey=null) rather than fall back to a
+  // shared constant — a shared key cross-contaminates unrelated editors (recovering doc A's draft
+  // into editor B, which Save then persists over B). Every real mount passes a key.
+  const draftScope = autosaveKey ?? sectionId ?? proposalId ?? null;
+  const draftKey = draftScope ? `canvas-draft:${draftScope}` : null;
+  const [recoverable, setRecoverable] = useState<CanvasDocument | null>(null);
+  const draftCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!draftKey || draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(draftKey) : null;
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { doc?: CanvasDocument };
+      if (saved?.doc && JSON.stringify(saved.doc.nodes) !== JSON.stringify(initialDocument.nodes)) {
+        setRecoverable(saved.doc);
+      } else if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(draftKey);
+      }
+    } catch { /* ignore a corrupt draft */ }
+  }, [draftKey, initialDocument]);
+
+  useEffect(() => {
+    if (!dirty || !draftKey || typeof window === 'undefined') return;
+    const t = setTimeout(() => {
+      try { window.localStorage.setItem(draftKey, JSON.stringify({ doc, savedAt: Date.now() })); } catch { /* quota / private mode */ }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [doc, dirty, draftKey]);
+
+  const handleRestoreDraft = useCallback(() => {
+    // Normalize the recovered draft the same way the mount path does — a partial/legacy persisted doc
+    // would otherwise crash the editor on setDoc (the mount-time withCanvasDefaults doesn't cover this path).
+    setRecoverable((rec) => { if (rec) { setDoc(withCanvasDefaults(rec)); setDirty(true); } return null; });
+  }, []);
+  const handleDiscardDraft = useCallback(() => {
+    try { if (draftKey && typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    setRecoverable(null);
+  }, [draftKey]);
 
   // ── Fine tools gated by the resolved capabilities (role × stage), falling back
   //    to !readOnly when the caller hasn't resolved them yet. ──
@@ -321,6 +393,10 @@ function CanvasEditorInner({
         return {
           ...n,
           content,
+          // A human content edit makes the node human-owned. Clear the ai_draft provenance so the
+          // Accept/Revert affordances (gated on source==='ai_draft') retire — otherwise Revert would
+          // still restore the pre-AI snapshot and silently discard this manual edit.
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString() },
@@ -395,8 +471,11 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Accept = keep the AI content as the human's own. Flipping source off
+        // 'ai_draft' clears the pending Accept/Revert affordance (they are gated on it).
         return {
           ...n,
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'accepted' as const, timestamp: new Date().toISOString() },
@@ -410,9 +489,18 @@ function CanvasEditorInner({
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
-        if (n.id !== nodeId || n.history.length < 2) return n;
+        if (n.id !== nodeId) return n;
+        // Restore the content captured before the last revision. Walk history back to
+        // the most recent entry that snapshotted previous_content; no-op if there is none.
+        const snapshot = [...n.history].reverse().find((h) => h.previous_content != null);
+        if (snapshot?.previous_content == null) return n;
+        let restored: CanvasNode['content'];
+        try { restored = JSON.parse(snapshot.previous_content) as CanvasNode['content']; }
+        catch { return n; }
         return {
           ...n,
+          content: restored,
+          provenance: { ...n.provenance, source: 'manual' as const },
           history: [
             ...n.history,
             { actor_id: actorId, actor_name: actorName, action: 'reverted' as const, timestamp: new Date().toISOString() },
@@ -459,13 +547,15 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Snapshot the pre-revision content so Revert can restore it (undo the AI edit).
+        const prior = JSON.stringify(n.content);
         return {
           ...n,
           content: newContent,
           provenance: { ...n.provenance, source: 'ai_draft' as const, drafted_at: new Date().toISOString() },
           history: [
             ...n.history,
-            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), comment: 'AI revision' },
+            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), previous_content: prior, comment: 'AI revision' },
           ],
         };
       }),
@@ -477,9 +567,16 @@ function CanvasEditorInner({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== nodeId) return n;
+        // Only replace into a node whose content is a single text/code field — preserving
+        // its shape. A library atom is prose; blindly writing { text } onto an image / table
+        // / chart / list node destroyed its content shape (image lost its storage_key). The
+        // Replace button is also hidden for those types (see canReplaceFromLibrary), so this
+        // is defense-in-depth: an unsupported type is a no-op, never a corruption.
+        const replaced = replaceNodeText(n.content, n.type, atom.content);
+        if (replaced === null) return n; // unsupported node type — leave untouched
         return {
           ...n,
-          content: { text: atom.content } as any,
+          content: replaced,
           provenance: {
             ...n.provenance,
             source: 'library' as const,
@@ -507,9 +604,16 @@ function CanvasEditorInner({
     updateDoc((prev) => {
       const nodes = [...prev.nodes];
       for (const a of atoms) {
-        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName }));
-        for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
-          nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName }));
+        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+        if (a.nodes && a.nodes.length > 0) {
+          // Structured atom (image / table / chart): insert its REAL nodes so figures + tables survive
+          // into the section AND export — re-id'd via createNode, style + provenance kept. (Its OCR/
+          // vision text lives in `content` for search/reuse ranking, not for re-rendering here.)
+          for (const n of a.nodes) nodes.push(createNode({ type: n.type, content: n.content, style: n.style, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+        } else {
+          for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
+            nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName, libraryUnitId: a.id }));
+          }
         }
       }
       return { ...prev, nodes };
@@ -572,6 +676,8 @@ function CanvasEditorInner({
         : doc;
       await onSave(docWithMeta);
       setDirty(false);
+      // Clear the local recovery draft — the server now has this content.
+      try { if (draftKey && typeof window !== 'undefined') window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
       // Clear revision meta after successful save
       lastRevisionMetaRef.current = null;
     } catch (err) {
@@ -579,7 +685,19 @@ function CanvasEditorInner({
     } finally {
       setSaving(false);
     }
-  }, [doc, onSave]);
+  }, [doc, onSave, draftKey]);
+
+  // Ctrl/⌘+S saves (a separate effect, after handleSave, to avoid a TDZ reference).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (dirty && !saving) void handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dirty, saving, handleSave]);
 
   // ── Complete & Lock (finish the ToDo) — save, then POST the section lock
   //    route (admin-gated server-side). On success, refresh so the server
@@ -741,6 +859,79 @@ function CanvasEditorInner({
     [tenantSlug, proposalId, sectionId, doc.nodes],
   );
 
+  // ── Selection-as-verb (fluid-canvas F0): act on a highlighted span ──────────
+  const [selBusy, setSelBusy] = useState(false);
+
+  /** Atomize a highlighted span → one reusable library atom (lineage from the section). */
+  const selectionAtomize = useCallback(async (sel: CanvasSelection) => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    const text = sel.text.trim();
+    if (text.length < 20) { toast.info('Select a bit more text to atomize (≥ 20 characters).'); return; }
+    setSelBusy(true);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/atomize-node`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: sel.nodeIds[0], heading: selectionLabel(sel), text, tags: [] }),
+        },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) toast.success(j?.data?.deduped ? 'Matched an existing library atom.' : 'Saved as a library atom.');
+      else toast.error(j?.error ?? 'Could not atomize the selection.');
+    } catch { toast.error('Could not atomize the selection.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [tenantSlug, proposalId, sectionId]);
+
+  /** Regenerate a highlighted span with AI — re-draft it and land it as a reviewable
+   *  ai_revision on the first block (Accept/Revert as usual). Reuses proposal.draft_section. */
+  const selectionRegenerate = useCallback(async (sel: CanvasSelection) => {
+    if (!proposalId) return;
+    setSelBusy(true);
+    try {
+      const res = await fetch('/api/tools/proposal.draft_section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: {
+          proposalId,
+          sectionTitle: selectionLabel(sel) || 'Selection',
+          instruction: `REVISE the following existing text, preserving its intent but improving clarity and specificity:\n\n<user_content>${sel.text}</user_content>`,
+          pageLimit: 1,
+        } }),
+      });
+      const j = await res.json().catch(() => ({}));
+      const newContent = j?.data?.nodes?.[0]?.content;
+      if (res.ok && newContent) {
+        handleReviseNode(sel.nodeIds[0], newContent, { source: 'ai_revision', aiInstruction: 'selection regenerate' });
+        toast.success('AI revision staged — Accept or Revert on the block.');
+      } else {
+        toast.error(j?.error ?? 'Could not regenerate the selection.');
+      }
+    } catch { toast.error('Could not regenerate the selection.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [proposalId, handleReviseNode]);
+
+  /** Annotate a highlighted span — attach a note (comment) to THIS section, quoting the span. */
+  const selectionAnnotate = useCallback(async (sel: CanvasSelection) => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    const note = typeof window !== 'undefined' ? window.prompt(`Add a note on “${selectionLabel(sel)}”:`) : null;
+    if (!note || !note.trim()) return;
+    const snippet = sel.text.slice(0, 140) + (sel.text.length > 140 ? '…' : '');
+    setSelBusy(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: sectionId, text: `“${snippet}” — ${note.trim()}` }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) toast.success('Note added to this section.');
+      else toast.error(j?.error ?? 'Could not add the note.');
+    } catch { toast.error('Could not add the note.'); }
+    finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+  }, [tenantSlug, proposalId, sectionId]);
+
   const railAcceptAll = useCallback(async () => {
     const pending = atomItems.filter((i) => i.status !== 'approved');
     for (const it of pending) {
@@ -753,6 +944,15 @@ function CanvasEditorInner({
     <div className="flex h-full">
       {/* Canvas area */}
       <div className="flex-1 min-w-0 overflow-y-auto">
+        {!readOnly && recoverable && (
+          <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800">
+            <span>You have unsaved changes from a previous session on this page.</span>
+            <span className="flex items-center gap-2 shrink-0">
+              <button onClick={handleRestoreDraft} className="px-2 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700">Restore them</button>
+              <button onClick={handleDiscardDraft} className="px-2 py-1 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100">Discard</button>
+            </span>
+          </div>
+        )}
         {/* Toolbar */}
         <div className="sticky top-0 z-10 flex items-center justify-between bg-white border-b px-4 py-2">
           <div className="flex items-center gap-3">
@@ -926,6 +1126,7 @@ function CanvasEditorInner({
             onUpdateNode={handleUpdateNode}
             onAddNode={handleAddNode}
             onDeleteNode={handleDeleteNode}
+            onUpdateCanvas={handleUpdateCanvas}
             variables={variables}
             readOnly={readOnly}
           />
@@ -938,6 +1139,17 @@ function CanvasEditorInner({
             variables={variables}
             readOnly={readOnly}
             onMoveNodeToIndex={handleMoveNodeToIndex}
+          />
+        )}
+        {/* Fluid-canvas F0: highlight a span → floating Atomize / Regenerate menu. Only in the
+            flow doc renderer (not slide/sheet forks), and only for an editable proposal section. */}
+        {!readOnly && doc.canvas.format !== 'spreadsheet' && (proposalId || sectionId) && (
+          <SelectionToolbar
+            doc={doc}
+            busy={selBusy}
+            onAtomize={tenantSlug && proposalId && sectionId ? selectionAtomize : undefined}
+            onRegenerate={proposalId ? selectionRegenerate : undefined}
+            onAnnotate={tenantSlug && proposalId && sectionId ? selectionAnnotate : undefined}
           />
         )}
       </div>

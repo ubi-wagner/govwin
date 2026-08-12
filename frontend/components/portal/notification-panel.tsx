@@ -12,6 +12,7 @@ interface Notification {
   payload?: Record<string, unknown> | null;
   created_at: string;
   is_read: boolean;
+  is_for_you?: boolean;
 }
 
 interface NotificationPanelProps {
@@ -169,6 +170,9 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
                         })}
                       </p>
                     </div>
+                    {n.is_for_you && (
+                      <span className="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 font-medium rounded flex-shrink-0">For you</span>
+                    )}
                     <span className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-500 rounded flex-shrink-0">
                       {n.namespace}
                     </span>

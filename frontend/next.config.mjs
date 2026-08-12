@@ -23,11 +23,20 @@ const securityHeaders = [
 
 const nextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['postgres', 'bcryptjs', 'mammoth', 'pdf-parse', 'pdfjs-dist', '@napi-rs/canvas', 'googleapis'],
+  serverExternalPackages: ['postgres', 'bcryptjs', 'mammoth', 'pdf-parse', 'pdfjs-dist', '@napi-rs/canvas', 'googleapis', 'tesseract.js'],
+  // tesseract.js loads its core wasm + our OCR language data by PATH at runtime (not via require),
+  // so Next's tracer misses them — force them into the standalone so OCR works on any deploy.
+  outputFileTracingIncludes: {
+    '/api/portal/[tenantSlug]/atoms/capture': ['./node_modules/tesseract.js-core/**/*', './ocr-data/**/*'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    // The atomize-package / atoms-upload routes accept files up to 25MB, but the middleware
+    // buffers request bodies to a 10MB default — silently truncating 10–25MB uploads (e.g. a
+    // real slide deck) before the route ever sees them. Lift the middleware cap to match.
+    middlewareClientMaxBodySize: '50mb',
   },
   async headers() {
     return [

@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { describeEvent } from '@/lib/event-labels';
 
@@ -66,6 +66,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    // RLS choke point (docs/RLS_CUTOVER.md): pin tenant context in the handler's own frame
+    // so the notification_read_state + proposal_sections (both RLS'd) reads scope to this
+    // tenant under govtech_app. Without it, the for-you routing silently returns nothing and
+    // the read-state query DENY-ALLs post-flip.
+    enterTenant(tenantId);
 
     // ── Parse query params ───────────────────────────────────────
     const url = new URL(request.url);
@@ -90,6 +95,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE tenant_id = ${tenantId}::uuid
           AND namespace IN ('proposal', 'capture', 'library', 'system')
           AND phase IN ('single', 'end')
+          AND actor_id IS DISTINCT FROM ${sessionUser.id}
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
@@ -102,6 +108,20 @@ export async function GET(request: Request, ctx: RouteContext) {
         LIMIT 1
       `;
       const lastReadMs = readState?.lastReadAt ? new Date(readState.lastReadAt).getTime() : 0;
+
+      // Section-level routing: an event is "for you" when it touches a section assigned to you.
+      // (Self-authored events are already excluded above, so the feed is what OTHERS did — the
+      // "your turn" signal — instead of the tenant-wide firehose.) Best-effort: a routing-query
+      // failure just leaves the for-you flags off; it never breaks the feed.
+      let assignedSections = new Set<string>();
+      try {
+        const assignedRows = await sql<{ id: string }[]>`
+          SELECT ps.id FROM proposal_sections ps
+          JOIN proposals p ON p.id = ps.proposal_id
+          WHERE ps.assigned_to = ${sessionUser.id}::uuid AND p.tenant_id = ${tenantId}::uuid
+        `;
+        assignedSections = new Set(assignedRows.map((r) => r.id));
+      } catch { /* routing is advisory */ }
 
       const items = notifications.map((n) => {
         const p = (n.payload ?? {}) as Record<string, unknown>;
@@ -117,6 +137,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           ? `Error: ${String(p.error)}`
           : ((p.summary as string) ?? null);
 
+        const sid = (p.sectionId ?? p.section_id) as string | undefined;
         return {
           id: n.id,
           type: n.type,
@@ -126,6 +147,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           payload: p, // returned so the bell can deep-link to the source entity
           created_at: n.createdAt,
           is_read: new Date(n.createdAt).getTime() <= lastReadMs,
+          is_for_you: sid ? assignedSections.has(sid) : false,
         };
       });
 
@@ -176,6 +198,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS: the read-state upsert writes under this tenant's scope (govtech_app)
     try {
       await sql`
         INSERT INTO notification_read_state (user_id, tenant_id, last_read_at, updated_at)

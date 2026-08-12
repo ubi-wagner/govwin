@@ -24,7 +24,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const u = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
-    if (!hasRoleAtLeast(role, 'partner_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    // Tenant-staff only. The ranked candidates ARE library content (titles/snippets) — a collaborator's
+    // partner_user membership passes verifyTenantAccess, so floor here or they'd read the tenant library
+    // for any section. Collaborators contribute their own content up; they don't pull from the library.
+    if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
@@ -35,10 +38,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     // Sanitize limit: a non-numeric/negative value must not reach `LIMIT` as NaN (→ 500).
     const rawLimit = Number(url.searchParams.get('limit'));
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(50, Math.floor(rawLimit)) : undefined;
+    // `text` is the human-readable section title/prompt — the semantic query for the vector axis
+    // (selectForSection embeds it when an engine is on; ignored when off). Capped defensively.
+    const text = (url.searchParams.get('text') ?? '').trim().slice(0, 500) || undefined;
     const atoms = await selectForSection(tenantId, {
       vol: url.searchParams.get('vol') ?? null,
       kinds: csv('kinds'),
       context: csv('context'),
+      text,
       limit,
     }, viewerFromRole(u.id, role));
 
@@ -49,10 +56,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const sectionId = url.searchParams.get('sectionId');
     if (sectionId && isValidUUID(sectionId) && atoms.length > 0 && hasRoleAtLeast(role, 'tenant_user')) {
       try {
+        // SEED only — never clobber. The ranked candidates are what was SHOWN, not what a human
+        // hand-picked; the explicit POST /atoms/select records the actual picks. So only stamp when
+        // no sources exist yet (fresh AI-drafting), guarded by `meta->'sourceAtomIds' IS NULL` — else
+        // re-opening the picker would overwrite the user's picks and mis-set harvest lineage + usage.
         await withTenant(tenantId, async (tx) =>
           tx`UPDATE proposal_sections
              SET meta = coalesce(meta, '{}'::jsonb) || ${tx.json({ sourceAtomIds: atoms.map((a) => a.id) })}
              WHERE id = ${sectionId}::uuid
+               AND (meta -> 'sourceAtomIds') IS NULL
                AND proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)`,
         );
       } catch (e) {

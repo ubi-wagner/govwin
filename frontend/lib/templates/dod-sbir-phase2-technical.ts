@@ -57,10 +57,15 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover Page ─────────────────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 468, height: 96, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 24 },
+    }),
     node('cover-title', {
       type: 'heading',
       content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', size: 16 },
+      style: { alignment: 'center', size: 16, space_before: 48 },
     }),
     node('cover-subtitle', {
       type: 'heading',
@@ -115,6 +120,11 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
 
     // ─── Section 2: Technical Approach ──────────────────────────
+    node('figure-1', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I feasibility results', width: 420, height: 260, caption: 'Figure 1: [Phase I feasibility results]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s2-heading', {
       type: 'heading',
       content: { level: 1, text: '2. Technical Approach' },
@@ -141,6 +151,11 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
       type: 'text_block',
       content: { text: '[Detail the research methodology, experimental design, and analytical approaches. Include specific protocols, test conditions, sample sizes, and statistical methods. Explain how each experiment maps to a technical objective.]' },
     }),
+    node('figure-2', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'System architecture and technical approach diagram', width: 420, height: 260, caption: 'Figure 2: [System architecture / technical approach]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s2-milestones', {
       type: 'heading',
       content: { level: 2, text: '2.3 Technical Milestones and Deliverables' },
@@ -151,6 +166,11 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
 
     // ─── Section 3: Key Personnel ───────────────────────────────
+    node('figure-3', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase II schedule and milestone Gantt chart', width: 420, height: 240, caption: 'Figure 3: [Phase II schedule / milestone Gantt]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s3-heading', {
       type: 'heading',
       content: { level: 1, text: '3. Key Personnel and Qualifications' },
@@ -188,6 +208,11 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s4-market-text', {
       type: 'text_block',
       content: { text: '[Describe the total addressable market (TAM) for the proposed technology. Break down by customer segments (DoD programs of record, other federal agencies, commercial). Provide specific dollar estimates and growth projections with sources.]' },
+    }),
+    node('figure-4', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Market size and commercialization roadmap', width: 420, height: 260, caption: 'Figure 4: [Market size / commercialization roadmap]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s4-customers', {
       type: 'heading',
