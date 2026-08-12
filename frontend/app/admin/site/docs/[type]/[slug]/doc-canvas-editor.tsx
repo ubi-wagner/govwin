@@ -17,7 +17,16 @@ import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { PageVersion } from '@/lib/content-admin';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
-import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
+
+// Public detail path per doc type (matches the publish route). Only blog_post/resource/guide have a
+// detail page; testimonial/team_member surface on a list page, so "View live" targets the list there.
+const VIEW_LIVE_PATH: Record<string, (slug: string) => string> = {
+  blog_post: (s) => `/resources/${encodeURIComponent(s)}`,
+  resource: (s) => `/resources/${encodeURIComponent(s)}`,
+  guide: (s) => `/resources/${encodeURIComponent(s)}`,
+  testimonial: () => '/customers',
+  team_member: () => '/team',
+};
 
 function shortActor(s: string | null): string {
   return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
@@ -61,19 +70,19 @@ export function SiteDocCanvasEditor({
   const [note, setNote] = useState('');
   const [panelOpen, setPanelOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false); // mirrored from the editor so the ribbon can disable during a save
 
   const effectiveSlug = isNew ? (slugVal.trim() || slugify(title)) : slug;
 
   // Mirror the fields into refs so the editor's async onSave closure always reads fresh values.
+  // (The CanvasEditor owns the unsaved-changes nav guard for the BODY — we intentionally do NOT add
+  //  a second useUnsavedChanges consumer here: two writers stomp the one shared flag and could drop
+  //  the flag while the canvas is still dirty, losing body edits on in-app nav. Metadata edits are
+  //  always saveable via the ribbon "Save draft".)
   const metaRef = useRef({ title, excerpt, tags, featuredImage, externalUrl, author, note, effectiveSlug, isNew });
   useEffect(() => {
     metaRef.current = { title, excerpt, tags, featuredImage, externalUrl, author, note, effectiveSlug, isNew };
   }, [title, excerpt, tags, featuredImage, externalUrl, author, note, effectiveSlug, isNew]);
-
-  // Metadata-dirty guard (canvas dirtiness is tracked inside the editor / its nav guard).
-  const metaSnapshot = JSON.stringify({ title, slugVal, excerpt, tags, featuredImage, externalUrl, author });
-  const [savedMeta, setSavedMeta] = useState(metaSnapshot);
-  useUnsavedChanges(metaSnapshot !== savedMeta);
 
   const publishAfterSaveRef = useRef(false);
   const triggerSaveRef = useRef<(() => void) | null>(null);
@@ -81,9 +90,13 @@ export function SiteDocCanvasEditor({
   // ── The editor calls this with the latest canvas. We POST canvas + metadata; the
   //    server projects the public HTML body from the canvas. Optionally publish after. ──
   const handleCanvasSave = useCallback(async (docFromEditor: CanvasDocument) => {
+    // Capture + clear the publish intent immediately, so a save that throws below can never leave the
+    // flag set for a later plain Save/Ctrl-S to silently publish (the inner editor's Save bypasses onSaveDraft).
+    const shouldPublish = publishAfterSaveRef.current;
+    publishAfterSaveRef.current = false;
     const m = metaRef.current;
-    if (!m.title.trim()) throw new Error('Title is required (open Post details).');
-    if (!m.effectiveSlug) throw new Error('Slug is required (open Post details).');
+    if (!m.title.trim()) { toast('Title is required — open Post details.', 'error'); throw new Error('Title is required'); }
+    if (!m.effectiveSlug) { toast('Slug is required — open Post details.', 'error'); throw new Error('Slug is required'); }
     const res = await fetch(`/api/admin/site/docs/${type}/${encodeURIComponent(m.effectiveSlug)}/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,14 +113,15 @@ export function SiteDocCanvasEditor({
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({} as { error?: string }));
-      throw new Error(j.error ?? `Save failed (HTTP ${res.status})`);
+      const msg = j.error ?? `Save failed (HTTP ${res.status})`;
+      toast(msg, 'error');
+      throw new Error(msg);
     }
-    setSavedMeta(JSON.stringify({ title: m.title, slugVal: m.effectiveSlug, excerpt: m.excerpt, tags: m.tags, featuredImage: m.featuredImage, externalUrl: m.externalUrl, author: m.author }));
-    // First save of a brand-new doc — move to the canonical URL so publish/status target it.
-    if (m.isNew) { router.replace(`/admin/site/docs/${type}/${encodeURIComponent(m.effectiveSlug)}`); }
+    // First save of a brand-new doc — move to the canonical URL + sync local slug so publish/status
+    // target it and the editor no longer behaves as "new".
+    if (m.isNew) { setSlugVal(m.effectiveSlug); router.replace(`/admin/site/docs/${type}/${encodeURIComponent(m.effectiveSlug)}`); }
 
-    if (publishAfterSaveRef.current) {
-      publishAfterSaveRef.current = false;
+    if (shouldPublish) {
       const pres = await fetch(`/api/admin/site/docs/${type}/${encodeURIComponent(m.effectiveSlug)}/publish`, { method: 'POST' });
       if (pres.ok) { toast('Published — live on the site.', 'success'); router.refresh(); }
       else { const j = await pres.json().catch(() => ({} as { error?: string })); toast(j.error ?? 'Publish failed', 'error'); }
@@ -154,17 +168,17 @@ export function SiteDocCanvasEditor({
           <button onClick={() => setPanelOpen((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50" title="Title, slug, excerpt, tags, featured image">
             {panelOpen ? 'Hide details' : 'Post details'}
           </button>
-          {!isNew && active && (
-            <a href={`/resources/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer" className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50">View live &#8599;</a>
+          {!isNew && active && VIEW_LIVE_PATH[type] && (
+            <a href={VIEW_LIVE_PATH[type](slug)} target="_blank" rel="noreferrer" className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50">View live &#8599;</a>
           )}
           {!isNew && active && (
-            <button disabled={busy} onClick={() => onStatus('archive')} className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50">Retire</button>
+            <button disabled={busy || saving} onClick={() => onStatus('archive')} className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50">Retire</button>
           )}
           {!isNew && !active && canRestore && (
-            <button disabled={busy} onClick={() => onStatus('restore')} className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-50">Restore</button>
+            <button disabled={busy || saving} onClick={() => onStatus('restore')} className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-50">Restore</button>
           )}
-          <button disabled={busy} onClick={onSaveDraft} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50">Save draft</button>
-          <button disabled={busy} onClick={onPublish} className="text-xs px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">Publish</button>
+          <button disabled={busy || saving} onClick={onSaveDraft} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50">{saving ? 'Saving…' : 'Save draft'}</button>
+          <button disabled={busy || saving} onClick={onPublish} className="text-xs px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Working…' : 'Publish'}</button>
         </div>
       </div>
 
@@ -176,9 +190,10 @@ export function SiteDocCanvasEditor({
             onSave={handleCanvasSave}
             actorId={actorId}
             actorName={actorName}
-            autosaveKey={`admin-site-doc:${type}:${effectiveSlug || 'new'}`}
+            autosaveKey={`admin-site-doc:${type}:${isNew ? 'new' : slug}`}
             variables={{}}
             triggerSaveRef={triggerSaveRef}
+            onSavingChange={setSaving}
           />
         </div>
         {panelOpen && (

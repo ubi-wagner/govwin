@@ -18,7 +18,6 @@ import {
   CANVAS_PRESETS,
   type CanvasDocument, type CanvasNode, type CanvasSection,
 } from '@/lib/types/canvas-document';
-import { renderCanvasBodyHtml } from '@/lib/export/canvas-html';
 
 // Self-contained node factory (mirrors lib/library/artifact-canvas.ts) — a seed node needs
 // no actor history; provenance 'template' marks it as starter content.
@@ -54,29 +53,152 @@ function baseDoc(title: string, nodes: CanvasNode[]): CanvasDocument {
   } as CanvasDocument;
 }
 
-/** The public HTML projection stored in blocks[0].body. Content has no merge fields. */
+// ── Public web projection ─────────────────────────────────────────────────────────────────
+// The marketing site does NOT ship @tailwindcss/typography — there is no `.prose`, and Tailwind
+// Preflight RESETS bare tags (ul/ol → no markers, h1-6 → body size, a → no color). The legacy
+// markdown path (lib/markdown.ts) coped by baking utility classes into its output. Canvas content
+// must be just as self-contained, so we emit semantic tags with INLINE web styles — bulletproof
+// against JIT purging AND Preflight (inline beats the reset), and preserved by the page sanitizer
+// (which keeps style attrs). This is a WEB renderer, deliberately separate from the print/PDF
+// renderCanvasBodyHtml (pt units, page furniture) which stays for exports.
+
+const esc = (s: string): string =>
+  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const INLINE_TAG_WEB: Record<string, [string, string]> = {
+  bold: ['<strong>', '</strong>'], strong: ['<strong>', '</strong>'],
+  italic: ['<em>', '</em>'], emphasis: ['<em>', '</em>'],
+  underline: ['<u>', '</u>'], strikethrough: ['<s>', '</s>'], code: ['<code>', '</code>'],
+};
+
+/** Render a text-block's inline runs (bold/italic/…) to escaped HTML with web-safe tags. */
+function inlineRunsWeb(tb: { text?: string; inline_formats?: { start: number; length: number; format: string }[] }): string {
+  const chars = [...(tb.text ?? '')];
+  const n = chars.length;
+  if (n === 0) return '';
+  const at: Array<Set<string>> = Array.from({ length: n }, () => new Set());
+  for (const f of tb.inline_formats ?? []) {
+    for (let k = f.start; k < f.start + f.length && k < n; k++) if (k >= 0) at[k].add(f.format);
+  }
+  const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+  let out = ''; let k = 0;
+  while (k < n) {
+    const set = at[k]; let j = k + 1;
+    while (j < n && setsEqual(at[j], set)) j++;
+    let seg = esc(chars.slice(k, j).join(''));
+    for (const f of set) { const t = INLINE_TAG_WEB[f]; if (t) seg = `${t[0]}${seg}${t[1]}`; }
+    out += seg; k = j;
+  }
+  return out;
+}
+
+const H_STYLE: Record<number, string> = {
+  1: 'font-size:1.875rem;font-weight:700;line-height:1.2;margin:1.5rem 0 .75rem',
+  2: 'font-size:1.5rem;font-weight:600;line-height:1.25;margin:1.25rem 0 .5rem',
+  3: 'font-size:1.25rem;font-weight:600;margin:1rem 0 .5rem',
+  4: 'font-size:1.1rem;font-weight:600;margin:.9rem 0 .4rem',
+  5: 'font-size:1rem;font-weight:700;margin:.8rem 0 .3rem',
+  6: 'font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#475569;margin:.8rem 0 .3rem',
+};
+
+function contentNodeToHtml(node: CanvasNode): string {
+  const c = (node.content ?? {}) as Record<string, unknown>;
+  switch (node.type) {
+    case 'heading': {
+      const lvl = Math.min(Math.max(Number(c.level ?? 2), 1), 6);
+      return `<h${lvl} style="${H_STYLE[lvl]}">${esc(String(c.text ?? ''))}</h${lvl}>`;
+    }
+    case 'text_block': {
+      const inner = inlineRunsWeb(c as { text?: string; inline_formats?: { start: number; length: number; format: string }[] });
+      return inner ? `<p style="margin:0 0 1rem;line-height:1.7">${inner}</p>` : '';
+    }
+    case 'bulleted_list':
+    case 'numbered_list': {
+      const items = Array.isArray(c.items) ? (c.items as { text?: string }[]) : [];
+      const tag = node.type === 'numbered_list' ? 'ol' : 'ul';
+      const listStyle = node.type === 'numbered_list' ? 'decimal' : 'disc';
+      const lis = items.map((it) => `<li style="margin:.25rem 0">${esc(String(it.text ?? ''))}</li>`).join('');
+      return `<${tag} style="list-style:${listStyle};padding-left:1.5rem;margin:0 0 1rem">${lis}</${tag}>`;
+    }
+    case 'blockquote':
+      return `<blockquote style="border-left:4px solid #cbd5e1;padding-left:1rem;font-style:italic;color:#475569;margin:1rem 0">${esc(String(c.text ?? ''))}</blockquote>`;
+    case 'url': {
+      const href = String(c.href ?? '#'); const txt = String(c.display_text ?? href);
+      return `<p style="margin:0 0 1rem"><a href="${esc(href)}" style="color:#2563eb;text-decoration:underline">${esc(txt)}</a></p>`;
+    }
+    case 'callout':
+      return `<aside style="border-left:3px solid #3b82f6;background:#eff6ff;padding:.75rem 1rem;margin:1rem 0;border-radius:.375rem">${c.title ? `<strong>${esc(String(c.title))}</strong> ` : ''}${esc(String(c.text ?? ''))}</aside>`;
+    case 'code_block':
+      return `<pre style="background:#f1f5f9;padding:1rem;border-radius:.375rem;overflow:auto;margin:0 0 1rem"><code>${esc(String(c.code ?? ''))}</code></pre>`;
+    case 'divider':
+      return '<hr style="border:0;border-top:1px solid #e2e8f0;margin:1.5rem 0">';
+    case 'caption':
+      return `<p style="font-size:.875rem;color:#64748b;text-align:center;font-style:italic;margin:.5rem 0">${c.prefix ? `${esc(String(c.prefix))} ${esc(String(c.number ?? ''))}. ` : ''}${esc(String(c.text ?? ''))}</p>`;
+    case 'table': {
+      const headers = Array.isArray(c.headers) ? (c.headers as string[]) : [];
+      const rows = Array.isArray(c.rows) ? (c.rows as unknown[][]) : [];
+      const th = headers.map((h) => `<th style="border:1px solid #e2e8f0;padding:.5rem;text-align:left;background:#f8fafc">${esc(String(h))}</th>`).join('');
+      const trs = rows.map((r) => `<tr>${(Array.isArray(r) ? r : []).map((cell) => `<td style="border:1px solid #e2e8f0;padding:.5rem">${esc(typeof cell === 'string' ? cell : String((cell as { text?: string })?.text ?? ''))}</td>`).join('')}</tr>`).join('');
+      return `<table style="border-collapse:collapse;width:100%;margin:0 0 1rem">${th ? `<thead><tr>${th}</tr></thead>` : ''}<tbody>${trs}</tbody></table>`;
+    }
+    case 'image': {
+      const key = String(c.storage_key ?? '');
+      const alt = esc(String(c.alt_text ?? ''));
+      // Only inline a resolvable src (http/data). An S3 key without a public URL is skipped (no broken img).
+      if (/^(https?:|data:)/i.test(key)) return `<figure style="margin:1rem 0"><img src="${esc(key)}" alt="${alt}" style="max-width:100%;height:auto"></figure>`;
+      return '';
+    }
+    default:
+      return typeof c.text === 'string' ? `<p style="margin:0 0 1rem;line-height:1.7">${esc(c.text)}</p>` : '';
+  }
+}
+
+/** Flatten a content canvas to its nodes in reading order (sections' groups, then any flat nodes). */
+function contentNodes(doc: CanvasDocument): CanvasNode[] {
+  const out: CanvasNode[] = [];
+  for (const s of doc.sections ?? []) for (const g of s.groups ?? []) out.push(...(g.nodes ?? []));
+  out.push(...(doc.nodes ?? []));
+  return out;
+}
+
+/**
+ * The public HTML projection stored in blocks[0].body — self-styled semantic web HTML.
+ * Content has no merge fields. Starts with `<` so the marketing renderer treats it as HTML.
+ */
 export function docBodyFromCanvas(canvas: CanvasDocument): string {
-  return renderCanvasBodyHtml(canvas, {}).trim();
+  return contentNodes(canvas).map(contentNodeToHtml).filter(Boolean).join('\n').trim();
 }
 
 // ── Seed parsing: existing markdown/HTML body → canvas nodes ──────────────────────────────
 
 const ENTITIES: Record<string, string> = {
   '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&nbsp;': ' ',
+  '&mdash;': '—', '&ndash;': '–', '&rsquo;': '’', '&lsquo;': '‘',
+  '&rdquo;': '”', '&ldquo;': '“', '&hellip;': '…', '&copy;': '©', '&reg;': '®', '&trade;': '™',
 };
 function decodeEntities(s: string): string {
-  return s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (m) => ENTITIES[m] ?? m);
+  return s
+    // numeric entities first (&#37; → %, &#x2019; → ’) so they aren't left literal and double-escaped
+    .replace(/&#x([0-9a-f]+);/gi, (m, h: string) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return m; } })
+    .replace(/&#(\d+);/g, (m, d: string) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return m; } })
+    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp|mdash|ndash|rsquo|lsquo|rdquo|ldquo|hellip|copy|reg|trade);/g, (m) => ENTITIES[m] ?? m);
 }
 
 /** Downconvert the common HTML block tags to markdown-ish lines, then strip the rest. */
 function htmlToMarkdownish(html: string): string {
   let s = html;
   s = s.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+  // Ordered lists → numbered markers, unordered → bullets (preserve ol-vs-ul; the generic
+  // per-<li> pass below only catches strays outside a list).
+  s = s.replace(/<\s*ol[^>]*>([\s\S]*?)<\s*\/\s*ol\s*>/gi, (_m, inner: string) =>
+    '\n' + inner.replace(/<\s*li[^>]*>/gi, '\n1. ').replace(/<\s*\/li\s*>/gi, '') + '\n');
+  s = s.replace(/<\s*ul[^>]*>([\s\S]*?)<\s*\/\s*ul\s*>/gi, (_m, inner: string) =>
+    '\n' + inner.replace(/<\s*li[^>]*>/gi, '\n- ').replace(/<\s*\/li\s*>/gi, '') + '\n');
+  s = s.replace(/<\s*li[^>]*>/gi, '\n- ');
+  s = s.replace(/<\s*\/li\s*>/gi, '');
   s = s.replace(/<\s*\/(p|div|section|article)\s*>/gi, '\n\n');
   s = s.replace(/<\s*h([1-6])[^>]*>/gi, (_m, l: string) => '\n' + '#'.repeat(Number(l)) + ' ');
   s = s.replace(/<\s*\/h[1-6]\s*>/gi, '\n\n');
-  s = s.replace(/<\s*li[^>]*>/gi, '\n- ');
-  s = s.replace(/<\s*\/li\s*>/gi, '');
   s = s.replace(/<\s*\/?(ul|ol)[^>]*>/gi, '\n');
   s = s.replace(/<[^>]+>/g, ''); // strip remaining tags
   return decodeEntities(s);
@@ -114,7 +236,7 @@ export function parseBodyToNodes(body: string): CanvasNode[] {
   const flushAll = () => { flushPara(); flushBullets(); flushNumbers(); };
 
   for (const ln of lines) {
-    if (ln.kind === 'heading') { flushAll(); nodes.push(node('heading', { level: Math.min(ln.level ?? 2, 4), text: ln.text })); continue; }
+    if (ln.kind === 'heading') { flushAll(); nodes.push(node('heading', { level: Math.min(ln.level ?? 2, 6), text: ln.text })); continue; }
     if (ln.kind === 'bullet') { flushPara(); flushNumbers(); bullets.push(ln.text); continue; }
     if (ln.kind === 'number') { flushPara(); flushBullets(); numbers.push(ln.text); continue; }
     if (ln.kind === 'blank') { flushAll(); continue; }

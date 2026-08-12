@@ -11,6 +11,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ type: s
   if (!(DOC_TYPES as readonly string[]).includes(type)) {
     return NextResponse.json({ error: 'Invalid content type', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
+  // "new" is the reserved editor route for a fresh doc — a real row saved at page_key='new' would be
+  // shadowed by the blank-new editor and become uneditable. Reject it (pick a different title/slug).
+  if (slug === 'new') {
+    return NextResponse.json({ error: '"new" is a reserved slug — choose a different slug', code: 'VALIDATION_ERROR' }, { status: 422 });
+  }
 
   let body: Record<string, unknown>;
   try {

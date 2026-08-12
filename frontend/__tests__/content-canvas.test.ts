@@ -55,21 +55,38 @@ describe('parseBodyToNodes (HTML)', () => {
     expect((nodes[2].content as { items: { text: string }[] }).items.map((i) => i.text)).toEqual(['alpha', 'beta']);
   });
 
-  it('decodes entities', () => {
-    const nodes = parseBodyToNodes('<p>Cut cost &amp; schedule by 40&#37;</p>'.replace('&#37;', '%'));
-    expect((nodes[0].content as { text: string }).text).toContain('Cut cost & schedule');
+  it('decodes named AND numeric entities (no literal leftovers)', () => {
+    const nodes = parseBodyToNodes('<p>Cut cost &amp; schedule by 40&#37; &mdash; done &#x2019;</p>');
+    const text = (nodes[0].content as { text: string }).text;
+    expect(text).toContain('Cut cost & schedule by 40%'); // &amp; and &#37; both decoded
+    expect(text).toContain('—');                          // &mdash;
+    expect(text).toContain('’');                           // &#x2019;
+    expect(text).not.toMatch(/&#?\w+;/);                   // no undecoded entity survives
+  });
+
+  it('preserves ordered vs unordered lists (no <ol>→<ul> downgrade)', () => {
+    const bul = parseBodyToNodes('<ul><li>a</li><li>b</li></ul>');
+    const num = parseBodyToNodes('<ol><li>one</li><li>two</li></ol>');
+    expect(bul[0].type).toBe('bulleted_list');
+    expect(num[0].type).toBe('numbered_list');
   });
 });
 
 describe('canvasFromDocBody + docBodyFromCanvas (round-trip)', () => {
-  it('seeds a canvas whose HTML projection is an HTML fragment the public renderer accepts', () => {
-    const canvas = canvasFromDocBody('My Post', '## Heading\n\nA paragraph.\n\n- a\n- b');
+  it('seeds a canvas whose HTML projection is SELF-STYLED semantic HTML (no .prose dependency)', () => {
+    const canvas = canvasFromDocBody('My Post', '## Heading\n\nA paragraph.\n\n- a\n- b\n\n1. one\n2. two');
     expect(canvas.sections?.[0]?.groups?.[0]?.nodes.length).toBeGreaterThan(0);
     const html = docBodyFromCanvas(canvas);
     // public renderer keys on body.startsWith('<') to treat it as HTML
     expect(html.startsWith('<')).toBe(true);
     expect(html).toContain('Heading');
     expect(html).toContain('paragraph');
+    // The marketing site has no @tailwindcss/typography (.prose); the projection MUST carry its own
+    // inline web styles so headings/lists/links survive Tailwind Preflight. Guards the regression.
+    expect(html).toMatch(/<h2 style=/);                 // headings styled
+    expect(html).toMatch(/<ul style="[^"]*list-style:disc/); // bullets restored
+    expect(html).toMatch(/<ol style="[^"]*list-style:decimal/); // numbers restored
+    expect(html).not.toMatch(/<(h2|ul|ol)>/);           // never a bare unstyled tag
   });
 
   it('never yields an empty canvas (empty body → one empty text block)', () => {
