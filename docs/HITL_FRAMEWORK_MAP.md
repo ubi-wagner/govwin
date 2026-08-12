@@ -199,3 +199,17 @@ descended shadow-admin), complete it, confirm resume. Screenshots per role.
 
 Order: **P1 → P2 → P3 → P4 → P5**, each green + committed before the next. P2 is the one requiring an
 explicit guardrail sign-off (data segregation) before it ships.
+
+### Status (2026-08-12)
+- **P1 ✅ shipped** (43ec682) — ~15 task types catalogued + `__tests__/task-catalog-drift.test.ts` guard.
+- **P2 ✅ shipped** (00584f7) — hierarchical tenant + shadow-admin (acts fully as tenant_admin, bounded
+  to the descended tenant, user-signed-off) + badge alignment + docstring fix. Live proof 15/15
+  (`scratchpad/drive-hitl-p2.mts`: cross-tenant denied both ways, no upward escalation, shadow bounded)
+  + `__tests__/hitl-role-hierarchy.test.ts`.
+- **P3/P4 ✅ shipped** (c4771c2) — manager_request → Team-page CTA (G6); `taskHref` deep-links on
+  review/upload gates; `/admin/site/content/[id]` resolver → Content Studio (content_publish, #163).
+- **Remaining follow-ups:** G8 portal-stage advance hook (completion route → `advancePortalStage` when
+  the last stage ToDo closes; task must carry portalId); partner_user self-surface (G4); single
+  admin-triage inbox (G5 — make `/admin/rfp-curation` completable or fold into the dashboard queue);
+  per-role browser walkthrough screenshots (P5 prove). No new producers were added, so the
+  `resolveGatePolicy` nudge/escalation routing (P5) is unchanged/inert as designed.
