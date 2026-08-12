@@ -208,8 +208,13 @@ explicit guardrail sign-off (data segregation) before it ships.
   + `__tests__/hitl-role-hierarchy.test.ts`.
 - **P3/P4 ✅ shipped** (c4771c2) — manager_request → Team-page CTA (G6); `taskHref` deep-links on
   review/upload gates; `/admin/site/content/[id]` resolver → Content Studio (content_publish, #163).
-- **Remaining follow-ups:** G8 portal-stage advance hook (completion route → `advancePortalStage` when
-  the last stage ToDo closes; task must carry portalId); partner_user self-surface (G4); single
-  admin-triage inbox (G5 — make `/admin/rfp-curation` completable or fold into the dashboard queue);
-  per-role browser walkthrough screenshots (P5 prove). No new producers were added, so the
-  `resolveGatePolicy` nudge/escalation routing (P5) is unchanged/inert as designed.
+- **G8 ✅ shipped** (061bd09) — the tenant tasks completion route calls `advancePortalStage` (no force)
+  after a portal-stage ToDo closes; the last one moves the portal, earlier ones no-op. Last broken loop closed.
+- **Generic primitives ✅ shipped** (19e4896) — `read_receipt` broadcast + `text_memo` ToDo
+  (Completed/Delegated/Not-completed), composable from the cockpit drawer; disposition on the
+  `task.completed` event for future triggers. As-run guide + 12 screenshots: **docs/HITL_TODO_GUIDE.md**.
+  Browser-proven per role (kate/conor/eric), every disposition + the shadow path + guardrails exercised.
+- **Remaining (surface polish, not broken wiring):** partner_user self-surface (their ToDos are already
+  reachable by the tenant_admin via hierarchical visibility, so not orphaned); single admin-triage inbox
+  (make `/admin/rfp-curation` completable or fold into the dashboard queue). No new producers were added,
+  so the `resolveGatePolicy` nudge/escalation routing is unchanged/inert as designed.
