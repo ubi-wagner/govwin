@@ -8,9 +8,10 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { listOpenTasksForActor, completeTask } from '@/lib/tasks/tasks';
+import { advancePortalStage } from '@/lib/portal-workflow';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -80,6 +81,21 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!out.ok) {
       return NextResponse.json({ error: out.error, code: out.code }, { status: out.status });
     }
+
+    // Portal build-stage advance hook (HITL G8): a stage's ToDos are standalone (no parked instance),
+    // so completing them never moved the portal. Now, after a portal-stage ToDo closes, try to advance
+    // the stage — advancePortalStage (no force) is a no-op unless EVERY stage ToDo is complete, so only
+    // the last one moves the portal forward. Best-effort; failure never blocks the completion.
+    try {
+      const [t] = await sql<{ portalId: string | null; entityType: string | null }[]>`
+        SELECT params->>'portalId' AS "portalId", entity_type AS "entityType" FROM tasks WHERE id = ${taskId}::uuid`;
+      if (t?.entityType === 'portal' && t.portalId) {
+        await advancePortalStage(r.actor, r.actor.tenantId, t.portalId);
+      }
+    } catch (e) {
+      console.error('[portal/tasks POST] stage-advance hook failed (non-fatal):', e);
+    }
+
     return NextResponse.json({ data: out.data });
   } catch (err) {
     console.error('[portal/tasks POST] error:', err);
