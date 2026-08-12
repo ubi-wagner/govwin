@@ -7,15 +7,18 @@
  *   go-to-market & business model → milestones, funding & financials →
  *   team & advisors.
  *
- * Letter, Times New Roman 12pt, 1-inch margins (letter_standard). Real,
- * polished narrative with {merge_field} placeholders and clearly-marked
- * [brackets] for the company's own market sizing, figures, and named IP.
+ * Calibri 11pt on the letter_collateral preset (running company header,
+ * page-numbered footer, figures enabled). Real, polished narrative with a hero
+ * banner and a market-sizing figure, {merge_field} placeholders, and
+ * clearly-marked [brackets] for the company's own market sizing, figures, and
+ * named IP.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// Standalone commercialization plan: Calibri 11pt, running header + page-numbered footer, figures on.
+const PRESET: CanvasRules = CANVAS_PRESETS.letter_collateral;
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -67,6 +70,13 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
       content: { thickness: 2, color: '#1f3a5f', line_style: 'solid' },
     }),
 
+    // ─── Hero band (product / mission imagery) ──────────────────
+    node('hero', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Hero image', width: 484, height: 128, caption: '' },
+      style: { alignment: 'center', space_before: 6, space_after: 8 },
+    }),
+
     // ─── 1. Market Need & Size ──────────────────────────────────
     node('s1-h', {
       type: 'heading',
@@ -102,6 +112,11 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
       type: 'text_block',
       content: { text: 'The market is expanding at an estimated [X]% CAGR, propelled by [drivers — e.g., mandated modernization, rising security requirements, and growing data volumes].' },
       style: { space_before: 6 },
+    }),
+    node('s1-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Figure 1', width: 340, height: 180, caption: 'Figure 1: [Market sizing — TAM / SAM / SOM, with CAGR]' },
+      style: { alignment: 'center', space_before: 8, space_after: 8 },
     }),
 
     // ─── 2. Customer & Value Proposition ────────────────────────
