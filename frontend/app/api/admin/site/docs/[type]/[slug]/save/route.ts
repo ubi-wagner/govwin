@@ -22,6 +22,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ type: s
   if (!title.trim()) {
     return NextResponse.json({ error: 'title is required', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
+  // Canvas-native: when the editor sends a CanvasDocument, it is the source of truth and the
+  // server projects the public body from it (saveDocumentDraft) — a client-sent `body` is only
+  // used by legacy/plain callers that omit the canvas.
+  const canvas = (body.canvas && typeof body.canvas === 'object' && !Array.isArray(body.canvas))
+    ? (body.canvas as DocFields['canvas'])
+    : null;
   const fields: DocFields = {
     title,
     body: typeof body.body === 'string' ? body.body : '',
@@ -30,6 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ type: s
     featuredImage: typeof body.featuredImage === 'string' ? body.featuredImage : null,
     externalUrl: typeof body.externalUrl === 'string' ? body.externalUrl : null,
     author: typeof body.author === 'string' ? body.author : null,
+    canvas,
   };
   const note = typeof body.note === 'string' ? body.note : 'Saved';
 

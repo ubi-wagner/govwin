@@ -5,6 +5,8 @@
  * drafts (kept as history). See ARCHITECTURE_V8.md.
  */
 import { sql } from '@/lib/db';
+import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { docBodyFromCanvas } from '@/lib/content-canvas';
 
 export interface PageBlock {
   section: string;
@@ -253,6 +255,13 @@ export interface DocFields {
   featuredImage?: string | null;
   externalUrl?: string | null;
   author?: string | null;
+  /**
+   * Canvas-native authoring: when present, this CanvasDocument is the source of truth
+   * (persisted in metadata.canvas) and `body` is IGNORED in favor of the canvas → HTML
+   * projection (docBodyFromCanvas). Absent → legacy plain-body behavior (body used as-is),
+   * so nothing regresses for callers that don't pass a canvas.
+   */
+  canvas?: CanvasDocument | null;
 }
 
 /** All documents (content_type <> 'page'), one row per (type, slug). */
@@ -358,10 +367,14 @@ export async function saveDocumentDraft(
   note: string,
   user: { id?: string; email?: string },
 ): Promise<PageVersion> {
+  // Canvas-native: the canvas is the source of truth; the public body is its HTML projection.
+  // Rendered server-side so a client can never inject an arbitrary body — the body always
+  // matches the stored canvas. Legacy callers (no canvas) keep the plain body verbatim.
+  const projectedBody = fields.canvas ? docBodyFromCanvas(fields.canvas) : fields.body;
   const blocks = [{
     section: 'body',
     title: fields.title,
-    body: fields.body,
+    body: projectedBody,
     excerpt: fields.excerpt ?? null,
     metadata: {},
   }];
@@ -371,6 +384,7 @@ export async function saveDocumentDraft(
     featuredImage: fields.featuredImage ?? null,
     externalUrl: fields.externalUrl ?? null,
     author: fields.author ?? null,
+    canvas: fields.canvas ?? null,
   };
   const [row] = await sql<PageRow[]>`
     INSERT INTO content_pages
