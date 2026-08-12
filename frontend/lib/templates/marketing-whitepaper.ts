@@ -82,7 +82,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 1. Executive Summary ───────────────────────────────────
     node('s1-h', {
       type: 'heading',
-      content: { level: 1, text: '1. Executive Summary', numbering: '1' },
+      content: { level: 1, text: 'Executive Summary', numbering: '1' },
     }),
     node('s1-p1', {
       type: 'text_block',
@@ -96,7 +96,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 2. The Problem — and Why It Matters ────────────────────
     node('s2-h', {
       type: 'heading',
-      content: { level: 1, text: '2. The Problem — and Why It Matters', numbering: '2' },
+      content: { level: 1, text: 'The Problem — and Why It Matters', numbering: '2' },
     }),
     node('s2-p1', {
       type: 'text_block',
@@ -125,7 +125,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 3. Our Approach & Technology ───────────────────────────
     node('s3-h', {
       type: 'heading',
-      content: { level: 1, text: '3. Our Approach & Technology', numbering: '3' },
+      content: { level: 1, text: 'Our Approach & Technology', numbering: '3' },
     }),
     node('s3-p1', {
       type: 'text_block',
@@ -167,7 +167,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 4. Results & Evidence ──────────────────────────────────
     node('s4-h', {
       type: 'heading',
-      content: { level: 1, text: '4. Results & Evidence', numbering: '4' },
+      content: { level: 1, text: 'Results & Evidence', numbering: '4' },
     }),
     node('s4-p1', {
       type: 'text_block',
@@ -205,7 +205,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 5. Implications for Leaders ────────────────────────────
     node('s5-h', {
       type: 'heading',
-      content: { level: 1, text: '5. Implications for Leaders', numbering: '5' },
+      content: { level: 1, text: 'Implications for Leaders', numbering: '5' },
     }),
     node('s5-p1', {
       type: 'text_block',
@@ -248,7 +248,7 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
     // ─── 6. About the Company ───────────────────────────────────
     node('s6-h', {
       type: 'heading',
-      content: { level: 1, text: '6. About {company_name}', numbering: '6' },
+      content: { level: 1, text: 'About {company_name}', numbering: '6' },
     }),
     node('s6-p1', {
       type: 'text_block',

@@ -96,11 +96,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 1. Technical Approach (~8 pages) ───────────────────────
     node('s1-heading', {
-      type: 'heading', content: { level: 1, text: '1. Technical Approach', numbering: '1' },
+      type: 'heading', content: { level: 1, text: 'Technical Approach', numbering: '1' },
     }),
 
     node('s1-1-heading', {
-      type: 'heading', content: { level: 2, text: '1.1 Problem Statement / Need', numbering: '1.1' },
+      type: 'heading', content: { level: 2, text: 'Problem Statement / Need', numbering: '1.1' },
     }),
     node('s1-1-text', {
       type: 'text_block',
@@ -108,7 +108,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s1-2-heading', {
-      type: 'heading', content: { level: 2, text: '1.2 Proposed Innovation', numbering: '1.2' },
+      type: 'heading', content: { level: 2, text: 'Proposed Innovation', numbering: '1.2' },
     }),
     node('s1-2-text', {
       type: 'text_block',
@@ -121,7 +121,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s1-3-heading', {
-      type: 'heading', content: { level: 2, text: '1.3 Technical Objectives', numbering: '1.3' },
+      type: 'heading', content: { level: 2, text: 'Technical Objectives', numbering: '1.3' },
     }),
     node('s1-3-text', {
       type: 'text_block',
@@ -139,7 +139,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s1-4-heading', {
-      type: 'heading', content: { level: 2, text: '1.4 Technical Approach & Methodology', numbering: '1.4' },
+      type: 'heading', content: { level: 2, text: 'Technical Approach & Methodology', numbering: '1.4' },
     }),
     node('s1-4-text', {
       type: 'text_block',
@@ -152,7 +152,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s1-5-heading', {
-      type: 'heading', content: { level: 2, text: '1.5 Schedule & Milestones', numbering: '1.5' },
+      type: 'heading', content: { level: 2, text: 'Schedule & Milestones', numbering: '1.5' },
     }),
     node('s1-5-text', {
       type: 'text_block',
@@ -179,7 +179,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s1-6-heading', {
-      type: 'heading', content: { level: 2, text: '1.6 Risk Assessment', numbering: '1.6' },
+      type: 'heading', content: { level: 2, text: 'Risk Assessment', numbering: '1.6' },
     }),
     node('s1-6-table', {
       type: 'table',
@@ -204,11 +204,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 2. Key Personnel (~2 pages) ────────────────────────────
     node('s2-heading', {
-      type: 'heading', content: { level: 1, text: '2. Key Personnel & Qualifications', numbering: '2' },
+      type: 'heading', content: { level: 1, text: 'Key Personnel & Qualifications', numbering: '2' },
     }),
 
     node('s2-1-heading', {
-      type: 'heading', content: { level: 2, text: '2.1 Principal Investigator', numbering: '2.1' },
+      type: 'heading', content: { level: 2, text: 'Principal Investigator', numbering: '2.1' },
     }),
     node('s2-1-text', {
       type: 'text_block',
@@ -216,7 +216,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s2-2-heading', {
-      type: 'heading', content: { level: 2, text: '2.2 Key Team Members', numbering: '2.2' },
+      type: 'heading', content: { level: 2, text: 'Key Team Members', numbering: '2.2' },
     }),
     node('s2-2-text', {
       type: 'text_block',
@@ -224,7 +224,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s2-3-heading', {
-      type: 'heading', content: { level: 2, text: '2.3 Company Qualifications', numbering: '2.3' },
+      type: 'heading', content: { level: 2, text: 'Company Qualifications', numbering: '2.3' },
     }),
     node('s2-3-text', {
       type: 'text_block',
@@ -233,7 +233,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 3. Facilities & Equipment (~0.5 pages) ─────────────────
     node('s3-heading', {
-      type: 'heading', content: { level: 1, text: '3. Facilities & Equipment', numbering: '3' },
+      type: 'heading', content: { level: 1, text: 'Facilities & Equipment', numbering: '3' },
     }),
     node('s3-text', {
       type: 'text_block',
@@ -242,7 +242,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 4. Related Work (~0.5 pages) ───────────────────────────
     node('s4-heading', {
-      type: 'heading', content: { level: 1, text: '4. Related Work & Prior Art', numbering: '4' },
+      type: 'heading', content: { level: 1, text: 'Related Work & Prior Art', numbering: '4' },
     }),
     node('s4-text', {
       type: 'text_block',
@@ -251,11 +251,11 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 5. Commercialization Strategy (~2 pages) ────────────────
     node('s5-heading', {
-      type: 'heading', content: { level: 1, text: '5. Commercialization Strategy', numbering: '5' },
+      type: 'heading', content: { level: 1, text: 'Commercialization Strategy', numbering: '5' },
     }),
 
     node('s5-1-heading', {
-      type: 'heading', content: { level: 2, text: '5.1 Market Opportunity', numbering: '5.1' },
+      type: 'heading', content: { level: 2, text: 'Market Opportunity', numbering: '5.1' },
     }),
     node('s5-1-text', {
       type: 'text_block',
@@ -263,7 +263,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
     }),
 
     node('s5-2-heading', {
-      type: 'heading', content: { level: 2, text: '5.2 Transition Plan', numbering: '5.2' },
+      type: 'heading', content: { level: 2, text: 'Transition Plan', numbering: '5.2' },
     }),
     node('s5-2-text', {
       type: 'text_block',
@@ -276,7 +276,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s5-3-heading', {
-      type: 'heading', content: { level: 2, text: '5.3 Intellectual Property', numbering: '5.3' },
+      type: 'heading', content: { level: 2, text: 'Intellectual Property', numbering: '5.3' },
     }),
     node('s5-3-text', {
       type: 'text_block',
@@ -285,7 +285,7 @@ export const DOD_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 6. TABA Plan (if applicable, ~1 page) ──────────────────
     node('s6-heading', {
-      type: 'heading', content: { level: 1, text: '6. TABA Plan', numbering: '6' },
+      type: 'heading', content: { level: 1, text: 'TABA Plan', numbering: '6' },
     }),
     node('s6-text', {
       type: 'text_block',
