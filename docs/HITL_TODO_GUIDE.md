@@ -101,5 +101,41 @@ cross-tenant guard + tenant belt in `completeTask` are unchanged. Live proof
 The `text_memo` disposition and `read_receipt` are emitted on `proposal:task.completed`, so a future
 automation trigger can react to "a ToDo was delegated / not completed / read" — turning this inline
 chat + tasking into a first-class event source for the workflow engine (the natural follow-on to the
-`resolveGatePolicy` nudge/escalation layer). The remaining framework follow-ups (portal-stage advance
-hook, partner_user self-surface, single admin-triage inbox) are tracked in docs/HITL_FRAMEWORK_MAP.md.
+`resolveGatePolicy` nudge/escalation layer). The framework follow-ups that were tracked in
+docs/HITL_FRAMEWORK_MAP.md — portal-stage advance hook (G8), partner_user self-surface, single
+admin-triage inbox — are now **all landed** (see §7).
+
+## 7. Surface polish (confirmed + tested)
+
+Two surface gaps closed, each proven as the real user in the browser.
+
+**partner_user self-surface (G4).** A `partner_user` is a per-proposal collaborator with no cockpit
+drawer, so they previously had **no** way to see a ToDo assigned to them. There is now a direct
+**To-dos** page on every portal (`/portal/[slug]/todos`), and the tenant tasks route is opened to
+`partner_user+` (still scoped, by `listOpenTasksForActor` + `completeTask`, to their own hierarchical
+bucket + own-id in their own tenant). Grace (Partner) sees only **her** ToDo — never the
+`tenant_admin`-only one, never another tenant_admin's — and completes it with the text-memo completer:
+
+![partner_user to-dos](assets/hitl/13-partneruser-todos.png)
+
+```
+Draft your subcontractor bio paragraph | partner_user | completed | disp=completed | by=grace.partner@skyline-e2e.test
+(admin-only + other tenant_admin ToDos seen by grace: 0 / 0 — scoped correctly)
+```
+
+**Single completable admin-triage inbox (G5).** The `/admin/rfp-curation` triage panel was a
+read-only list (completion lived only on the dashboard). It now mounts the same `TaskQueue`
+(`apiBase=/api/admin/tasks`), so an admin working in the curation workspace sees **and** completes
+their ToDos in place — one queue component, the workflow label + step trail + deep-links, above the
+intact RFP Triage Queue:
+
+![admin triage completable](assets/hitl/15-admin-triage-completable.png)
+
+After **Approve / Done**, the ToDo clears from the queue in place:
+
+![admin triage completed](assets/hitl/16-admin-triage-completed.png)
+
+```
+Triage the new Ohio TVSF Round-45 detections | admin_review | completed | approved=true | by=eric@rfppipeline.com
+proposal:task.completed emitted (taskType=admin_review)
+```
