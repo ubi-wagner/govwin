@@ -26,6 +26,29 @@ The last two are the **generic primitives** — effectively **inline chat + task
 (the disposition / receipt + memo) lands in the task `result` AND the `proposal:task.completed`
 event, so later automation can trigger off it.
 
+### Targeting — broadcast to all, or named to a user
+
+A human-composed tenant ToDo has exactly **two targeting modes** (the compose form offers only these;
+role buckets stay reserved for engine-produced ToDos):
+
+- **Broadcast to all** — no named assignee (`assignee_role` + `assignee_user_id` both NULL, scoped to
+  the tenant, mig 174). **Every member of the company receives it** — tenant_admin, tenant_user, AND
+  partner_user collaborators — and so does a **descended shadow admin** (an RFP/master admin) and a
+  **partner shadow admin** (a partner-manager descended into the company), *as though they were the
+  company's admin*. Each viewer **acknowledges independently**: their receipt is appended to
+  `result.receipts[]` (atomically, in one UPDATE), which drops the ToDo from **that** person's queue
+  while it stays standing for everyone else. One person's ack never clears it for the rest.
+- **Named to a user** — `assignee_user_id` set. **Private to that one person**; a shadow admin does
+  NOT auto-receive it (they receive the *broadcasts*, per above). Completed once, by that user.
+
+Proven via the real lib (`createTask`/`listOpenTasksForActor`/`completeTask`): a broadcast is seen by
+all 5 viewer kinds; conor's ack drops it from conor only; eric (shadow) sees + acks it; a named ToDo
+is visible to its user only; a cross-tenant actor is **denied** completion. Live HTTP re-proof: kate
+composed a broadcast (assign route → 201), conor + grace (partner) + kate all received it, conor's
+"✓ Confirm receipt" dropped it from conor while grace still saw it.
+
+![broadcast received in a member's queue](assets/hitl/17-broadcast-received.png)
+
 ## 2. Compose a ToDo (tenant_admin)
 
 A tenant_admin opens the **To-dos** drawer and clicks **＋ New to-do / broadcast**. The form offers a

@@ -72,6 +72,10 @@ export async function listOpenTasksForActor(opts: {
               (assignee_role IN ('rfp_admin', 'master_admin') AND (tenant_id IS NULL OR tenant_id = ${tenantId}::uuid))
               OR (assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user') AND tenant_id = ${tenantId}::uuid)
               OR assignee_user_id = ${userId}::uuid
+              -- A descended shadow admin RECEIVES this tenant's broadcasts as though they were its admin
+              -- (per-user receipt, same as a real member). Bounded to the descended tenant only.
+              OR (tenant_id = ${tenantId}::uuid AND assignee_role IS NULL AND assignee_user_id IS NULL
+                  AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${userId}::text))))
             )
           ORDER BY due_at ASC NULLS LAST, created_at ASC
           LIMIT 200
@@ -99,7 +103,10 @@ export async function listOpenTasksForActor(opts: {
     }
   }
 
-  // Tenant users are pinned to their own tenant, seeing their role bucket AND below (hierarchical).
+  // Tenant users are pinned to their own tenant, seeing their role bucket AND below (hierarchical),
+  // PLUS every tenant BROADCAST (assignee_role + assignee_user_id both NULL) they have not yet
+  // acknowledged — a broadcast is one row visible to the whole company; a per-user receipt in
+  // result.receipts drops it from THIS actor's queue without clearing it for anyone else.
   try {
     return await sql<TaskRow[]>`
       SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
@@ -107,8 +114,13 @@ export async function listOpenTasksForActor(opts: {
              status, due_at, nudge_schedule, params, created_at
       FROM tasks
       WHERE status IN ('open', 'in_progress')
-        AND (assignee_role = ANY(${visibleTenantRoles}) OR assignee_user_id = ${userId}::uuid)
         AND tenant_id = ${tenantId}::uuid
+        AND (
+          assignee_role = ANY(${visibleTenantRoles})
+          OR assignee_user_id = ${userId}::uuid
+          OR (assignee_role IS NULL AND assignee_user_id IS NULL
+              AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${userId}::text))))
+        )
       ORDER BY due_at ASC NULLS LAST, created_at ASC
       LIMIT 200
     `;
@@ -165,6 +177,10 @@ export async function createTask(opts: {
   tenantId: string | null;
   assigneeRole?: string | null;
   assigneeUserId?: string | null;
+  /** A tenant-wide broadcast: no named assignee, visible to EVERY member of the tenant (and to a
+   *  descended shadow admin / partner-manager, treated as the tenant's admin). Each viewer
+   *  acknowledges independently (per-user receipt), so one ack never clears it for the others. */
+  broadcast?: boolean;
   taskType: string;
   title: string;
   description?: string | null;
@@ -177,13 +193,20 @@ export async function createTask(opts: {
   const { actor, tenantId } = opts;
   const taskType = opts.taskType?.trim();
   const title = opts.title?.trim();
-  const assigneeRole = opts.assigneeRole?.trim() || null;
-  const assigneeUserId = opts.assigneeUserId?.trim() || null;
+  const broadcast = opts.broadcast === true;
+  // A broadcast has NO named assignee (both null); a normal task keeps its role/user target.
+  const assigneeRole = broadcast ? null : (opts.assigneeRole?.trim() || null);
+  const assigneeUserId = broadcast ? null : (opts.assigneeUserId?.trim() || null);
 
   // ── invariants ──
   if (!taskType) return { ok: false, status: 400, error: 'taskType is required', code: 'VALIDATION_ERROR' };
   if (!title) return { ok: false, status: 400, error: 'title is required', code: 'VALIDATION_ERROR' };
-  if (!assigneeRole && !assigneeUserId) {
+  // A broadcast is tenant-wide (all members) — it needs a tenant to scope to, and no named assignee.
+  // Every other task must name a role bucket or a user. (There is NO global/admin broadcast: a
+  // null-tenant task with no assignee would target every admin — disallowed.)
+  if (broadcast) {
+    if (!tenantId) return { ok: false, status: 400, error: 'a broadcast requires a tenant', code: 'VALIDATION_ERROR' };
+  } else if (!assigneeRole && !assigneeUserId) {
     return { ok: false, status: 400, error: 'an assignee role or user is required', code: 'VALIDATION_ERROR' };
   }
   if (assigneeRole && !isRole(assigneeRole)) {
@@ -324,6 +347,45 @@ export async function completeTask(opts: {
   const isAdmin = hasRoleAtLeast(actor.role, 'rfp_admin');
   if (!isAdmin && task.tenantId !== actor.tenantId) {
     return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
+  }
+
+  // ── Broadcast (tenant-wide, no named assignee) → PER-USER acknowledgment. ──
+  // A broadcast is ONE row visible to the whole tenant (and to a descended shadow admin / partner-
+  // manager, who the cross-tenant guard above already admits: a non-admin is pinned to their own
+  // tenant, an admin passes anywhere). It does NOT close on an ack — each viewer records their OWN
+  // receipt in result.receipts (appended atomically in a single UPDATE, so no read-modify-write
+  // race), which drops it from THAT actor's queue while leaving it standing for everyone else. No
+  // role/user assignee check (a broadcast is for everyone), no parked instance to resume.
+  const isBroadcast = !task.assigneeRole && !task.assigneeUserId && task.tenantId != null;
+  if (isBroadcast) {
+    const receipt = { userId: actor.id, email: actor.email ?? null, ...(result ?? {}) };
+    try {
+      await sql`
+        UPDATE tasks
+        SET result = jsonb_set(
+              COALESCE(result, '{}'::jsonb), '{receipts}',
+              COALESCE(result->'receipts', '[]'::jsonb) || ${sql.json([receipt] as unknown as Parameters<typeof sql.json>[0])}
+            ),
+            updated_at = now()
+        WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
+          AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${actor.id}::text)))
+      `;
+    } catch (e) {
+      console.error('[tasks] completeTask broadcast receipt failed:', e);
+      return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+    }
+    // 0 rows updated → this actor already acknowledged (idempotent); still report success.
+    const rb = (result ?? {}) as Record<string, unknown>;
+    await emitEventSingle({
+      namespace: 'proposal', type: 'task.completed',
+      actor: userActor(actor.id, actor.email ?? undefined),
+      tenantId: task.tenantId,
+      payload: {
+        taskId, taskType: task.taskType, resumed: false, completedBy: actor.id, broadcast: true,
+        disposition: typeof rb.disposition === 'string' ? rb.disposition : (rb.read === true ? 'read' : null),
+      },
+    });
+    return { ok: true, data: { taskId, resumed: false } };
   }
 
   // Must be an assignee of this task — HIERARCHICAL: the actor's role must be AT OR ABOVE the task's

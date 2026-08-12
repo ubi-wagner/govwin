@@ -72,11 +72,17 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid entityId', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // A broadcast targets the WHOLE tenant (no named assignee) — every member (+ a descended shadow
+    // admin) receives it and acknowledges independently. createTask enforces the "tenant required, no
+    // assignee" shape; here we just pass the flag (and ignore any role/user the client also sent).
+    const broadcast = body.broadcast === true;
+
     const out = await createTask({
       actor: { id: u.id, email: u.email ?? null, role, tenantId },
       tenantId,
-      assigneeRole,
-      assigneeUserId,
+      broadcast,
+      assigneeRole: broadcast ? null : assigneeRole,
+      assigneeUserId: broadcast ? null : assigneeUserId,
       taskType: str(body.taskType) ?? '',
       title: str(body.title) ?? '',
       description: str(body.description),

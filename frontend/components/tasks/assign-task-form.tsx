@@ -31,8 +31,10 @@ export function AssignTaskForm({
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // assignee select value: 'role:tenant_user' | 'role:partner_user' | 'user:<id>'
-  const [assignee, setAssignee] = useState('role:tenant_user');
+  // assignee select value: 'broadcast' (everyone in the tenant) | 'user:<id>' (one named member).
+  // Those are the only two targeting modes in the tenant portal — a broadcast to all, or a named
+  // person. (Role buckets stay for engine-produced ToDos, but a human never composes to one.)
+  const [assignee, setAssignee] = useState('broadcast');
   // how the assignee completes it (W-M typed completer): a plain review
   // (approve/dismiss), an upload (go do it then mark done), a small form, or a
   // broadcast note (read + acknowledge — the atomic ToDo).
@@ -50,7 +52,8 @@ export function AssignTaskForm({
       setMsg({ kind: 'err', text: 'A title is required.' });
       return;
     }
-    const [kind, value] = assignee.split(':');
+    const broadcast = assignee === 'broadcast';
+    const namedUserId = assignee.startsWith('user:') ? assignee.slice('user:'.length) : null;
     // Map the completion choice to the task's params.kind (the queue renders the
     // matching completer). 'review' is the default — send no params so the task
     // uses the plain approve/dismiss completer.
@@ -82,8 +85,8 @@ export function AssignTaskForm({
       taskType,
       title: title.trim(),
       description: description.trim() || undefined,
-      assigneeRole: kind === 'role' ? value : undefined,
-      assigneeUserId: kind === 'user' ? value : undefined,
+      broadcast: broadcast || undefined,
+      assigneeUserId: namedUserId ?? undefined,
       entityType,
       entityId,
       dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
@@ -146,7 +149,7 @@ export function AssignTaskForm({
             onChange={(e) => setAssignee(e.target.value)}
             className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white"
           >
-            <option value="role:tenant_user">Anyone on the team</option>
+            <option value="broadcast">Everyone in the company (broadcast)</option>
             {assignees
               .filter((a) => a.userId)
               .map((a) => (
@@ -165,7 +168,7 @@ export function AssignTaskForm({
           >
             <option value="review">Review &amp; approve</option>
             <option value="text_memo">Text response (memo + Completed/Delegated/Not-completed)</option>
-            <option value="read_receipt">Broadcast (read receipt)</option>
+            <option value="read_receipt">Read receipt (acknowledge)</option>
             <option value="upload">Upload a file</option>
             <option value="form">Fill a form</option>
           </select>
