@@ -12,6 +12,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { enterBypass } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
 import { reconcileActiveTenants } from '@/lib/opportunity-bridge';
 import { emitEventSingle, systemActor, userActor } from '@/lib/events';
@@ -36,6 +37,11 @@ export async function POST(request: Request) {
       actor = userActor(user.id ?? '', user.email ?? undefined);
     }
 
+    // Platform-wide sweep touches EVERY tenant's mirror → run on the owner/bypass pool so its
+    // per-tenant behind-detection reads the real state (docs/RLS_CUTOVER.md). Each applyToTenant
+    // still re-scopes its write via withTenant(tenantId); without bypass the detection read would
+    // DENY-ALL post-flip and over-select (correct output, wasted work). Matches the sibling admin routes.
+    enterBypass();
     const perTenant = await reconcileActiveTenants();
     const totalApplied = perTenant.reduce((s, t) => s + t.applied, 0);
 
