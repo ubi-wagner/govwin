@@ -123,8 +123,11 @@ export async function getTenantBySlug(slug: string) {
 export async function verifyTenantAccess(userId: string, role: string, tenantId: string): Promise<boolean> {
   try {
     // RFP-admins hold the DERIVED shadow membership (tenant_admin in every tenant, by
-    // T&C default) — access resolved here, not materialized. When they descend into a
-    // tenant their session role becomes tenant_admin; this coarse gate stays true.
+    // T&C default) — access resolved here, not materialized. NOTE: descending does NOT swap
+    // their session role (they SHADOW, they don't pin — see /api/enter; only partner_admin
+    // pins to tenant_admin). Their role stays rfp_admin/master_admin; the ToDo queue +
+    // completeTask treat a descended admin as tenant_admin-equivalent BOUNDED to that one
+    // tenant (hierarchical role checks in lib/tasks/tasks.ts), so this coarse gate stays true.
     // (Multi-membership identity P1 — docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.)
     // NOTE: this function does NOT enter the tenant RLS context — it only READS bypass
     // tables (user_memberships, tenants — both RLS-off) to decide access. The context is

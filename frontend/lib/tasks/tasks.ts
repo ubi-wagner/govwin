@@ -47,13 +47,41 @@ export async function listOpenTasksForActor(opts: {
   const { id: userId, role, tenantId } = opts;
   const isAdmin = hasRoleAtLeast(role, 'rfp_admin');
 
-  // NOTE: postgres.js treats ${} as a PARAM binding, not code — branch tenant
-  // scope in JS, never with a ternary inside the tagged template. Columns are
-  // inlined in both branches (house style; no sql-fragment composition).
-  // Assignee match (both branches): my role bucket OR me by id.
+  // The tenant-role bucket an actor can see is HIERARCHICAL: a task assigned to role R is visible to
+  // anyone who can perform R's job (their role is at-or-above R). So a tenant_admin sees tenant_user
+  // ToDos; a tenant_user does not see tenant_admin ToDos. (Was exact-match — HITL G3.)
+  const TENANT_ROLES = ['tenant_admin', 'tenant_user', 'partner_user'] as const;
+  const visibleTenantRoles = TENANT_ROLES.filter((r) => hasRoleAtLeast(role, r)) as unknown as string[];
+
+  // NOTE: postgres.js treats ${} as a PARAM binding, not code — branch scope in JS, never with a
+  // ternary inside the tagged template. Columns are inlined per branch (house style; no fragment comp).
   if (isAdmin) {
-    // Admins see admin-scoped tasks (tenant_id IS NULL), plus a specific
-    // tenant's when one is in context.
+    // Admin DESCENDED into a specific tenant (shadow-admin) — they are tenant_admin by derived
+    // membership, so they see + can act on that tenant's ToDos too. BOUNDED to this one tenant
+    // (no cross-tenant widening): admin-bucket (null-tenant or this tenant) + this tenant's
+    // tenant_admin/tenant_user/partner_user ToDos + anything named to them. (HITL G2.)
+    if (tenantId) {
+      try {
+        return await sql<TaskRow[]>`
+          SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
+                 description, entity_type, entity_id, process_instance_id, step_name,
+                 status, due_at, nudge_schedule, params, created_at
+          FROM tasks
+          WHERE status IN ('open', 'in_progress')
+            AND (
+              (assignee_role IN ('rfp_admin', 'master_admin') AND (tenant_id IS NULL OR tenant_id = ${tenantId}::uuid))
+              OR (assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user') AND tenant_id = ${tenantId}::uuid)
+              OR assignee_user_id = ${userId}::uuid
+            )
+          ORDER BY due_at ASC NULLS LAST, created_at ASC
+          LIMIT 200
+        `;
+      } catch (e) {
+        console.error('[tasks] listOpenTasksForActor shadow-admin query failed:', e);
+        throw new Error('Failed to load tasks');
+      }
+    }
+    // Admin dashboard (no tenant in context) — admin-bucket across all tenants + own-id tasks.
     try {
       return await sql<TaskRow[]>`
         SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
@@ -62,9 +90,6 @@ export async function listOpenTasksForActor(opts: {
         FROM tasks
         WHERE status IN ('open', 'in_progress')
           AND (assignee_role IN ('rfp_admin', 'master_admin') OR assignee_user_id = ${userId}::uuid)
-          AND (tenant_id IS NULL
-               OR ${tenantId}::uuid IS NULL
-               OR tenant_id = ${tenantId}::uuid)
         ORDER BY due_at ASC NULLS LAST, created_at ASC
         LIMIT 200
       `;
@@ -74,7 +99,7 @@ export async function listOpenTasksForActor(opts: {
     }
   }
 
-  // Tenant users are pinned to their own tenant.
+  // Tenant users are pinned to their own tenant, seeing their role bucket AND below (hierarchical).
   try {
     return await sql<TaskRow[]>`
       SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
@@ -82,7 +107,7 @@ export async function listOpenTasksForActor(opts: {
              status, due_at, nudge_schedule, params, created_at
       FROM tasks
       WHERE status IN ('open', 'in_progress')
-        AND (assignee_role = ${role} OR assignee_user_id = ${userId}::uuid)
+        AND (assignee_role = ANY(${visibleTenantRoles}) OR assignee_user_id = ${userId}::uuid)
         AND tenant_id = ${tenantId}::uuid
       ORDER BY due_at ASC NULLS LAST, created_at ASC
       LIMIT 200
@@ -301,11 +326,16 @@ export async function completeTask(opts: {
     return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
   }
 
-  // Must be an assignee of this task.
-  const isAssignee =
-    (task.assigneeRole && task.assigneeRole === actor.role) ||
-    (task.assigneeUserId && task.assigneeUserId === actor.id);
-  if (!isAssignee) {
+  // Must be an assignee of this task — HIERARCHICAL: the actor's role must be AT OR ABOVE the task's
+  // assignee role (a tenant_admin completes a tenant_user ToDo; a descended admin — rfp_admin ≥
+  // tenant_admin — completes the tenant's ToDos), OR the task is named to them by id. The cross-tenant
+  // guard above already pins a non-admin to their OWN tenant, so this never crosses a tenant boundary;
+  // and a tenant_admin can never complete an rfp_admin task (hasRoleAtLeast(tenant_admin, rfp_admin) is
+  // false). (HITL G2/G3.)
+  const roleAssignee =
+    !!task.assigneeRole && isRole(task.assigneeRole) && hasRoleAtLeast(actor.role, task.assigneeRole);
+  const userAssignee = !!task.assigneeUserId && task.assigneeUserId === actor.id;
+  if (!roleAssignee && !userAssignee) {
     return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
   }
 

@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { describeEvent } from '@/lib/event-labels';
 import { Cockpit } from '@/components/portal/cockpit';
+import { listOpenTasksForActor } from '@/lib/tasks/tasks';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,13 @@ export default async function DashboardPage({
   const libraryCount = await count('library', sql`SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId} AND archived_at IS NULL`);
   const proposalCount = await count('proposal', sql`SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')`);
   const oppsCount = await count('opps', sql`SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived' AND archived_at IS NULL`);
-  const todosCount = await count('todos', sql`SELECT COUNT(*)::text AS count FROM tasks WHERE tenant_id = ${tenantId} AND status IN ('open','in_progress')`);
+  // Count what the actor can actually SEE in the drawer (same query the ToDo queue uses), so the
+  // badge never disagrees with the drawer — for a tenant_user (hierarchical) or a descended
+  // shadow-admin (admin + this tenant's ToDos) alike. (HITL G2.)
+  const todosCount = await (async () => {
+    try { return (await listOpenTasksForActor({ id: sessionUser.id!, role, tenantId })).length; }
+    catch (e) { console.error('[dashboard] todos count failed', e); return 0; }
+  })();
   const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}`);
   const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
 
