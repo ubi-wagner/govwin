@@ -41,6 +41,15 @@ role buckets stay reserved for engine-produced ToDos):
 - **Named to a user** — `assignee_user_id` set. **Private to that one person**; a shadow admin does
   NOT auto-receive it (they receive the *broadcasts*, per above). Completed once, by that user.
 
+**Broadcast → group thread (`kind='thread'`).** A broadcast can be a lightweight **group chat**: it
+renders the message **chain** (`result.chain[]`) and anyone in the tenant (incl. a descended shadow
+admin) can **post a timestamped message** — nobody is required to respond, it never closes, and it is
+**not (yet) a trigger item**. The chain entries are **typed** (`type: 'message' | 'ack'`, extensible),
+so future workflows can append their own entry types — a proposed meeting time, an RSVP, a task — and
+render them as cards. The thread is the substrate those "schedule a meeting / PM task" extensions plug
+into. Proven (real lib): a 5-message thread (one author posting twice), every entry timestamped, stays
+visible to all 4 viewer kinds after posting, cross-tenant post denied.
+
 Proven via the real lib (`createTask`/`listOpenTasksForActor`/`completeTask`): a broadcast is seen by
 all 5 viewer kinds; conor's ack drops it from conor only; eric (shadow) sees + acks it; a named ToDo
 is visible to its user only; a cross-tenant actor is **denied** completion. Live HTTP re-proof: kate

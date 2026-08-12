@@ -30,6 +30,8 @@ export interface TaskRow {
   dueAt: string | null;
   nudgeSchedule: number[] | null;
   params: Record<string, unknown> | null;
+  /** For a broadcast: result.chain[] is the message thread (typed, timestamped entries). */
+  result: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -65,7 +67,7 @@ export async function listOpenTasksForActor(opts: {
         return await sql<TaskRow[]>`
           SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
                  description, entity_type, entity_id, process_instance_id, step_name,
-                 status, due_at, nudge_schedule, params, created_at
+                 status, due_at, nudge_schedule, params, result, created_at
           FROM tasks
           WHERE status IN ('open', 'in_progress')
             AND (
@@ -73,9 +75,10 @@ export async function listOpenTasksForActor(opts: {
               OR (assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user') AND tenant_id = ${tenantId}::uuid)
               OR assignee_user_id = ${userId}::uuid
               -- A descended shadow admin RECEIVES this tenant's broadcasts as though they were its admin
-              -- (per-user receipt, same as a real member). Bounded to the descended tenant only.
+              -- (thread stays visible; single-ack drops once they post). Bounded to the descended tenant.
               OR (tenant_id = ${tenantId}::uuid AND assignee_role IS NULL AND assignee_user_id IS NULL
-                  AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${userId}::text))))
+                  AND (params->>'kind' = 'thread'
+                       OR NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
             )
           ORDER BY due_at ASC NULLS LAST, created_at ASC
           LIMIT 200
@@ -90,7 +93,7 @@ export async function listOpenTasksForActor(opts: {
       return await sql<TaskRow[]>`
         SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
                description, entity_type, entity_id, process_instance_id, step_name,
-               status, due_at, nudge_schedule, params, created_at
+               status, due_at, nudge_schedule, params, result, created_at
         FROM tasks
         WHERE status IN ('open', 'in_progress')
           AND (assignee_role IN ('rfp_admin', 'master_admin') OR assignee_user_id = ${userId}::uuid)
@@ -104,14 +107,14 @@ export async function listOpenTasksForActor(opts: {
   }
 
   // Tenant users are pinned to their own tenant, seeing their role bucket AND below (hierarchical),
-  // PLUS every tenant BROADCAST (assignee_role + assignee_user_id both NULL) they have not yet
-  // acknowledged — a broadcast is one row visible to the whole company; a per-user receipt in
-  // result.receipts drops it from THIS actor's queue without clearing it for anyone else.
+  // PLUS every tenant BROADCAST (assignee_role + assignee_user_id both NULL): a THREAD
+  // (params.kind='thread') stays visible to all so the conversation persists; a single-ack broadcast
+  // drops from THIS actor's queue once they've posted to result.chain (no clearing for anyone else).
   try {
     return await sql<TaskRow[]>`
       SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
              description, entity_type, entity_id, process_instance_id, step_name,
-             status, due_at, nudge_schedule, params, created_at
+             status, due_at, nudge_schedule, params, result, created_at
       FROM tasks
       WHERE status IN ('open', 'in_progress')
         AND tenant_id = ${tenantId}::uuid
@@ -119,7 +122,8 @@ export async function listOpenTasksForActor(opts: {
           assignee_role = ANY(${visibleTenantRoles})
           OR assignee_user_id = ${userId}::uuid
           OR (assignee_role IS NULL AND assignee_user_id IS NULL
-              AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${userId}::text))))
+              AND (params->>'kind' = 'thread'
+                   OR NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
         )
       ORDER BY due_at ASC NULLS LAST, created_at ASC
       LIMIT 200
@@ -147,7 +151,7 @@ export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
   return await sql<TaskRow[]>`
     SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
            description, entity_type, entity_id, process_instance_id, step_name,
-           status, due_at, nudge_schedule, params, created_at
+           status, due_at, nudge_schedule, params, result, created_at
     FROM tasks
     WHERE status IN ('open', 'in_progress')
       AND assignee_role IN ('rfp_admin', 'master_admin')
@@ -313,6 +317,7 @@ export async function completeTask(opts: {
     assigneeUserId: string | null;
     processInstanceId: string | null;
     taskType: string;
+    params: Record<string, unknown> | null;
   }[];
   try {
     rows = await sql<{
@@ -323,8 +328,9 @@ export async function completeTask(opts: {
       assigneeUserId: string | null;
       processInstanceId: string | null;
       taskType: string;
+      params: Record<string, unknown> | null;
     }[]>`
-      SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id, task_type
+      SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id, task_type, params
       FROM tasks WHERE id = ${taskId}::uuid
     `;
   } catch (e) {
@@ -349,41 +355,60 @@ export async function completeTask(opts: {
     return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
   }
 
-  // ── Broadcast (tenant-wide, no named assignee) → PER-USER acknowledgment. ──
+  // ── Broadcast (tenant-wide, no named assignee) → append to the message CHAIN. ──
   // A broadcast is ONE row visible to the whole tenant (and to a descended shadow admin / partner-
-  // manager, who the cross-tenant guard above already admits: a non-admin is pinned to their own
-  // tenant, an admin passes anywhere). It does NOT close on an ack — each viewer records their OWN
-  // receipt in result.receipts (appended atomically in a single UPDATE, so no read-modify-write
-  // race), which drops it from THAT actor's queue while leaving it standing for everyone else. No
-  // role/user assignee check (a broadcast is for everyone), no parked instance to resume.
+  // manager, whom the cross-tenant guard above already admits). It never closes on a response — each
+  // response is appended to result.chain[] as a TYPED, server-timestamped entry (atomically, in one
+  // UPDATE, so no read-modify-write race), turning the broadcast into a lightweight message thread
+  // (ala a group chat). Entry shape (extensible — future workflows append their own `type`s, e.g. a
+  // proposed meeting time or a task): { by, name, at, type: 'ack'|'message', text, disposition }.
+  //   • A THREAD (params.kind='thread') accepts REPEATED posts — a real back-and-forth — and stays in
+  //     everyone's view (see listOpenTasksForActor); nobody is required to respond.
+  //   • A plain ack/read-receipt broadcast is SINGLE-post (the guard blocks a second entry) and drops
+  //     from a responder's queue once they've posted.
+  // No role/user assignee check (a broadcast is for everyone), no parked instance to resume, no trigger.
   const isBroadcast = !task.assigneeRole && !task.assigneeUserId && task.tenantId != null;
   if (isBroadcast) {
-    const receipt = { userId: actor.id, email: actor.email ?? null, ...(result ?? {}) };
+    const rb = (result ?? {}) as Record<string, unknown>;
+    const memoText = typeof rb.memo === 'string' && rb.memo.trim() ? rb.memo.trim().slice(0, 4000) : null;
+    const disposition = typeof rb.disposition === 'string' ? rb.disposition : (rb.read === true ? 'read' : null);
+    const entryType = memoText ? 'message' : 'ack';
+    const name = actor.email ?? actor.id;
+    const isThread = (task.params as { kind?: unknown } | null)?.kind === 'thread';
     try {
-      await sql`
-        UPDATE tasks
-        SET result = jsonb_set(
-              COALESCE(result, '{}'::jsonb), '{receipts}',
-              COALESCE(result->'receipts', '[]'::jsonb) || ${sql.json([receipt] as unknown as Parameters<typeof sql.json>[0])}
-            ),
-            updated_at = now()
-        WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
-          AND NOT (COALESCE(result->'receipts', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('userId', ${actor.id}::text)))
-      `;
+      if (isThread) {
+        // A thread accepts repeated posts — always append (a real conversation).
+        await sql`
+          UPDATE tasks
+          SET result = jsonb_set(COALESCE(result, '{}'::jsonb), '{chain}',
+                COALESCE(result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                  'by', ${actor.id}::text, 'name', ${name}::text, 'at', now(),
+                  'type', ${entryType}::text, 'text', ${memoText}::text, 'disposition', ${disposition}::text))),
+              updated_at = now()
+          WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
+        `;
+      } else {
+        // A single-ack broadcast: append only if this actor has not already responded (idempotent).
+        await sql`
+          UPDATE tasks
+          SET result = jsonb_set(COALESCE(result, '{}'::jsonb), '{chain}',
+                COALESCE(result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                  'by', ${actor.id}::text, 'name', ${name}::text, 'at', now(),
+                  'type', ${entryType}::text, 'text', ${memoText}::text, 'disposition', ${disposition}::text))),
+              updated_at = now()
+          WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
+            AND NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${actor.id}::text)))
+        `;
+      }
     } catch (e) {
-      console.error('[tasks] completeTask broadcast receipt failed:', e);
+      console.error('[tasks] completeTask broadcast chain-append failed:', e);
       return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
     }
-    // 0 rows updated → this actor already acknowledged (idempotent); still report success.
-    const rb = (result ?? {}) as Record<string, unknown>;
     await emitEventSingle({
       namespace: 'proposal', type: 'task.completed',
       actor: userActor(actor.id, actor.email ?? undefined),
       tenantId: task.tenantId,
-      payload: {
-        taskId, taskType: task.taskType, resumed: false, completedBy: actor.id, broadcast: true,
-        disposition: typeof rb.disposition === 'string' ? rb.disposition : (rb.read === true ? 'read' : null),
-      },
+      payload: { taskId, taskType: task.taskType, resumed: false, completedBy: actor.id, broadcast: true, thread: isThread, disposition },
     });
     return { ok: true, data: { taskId, resumed: false } };
   }

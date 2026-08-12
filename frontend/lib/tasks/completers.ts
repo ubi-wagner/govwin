@@ -17,8 +17,43 @@
  *  - text_memo    : a free-text ToDo — an optional text memo response + a close disposition
  *                   (Completed / Delegated / Not completed). Inline chat + tasking; the disposition
  *                   is recorded in the result (and the task.completed event) for future triggers.
+ *  - thread       : a broadcast GROUP CHAT — the message chain (result.chain[]) is shown and anyone
+ *                   in the tenant (incl. a descended shadow admin) can post a timestamped message.
+ *                   Nobody is required to respond; it never closes and is not (yet) a trigger item.
  */
-export type CompleterKind = 'review' | 'upload' | 'form' | 'acknowledge' | 'read_receipt' | 'text_memo';
+export type CompleterKind = 'review' | 'upload' | 'form' | 'acknowledge' | 'read_receipt' | 'text_memo' | 'thread';
+
+/** One entry in a broadcast's message chain (result.chain[]). Typed + timestamped so future
+ *  workflows can append their own entry `type`s (e.g. a proposed meeting time, an RSVP, a task). */
+export interface ChainEntry {
+  by: string;
+  name: string | null;
+  at: string | null;
+  type: string;         // 'message' | 'ack' now; extensible
+  text: string | null;
+  disposition: string | null;
+}
+
+/** Parse result.chain[] defensively into ordered ChainEntry[] (bad entries dropped). */
+export function taskChain(result: Record<string, unknown> | null | undefined): ChainEntry[] {
+  const raw = result && typeof result === 'object' ? (result as { chain?: unknown }).chain : undefined;
+  if (!Array.isArray(raw)) return [];
+  const out: ChainEntry[] = [];
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue;
+    const r = e as Record<string, unknown>;
+    if (typeof r.by !== 'string') continue;
+    out.push({
+      by: r.by,
+      name: typeof r.name === 'string' ? r.name : null,
+      at: typeof r.at === 'string' ? r.at : null,
+      type: typeof r.type === 'string' ? r.type : 'message',
+      text: typeof r.text === 'string' ? r.text : null,
+      disposition: typeof r.disposition === 'string' ? r.disposition : null,
+    });
+  }
+  return out;
+}
 
 export interface FormField {
   name: string;
@@ -40,7 +75,7 @@ export function taskCompleterKind(
 ): CompleterKind {
   const kind = params && typeof params === 'object' ? (params as { kind?: unknown }).kind : undefined;
   if (kind === 'upload' || kind === 'form' || kind === 'acknowledge' || kind === 'review'
-      || kind === 'read_receipt' || kind === 'text_memo') return kind;
+      || kind === 'read_receipt' || kind === 'text_memo' || kind === 'thread') return kind;
   return fallback;
 }
 

@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Urgency, urgencyOf, sortByUrgency } from '@/lib/tasks/urgency';
-import { taskCompleterKind, formFields, taskHref } from '@/lib/tasks/completers';
+import { taskCompleterKind, formFields, taskHref, taskChain, type ChainEntry } from '@/lib/tasks/completers';
 import { resolveTaskWorkflow, type TaskWorkflowDef } from '@/lib/tasks/workflows';
 
 export interface QueueTask {
@@ -25,6 +25,8 @@ export interface QueueTask {
   dueAt: string | null;
   tenantId: string | null;
   params?: Record<string, unknown> | null;
+  /** For a broadcast: result.chain[] is the message thread. */
+  result?: Record<string, unknown> | null;
 }
 
 const URGENCY_STYLE: Record<Urgency, { chip: string; label: string }> = {
@@ -170,6 +172,8 @@ export function TaskQueue({
                 tenantSlug={tenantSlug}
                 busy={!!busy[t.id]}
                 onComplete={(decision) => complete(t.id, decision)}
+                apiBase={apiBase}
+                reload={load}
               />
             </li>
           );
@@ -222,12 +226,16 @@ function TaskCompleter({
   tenantSlug,
   busy,
   onComplete,
+  apiBase,
+  reload,
 }: {
   task: QueueTask;
   workflow: TaskWorkflowDef;
   tenantSlug?: string;
   busy: boolean;
   onComplete: (decision: Record<string, unknown>) => void;
+  apiBase: string;
+  reload: () => void;
 }) {
   // A manager-access request is NOT completed from the queue (the generic completer 409s) — it is
   // approved/declined on the company Team page. Route the human there instead. (HITL G6.)
@@ -239,6 +247,8 @@ function TaskCompleter({
   // Explicit params.kind wins; otherwise the ToDo completes the way its defined
   // workflow prescribes (e.g. broadcast → acknowledge, review_section → review).
   const kind = taskCompleterKind(task.params, workflow.completer);
+  // A group-chat THREAD posts to the message chain + reloads in place (never removes itself).
+  if (kind === 'thread') return <ThreadCompleter task={task} apiBase={apiBase} reload={reload} />;
   if (kind === 'acknowledge') return <AcknowledgeCompleter busy={busy} onComplete={onComplete} />;
   if (kind === 'read_receipt') return <ReadReceiptCompleter busy={busy} onComplete={onComplete} />;
   if (kind === 'text_memo') return <TextMemoCompleter busy={busy} onComplete={onComplete} />;
@@ -303,6 +313,90 @@ function TextMemoCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d
       </div>
     </div>
   );
+}
+
+/**
+ * A broadcast GROUP CHAT (kind='thread'). Renders the message chain + a reply box; posting appends a
+ * timestamped message and reloads in place. The thread never leaves anyone's queue and nobody is
+ * required to respond. Entries are typed, so future workflows can render richer entry types here
+ * (a proposed meeting time, an RSVP, a task) — this is the substrate those extensions plug into.
+ */
+function ThreadCompleter({ task, apiBase, reload }: { task: QueueTask; apiBase: string; reload: () => void }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const chain = taskChain(task.result);
+  const now = Date.now();
+  async function post() {
+    if (!text.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(apiBase, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: task.id, result: { memo: text.trim() } }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not post your message.'); return; }
+      setText('');
+      reload();
+    } catch { setErr('Network error posting your message.'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="mt-2">
+      <div className="rounded-md border border-gray-200 bg-gray-50/60">
+        {chain.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-gray-400">No messages yet — start the thread.</p>
+        ) : (
+          <ul className="max-h-52 overflow-y-auto divide-y divide-gray-100">
+            {chain.map((e, i) => (
+              <li key={i} className="px-3 py-1.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-semibold text-gray-700">{e.name ?? 'Someone'}</span>
+                  <span className="text-[10px] text-gray-400">{relTime(e.at, now)}</span>
+                </div>
+                {e.text
+                  ? <p className="text-xs text-gray-600 whitespace-pre-wrap">{e.text}</p>
+                  : <p className="text-[11px] italic text-gray-400">✓ acknowledged</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="mt-2 flex items-end gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={1}
+          maxLength={4000}
+          placeholder="Message the group…"
+          className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-xs"
+        />
+        <button
+          onClick={post}
+          disabled={busy || !text.trim()}
+          className="rounded border border-indigo-300 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+        >
+          {busy ? '…' : 'Post'}
+        </button>
+      </div>
+      {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+    </div>
+  );
+}
+
+/** Relative "3m ago" timestamp for a chain entry. */
+function relTime(at: string | null, now: number): string {
+  if (!at) return '';
+  const t = new Date(at).getTime();
+  if (isNaN(t)) return '';
+  const s = Math.max(0, Math.floor((now - t) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 /** manager_request routes to the Team page (its real approve/decline surface), not a queue completer. */

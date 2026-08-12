@@ -38,7 +38,7 @@ export function AssignTaskForm({
   // how the assignee completes it (W-M typed completer): a plain review
   // (approve/dismiss), an upload (go do it then mark done), a small form, or a
   // broadcast note (read + acknowledge — the atomic ToDo).
-  const [completion, setCompletion] = useState<'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo'>('review');
+  const [completion, setCompletion] = useState<'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo' | 'thread'>('review');
   // for completion='form': comma-separated field names → params.spec.fields.
   const [formFieldsRaw, setFormFieldsRaw] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -52,8 +52,9 @@ export function AssignTaskForm({
       setMsg({ kind: 'err', text: 'A title is required.' });
       return;
     }
-    const broadcast = assignee === 'broadcast';
-    const namedUserId = assignee.startsWith('user:') ? assignee.slice('user:'.length) : null;
+    // A group thread is inherently a broadcast (everyone in the company can post).
+    const broadcast = assignee === 'broadcast' || completion === 'thread';
+    const namedUserId = completion === 'thread' ? null : (assignee.startsWith('user:') ? assignee.slice('user:'.length) : null);
     // Map the completion choice to the task's params.kind (the queue renders the
     // matching completer). 'review' is the default — send no params so the task
     // uses the plain approve/dismiss completer.
@@ -62,7 +63,11 @@ export function AssignTaskForm({
     // by params.kind. read_receipt = a broadcast whose completion captures a read receipt; text_memo
     // = a free-text ToDo answered with an optional memo + a close disposition.
     let taskType = 'delegated_task';
-    if (completion === 'read_receipt') {
+    if (completion === 'thread') {
+      // A persistent group chat: broadcast to all, a message chain, never closes, no trigger.
+      taskType = 'broadcast';
+      params = { kind: 'thread' };
+    } else if (completion === 'read_receipt') {
       taskType = 'broadcast';
       params = { kind: 'read_receipt' };
     } else if (completion === 'text_memo') {
@@ -163,12 +168,13 @@ export function AssignTaskForm({
           <label className="block text-xs font-medium text-gray-500 mb-1">Completion</label>
           <select
             value={completion}
-            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo')}
+            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form' | 'read_receipt' | 'text_memo' | 'thread')}
             className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white"
           >
             <option value="review">Review &amp; approve</option>
             <option value="text_memo">Text response (memo + Completed/Delegated/Not-completed)</option>
             <option value="read_receipt">Read receipt (acknowledge)</option>
+            <option value="thread">Group thread (chat — everyone can post)</option>
             <option value="upload">Upload a file</option>
             <option value="form">Fill a form</option>
           </select>
