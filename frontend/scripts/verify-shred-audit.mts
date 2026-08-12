@@ -17,6 +17,10 @@ const FULL_TEXT = [
   'The offeror must submit a Cost Volume with a detailed budget narrative and justification.',
   'Proposals shall include a Commercialization Plan describing the path to market and revenue model.',
   'The offeror shall submit a Letter of Support from the partnering research institution.',
+  // False-GO guard: shares ONE term ("technical") with the captured "Technical Approach" label but is
+  // about points of contact, not the technical approach. Must still be flagged — an incidental single-term
+  // overlap can't vouch coverage (reverse-subset needs ≥60% of the label's terms; the phrase isn't present).
+  'The offeror shall provide technical points of contact for each proposed subcontractor.',
 ].join(' ');
 
 async function main() {
@@ -28,13 +32,15 @@ async function main() {
     await sql`UPDATE curated_solicitations SET full_text=${FULL_TEXT} WHERE id=${SOL}::uuid`;
     const r = await auditShredCompleteness(SOL);
     const gapsJoined = r.candidateGaps.join(' | ').toLowerCase();
-    check(`obligations detected (${r.obligationsFound}) ≥ 5`, r.obligationsFound >= 5);
+    check(`obligations detected (${r.obligationsFound}) ≥ 6`, r.obligationsFound >= 6);
     check(`captured requirements read from the shred (${r.requirementsCaptured}) ≥ 2`, r.requirementsCaptured >= 2);
     check('Cost Volume flagged as an uncaptured gap', gapsJoined.includes('cost volume'));
     check('Commercialization Plan flagged as an uncaptured gap', gapsJoined.includes('commercialization'));
     check('Letter of Support flagged as an uncaptured gap', gapsJoined.includes('letter of support'));
     check('captured "Technical Approach" NOT flagged as a gap', !gapsJoined.includes('technical approach'));
     check('captured "Key Personnel" NOT flagged as a gap', !gapsJoined.includes('key personnel'));
+    check('incidental single-term overlap ("technical points of contact") STILL flagged — no false GO',
+      gapsJoined.includes('points of contact'));
     check('deterministic layer ran without an AI key (aiPass=false)', r.aiPass === false);
   } finally {
     await sql`UPDATE curated_solicitations SET full_text=${orig?.ft ?? null} WHERE id=${SOL}::uuid`;

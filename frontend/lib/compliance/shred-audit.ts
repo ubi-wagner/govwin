@@ -45,7 +45,10 @@ const STOP = new Set([
 /** Crude sentence split (period/semicolon/newline/bullet), trimmed, non-trivial length. */
 export function splitSentences(text: string): string[] {
   return (text || '')
-    .replace(/\s+/g, ' ')
+    // Collapse HORIZONTAL whitespace only — keep '\n' intact so the `\n+` split alternative below
+    // still fires. (A blanket /\s+/→' ' would eat every newline first, making `\n+` dead code and
+    // merging bare-line-break-delimited obligations from PDF-extracted text into one blob.)
+    .replace(/[^\S\n]+/g, ' ')
     .split(/(?<=[.;:])\s+|\n+|(?=•|•|\d+\.\s)/)
     .map((s) => s.trim())
     .filter((s) => s.length >= 15);
@@ -83,18 +86,36 @@ export async function auditShredCompleteness(solicitationId: string): Promise<Sh
   const label = (v: unknown): string =>
     typeof v === 'string' ? v : (v as { name?: string; label?: string; text?: string } | null)?.name
       ?? (v as { label?: string } | null)?.label ?? (v as { text?: string } | null)?.text ?? '';
-  const capturedReqTerms = [
+  const capturedLabels = [
     ...items.map((i) => i.itemName ?? ''),
     ...docs.map(label),
     ...secs.map(label),
-  ].map((l) => salientTerms(l)).filter((t) => t.length > 0);
-  const requirementsCaptured = items.length + docs.length;
+  ].map((l) => l.trim()).filter((l) => l.length > 0);
+  // Two representations of the captured corpus, for the two coverage tests below:
+  //  • PHRASES — multi-word labels, whitespace-normalized, matched as a contiguous substring. The
+  //    strong, unambiguous signal — catches "Key Personnel", whose salient-term set collapses to the
+  //    single word "personnel" ("key" is below the 4-char term threshold), so a term-subset test alone
+  //    would miss it.
+  //  • TERM SETS — labels with ≥2 salient terms, matched by reverse-subset. A single-term label is
+  //    deliberately excluded: a lone generic word ("cost" from "Cost Proposal") would vouch for ANY
+  //    obligation that merely mentions it, hiding a real gap — the exact miss this audit exists to catch.
+  const capturedPhrases = capturedLabels
+    .filter((l) => /\s/.test(l))
+    .map((l) => l.toLowerCase().replace(/\s+/g, ' '));
+  const capturedReqTerms = capturedLabels.map(salientTerms).filter((t) => t.length >= 2);
+  // Count EVERY captured source the coverage match actually reads (items + docs + sections). Omitting
+  // `secs` here — while `covered()` above still matches against it — made the readout self-contradict:
+  // a mid-curation solicitation with only `required_sections` populated reported "0 captured / thin"
+  // AND "every obligation mapped" at once. required_sections is real prod data (mig 140 TVSF: 12 rows).
+  const requirementsCaptured = items.length + docs.length + secs.length;
 
-  // An obligation is COVERED when some captured requirement is clearly NAMED within it — ≥60% of that
-  // requirement label's salient terms appear in the obligation. Reverse-direction (label ⊆ obligation),
-  // so a verbose obligation that names a captured requirement ("...a detailed Technical Approach
-  // describing the methodology") isn't falsely flagged just for carrying extra descriptive words.
-  const covered = (oblTerms: Set<string>): boolean =>
+  // An obligation is COVERED when some captured requirement is clearly NAMED within it: either a
+  // multi-word captured label appears as a contiguous phrase, or ≥60% of a multi-term label's salient
+  // terms appear (reverse-subset — label ⊆ obligation — so a verbose obligation that names a captured
+  // requirement, "...a detailed Technical Approach describing the methodology", isn't flagged just for
+  // its extra descriptive words). A lone generic term can't vouch on its own (see capturedPhrases).
+  const covered = (oblNorm: string, oblTerms: Set<string>): boolean =>
+    capturedPhrases.some((p) => oblNorm.includes(p)) ||
     capturedReqTerms.some((req) => req.filter((t) => oblTerms.has(t)).length / req.length >= 0.6);
 
   const obligations = splitSentences(fullText).filter((s) => OBLIGATION_CUE.test(s));
@@ -102,7 +123,8 @@ export async function auditShredCompleteness(solicitationId: string): Promise<Sh
   for (const s of obligations) {
     const terms = new Set(salientTerms(s));
     if (terms.size === 0) continue;
-    if (!covered(terms)) candidateGaps.push(s.length > 240 ? `${s.slice(0, 237)}…` : s);
+    const oblNorm = s.toLowerCase().replace(/\s+/g, ' ');
+    if (!covered(oblNorm, terms)) candidateGaps.push(s.length > 240 ? `${s.slice(0, 237)}…` : s);
   }
 
   const obligationsFound = obligations.length;

@@ -792,7 +792,10 @@ export function CurationWorkspace({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-amber-900">Shred completeness</span>
-              {shredReport.thin && (
+              {/* `thin` is a secondary count heuristic; the gap list is the authoritative signal. Only
+                  escalate with the red badge when there are actual gaps, so it never contradicts the
+                  green "every obligation maps" readout below. */}
+              {shredReport.thin && shredReport.candidateGaps.length > 0 && (
                 <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-600 text-white">matrix looks thin</span>
               )}
               {shredReport.aiPass && (

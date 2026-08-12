@@ -105,7 +105,10 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
           <div className="flex flex-wrap gap-3 text-xs mb-3">
             {(() => {
               const d = report.summary.deadline;
-              if (!d.closeDate) return <span className="text-gray-400 font-medium">⏱ no deadline set</span>;
+              // Optional-chain the whole block: under a rolling-deploy version skew a new client bundle
+              // can hit an old route whose report predates `deadline`/`documents` — match the defensive
+              // reads used for volumes/cost below rather than white-screening the card on a TypeError.
+              if (!d?.closeDate) return <span className="text-gray-400 font-medium">⏱ no deadline set</span>;
               const dr = d.daysRemaining ?? 0;
               const label = d.past
                 ? `closed ${Math.abs(dr)}d ago${d.estimated ? ' (est.)' : ''}`
@@ -121,11 +124,11 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
             <span className="text-gray-600 font-medium">
               {report.summary.requirements.satisfied}/{report.summary.requirements.mandatory} requirements met
             </span>
-            {report.summary.documents.required > 0 && (
+            {(report.summary.documents?.required ?? 0) > 0 && (
               <>
                 <span className="text-gray-400">·</span>
-                <span className={report.summary.documents.missing > 0 ? 'text-red-600 font-medium' : 'text-emerald-600 font-medium'}>
-                  {report.summary.documents.provided}/{report.summary.documents.required} forms provided
+                <span className={(report.summary.documents?.missing ?? 0) > 0 ? 'text-red-600 font-medium' : 'text-emerald-600 font-medium'}>
+                  {report.summary.documents?.provided}/{report.summary.documents?.required} forms provided
                 </span>
               </>
             )}
