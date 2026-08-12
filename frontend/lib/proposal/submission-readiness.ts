@@ -61,7 +61,8 @@ export interface ReadinessReport {
     requirements: { mandatory: number; satisfied: number; unmet: number };
     /** Required supporting docs/forms (SF424, reps & certs, letters): provided vs still missing. */
     documents: { required: number; provided: number; missing: number };
-    formatWarnings: number;
+    /** Mandated-format violations promoted to hard blockers (sub-minimum font, image where forbidden). */
+    formatViolations: number;
     overBudget: number;
     /** Per size-limited volume: the REAL rendered size (pages for docs, slides for decks) vs its hard cap. */
     volumes: Array<{ name: string; pages: number; max: number; over: boolean; unit: 'pages' | 'slides' }>;
@@ -159,7 +160,7 @@ export async function computeSubmissionReadiness(
   const blockers: ReadinessBlocker[] = [];
 
   // ── Section state ──────────────────────────────────────────────────────────
-  let locked = 0, emptyN = 0, draftedUnlocked = 0, formatWarnings = 0, overBudget = 0;
+  let locked = 0, emptyN = 0, draftedUnlocked = 0, formatViolations = 0, overBudget = 0;
   for (const s of sections) {
     const isEmpty = (s.status ?? '') === 'empty';
     if (s.isLocked) {
@@ -202,15 +203,21 @@ export async function computeSubmissionReadiness(
       volSections.set(s.artifactId, list);
     }
 
-    // Format floor (advisory) — only the per-section-meaningful rules, from the section's artifact spec.
+    // Mandated format floor — HARD blocker. A font below the RFP's stated minimum, or an image where
+    // the volume forbids figures, is an administrative DQ ("proposals not conforming to the format
+    // requirements will not be evaluated"), not a nicety. These two codes fire ONLY when the
+    // solicitation actually set the rule (min_font_size / images_allowed=false) and are read off
+    // explicit node properties (smallest node font; presence of an image node), so a violation is
+    // real, not an estimate — hence a blocker, not an advisory. (Page/slide caps are gated
+    // separately below; header/footer + other softer codes stay out of the per-section pass.)
     const spec = s.artifactId ? specByArtifact.get(s.artifactId) : undefined;
     if (!spec) continue;
     for (const v of validateCanvasAgainstSpec(doc, spec)) {
       if (v.code !== 'font_too_small' && v.code !== 'image_not_allowed') continue; // per-section only
-      formatWarnings++;
+      formatViolations++;
       blockers.push({
         category: 'format_floor',
-        severity: 'warning',
+        severity: 'blocker',
         message: `"${s.title ?? 'Section'}": ${v.message}`,
         sectionId: s.id,
         sectionTitle: s.title ?? undefined,
@@ -360,7 +367,7 @@ export async function computeSubmissionReadiness(
       sections: { total: sections.length, locked, drafted_unlocked: draftedUnlocked, empty: emptyN },
       requirements: { mandatory: matrix.length, satisfied: satisfiedReq, unmet: matrix.length - satisfiedReq },
       documents: { required: requiredDocs.length, provided: docsProvided, missing: requiredDocs.length - docsProvided },
-      formatWarnings,
+      formatViolations,
       overBudget,
       volumes: volumeInfo,
       ...(workSplit ? { workSplit } : {}),

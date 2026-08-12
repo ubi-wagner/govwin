@@ -174,7 +174,7 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
           {warnings.length > 0 && (
             <details className="mt-1">
               <summary className="text-[11px] text-gray-500 cursor-pointer hover:text-gray-700">
-                {warnings.length} format advisor{warnings.length === 1 ? 'y' : 'ies'} (won’t block submission)
+                {warnings.length} advisor{warnings.length === 1 ? 'y' : 'ies'} (won’t block submission)
               </summary>
               <div className="space-y-1 mt-1.5">
                 {warnings.slice(0, MAX_SHOWN).map((w, i) => (
@@ -185,8 +185,9 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
           )}
 
           <p className="text-[11px] text-gray-400 mt-2">
-            Rolls up section lock state, requirement coverage, and the format floor. Advisory — lock every
-            section (and clear the blockers) to unlock export &amp; submission.
+            Rolls up section lock state, requirement coverage, required forms, page &amp; mandated-format
+            limits, and the cost roll-up. Advisory — clear every blocker before you submit so the proposal
+            can’t be administratively disqualified.
           </p>
         </>
       )}
