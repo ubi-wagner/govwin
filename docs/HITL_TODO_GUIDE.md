@@ -48,7 +48,11 @@ admin) can **post a timestamped message** — nobody is required to respond, it 
 so future workflows can append their own entry types — a proposed meeting time, an RSVP, a task — and
 render them as cards. The thread is the substrate those "schedule a meeting / PM task" extensions plug
 into. Proven (real lib): a 5-message thread (one author posting twice), every entry timestamped, stays
-visible to all 4 viewer kinds after posting, cross-tenant post denied.
+visible to all 4 viewer kinds after posting, cross-tenant post denied. Live UI (below): the chain
+renders per-author with "just now" timestamps and a **Message the group…** reply box; a member's reply
+appears in the chain and the thread stays open.
+
+![group thread / chat](assets/hitl/18-group-thread.png)
 
 Proven via the real lib (`createTask`/`listOpenTasksForActor`/`completeTask`): a broadcast is seen by
 all 5 viewer kinds; conor's ack drops it from conor only; eric (shadow) sees + acks it; a named ToDo
