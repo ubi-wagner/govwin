@@ -353,7 +353,12 @@ export async function reconcileTenant(tenantId: string): Promise<number> {
     // Per opp, the head bridge version — kept only when the tenant has no card or a stale one.
     // WHERE runs before DISTINCT ON, so this narrows to opps the tenant is behind on, then picks
     // each opp's newest missed version.
-    behind = await sql`
+    // Run the behind-detection under the tenant's OWN RLS scope so it reads real state regardless of
+    // the caller's ambient context (the /cards read-repair calls this before its own withTenant block;
+    // the admin sweep on the bypass pool). Under govtech_app a context-less read of the force-RLS
+    // tenant_opportunity_cards would DENY-ALL → the LEFT JOIN would treat every bridge head as "behind"
+    // and re-apply on every call (self-correcting via the forward-only guard, but wasteful). Self-scope.
+    behind = await withTenant(tenantId, async (tx) => tx`
       SELECT DISTINCT ON (b.opportunity_id)
              b.id, b.opportunity_id AS "opportunityId", b.version, b.event_type AS "eventType", b.card
       FROM opportunity_bridge b
@@ -361,7 +366,7 @@ export async function reconcileTenant(tenantId: string): Promise<number> {
         ON c.tenant_id = ${tenantId}::uuid AND c.opportunity_id = b.opportunity_id
       WHERE c.opportunity_id IS NULL OR b.version > c.bridge_version
       ORDER BY b.opportunity_id, b.version DESC
-    ` as typeof behind;
+    `) as typeof behind;
   } catch (e) {
     console.error('[bridge] reconcile head query failed', tenantId, e);
     return 0;
