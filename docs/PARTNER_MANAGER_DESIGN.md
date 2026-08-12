@@ -62,6 +62,16 @@ Nothing is destructive; every existing tenant keeps `kind='standard'`, every exi
   **# pipelines (portals/proposals)** + status mix, and **Open workspace →** (descend).
 - **Add company** button → the precheck + 3‑branch flow (§4).
 - Owner‑scoped: the console reads only `owner_id = me ∪ partner_manager memberships of me`.
+- **ToDos surface here ("notify up")** — the console is the manager's notification top, mirroring the
+  RFP‑admin dashboard `TaskQueue`. `tenantRollupStats` also counts **openTodos** per company (the
+  tenant‑role bucket tasks a descended `tenant_admin` would see; admin‑bucket tasks excluded), and the
+  console renders an **aggregate attention banner** ("N open to‑dos across your companies"), a per‑card
+  **"N to‑dos" badge**, companies with open ToDos **sorted first**, and a **"Review N to‑dos →"**
+  deep‑link. Completion never happens at the console (no cross‑tenant completion surface): the link
+  **descends** (`/api/partner/enter?slug=X&next=todos`, `next` whitelisted) straight to the company's
+  `/portal/[slug]/todos`, where the manager (now `tenant_admin`) reviews + completes — the
+  **"descend down to complete"** half of the bridge. (Screenshots: `assets/partner/01‑partner‑console‑notify‑up.png`,
+  `assets/partner/02‑partner‑descended‑todos.png`.)
 
 ### 3b. Descend / ascend (D2)
 - **Descend:** `POST /api/partner/enter` (or `/api/enter` extended) verifies the target is in the

@@ -18,10 +18,25 @@ import PartnerGuide from './partner-guide';
 
 export const dynamic = 'force-dynamic';
 
-function enterHref(slug: string): string {
+function enterHref(slug: string, next?: string): string {
   // Partner-scoped descend: pins as tenant_admin, smooth hop between the partner's companies,
   // and carries the base role so "Exit to console" can ascend (docs/PARTNER_MANAGER_DESIGN.md §3b).
-  return `/api/partner/enter?slug=${encodeURIComponent(slug)}`;
+  // `next` (whitelisted in the enter route) lands the manager on a specific portal page — the console's
+  // "Review to-dos →" deep-link is the "descend down to complete" half of the notify-up/descend bridge.
+  const n = next ? `&next=${encodeURIComponent(next)}` : '';
+  return `/api/partner/enter?slug=${encodeURIComponent(slug)}${n}`;
+}
+
+/** The console attention badge: open ToDos inside a company (the "notify up" signal). */
+function TodoBadge({ count }: { count: number }) {
+  if (count <= 0) {
+    return <span className="text-[11px] uppercase tracking-wide text-navy-300">No to-dos</span>;
+  }
+  return (
+    <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border border-award-300 bg-award-50 text-award-700">
+      {count} to-do{count === 1 ? '' : 's'}
+    </span>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -58,16 +73,39 @@ export default async function PartnerConsole() {
 
   const ownStats = ownOrg ? rollup.get(ownOrg.id) : undefined;
 
+  // "Notify up": total open ToDos across the stable + own org, and surface companies that need
+  // attention first — the manager sees WHERE to descend without opening each company. Completion
+  // still happens inside the company (the descend-to-complete bridge), matching the RFP-admin pattern.
+  const stableSorted = [...stable].sort(
+    (a, b) => (rollup.get(b.id)?.openTodos ?? 0) - (rollup.get(a.id)?.openTodos ?? 0),
+  );
+  const stableTodos = stable.reduce((n, t) => n + (rollup.get(t.id)?.openTodos ?? 0), 0);
+  const ownTodos = ownStats?.openTodos ?? 0;
+  const totalTodos = stableTodos + ownTodos;
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-baseline justify-between mb-1">
         <h1 className="font-display text-2xl font-black text-navy-900">Partner Console</h1>
         <span className="text-sm text-navy-500">{u.name ?? 'Partner'}{ownOrg ? ` · ${ownOrg.name}` : ''}</span>
       </div>
-      <p className="text-sm text-navy-600 mb-8">
+      <p className="text-sm text-navy-600 mb-4">
         Your organization and the companies you support. Open any company to work inside it as its
         manager, or add a new company to your stable.
       </p>
+      {/* Attention banner — the aggregate "notify up" across the whole stable. */}
+      <div className="mb-8">
+        {totalTodos > 0 ? (
+          <div className="inline-flex items-center gap-2 rounded-lg border border-award-300 bg-award-50 px-3 py-1.5 text-sm text-award-800">
+            <span className="font-semibold">{totalTodos} open to-do{totalTodos === 1 ? '' : 's'}</span>
+            <span className="text-award-700">across your companies — open a company below to review &amp; complete.</span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm text-navy-500">
+            No open to-dos across your companies right now.
+          </div>
+        )}
+      </div>
 
       {/* ── Your organization ─────────────────────────────────────────── */}
       {ownOrg && (
@@ -79,15 +117,23 @@ export default async function PartnerConsole() {
               <p className="text-sm text-navy-500">Higher-order org — run your own buckets, pipeline &amp; grants here.</p>
             </div>
             {ownStats && (
-              <div className="flex gap-6">
+              <div className="flex items-center gap-6">
                 <Stat label="Buckets" value={ownStats.buckets} />
                 <Stat label="Pins" value={ownStats.pins} />
                 <Stat label="Proposals" value={ownStats.proposals} />
+                <TodoBadge count={ownTodos} />
               </div>
             )}
-            <a href={enterHref(ownOrg.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900 whitespace-nowrap">
-              Open my org workspace →
-            </a>
+            <div className="flex flex-col items-end gap-1 whitespace-nowrap">
+              <a href={enterHref(ownOrg.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900">
+                Open my org workspace →
+              </a>
+              {ownTodos > 0 && (
+                <a href={enterHref(ownOrg.slug, 'todos')} className="text-xs font-semibold text-award-700 hover:text-award-800">
+                  Review {ownTodos} to-do{ownTodos === 1 ? '' : 's'} →
+                </a>
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -109,10 +155,13 @@ export default async function PartnerConsole() {
           <p className="text-sm text-navy-500">No companies yet — add your first above.</p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {stable.map((t) => {
+            {stableSorted.map((t) => {
               const s = rollup.get(t.id);
+              const todos = s?.openTodos ?? 0;
               return (
-                <div key={t.id} className="bg-white border border-cream-200 rounded-xl p-5 hover:border-navy-300 transition-colors">
+                <div key={t.id} className={`bg-white border rounded-xl p-5 transition-colors ${
+                  todos > 0 ? 'border-award-200 hover:border-award-400' : 'border-cream-200 hover:border-navy-300'
+                }`}>
                   <div className="flex items-start justify-between gap-3 mb-1">
                     <p className="text-base font-bold text-navy-900">{t.name}</p>
                     <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${
@@ -122,15 +171,23 @@ export default async function PartnerConsole() {
                   <p className="text-xs text-navy-500 mb-4 truncate">
                     {s?.adminPocEmail ? <>Admin: {s.adminPocName ? `${s.adminPocName} · ` : ''}{s.adminPocEmail}</> : 'No admin POC'}
                   </p>
-                  <div className="flex gap-5 mb-4">
+                  <div className="flex items-center gap-5 mb-4">
                     <Stat label="Buckets" value={s?.buckets ?? 0} />
                     <Stat label="Pins" value={s?.pins ?? 0} />
                     <Stat label="Proposals" value={s?.proposals ?? 0} />
                     <Stat label="Portals" value={s?.portals ?? 0} />
+                    <TodoBadge count={todos} />
                   </div>
-                  <a href={enterHref(t.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900">
-                    Open workspace →
-                  </a>
+                  <div className="flex items-center gap-4">
+                    <a href={enterHref(t.slug)} className="text-sm font-semibold text-navy-700 hover:text-navy-900">
+                      Open workspace →
+                    </a>
+                    {todos > 0 && (
+                      <a href={enterHref(t.slug, 'todos')} className="text-sm font-semibold text-award-700 hover:text-award-800">
+                        Review {todos} to-do{todos === 1 ? '' : 's'} →
+                      </a>
+                    )}
+                  </div>
                 </div>
               );
             })}
