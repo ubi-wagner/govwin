@@ -13,6 +13,23 @@ export interface CatalogTrigger {
   help: string;
   /** Whether this trigger can auto-run an agent (the AI-agents group; Phase E). */
   agentCapable?: boolean;
+  /**
+   * Does configuring this trigger (recipients / nudge cadence / channel) actually DELIVER a
+   * notification today? 'active' = a `resolveGatePolicy` consumer fires it; 'preview' = the trigger
+   * is exposed for tuning but its delivery path is not wired yet, so saved settings would send
+   * nothing. The tenant editor renders a 'preview' trigger as not-yet-delivering so the dial never
+   * lies (capabilities are optional support — a control that silently does nothing is a broken promise).
+   *
+   * Keep in lockstep with the consumer set (enforced by catalog.test.ts):
+   *   active  — proposal:proposal.advanced → lib/proposal-advance.ts (resolveGatePolicy);
+   *             section_review / final_review → lib/automation/prestage-todos.ts.
+   *   preview — capture:card.applied (no discovery notify beat is built);
+   *             proposal:collaborator.get_ready (no consumer);
+   *             proposal:document.locked (only its condition.auto_advance sub-toggle is honored, in
+   *               lib/proposal/lock-section.ts — the recipients/nudge/channel this editor exposes are
+   *               NOT delivered; the ToDo is deferred to proposal.advance_ready by design).
+   */
+  deliveryStatus: 'active' | 'preview';
 }
 
 export const TRIGGER_CATALOG: CatalogTrigger[] = [
@@ -22,6 +39,7 @@ export const TRIGGER_CATALOG: CatalogTrigger[] = [
     triggerKey: 'capture:card.applied',
     label: 'New priority opportunity',
     help: 'Alert when a new high-alignment opportunity lands in a bucket (else a company-profile match near its close date).',
+    deliveryStatus: 'preview',
   },
   // ── Build (portals) ──
   {
@@ -29,12 +47,14 @@ export const TRIGGER_CATALOG: CatalogTrigger[] = [
     triggerKey: 'proposal:document.locked',
     label: 'Document ready',
     help: 'Notify the team when every section of a document is accepted & locked.',
+    deliveryStatus: 'preview',
   },
   {
     scope: 'build',
     triggerKey: 'proposal:collaborator.get_ready',
     label: 'Collaborator "get ready"',
     help: 'Give collaborators a heads-up as their stage approaches.',
+    deliveryStatus: 'preview',
   },
   {
     scope: 'build',
@@ -42,12 +62,14 @@ export const TRIGGER_CATALOG: CatalogTrigger[] = [
     label: 'Stage advanced',
     help: 'Notify when a proposal advances a stage. Can also run an AI review.',
     agentCapable: true,
+    deliveryStatus: 'active',
   },
   {
     scope: 'build',
     triggerKey: 'section_review',
     label: 'Draft review gate',
     help: 'The pre-staged ToDo to review & complete the (AI-)drafted sections. Tune who reviews and the nudge cadence.',
+    deliveryStatus: 'active',
   },
   {
     scope: 'build',
@@ -55,6 +77,7 @@ export const TRIGGER_CATALOG: CatalogTrigger[] = [
     label: 'Final review gate',
     help: 'The agent-assisted final review before submission. Tune who confirms and the nudge cadence.',
     agentCapable: true,
+    deliveryStatus: 'active',
   },
 ];
 
@@ -67,4 +90,11 @@ export const VALID_RECIPIENT_FLAGS = new Set(['delegated_managers', 'collaborato
 /** A catalog trigger is valid for a given scope only if it matches the catalog. */
 export function isCatalogTrigger(scope: string, triggerKey: string): boolean {
   return TRIGGER_CATALOG.some((t) => t.scope === scope && t.triggerKey === triggerKey);
+}
+
+/** Does this trigger actually deliver notifications today (a resolveGatePolicy consumer fires it)? */
+export function isDeliveryActive(scope: string, triggerKey: string): boolean {
+  return TRIGGER_CATALOG.some(
+    (t) => t.scope === scope && t.triggerKey === triggerKey && t.deliveryStatus === 'active',
+  );
 }

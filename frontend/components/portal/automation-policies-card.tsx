@@ -23,6 +23,8 @@ interface CatalogItem {
   label: string;
   help: string;
   agentCapable?: boolean;
+  /** 'preview' = exposed for tuning but its delivery path isn't wired yet (won't send). See catalog.ts. */
+  deliveryStatus?: 'active' | 'preview';
   configured: boolean;
   row: PolicyRow | null;
 }
@@ -142,22 +144,33 @@ export function AutomationPoliciesCard({ tenantSlug }: { tenantSlug: string }) {
                 const row = draft[item.triggerKey];
                 if (!row) return null;
                 const savedNow = savedKey === item.triggerKey;
+                // A 'preview' trigger is exposed but its delivery path isn't wired yet — freeze its
+                // controls and say so, so a tenant never configures a dial that silently sends nothing.
+                const isPreview = item.deliveryStatus === 'preview';
                 return (
-                  <div key={item.triggerKey} className="rounded-md border border-gray-200 p-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="checkbox" checked={row.enabled}
+                  <div key={item.triggerKey} className={`rounded-md border p-4 ${isPreview ? 'border-gray-200 bg-gray-50/60' : 'border-gray-200'}`}>
+                    <label className={`flex items-start gap-3 ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
+                      <input type="checkbox" checked={row.enabled} disabled={isPreview}
                         onChange={(e) => update(item.triggerKey, { enabled: e.target.checked })}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50" />
                       <span className="min-w-0">
                         <span className="block text-sm font-medium text-gray-800">
                           {item.label}
                           {item.agentCapable && <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 align-middle">AI-capable</span>}
+                          {isPreview && <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 align-middle">Preview</span>}
                         </span>
                         <span className="block text-xs text-gray-500">{item.help}</span>
                       </span>
                     </label>
 
-                    {row.enabled && (
+                    {isPreview && (
+                      <p className="mt-2 pl-7 text-[11px] text-gray-500">
+                        Not delivering yet — this trigger is shown so you can see what’s coming, but recipients &amp;
+                        timing set here won’t send notifications until it’s activated. It unlocks automatically then.
+                      </p>
+                    )}
+
+                    {row.enabled && !isPreview && (
                       <div className="mt-3 pl-7 grid gap-3 sm:grid-cols-2">
                         <div>
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Who</div>
@@ -204,13 +217,15 @@ export function AutomationPoliciesCard({ tenantSlug }: { tenantSlug: string }) {
                       </div>
                     )}
 
-                    <div className="mt-3 pl-7 flex items-center gap-3">
-                      <button onClick={() => save(item)} disabled={savingKey === item.triggerKey}
-                        className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                        {savingKey === item.triggerKey ? 'Saving…' : 'Save'}
-                      </button>
-                      {savedNow && <span className="text-[11px] text-green-600">Saved</span>}
-                    </div>
+                    {!isPreview && (
+                      <div className="mt-3 pl-7 flex items-center gap-3">
+                        <button onClick={() => save(item)} disabled={savingKey === item.triggerKey}
+                          className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                          {savingKey === item.triggerKey ? 'Saving…' : 'Save'}
+                        </button>
+                        {savedNow && <span className="text-[11px] text-green-600">Saved</span>}
+                      </div>
+                    )}
                   </div>
                 );
               })}
