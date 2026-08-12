@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { toast } from '@/lib/toast';
+import type { ShredAuditReport } from '@/lib/compliance/shred-audit';
 import dynamic from 'next/dynamic';
 import type { TextSelection } from './pdf-viewer';
 // react-pdf / pdf.js sets its worker at module-eval (import) time and touches browser
@@ -197,6 +198,8 @@ export function CurationWorkspace({
   const [compState, setCompState] = useState(compliance);
   const [assistBusy, setAssistBusy] = useState(false);
   const [assessBusy, setAssessBusy] = useState(false);
+  const [shredBusy, setShredBusy] = useState(false);
+  const [shredReport, setShredReport] = useState<ShredAuditReport | null>(null);
   const [assessment, setAssessment] = useState<{
     stage: string;
     status: string;
@@ -246,6 +249,25 @@ export function CurationWorkspace({
       toast.error(e instanceof Error ? e.message : 'Assessment failed');
     } finally {
       setAssessBusy(false);
+    }
+  };
+  // Shred-completeness audit — ADVISORY. Diffs the solicitation's stated obligations against the
+  // captured requirements and surfaces candidate gaps the admin should fill BEFORE release. Read-only.
+  const handleShredAudit = async () => {
+    setShredBusy(true);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${sol.id}/shred-audit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Shred audit failed');
+      setShredReport(json.data as ShredAuditReport);
+      const gaps = (json.data as ShredAuditReport)?.candidateGaps?.length ?? 0;
+      toast[gaps > 0 ? 'info' : 'success'](gaps > 0 ? `${gaps} possible requirement gap(s) to review` : 'No obvious requirement gaps');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Shred audit failed');
+    } finally {
+      setShredBusy(false);
     }
   };
   const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
@@ -745,6 +767,14 @@ export function CurationWorkspace({
           >
             {assessBusy ? 'Assessing…' : '🩺 Assess readiness'}
           </button>
+          <button
+            onClick={handleShredAudit}
+            disabled={shredBusy}
+            title="Shred completeness — diff the solicitation's stated obligations against the captured requirements and flag possible gaps to fill before release (advisory, read-only)"
+            className="px-3 py-1.5 text-sm font-medium rounded border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 disabled:opacity-50"
+          >
+            {shredBusy ? 'Auditing…' : '🔍 Shred audit'}
+          </button>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${
             sol.status === 'pushed_to_pipeline' ? 'bg-emerald-100 text-emerald-800' :
             sol.status === 'dismissed' ? 'bg-gray-200 text-gray-600' :
@@ -755,6 +785,49 @@ export function CurationWorkspace({
           </span>
         </div>
       </div>
+
+      {/* Shred-completeness readout (advisory — from Shred audit) */}
+      {shredReport && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-amber-900">Shred completeness</span>
+              {shredReport.thin && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-600 text-white">matrix looks thin</span>
+              )}
+              {shredReport.aiPass && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-600 text-white">AI-refined</span>
+              )}
+            </div>
+            <button onClick={() => setShredReport(null)} className="text-xs text-gray-500 hover:text-gray-800">Dismiss ✕</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3 text-xs">
+            <span className={shredReport.hasFullText ? 'text-emerald-700' : 'text-gray-400'}>{shredReport.hasFullText ? '✓' : '○'} shredded text</span>
+            <span className="text-gray-600 font-medium">{shredReport.obligationsFound} obligations detected</span>
+            <span className="text-gray-600 font-medium">{shredReport.requirementsCaptured} requirements captured</span>
+            <span className={shredReport.candidateGaps.length > 0 ? 'text-red-600 font-medium' : 'text-emerald-700 font-medium'}>
+              {shredReport.candidateGaps.length} possible gap{shredReport.candidateGaps.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          {shredReport.candidateGaps.length > 0 ? (
+            <ul className="mt-2 space-y-1 list-disc list-inside">
+              {shredReport.candidateGaps.map((g, i) => (
+                <li key={i} className="text-xs text-gray-700">{g}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">
+              {shredReport.hasFullText
+                ? 'Every stated obligation maps to a captured requirement.'
+                : 'No shredded full text to audit — ingest the source first.'}
+            </p>
+          )}
+          <p className="mt-2 text-[11px] text-gray-400">
+            Advisory — obligations in the solicitation text that may not be represented in the captured
+            requirements. Review and add any real ones before release.
+          </p>
+        </div>
+      )}
 
       {/* Ingest-readiness readout (advisory — from Assess readiness) */}
       {assessment && (
