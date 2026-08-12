@@ -5,15 +5,20 @@
  * headline value proposition → the problem → our solution → three key
  * differentiators → proof points & traction → call-to-action + contact.
  *
- * Letter, Times New Roman 12pt, 1-inch margins (letter_standard). Designed
- * to render on ONE page. Real, polished starter copy with {merge_field}
- * placeholders that get interpolated at proposal/collateral creation.
+ * Calibri 10.5pt on the letter_onepager preset (contact footer, hard 1-page
+ * cap, figures enabled). Built to FILL exactly one page — hero banner, tight
+ * sections, page-anchored contact footer — with {merge_field} placeholders
+ * that get interpolated at proposal/collateral creation.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// One-page sales sheet: Calibri 10.5pt, page-anchored contact footer, hard 1-page cap, figures on.
+const PRESET: CanvasRules = {
+  ...CANVAS_PRESETS.letter_onepager,
+  max_pages: 1,
+};
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -58,6 +63,13 @@ export const MARKETING_ONE_PAGER: CanvasDocument = {
     node('masthead-rule', {
       type: 'divider',
       content: { thickness: 2, color: '#1f3a5f', line_style: 'solid' },
+    }),
+
+    // ─── Hero band (product hero shot / mission imagery) ────────
+    node('hero', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Hero image', width: 504, height: 116, caption: '' },
+      style: { alignment: 'center', space_before: 6, space_after: 8 },
     }),
 
     // ─── Headline value proposition ─────────────────────────────

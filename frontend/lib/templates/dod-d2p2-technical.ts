@@ -61,10 +61,15 @@ export const DOD_D2P2_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover Page ─────────────────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 468, height: 96, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 24 },
+    }),
     node('cover-title', {
       type: 'heading',
       content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', size: 16 },
+      style: { alignment: 'center', size: 16, space_before: 48 },
     }),
     node('cover-subtitle', {
       type: 'heading',
@@ -137,6 +142,11 @@ export const DOD_D2P2_TECHNICAL: CanvasDocument = {
         border_style: 'single',
       },
     }),
+    node('figure-1', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I-equivalent feasibility evidence', width: 420, height: 260, caption: 'Figure 1: [Phase I-equivalent feasibility evidence]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s1-source', {
       type: 'heading',
       content: { level: 2, text: '1.3 Source of Prior Work and Funding' },
@@ -175,6 +185,11 @@ export const DOD_D2P2_TECHNICAL: CanvasDocument = {
     }),
 
     // ─── Section 3: Tasks, Milestones, and Schedule ─────────────
+    node('figure-2', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase II system architecture diagram', width: 420, height: 260, caption: 'Figure 2: [Phase II system architecture]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s3-heading', {
       type: 'heading',
       content: { level: 1, text: '3. Tasks, Milestones, and Schedule' },
@@ -202,6 +217,11 @@ export const DOD_D2P2_TECHNICAL: CanvasDocument = {
         column_widths: [60, 220, 60, 160],
         border_style: 'single',
       },
+    }),
+    node('figure-3', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase II schedule and milestone Gantt chart', width: 420, height: 240, caption: 'Figure 3: [Phase II schedule / milestone Gantt]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s3-gonogo', {
       type: 'heading',
@@ -282,6 +302,11 @@ export const DOD_D2P2_TECHNICAL: CanvasDocument = {
     node('s5-transition-text', {
       type: 'text_block',
       content: { text: '[Identify the specific Department of War programs of record, prime contractors, or acquisition pathways that will adopt the technology, with evidence of interest: Letters of Intent, MOUs, teaming agreements, matching funds, or program-office engagement. Evaluators weight demonstrated transition commitment heavily for D2P2.]' },
+    }),
+    node('figure-4', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Transition pathway and customer pipeline', width: 420, height: 240, caption: 'Figure 4: [Transition pathway / customer pipeline]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s5-phase3', {
       type: 'heading',

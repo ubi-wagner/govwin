@@ -6,16 +6,20 @@
  * → Our Solution & Differentiators → How It Works → Proof & Case Studies →
  * Customers & Partners → Why Us → Next Steps.
  *
- * Arial 18pt, 16:9 widescreen (slide_cso). Each slide is a page_break-delimited
- * section with a heading and structured content. {merge_field} placeholders
- * interpolate at provisioning; [bracketed prompts] mark the specifics, and the
- * italic tip lines are coaching notes to delete before sending.
+ * Arial 18pt, 16:9 widescreen on the `slide_deck` preset (subtle footer
+ * '{company_name} · {n} / {N}', images enabled). Each slide is a page_break-
+ * delimited section with a heading, a structured cluster, and — on the title and
+ * four content slides — a sized `image` placeholder (empty storage_key) where a
+ * visual belongs: hero banner, market chart, product shot, process diagram, and
+ * a customer/partner logo wall. {merge_field} placeholders interpolate at
+ * provisioning; [bracketed prompts] mark the specifics (including each figure's
+ * caption); the italic tip lines are coaching notes to delete before sending.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.slide_cso;
+const PRESET: CanvasRules = CANVAS_PRESETS.slide_deck;
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -50,21 +54,27 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
     node('s1-title', {
       type: 'heading',
       content: { level: 1, text: '{company_name}' },
-      style: { alignment: 'center', space_before: 80, size: 28, weight: 'bold' },
+      style: { alignment: 'center', space_before: 72, size: 28, weight: 'bold' },
     }),
     node('s1-tagline', {
       type: 'text_block',
       content: { text: '{tagline}' },
       style: { alignment: 'center', size: 20, style: 'italic' },
     }),
-    node('s1-category', {
-      type: 'text_block',
-      content: { text: 'Capabilities Overview' },
-      style: { alignment: 'center', size: 16, space_before: 32 },
+    node('s1-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Company logo or hero product image',
+        width: 760,
+        height: 200,
+        caption: '[Company logo or hero product image — drop in your brand banner]',
+      },
+      style: { alignment: 'center', space_before: 20 },
     }),
-    node('s1-contact', {
+    node('s1-info', {
       type: 'text_block',
-      content: { text: '{contact_email}    ·    [yourdomain.com]' },
+      content: { text: 'Capabilities Overview · {contact_email} · [yourdomain.com]' },
       style: { alignment: 'center', size: 14, space_before: 16 },
     }),
     node('s1-break', { type: 'page_break', content: null }),
@@ -106,10 +116,16 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-note', {
-      type: 'text_block',
-      content: { text: 'Frame the problem the way your customers describe it, and quantify the cost of doing nothing.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s3-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Market opportunity chart',
+        width: 560,
+        height: 300,
+        caption: '[Market-size or cost-of-inaction chart — quantify the pain the way customers describe it]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s3-break', { type: 'page_break', content: null }),
 
@@ -125,11 +141,22 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
         items: [
           { text: '{company_name} delivers {tagline} — [what the product or service is].' },
           { text: 'Differentiator 1: [what only you do].' },
-          { text: 'Differentiator 2: [proprietary method, data, or speed].' },
-          { text: 'Differentiator 3: [service model, integration, or support].' },
+          { text: 'Differentiator 2: [proprietary method or speed].' },
+          { text: 'Differentiator 3: [service model or integration].' },
         ],
       },
       style: { size: 16 },
+    }),
+    node('s4-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Product screenshot',
+        width: 600,
+        height: 300,
+        caption: '[Product screenshot or annotated hero shot of the solution in action]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s4-break', { type: 'page_break', content: null }),
 
@@ -150,10 +177,16 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s5-note', {
-      type: 'text_block',
-      content: { text: 'A simple three-step diagram here makes the process tangible at a glance.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s5-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'How it works process diagram',
+        width: 780,
+        height: 240,
+        caption: '[Three-step process diagram: Discover → Deploy → Deliver — makes the process tangible at a glance]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s5-break', { type: 'page_break', content: null }),
 
@@ -204,10 +237,16 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s7-note', {
-      type: 'text_block',
-      content: { text: 'Drop in a logo wall — customer and partner marks build instant credibility.' },
-      style: { size: 12, style: 'italic', color: '#888888', space_before: 24 },
+    node('s7-image', {
+      type: 'image',
+      content: {
+        storage_key: '',
+        alt_text: 'Customer and partner logo wall',
+        width: 800,
+        height: 170,
+        caption: '[Customer & partner logo wall — the marks that build instant credibility]',
+      },
+      style: { alignment: 'center', space_before: 16 },
     }),
     node('s7-break', { type: 'page_break', content: null }),
 

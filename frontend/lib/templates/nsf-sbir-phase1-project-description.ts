@@ -2,9 +2,10 @@
  * NSF SBIR/STTR Phase I — Project Description Template (15 pages)
  *
  * Structured per the NSF SBIR/STTR Phase I Program Solicitation. Times New
- * Roman 12pt, 1-inch margins (NSF PAPPG requires body font no smaller than
- * 11pt). The Project Description is capped at 15 pages including all figures,
- * tables, and references.
+ * Roman 11pt, 1-inch margins with a running header + page-numbered footer
+ * (letter_agency; NSF PAPPG requires body font no smaller than 11pt). The
+ * Project Description is capped at 15 pages including all figures, tables, and
+ * references.
  *
  * NSF scores every proposal on its two statutory merit-review criteria:
  *   Intellectual Merit  — is the innovation sound, non-incremental, and does
@@ -23,10 +24,11 @@
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-// NSF prose narrative: 12pt Times New Roman, 1-inch margins, 15-page cap.
-// (letter_standard, with the solicitation's 15-page Project Description limit.)
+// NSF prose narrative: 11pt Times New Roman, 1-inch margins, running header +
+// page-numbered footer (letter_agency), with the solicitation's 15-page Project
+// Description limit.
 const PRESET: CanvasRules = {
-  ...CANVAS_PRESETS.letter_standard,
+  ...CANVAS_PRESETS.letter_agency,
   max_pages: 15,
 };
 
@@ -60,9 +62,14 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
   },
   nodes: [
     // ─── Cover / Identity Block ─────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 936, height: 90, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 12 },
+    }),
     node('cover-title', {
       type: 'heading', content: { level: 1, text: '{project_title}' },
-      style: { alignment: 'center', space_before: 120 },
+      style: { alignment: 'center', space_before: 18 },
     }),
     node('cover-subtitle', {
       type: 'text_block', content: { text: 'NSF SBIR/STTR Phase I — Project Description' },
@@ -99,7 +106,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     node('cover-note', {
       type: 'text_block',
       content: { text: 'NSF review is organized around two criteria — Intellectual Merit and Broader Impacts. Sections 1–3 carry the Intellectual Merit case (a non-incremental innovation on a sound technical foundation with a credible, high-risk R&D plan); Section 5 carries the commercial case; Section 6 addresses Broader Impacts. Address every criterion explicitly — reviewers score against them by name.' },
-      style: { size: 10, style: 'italic', space_before: 12 },
+      style: { size: 11, style: 'italic', space_before: 12 },
     }),
     node('cover-break', { type: 'page_break', content: null }),
 
@@ -126,6 +133,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     node('s1-2-text', {
       type: 'text_block',
       content: { text: '[This subsection makes the Intellectual Merit case. Describe the core technical innovation — the specific scientific or engineering advance that makes your solution possible. Be concrete about the mechanism: what is novel, why it has not been done before, and what fundamental insight or new capability it rests on. NSF funds non-incremental, high-technical-risk innovation, so distinguish sharply between what is already known/de-risked and the genuine unknowns this project will resolve. State the central technical hypothesis you will test in Phase I. 2–3 paragraphs.]' },
+    }),
+    node('s1-2-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'System architecture and innovation concept diagram', width: 900, height: 520, caption: 'Figure 1: [System architecture / innovation concept — label the novel mechanism and how it advances the state of the art]' },
+      style: { space_before: 6, space_after: 6 },
     }),
 
     node('s1-3-heading', {
@@ -200,6 +212,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
       type: 'text_block',
       content: { text: '[This is the heart of the Intellectual Merit case and typically the longest subsection. Describe in detail the methods, models, experimental design, and analysis you will use to meet each objective. Ground the approach in the underlying science and justify design choices against alternatives you considered and rejected. Include any preliminary data or proof-of-concept results — they materially strengthen a Phase I proposal. Reference figures and prior literature. 3–5 paragraphs.]' },
     }),
+    node('s3-1-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Preliminary results or proof-of-concept data plot', width: 900, height: 520, caption: 'Figure 2: [Preliminary results / proof-of-concept data — the plot that most de-risks feasibility]' },
+      style: { space_before: 6, space_after: 6 },
+    }),
 
     node('s3-2-heading', {
       type: 'heading', content: { level: 2, text: '3.2 Tasks and Methodology', numbering: '3.2' },
@@ -241,6 +258,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
         column_widths: [55, 175, 195, 55],
         border_style: 'single',
       },
+    }),
+    node('s3-3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I milestone schedule Gantt chart', width: 900, height: 460, caption: 'Figure 3: [Phase I milestone schedule / Gantt — tasks vs. months with the go/no-go decision point marked]' },
+      style: { space_before: 6, space_after: 6 },
     }),
     node('s3-break', { type: 'page_break', content: null }),
 
@@ -284,6 +306,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     node('s5-1-text', {
       type: 'text_block',
       content: { text: '[Define the customer and the market. Identify the specific first customer segment (not just an industry), the total addressable and serviceable markets with cited sources, and the concrete pain your customer will pay to remove. Summarize any customer discovery you have done — interviews, letters of support, pilots, or NSF I-Corps participation carry real weight here. Quantify the value proposition (dollars saved, revenue enabled, risk reduced). 2–3 paragraphs.]' },
+    }),
+    node('s5-1-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Market opportunity sizing chart', width: 900, height: 500, caption: 'Figure 4: [Market opportunity — TAM / SAM / SOM with cited sources, or the customer value-proposition comparison]' },
+      style: { space_before: 6, space_after: 6 },
     }),
 
     node('s5-2-heading', {

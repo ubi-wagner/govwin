@@ -5,16 +5,18 @@
  *   executive summary → the problem & why it matters → our approach &
  *   technology → results & evidence → implications for leaders → about us.
  *
- * Letter, Times New Roman 12pt, 1-inch margins (letter_standard). Includes
- * a cover, a table of contents, and real, publication-ready prose with
- * {merge_field} placeholders (and a few clearly-marked spots for the
- * company's own figures/citations).
+ * Calibri 11pt on the letter_collateral preset (running company header,
+ * page-numbered footer, figures enabled). Includes a cover with hero art, a
+ * table of contents, two in-body figure placeholders, and real,
+ * publication-ready prose with {merge_field} placeholders (and clearly-marked
+ * spots for the company's own figures/citations).
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// Thought-leadership white paper: Calibri 11pt, running header + page-numbered footer, figures on.
+const PRESET: CanvasRules = CANVAS_PRESETS.letter_collateral;
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -65,6 +67,11 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
       type: 'text_block',
       content: { text: '{company_name}   ·   {website}' },
       style: { alignment: 'center', size: 12, weight: 'bold', space_before: 40 },
+    }),
+    node('cover-hero', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Hero image', width: 484, height: 210, caption: '' },
+      style: { alignment: 'center', space_before: 28 },
     }),
     node('cover-break', { type: 'page_break', content: null }),
 
@@ -151,6 +158,11 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
       content: { text: 'The result is technology that fits the government environment rather than fighting it — capability that operators actually adopt, that security teams can defend, and that leaders can stand behind.' },
       style: { space_before: 6 },
     }),
+    node('s3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Figure 1', width: 380, height: 200, caption: 'Figure 1: [Reference architecture — how the solution fits the mission environment]' },
+      style: { alignment: 'center', space_before: 8, space_after: 8 },
+    }),
 
     // ─── 4. Results & Evidence ──────────────────────────────────
     node('s4-h', {
@@ -183,6 +195,11 @@ export const MARKETING_WHITEPAPER: CanvasDocument = {
       type: 'text_block',
       content: { text: 'These are representative results; outcomes depend on scope and starting point. What does not change is the underlying discipline — measure, integrate, and deliver in increments — which is what makes the gains durable rather than one-time. [Replace the figures above with your own program metrics and add a short customer proof point or quotation to strengthen this section.]' },
       style: { space_before: 6 },
+    }),
+    node('s4-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Figure 2', width: 380, height: 200, caption: 'Figure 2: [Results — outcome metrics, traditional approach vs. with {product_name}]' },
+      style: { alignment: 'center', space_before: 8, space_after: 8 },
     }),
 
     // ─── 5. Implications for Leaders ────────────────────────────

@@ -64,10 +64,15 @@ export const DOD_STTR_PHASE2_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover Page ─────────────────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 468, height: 96, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 24 },
+    }),
     node('cover-title', {
       type: 'heading',
       content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', size: 16 },
+      style: { alignment: 'center', size: 16, space_before: 48 },
     }),
     node('cover-subtitle', {
       type: 'heading',
@@ -127,6 +132,11 @@ export const DOD_STTR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
 
     // ─── Section 2: Technical Approach ──────────────────────────
+    node('figure-1', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I feasibility results', width: 420, height: 260, caption: 'Figure 1: [Phase I feasibility results]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s2-heading', {
       type: 'heading',
       content: { level: 1, text: '2. Technical Approach' },
@@ -152,6 +162,11 @@ export const DOD_STTR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s2-methodology-text', {
       type: 'text_block',
       content: { text: '[Detail the research methodology, experimental design, and analytical approaches. Include specific protocols, test conditions, sample sizes, and statistical methods. Explain how each experiment maps to a technical objective and to the SBC or RI performing it.]' },
+    }),
+    node('figure-2', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'System architecture and technical approach diagram', width: 420, height: 260, caption: 'Figure 2: [System architecture / technical approach]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s2-milestones', {
       type: 'heading',
@@ -207,6 +222,11 @@ export const DOD_STTR_PHASE2_TECHNICAL: CanvasDocument = {
         column_widths: [150, 190, 80, 120],
         border_style: 'single',
       },
+    }),
+    node('figure-3', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'SBC and RI work allocation and collaboration diagram', width: 420, height: 240, caption: 'Figure 3: [SBC/RI work allocation & collaboration]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s3-ip', {
       type: 'heading',
@@ -299,6 +319,11 @@ export const DOD_STTR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s6-targets-text', {
       type: 'text_block',
       content: { text: '[Identify the specific Department of War programs of record, prime contractors, or acquisition pathways that will adopt the technology, and the technical and programmatic steps to move from a Phase II prototype to a fielded capability. Describe the continuing role, if any, of {research_institution}.]' },
+    }),
+    node('figure-4', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase III transition timeline', width: 420, height: 240, caption: 'Figure 4: [Phase III transition timeline]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
     }),
     node('s6-commitments', {
       type: 'heading',

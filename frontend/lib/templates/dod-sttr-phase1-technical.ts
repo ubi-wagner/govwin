@@ -57,9 +57,14 @@ export const DOD_STTR_PHASE1_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover Page ─────────────────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 468, height: 96, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 18 },
+    }),
     node('cover-title', {
       type: 'heading', content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', space_before: 120 },
+      style: { alignment: 'center', space_before: 24 },
     }),
     node('cover-subtitle', {
       type: 'text_block', content: { text: 'STTR Phase I Technical Volume' },
@@ -127,6 +132,11 @@ export const DOD_STTR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '{company_name} proposes [name the innovation in a single crisp sentence]. The core innovation is [what is genuinely new versus the state of the art — a method, material, algorithm, architecture, or process]. Where current approaches [limitation], our approach [advantage], enabling [quantified benefit]. This concept builds on foundational research at {research_institution} in [research area], transitioning that fundamental science toward a fieldable Department of War capability — the central intent of the STTR program. [2–3 paragraphs. Reviewers score novelty and technical merit heavily; be specific and defensible.]' },
     }),
 
+    node('figure-1', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Solution concept and proposed innovation diagram', width: 400, height: 250, caption: 'Figure 1: [Solution concept / proposed innovation]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s1-3-heading', {
       type: 'heading', content: { level: 2, text: '1.3 Technical Objectives', numbering: '1.3' },
     }),
@@ -153,6 +163,11 @@ export const DOD_STTR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[This is the core of the proposal and the most heavily weighted section. Describe the joint technical approach in detail: the methods, models, algorithms, experiments, and analyses {company_name} and {research_institution} will use to achieve each objective. Identify which tasks are performed by the small business concern and which by the research institution, consistent with the work allocation in Section 2. Present preliminary or prior data, cite the relevant technical literature, and explain why the approach will work and what the principal technical risks are. 3–5 paragraphs with figures and tables as needed.]' },
     }),
 
+    node('figure-2', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Joint technical approach and system architecture', width: 400, height: 250, caption: 'Figure 2: [Joint technical approach / system architecture]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s1-5-heading', {
       type: 'heading', content: { level: 2, text: '1.5 Schedule & Milestones', numbering: '1.5' },
     }),
@@ -254,6 +269,11 @@ export const DOD_STTR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[Describe how the joint effort is managed across the two organizations: the integrated master schedule, communication cadence, data-sharing mechanism, and how the Principal Investigator, {pi_name}, coordinates the SBC and RI teams. Identify the single PI responsible for overall technical direction and the RI research lead, and describe how deliverables from {research_institution} feed the SBC integration and test tasks.]' },
     }),
 
+    node('figure-3', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'SBC and RI collaboration and data flow diagram', width: 400, height: 240, caption: 'Figure 3: [SBC/RI collaboration & data flow]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s2-4-heading', {
       type: 'heading', content: { level: 2, text: '2.4 Intellectual Property Allocation Agreement', numbering: '2.4' },
     }),
@@ -330,6 +350,11 @@ export const DOD_STTR_PHASE1_TECHNICAL: CanvasDocument = {
       content: { text: '[Explain the path from Phase I feasibility to a Phase II prototype to Phase III production or fielding. Identify specific Department of War programs of record, prime contractors, or commercial customers who would adopt the technology, and describe the continuing role of {research_institution} in development. Include any Letters of Intent, memoranda of understanding, or existing relationships.]' },
     }),
 
+    node('figure-4', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I to Phase III transition timeline', width: 400, height: 240, caption: 'Figure 4: [Phase I to II to III transition timeline]' },
+      style: { alignment: 'center', space_before: 12, space_after: 12 },
+    }),
     node('s6-3-heading', {
       type: 'heading', content: { level: 2, text: '6.3 Intellectual Property', numbering: '6.3' },
     }),

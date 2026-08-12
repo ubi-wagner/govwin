@@ -14,17 +14,19 @@
  *   3. Market Opportunity
  *   4. Company and Team
  *
- * Times New Roman 12pt, 1-inch margins (letter_standard), 3-page limit. Because
- * it is short and prose-only, there is no cover page or table of contents — a
- * compact identity block leads straight into the four prompts.
+ * Times New Roman 11pt, 1-inch margins with a running header + page-numbered
+ * footer (letter_agency), 3-page limit. Because it is short and prose-only, there
+ * is no cover page or table of contents — a masthead banner and a compact identity
+ * block lead straight into the four prompts.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-// Short prose pre-proposal: 12pt Times New Roman, 1-inch margins, 3-page cap.
+// Short prose pre-proposal: 11pt Times New Roman, 1-inch margins, running header +
+// page-numbered footer (letter_agency), 3-page cap.
 const PRESET: CanvasRules = {
-  ...CANVAS_PRESETS.letter_standard,
+  ...CANVAS_PRESETS.letter_agency,
   max_pages: 3,
 };
 
@@ -57,10 +59,17 @@ export const NSF_PROJECT_PITCH: CanvasDocument = {
     status: 'empty',
   },
   nodes: [
+    // ─── Masthead banner ────────────────────────────────────────
+    node('banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 936, height: 90, caption: '' },
+      style: { alignment: 'center', space_after: 10 },
+    }),
+
     // ─── Identity Block ─────────────────────────────────────────
     node('hdr-title', {
       type: 'heading', content: { level: 1, text: '{project_title}' },
-      style: { alignment: 'center' },
+      style: { alignment: 'center', space_before: 6 },
     }),
     node('hdr-subtitle', {
       type: 'text_block', content: { text: 'NSF Project Pitch — {company_name}' },
@@ -69,12 +78,12 @@ export const NSF_PROJECT_PITCH: CanvasDocument = {
     node('hdr-meta', {
       type: 'text_block',
       content: { text: 'Topic Area: {topic_area}    |    PI: {pi_name} ({pi_email})    |    Solicitation: {solicitation_number}' },
-      style: { alignment: 'center', size: 10, style: 'italic', space_after: 12 },
+      style: { alignment: 'center', size: 11, style: 'italic', space_after: 12 },
     }),
     node('hdr-note', {
       type: 'text_block',
       content: { text: 'The Project Pitch is a deep-tech screen. In three pages, convince a program director that this is a real technological innovation, that Phase I carries genuine technical risk (not routine engineering), and that success unlocks a large commercial market. Keep each answer tight and specific.' },
-      style: { size: 10, style: 'italic', space_after: 12 },
+      style: { size: 11, style: 'italic', space_after: 12 },
     }),
 
     // ─── 1. Technology Innovation ───────────────────────────────
@@ -84,6 +93,11 @@ export const NSF_PROJECT_PITCH: CanvasDocument = {
     node('p1-text', {
       type: 'text_block',
       content: { text: 'Describe the technical innovation that would be the focus of a Phase I project, including a summary of the current state of the art and its limitations. {company_name} is developing [the innovation in one sentence] to [the outcome it enables]. [Explain what is scientifically or technically new, why existing approaches cannot get there, and what specific advance makes yours possible. Emphasize the leap over the state of the art — NSF funds transformative, not incremental, technology. ~1/2 page.]' },
+    }),
+    node('p1-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Innovation concept and system diagram', width: 900, height: 500, caption: 'Figure 1: [System architecture / innovation concept diagram — how the pieces fit and where the advance sits]' },
+      style: { space_before: 6, space_after: 6 },
     }),
 
     // ─── 2. Technical Objectives and Challenges ─────────────────
@@ -112,6 +126,11 @@ export const NSF_PROJECT_PITCH: CanvasDocument = {
     node('p3-text', {
       type: 'text_block',
       content: { text: 'Describe the customer profile and pain point that motivate this innovation, and the size of the market opportunity. [Name the specific first customer and the concrete problem they will pay to solve, quantify the total addressable market with a cited source, and state the value proposition in dollars saved or revenue enabled. Cite any customer discovery — interviews, letters of interest, or pilots — that shows real pull. ~1/2 page.]' },
+    }),
+    node('p3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Market opportunity sizing', width: 900, height: 500, caption: 'Figure 2: [Market opportunity — TAM / SAM / SOM with a cited source, or the value-proposition comparison]' },
+      style: { space_before: 6, space_after: 6 },
     }),
 
     // ─── 4. Company and Team ────────────────────────────────────

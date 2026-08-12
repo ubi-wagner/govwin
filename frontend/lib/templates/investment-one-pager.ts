@@ -6,17 +6,18 @@
  * onto one letter page: who the company is, the problem, the solution, the
  * market (TAM/SAM/SOM), traction, business model, team, and the ask.
  *
- * Times New Roman 12pt, 1-inch margins (letter_standard), designed to fit a
- * single page. {merge_field} placeholders interpolate at provisioning;
- * [bracketed prompts] mark the specifics the founder fills in.
+ * Calibri 10.5pt on the letter_onepager preset (contact footer, hard 1-page
+ * cap, figures enabled), designed to FILL a single page — hero banner + tight,
+ * evenly-weighted sections. {merge_field} placeholders interpolate at
+ * provisioning; [bracketed prompts] mark the specifics the founder fills in.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-// One-page investor summary: 12pt Times New Roman, 1-inch margins, 1-page target.
+// One-page investor summary: Calibri 10.5pt, page-anchored contact footer, hard 1-page cap, figures on.
 const PRESET: CanvasRules = {
-  ...CANVAS_PRESETS.letter_standard,
+  ...CANVAS_PRESETS.letter_onepager,
   max_pages: 1,
 };
 
@@ -56,7 +57,14 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
     }),
     node('hdr-tagline', {
       type: 'text_block', content: { text: '{tagline}' },
-      style: { alignment: 'center', size: 13, style: 'italic', space_after: 10 },
+      style: { alignment: 'center', size: 13, style: 'italic', space_after: 8 },
+    }),
+
+    // ─── Hero band (company / product imagery) ──────────────────
+    node('hero', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Hero image', width: 504, height: 104, caption: '' },
+      style: { alignment: 'center', space_after: 8 },
     }),
 
     // ─── Problem ────────────────────────────────────────────────
@@ -65,7 +73,7 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
     }),
     node('problem-t', {
       type: 'text_block',
-      content: { text: 'Every day, [target customers] lose time and money to [the core problem {company_name} solves]. The tools they have today are manual, fragmented, and expensive — and the gap only widens as [the key market trend] accelerates.' },
+      content: { text: 'Every day, [target customers] lose time and money to [the core problem {company_name} solves]. Today\'s tools are manual, fragmented, and costly — and the gap widens as [the key market trend] accelerates.' },
     }),
 
     // ─── Solution ───────────────────────────────────────────────
@@ -74,7 +82,7 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
     }),
     node('solution-t', {
       type: 'text_block',
-      content: { text: '{company_name} is {tagline}. [One sentence on what the product does and the outcome it delivers], so customers get [the key benefit] without [the old tradeoff]. It works out of the box and gets smarter with every use.' },
+      content: { text: '{company_name} is {tagline}. [One line on what the product does and the outcome it delivers], so customers get [the key benefit] without [the old tradeoff].' },
     }),
 
     // ─── Market ─────────────────────────────────────────────────
@@ -125,7 +133,7 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
     }),
     node('model-t', {
       type: 'text_block',
-      content: { text: 'We earn revenue through [subscription / usage / transaction] pricing at [$X per seat / unit / month], at [M]% gross margin, with a [self-serve / sales-led] motion that expands via [land-and-expand].' },
+      content: { text: 'Recurring [subscription / usage] pricing, [M]% gross margin, [self-serve / sales-led] land-and-expand.' },
     }),
 
     // ─── Team ───────────────────────────────────────────────────
@@ -134,7 +142,7 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
     }),
     node('team-t', {
       type: 'text_block',
-      content: { text: '[Founder Name], CEO — [prior company / domain, N years]. [Cofounder Name], CTO — [technical background]. Backed by advisors from [notable organizations].' },
+      content: { text: 'CEO [Founder] — [prior domain]. CTO [Cofounder] — [background]. Advisors from [notable orgs].' },
     }),
 
     // ─── The Ask ────────────────────────────────────────────────
@@ -145,12 +153,7 @@ export const INVESTMENT_ONE_PAGER: CanvasDocument = {
       type: 'text_block',
       content: { text: '{company_name} is raising {raise_amount} to {use_of_funds}. This funds [N] months of runway to reach [the milestone that de-risks the next round].' },
     }),
-
-    // ─── Contact ────────────────────────────────────────────────
-    node('contact', {
-      type: 'text_block',
-      content: { text: '{company_name}    ·    {contact_email}    ·    [yourdomain.com]' },
-      style: { alignment: 'center', size: 11, weight: 'bold', space_before: 10 },
-    }),
+    // Contact intentionally lives in the page-anchored footer (letter_onepager:
+    // "{company_name} · {contact_email} · {website}") — no duplicate in-body line.
   ],
 };

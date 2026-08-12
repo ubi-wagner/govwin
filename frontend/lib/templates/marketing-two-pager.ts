@@ -6,15 +6,21 @@
  *   Page 1 — company overview · core competencies · differentiators
  *   Page 2 — past performance · company data (CAGE/UEI/NAICS/set-asides/POC)
  *
- * Letter, Times New Roman 12pt, 1-inch margins (letter_standard). The
- * company-data block is a two-column table per convention. Real, polished
- * starter copy with {merge_field} placeholders.
+ * Calibri 11pt on the letter_collateral preset (running company header,
+ * page-numbered footer, figures enabled), balanced across two pages — a
+ * letterhead banner up top and a past-performance figure on page 2. The
+ * company-data block is a two-column table per convention, with {merge_field}
+ * placeholders.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// Two-page capability statement: Calibri 11pt, running header + page-numbered footer, figures on, 2-page cap.
+const PRESET: CanvasRules = {
+  ...CANVAS_PRESETS.letter_collateral,
+  max_pages: 2,
+};
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return {
@@ -45,6 +51,13 @@ export const MARKETING_TWO_PAGER: CanvasDocument = {
     status: 'empty',
   },
   nodes: [
+    // ─── Letterhead banner (logo / brand imagery) ──────────────
+    node('banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Hero image', width: 484, height: 90, caption: '' },
+      style: { alignment: 'center', space_after: 6 },
+    }),
+
     // ─── Masthead ───────────────────────────────────────────────
     node('masthead-name', {
       type: 'heading',
@@ -139,6 +152,12 @@ export const MARKETING_TWO_PAGER: CanvasDocument = {
         border_style: 'single',
       },
       style: { space_before: 6 },
+    }),
+    // ─── Past-performance figure ───────────────────────────────
+    node('pp-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Figure 1', width: 300, height: 150, caption: 'Figure 1: [Past-performance results graphic — e.g., outcomes bar chart]' },
+      style: { alignment: 'center', space_before: 6, space_after: 6 },
     }),
 
     // ─── Company Data ───────────────────────────────────────────

@@ -17,16 +17,18 @@
  * employed by EITHER the small business OR the research institution — unlike
  * SBIR, where the PI must be primarily employed by the small business.
  *
- * Times New Roman 12pt, 1-inch margins (DOE requires body text no smaller than
- * 11pt); the Technical Narrative is capped at 20 pages.
+ * Times New Roman 11pt, 1-inch margins with a running header + page-numbered
+ * footer (letter_agency; DOE requires body text no smaller than 11pt); the
+ * Technical Narrative is capped at 20 pages.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-// DOE prose narrative: 12pt Times New Roman, 1-inch margins, 20-page cap.
+// DOE prose narrative: 11pt Times New Roman, 1-inch margins, running header +
+// page-numbered footer (letter_agency), 20-page cap.
 const PRESET: CanvasRules = {
-  ...CANVAS_PRESETS.letter_standard,
+  ...CANVAS_PRESETS.letter_agency,
   max_pages: 20,
 };
 
@@ -60,9 +62,14 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
   },
   nodes: [
     // ─── Cover / Identity Block ─────────────────────────────────
+    node('cover-banner', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Company banner', width: 936, height: 90, caption: '' },
+      style: { alignment: 'center', space_before: 24, space_after: 12 },
+    }),
     node('cover-title', {
       type: 'heading', content: { level: 1, text: '{topic_number}: {topic_title}' },
-      style: { alignment: 'center', space_before: 120 },
+      style: { alignment: 'center', space_before: 18 },
     }),
     node('cover-subtitle', {
       type: 'text_block', content: { text: 'DOE STTR Phase I — Technical Narrative' },
@@ -80,6 +87,7 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
           { text: 'Value', style: { bg: '#f0f0f0' } },
         ],
         rows: [
+          ['Proposal Title', '{project_title}'],
           ['FOA Number', '{solicitation_number}'],
           ['Sponsoring Program Office', '{doe_program_office}'],
           ['Topic Number', '{topic_number}'],
@@ -101,7 +109,7 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
     node('cover-note', {
       type: 'text_block',
       content: { text: 'DOE STTR is a mission grant executed as a formal small-business/research-institution collaboration. Reviewers weigh the scientific/technical approach, the team, and the SIGNIFICANCE of the work to the sponsoring program office — and, uniquely for STTR, the quality of the partnership and compliance with the ≥40% / ≥30% work split. Make the mission relevance and the collaboration both unmistakable.' },
-      style: { size: 10, style: 'italic', space_before: 12 },
+      style: { size: 11, style: 'italic', space_before: 12 },
     }),
     node('cover-break', { type: 'page_break', content: null }),
 
@@ -133,6 +141,11 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
     node('s1-3-text', {
       type: 'text_block',
       content: { text: '{company_name}, in partnership with {research_institution}, proposes [the innovation in one or two sentences]. [Describe what is novel, the scientific or engineering principle it rests on, and how the small-business/research-institution pairing is uniquely positioned to prove it. State the central feasibility question Phase I will answer. 1–2 paragraphs.]' },
+    }),
+    node('s1-3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Proposed innovation and collaboration concept diagram', width: 900, height: 520, caption: 'Figure 1: [Proposed innovation / collaboration concept — the novel mechanism and how the small business and research institution jointly prove it]' },
+      style: { space_before: 6, space_after: 6 },
     }),
     node('s1-break', { type: 'page_break', content: null }),
 
@@ -174,6 +187,11 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
         ],
       },
     }),
+    node('s3-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Technical approach and partner task-flow diagram', width: 900, height: 520, caption: 'Figure 2: [Technical approach & partner task flow — which tasks the small business performs, which the research institution performs, and the hand-offs between them]' },
+      style: { space_before: 6, space_after: 6 },
+    }),
     node('s3-deliverables-heading', {
       type: 'heading', content: { level: 2, text: '3.1 Deliverables', numbering: '3.1' },
     }),
@@ -210,6 +228,11 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
         column_widths: [50, 165, 65, 55, 145],
         border_style: 'single',
       },
+    }),
+    node('s4-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Phase I milestone schedule Gantt chart with performers', width: 900, height: 460, caption: 'Figure 3: [Phase I milestone schedule (Gantt) — task bars across the period of performance by performer (SBC / RI / joint), with the go/no-go decision point marked]' },
+      style: { space_before: 6, space_after: 6 },
     }),
 
     // ─── 5. Related Research or R&D (~1 page) ───────────────────
@@ -312,6 +335,11 @@ export const DOE_STTR_PHASE1_TECHNICAL: CanvasDocument = {
     node('s9-1-text', {
       type: 'text_block',
       content: { text: '[Describe the commercial opportunity if Phase I and II succeed: the target market and its size (with sources), the specific customers, and the value proposition. Identify both the commercial market and any DOE/federal adoption path. The small business holds the lead commercialization role; make that explicit. 1–2 paragraphs.]' },
+    }),
+    node('s9-1-figure', {
+      type: 'image',
+      content: { storage_key: '', alt_text: 'Market opportunity and energy impact chart', width: 900, height: 500, caption: 'Figure 4: [Market opportunity & energy impact — TAM / SAM / SOM with sources, or the projected energy/cost impact at scale]' },
+      style: { space_before: 6, space_after: 6 },
     }),
     node('s9-2-heading', {
       type: 'heading', content: { level: 2, text: '9.2 Path to Market and Economic/Energy Impact', numbering: '9.2' },
