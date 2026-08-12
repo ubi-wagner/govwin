@@ -60,3 +60,31 @@ export function uploadHref(
   if (entityType === 'proposal' && entityId) return `/portal/${tenantSlug}/proposals/${entityId}`;
   return null;
 }
+
+/**
+ * The "open the thing this ToDo is about" deep-link (HITL P4). Generalizes uploadHref across the
+ * entity types a ToDo can reference — tenant-plane (needs tenantSlug) and admin-plane. Returns null
+ * when there's no sensible destination (the ToDo stays completable without a link).
+ *   proposal        → the tenant proposal workspace
+ *   content_pages   → the admin Content Studio (via a resolver that maps the row id → type/slug)
+ *   source          → the admin Sources workspace
+ *   opportunity/solicitation → admin curation
+ *   contract        → the tenant contract workspace
+ */
+export function taskHref(opts: {
+  tenantSlug?: string | null;
+  entityType: string | null;
+  entityId: string | null;
+}): string | null {
+  const { tenantSlug, entityType, entityId } = opts;
+  if (!entityType || !entityId) return null;
+  switch (entityType) {
+    case 'proposal': return tenantSlug ? `/portal/${tenantSlug}/proposals/${entityId}` : null;
+    case 'contract': return tenantSlug ? `/portal/${tenantSlug}/contracts/${entityId}` : null;
+    case 'content_pages': return `/admin/site/content/${entityId}`; // resolver → Studio editor
+    case 'source': return `/admin/sources/${entityId}`;
+    case 'opportunity':
+    case 'solicitation': return `/admin/rfp-curation`;
+    default: return null;
+  }
+}

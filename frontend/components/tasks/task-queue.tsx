@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Urgency, urgencyOf, sortByUrgency } from '@/lib/tasks/urgency';
-import { taskCompleterKind, formFields, uploadHref } from '@/lib/tasks/completers';
+import { taskCompleterKind, formFields, taskHref } from '@/lib/tasks/completers';
 import { resolveTaskWorkflow, type TaskWorkflowDef } from '@/lib/tasks/workflows';
 
 export interface QueueTask {
@@ -229,15 +229,34 @@ function TaskCompleter({
   busy: boolean;
   onComplete: (decision: Record<string, unknown>) => void;
 }) {
+  // A manager-access request is NOT completed from the queue (the generic completer 409s) — it is
+  // approved/declined on the company Team page. Route the human there instead. (HITL G6.)
+  if (task.taskType === 'manager_request') return <ManagerRequestCompleter tenantSlug={tenantSlug} />;
+
+  // "Open the thing this ToDo is about" deep-link (HITL P4) — shown on review/upload gates.
+  const openHref = taskHref({ tenantSlug, entityType: task.entityType, entityId: task.entityId });
+
   // Explicit params.kind wins; otherwise the ToDo completes the way its defined
   // workflow prescribes (e.g. broadcast → acknowledge, review_section → review).
   const kind = taskCompleterKind(task.params, workflow.completer);
   if (kind === 'acknowledge') return <AcknowledgeCompleter busy={busy} onComplete={onComplete} />;
   if (kind === 'form') return <FormCompleter task={task} busy={busy} onComplete={onComplete} />;
   if (kind === 'upload') {
-    return <UploadCompleter task={task} tenantSlug={tenantSlug} busy={busy} onComplete={onComplete} />;
+    return <UploadCompleter openHref={openHref} busy={busy} onComplete={onComplete} />;
   }
-  return <ReviewCompleter busy={busy} onComplete={onComplete} />;
+  return <ReviewCompleter openHref={openHref} busy={busy} onComplete={onComplete} />;
+}
+
+/** manager_request routes to the Team page (its real approve/decline surface), not a queue completer. */
+function ManagerRequestCompleter({ tenantSlug }: { tenantSlug?: string }) {
+  if (!tenantSlug) return <div className="mt-2 text-xs text-gray-500">Approve or decline on the company Team page.</div>;
+  return (
+    <div className="mt-2">
+      <a href={`/portal/${tenantSlug}/team`} className="rounded border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+        Review on Team page &rarr;
+      </a>
+    </div>
+  );
 }
 
 /**
@@ -258,9 +277,14 @@ function AcknowledgeCompleter({ busy, onComplete }: { busy: boolean; onComplete:
   );
 }
 
-function ReviewCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
+function ReviewCompleter({ openHref, busy, onComplete }: { openHref?: string | null; busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
   return (
-    <div className="mt-2 flex gap-2">
+    <div className="mt-2 flex flex-wrap gap-2">
+      {openHref && (
+        <a href={openHref} className="rounded border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+          Open &rarr;
+        </a>
+      )}
       <button
         onClick={() => onComplete({ approved: true })}
         disabled={busy}
@@ -280,22 +304,19 @@ function ReviewCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: 
 }
 
 function UploadCompleter({
-  task,
-  tenantSlug,
+  openHref,
   busy,
   onComplete,
 }: {
-  task: QueueTask;
-  tenantSlug?: string;
+  openHref?: string | null;
   busy: boolean;
   onComplete: (d: Record<string, unknown>) => void;
 }) {
-  const href = tenantSlug ? uploadHref(tenantSlug, task.entityType, task.entityId) : null;
   return (
     <div className="mt-2 flex items-center gap-2">
-      {href && (
+      {openHref && (
         <a
-          href={href}
+          href={openHref}
           className="rounded border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
         >
           Open to upload
