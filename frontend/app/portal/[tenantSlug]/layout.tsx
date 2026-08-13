@@ -26,6 +26,15 @@ export async function generateMetadata({
   }
 }
 
+/** A quiet uppercase group label in the sidebar nav (like the admin nav sections). */
+function NavSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-1 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+      {children}
+    </div>
+  );
+}
+
 /**
  * Portal layout — server component with auth + tenant access check.
  *
@@ -127,29 +136,32 @@ export default async function PortalLayout({
             {!isPartner && <NotificationBell tenantSlug={tenantSlug} />}
           </div>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
+          {/* Sectioned nav — the 17 destinations grouped into Pursue / Build / Work / Account
+              (mirrors the admin nav). Section headers render only for roles that have items in
+              them, so a partner/tenant_user never sees an empty header. */}
           <nav className="flex flex-col gap-1 text-sm">
-            {!isPartner && (
+            {!isPartner && <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>}
+
+            {/* Pursue — BD surfaces, tenant_admin only (find + rank opportunities). */}
+            {isTenantAdmin && (
               <>
-                <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>
-                {/* Admin console ("Page 2") — the setup/governance hub. Same
-                    tenant_admin floor as the other admin surfaces (serves a
-                    descended shadow admin via rank). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/manage`}>Manage</PortalNavLink>}
-                {/* BD surfaces — delegated authority, gated to tenant_admin to
-                    match the cockpit's grant model (a base tenant_user does not
-                    see Opportunities/Buckets/Builds). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
-                <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>
-                {/* Collaboration vaults ("nooks") — segregated per-partner branch
-                    libraries. tenant_admin only (manage members + harvest). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
+                <NavSection>Pursue</NavSection>
+                <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>
+                <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>
               </>
             )}
+
+            {/* Build — the proposals and the material they draw from. */}
+            <NavSection>Build</NavSection>
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
-            {/* A direct ToDo surface for every role — the only ToDo view a partner_user has (they
-                have no cockpit drawer); tenant users also keep the cockpit drawer. */}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
+            {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
+            {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
+
+            {/* Work — day-to-day collaboration + tracking. To-dos is the only ToDo view a
+                partner_user has (no cockpit drawer). */}
+            <NavSection>Work</NavSection>
             <PortalNavLink href={`${basePath}/todos`}>To-dos</PortalNavLink>
             {!isPartner && (
               <>
@@ -157,17 +169,19 @@ export default async function PortalLayout({
                 <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>}
-                {isTenantAdmin && (
-                  <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
-                )}
-                {isTenantAdmin && (
-                  <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>
-                )}
               </>
             )}
+
+            {/* Account — setup + governance (non-partner). "Manage" is the setup hub. */}
             {!isPartner && (
-              <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+              <>
+                <NavSection>Account</NavSection>
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/manage`}>Manage</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>}
+                <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+              </>
             )}
           </nav>
         </div>
