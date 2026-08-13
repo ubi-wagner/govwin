@@ -1,6 +1,222 @@
 # Agent Fabric Design — RFP Pipeline
 
-**Status:** As-built. The `AgentFabric` auto-registers **27 archetypes** at pipeline boot; **dormant ≠
+## Introduction — the workforce (a firm of 36)
+
+Think of the agent fabric as a **firm of 36 specialist AI workers**, each with a job, a set of skills
+(the tools it may call), and an **employer** it is bound to. There are two employers:
+
+- **RFP Pipeline — the platform operator ("our-org").** Eleven **platform-scope** staff work on
+  *master + our-org* data for the RFP admin: they find and triage opportunities, curate uploaded
+  solicitations into the master compliance record, keep the ops river healthy, and run our own
+  marketing/CMS. They have **no tenant to bind to** and never touch a customer's private content.
+- **Each customer company — a tenant.** Twenty-five **tenant-scope** staff are *seconded into every
+  customer company*, bound to that one tenant's data with **tenant_user authority and nothing more**
+  (their tool schemas expose no `tenant_id` — the company is fixed by the trusted task context, so a
+  worker literally cannot reach another company's data). They build, cost, review, and package that
+  company's proposals and tend its library.
+
+Every worker — regardless of employer — holds the same **employment contract**: it is **advisory**
+(it proposes; it never writes a business table or advances a human gate itself), its untrusted inputs
+are **injection-fenced** (RFP text, web pages, tenant content are data, never instructions), its output
+passes a **guardrail** before it lands or surfaces for review, and it is **runaway-bounded** (round /
+cost / rate / budget caps) and **never dead-ends** a workflow (a failure safe-skips). Reasoning runs on
+Claude on deploy (the pipeline `ANTHROPIC_API_KEY`); in the sandbox it runs on the emulated model.
+Status tags below: **▸live** (fires at a proven site today) · **▹proven** (fires + verified live this
+cycle) · **·wired** (registered + step-mapped, woken as its producer lands).
+
+### Platform staff — employed by RFP Pipeline (our-org)
+
+- **opportunity_scout** ▹proven — *the triage prioritizer.* When a scout/ingest run fills the triage
+  queue, it reads the newly-detected solicitations and crawler leads and ranks them for the RFP admin
+  (pursue-worthy? likely agency/program? possible amendment?). Skills: `get_recent_new_solicitations`,
+  `get_crawled_opportunities`.
+- **ingest_analyst** ▹proven — *the solicitation reader.* After a raw RFP is shredded, it extracts a
+  structured view (agency, program, deadlines, NAICS, set-aside, requirements, evaluation criteria,
+  volume structure) as a curation draft. Skills: `get_solicitation`.
+- **matrix_stager** ▹proven — *the compliance-matrix builder.* From the curated solicitation + extracted
+  variables it derives the master compliance-matrix rows (requirement → item, page limit, format,
+  volume, required form) that get instantiated per tenant at provision. Skills: `get_solicitation`,
+  `get_compliance`.
+- **skeleton_architect** ▹proven — *the master-outline architect.* From the matrix it builds the master
+  response skeleton (volumes → sections → suggested template + page budget) that becomes each tenant's
+  starting structure. Skills: `get_compliance`, `get_outline`.
+- **amendment_monitor** ·wired — *the change watcher.* When a source scan detects a meaningful change,
+  it decides whether it's a compliance-affecting amendment (new requirements, page limits, deadlines)
+  and flags the delta so a mid-flight change never slips through. Skills: `get_recent_changed_solicitations`.
+- **curation_qa** ·wired — *the pre-release QC.* When an admin submits a curated solicitation for review,
+  it runs an advisory quality pass: is the curation complete, do the matrix + skeleton hang together,
+  is anything missing? Skills: `get_solicitation`, `get_compliance`, `get_outline`.
+- **rfp_ingest_manager** ▸live — *the ingest floor manager* (the platform analog of the tenant-side
+  proposal_manager). Given a curated solicitation it reads the ingest state, infers the pipeline stage,
+  and emits one advisory "readiness report + plan": which specialist to run next. Skills: `get_ingest_state`.
+- **ops_digest** ·wired — *the operations analyst.* On a schedule it compiles a health digest for the
+  master_admin: workforce usage/cost/failures, pipeline backlog, SLA breaches, alerts. Skills:
+  `get_workforce_usage`, `get_pipeline_health`. (No human gate — it only reports.)
+- **content_generator** ▹proven — *the marketing copywriter* (our-org CMS). Drafts new marketing content
+  from a brief, grounded in our published voice, for the content-pipeline human review. Skills:
+  `get_published_content`.
+- **content_curator** ·wired — *the social/web scout* (our-org CMS). Reads items a crawler found from
+  organizations we follow and curates the repost-worthy ones with attribution. Skills: `get_repost_candidates`.
+- **social_scheduler** ·wired — *the social publisher* (our-org CMS). On a cadence, picks recently-published /
+  evergreen content and drafts a week's social queue with suggested platform + timing. Skills:
+  `get_publishable_content`.
+
+### Tenant staff — seconded into each customer company
+
+**Onboarding & discovery.**
+- **onboarding_agent** ▹proven — *the concierge.* Cold-starts a brand-new company: assesses what's
+  missing (profile, atoms, buckets, uploads) and produces a day-one plan. Skills: `get_onboarding_context`,
+  `search_library`, `get_tenant_profile`.
+- **opportunity_analyst** ▸live — *the fit assessor.* Judges how well a newly-arrived opportunity fits the
+  company. Skills: `get_tenant_profile`, `search_past_awards`. (Invoked by a per-tenant **producer** on the
+  card-pin route, not a workflow.)
+- **scoring_strategist** ▸live — *the ranking analyst.* Lays an LLM scoring overlay (±15) on top of the
+  algorithmic score, landing beside it — never overwriting. Skills: `get_tenant_profile`, `search_memory`.
+  (Per-tenant **producer** on the pin route. No human gate — the ±15 is guardrail-bounded.)
+- **outcome_analyst** ▹proven — *the win/loss analyst.* When an outcome is recorded, it writes a win/loss
+  lesson to the company's agent memory so the scorer + capture strategist calibrate over time — the
+  learning loop. Skills: `get_proposal_outcome`, `search_memory`.
+
+**The proposal build cohort.**
+- **proposal_architect** ▸live — *the structural architect.* Designs the proposal structure from the
+  solicitation: maps requirements → sections, allocates page budgets, names library sources. Skills:
+  `get_opportunity_detail`, `get_compliance`, `search_library`, `search_memory`.
+- **capture_strategist** ▸live — *the capture lead.* Go/no-go, win themes, competitive positioning,
+  teaming, and a risk register to seed the build. Skills: `get_tenant_profile`, `get_opportunity_detail`,
+  `search_library`, `search_memory`.
+- **section_drafter** ▸live — *the drafter.* Writes the V0 of each section grounded on the company's
+  library atoms (draft → canvas → publish). Skills: `search_starter_scaffold`, `search_library`,
+  `get_compliance`. (Runs via the `draft_v0` action.)
+- **cost_estimator** ·wired — *the cost analyst.* Drafts cost-volume guidance and flags cost-realism
+  issues, backed by a deterministic burden engine (`compute_budget`) so its dollars equal the exported
+  cost sheet. Skills: `get_compliance`, `search_library`, `compute_budget`.
+- **pp_matcher** ·wired — *the past-performance matcher.* Surfaces the company's most relevant PP atoms,
+  proposes the PP-volume structure, and flags capability gaps (which feed teaming). Skills: `get_compliance`,
+  `search_library`.
+- **research_scout** ▸live — *the R&D scout.* On a research request, browses the open web through the
+  controlled server-side browser and writes a cited market/prior-art/competitor brief to memory. Skills:
+  `web_search`, `fetch_page`, `search_memory`.
+- **compliance_reviewer** ▸live — *the compliance checker.* Verifies every solicitation requirement is
+  addressed, emitting a pass/fail/partial matrix — the requirement-coverage gate. Skills: `get_sections`,
+  `get_compliance`, `search_memory`. (No human gate — it's a check.)
+- **color_team_reviewer** ▸live — *the red/gold team.* Reviews a draft against evaluation criteria before
+  a stage advance. Skills: `get_eval_criteria`, `get_compliance_matrix`.
+- **packaging_specialist** ▸live — *the packager.* Compiles the final submission package + manifest,
+  validates formatting/page counts, generates submission instructions. Skills: `get_sections`,
+  `get_compliance`, `search_memory`.
+- **partner_coordinator** ▸live — *the teaming coordinator.* Drafts partner/subcontractor outreach,
+  tracks commitments, flags teaming risks (missing LOIs, uncommitted personnel, scope gaps). Skills:
+  `get_sections`, `get_compliance`, `search_memory`.
+
+**The full-draft manager + production-integrity + adversarial cohort.**
+- **proposal_manager** ·wired — *the draft planner.* Head of the full-draft run: turns skeleton + matrix +
+  ranked atoms into a per-section draft plan (atoms to seed, mode, voice) — it plans, writes nothing.
+  Skills: `get_proposal_skeleton`, `get_compliance_matrix`, `get_ranked_atoms_for_section`, `emit_draft_plan`.
+- **formatter** ·wired — *the scaffold checker.* Checks a section's CanvasDocument scaffold vs the target
+  artifact and stages a re-scaffold when a reused atom's grain/structure mismatches. Skills:
+  `get_section_canvas`, `get_target_scaffold`, `propose_rescaffold`.
+- **stylist** ·wired — *the copy editor.* Normalizes styling across atom pedigrees to the artifact's
+  house style (staged), preserving purposeful emphasis. Skills: `get_artifact_canvas`, `get_house_style`,
+  `propose_restyle`.
+- **continuity_manager** ·wired — *the whole-proposal QA.* Cross-artifact review against the RFP — flags
+  alignment gaps, contradictions, and non-customer entity (provenance) leaks. Skills:
+  `get_all_section_canvases`, `get_all_artifacts`, `get_rfp_context`, `get_compliance_matrix`,
+  `flag_continuity_issues`.
+- **traceability_auditor** ·wired — *the coverage auditor.* Maps every requirement to its covering
+  section; flags unaddressed requirements and orphan sections. Skills: `get_compliance_matrix`,
+  `get_all_section_canvases`, `flag_coverage_gaps`.
+- **redaction_guard** ·wired — *the OPSEC scanner.* Scans assembled content for cross-boundary agency
+  names, CUI/markings, and competitor-sensitive text leaked by reused atoms. Skills: `get_all_artifacts`,
+  `get_opportunity_context`, `flag_redaction_issues`.
+- **market_analyst** ▹proven — *the SOTA researcher.* At a draft/gate, injects fresh cited SOTA + market
+  context that library atoms can't carry (Commercialization; Related-Work / Future-R&D), anchored on a
+  real section. Skills: `get_section_context`, `search_market_sota`, `flag_market_insights`.
+- **advisory_manager** ·wired — *the review foreman.* Wraps any advisor in a 1:n adversarial fan-out and
+  reconciles the results (majority / consensus / refute-vote → remediation), recording advisory memory
+  only. Skills: `plan_fanout`, `reconcile_results`, `record_advisory_memory`.
+
+**Library & reuse.**
+- **librarian** ▸live — *the librarian.* Catalogs, scores, dedupes, and freshness-checks new atoms in the
+  company's `library_atoms`. Skills: `search_atoms`, `match_section_skeleton`, `search_memory`,
+  `get_tenant_profile`. (Producer in the atomize-package route; no human gate.)
+- **library_seed_suggester** ▸live — *the reuse scout.* When a new proposal is provisioned, ranks the
+  company's prior proposals as seed sources against the new matrix. Skills: `get_requirements`,
+  `get_prior_proposals`, `save_candidates`.
+- **library_seed_mapper** ▸live — *the reuse mapper.* After an admin picks a seed source, maps its atoms
+  onto each target section of the new build. Skills: `get_target_sections`, `get_source_atoms`, `save_mapping`.
+
+### The workflows — where the staff report for duty
+
+A workflow is a declarative template: a **trigger** (the event that wakes it) and a sequence of **steps**
+(agent `AI_INVOKE`s, deterministic `ACTION`s, `NOTIFY` emails, `TODO` human gates). Agent steps are
+**independent** so one failing never blocks the human alert or the rest of the run.
+
+**Discovery & intake (platform).**
+- **OnOpportunitiesDetected** — *new finds announce themselves.* `finder:opportunities.detected` →
+  **opportunity_scout** prioritizes the backlog → email the RFP admin → park a triage ToDo.
+- **OnRfpUploaded** — *shred an uploaded RFP into the master record.* `finder:rfp.uploaded` →
+  **ingest_analyst** → **matrix_stager** → **skeleton_architect** → notify.
+- **OnSolicitationReviewRequested** — *pre-release gate.* `finder:solicitation.triaged` → **curation_qa**
+  → notify.
+- **OnSolicitationUpdateScan** — *proactive amendment re-check.* `finder:solicitation.update_scan_requested`
+  (every 6h) → **amendment_monitor** → notify.
+- **OnSourceChangeDetected** — *reactive amendment.* `finder:source.change_detected` → **amendment_monitor**
+  → record → notify → ToDo.
+- **OnIngestAssessmentRequested** — *admin asks "where is this in the pipeline?"* `finder:ingest.assessment_requested`
+  → **rfp_ingest_manager** → notify.
+- **OnSolicitationPushed** — `finder:solicitation.pushed` → notify (no agent; the card fan-out is elsewhere).
+
+**Proposal build (tenant).**
+- **OnProposalCreated** — *the kickoff cohort.* `proposal:proposal.created` → **proposal_architect** ·
+  **capture_strategist** · **cost_estimator** · **pp_matcher** · **research_scout** ·
+  **library_seed_suggester** (independent advisory steps) + the `draft_v0` action (**section_drafter**) →
+  notify the admin to review.
+- **OnProposalAdvancedToReview** — `proposal:proposal.advanced` → **compliance_reviewer** → notify + ToDo.
+- **OnProposalAdvancedToFinal** — `proposal:proposal.advanced` → **packaging_specialist** → notify.
+- **OnCollaboratorInvited** — `proposal:collaborator.invited` → **partner_coordinator** → notify.
+- **OnProposalOutcomeRecorded** — `proposal:outcome.recorded` → attribution action + **outcome_analyst**
+  (the learning loop).
+- **OnProposalSectionEdited** — `proposal:section.saved` → a recompute action (no agent).
+
+**Full-draft, admin-run (tenant).** All three share `proposal:proposal.full_draft_requested` and branch on mode.
+- **Mode A (V0.1, HITL)** → **library_seed_suggester** → **section_drafter** → review ToDo.
+- **Mode B (V0.2, restyle)** → **stylist** → **formatter** → review ToDo.
+- **Mode C (V0.5, full auto)** → **library_seed_suggester** → **section_drafter** → **formatter** →
+  **stylist** → **cost_estimator** → **packaging_specialist** → **continuity_manager** →
+  **traceability_auditor** → **redaction_guard** → (optional) request-overlay action → review ToDo.
+
+**Proposal Studio phases (tenant).** All three share `proposal:review_phase.requested`.
+- **Draft** → **proposal_manager** → **library_seed_suggester** → **section_drafter**.
+- **Refine** → **formatter** → **stylist** → **cost_estimator** → **packaging_specialist**.
+- **Compliance** → **compliance_reviewer** → **continuity_manager** → **traceability_auditor** →
+  **redaction_guard**.
+
+**Adversarial overlay (tenant, reusable).** `proposal:proposal.advisory_overlay_requested` →
+**market_analyst** pre-augments with SOTA (section-anchored) → **continuity_manager** ×N (perspective-diverse
+fan-out) → **advisory_manager** reconciles → **AdvisoryOverlay** lands a HITL review ToDo, or
+**AdvisoryOverlayAuto** records an advisory audit event (per the tenant's policy). Never advances a gate.
+
+**Onboarding (tenant).**
+- **OnApplicationAccepted** — `capture:application.accepted` → **onboarding_agent** cold-starts the company
+  → waits for first login.
+
+**Our-org content & ops (platform).**
+- **OnCmsContentRequested** — `library:content.requested` → **content_generator** → review ToDo → notify.
+- **OnContentResurfaceRequested** — `library:content.resurface_requested` → **content_curator** → notify.
+- **OnSocialScheduleRequested** — `system:social.schedule_requested` → **social_scheduler** → notify.
+- **OnOpsDigestRequested** — `system:ops.digest_requested` → **ops_digest** → notify.
+
+**Ranking & collaboration (no-agent).**
+- **OnCardApplied** / **OnBucketsUpdated** — `capture:card.applied` / `capture:buckets.updated` → a rescore
+  action (the scoring producers enqueue **scoring_strategist** / **opportunity_analyst** separately).
+- **ProjectCollaboration** — `proposal:project.collaboration_requested` → a ToDo + notify.
+
+*(Grounded in source: `pipeline/src/agents/archetypes/*.py` role/scope/tools, the `TOOL_ACTION_TO_ARCHETYPE`
+map, and every `pipeline/src/workflows/*.py` trigger + step — extracted by `scripts/extract_fabric_facts.py`.)*
+
+---
+
+**Status:** As-built. The `AgentFabric` auto-registers **36 archetypes** at pipeline boot; **dormant ≠
 dead** — every archetype is registry-wired and invocable, and "dormant" means only that no producer/step
 fires it yet. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
 plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine those agents plug into is
@@ -8,7 +224,8 @@ plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine 
 `docs/archive/AGENT_ROADMAP.md`. This file is the fabric definition + the how-to for ADDING/UPDATING an archetype
 (§0), plus the original design rationale (§1–8, archived).**
 
-> **AS-BUILT (2026-07-22):** the fabric registers **27 archetypes** (`_ARCHETYPE_CLASSES` in
+> **AS-BUILT (2026-07-22 — #117-era snapshot; the fabric now registers 36, see the Introduction above
+> for the current per-agent roster):** the fabric registered **27 archetypes** at this milestone (`_ARCHETYPE_CLASSES` in
 > `pipeline/src/agents/fabric.py` — `BaseArchetype` excluded). The original #117 batch of 10 is fully wired
 > as workflow actors: section_drafter (`draft_v0` + interactive), compliance_reviewer (inline `ai/compliance`
 > + `AI_INVOKE`), color_team_reviewer (advance queue + `handle_event`), librarian (producer in
@@ -32,7 +249,8 @@ plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine 
 > NOBYPASSRLS pool (`AGENT_DATABASE_URL`); **inert under today's bypass role — the deploy CUTOVER is pending**
 > (`AGENT_WORKFORCE.md §7–8`). Oversight: `/admin/agents` → Agent Workforce (roster + per-tenant usage rollup,
 > forward-only bridge).
-**Last updated:** 2026-07-22.
+**Last updated:** 2026-08-13 (Introduction — the firm of 36 — added; §1–8 + §0 below are the older
+design/#117-era material, retained for history).
 **Author:** Claude (Opus 4.7 / 4.8) + Eric Wagner
 
 This document defines how Claude agents are deployed, provisioned,
@@ -43,11 +261,12 @@ and the specific agent archetypes at each layer.
 > **⚠ Superseded in part (as-built).** §1–8 are the original pre-implementation design and the
 > "Review Agent / Compliance Checker / Color Team Simulator" names/tables below are design-era. The as-built
 > source of truth is **`docs/AGENT_WORKFORCE.md`** (roster + safety contract) and **`docs/AUTOMATION_SPINE_MAP.md`**
-> (the spine the agents run on); `pipeline/src/agents/` is the code. As-built: **`fabric.py` now registers 25
-> archetypes** (up from the 10 in the #117 batch) under their real `role_name`s (section_drafter,
-> compliance_reviewer, color_team_reviewer, opportunity_analyst, scoring_strategist, capture_strategist,
-> proposal_architect, librarian, partner_coordinator, packaging_specialist, + the 15 in §0.1). The cost/status
-> tables below are design estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+> (the spine the agents run on); `pipeline/src/agents/` is the code. As-built: **`fabric.py` now registers
+> 36 archetypes** (the Introduction above is the current per-agent roster; this note captured an interim 25,
+> up from the 10 in the #117 batch) under their real `role_name`s (section_drafter, compliance_reviewer,
+> color_team_reviewer, opportunity_analyst, scoring_strategist, capture_strategist, proposal_architect,
+> librarian, partner_coordinator, packaging_specialist, + the rest). The cost/status tables below are design
+> estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
 
 ---
 
@@ -56,12 +275,16 @@ and the specific agent archetypes at each layer.
 > The canonical roster + safety detail is `docs/AGENT_WORKFORCE.md`; the forward plan is
 > `docs/archive/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
 
-### 0.1 The 27 archetypes (registry-wired · dormant ≠ dead)
+### 0.1 The archetypes (registry-wired · dormant ≠ dead) — #117-era illustrative snapshot
 
-All 27 auto-register from `_ARCHETYPE_CLASSES` at fabric boot (`fabric.py::_register_all_archetypes`),
-keyed by their `role_name`. The **canonical per-agent roster (scope · trigger · live/dormant status)
-lives in `AGENT_WORKFORCE.md §1`** — this is the fabric-doc mirror. The core #117 tenant-side ten (fully
-producer/step-wired) are the illustrative set below; the other 15 are grouped after it.
+> **Current roster is the Introduction above (the firm of 36).** This subsection is the #117-era
+> illustrative snapshot (27 at the time) and is retained for history — the P1–P4 Proposal Draft Manager
+> program later added the +8 production-integrity / manager cohort to reach 36.
+
+At the #117 milestone, 27 auto-registered from `_ARCHETYPE_CLASSES` at fabric boot
+(`fabric.py::_register_all_archetypes`), keyed by their `role_name`. The **canonical per-agent roster (scope ·
+trigger · live/dormant status) lives in `AGENT_WORKFORCE.md §1`** — this is the fabric-doc mirror. The core
+#117 tenant-side ten (fully producer/step-wired) are the illustrative set below; the other 15 are grouped after it.
 
 **Core tenant-side ten** (skills · job · tools · trigger):
 
@@ -90,8 +313,8 @@ producer/step-wired) are the illustrative set below; the other 15 are grouped af
   run at OUR authority (no tenant to bind) → tenant-discretion N/A, but they **keep the injection fence**.
 - **Our-org ops / CMS (🌐):** `curation_qa` (pre-release QA gate, on solicitation-triaged) · `ops_digest`
   (scheduled ops digest, `AI_INVOKE` in `OnOpsDigestRequested`) · `content_generator` /  `content_curator` /
-  `social_scheduler` (CMS content + social loop) · `research_scout` (research briefs; `handle_event` only —
-  **not in `TOOL_ACTION_TO_ARCHETYPE`**, so it can't be dropped into an `AI_INVOKE` step until mapped).
+  `social_scheduler` (CMS content + social loop) · `research_scout` (tenant-scope R&D briefs; **now mapped**
+  as `tool.research.scout` and wired as an independent `AI_INVOKE` step in `OnProposalCreated`).
 
 ### 0.2 Integration — two producer shapes (both funnel into `AgentFabric.invoke_agent`)
 
@@ -114,8 +337,8 @@ independent notify · pin route → scoring_strategist + opportunity_analyst · 
 (`workflows/base.py`) **HARD-REJECTS at registration** any `AI_INVOKE` step whose `action` is not in the map —
 `register_workflow` then DROPS the whole workflow (an unmapped action would otherwise be a guaranteed silent
 skip). So you cannot ship an agent step without wiring its archetype; the typo is caught at boot, not in prod.
-(An archetype that is `handle_event`-only, e.g. `research_scout`, needs no map entry — but also cannot be used
-in an `AI_INVOKE` step until one is added.)
+(An archetype that is `handle_event`-only needs no map entry — but also cannot be used in an `AI_INVOKE`
+step until one is added. `research_scout` was such a case and has since been mapped `tool.research.scout`.)
 
 **Every step emits a start→end pair.** The managed executor (`workflows/manager.py`) emits
 `system:workflow.step_started` before a step and `system:workflow.step_completed` (on success **or** a safe
