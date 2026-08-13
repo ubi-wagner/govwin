@@ -3,7 +3,8 @@
 > **As-built correction (deepest-review sweep).** See **docs/START_END_FRAMEWORK.md** §4 for the verified
 > agent×scope map. Corrections: every one of the 35 archetypes now has a concrete invocation site (a
 > producer or an `AI_INVOKE` step) — the "15 dormant" framing is stale; `research_scout` is invocable via a
-> queue producer (`ai/research/route.ts`), just not as an `AI_INVOKE` step. The injection fence was hardened
+> queue producer (`ai/research/route.ts`) — and, as of AGENTS-LIVE, ALSO as an `AI_INVOKE` step
+> (`tool.research.scout` in `OnProposalCreated`, closing the last unmapped-archetype gap). The injection fence was hardened
 > this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
 > `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
 
@@ -92,7 +93,7 @@ content loop), so the whole platform runs on one fabric:
 | **Content Generator** (`content_generator`) | 🌐 our-org CMS | Content requested | Drafts marketing/content-pipeline copy. |
 | **Content Curator** (`content_curator`) | 🌐 our-org CMS | Content resurface requested | Selects/repurposes existing content for resurfacing. |
 | **Social Scheduler** (`social_scheduler`) | 🌐 our-org CMS | Social schedule requested | Schedules social posts across the content calendar. |
-| **Research Scout** (`research_scout`) | 🌐 our-org | Research requested (`handle_event` only) | Produces research briefs; **not yet in `TOOL_ACTION_TO_ARCHETYPE`** (can't back an `AI_INVOKE` step until mapped). |
+| **Research Scout** (`research_scout`) | 🔒 tenant | Research requested (on-demand queue) **+ proposal created (AI_INVOKE step)** | Produces cited research briefs (market / prior-art / competitor). **MAPPED (AGENTS-LIVE)**: `tool.research.scout` → `research_scout`, now an independent `AI_INVOKE` step in `OnProposalCreated` (initial brief) alongside the on-demand `ai/research` queue path. Web results injection-fenced; safe-skips without egress. Locked by `test_research_scout_wiring.py` (10/10); proven live via `scripts/drive_research_scout.py`. |
 
 🌐 **platform-scope** agents (incl. the our-org ops/CMS set) run at our authority on master/our-org data (no
 tenant to bind to), so tenant-discretion is N/A — but they keep the **mandatory injection fence** (they read

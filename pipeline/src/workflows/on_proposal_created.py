@@ -157,6 +157,23 @@ class OnProposalCreated(Workflow):
             },
             timeout_minutes=10,
         ),
+        # Research scout: an initial market-research / prior-art / competitor-landscape brief for
+        # the new proposal's opportunity (a declarative AI_INVOKE STEP actor, complementing the
+        # on-demand ai/research queue producer). Independent (no depends_on) so a failure/skip never
+        # blocks drafting; TENANT-BOUND via payload.tenantId; advisory — the cited brief lands in
+        # agent memory for human acceptance, never auto-writes a business table. Web results are
+        # injection-fenced by the archetype; safe-skips when web egress is unconfigured.
+        Step(
+            name="ai_research_scout",
+            step_type=StepType.AI_INVOKE,
+            action="tool.research.scout",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+                "question": '"market research, prior art, and competitor landscape for this proposal\'s opportunity"',
+            },
+            timeout_minutes=10,
+        ),
         # Library seed suggester: runs in parallel with the structural advisory agents
         # BEFORE the drafter fires, so a seeded proposal can skip/augment drafted sections.
         # Non-blocking: a failure/skip never delays draft_sections.

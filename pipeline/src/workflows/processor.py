@@ -281,6 +281,9 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.solicitation.amendment_delta": "amendment_monitor",
     "tool.proposal.cost_estimate": "cost_estimator",
     "tool.proposal.match_past_performance": "pp_matcher",
+    # Tenant R&D / market-research scout (on-demand via ai/research queue producer; ALSO a
+    # declarative AI_INVOKE step actor in OnProposalCreated — initial market/competitor brief).
+    "tool.research.scout": "research_scout",
     # POD 4 — our-org RFP-admin ops (pre-release QA gate + scheduled ops digest)
     "tool.curation.qa": "curation_qa",
     "tool.ops.digest": "ops_digest",
