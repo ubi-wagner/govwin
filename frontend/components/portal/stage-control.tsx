@@ -240,7 +240,7 @@ export function StageControl({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {closeDateStr && daysUntilClose !== null && (
             <span className={`text-xs font-medium ${daysUntilClose <= 7 ? 'text-red-500' : 'text-gray-500'}`}>
               Due: {closeDateStr} ({daysUntilClose > 0 ? `${daysUntilClose} days` : 'Overdue'})
@@ -264,7 +264,7 @@ export function StageControl({
             <button
               onClick={() => handleAdvance(false)}
               disabled={advancing}
-              className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
               {advancing ? 'Advancing...' : `Advance to ${gateConfig[currentIndex + 1]?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} →`}
             </button>

@@ -83,6 +83,20 @@ responsive shell (hamburger nav, stacking card grids). The polish is targeted, n
 - **P3 — the peripheral forms.** `grid-cols-1 sm:grid-cols-N` on the launcher/create forms and
   `agent-usage-summary`; route content-review ToDos off the curation/dashboard queues.
 
+## Polish pass 1 — shipped & proven (2026-08-13)
+
+Verified green (`tsc` 0 · `vitest` 1085 passed) and re-driven at 390×844 on the live server:
+
+- **RFP Triage Queue → responsive cards** (`triage-queue.tsx`): the desktop table is `hidden md:block`; below `md` each row renders as a card with title + status + agency/source **and its Claim/Release/Open/Force-Release action** (shared `rowActions` helper, ≥44px targets). The core review→release job is now operable on a phone. *(proof: `scratchpad/ux/proof/p3-triage-cards.png`)*
+- **ToDo compose → stacks** (`assign-task-form.tsx:149`): `grid-cols-1 sm:grid-cols-3` — Assign-to/Completion/Due are now full-width and readable on mobile. *(proof: `p2-compose-stacked.png`)*
+- **Studio 3-phase strip → stacks** (`proposal-studio.tsx:127`): `grid-cols-1 sm:grid-cols-3` — Draft/Refine/Compliance are full-width cards, not slivers. *(proof: `p1-studio-strip.png`)*
+- **Approve & Advance** (`stage-control.tsx`): action row is now `flex-wrap`; the Advance button is `min-h-[44px]`.
+- **Peripheral form grids** made responsive (`grid-cols-1 sm:grid-cols-N`): `proposal-admin-panel.tsx` (dropboxes), `new-company-form.tsx`, `create-partner-org-form.tsx`, `intake-form.tsx`.
+
+**Scope correction:** the earlier `-o` census over-flagged three files that were *already* responsive — `agent-usage-summary.tsx` (`grid-cols-2 md:grid-cols-3 lg:grid-cols-6`), `launch-collaboration-client.tsx`, `launch-content-client.tsx`. And `curation-workspace.tsx:736` is the page container (`max-w-6xl`), not a modal; its real modals already carry `max-h-[90vh] overflow-y-auto`. No edits needed there.
+
+**Still open (deliberately, larger scope):** the Review Gate **entity pickers** (replacing raw-UUID entry — a UX-report P1 needing a search-select component), routing **content-review ToDos** off the operational queues, and a *global* ≥44px touch scale beyond the primary buttons touched here.
+
 ## Screenshots
 
 Captured at 390×844 under `scratchpad/ux/ops/`: `ta-02-assign-task-open` (compose broken),

@@ -36,7 +36,7 @@ export default function IntakeForm() {
 
   return (
     <div className="border border-gray-200 rounded-xl p-5 bg-white space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label className="block text-xs text-gray-500 mb-1">Title *</label><input className={input} value={f.title} onChange={set('title')} /></div>
         <div><label className="block text-xs text-gray-500 mb-1">Agency *</label><input className={input} value={f.agency} onChange={set('agency')} /></div>
         <div><label className="block text-xs text-gray-500 mb-1">Office</label><input className={input} value={f.office} onChange={set('office')} /></div>

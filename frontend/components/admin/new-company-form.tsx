@@ -88,7 +88,7 @@ export function NewCompanyForm() {
                     <span className="text-xs font-medium text-gray-700">Admin POC name</span>
                     <input name="adminName" className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="block">
                       <span className="text-xs font-medium text-gray-700">Legal name</span>
                       <input name="legalName" className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
