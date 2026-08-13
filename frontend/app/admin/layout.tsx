@@ -3,6 +3,8 @@ import { AdminNavProvider } from '@/components/admin/admin-nav-context';
 import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
 import { NavShell } from '@/components/ui/nav-shell';
 
+export const metadata = { title: 'Admin' };
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminNavProvider>

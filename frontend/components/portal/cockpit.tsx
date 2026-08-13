@@ -34,6 +34,8 @@ export interface CockpitProposal {
 interface CockpitProps {
   tenantSlug: string;
   companyName: string;
+  /** The signed-in person's name — greet them by first name (falls back to company). */
+  userName?: string;
   basePath: string;
   role: Role;
   grants: { canSeeOpps: boolean; canManageBuckets: boolean };
@@ -54,11 +56,13 @@ const STAGE: Record<string, { label: string; cls: string }> = {
 };
 
 export function Cockpit({
-  tenantSlug, companyName, basePath, role, grants, proposals, pendingBuilds, counts, activity, getStarted,
+  tenantSlug, companyName, userName, basePath, role, grants, proposals, pendingBuilds, counts, activity, getStarted,
 }: CockpitProps) {
   const [active, setActive] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const close = () => setActive(null);
+  // Greet the person, not the company (a person recognizes their own name first).
+  const firstName = userName?.trim().split(/\s+/)[0] || companyName;
 
   const indicators: Indicator[] = [
     { key: 'todos', icon: '✓', label: 'To-dos', count: counts.todos },
@@ -82,7 +86,7 @@ export function Cockpit({
   return (
     <div className="flex gap-6">
       <div className="flex-1 min-w-0">
-        <h1 className="text-2xl font-bold">Welcome back, {companyName}</h1>
+        <h1 className="text-2xl font-bold">Welcome back, {firstName}</h1>
         <p className="text-sm text-gray-500 mt-1 mb-4">{summary}</p>
 
         {/* In-flight purchases (curation/guardrails pending) — visible whether or not there are active builds */}

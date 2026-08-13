@@ -102,23 +102,36 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Proposal-level access check for non-admin users ─────────────
+    // ── Proposal-level access for non-admins ────────────────────────
+    // Tenant-wide HOME members (active tenant_admin/tenant_user membership) have full
+    // proposal access via the membership ledger and are NOT collaborators — matching the
+    // canonical resolver (lib/proposal-access.ts). Only non-members (e.g. partner_user)
+    // fall through to the per-proposal collaborator gate. Previously this 403'd every
+    // tenant_user opening a proposal (surfaced by the StageControl mount fetch).
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
       try {
-        const [collab] = await sql<{ userId: string }[]>`
-          SELECT user_id FROM proposal_collaborators
-          WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
-            AND revoked_at IS NULL
+        const [membership] = await sql<{ role: string }[]>`
+          SELECT role FROM user_memberships
+          WHERE user_id = ${sessionUser.id}::uuid AND tenant_id = ${tenantId}::uuid
+            AND status = 'active' AND role IN ('tenant_admin', 'tenant_user')
           LIMIT 1
         `;
-        if (!collab) {
-          return NextResponse.json(
-            { error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' },
-            { status: 403 },
-          );
+        if (!membership) {
+          const [collab] = await sql<{ userId: string }[]>`
+            SELECT user_id FROM proposal_collaborators
+            WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
+              AND revoked_at IS NULL
+            LIMIT 1
+          `;
+          if (!collab) {
+            return NextResponse.json(
+              { error: 'You do not have access to this proposal', code: 'FORBIDDEN' },
+              { status: 403 },
+            );
+          }
         }
       } catch (e) {
-        console.error('[portal/proposals/gates] collaborator check failed:', e);
+        console.error('[portal/proposals/gates] access check failed:', e);
         return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
       }
     }

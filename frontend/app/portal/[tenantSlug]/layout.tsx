@@ -8,6 +8,23 @@ import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
+import type { Metadata } from 'next';
+
+// Per-tenant tab title — every portal page reads "<Company> · RFP Pipeline" unless the
+// page sets its own; a page-level title overrides this. Fixes the all-"RFP Pipeline" tabs.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+}): Promise<Metadata> {
+  try {
+    const { tenantSlug } = await params;
+    const tenant = await getTenantBySlug(tenantSlug);
+    return { title: (tenant?.name as string) || 'Portal' };
+  } catch {
+    return { title: 'Portal' };
+  }
+}
 
 /**
  * Portal layout — server component with auth + tenant access check.

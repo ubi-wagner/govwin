@@ -28,7 +28,7 @@ export default async function DashboardPage({
     redirect('/login');
   }
 
-  const sessionUser = session.user as { id?: string; role?: unknown; tenantId?: string | null };
+  const sessionUser = session.user as { id?: string; name?: string | null; role?: unknown; tenantId?: string | null };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
     redirect('/login?error=session');
@@ -214,6 +214,7 @@ export default async function DashboardPage({
       <Cockpit
         tenantSlug={tenantSlug}
         companyName={companyName}
+        userName={sessionUser.name ?? undefined}
         basePath={basePath}
         role={role}
         grants={grants}
