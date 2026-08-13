@@ -64,14 +64,25 @@
   outline-offset: 2px;
   border-radius: 3px;
 }
-/* Provenance = a source-colored left gutter (non-destructive; never overrides a fill). */
-.cv-ov.ov-provenance [data-node-source="ai_draft"] { box-shadow: inset 3px 0 0 #7c5cf0; }
-.cv-ov.ov-provenance [data-node-source="library"]  { box-shadow: inset 3px 0 0 #2f6df6; }
-.cv-ov.ov-provenance [data-node-source="imported"] { box-shadow: inset 3px 0 0 #c77d0a; }
+/* Provenance = a source-colored ::before left gutter. NOT box-shadow: Tailwind's ring-*
+   selection/hover affordances are themselves box-shadow, and a box-shadow rule (higher
+   specificity, later in source) would REPLACE the ring. A ::before is a separate paint that
+   never collides with the ring and never stomps a node's real background fill. The node
+   wrapper is always position:relative (canvas-renderer). The sheet grid is handled below. */
+.cv-ov.ov-provenance [data-node-source="ai_draft"]:not(.cv-sheet-grid)::before,
+.cv-ov.ov-provenance [data-node-source="library"]:not(.cv-sheet-grid)::before,
+.cv-ov.ov-provenance [data-node-source="imported"]:not(.cv-sheet-grid)::before {
+  content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; border-radius: 2px;
+  pointer-events: none;
+}
+.cv-ov.ov-provenance [data-node-source="ai_draft"]:not(.cv-sheet-grid)::before { background: #7c5cf0; }
+.cv-ov.ov-provenance [data-node-source="library"]:not(.cv-sheet-grid)::before  { background: #2f6df6; }
+.cv-ov.ov-provenance [data-node-source="imported"]:not(.cv-sheet-grid)::before { background: #c77d0a; }
 
-/* Sheet surface — the whole grid is one worksheet/table primitive, so the overlay wraps the
-   grid (a per-cell outline would be noise). Higher specificity than the generic node rules. */
+/* Sheet surface — the whole grid is one worksheet/table primitive. Atoms outlines the grid
+   (outline paints ON TOP, never occluded). Provenance is a colored border on the grid WRAPPER,
+   OUTSIDE the opaque cells — an inset gutter would hide behind the opaque row-number column. */
 .cv-ov.ov-atoms table[data-node-id] { outline: 2px dotted #0f9d8f; outline-offset: -1px; }
-.cv-ov.ov-provenance table[data-node-source="ai_draft"] { box-shadow: inset 4px 0 0 #7c5cf0; }
-.cv-ov.ov-provenance table[data-node-source="library"]  { box-shadow: inset 4px 0 0 #2f6df6; }
-.cv-ov.ov-provenance table[data-node-source="imported"] { box-shadow: inset 4px 0 0 #c77d0a; }
+.cv-ov.ov-provenance .cv-sheet-grid[data-node-source="ai_draft"] { border-left: 4px solid #7c5cf0; }
+.cv-ov.ov-provenance .cv-sheet-grid[data-node-source="library"]  { border-left: 4px solid #2f6df6; }
+.cv-ov.ov-provenance .cv-sheet-grid[data-node-source="imported"] { border-left: 4px solid #c77d0a; }

@@ -947,8 +947,18 @@ function CanvasEditorInner({
 
   return (
     <div className="flex h-full">
-      {/* Canvas area */}
-      <div className={`flex-1 min-w-0 overflow-y-auto ${overlayClass(overlays)}`}>
+      {/* Canvas column — the overlay bar stays ABOVE the scroller (always reachable / can't
+          scroll out of view), then the scrolling canvas area below it. */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* Structure overlays — togglable dotted atom-primitive outlines + provenance gutter. */}
+        <div className="shrink-0 border-b bg-white px-4 py-1.5">
+          <CanvasOverlayBar
+            active={overlays}
+            onToggle={toggleOverlay}
+            items={OVERLAYS.filter((o) => o.key !== 'sections')}
+          />
+        </div>
+        <div className={`flex-1 overflow-y-auto min-h-0 ${overlayClass(overlays)}`}>
         {!readOnly && recoverable && (
           <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800">
             <span>You have unsaved changes from a previous session on this page.</span>
@@ -1112,15 +1122,6 @@ function CanvasEditorInner({
           </div>
         </div>
 
-        {/* Structure overlays — togglable dotted atom-primitive outlines + provenance gutter. */}
-        <div className="border-b bg-white px-4 py-1.5">
-          <CanvasOverlayBar
-            active={overlays}
-            onToggle={toggleOverlay}
-            items={OVERLAYS.filter((o) => o.key !== 'sections')}
-          />
-        </div>
-
         {/* Formatting toolbar — insert blocks + format the selected one */}
         {!readOnly && (
           <CanvasToolbar
@@ -1166,6 +1167,7 @@ function CanvasEditorInner({
             onAnnotate={tenantSlug && proposalId && sectionId ? selectionAnnotate : undefined}
           />
         )}
+        </div>
       </div>
 
       {/* Insert from library — hand-pick canonical atoms into this section's canvas */}

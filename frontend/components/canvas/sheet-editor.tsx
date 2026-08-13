@@ -950,12 +950,12 @@ export function SheetEditor({
         onDelete={handleDeleteMediaNode}
       />
 
-      {/* ── Grid ── */}
-      <div className="flex-1 overflow-auto">
+      {/* ── Grid ── (the provenance overlay borders this WRAPPER — outside the opaque cells —
+          while the atoms overlay outlines the table itself). */}
+      <div className="flex-1 overflow-auto cv-sheet-grid" data-node-source={currentSheet?.source}>
         <table
           className="border-collapse w-full"
           data-node-id={currentSheet?.nodeId}
-          data-node-source={currentSheet?.source}
         >
           <thead>
             {/* Column letter headers with delete buttons */}
