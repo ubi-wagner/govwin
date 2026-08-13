@@ -34,6 +34,7 @@ CHANGE LOG:
 ================================================================================
 """
 import logging
+import uuid
 
 logger = logging.getLogger("pipeline.workflows.actions.advisory")
 
@@ -55,6 +56,30 @@ DEFAULT_TARGET = "continuity_manager"
 DEFAULT_RESOLUTION = "majority"
 
 _VALID_POLICIES = ("hitl", "auto")
+
+
+async def _resolve_market_section(conn, proposal_id) -> str | None:
+    """Pick the proposal's most market-relevant section for market_analyst's SOTA anchor:
+    prefer a Commercialization / Related-Work / Market / Competitive section, else the first by
+    sort_index. Best-effort — returns None on any error / no sections (pre_augment safe-skips)."""
+    if not proposal_id:
+        return None
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id FROM proposal_sections
+            WHERE proposal_id = $1
+            ORDER BY (title ILIKE '%commercial%' OR title ILIKE '%market%'
+                      OR title ILIKE '%related work%' OR title ILIKE '%competit%') DESC,
+                     COALESCE(sort_index, 2147483647), created_at
+            LIMIT 1
+            """,
+            uuid.UUID(str(proposal_id)),
+        )
+        return str(row["id"]) if row else None
+    except Exception as exc:
+        logger.warning("request_advisory_overlay: market-section resolve failed: %s", exc)
+        return None
 
 
 async def request_advisory_overlay(
@@ -80,6 +105,14 @@ async def request_advisory_overlay(
     tgt = target or DEFAULT_TARGET
     lens_list = lenses if (isinstance(lenses, list) and lenses) else DEFAULT_LENSES
 
+    # The overlay's pre_augment (overlay param #4 = market_analyst) is SECTION-scoped: its
+    # get_section_context requires a section_id. Resolve the proposal's most market-relevant
+    # section (Commercialization / Related-Work / Market / Competitive), else the first by
+    # sort_index, and thread it into the payload so the SOTA scout anchors on a real section
+    # instead of erroring. Best-effort: on no match the key is omitted and pre_augment safe-skips
+    # (it is INDEPENDENT — the fan-out + reconcile still run, never a dead-end).
+    section_id = await _resolve_market_section(conn, proposal_id)
+
     payload = {
         "proposal_id": proposal_id,
         "tenant_id": tenant_id,
@@ -88,6 +121,8 @@ async def request_advisory_overlay(
         "resolution": res,
         "target": tgt,
     }
+    if section_id:
+        payload["section_id"] = section_id
     # Per-lens directives the overlay reads as payload.lens_0 / lens_1 / lens_2.
     for i, lens in enumerate(lens_list[:3]):
         payload[f"lens_{i}"] = lens
