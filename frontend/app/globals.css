@@ -59,7 +59,7 @@
   background: #fff;
   padding: 0 5px;
 }
-.cv-ov.ov-atoms [data-node-id]:not([data-node-id^="sec:"]) {
+.cv-ov.ov-atoms [data-node-id]:not([data-node-id^="sec:"]):not(table) {
   outline: 1.5px dotted rgba(15, 157, 143, .7);
   outline-offset: 2px;
   border-radius: 3px;
@@ -68,3 +68,10 @@
 .cv-ov.ov-provenance [data-node-source="ai_draft"] { box-shadow: inset 3px 0 0 #7c5cf0; }
 .cv-ov.ov-provenance [data-node-source="library"]  { box-shadow: inset 3px 0 0 #2f6df6; }
 .cv-ov.ov-provenance [data-node-source="imported"] { box-shadow: inset 3px 0 0 #c77d0a; }
+
+/* Sheet surface — the whole grid is one worksheet/table primitive, so the overlay wraps the
+   grid (a per-cell outline would be noise). Higher specificity than the generic node rules. */
+.cv-ov.ov-atoms table[data-node-id] { outline: 2px dotted #0f9d8f; outline-offset: -1px; }
+.cv-ov.ov-provenance table[data-node-source="ai_draft"] { box-shadow: inset 4px 0 0 #7c5cf0; }
+.cv-ov.ov-provenance table[data-node-source="library"]  { box-shadow: inset 4px 0 0 #2f6df6; }
+.cv-ov.ov-provenance table[data-node-source="imported"] { box-shadow: inset 4px 0 0 #c77d0a; }
