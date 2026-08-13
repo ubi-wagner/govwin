@@ -52,11 +52,14 @@ verify routing + producer/step + tool SQL against the live schema.
 
 > **Live-count reconciliation (2026-07 rebaseline; +opportunity_scout 2026-08).** "Awake as workflow
 > actors" here means *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full
-> 36). That is a different measure from a **proven live enqueue/inline site**, of which there are **10**
+> 36). That is a different measure from a **proven live enqueue/inline site**, of which there are **15**
 > today (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`,
 > `scoring_strategist`, `opportunity_analyst`, `research_scout`, `library_seed_suggester`,
-> `library_seed_mapper`, **`opportunity_scout`**). The rest are dormant-but-mapped, woken one at a time
-> under the automation-policy phase. Use **10** when a doc means "actively firing."
+> `library_seed_mapper`, `opportunity_scout`, **`onboarding_agent`**, **`outcome_analyst`**,
+> **`ingest_analyst`**, **`matrix_stager`**, **`skeleton_architect`** — the last five proven live via
+> `scripts/drive_prove_agents.py`: each producer-wired (accept route → OnApplicationAccepted; outcome
+> route → OnProposalOutcomeRecorded; rfp-upload → OnRfpUploaded) and each runs advisory on the emulator,
+> guardrail-gated + audited). The rest are dormant-but-mapped. Use **15** when a doc means "actively firing."
 >
 > **opportunity_scout WOKEN (AGENTS-LIVE).** `OnOpportunitiesDetected` (finder:opportunities.detected)
 > was dark in the frontend intake path — nothing emitted its trigger. `lib/intake.stageIntake` now emits
