@@ -115,6 +115,26 @@ Inert until the flip (owner bypasses RLS today). **Prod flip is one op the opera
 the frontend `DATABASE_URL` at `govtech_app` and set `DATABASE_URL_OWNER` to the owner string (for
 `sqlBypass`). No code change at flip time.
 
+### Re-proven 2026-08-13 (sandbox, against the current Foundation seed)
+The prior P5 drives targeted an `immobileyes` seed no longer present; re-ran the whole proof against the
+live `govtech_intel` DB with the app connected as `govtech_app` (`ALTER ROLE govtech_app LOGIN` for the
+run, reverted to `NOLOGIN` after). All green:
+- **DB layer (raw SQL, `govtech_app`):** no-context → 0 (deny-all); ctx=A → 303; ctx=B → 303; ctx=A +
+  explicit `WHERE tenant_id=B` → 0 (RLS overrides the app predicate); cross-tenant `UPDATE` → 0 rows.
+  Contrast: the current superuser app role (`govtech`, `rolsuper=t`) sees all 639 atoms with no context.
+- **App data layer** — `scripts/drive-rls-context.mts` (real `lib/db` Proxy + `tenant-context`): **6/6**.
+- **Portal routes** — `scripts/drive-rls-portal-fnd.mjs` (Foundation tenant_admin, 27 data-bearing routes
+  + 1 cross-tenant-atom negative): **28/28** (foreign atom → 404).
+- **Server components** — `scripts/drive-rls-pages-fnd.mjs` (forced-data token in rendered HTML): **7/7**.
+- **Admin cross-tenant** — `scripts/drive-rls-admin-fnd.mjs` (rfp_admin, `sqlBypass` routes): **11/11**
+  (`/api/admin/tenants` sees all 4 tenants). *(The `-fnd` scripts are the current-seed retargets of the
+  immobileyes-era originals.)*
+- **From-zero reproducibility:** `ALLOW_SCHEMA_RESET=true migrate.mjs` on an empty DB applied the full
+  chain **176/176, 0 skipped**, and the fresh DB came up armed: **20 force-RLS tables · 35 policies · head 176**.
+
+Net: the isolation *mechanism* + the *route/page coverage under the flip* are proven in-sandbox. The only
+step left for prod is the env flip itself (`DATABASE_URL`→`govtech_app`) + re-running these drives against staging.
+
 ### Server components (page.tsx) + non-request entry points — WIRED, one open verification
 The API-route wiring doesn't cover code that also runs as govtech_app: Next **server components**
 (page.tsx query forced tables during the server render) and non-request routes. These were audited
