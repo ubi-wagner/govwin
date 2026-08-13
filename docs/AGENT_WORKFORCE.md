@@ -49,13 +49,23 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
-> **Live-count reconciliation (2026-07 rebaseline).** "Awake as workflow actors" here means
-> *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full 35). That is a
-> different measure from a **proven live enqueue/inline site**, of which there are **9** today
-> (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`, `scoring_strategist`,
-> `opportunity_analyst`, `research_scout`, `library_seed_suggester`, `library_seed_mapper`). The other
-> 26 are dormant-but-mapped, woken one at a time under the automation-policy phase. Use **9** when a doc
-> means "actively firing." (CLAUDE.md's shorter "live today" list understated this.)
+> **Live-count reconciliation (2026-07 rebaseline; +opportunity_scout 2026-08).** "Awake as workflow
+> actors" here means *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full
+> 36). That is a different measure from a **proven live enqueue/inline site**, of which there are **10**
+> today (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`,
+> `scoring_strategist`, `opportunity_analyst`, `research_scout`, `library_seed_suggester`,
+> `library_seed_mapper`, **`opportunity_scout`**). The rest are dormant-but-mapped, woken one at a time
+> under the automation-policy phase. Use **10** when a doc means "actively firing."
+>
+> **opportunity_scout WOKEN (AGENTS-LIVE).** `OnOpportunitiesDetected` (finder:opportunities.detected)
+> was dark in the frontend intake path — nothing emitted its trigger. `lib/intake.stageIntake` now emits
+> `finder:opportunities.detected` on every staged notice (both the admin intake form AND the #176 scout
+> `releaseAsNew` funnel through it), so the chain fires live: **opportunity_scout** prioritizes the
+> triage backlog (reads `curated_solicitations` + the #176 `scout_findings` queue; advisory,
+> platform-scope `tenantId=null`, injection-fenced, guardrail-gated) → rfp_admin email → a
+> `triage_new_opportunities` ToDo. Proven live on the emulator (`scripts/drive-opp-scout.mts`: 1
+> detection → agent.invoked ×2, guardrail `apply` → 1 triage ToDo); locked by
+> `pipeline/tests/test_opportunity_scout_wiring.py` (8/8).
 
 **Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):

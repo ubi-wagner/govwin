@@ -76,7 +76,12 @@ is woken into live flows one at a time — **canonical plan + safety contract in
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
 `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance `agent_task_queue`;
 plus the greenfielded `librarian` (onto `library_atoms`, atomize→`agent_task_queue`, injection-fenced) and
-`scoring_strategist` (tenant-discretion) producers. The **Proposal Draft Manager program** (P1–P4) added +8
+`scoring_strategist` (tenant-discretion) producers, and the platform-scope `opportunity_scout` — WOKEN
+(AGENTS-LIVE): `lib/intake.stageIntake` now emits `finder:opportunities.detected` (admin intake + #176 scout
+releaseAsNew both funnel through it) → `OnOpportunitiesDetected` prioritizes the triage backlog (reads
+`scout_findings` + `curated_solicitations`; advisory, injection-fenced, guardrail-gated) → rfp_admin email +
+a `triage_new_opportunities` ToDo (docs/AGENT_WORKFORCE.md; `test_opportunity_scout_wiring.py`). The
+**Proposal Draft Manager program** (P1–P4) added +8
 archetypes (27→35): the G1 integrity cohort (`formatter`/`stylist`/`continuity_manager`), the P1 cohort
 (`proposal_manager` planner + `traceability_auditor`/`redaction_guard`/`market_analyst`), and the P1.5
 `advisory_manager` — orchestrated by the admin-run `OnFullDraftRequested{ModeA,B,C}` (V0.1 HITL / V0.2
