@@ -353,6 +353,20 @@ source_diffs (025)
   GOTCHA: "next_snapshot_id" NOT "to_snapshot_id"
   GOTCHA: "summary" NOT "diff_summary"
   GOTCHA: "severity" NOT "significance"
+
+scout_findings (118 + 175)   -- the "potential NEW/UPDATED OPP" candidate review→release queue
+  id, source_id(->scout_sources), run_id, purpose('content'|'opportunity'|'both'),
+  kind, title, url, snippet, author, published_at, discovered_at,
+  status('new'|'reviewed'|'reposted'|'drafted'|'pursued'|'dismissed'), outcome, acted_at,
+  dedup_hash, raw, created_at,
+  -- mig 175 classification + release outcome (SCOUT-INTAKE #176):
+  classification('new'|'update'|'unknown'), match_opportunity_id(->opportunities),
+  similarity_score, match_reason, classified_at,
+  released_kind('new'|'update'), released_ref(intake opp_id OR amendment_id),
+  reviewed_by, reviewed_at
+  FLOW: classify (lib/scout/classify.ts, deterministic) → release_new (stageIntake) |
+        release_update (logAmendment on matched opp) | dismiss. Platform-scope, no tenant_id.
+  DOC: docs/SCOUT_INTAKE_QUEUE.md
 ```
 
 ### Workflow Engine (043)

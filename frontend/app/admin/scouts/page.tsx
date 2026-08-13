@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 // Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
 import { sqlBypass as sql } from '@/lib/db';
+import ScoutCandidateQueue from '@/components/scout/candidate-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,6 +122,9 @@ export default async function ScoutMonitorPage() {
         </div>
         <Link href="/admin/pipeline" className="text-sm text-blue-600 hover:underline">Pipeline Jobs →</Link>
       </div>
+
+      {/* The new/updated OPP candidate review→release queue (#176) */}
+      <ScoutCandidateQueue />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {cards.map(([label, value, color]) => (

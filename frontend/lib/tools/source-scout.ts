@@ -339,6 +339,7 @@ export const sourceScoutTool = defineTool<Input, Output>({
     let diffsFound = 0;
     let meaningfulChanges = 0;
     const regionResults: RegionDiff[] = [];
+    const allExtractedOpps: unknown[] = []; // accumulated across regions → the candidate queue
 
     // If no regions, process the full page as a single implicit region
     const regionsToProcess =
@@ -446,6 +447,7 @@ export const sourceScoutTool = defineTool<Input, Output>({
 
       diffsFound++;
       if (isMeaningful) meaningfulChanges++;
+      if (isMeaningful && extractedOpps.length > 0) allExtractedOpps.push(...extractedOpps);
 
       regionResults.push({
         regionId: region.id ?? 'full-page',
@@ -509,12 +511,32 @@ export const sourceScoutTool = defineTool<Input, Output>({
       });
     }
 
+    // ── 8. Feed extracted opportunities into the candidate review queue ──
+    // Materialize each Claude-extracted opportunity as a scout_findings row (classified NEW/UPDATE)
+    // so the HITL scout and the crawler feed ONE review→release queue. Best-effort — a failure here
+    // must never fail the scout run.
+    let candidatesQueued = 0;
+    if (allExtractedOpps.length > 0) {
+      try {
+        const { materializeExtractedOpportunities } = await import('@/lib/scout/candidates');
+        candidatesQueued = await materializeExtractedOpportunities(
+          sourceId,
+          profile.name,
+          allExtractedOpps,
+          { actorId, actorEmail: ctx.actor.email ?? null },
+        );
+      } catch (err) {
+        console.error('[finder.scout_source] materialize candidates failed:', err);
+      }
+    }
+
     ctx.log?.info?.({
       msg: 'finder.scout_source completed',
       sourceId,
       snapshotsCreated,
       diffsFound,
       meaningfulChanges,
+      candidatesQueued,
     });
 
     return {

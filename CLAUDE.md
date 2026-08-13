@@ -35,7 +35,12 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **169** — migs 163–167 per below;
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **175** — migs 163–167 per below;
+mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
+extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
+**NEW vs UPDATE** (`lib/scout/classify.ts`) and released as a new intake (`stageIntake`) or an update
+(`logAmendment` on the matched opp), or dismissed — advisory, injection-fenced, platform-scope, `/admin/scouts`;
+docs/SCOUT_INTAKE_QUEUE.md;
 the **cost-volume common-form pass** added migs **168–169** (the Ohio TVSF Round-45 OPP card + the final Foundation
 3DCP proposal off it, for deployment verification). The cost/budget volume is now COMPUTED + agency-neutral: one
 deterministic burden engine (`lib/proposal/cost-model.ts`, a TS port of `pipeline/…/budget_model.py`, parity to the
