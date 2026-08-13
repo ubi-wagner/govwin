@@ -367,8 +367,10 @@ export function ProposalWorkspace({
         </div>
       )}
 
-      {/* Role-aware content */}
+      {/* Role-aware content. The admin panel is a subordinate "Manage" toolset — set it off
+          with a divider so it reads as a distinct level below the primary section-view tabs. */}
       {userRole === 'admin' ? (
+        <div className="mt-6 border-t border-gray-100 pt-6">
         <ProposalAdminPanel
           proposalId={proposalId}
           tenantSlug={tenantSlug}
@@ -381,6 +383,7 @@ export function ProposalWorkspace({
           isLocked={isLocked}
           proposalStage={proposalStage}
         />
+        </div>
       ) : (
         <ProposalContributorView
           proposalId={proposalId}
