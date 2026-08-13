@@ -74,7 +74,7 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
     }),
     node('s1-info', {
       type: 'text_block',
-      content: { text: 'Capabilities Overview · {contact_email} · [yourdomain.com]' },
+      content: { text: 'Capabilities Overview · {contact_email} · {website}' },
       style: { alignment: 'center', size: 14, space_before: 16 },
     }),
     node('s1-break', { type: 'page_break', content: null }),
@@ -289,7 +289,7 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
     }),
     node('s9-contact', {
       type: 'text_block',
-      content: { text: '{company_name}\n{contact_email}\n[yourdomain.com]' },
+      content: { text: '{company_name}\n{contact_email}\n{website}' },
       style: { alignment: 'center', size: 18, weight: 'bold', space_before: 40 },
     }),
   ],

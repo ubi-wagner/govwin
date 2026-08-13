@@ -369,7 +369,7 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
     }),
     node('s11-contact', {
       type: 'text_block',
-      content: { text: '{company_name}\n{contact_email}\n[yourdomain.com]' },
+      content: { text: '{company_name}\n{contact_email}\n{website}' },
       style: { alignment: 'center', size: 18, weight: 'bold', space_before: 40 },
     }),
   ],
