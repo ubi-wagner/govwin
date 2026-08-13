@@ -73,6 +73,13 @@ Three shared pieces, mounted by every surface:
   · **Compliance** (coverage · slide-overflow · cost caps) · **Provenance** (AI/library/manual/reuse heatmap)
   · **Budget** (page/slide/tab gauges). Surface-aware projection: doc spans · slide regions+rail · sheet
   cells. The "toggle section breaks + atom-primitive outlines on/off" is exactly this.
+  **BUILT (2026-08-13) — the `OverlayLayer` is live across all four surfaces:** Sections + Atoms +
+  Provenance on the fluid document; Atoms + Provenance on the per-section editor + slides (shared
+  `CanvasRenderer`) and on the sheet grid. One component (`components/canvas/canvas-overlays.tsx` —
+  `CanvasOverlayBar` · `useOverlays` · `overlayClass`) + one CSS block (`.cv-ov` in `app/globals.css`),
+  painted off the `data-node-id` / `data-node-source` the node wrapper already carries. Off by default;
+  live-driven per surface; coexists with the selection/AI toolbar (proven). Still to wire: the
+  Compliance + Budget layers and a slide-rail treatment.
 - **`ActOnSelection`** — the five-verb menu **Atomize · Regenerate · Annotate · Reuse · Compliance-check**;
   doc/slide read a span, sheet reads a **cell range**.
 - **`AssistPanel`** — AI-assist on every surface (regenerate span/slide/range · check-vs-spec · recompute
@@ -142,7 +149,8 @@ From the Phase-1 baseline (G1–G17), updated to current reality:
 
 ## 7. Phased path to the unified UI (design only until each phase is signed off)
 
-0. Revert the nav-sectioning (compartment drift). 1. Shared **`OverlayLayer`** (F3, dotted layers + toggle).
+0. Revert the nav-sectioning (compartment drift) — **DONE**. 1. Shared **`OverlayLayer`** (F3, dotted layers +
+toggle) — **SHIPPED** (Sections/Atoms/Provenance across all four surfaces; Compliance/Budget layers pending).
 2. Unify **`ActOnSelection`** (+ Reuse/Compliance-check + sheet range). 3. **Sheets into the shell** (ribbon +
 chart-from-range + overlays + AI). 4. **Slides finish** (section=slide canonical + on-slide placement).
 5. **Fluid as default** (list view optional; `Manage` tabs dissolve). 6. Consistency pass (one action bar,
