@@ -1,5 +1,7 @@
 # CANVAS_AUDIT.md — the heart, the muscles, the nervous system (2026-08-02)
 
+> **Historical analysis (2026-08-02 snapshot).** Canonical canvas architecture: `docs/CANVAS_ARCHITECTURE.md`.
+
 > Full audit of the canvas subsystem, mapped in the architecture's own terms:
 > **Canvas = the heart** (document model · renderer/editor · exporters · preview),
 > **Sidebar = the muscles** (toolbox cards + panels that move the document),

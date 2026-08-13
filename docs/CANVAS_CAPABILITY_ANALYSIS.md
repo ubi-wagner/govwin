@@ -1,5 +1,7 @@
 # CANVAS_CAPABILITY_ANALYSIS.md — Phase 2: what a person can actually do
 
+> **Historical analysis (Phase 2 snapshot).** Canonical canvas architecture: `docs/CANVAS_ARCHITECTURE.md`.
+
 **Phase 2 of the Common-Canvas redesign.** Phase 1 mapped the machine; this grades the **human**
 experience against the four reasons people live in Google Docs / M365 — the ones stated plainly:
 

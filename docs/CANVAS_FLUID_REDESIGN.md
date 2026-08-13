@@ -1,5 +1,7 @@
 # Fluid Canvas Redesign — document-first, structure-as-overlay, selection-as-verb
 
+> **Superseded design — folded into `docs/CANVAS_ARCHITECTURE.md` (the single source of truth), §3 + §7.** Kept for history.
+
 The next canvas evolution. Signed off 2026-08. Builds on the human×machine analysis
 (`docs/CANVAS_HUMAN_MACHINE_ANALYSIS.md`) — the model + export layer are strong; this is a
 UI/interaction re-architecture over them, **not** a data migration.

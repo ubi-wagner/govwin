@@ -1,5 +1,7 @@
 # CANVAS_PRIMITIVES.md — the canvas primitive catalog
 
+> **Current reference for the primitive catalog.** The canvas architecture single source is `docs/CANVAS_ARCHITECTURE.md`.
+
 > **Canvas is everything.** Every artifact the platform produces — a proposal narrative, a cost
 > workbook, a slide deck, a letter, a template, an OPP sheet — is ONE `CanvasDocument`: a typed,
 > format-independent tree of **primitives** (nodes). A single set of renderers turns that tree into

@@ -1,5 +1,7 @@
 # Canvas Redesign — Build Log (Phase 5 execution)
 
+> **Execution log of shipped canvas work.** The canvas architecture single source is `docs/CANVAS_ARCHITECTURE.md`.
+
 > **What this is.** The as-built record of the Common-Canvas redesign execution, after the four analysis
 > phases (`CANVAS_ARCHITECTURE.md` → `CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` →
 > `CANVAS_REDESIGN_PLAN.md`) and the user's sign-off. **Signed-off scope:** the **MVP cut** (Wave 0 + the

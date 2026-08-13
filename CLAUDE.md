@@ -284,9 +284,14 @@ sprint state, how to spin up the sandbox, verified demo accounts, the live gap l
 the recurring bug-classes. Read it first when resuming; the identity model is in
 docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
 
-**Common-Canvas redesign (2026-08):** the four-phase analysis (`docs/CANVAS_ARCHITECTURE.md` →
-`CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` → `CANVAS_REDESIGN_PLAN.md`) drove a
-signed-off MVP + admin-plane build recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
+**Canvas — single source of truth is `docs/CANVAS_ARCHITECTURE.md`.** All canvas architecture is
+consolidated there: the model + as-built surfaces (one `CanvasDocument`; `canvas.format` forks into
+`CanvasRenderer`/`SlideEditor`/`SheetEditor`; PDF is an export target, not a type), the signed-off
+**one-canvas / three-surfaces / one-interaction-layer** direction (doc·pdf fluid · ppt discrete
+section-per-slide · xls grid+chart+ribbon — all sharing togglable dotted `OverlayLayer` +
+`ActOnSelection` verbs + `AssistPanel`), a realigned gap register, the phased path, and a **map of every
+other `docs/CANVAS_*.md`** (historical analysis · data-model reference · superseded design · build log).
+The 2026-08 Common-Canvas build is recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
 hub** — a writable section restore path (`…/sections/[s]/versions` POST, CAS-safe, mig 163
 `content_source`), local-draft **autosave**/recover + Ctrl-S, and one-click **Accept AI drafts**
 (`accept-ai-revisions`) that lands the staged full-draft workforce onto the page; a **non-destructive
