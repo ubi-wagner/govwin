@@ -543,6 +543,7 @@ function NodeRenderer({
   return (
     <div
       data-node-id={node.id}
+      data-node-source={node.provenance?.source}
       className={`relative rounded px-1 cursor-text transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
       // The node body is NOT draggable (only the grip is) and the text is selectable, so a
       // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,

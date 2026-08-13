@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CanvasRenderer } from './canvas-renderer';
 import { SelectionToolbar } from './selection-toolbar';
+import { CanvasOverlayBar, overlayClass, useOverlays } from './canvas-overlays';
 import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
 import type { AssembledProposal } from '@/lib/canvas/assemble-proposal';
 import { toast } from '@/lib/toast';
@@ -44,6 +45,9 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
   const [activeSection, setActiveSection] = useState<string | null>(outline[0]?.sectionId ?? null);
   const [selBusy, setSelBusy] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Structure-as-overlay (Phase 1): togglable dotted Sections / Atoms / Provenance layers,
+  // off by default → a clean document until a chip is summoned. See canvas-overlays.tsx.
+  const { active: overlays, toggle: toggleOverlay } = useOverlays();
 
   // Active-section-on-scroll: observe the inline section-title anchors and light up the
   // topmost one currently in the reading band.
@@ -140,7 +144,10 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
   );
 
   return (
-    <div className="flex gap-4 h-full min-h-0">
+    <div className="flex flex-col gap-3 h-full min-h-0">
+      {/* Overlay chips — summon the dotted section / atom-primitive / provenance layers. */}
+      <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} className="shrink-0 px-1" />
+      <div className="flex gap-4 flex-1 min-h-0">
       {/* Outline rail */}
       <nav className="hidden md:block w-56 shrink-0 self-start sticky top-2 max-h-[calc(100vh-1rem)] overflow-y-auto py-3 pr-1">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2 px-2">Document outline</div>
@@ -173,7 +180,7 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
       {/* The continuous document. userSelect:text guarantees the read-only render is still
           selectable regardless of any ancestor `select-none` (the per-node readOnly path
           leaves user-select unset, i.e. inherit — this wrapper supplies it). */}
-      <div ref={containerRef} className="flex-1 min-w-0 overflow-y-auto" style={{ userSelect: 'text' }}>
+      <div ref={containerRef} className={`flex-1 min-w-0 overflow-y-auto ${overlayClass(overlays)}`} style={{ userSelect: 'text' }}>
         <CanvasRenderer
           document={doc}
           selectedNodeId={null}
@@ -183,6 +190,7 @@ export function FluidDocumentView({ assembled, tenantSlug, proposalId, variables
           readOnly
         />
         {canAct && <SelectionToolbar doc={doc} busy={selBusy} onAtomize={selectionAtomize} onAnnotate={selectionAnnotate} />}
+      </div>
       </div>
     </div>
   );
