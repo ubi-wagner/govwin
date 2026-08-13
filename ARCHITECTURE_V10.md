@@ -10,7 +10,14 @@
 > (docs/FULL_DRAFT_LANDING_DESIGN.md). The **cost/budget volume is now computed + agency-neutral** — one deterministic
 > burden engine rendered in the common government FORM the solicitation needs (DoW waterfall · NSF/DOE SF-424A · Ohio
 > TVSF OTF state budget), migs 168–169 seeding the Ohio TVSF Round-45 card + the final Foundation proposal
-> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **169**
+> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **176**
+> (170–171 semantic-retrieval `atom_embeddings`; 172–174 scout schedule + RLS gap + tasks-broadcast; **175**
+> the scout-intake NEW-vs-UPDATE candidate queue on `scout_findings`, docs/SCOUT_INTAKE_QUEUE.md; **176**
+> the program-primer guide drafts BAA/OTA/CSO/Grants queued for review, docs/CONTENT_QUEUE.md). **Agent
+> workforce (AGENTS-LIVE):** `opportunity_scout` woken dark→live, `research_scout` mapped as an AI_INVOKE
+> step, `market_analyst` overlay pre-augment fixed to be section-anchored — each proven live
+> (docs/AGENT_WORKFORCE.md). Every major generative effort (CMS · proposal · marketing) is proven
+> end-to-end with real actors in docs/E2E_GENERATIVE_PROOF.md. (Older 169 note:
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix; the **V1 UI-wiring pass** then added 143
 > `proposal_sections.sort_index`, 144 `proposals.studio_phase`, 145 `notification_read_state`, 146 the amendment
 > engine, 147–148 the soft-archive `archived_at` cascade — canonical **docs/ARCHIVABLE_CONTRACT.md**); the archetype roster is **36 files =

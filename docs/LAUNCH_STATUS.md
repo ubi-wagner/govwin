@@ -34,10 +34,18 @@ plus the live proofs cited below.
   `OnFullDraftRequested{ModeA/B/C}` (HITL / restyle / full-auto), `cost_estimator` woken on the
   deterministic burden engine, the adversarial `AdvisoryOverlay` gate. Admin-drivable from the **doorbell**.
 - **✅ Agent workforce — 36 archetypes, all auto-registered.** Live in flows today: `section_drafter`,
-  `compliance_reviewer` (inline), `color_team_reviewer`, `librarian`, `scoring_strategist`, and the
-  admin-plane `rfp_ingest_manager`. The rest are greenfielded + registry-wired, pending per-producer wiring.
-  Agent invariants (non-negotiable): tenant-bound · advisory→guardrail→land-or-review · injection-fenced ·
-  runaway-bounded · never dead-ends a workflow. (docs/AGENT_WORKFORCE.md)
+  `compliance_reviewer` (inline), `color_team_reviewer`, `librarian`, `scoring_strategist`,
+  `opportunity_analyst`, `research_scout`, `opportunity_scout`, and the admin-plane `rfp_ingest_manager`.
+  **AGENTS-LIVE (proven live this cycle):** `opportunity_scout` woken dark→live (intake → AI triage
+  prioritization + ToDo), `research_scout` mapped as an AI_INVOKE step in `OnProposalCreated`,
+  `market_analyst` overlay pre-augment fixed to anchor on a real section. Investigation also confirmed the
+  "dormant" list was largely stale — `onboarding_agent`, `outcome_analyst`, the ingest cohort, `pp_matcher`,
+  `cost_estimator` already have live producers. Agent invariants (non-negotiable): tenant-bound ·
+  advisory→guardrail→land-or-review · injection-fenced · runaway-bounded · never dead-ends a workflow.
+  (docs/AGENT_WORKFORCE.md)
+- **✅ Generative flows proven end-to-end with real actors** — CMS content (generate → review → publish →
+  live on the public site), proposal (AI-built cohort → real actor → compiled docx/pdf package bytes), and
+  marketing documents (mold → real actor → real .docx). (docs/E2E_GENERATIVE_PROOF.md)
 - **✅ Full-draft landing** — the cohort's staged output lands via a **read-on-review** route
   (human-triggered "Apply AI-proposed revisions"), since the engine forbids a pipeline consumer of agent output.
 - **✅ Semantic retrieval** — hybrid `selectForSection` blends pgvector cosine (`atom_embeddings`, mig 171,
