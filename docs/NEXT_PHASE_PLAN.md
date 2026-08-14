@@ -42,9 +42,15 @@ Highest-value next wakes (my ranking):
 - Guardrail: never rush a wake — tenant isolation + injection fence are safety-critical (docs/AGENT_WORKFORCE.md).
 
 ### C. Feature depth  ·  PRODUCE/PLAN  ·  larger
-1. **Whole-proposal submission-readiness** — roll per-section readiness into a whole-proposal verdict
-   (all volumes locked, matrix satisfied, page budgets, required forms) with a single "ready to submit"
-   gate. Deferred in the Canvas build log; high customer value. ~3–5 D.
+1. **Whole-proposal submission-readiness — ✅ BUILT (C1, 2026-08-14).** The roll-up engine
+   (`lib/proposal/submission-readiness.ts`: section lock, mandatory-requirement coverage, required forms,
+   per-volume page/slide caps, format floor, deterministic cost + STTR work-split → one `ready` verdict +
+   blocker list), the tenant-gated route, and the overview card were already built (SR1–SR4). This cycle
+   closed the last gap — the verdict now **gates the submission**: `advanceProposalStage(→final)` computes
+   readiness and HARD-BLOCKS on any blocker (`NOT_READY` + the blocker list) unless the caller explicitly
+   acknowledges (the StageControl "Submit anyway" confirm), audited via `readinessOverride` on the
+   `proposal.advanced` event; admin `force` bypasses; fail-open on a compute error. Unit (advance 28/28) +
+   live-DB proof (`scripts/drive-submit-gate.mts`: block→no-mutation, acknowledge→submitted, override audited).
 2. **Polymorphic artifact key / one-canvas refactor** — unify proposal sections, standalone docs, templates,
    and content under one canvas/versioning model. Deferred; pays down real complexity but is invasive. ~5–8 D.
    Recommend a **design pass first**, not a blind build.

@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
+import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
 
 /**
  * Shared proposal stage-advance core.
@@ -47,6 +48,9 @@ export interface AdvanceParams {
   targetStage?: string;
   /** Tag the activity log / advance event as an automated advance. */
   trigger?: 'manual' | 'auto';
+  /** The whole-proposal readiness gate blocks submission (→final) on hard blockers; set true to
+   *  submit anyway (the UI "Submit anyway" confirm). The override is recorded on the advance event. */
+  acknowledgeBlockers?: boolean;
 }
 
 export interface AdvanceSuccess {
@@ -75,6 +79,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
     tenantId, tenantSlug, proposalId,
     actorId, actorEmail, actorRole,
     force = false, notes = null, trigger = 'manual',
+    acknowledgeBlockers = false,
   } = params;
 
   // ── Load current proposal ────────────────────────────────────────
@@ -161,6 +166,39 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   const shouldLock = targetStage === 'final';
   // When advancing to 'final' AND auto-locking, also advance to 'submitted'
   const finalStageValue = shouldLock ? 'submitted' : targetStage;
+
+  // ── Submission-readiness gate (the single "ready to submit" gate) ────────────
+  // Advancing to 'final' LOCKS + auto-advances to 'submitted' — it IS the submission moment. Roll up
+  // the whole-proposal readiness verdict (empty/unlocked sections, unmet mandatory requirements,
+  // missing required forms, over-budget volumes, a closed solicitation) and HARD-BLOCK on any blocker
+  // unless the caller explicitly acknowledges them (the UI's "Submit anyway" confirm). Warnings never
+  // block. An admin force-advance (force=true) bypasses this, exactly as it bypasses the lock/gate
+  // checks. FAIL-OPEN: a readiness-computation error must never strand a submission, so it logs and
+  // allows the advance — the gate guards against known-incomplete, not against its own failure.
+  let readinessOverride: { blockerCount: number; categories: string[] } | null = null;
+  if (shouldLock && !force) {
+    let readiness: Awaited<ReturnType<typeof computeSubmissionReadiness>> = null;
+    try {
+      readiness = await computeSubmissionReadiness(proposalId, tenantId);
+    } catch (e) {
+      console.error('[proposal-advance] readiness gate check failed (non-fatal, allowing advance):', e);
+    }
+    if (readiness && readiness.blockerCount > 0) {
+      const hardBlockers = readiness.blockers.filter((b) => b.severity === 'blocker');
+      if (!acknowledgeBlockers) {
+        return {
+          ok: false, status: 422, code: 'NOT_READY',
+          error: `Not ready to submit — ${readiness.blockerCount} blocker(s) must be resolved (or explicitly acknowledged to submit anyway).`,
+          details: { blockers: hardBlockers, summary: readiness.summary },
+        };
+      }
+      // Acknowledged → proceed, but AUDIT what was overridden (folded into the advance event below).
+      readinessOverride = {
+        blockerCount: readiness.blockerCount,
+        categories: [...new Set(hardBlockers.map((b) => b.category))],
+      };
+    }
+  }
 
   // ── Start event for stage advancement ────────────────────────────
   const startId = await emitEventStart({
@@ -390,6 +428,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       previousStage,
       targetStage,
       forced: force,
+      ...(readinessOverride ? { readinessOverride } : {}),
       forcedOpenSections,
       sectionsLocked: lockedSections,
       trigger,
