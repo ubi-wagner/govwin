@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AdminNavProvider>
     <NavShell
       brand="RFP Admin"
-      mainClassName="flex-1 min-w-0 p-8 bg-gray-50 min-h-screen"
+      mainClassName="flex-1 min-w-0 p-4 sm:p-8 bg-gray-50 min-h-screen"
       rail={<>
         <AdminNavLink href="/admin/dashboard">
           <span className="text-lg font-bold">RFP Admin</span>
@@ -18,6 +18,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex flex-col gap-1 text-sm flex-1 mt-4">
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-2 mb-1">Overview</span>
+          <AdminNavLink href="/admin/command">🎯 Command Center</AdminNavLink>
           <AdminNavLink href="/admin/dashboard">Dashboard</AdminNavLink>
           <AdminNavLink href="/portal/rfp-pipeline/dashboard">Our Workspace</AdminNavLink>
 
