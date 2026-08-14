@@ -82,6 +82,9 @@ export default async function PartnerConsole() {
   const stableTodos = stable.reduce((n, t) => n + (rollup.get(t.id)?.openTodos ?? 0), 0);
   const ownTodos = ownStats?.openTodos ?? 0;
   const totalTodos = stableTodos + ownTodos;
+  // Stable-wide pipeline glance (the partner's "Opportunities" signal): live builds across the
+  // whole stable + own org, so the manager sees pipeline depth beside the to-do attention count.
+  const totalProposals = stable.reduce((n, t) => n + (rollup.get(t.id)?.proposals ?? 0), 0) + (ownStats?.proposals ?? 0);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
@@ -93,18 +96,24 @@ export default async function PartnerConsole() {
         Your organization and the companies you support. Open any company to work inside it as its
         manager, or add a new company to your stable.
       </p>
-      {/* Attention banner — the aggregate "notify up" across the whole stable. */}
-      <div className="mb-8">
+      {/* Attention banner — the aggregate "notify up" across the whole stable, with the pipeline
+          glance beside it. Opening a company descends into its Command Center (the same tabbed
+          console a tenant admin runs), where the manager acts. */}
+      <div className="mb-8 flex flex-wrap items-center gap-2">
         {totalTodos > 0 ? (
           <div className="inline-flex items-center gap-2 rounded-lg border border-award-300 bg-award-50 px-3 py-1.5 text-sm text-award-800">
             <span className="font-semibold">{totalTodos} open to-do{totalTodos === 1 ? '' : 's'}</span>
-            <span className="text-award-700">across your companies — open a company below to review &amp; complete.</span>
+            <span className="text-award-700">across your companies — open a company to review &amp; complete.</span>
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm text-navy-500">
             No open to-dos across your companies right now.
           </div>
         )}
+        <div className="inline-flex items-center gap-2 rounded-lg border border-navy-200 bg-white px-3 py-1.5 text-sm text-navy-600">
+          <span className="font-semibold text-navy-800">{totalProposals}</span>
+          <span>build{totalProposals === 1 ? '' : 's'} in flight across your stable</span>
+        </div>
       </div>
 
       {/* ── Your organization ─────────────────────────────────────────── */}

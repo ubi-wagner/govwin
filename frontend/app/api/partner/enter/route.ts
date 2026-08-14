@@ -47,12 +47,18 @@ export async function GET(req: NextRequest) {
       await emitEventSingle({ namespace: 'finder', type: 'partner.entered', actor: userActor(u.id, u.email), tenantId: t.id, payload: { tenantId: t.id, slug } });
     } catch { /* best-effort */ }
 
-    // Optional landing target within the descended portal (the console's "Review to-dos →" deep-link).
+    // Optional landing target within the descended portal (the console's descend deep-links).
     // Whitelisted to a known set of portal sub-pages — never an open redirect (only a bare suffix,
     // no scheme/host), so a manager lands where the console sent them, not the generic dashboard.
-    const NEXT_WHITELIST = new Set(['todos', 'dashboard', 'proposals', 'cards', 'manage']);
+    // `command` (the tenant Command Center) is the default landing so a descended manager arrives in
+    // the SAME tabbed console a tenant admin sees (COMMAND_CENTER_DESIGN.md §3.3). Widened to the
+    // surfaces a manager acts on (processes/activity/buckets/portals/atoms/team) — all bare suffixes.
+    const NEXT_WHITELIST = new Set([
+      'command', 'dashboard', 'todos', 'proposals', 'cards', 'buckets',
+      'processes', 'activity', 'portals', 'atoms', 'team', 'manage',
+    ]);
     const next = req.nextUrl.searchParams.get('next')?.trim() ?? '';
-    const dest = NEXT_WHITELIST.has(next) ? next : 'dashboard';
+    const dest = NEXT_WHITELIST.has(next) ? next : 'command';
     return NextResponse.redirect(url(`/portal/${slug}/${dest}`));
   } catch (e) {
     console.error('[partner/enter] failed:', e);

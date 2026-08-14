@@ -75,6 +75,16 @@ action-tone tabs.
 
 ### 3.2 EconDev partner-manager (`partner_admin`, rank 50 — **pin-up**, owned ∪ managed stable)  → tabs: Opportunities · Companies (tenant-surfaced)
 
+> **As-built (Phase 3, 2026-08-14):** the existing `/partner` console **is** the partner Command
+> Center — its "notify-up" attention banner (Σ open to-dos) + the new stable-wide **pipeline glance**
+> (Σ builds in flight) are the two lanes below, and its per-company rollup cards carry the descend.
+> It keeps its own navy/award identity rather than the gray `CommandTabs` shell (a deliberate choice —
+> the tabbed lanes are delivered by the **tenant** CC the manager descends *into*). The one required
+> code change (§5) shipped: `/api/partner/enter`'s `next` whitelist is widened and now **defaults to
+> `command`**, so "Open workspace →" lands the pinned-in manager in the tenant Command Center — the
+> SAME tabbed console (§3.3) a tenant admin runs. "Review N to-dos →" still lands on `todos`.
+
+
 | Tab | Purpose | Data source | Count = | Row → |
 |---|---|---|---|---|
 | **Opportunities** | live pipeline across the stable | `tenant_opportunity_cards` (pins) + `proposals` for `partnerScopeTenants(userId)` ids, via bypass scoped to those ids | # active pins/proposals needing attention | descend into that company |
