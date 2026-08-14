@@ -10,27 +10,33 @@
  * Usage: cd frontend && DATABASE_URL=… [ATOM_EMBED=local] node --import tsx scripts/niloc/verify.mts
  */
 import { sql } from '@/lib/db';
-import { computeBudget, popByYear, type LaborLine, type OtherDirectCost, type Subcontract } from '@/lib/proposal/cost-model';
+import { computeBudget, popBasePlusOption, singlePeriod, type LaborLine, type OtherDirectCost, type Subcontract, type Period } from '@/lib/proposal/cost-model';
 import { selectForSection } from '@/lib/atoms';
-import { COST_SPECS, buildFilledCost, costPrice } from './_shared.mts';
+import { COST_SPECS, buildFilledCost, costPrice, type CostSpec } from './_shared.mts';
+
+const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+function specPoP(spec: CostSpec): Period[] {
+  return spec.periods.length === 1 ? singlePeriod(spec.periods[0].name) : popBasePlusOption(spec.periods.map((p) => [p.name, p.months]));
+}
 
 async function proveCost() {
   console.log('A. COST ROLL-UP (template vs computeBudget)');
   let allOk = true;
   for (const spec of COST_SPECS) {
     const doc = buildFilledCost(spec);
-    const tpl = costPrice(doc);
-    const labor: LaborLine[] = spec.labor.map((l, i) => l ? ({ name: `code${i}`, category: `cat${i}`, hours: l.y1 + l.y2, unburdenedRate: l.rate, allocation: [l.y1, l.y2] }) : null).filter(Boolean) as LaborLine[];
-    const odcs: OtherDirectCost[] = [
-      { kind: 'materials', label: 'm', amount: spec.materials.y1 + spec.materials.y2, allocation: [spec.materials.y1, spec.materials.y2] },
-      { kind: 'travel', label: 't', amount: spec.travel.y1 + spec.travel.y2, allocation: [spec.travel.y1, spec.travel.y2] },
-      { kind: 'equipment', label: 'e', amount: spec.equipment.y1 + spec.equipment.y2, allocation: [spec.equipment.y1, spec.equipment.y2] },
-      { kind: 'odc_other', label: 'o', amount: spec.other.y1 + spec.other.y2, allocation: [spec.other.y1, spec.other.y2] },
-    ];
-    const subs: Subcontract[] = [{ org: spec.subOrg, role: 'sub', amount: spec.subs.y1 + spec.subs.y2, allocation: [spec.subs.y1, spec.subs.y2] }];
-    const eng = computeBudget(labor, spec.rates, { odcs, subs, periods: popByYear(2) });
+    const tpl = costPrice(doc, spec.periods.length);
+    const labor: LaborLine[] = spec.labor.map((l, i) => l ? ({ name: `code${i}`, category: `cat${i}`, hours: sum(l.hours), unburdenedRate: l.rate, allocation: l.hours }) : null).filter(Boolean) as LaborLine[];
+    // a $0 line contributes nothing to the total; omit it so the engine's positive-allocation guard is happy
+    const odcs: OtherDirectCost[] = ([
+      { kind: 'materials', label: 'm', amount: sum(spec.materials), allocation: spec.materials },
+      { kind: 'travel', label: 't', amount: sum(spec.travel), allocation: spec.travel },
+      { kind: 'equipment', label: 'e', amount: sum(spec.equipment), allocation: spec.equipment },
+      { kind: 'odc_other', label: 'o', amount: sum(spec.other), allocation: spec.other },
+    ] as OtherDirectCost[]).filter((o) => o.amount > 0);
+    const subs: Subcontract[] = sum(spec.subs) > 0 ? [{ org: spec.subOrg, role: 'sub', amount: sum(spec.subs), allocation: spec.subs }] : [];
+    const eng = computeBudget(labor, spec.rates, { odcs, subs, periods: specPoP(spec) });
     const ok = Math.abs(tpl - eng.grand.totalPrice) < 0.02; allOk &&= ok;
-    console.log(`  ${spec.tag.padEnd(10)} template=$${Math.round(tpl).toLocaleString().padStart(11)}  engine=$${Math.round(eng.grand.totalPrice).toLocaleString().padStart(11)}  ${ok ? '✓' : '✗ MISMATCH'}`);
+    console.log(`  ${spec.tag.padEnd(13)} template=$${Math.round(tpl).toLocaleString().padStart(11)}  engine=$${Math.round(eng.grand.totalPrice).toLocaleString().padStart(11)}  ${ok ? '✓' : '✗ MISMATCH'}`);
   }
   return allOk;
 }

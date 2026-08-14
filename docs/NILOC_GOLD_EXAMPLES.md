@@ -38,25 +38,43 @@ user's steer (electronics / software / systems; RF/EM/CV/AI/automation; not biol
 
 ## What was built (all landed in the NILOC tenant)
 
-Per technology, a **multi-volume** set:
+The set spans the **proposal forms** the platform handles — not just Phase II. Each prose document is
+landed as a `tenant_documents` row and **decomposed into `library_atoms`** (foundation → sections →
+primitives) so the drafter can reuse it; cost volumes are formula-cached burden workbooks.
 
-- **Technical Volume** — a complete SBIR Phase II narrative (~2,300–2,600 words, 9 sections:
-  Executive Summary · Significance · Technical Objectives · Approach & Work Plan · Related Work ·
-  Key Personnel · Commercialization · Quad Chart). Landed as a `tenant_documents` row and
-  **decomposed into `library_atoms`** (foundation → sections → primitives) so the drafter can reuse it.
-- **Cost Volume** — a 24-month (Year 1 + Year 2) burden-waterfall workbook (Rates · Labor · ODC ·
-  Summary), filled with realistic NILOC labor/rates/ODC and **formula-cached**, landed likewise.
+| Form | Technology | Cost volume |
+|------|-----------|-------------|
+| SBIR **Phase II** technical volume ×3 | CADENCE · AURA · PolarHawk | 24-mo (Year 1 + Year 2) |
+| SBIR **Phase I** technical volume (Navy) | AURA | Base 6 mo + Option 6 mo |
+| **CSO** solution brief (DIU/AFWERX-style) | CADENCE | (ROM in-brief) |
+| **NSF** Project Pitch (America's Seed Fund, ~3 pp) | PolarHawk | (no budget at pitch) |
+| **NASA** SBIR Phase I (spacecraft ISHM) | CADENCE-ISHM | single 6-mo period |
+| **Ohio Third Frontier TVSF** commercialization application | Battelle "OATS" (see below) | in-narrative budget + 1:1 match |
 
-Plus company foundation atoms: **Eric Wagner's CEO bio** and the **NILOC capability statement**.
+Plus company foundation atoms: **Eric Wagner's CEO bio** and the **NILOC capability statement**
+(CAGE **8NLC7** · UEI **K9NLC7X2M4Q8** — illustrative, replace with SAM values before submission).
 
-NILOC library after seeding: **498 atoms**; **6 gold documents** (3 technical + 3 cost).
+NILOC library after seeding: **≈770 atoms**; **13 gold documents** (8 prose + 5 cost).
+
+### The TVSF technology — RFP-Pipeline-adjacent, Ohio-nexus
+
+The one form that needed a *new* technology is the TVSF application (Ohio Third Frontier funds Ohio
+companies commercializing **Ohio-institution** IP). The match to RFP Pipeline's own core is
+**Battelle Memorial Institute's "OATS"** — ontology-guided, query-focused automatic text
+summarization / information extraction, **U.S. Patent 12,430,376** (Columbus, Ohio). NILOC licenses
+it to validate a **document-intelligence engine** powering RFP Pipeline + a standalone product —
+Ohio-invented IP commercialized by an Ohio company. The narrative states honestly that OATS is
+**Battelle's** IP (a commercial license, not a federal transfer) and makes confirming license terms
+**Milestone 1**. (Alternatives the research surfaced, held in reserve: Navy US 7,925,496 summarization —
+clean *federal* license; AFRL/RI info-extraction via TechLink/Dayton-WBI.)
 
 ## Proof (`scripts/niloc/verify.mts`)
 
 1. **Cost roll-up = portal engine, to the cent.** Each workbook's `TOTAL PROPOSED PRICE` equals
    `lib/proposal/cost-model.ts` `computeBudget` exactly, so a tenant transcribes the sheet 1:1 into
-   the portal cost volume with no drift:
-   - CADENCE **$1,859,211** · AURA **$1,807,743** · PolarHawk **$1,876,009** (realistic DoD Phase II).
+   the portal cost volume with no drift, across every period shape (24-mo, base+option, single):
+   - Phase II — CADENCE **$1,859,211** · AURA **$1,807,743** · PolarHawk **$1,876,009**.
+   - AURA **Phase I** (base+option) **$261,425** · CADENCE-ISHM **NASA Phase I** (6 mo) **$149,029**.
 2. **Drafter reuse.** `selectForSection` (the section-drafter's exact retrieval) surfaces NILOC's own
    gold-proposal atoms for a new draft section — **6/6 on-topic** for each of the three technology
    queries with the semantic index on (`ATOM_EMBED=local` or Voyage). With the engine off it still
@@ -74,7 +92,9 @@ NILOC library after seeding: **498 atoms**; **6 gold documents** (3 technical + 
 
 ## [confirm] — before any real submission
 
-Eric to supply / replace: biosketch specifics (education, prior roles, years, clearances, awards);
-CAGE / UEI / SAM registration + set-aside status; official contact email/phone; NILOC's actual
-indirect + labor rates (the workbooks recompute automatically); and confirmation of every
-`[bracketed]` planning figure via modeling / Phase I feasibility / Phase II test data.
+Eric to supply / replace: biosketch specifics (education, prior roles, years, clearances, awards —
+LinkedIn on file: https://www.linkedin.com/in/eric-wagner-7480385, not auto-fetchable here);
+**real SAM.gov CAGE / UEI** (8NLC7 / K9NLC7X2M4Q8 are illustrative placeholders) + set-aside status;
+NILOC's registered Ohio address; official contact email/phone; NILOC's actual indirect + labor rates
+(the workbooks recompute automatically); confirmation of every `[bracketed]` planning figure; and —
+for the TVSF — **confirming Battelle license availability/terms for US 12,430,376** (Milestone 1).

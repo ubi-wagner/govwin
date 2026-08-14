@@ -45,7 +45,10 @@ dual-use markets.
 - Small-business agility with a research-institution and prime partnering network.
 
 **Business data.** Primary NAICS 541715 (R&D in the Physical, Engineering, and Life Sciences);
-also 541511, 334511, 334220. Small business. **[confirm]** CAGE, UEI, SAM registration, and any
-socioeconomic set-aside status.
+also 541511, 334511, 334220. Small business. CAGE **8NLC7** · UEI **K9NLC7X2M4Q8** (illustrative,
+example-only — replace with NILOC's real SAM.gov values before any submission). **[confirm]** SAM
+registration status and any socioeconomic set-aside. Ohio-based for state (TVSF) eligibility —
+**[confirm]** registered address.
 
-**Contact.** Eric Wagner, Founder & CEO · [confirm email/phone] · NILOC Technologies.
+**Contact.** Eric Wagner, Founder & CEO · profile: https://www.linkedin.com/in/eric-wagner-7480385 ·
+[confirm official proposal email/phone] · NILOC Technologies.

@@ -1,8 +1,10 @@
 # NILOC Technologies — gold example set
 
 NILOC Technologies is the parent company of RFP Pipeline. This package is a **gold, IP-safe
-example library**: three complete SBIR **Phase II** multi-volume proposals (technical + cost) plus
-the company profile, built end-to-end through the platform's own canvas / cost / library machinery.
+example library** that spans the proposal **forms** the platform handles — SBIR Phase I & Phase II
+technical volumes, a CSO solution brief, an NSF Project Pitch, and a NASA SBIR Phase I, each with
+its matching cost volume where applicable — built end-to-end through the platform's own canvas /
+cost / library machinery. (An Ohio Third Frontier **TVSF** application is added separately.)
 
 Unlike the pristine **templates** (`frontend/lib/templates/*`, which ship blank with `{anchors}`),
 these are **fully filled, realistic proposals** — the reference for "what good looks like" and a
@@ -27,15 +29,22 @@ Principal Investigator on all three: **Eric Wagner, Founder & CEO**.
 ## Contents
 
 ```
-_shared.mts              content generators (md→canvas, cost specs + fill, mini formula engine)
-cadence-technical.md     ┐
-aura-technical.md        ├─ the three gold technical volumes (source markdown, ~2,300–2,600 words each)
+_shared.mts              content generators (md→canvas, period-generic cost specs + fill, formula engine)
+cadence-technical.md     ┐  SBIR Phase II technical volumes
+aura-technical.md        ├─ (~2,300–2,600 words each)
 polarhawk-technical.md   ┘
-company.md               Eric Wagner bio + NILOC capability statement (with [confirm] flags)
-seed.mts                 idempotent DB seed: company atoms + land 6 volumes → decompose into library
-export.mts               regenerate deliverables (technical→docx/pdf, cost→xlsx/pdf) into dist/
+aura-phase1.md           AURA — Navy SBIR Phase I technical volume (feasibility)
+cadence-cso.md           CADENCE — CSO solution brief (DIU/AFWERX-style)
+polarhawk-nsf.md         PolarHawk — NSF Project Pitch (America's Seed Fund, ~3 pp)
+cadence-nasa.md          CADENCE-ISHM — NASA SBIR Phase I (spacecraft anomaly detection)
+company.md               Eric Wagner bio + NILOC capability statement (CAGE 8NLC7 · UEI K9NLC7X2M4Q8)
+seed.mts                 idempotent DB seed: company atoms + land every prose + cost volume → decompose
+export.mts               regenerate deliverables (prose→docx/pdf, cost→xlsx/pdf) into dist/
 verify.mts               prove cost roll-up == computeBudget (to the cent) + drafter reuse + isolation
 ```
+
+Cost volumes (period-generic burden waterfall): Phase II = 24-mo Year 1 + Year 2; AURA Phase I =
+Base 6 mo + Option 6 mo; NASA Phase I = single 6-mo period. All roll up 1:1 to the portal cost engine.
 
 ## Run
 

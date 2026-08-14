@@ -3,21 +3,22 @@
  *
  * NILOC is the parent company of RFP Pipeline. These examples are built from real,
  * IP-safe federal technologies offered for license through the DoD tech-transfer
- * ecosystem (TechLink / lab T2 offices) — so they read as genuine SBIR Phase II
- * proposals NILOC could file, with no third-party IP exposure. Eric Wagner (Founder
- * & CEO) is the Principal Investigator. Unverifiable specifics are marked [confirm]
- * or shown as [bracketed] planning estimates in the narratives.
+ * ecosystem (TechLink / lab T2 offices) — so they read as genuine proposals NILOC could
+ * file, with no third-party IP exposure. Eric Wagner (Founder & CEO) is the Principal
+ * Investigator. Unverifiable specifics are marked [confirm] or shown as [bracketed]
+ * planning estimates in the narratives.
  *
- * The three technologies (base patent honestly cited in each narrative):
+ * The technologies (base patent honestly cited in each narrative):
  *   · CADENCE™   — Pattern-of-Life / activity-based-intelligence analytics (AFRL, Rome NY)
- *   · AURA™      — Counter-UAS RF sensing / passive electronic support
- *   · PolarHawk™ — Low-SWaP compact-polarimetric monopulse radar for small-UAS
+ *   · AURA™      — Counter-UAS RF sensing / passive electronic support (NSWC Crane)
+ *   · PolarHawk™ — Low-SWaP compact-polarimetric monopulse radar for small-UAS (NRL)
  *
- * Cost volumes are 24-month (Phase II Year 1 + Year 2) burden-waterfall workbooks whose
- * roll-ups mirror the portal cost engine (lib/proposal/cost-model.ts computeBudget) to
- * the cent — verify.mts proves it.
+ * Coverage spans the proposal FORMS the platform handles: SBIR Phase I & Phase II
+ * technical volumes, a CSO solution brief, an NSF Project Pitch, and a NASA SBIR Phase I —
+ * plus 24-month / base+option / single-period burden-waterfall cost workbooks whose
+ * roll-ups mirror the portal cost engine (lib/proposal/cost-model.ts) to the cent.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildBurdenCostSheet } from '@/lib/templates/cost/burden-cost-sheet';
@@ -28,16 +29,27 @@ export const NILOC_TENANT_ID = 'd5386192-2aca-4d77-8d1e-61719ee34cce';
 export const ERIC_USER_ID = '1bc09a41-c018-4738-9dcd-9a1b1cf88894';
 export const HERE = dirname(fileURLToPath(import.meta.url));
 
-// ── the three technical volumes (markdown → sectioned canvas) ──
-export const TECH_VOLUMES: Array<{ key: string; file: string; title: string; tag: string }> = [
-  { key: 'cadence', file: 'cadence-technical.md', tag: 'CADENCE', title: 'CADENCE — Pattern-of-Life Analytics (SBIR Phase II Technical Volume)' },
-  { key: 'aura', file: 'aura-technical.md', tag: 'AURA', title: 'AURA — Counter-UAS RF Sensing (SBIR Phase II Technical Volume)' },
-  { key: 'polarhawk', file: 'polarhawk-technical.md', tag: 'PolarHawk', title: 'PolarHawk — Compact-Polarimetric Radar for sUAS (SBIR Phase II Technical Volume)' },
+// ── the prose proposals (markdown → sectioned canvas), one per (technology × form) ──
+export interface ProseDoc { file: string; tag: string; title: string; docType: string }
+export const PROSE_DOCS: ProseDoc[] = [
+  // SBIR Phase II technical volumes (the flagship three)
+  { file: 'cadence-technical.md', tag: 'CADENCE', docType: 'technical_volume', title: 'CADENCE — Pattern-of-Life Analytics (SBIR Phase II Technical Volume)' },
+  { file: 'aura-technical.md', tag: 'AURA', docType: 'technical_volume', title: 'AURA — Counter-UAS RF Sensing (SBIR Phase II Technical Volume)' },
+  { file: 'polarhawk-technical.md', tag: 'PolarHawk', docType: 'technical_volume', title: 'PolarHawk — Compact-Polarimetric Radar for sUAS (SBIR Phase II Technical Volume)' },
+  // other forms across the same technologies
+  { file: 'aura-phase1.md', tag: 'AURA-PhaseI', docType: 'technical_volume', title: 'AURA — Counter-UAS RF Sensing (Navy SBIR Phase I Technical Volume)' },
+  { file: 'cadence-cso.md', tag: 'CADENCE-CSO', docType: 'custom', title: 'CADENCE — Pattern-of-Life Analytics (CSO Solution Brief)' },
+  { file: 'polarhawk-nsf.md', tag: 'PolarHawk-NSF', docType: 'custom', title: 'PolarHawk — Compact-Polarimetric Radar (NSF Project Pitch)' },
+  { file: 'cadence-nasa.md', tag: 'CADENCE-NASA', docType: 'technical_volume', title: 'CADENCE-ISHM — Spacecraft Anomaly Detection (NASA SBIR Phase I)' },
+  // Ohio Third Frontier TVSF — NILOC licenses Battelle "OATS" (US 12,430,376), the RFP-Pipeline-adjacent tech
+  { file: 'tvsf-application.md', tag: 'TVSF-OATS', docType: 'custom', title: 'NILOC — Document Intelligence via Battelle OATS (Ohio Third Frontier TVSF Application)' },
 ];
+/** Back-compat alias — the first three are the SBIR Phase II technical volumes. */
+export const TECH_VOLUMES = PROSE_DOCS.slice(0, 3);
 
-export function readTech(file: string): string {
-  return readFileSync(join(HERE, file), 'utf8');
-}
+export function readProse(file: string): string { return readFileSync(join(HERE, file), 'utf8'); }
+export function proseExistsOnDisk(file: string): boolean { return existsSync(join(HERE, file)); }
+export const readTech = readProse;                    // legacy name
 
 // markdown → flat canvas nodes (headings / lists / paragraphs)
 export function mdToNodes(md: string): CanvasNode[] {
@@ -54,7 +66,7 @@ export function mdToNodes(md: string): CanvasNode[] {
     if (line.trim() === '') { i++; continue; }
     const para: string[] = [];
     while (i < lines.length && lines[i].trim() !== '' && !/^#{1,3}\s/.test(lines[i]) && !/^\s*[-*]\s/.test(lines[i]) && !/^\s*\d+[.)]\s/.test(lines[i])) { para.push(lines[i].trim()); i++; }
-    const text = para.join(' ').replace(/\*\*/g, '').trim(); if (text) nodes.push(mk('text_block', { text }));
+    const text = para.join(' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); if (text) nodes.push(mk('text_block', { text }));
   }
   return nodes;
 }
@@ -64,7 +76,7 @@ export function toSections(nodes: CanvasNode[]): CanvasSection[] {
   for (const n of nodes) { if (n.type === 'heading') { flush(); cur = [n]; title = (n.content as { text?: string })?.text; } else cur.push(n); }
   flush(); return sections;
 }
-export function techDoc(md: string, title: string): CanvasDocument {
+export function proseDoc(md: string, title: string): CanvasDocument {
   const now = '2026-01-01T00:00:00Z';
   return {
     version: 2, document_id: crypto.randomUUID(),
@@ -73,20 +85,31 @@ export function techDoc(md: string, title: string): CanvasDocument {
     metadata: { title, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: ERIC_USER_ID, version_number: 1, status: 'ai_drafted' },
   };
 }
+export const techDoc = proseDoc;                      // legacy name
 
-// ── the three cost volumes (24-month burden waterfall) ──
-export type Lab = { rate: number; y1: number; y2: number } | null;
-export type Odc = { y1: number; y2: number };
+// ── cost volumes (period-generic burden waterfall) ──
+export type LaborLineSpec = { rate: number; hours: number[] } | null;   // hours length = periods
 export interface CostSpec {
   key: string; tag: string; title: string; topic: string;
+  program?: 'sbir' | 'sttr' | 'grant';
+  periods: { name: string; months: number }[];
+  ceilingNote?: string;
   rates: { fringePct: number; overheadPct: number; gnaPct: number; feePct: number };
-  labor: Lab[];                                   // length 9, aligned to LABOR_CODES rows
-  materials: Odc; travel: Odc; equipment: Odc; other: Odc; subs: Odc; subOrg: string;
+  labor: LaborLineSpec[];                              // length 9, aligned to LABOR_CODES rows
+  materials: number[]; travel: number[]; equipment: number[]; other: number[]; subs: number[]; // each length = periods
+  subOrg: string;
 }
+const Y2 = [{ name: 'Year 1', months: 12 }, { name: 'Year 2', months: 12 }];
+const P1BO = [{ name: 'Base', months: 6 }, { name: 'Option', months: 6 }];
+const P1S = [{ name: 'Period of Performance', months: 6 }];
 export const COST_SPECS: CostSpec[] = [
-  { key: 'cadence', tag: 'CADENCE', topic: 'AF SBIR Phase II — Pattern-of-Life Analytics', title: 'NILOC · CADENCE Cost Volume (Phase II, 24 mo)', rates: { fringePct: 0.30, overheadPct: 0.55, gnaPct: 0.12, feePct: 0.07 }, labor: [{ rate: 110, y1: 420, y2: 380 }, { rate: 96, y1: 720, y2: 720 }, { rate: 88, y1: 820, y2: 820 }, { rate: 72, y1: 760, y2: 800 }, { rate: 80, y1: 800, y2: 820 }, null, null, { rate: 82, y1: 240, y2: 240 }, { rate: 46, y1: 140, y2: 140 }], materials: { y1: 22000, y2: 18000 }, travel: { y1: 10000, y2: 12000 }, equipment: { y1: 14000, y2: 0 }, other: { y1: 3000, y2: 3000 }, subs: { y1: 70000, y2: 60000 }, subOrg: 'University ML research partner (STTR-style RI collaboration)' },
-  { key: 'aura', tag: 'AURA', topic: 'NAVY SBIR Phase II — Counter-UAS RF Sensing', title: 'NILOC · AURA Cost Volume (Phase II, 24 mo)', rates: { fringePct: 0.30, overheadPct: 0.58, gnaPct: 0.13, feePct: 0.07 }, labor: [{ rate: 110, y1: 330, y2: 300 }, { rate: 98, y1: 500, y2: 500 }, { rate: 92, y1: 720, y2: 720 }, { rate: 74, y1: 560, y2: 580 }, { rate: 80, y1: 500, y2: 520 }, { rate: 84, y1: 380, y2: 360 }, { rate: 54, y1: 420, y2: 440 }, { rate: 82, y1: 180, y2: 180 }, { rate: 46, y1: 110, y2: 110 }], materials: { y1: 35000, y2: 28000 }, travel: { y1: 12000, y2: 14000 }, equipment: { y1: 45000, y2: 15000 }, other: { y1: 5000, y2: 5000 }, subs: { y1: 40000, y2: 35000 }, subOrg: 'RF antenna / range-test subcontractor' },
-  { key: 'polarhawk', tag: 'PolarHawk', topic: 'NAVY SBIR Phase II — Compact-Polarimetric Radar for sUAS', title: 'NILOC · PolarHawk Cost Volume (Phase II, 24 mo)', rates: { fringePct: 0.30, overheadPct: 0.60, gnaPct: 0.13, feePct: 0.07 }, labor: [{ rate: 110, y1: 300, y2: 270 }, { rate: 100, y1: 480, y2: 480 }, { rate: 94, y1: 680, y2: 680 }, { rate: 74, y1: 520, y2: 540 }, { rate: 80, y1: 480, y2: 500 }, { rate: 86, y1: 420, y2: 400 }, { rate: 55, y1: 460, y2: 480 }, { rate: 82, y1: 170, y2: 170 }, { rate: 46, y1: 100, y2: 100 }], materials: { y1: 40000, y2: 30000 }, travel: { y1: 12000, y2: 14000 }, equipment: { y1: 70000, y2: 20000 }, other: { y1: 6000, y2: 6000 }, subs: { y1: 55000, y2: 45000 }, subOrg: 'Antenna fabrication / range-test subcontractor' },
+  { key: 'cadence', tag: 'CADENCE', topic: 'AF SBIR Phase II — Pattern-of-Life Analytics', title: 'NILOC · CADENCE Cost Volume (Phase II, 24 mo)', periods: Y2, ceilingNote: 'confirm the Phase II ceiling in your solicitation', rates: { fringePct: 0.30, overheadPct: 0.55, gnaPct: 0.12, feePct: 0.07 }, labor: [{ rate: 110, hours: [420, 380] }, { rate: 96, hours: [720, 720] }, { rate: 88, hours: [820, 820] }, { rate: 72, hours: [760, 800] }, { rate: 80, hours: [800, 820] }, null, null, { rate: 82, hours: [240, 240] }, { rate: 46, hours: [140, 140] }], materials: [22000, 18000], travel: [10000, 12000], equipment: [14000, 0], other: [3000, 3000], subs: [70000, 60000], subOrg: 'University ML research partner (STTR-style RI collaboration)' },
+  { key: 'aura', tag: 'AURA', topic: 'NAVY SBIR Phase II — Counter-UAS RF Sensing', title: 'NILOC · AURA Cost Volume (Phase II, 24 mo)', periods: Y2, ceilingNote: 'confirm the Phase II ceiling in your solicitation', rates: { fringePct: 0.30, overheadPct: 0.58, gnaPct: 0.13, feePct: 0.07 }, labor: [{ rate: 110, hours: [330, 300] }, { rate: 98, hours: [500, 500] }, { rate: 92, hours: [720, 720] }, { rate: 74, hours: [560, 580] }, { rate: 80, hours: [500, 520] }, { rate: 84, hours: [380, 360] }, { rate: 54, hours: [420, 440] }, { rate: 82, hours: [180, 180] }, { rate: 46, hours: [110, 110] }], materials: [35000, 28000], travel: [12000, 14000], equipment: [45000, 15000], other: [5000, 5000], subs: [40000, 35000], subOrg: 'RF antenna / range-test subcontractor' },
+  { key: 'polarhawk', tag: 'PolarHawk', topic: 'NAVY SBIR Phase II — Compact-Polarimetric Radar for sUAS', title: 'NILOC · PolarHawk Cost Volume (Phase II, 24 mo)', periods: Y2, ceilingNote: 'confirm the Phase II ceiling in your solicitation', rates: { fringePct: 0.30, overheadPct: 0.60, gnaPct: 0.13, feePct: 0.07 }, labor: [{ rate: 110, hours: [300, 270] }, { rate: 100, hours: [480, 480] }, { rate: 94, hours: [680, 680] }, { rate: 74, hours: [520, 540] }, { rate: 80, hours: [480, 500] }, { rate: 86, hours: [420, 400] }, { rate: 55, hours: [460, 480] }, { rate: 82, hours: [170, 170] }, { rate: 46, hours: [100, 100] }], materials: [40000, 30000], travel: [12000, 14000], equipment: [70000, 20000], other: [6000, 6000], subs: [55000, 45000], subOrg: 'Antenna fabrication / range-test subcontractor' },
+  // AURA — Navy SBIR Phase I feasibility (Base 6 mo + Option 6 mo, ≈ $150K base ceiling)
+  { key: 'aura-p1', tag: 'AURA-PhaseI', topic: 'NAVY SBIR Phase I — Counter-UAS RF Sensing (feasibility)', title: 'NILOC · AURA Cost Volume (Navy Phase I, Base 6 mo + Option 6 mo)', periods: P1BO, program: 'sbir', ceilingNote: 'confirm the Phase I base + option ceiling (~$150K base)', rates: { fringePct: 0.30, overheadPct: 0.58, gnaPct: 0.13, feePct: 0.07 }, labor: [{ rate: 110, hours: [120, 90] }, null, { rate: 92, hours: [240, 170] }, { rate: 74, hours: [200, 150] }, null, null, { rate: 54, hours: [60, 40] }, null, null], materials: [8000, 6000], travel: [3000, 3000], equipment: [0, 0], other: [1000, 1000], subs: [3000, 2000], subOrg: 'RF test support' },
+  // CADENCE-ISHM — NASA SBIR Phase I (single 6-mo period, ≈ $150K)
+  { key: 'cadence-nasa-p1', tag: 'CADENCE-NASA', topic: 'NASA SBIR Phase I — Spacecraft ISHM / Anomaly Detection', title: 'NILOC · CADENCE-ISHM Cost Volume (NASA Phase I, 6 mo)', periods: P1S, program: 'sbir', ceilingNote: 'confirm the NASA Phase I ceiling (~$150K)', rates: { fringePct: 0.30, overheadPct: 0.55, gnaPct: 0.12, feePct: 0.07 }, labor: [{ rate: 110, hours: [120] }, { rate: 96, hours: [260] }, null, null, { rate: 80, hours: [220] }, null, null, null, null], materials: [8000], travel: [2000], equipment: [0], other: [2000], subs: [0], subOrg: 'n/a' },
 ];
 
 // ── mini spreadsheet engine over the is_spreadsheet table nodes ──
@@ -97,7 +120,7 @@ export function loadSheets(doc: CanvasDocument): Sheets {
   return s;
 }
 function colIdx(letters: string): number { let x = 0; for (const ch of letters) x = x * 26 + (ch.charCodeAt(0) - 64); return x; }
-function colLetters(n: number): string { let s = ''; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
+export function colLetters(n: number): string { let s = ''; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
 type Cell = { formula?: string; value?: number; text?: string; number_format?: string };
 function cellObj(sh: Sheets, sheet: string, col: string, row: number): Cell | undefined { return (sh.get(sheet)![row - 2] as Cell[] | undefined)?.[colIdx(col) - 1]; }
 export function cellAt(sh: Sheets, sheet: string, col: string, row: number): number {
@@ -115,22 +138,28 @@ export function evalFormula(formula: string, sh: Sheets, cur: string): number {
 }
 function setNum(sh: Sheets, sheet: string, col: string, row: number, v: number) { const cell = cellObj(sh, sheet, col, row); if (!cell) throw new Error(`no cell ${sheet}!${col}${row}`); cell.value = v; cell.text = String(v); }
 
-/** Build a filled + formula-cached CADENCE/AURA/PolarHawk cost workbook (interpolated for NILOC). */
+/** Build a filled + formula-cached NILOC cost workbook for any period count (interpolated). */
 export function buildFilledCost(spec: CostSpec, opts: { cacheFormulas?: boolean } = {}): CanvasDocument {
-  const doc = buildBurdenCostSheet({ documentId: `niloc-cost-${spec.key}`, title: spec.title, program: 'sbir', periods: [{ name: 'Year 1', months: 12 }, { name: 'Year 2', months: 12 }], ceilingNote: 'confirm the Phase II ceiling in your solicitation' });
+  const P = spec.periods.length;
+  const doc = buildBurdenCostSheet({ documentId: `niloc-cost-${spec.key}`, title: spec.title, program: spec.program ?? 'sbir', periods: spec.periods, ceilingNote: spec.ceilingNote ?? '' });
   const sh = loadSheets(doc);
   setNum(sh, 'Rates', 'B', 2, spec.rates.fringePct); setNum(sh, 'Rates', 'B', 3, spec.rates.overheadPct); setNum(sh, 'Rates', 'B', 4, spec.rates.gnaPct); setNum(sh, 'Rates', 'B', 5, spec.rates.feePct);
-  spec.labor.forEach((l, i) => { if (!l) return; const r = 2 + i; setNum(sh, 'Labor', 'C', r, l.rate); setNum(sh, 'Labor', 'D', r, l.y1); setNum(sh, 'Labor', 'F', r, l.y2); });
-  const od: Array<[number, Odc]> = [[2, spec.materials], [3, spec.travel], [4, spec.equipment], [5, spec.other], [6, spec.subs]];
-  for (const [r, o] of od) { setNum(sh, 'ODC', 'B', r, o.y1); setNum(sh, 'ODC', 'C', r, o.y2); }
+  const laborHrsCol = (p: number) => colLetters(4 + 2 * p);   // D, F, H, ...
+  spec.labor.forEach((l, i) => { if (!l) return; const r = 2 + i; setNum(sh, 'Labor', 'C', r, l.rate); for (let p = 0; p < P; p++) setNum(sh, 'Labor', laborHrsCol(p), r, l.hours[p] ?? 0); });
+  const periodCol = (p: number) => colLetters(2 + p);        // B, C, D, ...
+  const odRows: Array<[number, number[]]> = [[2, spec.materials], [3, spec.travel], [4, spec.equipment], [5, spec.other], [6, spec.subs]];
+  for (const [r, arr] of odRows) for (let p = 0; p < P; p++) setNum(sh, 'ODC', periodCol(p), r, arr[p] ?? 0);
   if (opts.cacheFormulas !== false) {
     for (const [name, rows] of sh) for (let ri = 0; ri < rows.length; ri++) for (let ci = 0; ci < (rows[ri] as Cell[]).length; ci++) { const cell = (rows[ri] as Cell[])[ci]; if (cell && typeof cell.formula === 'string') { const v = evalFormula(cell.formula, sh, name); cell.value = Math.round(v * 100) / 100; if (!cell.number_format) cell.text = String(cell.value); } }
   }
   interpolate(doc, { company_name: 'NILOC Technologies', pi_name: 'Eric Wagner', topic_number: spec.topic });
   return doc;
 }
-/** total proposed price = Summary total-column, price row 14 (P=2 → column D). */
-export function costPrice(doc: CanvasDocument): number { return cellAt(loadSheets(doc), 'Summary', 'D', 14); }
+/** Total proposed price: Summary row 14 — total column for P>1, else the single period column B. */
+export function costPrice(doc: CanvasDocument, periodCount: number): number {
+  const priceCol = periodCount > 1 ? colLetters(2 + periodCount) : 'B';
+  return cellAt(loadSheets(doc), 'Summary', priceCol, 14);
+}
 
 function interpolate(doc: CanvasDocument, vars: Record<string, string>) {
   const re = /\{([a-z_]+)\}/g;
