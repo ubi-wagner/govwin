@@ -83,7 +83,7 @@ two-voice sender model. It needs **one credential** to switch on.
 
 | Var | Purpose |
 |-----|---------|
-| `CMS_DATABASE_URL` | the CMS's own Postgres (`govtech_cms`) |
+| `CMS_DATABASE_URL` | the `rfp-crm` service's own Postgres (`cms-postgres`) |
 | `SHARED_DATABASE_URL` | the shared `system_events` bridge back to the main DB |
 | `CMS_API_KEY` | service-to-service auth (frontend → CMS) |
 | `CMS_JWT_SECRET`, `CMS_AUTH_MODE`, `CMS_BASIC_USER`, `CMS_BASIC_PASS` | CMS admin auth |
