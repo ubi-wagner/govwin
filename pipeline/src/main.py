@@ -152,7 +152,7 @@ async def main() -> None:
     from health import run_health_server
     from lifecycle_scheduler import run_lifecycle_scheduler
 
-    # Instantiate the AgentFabric so all 10 archetypes are registered
+    # Instantiate the AgentFabric so all 36 archetypes are registered
     # and ready for invocation by the workflow processor (AI_INVOKE
     # steps) and the agent_task_queue consumer.
     fabric = None

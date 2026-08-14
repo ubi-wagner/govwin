@@ -28,9 +28,80 @@ under, and the RFP-admin oversight surface. The fabric mechanics + how to add an
 
 ---
 
+## 0. As-built live status (2026-08-14) — the authoritative current state
+
+> This block supersedes the scattered "and now the fabric registers N / 15 live" counts below (kept as
+> the build narrative). Verified against code — `fabric.py` `_ARCHETYPE_CLASSES` (lines 106–143 = **36**),
+> `processor.py` `TOOL_ACTION_TO_ARCHETYPE` (225–295), the 25 `workflows/*.py`, and a full live drive.
+
+**The fabric registers 36 archetypes, and ALL 36 are now proven to fire live in-sandbox** (2026-08-14),
+under prod-parity: the app connected as **`govtech_app` (NOBYPASSRLS)** + owner for `sqlBypass`, the
+**pipeline worker** listening, LLM on the emulator. Verification signal per agent: a `system_events`
+`type='agent.invoked'` row (`payload.archetype`) + a `guardrail` verdict + a managed `process_instances`
+row (workflow paths). The drive fired **36 distinct archetypes**, guardrail verdict **`apply`** on every
+advisory landing, **0 errored** end-rows; the HITL workflows correctly **paused at their human gates**
+(a tenant `proposal_review` ToDo + a platform `triage_new_opportunities` ToDo), and `color_team_reviewer`
+landed **13 per-section `ai_review` comments** into the builder thread. (Drives:
+`frontend/scripts/drive-remaining-cohorts.mts` + `drive-full-draft.mts` + the pre-existing
+`drive-pin/opp-scout/research_scout/overlay_market/prove_agents` set.)
+
+**Dispatch model** (`processor.py:738–812`): **workflow-first** — a `get_workflow_for_event` match runs
+the managed engine; **archetype-fallback** (`fabric.has_handler` → `handle_event`) fires only when *no*
+workflow claims the event AND `phase != 'start'`. `AI_INVOKE` steps route via `TOOL_ACTION_TO_ARCHETYPE`;
+an **unmapped action is a safe skip** (never a dead-end), and `Workflow.validate()` rejects an unmapped
+`AI_INVOKE` at boot.
+
+**The complete firing-path catalog** (every archetype has ≥1 site; the paths the older sections omit are
+marked ⊕):
+
+| Firing path | Trigger | Archetypes fired |
+|---|---|---|
+| Provision | `OnProposalCreated` (`proposal:proposal.created:end`) | proposal_architect · capture_strategist · cost_estimator · pp_matcher · research_scout · library_seed_suggester · section_drafter (`draft_v0`) |
+| Advance gates | `OnProposalAdvancedToReview` / `…ToFinal` (`proposal:proposal.advanced:end`) | compliance_reviewer · packaging_specialist |
+| Full-draft cohort | `OnFullDraftRequested{ModeA,B,C}` (`proposal:proposal.full_draft_requested:end`) | proposal_manager (head) · section_drafter · formatter · stylist · cost_estimator · packaging_specialist · continuity_manager · traceability_auditor · redaction_guard · library_seed_suggester |
+| Adversarial overlay | `AdvisoryOverlay(Auto)` (`proposal:proposal.advisory_overlay_requested`) | market_analyst (pre_augment) · advisory_manager (reconcile) |
+| ⊕ **Proposal Studio (3 gated loops)** | `OnReviewPhaseRequested{Draft,Refine,Compliance}` (`proposal:review_phase.requested`, mig 144 `studio_phase`) | the **same** full-draft + gate cohort, one loop at a time (Draft → Refine → Compliance) |
+| Queue producers (human-actor buttons) | `agent_task_queue` → `process_task_queue` | scoring_strategist + opportunity_analyst (pin) · color_team_reviewer (AI-review) · librarian (atomize-package) · library_seed_mapper (seed-job select) · research_scout (ai/research) |
+| Platform ingest | `OnRfpUploaded` (`finder:rfp.uploaded:end`) | ingest_analyst · matrix_stager · skeleton_architect |
+| Platform ingest-mgr / QA | `OnIngestAssessmentRequested` · `OnSolicitationReviewRequested` | rfp_ingest_manager · curation_qa |
+| Platform triage / amendments | `OnOpportunitiesDetected` (`finder:opportunities.detected:single`) · `OnSourceChangeDetected` / `OnSolicitationUpdateScan` | opportunity_scout · amendment_monitor |
+| Onboarding / outcome | `OnApplicationAccepted` · `OnProposalOutcomeRecorded` | onboarding_agent · outcome_analyst |
+| Scheduled (our-org CMS/ops) | `OnOpsDigestRequested` · `OnContentResurfaceRequested` · `OnSocialScheduleRequested` · `OnCmsContentRequested` | ops_digest · content_curator · social_scheduler · content_generator |
+
+⊕ **Admin doorbells** (missing from §s below): full-draft **and** Studio are also admin-drivable from
+`/admin/agents` — `POST /api/admin/proposals/[p]/full-draft` and `.../studio` funnel through the SAME
+`lib/proposal-full-draft.ts` / `lib/proposal-studio.ts` helpers (`source='admin_doorbell'`), so a build
+can be auto-drafted from up top without descending into the portal.
+
+**The concrete landing surface** (the "advisory → land-or-review" §7 consumer, named): the full-draft /
+Studio cohort's staged output lands via **`POST /api/portal/[t]/proposals/[p]/land-revisions`** (+ the
+"Apply AI-proposed revisions" button / `accept-ai-revisions`), which writes review-staged
+`source='ai_revision'` `canvas_versions` the builder reviews + restores (the workflow engine forbids a
+pipeline consumer of agent output, so the landing is frontend + human-triggered —
+docs/FULL_DRAFT_LANDING_DESIGN.md). Per-section `color_team_reviewer` lands `proposal_comments`
+(`ai_review`); `scoring_strategist` lands `tenant_bucket_scores.factors` (±15, beside the algo score).
+
+**Known gaps (tracked, not blocking):**
+- **`content_generator` has no producer.** `OnCmsContentRequested` fires on `library:content.requested`,
+  but nothing in the app emits that event (repo-wide grep: only the workflow def, viz, roster, tests +
+  this drive). It is drivable only by emitting the event directly; a CMS/CRM "content brief" surface to
+  emit it is the wake. (Fires live when the event is emitted — proven in the drive.)
+- **Three `TOOL_ACTION_TO_ARCHETYPE` entries are latent** (mapped, no workflow references them):
+  `tool.proposal.review_color_team`, `tool.library.curate`, `tool.proposal.seed_map`. Their agents
+  (color_team_reviewer, librarian, library_seed_mapper) fire via **queue producers** instead — so the
+  mappings are reserved for a future `AI_INVOKE` step, not live step actors. Don't describe them as steps.
+- **Cron-only agents** (ops_digest, content_curator, social_scheduler, amendment_monitor-via-update_scan)
+  have no human-trigger surface by design (scheduled); their human surface is the output review.
+
+---
+
 ## 1. The workforce (what the agents are)
 
-Ten specialist AI agents, each a role with its own prompt, tools, and trigger:
+> The full roster is **36** (see §0 for the code-verified list + live status). The table below is the
+> **founding core-10 cohort** (#117) — the first agents woken — kept for the wiring narrative; the
+> sections after it track each later batch up to 36.
+
+The founding ten specialist AI agents, each a role with its own prompt, tools, and trigger:
 
 | Agent | Scope | Wakes on | Status | What it does |
 |---|---|---|---|---|
@@ -50,16 +121,17 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
-> **Live-count reconciliation (2026-07 rebaseline; +opportunity_scout 2026-08).** "Awake as workflow
-> actors" here means *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full
-> 36). That is a different measure from a **proven live enqueue/inline site**, of which there are **15**
-> today (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`,
-> `scoring_strategist`, `opportunity_analyst`, `research_scout`, `library_seed_suggester`,
-> `library_seed_mapper`, `opportunity_scout`, **`onboarding_agent`**, **`outcome_analyst`**,
-> **`ingest_analyst`**, **`matrix_stager`**, **`skeleton_architect`** — the last five proven live via
-> `scripts/drive_prove_agents.py`: each producer-wired (accept route → OnApplicationAccepted; outcome
-> route → OnProposalOutcomeRecorded; rfp-upload → OnRfpUploaded) and each runs advisory on the emulator,
-> guardrail-gated + audited). The rest are dormant-but-mapped. Use **15** when a doc means "actively firing."
+> **Live-count reconciliation — SUPERSEDED by §0 (all 36 proven live 2026-08-14).** The "15 actively
+> firing" figure below was the count at the 2026-07 rebaseline; the 2026-08-14 full drive (§0) fired
+> **all 36** archetypes live in-sandbox via their real workflow/producer paths, so the "15 vs dormant"
+> split no longer holds — every archetype has been observed emitting `agent.invoked`, guardrail `apply`,
+> 0 errors. Kept for history: at rebaseline the proven-firing set was 15 (`section_drafter`,
+> `compliance_reviewer`, `color_team_reviewer`, `librarian`, `scoring_strategist`, `opportunity_analyst`,
+> `research_scout`, `library_seed_suggester`, `library_seed_mapper`, `opportunity_scout`,
+> `onboarding_agent`, `outcome_analyst`, `ingest_analyst`, `matrix_stager`, `skeleton_architect` — the
+> last five via `scripts/drive_prove_agents.py`). Note the distinction §0 preserves: "fires live when its
+> trigger is emitted" (all 36) is not the same as "a producer in the app emits that trigger today" —
+> `content_generator`'s trigger (`library:content.requested`) still has no in-app producer (§0 gap).
 >
 > **opportunity_scout WOKEN (AGENTS-LIVE).** `OnOpportunitiesDetected` (finder:opportunities.detected)
 > was dark in the frontend intake path — nothing emitted its trigger. `lib/intake.stageIntake` now emits
@@ -235,12 +307,12 @@ workflow template as an actor" — both are agents-as-actors + kickoff trigger; 
 
 | Agent | Shape | Trigger / producer site | AI_INVOKE action |
 |---|---|---|---|
-| **scoring_strategist** | fan-out | card push → bucket-scored (per tenant) → producer | `tool.opportunity.score` |
-| **opportunity_analyst** | fan-out | card push (per tenant) → producer | `tool.opportunity.analyze` |
-| **proposal_architect** | single-entity step | proposal provision workflow | `tool.proposal.architect` |
-| **packaging_specialist** | single-entity step | all-sections-locked workflow | `tool.proposal.package` |
-| **capture_strategist** | single-entity step | portal-purchased workflow | `tool.capture.generate_strategy` |
-| **partner_coordinator** | single-entity step | collaborator-invited workflow | `tool.partner.coordinate` |
+| **scoring_strategist** | fan-out | card **pinned** → pin route producer (`cards/[oppId]/pin/route.ts:74`, `score_adjustment`) | `tool.opportunity.score` — *mapped but latent (no workflow uses it); fires via the queue producer. The `OnCardApplied` rescore is deterministic (`workflows/actions/rescore.py`), not this agent.* |
+| **opportunity_analyst** | fan-out | card **pinned** → pin route producer (`…/pin/route.ts:75`, `analyze_fit`) | `tool.opportunity.analyze` — *mapped; fires via the queue producer.* |
+| **proposal_architect** | single-entity step | `OnProposalCreated` (proposal provision) | `tool.proposal.architect` |
+| **packaging_specialist** | single-entity step | `OnProposalAdvancedToFinal` (all-sections-locked) | `tool.proposal.package` |
+| **capture_strategist** | single-entity step | `OnProposalCreated` (portal-purchased) | `tool.capture.generate_strategy` |
+| **partner_coordinator** | single-entity step | `OnCollaboratorInvited` | `tool.partner.coordinate` |
 
 **Status (#117 COMPLETE):** all six are wired and locked by wiring tests.
 - `librarian` — producer in the atomize-package route (per cocoon).
@@ -302,7 +374,7 @@ registry) is where the guardrail check runs — so "advisory → guardrail → l
 
 | Property | Status | How |
 |---|---|---|
-| **No prompt injection** | ✅ all 35 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
+| **No prompt injection** | ✅ every archetype that inlines untrusted text fences it (32/36 build_messages, per-agent tests) | Untrusted tenant/external text (atoms/RFP/opportunity/partner identity) inlined into `build_messages` is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard; each `test_<agent>_wiring.py` asserts the fence. The 4 that don't fence `build_messages` — `library_seed_suggester`, `library_seed_mapper`, `ops_digest`, `social_scheduler` — **don't inline untrusted text there** (UUID/tool-driven prompts), so there is no per-agent build_messages gap. They read untrusted atom/section text only via **tool results**, which the fabric returns verbatim as `json.dumps(result)` in `tool_result` blocks (`fabric.py:618`) — a structured, lighter-defense channel shared by **all** tool-using agents. **Platform hardening candidate (tracked, not per-agent):** neutralize/fence free-text fields in the tool-result channel so a poisoned own-tenant upload can't smuggle instructions through a tool return. |
 | **No runaway** | ✅ enforced by the runtime | `MAX_TOOL_ROUNDS=20` + `PER_CALL_CEILING_USD=$0.50` mid-loop + rate limit 50 calls/hr/tenant + $50/mo budget (fabric). Producers stay **bounded** — one task per package / per tenant, never per-atom; and an agent's output event must **not re-trigger the same agent** (no self-loop); task enqueue is idempotent. |
 | **No dead-ending a workflow/automation** | ✅ enforced by the runtime | The processor catches/logs/continues (never crashes the poll loop); an unmapped or failed `AI_INVOKE` action is a **safe skip** (no fabric call, no DB write); agent output is **advisory** (never writes business tables directly); the fabric returns an error status dict, **never raises**. So a failing agent-actor degrades gracefully — the human loop continues. `AI_INVOKE` steps also carry `on_failure`/`on_timeout`/`retry_count`. |
 | **Tenant isolation** | discretion ✅; RLS ✅ **built** (deploy-gated) | §7b: tenant-discretion holds today; **RLS backstop built** — mig 117 adds the `rfp_agent` NOBYPASSRLS role + FORCE-RLS on the gap tables (proposals/proposal_sections/tenant_profiles/atom_tags), and `fabric.invoke_agent` sets/resets `app.tenant_id` per call. **Proven in sandbox**: as `rfp_agent`, a cross-tenant / unset read returns 0 rows. Deploy step: provision a login member + `AGENT_DATABASE_URL`. |
