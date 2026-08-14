@@ -52,6 +52,8 @@ export { DATA_MANAGEMENT_PLAN } from './data-management-plan';
 export { FACILITIES_EQUIPMENT } from './facilities-equipment';
 export { LETTER_OF_COLLABORATION } from './letter-of-collaboration';
 export { SF424A_BUDGET } from './sf424a-budget';
+// ── Cost volumes — burden-waterfall PoP variants (formula spreadsheets) ──
+export { COST_PHASE1_BASE_OPTION, COST_UNDER_12MO, COST_18MO, COST_PHASE2_24MO, COST_CUSTOM } from './cost/variants';
 
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { DOD_SBIR_PHASE1_TECHNICAL } from './dod-sbir-phase1-technical';
@@ -88,6 +90,7 @@ import { DATA_MANAGEMENT_PLAN } from './data-management-plan';
 import { FACILITIES_EQUIPMENT } from './facilities-equipment';
 import { LETTER_OF_COLLABORATION } from './letter-of-collaboration';
 import { SF424A_BUDGET } from './sf424a-budget';
+import { COST_PHASE1_BASE_OPTION, COST_UNDER_12MO, COST_18MO, COST_PHASE2_24MO, COST_CUSTOM } from './cost/variants';
 
 export type TemplateCategory = 'dod_dow' | 'nsf' | 'doe' | 'nasa' | 'nih' | 'marketing' | 'commercialization' | 'investment' | 'tech' | 'company' | 'forms';
 
@@ -126,6 +129,11 @@ export type TemplateKey =
   | 'facilities-equipment'
   | 'letter-of-collaboration'
   | 'sf424a-budget'
+  | 'cost-phase1-base-option'
+  | 'cost-under-12mo'
+  | 'cost-18mo'
+  | 'cost-phase2-24mo'
+  | 'cost-custom'
   | 'key-personnel-bio'
   | 'past-performance-narrative';
 
@@ -164,6 +172,11 @@ const TEMPLATE_MAP: Record<string, CanvasDocument> = {
   'facilities-equipment': FACILITIES_EQUIPMENT,
   'letter-of-collaboration': LETTER_OF_COLLABORATION,
   'sf424a-budget': SF424A_BUDGET,
+  'cost-phase1-base-option': COST_PHASE1_BASE_OPTION,
+  'cost-under-12mo': COST_UNDER_12MO,
+  'cost-18mo': COST_18MO,
+  'cost-phase2-24mo': COST_PHASE2_24MO,
+  'cost-custom': COST_CUSTOM,
 };
 
 /** Picker metadata — grouped, launch-facing catalog of the starter templates. */
@@ -202,6 +215,11 @@ export const TEMPLATE_CATALOG: { key: TemplateKey; title: string; category: Temp
   { key: 'facilities-equipment', title: 'Facilities, Equipment & Other Resources', category: 'forms', format: 'document' },
   { key: 'letter-of-collaboration', title: 'Letter of Collaboration', category: 'forms', format: 'document' },
   { key: 'sf424a-budget', title: 'SF-424A — Budget (Non-Construction)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-phase1-base-option', title: 'Cost — Phase I Base (6mo) + Option (6mo)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-under-12mo', title: 'Cost — Under 12 Months', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-18mo', title: 'Cost — 18 Months', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-phase2-24mo', title: 'Cost — 24 Months (Phase II)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-custom', title: 'Cost — Custom (Multi-Period)', category: 'forms', format: 'spreadsheet' },
 ];
 
 /**
