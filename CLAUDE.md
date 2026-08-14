@@ -112,11 +112,12 @@ spine, then either a **per-tenant producer** (fan-out agents) or a declarative *
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
 authority; tool schemas expose NO `tenant_id`); output is **advisory → guardrail → land-or-review** (never
 auto-writes business tables); untrusted tenant content is **injection-fenced**; runtime bounds **runaway**
-(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop is **built + applied
-in schema** — mig 116 forced RLS on `episodic_memories`, and mig 136_rls_cutover added the `NOBYPASSRLS` roles
+(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS is **LIVE (two-layer,
+enforced)** — mig 116 forced RLS on `episodic_memories`; mig 136_rls_cutover put the `NOBYPASSRLS` roles
 (`govtech_app` app / `rfp_agent` agents), `tenant_isolation` policies, and the per-request `SET app.tenant_id`
-context layer (mig 137 validates the namespace CHECK); it stays **inert until the one-op prod `DATABASE_URL`
-flip** off the owner role (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
+context in effect (mig 137 validates the namespace CHECK). The app runs as `govtech_app` and **the sandbox
+emulates production exactly (serve as `govtech_app`, RLS on)** — the owner/`sqlBypass` role is only for
+bootstrap/migrations + legitimate cross-tenant reads (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
 per-tenant usage, forward-only bridge). **Workflow visualization + compliance + full-draft landing (2026-08,
 merged via PR #205 + deployed):** `/admin/workflows` renders a dependency-free **Workflow Map** — all 29
 templates as DAGs, grouped by the two spines + platform — plus **live instance graphs** (per-step status
@@ -264,12 +265,14 @@ See CLAUDE_CLIFFNOTES.md for:
 - User content clearly delimited in agent prompts (prompt injection defense)
 - No committed production credentials — mig 124 rotated master_admin off the committed seed
   (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
-- RLS is ENABLE/FORCE'd and **single-layer in effect today** (the app still connects as the RLS-bypassing
-  owner role). The `NOBYPASSRLS` `govtech_app` cutover is **built + applied in schema** (mig 136_rls_cutover:
-  19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles + the per-request context layer;
-  mig 137 validates the namespace CHECK) — it stays **inert until the one-op prod `DATABASE_URL` flip** to
-  `govtech_app`. Cross-tenant admin/CMS reads on RLS-forced tables must run on a BYPASS connection /
-  owner-view — RLS-cutover checklist in docs/RLS_CUTOVER.md. Full posture: **docs/SECURITY_AND_SAFETY.md**.
+- **RLS is LIVE (two-layer, enforced) — not "inert until a future flip".** The app connects as the
+  `NOBYPASSRLS` `govtech_app` role and RLS scopes every request via the per-request `SET app.tenant_id`
+  context (mig 136_rls_cutover: 19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles;
+  mig 137 validates the namespace CHECK). **The sandbox EMULATES PRODUCTION EXACTLY — serve as
+  `govtech_app` with RLS on.** The owner/`sqlBypass` connection is only for bootstrap/migrations and
+  the few legitimate cross-tenant reads (admin/CMS on RLS-forced tables, e.g. the agent-workforce
+  rollup, `matched_opportunities`, rfp-curation Customer Interest — these MUST use `sqlBypass`).
+  Full posture: **docs/SECURITY_AND_SAFETY.md**; mechanics in docs/RLS_CUTOVER.md.
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
