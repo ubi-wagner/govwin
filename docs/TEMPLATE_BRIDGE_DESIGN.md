@@ -204,7 +204,14 @@ The bridge only removes the deprecation risk if we also **stop the live cross-te
   `library:template.stable_synced` + `library:template.published`. Proven live (admin drive): 18 masters,
   Sync = "18 unchanged" (idempotent), Push "Commercialization Plan" → bridge v2 → all 4 tenant cards v2 +
   update_available (bridge rows `1:published, 2:republished`).
-- **Phase 5 (consolidate/retire), Phase 6 (content-stable gaps) — PENDING.**
+- **Phase 6 (content-stable gaps) — IN PROGRESS.** The two named deck gaps authored pristine (anchor-only,
+  interpolation-audited): **Technology Overview — Deck** (`tech-overview-deck`, category `tech`) and **Company
+  Capability — Deck** (`company-capability-deck`, category `company`) — the government capability briefing.
+  Both registered in the catalog and shipped through the Phase 3 sync (created → fanned to 4 tenants);
+  audit-proven: every profile anchor resolves, anchors stay literal when unset, zero baked-in money/emails
+  (`{n}` is the shared preset footer's page-number token, resolved at export). Stable now 20 templates, 8
+  categories, live on tenant shelves. Remaining §5 gaps (NSF/DoE cost sheets, generic BAA/OTA) still to author.
+- **Phase 5 (consolidate/retire) — PENDING** (the risky repoint of the hot provisioning path; do last).
 
 ## 8. Thoughts + open calls (your "thoughts?")
 

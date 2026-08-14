@@ -32,6 +32,9 @@ export { MARKETING_SLIDE_DECK } from './marketing-slide-deck';
 export { COMMERCIALIZATION_PLAN } from './commercialization-plan';
 export { INVESTMENT_ONE_PAGER } from './investment-one-pager';
 export { INVESTMENT_PITCH_DECK } from './investment-pitch-deck';
+// ── Overview decks — technology + company capability ──
+export { TECH_OVERVIEW_DECK } from './tech-overview-deck';
+export { COMPANY_CAPABILITY_DECK } from './company-capability-deck';
 
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { DOD_SBIR_PHASE1_TECHNICAL } from './dod-sbir-phase1-technical';
@@ -52,8 +55,10 @@ import { MARKETING_SLIDE_DECK } from './marketing-slide-deck';
 import { COMMERCIALIZATION_PLAN } from './commercialization-plan';
 import { INVESTMENT_ONE_PAGER } from './investment-one-pager';
 import { INVESTMENT_PITCH_DECK } from './investment-pitch-deck';
+import { TECH_OVERVIEW_DECK } from './tech-overview-deck';
+import { COMPANY_CAPABILITY_DECK } from './company-capability-deck';
 
-export type TemplateCategory = 'dod_dow' | 'nsf' | 'doe' | 'marketing' | 'commercialization' | 'investment';
+export type TemplateCategory = 'dod_dow' | 'nsf' | 'doe' | 'marketing' | 'commercialization' | 'investment' | 'tech' | 'company';
 
 export type TemplateKey =
   | 'dod-sbir-phase1-technical'
@@ -74,6 +79,8 @@ export type TemplateKey =
   | 'commercialization-plan'
   | 'investment-one-pager'
   | 'investment-pitch-deck'
+  | 'tech-overview-deck'
+  | 'company-capability-deck'
   | 'key-personnel-bio'
   | 'past-performance-narrative';
 
@@ -96,6 +103,8 @@ const TEMPLATE_MAP: Record<string, CanvasDocument> = {
   'commercialization-plan': COMMERCIALIZATION_PLAN,
   'investment-one-pager': INVESTMENT_ONE_PAGER,
   'investment-pitch-deck': INVESTMENT_PITCH_DECK,
+  'tech-overview-deck': TECH_OVERVIEW_DECK,
+  'company-capability-deck': COMPANY_CAPABILITY_DECK,
 };
 
 /** Picker metadata — grouped, launch-facing catalog of the starter templates. */
@@ -118,6 +127,8 @@ export const TEMPLATE_CATALOG: { key: TemplateKey; title: string; category: Temp
   { key: 'commercialization-plan', title: 'Commercialization Plan', category: 'commercialization', format: 'document' },
   { key: 'investment-one-pager', title: 'Investment — One-Pager', category: 'investment', format: 'document' },
   { key: 'investment-pitch-deck', title: 'Investment — Pitch Deck', category: 'investment', format: 'deck' },
+  { key: 'tech-overview-deck', title: 'Technology Overview — Deck', category: 'tech', format: 'deck' },
+  { key: 'company-capability-deck', title: 'Company Capability — Deck', category: 'company', format: 'deck' },
 ];
 
 /**
