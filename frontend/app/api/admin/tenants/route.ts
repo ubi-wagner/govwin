@@ -303,7 +303,7 @@ export async function POST(request: Request) {
     // notice. Best-effort; the tempPassword also returns below as an admin-relay backstop.
     let emailSent = false;
     try {
-      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       if (created.isNewUser) {
         const c = applicationAcceptedEmail({ contactName: adminName ?? adminEmail, contactEmail: adminEmail, companyName: name, tempPassword: tempPw, tenantSlug: created.slug, loginUrl: `${base}/login` });
         const r = await sendEmail({ to: adminEmail, subject: c.subject, html: c.html });

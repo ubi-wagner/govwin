@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     try {
       const tenant = await getTenantBySlug(tenantSlug);
       const ownerName = (tenant?.name as string) ?? 'a customer';
-      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       const content = collaboratorInviteEmail({
         recipientName: email.split('@')[0], recipientEmail: email,
         proposalTitle: `${ownerName} — shared collaboration space`,

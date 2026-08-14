@@ -281,7 +281,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       const { sendEmail } = await import('@/lib/email');
       const { collaboratorInviteEmail } = await import('@/lib/email-templates');
-      const loginUrl = `${process.env.NEXTAUTH_URL || ''}/login`;
+      const loginUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || ''}/login`;
       const emailContent = collaboratorInviteEmail({
         recipientName: name,
         recipientEmail: email,

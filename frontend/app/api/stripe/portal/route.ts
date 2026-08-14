@@ -53,7 +53,7 @@ export async function POST() {
       );
     }
 
-    const returnUrl = `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}/portal/${tenant.slug}/billing`;
+    const returnUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) ?? 'http://localhost:3000'}/portal/${tenant.slug}/billing`;
 
     const portalSession = await createCustomerPortalSession(
       tenant.stripeCustomerId,

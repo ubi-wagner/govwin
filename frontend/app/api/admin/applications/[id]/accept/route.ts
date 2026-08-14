@@ -223,7 +223,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // contractually no-throw today; this wrap keeps the guarantee even if that ever changes.
     let emailResult: Awaited<ReturnType<typeof sendEmail>> = { provider: 'skipped', error: 'not-sent' };
     try {
-      const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+      const loginUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
       const emailContent = applicationAcceptedEmail({
         contactName: app.contactName,
         contactEmail: app.contactEmail,
