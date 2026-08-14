@@ -1,6 +1,8 @@
 # Railway Deployment Guide
 
 > **Legacy scaffold guide — pending a fuller refresh.** This runbook dates from the initial scaffold; service/DB/topology names below have been corrected to the deployed production names, but some steps and env values may still be scaffold-era.
+>
+> **📋 Canonical per-service environment-variable reference (current): [docs/RAILWAY_ENV_VARS.md](docs/RAILWAY_ENV_VARS.md).**
 
 Complete step-by-step to get govtech-intel-v3 live on Railway.
 

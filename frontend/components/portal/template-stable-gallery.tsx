@@ -108,7 +108,7 @@ export function TemplateStableGallery({ tenantSlug }: { tenantSlug: string }) {
     } catch { /* best-effort — the badge is informational */ }
   }, [tenantSlug]);
 
-  const useTemplate = useCallback(async (card: TemplateCard) => {
+  const applyTemplate = useCallback(async (card: TemplateCard) => {
     setUsingId(card.id);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/template-cards/${card.id}/use`, {
@@ -189,7 +189,7 @@ export function TemplateStableGallery({ tenantSlug }: { tenantSlug: string }) {
                     </div>
                     <div className="flex items-center gap-2 mt-auto pt-1">
                       <button
-                        onClick={() => useTemplate(card)}
+                        onClick={() => applyTemplate(card)}
                         disabled={usingId === card.id}
                         className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                       >
@@ -217,7 +217,7 @@ export function TemplateStableGallery({ tenantSlug }: { tenantSlug: string }) {
           loading={preview.loading}
           busy={usingId === preview.card.id}
           onClose={() => setPreview(null)}
-          onUse={() => useTemplate(preview.card)}
+          onUse={() => applyTemplate(preview.card)}
         />
       )}
     </div>
