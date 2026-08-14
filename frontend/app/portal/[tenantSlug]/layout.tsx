@@ -143,7 +143,8 @@ export default async function PortalLayout({
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/processes`}>Processes</PortalNavLink>
-                <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
+                {/* Activity firehose is admin-only (tenant_admin+) — matches the page guard. */}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>}
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
                 <PortalNavLink href={`${basePath}/templates`}>Templates</PortalNavLink>

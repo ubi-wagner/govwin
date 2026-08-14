@@ -64,6 +64,10 @@ export function Cockpit({
   // Greet the person, not the company (a person recognizes their own name first).
   const firstName = userName?.trim().split(/\s+/)[0] || companyName;
 
+  // Activity firehose is admin-only (tenant_admin+) — a base drafter shouldn't see the tenant-wide
+  // event stream. Matches the page guard (activity/page.tsx) + nav gate (layout.tsx). A descended
+  // partner-manager (session pinned to tenant_admin) and a shadow rfp_admin both pass.
+  const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
   const indicators: Indicator[] = [
     { key: 'todos', icon: '✓', label: 'To-dos', count: counts.todos },
     { key: 'library', icon: '⬆', label: 'Library', count: counts.library },
@@ -73,7 +77,9 @@ export function Cockpit({
           { key: 'buckets', icon: '▦', label: 'Buckets', count: counts.buckets },
         ] as Indicator[])
       : []),
-    { key: 'activity', icon: '↻', label: 'Activity', count: null },
+    ...(isTenantAdmin
+      ? ([{ key: 'activity', icon: '↻', label: 'Activity', count: null }] as Indicator[])
+      : []),
   ];
 
   const summary = [
