@@ -10,6 +10,17 @@ import { inferCategory, inferCategoryFromFilename } from './types';
 
 const SYSTEM_ACTOR = { id: 'system:import', name: 'Document Import' };
 
+/** Strip inline markdown emphasis/code markers so imported text reads cleanly
+ *  (`**bold**` → bold, `__bold__` → bold, `` `code` `` → code, stray `**` removed). */
+export function stripInlineMarkdown(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*/g, '')
+    .trim();
+}
+
 /**
  * Parse a .txt or .md buffer into structured ImportedAtoms.
  *
@@ -49,7 +60,7 @@ export async function readText(
 // Markdown parsing
 // ---------------------------------------------------------------------------
 
-function parseMarkdown(text: string): CanvasNode[] {
+export function parseMarkdown(text: string): CanvasNode[] {
   const nodes: CanvasNode[] = [];
   const lines = text.split('\n');
   let i = 0;
@@ -61,7 +72,7 @@ function parseMarkdown(text: string): CanvasNode[] {
     const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
     if (headingMatch) {
       const level = Math.min(headingMatch[1].length, 3) as 1 | 2 | 3;
-      const headingText = headingMatch[2].trim();
+      const headingText = stripInlineMarkdown(headingMatch[2].trim());
       if (headingText) {
         nodes.push(createNode({
           type: 'heading',
@@ -84,7 +95,7 @@ function parseMarkdown(text: string): CanvasNode[] {
         const itemLine = lines[i];
         const indentMatch = itemLine.match(/^(\s*)/);
         const indentLevel = Math.floor((indentMatch?.[1].length ?? 0) / 2);
-        const itemText = itemLine.replace(/^\s*[-*]\s+/, '').replace(/^\s*\d+[.)]\s+/, '').trim();
+        const itemText = stripInlineMarkdown(itemLine.replace(/^\s*[-*]\s+/, '').replace(/^\s*\d+[.)]\s+/, '').trim());
         if (itemText) {
           items.push({ text: itemText, indent_level: indentLevel });
         }
@@ -122,7 +133,7 @@ function parseMarkdown(text: string): CanvasNode[] {
       i++;
     }
 
-    const paraText = paraLines.join(' ').trim();
+    const paraText = stripInlineMarkdown(paraLines.join(' ').trim());
     if (paraText) {
       nodes.push(createNode({
         type: 'text_block',

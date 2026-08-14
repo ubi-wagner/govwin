@@ -22,7 +22,9 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildBurdenCostSheet } from '@/lib/templates/cost/burden-cost-sheet';
-import { createNode, type CanvasDocument, type CanvasNode, type CanvasSection } from '@/lib/types/canvas-document';
+import { interpolateTemplate } from '@/lib/templates';
+import { markdownToCanvasDocument } from '@/lib/import/markdown-canvas';
+import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export const NILOC_TENANT_SLUG = 'niloc';
 export const NILOC_TENANT_ID = 'd5386192-2aca-4d77-8d1e-61719ee34cce';
@@ -51,39 +53,11 @@ export function readProse(file: string): string { return readFileSync(join(HERE,
 export function proseExistsOnDisk(file: string): boolean { return existsSync(join(HERE, file)); }
 export const readTech = readProse;                    // legacy name
 
-// markdown → flat canvas nodes (headings / lists / paragraphs)
-export function mdToNodes(md: string): CanvasNode[] {
-  const nodes: CanvasNode[] = []; const lines = md.split('\n'); let i = 0;
-  const mk = (type: CanvasNode['type'], content: CanvasNode['content']) => createNode({ type, content, source: 'imported', actorId: ERIC_USER_ID, actorName: 'Eric Wagner' });
-  while (i < lines.length) {
-    const line = lines[i]; const hm = line.match(/^(#{1,3})\s+(.+)$/);
-    if (hm) { const lvl = Math.min(hm[1].length, 3) as 1 | 2 | 3; nodes.push(mk('heading', { level: lvl, text: hm[2].trim() })); i++; continue; }
-    if (/^\s*[-*]\s/.test(line) || /^\s*\d+[.)]\s/.test(line)) {
-      const numbered = /^\s*\d+[.)]\s/.test(line); const items: Array<{ text: string }> = [];
-      while (i < lines.length && (/^\s*[-*]\s/.test(lines[i]) || /^\s*\d+[.)]\s/.test(lines[i]))) { const t = lines[i].replace(/^\s*[-*]\s+/, '').replace(/^\s*\d+[.)]\s+/, '').trim(); if (t) items.push({ text: t.replace(/\*\*/g, '') }); i++; }
-      if (items.length) nodes.push(mk(numbered ? 'numbered_list' : 'bulleted_list', { items })); continue;
-    }
-    if (line.trim() === '') { i++; continue; }
-    const para: string[] = [];
-    while (i < lines.length && lines[i].trim() !== '' && !/^#{1,3}\s/.test(lines[i]) && !/^\s*[-*]\s/.test(lines[i]) && !/^\s*\d+[.)]\s/.test(lines[i])) { para.push(lines[i].trim()); i++; }
-    const text = para.join(' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); if (text) nodes.push(mk('text_block', { text }));
-  }
-  return nodes;
-}
-export function toSections(nodes: CanvasNode[]): CanvasSection[] {
-  const sections: CanvasSection[] = []; let cur: CanvasNode[] = []; let title: string | undefined;
-  const flush = () => { if (cur.length) sections.push({ id: crypto.randomUUID(), title, layout: { mode: 'flow' }, groups: [{ id: crypto.randomUUID(), nodes: cur }] }); };
-  for (const n of nodes) { if (n.type === 'heading') { flush(); cur = [n]; title = (n.content as { text?: string })?.text; } else cur.push(n); }
-  flush(); return sections;
-}
+// Prose (markdown) → CanvasDocument via the PRODUCT importer (lib/import/markdown-canvas),
+// which reuses the same block parser as the upload→atomize flow — so a seeded example and a
+// tenant-uploaded markdown draft produce identical nodes and decompose to identical atoms.
 export function proseDoc(md: string, title: string): CanvasDocument {
-  const now = '2026-01-01T00:00:00Z';
-  return {
-    version: 2, document_id: crypto.randomUUID(),
-    canvas: { format: 'letter', width: 612, height: 792, margins: { top: 72, right: 72, bottom: 72, left: 72 }, header: null, footer: { template: 'NILOC Technologies · Proprietary · {n} / {N}', height: 36, font: { family: 'Times New Roman', size: 9 } }, font_default: { family: 'Times New Roman', size: 11 }, line_spacing: 1.15, max_pages: null, max_slides: null },
-    sections: toSections(mdToNodes(md)),
-    metadata: { title, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: ERIC_USER_ID, version_number: 1, status: 'ai_drafted' },
-  };
+  return markdownToCanvasDocument(md, { title, actorId: ERIC_USER_ID, footerTemplate: 'NILOC Technologies · Proprietary · {n} / {N}', createdAt: '2026-01-01T00:00:00Z' });
 }
 export const techDoc = proseDoc;                      // legacy name
 
@@ -152,22 +126,11 @@ export function buildFilledCost(spec: CostSpec, opts: { cacheFormulas?: boolean 
   if (opts.cacheFormulas !== false) {
     for (const [name, rows] of sh) for (let ri = 0; ri < rows.length; ri++) for (let ci = 0; ci < (rows[ri] as Cell[]).length; ci++) { const cell = (rows[ri] as Cell[])[ci]; if (cell && typeof cell.formula === 'string') { const v = evalFormula(cell.formula, sh, name); cell.value = Math.round(v * 100) / 100; if (!cell.number_format) cell.text = String(cell.value); } }
   }
-  interpolate(doc, { company_name: 'NILOC Technologies', pi_name: 'Eric Wagner', topic_number: spec.topic });
-  return doc;
+  // fill the {company_name}/{pi_name}/{topic_number} anchors via the product's interpolateTemplate
+  return interpolateTemplate(doc, { company_name: 'NILOC Technologies', pi_name: 'Eric Wagner', topic_number: spec.topic });
 }
 /** Total proposed price: Summary row 14 — total column for P>1, else the single period column B. */
 export function costPrice(doc: CanvasDocument, periodCount: number): number {
   const priceCol = periodCount > 1 ? colLetters(2 + periodCount) : 'B';
   return cellAt(loadSheets(doc), 'Summary', priceCol, 14);
-}
-
-function interpolate(doc: CanvasDocument, vars: Record<string, string>) {
-  const re = /\{([a-z_]+)\}/g;
-  const walk = (o: unknown) => {
-    if (o == null || typeof o !== 'object') return;
-    if (Array.isArray(o)) { o.forEach((v, i) => { if (typeof v === 'string') o[i] = v.replace(re, (m, k) => vars[k] ?? m); else walk(v); }); return; }
-    const rec = o as Record<string, unknown>;
-    for (const k of Object.keys(rec)) { const v = rec[k]; if (typeof v === 'string') rec[k] = v.replace(re, (mm, kk) => vars[kk] ?? mm); else walk(v); }
-  };
-  walk(doc.canvas); walk(doc.nodes);
 }
