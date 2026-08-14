@@ -209,22 +209,23 @@ export function CurationWorkspace({
 
   // Ingest Assist — one action that runs the whole ingest SOP for this claimed
   // solicitation: parse its text → auto-build the compliance matrix + volumes +
-  // section molds → publish the opportunity card(s) (a suite for a multi-topic
-  // solicitation). The same materializer the Scouts feed.
+  // section molds → topic opportunities, FOR YOUR REVIEW (a suite for a multi-topic
+  // solicitation). Review-gated: it does NOT publish to customers — release happens
+  // through Push after you approve. The same materializer the Scouts feed.
   const handleIngestAssist = async () => {
     if (typeof window !== 'undefined' && !window.confirm(
-      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds, then publish the opportunity card(s). Existing volumes/compliance for this solicitation are replaced. Continue?'
+      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds for your review. Nothing is published to customers — you release it with Push after review. Existing volumes/compliance for this solicitation are replaced. Continue?'
     )) return;
     setAssistBusy(true);
     try {
       const res = await fetch(`/api/admin/rfp-curation/${sol.id}/ingest-assist`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
       const d = json.data ?? {};
       toast.success(
-        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) · ${d.cards} card(s) published`,
+        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) built for review — Push to release`,
       );
       router.refresh();
     } catch (e) {
@@ -764,7 +765,7 @@ export function CurationWorkspace({
           <button
             onClick={handleIngestAssist}
             disabled={assistBusy}
-            title="Parse this solicitation and auto-build the matrix, volumes, section molds, and publish the opportunity card(s)"
+            title="Parse this solicitation and auto-build the matrix, volumes, and section molds for your review (nothing is published to customers until you Push)"
             className="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {assistBusy ? 'Building…' : '✨ Ingest Assist'}
