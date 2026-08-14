@@ -211,7 +211,18 @@ The bridge only removes the deprecation risk if we also **stop the live cross-te
   audit-proven: every profile anchor resolves, anchors stay literal when unset, zero baked-in money/emails
   (`{n}` is the shared preset footer's page-number token, resolved at export). Stable now 20 templates, 8
   categories, live on tenant shelves. Remaining §5 gaps (NSF/DoE cost sheets, generic BAA/OTA) still to author.
-- **Phase 5 (consolidate/retire) — PENDING** (the risky repoint of the hot provisioning path; do last).
+- **Phase 5 (retire the customer-facing shared reads) — SHIPPED (surgical).** The live `is_system` shared
+  reads that customers depended on for STANDALONE documents are retired: `portal/[t]/templates` GET and
+  `documents` POST now read only the tenant's OWN saved templates (`tenant_id = $tenant AND is_system = false`);
+  the pristine starter stable is served exclusively by the owned template-card gallery. The `documents/new`
+  chooser drops its "System library" group and adds a "Browse the template library →" link to the gallery
+  (blank presets + own saved templates remain). Proven live: `GET /templates` returns 0 shared rows
+  (anySystem=false), chooser shows no system group.
+  **Deliberately NOT touched** (different mechanisms, not the starter-set sharing risk): `proposals/create`'s
+  `item.templateId` read (admin-linked compliance MOLDS via `volume_required_items`), the admin
+  `document_templates` management surface, and `library/system-templates` (a benign copy-INWARD of library
+  foundations, already mitigated by KEEP+COPY eager-copy). Full 3-systems→1 consolidation (migrating the admin
+  `document_templates` publish path onto the bridge) remains a later, separately-scoped follow-on.
 
 ## 8. Thoughts + open calls (your "thoughts?")
 

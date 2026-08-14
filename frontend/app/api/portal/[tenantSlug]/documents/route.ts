@@ -70,13 +70,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
       let tpl: TemplateRow | undefined;
       try {
-        // Only the tenant's OWN templates or the shared system library — never
-        // another tenant's private skeleton.
+        // Phase 5 (template bridge): only the tenant's OWN saved templates — the shared is_system read is
+        // RETIRED (the pristine stable instantiates through the owned template-card gallery,
+        // /template-cards/[id]/use). Never another tenant's skeleton, never a shared system row.
         [tpl] = await sql<TemplateRow[]>`
           SELECT id, name, template_type, canvas_preset, canvas_document, metadata
           FROM document_templates
           WHERE id = ${body.templateId}::uuid
-            AND (tenant_id = ${tenantId}::uuid OR is_system = true)
+            AND tenant_id = ${tenantId}::uuid AND is_system = false
           LIMIT 1
         `;
       } catch (e) {
