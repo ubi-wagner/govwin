@@ -43,23 +43,26 @@ Every step that touches product data went through the platform's own functions:
    strips inline markdown (`**bold**`, `__bold__`, `` `code` ``) via the new `stripInlineMarkdown`
    — a small improvement that also cleans up the product's real document-upload path.
 3. **`interpolateTemplate`** is now used for cost-sheet anchor fill (the bespoke walker is deleted).
+4. **The computed cost path is now the product's own `buildCostVolume`** (`scripts/niloc/computed-cost.mts`).
+   `buildComputedCost(spec)` emits each NILOC cost volume via `buildCostVolume('burden_waterfall', …)`,
+   and `buildTvsfBudget()` emits the TVSF budget in Ohio's own **`otf_state_budget`** form (state caps:
+   $200K ceiling, ≤20% personnel, no cost-share). Proven three-way: the **computed** volume's total
+   equals the fill-in template roll-up *and* `computeBudget`, to the cent (CADENCE $1,859,211 /
+   AURA $1,807,743 / PolarHawk $1,876,009 / AURA-PhaseI $261,425 / NASA $149,029; TVSF budget $200,000
+   ≤ $200,000 ceiling). The template-fill `verify.mts` is retained as the *transcription* proof (a
+   tenant's edited template must agree with the portal's computed volume).
 
 ## Still bespoke on purpose (documented, not folded)
 
-- **Cost fill + formula evaluation** (`verify.mts`): this exists to *prove* the pristine template a
-  tenant fills rolls up to `computeBudget` to the cent — a verification, not a build path. The
-  in-system way to emit a *filled/computed* cost volume from inputs is **`buildCostVolume` /
-  `buildCostVolumeCanvas`** (`lib/proposal/cost-forms.ts`), which wraps `computeBudget` and supports
-  the agency-neutral forms (`burden_waterfall` / `sf424a` / `otf_state_budget`). A natural next step
-  is to render the NILOC cost volumes (and the TVSF budget, via `otf_state_budget`) through
-  `buildCostVolume` so the *computed* artifact also comes straight from the product.
 - **Direct `tenant_documents` insert** in the seed: convenience for an offline, idempotent seed.
   Promote to a shared `createTenantDocument` helper if/when the seed should mirror the route exactly.
+- **Gold prose authoring** is hand-authored reference content, not `section_drafter`/Studio output —
+  by design (see the out-of-system table).
 
 ## Bottom line
 
 The substance — atomization, retrieval, the cost engine, the exporters, embeddings — was always the
-platform's own code. The glue that was bespoke was either **folded into the product** (markdown
-import, interpolation) or is **verification/authoring scaffolding** that isn't a product path. The
-one remaining "use more of our own tools" opportunity is to emit the *computed* cost volumes through
-`buildCostVolume` (including the TVSF's `otf_state_budget` form).
+platform's own code. The bespoke glue is now **folded into the product** (markdown import,
+interpolation, and the computed cost path via `buildCostVolume` incl. the TVSF's `otf_state_budget`
+form); what remains bespoke is verification/authoring scaffolding that isn't a product path, plus the
+offline seed's direct insert.
