@@ -1,5 +1,7 @@
 # Changelog
 
+> **Historical changelog — not current.** The latest entry below is **v0.5b (2026-04-09)**; this log was not maintained past it. Current project state lives in `docs/CONTINUATION.md` and `docs/LAUNCH_STATUS.md`.
+
 ## v0.5b — Foundation Complete (2026-04-09)
 
 Closes the Phase 0.5 scope gap. Every binding convention doc, every

@@ -111,7 +111,7 @@ where the admin **comments + regenerates** (comments threaded as `guidance`) or 
 **runs all 3 automatically** via the doorbell (`advance_studio_phase` ACTION auto-chains). Advisory —
 it never advances a stage, locks, or submits. Observability
 is enforced end-to-end: every actor/automation/agent/manager action posts to `system_events` (+ domain audit
-logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-02.md; the `package?format=zip` blind spot is closed).
+logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-14.md; the `package?format=zip` blind spot is closed).
 The rest are greenfielded + registry-wired, pending their per-producer wiring (the **global automation-policy layer** #190 — recipients×timing×escalation — is BUILT + complete, docs/AUTOMATION_POLICY_BUILD_LOG.md; it ships inert until a tenant edits a policy). Wiring pattern: realign to the current
 spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
 (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`

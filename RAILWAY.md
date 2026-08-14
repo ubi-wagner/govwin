@@ -106,7 +106,7 @@ Rename it to `govtech-frontend`.
 ## Step 5 — Add Pipeline Service
 
 1. In your Railway project → **+ New** → **GitHub Repo** → same repo
-2. Railway creates a second service — rename to `govtech-pipeline`
+2. Railway creates a second service — rename to `pipeline`
 
 **Settings → Build:**
 - Builder: `Dockerfile`
@@ -197,18 +197,18 @@ cd govtech-intel-v3
 railway link
 
 # Run migrations via the pipeline service's environment
-railway run --service govtech-pipeline \
+railway run --service pipeline \
   psql "$DATABASE_URL" -f db/migrations/001_auth_tenants.sql
-railway run --service govtech-pipeline \
+railway run --service pipeline \
   psql "$DATABASE_URL" -f db/migrations/002_control_plane.sql
-railway run --service govtech-pipeline \
+railway run --service pipeline \
   psql "$DATABASE_URL" -f db/migrations/003_opportunities.sql
-railway run --service govtech-pipeline \
+railway run --service pipeline \
   psql "$DATABASE_URL" -f db/migrations/004_knowledge_base.sql
 ```
 
 **Option B: Railway shell**
-1. Click `govtech-pipeline` service → **Shell** tab
+1. Click `pipeline` service → **Shell** tab
 2. Paste each migration:
    ```bash
    psql $DATABASE_URL -f /path/to/001_auth_tenants.sql
@@ -285,8 +285,8 @@ railway login              # Authenticate
 railway link               # Link local dir to Railway project
 railway status             # See all services
 railway logs               # Stream logs from all services
-railway logs --service govtech-pipeline   # Logs from one service
-railway shell --service govtech-pipeline  # Open shell in service
+railway logs --service pipeline   # Logs from one service
+railway shell --service pipeline  # Open shell in service
 railway run --service X -- <command>      # Run command in service env
 railway variables          # List env vars for current service
 ```

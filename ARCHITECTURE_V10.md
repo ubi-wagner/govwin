@@ -412,7 +412,7 @@ run next; and (2) the **Proposal Auto-Drive "doorbell"** — an `/admin/agents` 
 one emission helper (`lib/proposal-full-draft.ts`), so every full draft is one auditable
 `proposal:full_draft_requested` record (`source` = `portal`|`admin_doorbell`). Neither descends into a
 tenant (Phase 2). Canonical: **docs/ADMIN_AGENT_DESIGN.md**. Observability of ALL actor/agent/automation
-actions was swept + gap-fixed (**docs/EVENT_AUDIT_2026-08-02.md** — the `package?format=zip` audit blind
+actions was swept + gap-fixed (**docs/EVENT_AUDIT_2026-08-14.md** — the `package?format=zip` audit blind
 spot is closed; everything posts to `system_events` + domain logs).
 
 **Compliance matrix (`proposal_compliance_matrix`, pre-exists mig 001; now populated).** The create route
