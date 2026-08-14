@@ -32,6 +32,28 @@ export { MARKETING_SLIDE_DECK } from './marketing-slide-deck';
 export { COMMERCIALIZATION_PLAN } from './commercialization-plan';
 export { INVESTMENT_ONE_PAGER } from './investment-one-pager';
 export { INVESTMENT_PITCH_DECK } from './investment-pitch-deck';
+// ── Overview decks — technology + company capability ──
+export { TECH_OVERVIEW_DECK } from './tech-overview-deck';
+export { COMPANY_CAPABILITY_DECK } from './company-capability-deck';
+// ── Agency proposals — NASA / NIH ──
+export { NASA_SBIR_PHASE1_TECHNICAL } from './nasa-sbir-phase1-technical';
+export { NIH_RESEARCH_STRATEGY } from './nih-research-strategy';
+// ── Vehicles — BAA white paper / OTA solution brief ──
+export { BAA_WHITE_PAPER } from './baa-white-paper';
+export { OTA_SOLUTION_BRIEF } from './ota-solution-brief';
+// ── Universal proposal forms ──
+export { QUAD_CHART } from './quad-chart';
+export { EXECUTIVE_SUMMARY } from './executive-summary';
+export { STATEMENT_OF_WORK } from './statement-of-work';
+export { BUDGET_JUSTIFICATION } from './budget-justification';
+export { BIOGRAPHICAL_SKETCH } from './biographical-sketch';
+export { CURRENT_AND_PENDING_SUPPORT } from './current-and-pending-support';
+export { DATA_MANAGEMENT_PLAN } from './data-management-plan';
+export { FACILITIES_EQUIPMENT } from './facilities-equipment';
+export { LETTER_OF_COLLABORATION } from './letter-of-collaboration';
+export { SF424A_BUDGET } from './sf424a-budget';
+// ── Cost volumes — burden-waterfall PoP variants (formula spreadsheets) ──
+export { COST_PHASE1_BASE_OPTION, COST_UNDER_12MO, COST_18MO, COST_PHASE2_24MO, COST_CUSTOM } from './cost/variants';
 
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { DOD_SBIR_PHASE1_TECHNICAL } from './dod-sbir-phase1-technical';
@@ -52,8 +74,25 @@ import { MARKETING_SLIDE_DECK } from './marketing-slide-deck';
 import { COMMERCIALIZATION_PLAN } from './commercialization-plan';
 import { INVESTMENT_ONE_PAGER } from './investment-one-pager';
 import { INVESTMENT_PITCH_DECK } from './investment-pitch-deck';
+import { TECH_OVERVIEW_DECK } from './tech-overview-deck';
+import { COMPANY_CAPABILITY_DECK } from './company-capability-deck';
+import { NASA_SBIR_PHASE1_TECHNICAL } from './nasa-sbir-phase1-technical';
+import { NIH_RESEARCH_STRATEGY } from './nih-research-strategy';
+import { BAA_WHITE_PAPER } from './baa-white-paper';
+import { OTA_SOLUTION_BRIEF } from './ota-solution-brief';
+import { QUAD_CHART } from './quad-chart';
+import { EXECUTIVE_SUMMARY } from './executive-summary';
+import { STATEMENT_OF_WORK } from './statement-of-work';
+import { BUDGET_JUSTIFICATION } from './budget-justification';
+import { BIOGRAPHICAL_SKETCH } from './biographical-sketch';
+import { CURRENT_AND_PENDING_SUPPORT } from './current-and-pending-support';
+import { DATA_MANAGEMENT_PLAN } from './data-management-plan';
+import { FACILITIES_EQUIPMENT } from './facilities-equipment';
+import { LETTER_OF_COLLABORATION } from './letter-of-collaboration';
+import { SF424A_BUDGET } from './sf424a-budget';
+import { COST_PHASE1_BASE_OPTION, COST_UNDER_12MO, COST_18MO, COST_PHASE2_24MO, COST_CUSTOM } from './cost/variants';
 
-export type TemplateCategory = 'dod_dow' | 'nsf' | 'doe' | 'marketing' | 'commercialization' | 'investment';
+export type TemplateCategory = 'dod_dow' | 'nsf' | 'doe' | 'nasa' | 'nih' | 'marketing' | 'commercialization' | 'investment' | 'tech' | 'company' | 'forms';
 
 export type TemplateKey =
   | 'dod-sbir-phase1-technical'
@@ -74,6 +113,27 @@ export type TemplateKey =
   | 'commercialization-plan'
   | 'investment-one-pager'
   | 'investment-pitch-deck'
+  | 'tech-overview-deck'
+  | 'company-capability-deck'
+  | 'nasa-sbir-phase1-technical'
+  | 'nih-research-strategy'
+  | 'baa-white-paper'
+  | 'ota-solution-brief'
+  | 'quad-chart'
+  | 'executive-summary'
+  | 'statement-of-work'
+  | 'budget-justification'
+  | 'biographical-sketch'
+  | 'current-and-pending-support'
+  | 'data-management-plan'
+  | 'facilities-equipment'
+  | 'letter-of-collaboration'
+  | 'sf424a-budget'
+  | 'cost-phase1-base-option'
+  | 'cost-under-12mo'
+  | 'cost-18mo'
+  | 'cost-phase2-24mo'
+  | 'cost-custom'
   | 'key-personnel-bio'
   | 'past-performance-narrative';
 
@@ -96,6 +156,27 @@ const TEMPLATE_MAP: Record<string, CanvasDocument> = {
   'commercialization-plan': COMMERCIALIZATION_PLAN,
   'investment-one-pager': INVESTMENT_ONE_PAGER,
   'investment-pitch-deck': INVESTMENT_PITCH_DECK,
+  'tech-overview-deck': TECH_OVERVIEW_DECK,
+  'company-capability-deck': COMPANY_CAPABILITY_DECK,
+  'nasa-sbir-phase1-technical': NASA_SBIR_PHASE1_TECHNICAL,
+  'nih-research-strategy': NIH_RESEARCH_STRATEGY,
+  'baa-white-paper': BAA_WHITE_PAPER,
+  'ota-solution-brief': OTA_SOLUTION_BRIEF,
+  'quad-chart': QUAD_CHART,
+  'executive-summary': EXECUTIVE_SUMMARY,
+  'statement-of-work': STATEMENT_OF_WORK,
+  'budget-justification': BUDGET_JUSTIFICATION,
+  'biographical-sketch': BIOGRAPHICAL_SKETCH,
+  'current-and-pending-support': CURRENT_AND_PENDING_SUPPORT,
+  'data-management-plan': DATA_MANAGEMENT_PLAN,
+  'facilities-equipment': FACILITIES_EQUIPMENT,
+  'letter-of-collaboration': LETTER_OF_COLLABORATION,
+  'sf424a-budget': SF424A_BUDGET,
+  'cost-phase1-base-option': COST_PHASE1_BASE_OPTION,
+  'cost-under-12mo': COST_UNDER_12MO,
+  'cost-18mo': COST_18MO,
+  'cost-phase2-24mo': COST_PHASE2_24MO,
+  'cost-custom': COST_CUSTOM,
 };
 
 /** Picker metadata — grouped, launch-facing catalog of the starter templates. */
@@ -118,6 +199,27 @@ export const TEMPLATE_CATALOG: { key: TemplateKey; title: string; category: Temp
   { key: 'commercialization-plan', title: 'Commercialization Plan', category: 'commercialization', format: 'document' },
   { key: 'investment-one-pager', title: 'Investment — One-Pager', category: 'investment', format: 'document' },
   { key: 'investment-pitch-deck', title: 'Investment — Pitch Deck', category: 'investment', format: 'deck' },
+  { key: 'tech-overview-deck', title: 'Technology Overview — Deck', category: 'tech', format: 'deck' },
+  { key: 'company-capability-deck', title: 'Company Capability — Deck', category: 'company', format: 'deck' },
+  { key: 'nasa-sbir-phase1-technical', title: 'NASA SBIR/STTR Phase I — Technical', category: 'nasa', format: 'document' },
+  { key: 'nih-research-strategy', title: 'NIH Research Strategy (Specific Aims + Strategy)', category: 'nih', format: 'document' },
+  { key: 'baa-white-paper', title: 'BAA White Paper', category: 'dod_dow', format: 'document' },
+  { key: 'ota-solution-brief', title: 'OTA Solution Brief (CSO)', category: 'dod_dow', format: 'document' },
+  { key: 'quad-chart', title: 'Quad Chart', category: 'forms', format: 'document' },
+  { key: 'executive-summary', title: 'Executive Summary', category: 'forms', format: 'document' },
+  { key: 'statement-of-work', title: 'Statement of Work (SOW)', category: 'forms', format: 'document' },
+  { key: 'budget-justification', title: 'Budget Justification', category: 'forms', format: 'document' },
+  { key: 'biographical-sketch', title: 'Biographical Sketch', category: 'forms', format: 'document' },
+  { key: 'current-and-pending-support', title: 'Current & Pending Support', category: 'forms', format: 'document' },
+  { key: 'data-management-plan', title: 'Data Management & Sharing Plan', category: 'forms', format: 'document' },
+  { key: 'facilities-equipment', title: 'Facilities, Equipment & Other Resources', category: 'forms', format: 'document' },
+  { key: 'letter-of-collaboration', title: 'Letter of Collaboration', category: 'forms', format: 'document' },
+  { key: 'sf424a-budget', title: 'SF-424A — Budget (Non-Construction)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-phase1-base-option', title: 'Cost — Phase I Base (6mo) + Option (6mo)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-under-12mo', title: 'Cost — Under 12 Months', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-18mo', title: 'Cost — 18 Months', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-phase2-24mo', title: 'Cost — 24 Months (Phase II)', category: 'forms', format: 'spreadsheet' },
+  { key: 'cost-custom', title: 'Cost — Custom (Multi-Period)', category: 'forms', format: 'spreadsheet' },
 ];
 
 /**

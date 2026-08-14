@@ -10,6 +10,7 @@
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { createTask } from '@/lib/tasks/tasks';
+import { emitEventSingle, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
 export interface GuardrailLimits {
@@ -180,12 +181,29 @@ export async function advancePortalStage(
     await withTenant(tenantId, async (tx) => {
       await tx`UPDATE proposal_portals SET status = 'closeout', current_stage_index = ${nextIndex} WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
     });
+    await emitPortalStageAdvanced(actor, tenantId, portalId, portal.currentStageIndex, nextIndex, 'closeout');
     return { advanced: true, stageIndex: nextIndex, status: 'closeout' };
   }
 
   await withTenant(tenantId, async (tx) => {
     await tx`UPDATE proposal_portals SET status = 'executing', current_stage_index = ${nextIndex} WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
   });
+  await emitPortalStageAdvanced(actor, tenantId, portalId, portal.currentStageIndex, nextIndex, 'executing');
   await createStageTodos(actor, tenantId, portalId, stages[nextIndex], nudgeDays);
   return { advanced: true, stageIndex: nextIndex, status: 'executing' };
+}
+
+/** Audit a portal stage transition so a workflow can consume "portal reached the next stage / closeout".
+ *  Both the ToDo-completion auto-advance and the explicit advance-stage action funnel through here. */
+async function emitPortalStageAdvanced(
+  actor: { id: string; email: string | null },
+  tenantId: string, portalId: string, fromStageIndex: number, toStageIndex: number, status: string,
+) {
+  await emitEventSingle({
+    namespace: 'capture',
+    type: 'portal.stage_advanced',
+    actor: userActor(actor.id, actor.email ?? undefined),
+    tenantId,
+    payload: { portalId, fromStageIndex, toStageIndex, status },
+  });
 }

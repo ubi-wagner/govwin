@@ -1,0 +1,68 @@
+/** CLOSE-CMS — real-actor E2E: admin reviews a queued guide draft in Content Studio and PUBLISHES
+ *  it; verify it goes live (active) and renders on the public marketing site.
+ *  cd frontend && DATABASE_URL=… node scripts/close-e2e-cms.mjs */
+import { chromium } from 'playwright';
+import postgres from 'postgres';
+import fs from 'fs';
+import path from 'path';
+
+const BASE = 'http://localhost:3000';
+const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const OUT = '/home/user/govwin/docs/assets/close-e2e';
+fs.mkdirSync(OUT, { recursive: true });
+const sql = postgres(process.env.DATABASE_URL || 'postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 3 });
+const ADMIN = { email: 'eric@rfppipeline.com', pw: 'RFPAdmin2026!' };
+const SLUG = 'what-is-a-baa';
+const shot = async (p, n) => { await p.screenshot({ path: path.join(OUT, n + '.png'), fullPage: true }); console.log('  ✓ shot', n); };
+const settle = async (p, ms = 2000) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };
+let ok = true; const A = (l, c, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
+
+const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+const p = await (await browser.newContext({ viewport: { width: 1440, height: 2000 } })).newPage();
+try {
+  // Reset the guide to a clean draft (idempotent re-runs): archive any active, keep the draft.
+  await sql`UPDATE content_pages SET status='archived', archived_at=now() WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
+  const before = await sql`SELECT count(*)::int AS n FROM content_pages WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
+  A('precondition: BAA guide is NOT live (0 active)', before[0].n === 0);
+
+  await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+  await p.waitForSelector('#email', { timeout: 20000 });
+  await p.fill('#email', ADMIN.email); await p.fill('#password', ADMIN.pw);
+  await p.click('button[type="submit"]'); await settle(p, 2800);
+  console.log('  logged in →', p.url());
+
+  // Content Studio: the guide draft.
+  await p.goto(`${BASE}/admin/site/docs/guide/${SLUG}`); await settle(p, 2500);
+  await shot(p, 'cms-01-guide-draft');
+
+  // Real actor PUBLISHES.
+  const pubBtn = p.getByRole('button', { name: /^Publish$/ }).first();
+  A('Publish control present for the reviewer', await pubBtn.count() > 0);
+  if (await pubBtn.count() > 0) {
+    await pubBtn.click();
+    await settle(p, 2600);
+    await shot(p, 'cms-02-after-publish');
+  }
+
+  // Verify it went live in the DB.
+  const after = await sql`SELECT status, version_no FROM content_pages WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
+  A('the guide is now LIVE (active version exists)', after.length > 0, after[0] ? `v${after[0].versionNo}` : 'none');
+
+  // Verify it renders on the PUBLIC marketing site (the resources/guides surface projects HTML).
+  const pubUrl = `${BASE}/resources/${SLUG}`;
+  const res = await p.goto(pubUrl, { waitUntil: 'domcontentloaded' }).catch(() => null);
+  await settle(p, 1500);
+  const bodyText = await p.textContent('body').catch(() => '');
+  const live = (res && res.status() === 200 && /Broad Agency Announcement/i.test(bodyText || ''));
+  A('the published guide renders on the public site', !!live, `${pubUrl} → ${res?.status()}`);
+  if (live) await shot(p, 'cms-03-public-live');
+
+  console.log(`\n${ok ? '✅ CMS E2E PASS — draft reviewed → published → live on the public site' : '❌ see failures'}\n`);
+} catch (e) {
+  console.error('CMS E2E ERROR', e.message);
+  await p.screenshot({ path: path.join(OUT, 'cms-error.png') }).catch(() => {});
+  ok = false;
+} finally {
+  await browser.close(); await sql.end();
+  process.exit(ok ? 0 : 1);
+}

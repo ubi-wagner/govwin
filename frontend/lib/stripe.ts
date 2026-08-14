@@ -118,8 +118,8 @@ export async function createCheckoutSession(
   const isSubscription = productType === 'finder_subscription';
   const quantity = metadata.quantity ?? 1;
 
-  const successUrl = `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing?session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing`;
+  const successUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing?session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing`;
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: metadata.customerId,

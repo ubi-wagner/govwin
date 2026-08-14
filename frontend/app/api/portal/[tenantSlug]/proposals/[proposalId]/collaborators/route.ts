@@ -405,7 +405,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     // Send collaborator invite email (non-blocking — failure is logged, not fatal)
-    const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+    const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
     // NEW user → the acceptance page (sets their password + accepted_at, then lands
     // them in the proposal). EXISTING user → straight to the proposal (already accepted).
     // The old code pointed BOTH at /login, which never set accepted_at → the workspace

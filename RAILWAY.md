@@ -1,23 +1,37 @@
 # Railway Deployment Guide
 
+> **Legacy scaffold guide — pending a fuller refresh.** This runbook dates from the initial scaffold; service/DB/topology names below have been corrected to the deployed production names, but some steps and env values may still be scaffold-era.
+>
+> **📋 Canonical per-service environment-variable reference (current): [docs/RAILWAY_ENV_VARS.md](docs/RAILWAY_ENV_VARS.md).**
+
 Complete step-by-step to get govtech-intel-v3 live on Railway.
 
 ---
 
 ## What You're Deploying
 
+Production topology — 5 Railway nodes (3 services + 2 Postgres DBs), plus a shared Cloudflare R2 bucket:
+
 ```
-Railway Project: govtech-intel
-├── Postgres (main)     ← pgvector-enabled, Railway manages it (customer + pipeline data)
-├── Postgres (cms)      ← Separate DB for CMS service (content + media metadata)
-├── govtech-frontend    ← Next.js, built from /frontend/Dockerfile
-├── govtech-pipeline    ← Python worker, built from /pipeline/Dockerfile
-└── govtech-cms         ← FastAPI CMS service, built from /services/cms/Dockerfile
-    └── Volume: /data/cms  ← Persistent volume for media files
+Railway Project
+├── govtech-frontend   ← Next.js (www.rfppipeline.com), built from /frontend/Dockerfile
+│                        → main Postgres (govtech_intel) + rfp-pipeline-bucket
+├── pipeline           ← Python worker, built from /pipeline/Dockerfile
+│                        → main Postgres (govtech_intel) + rfp-pipeline-bucket
+├── rfp-crm            ← FastAPI service (source: services/cms/), built from /services/cms/Dockerfile
+│                        → cms-postgres + rfp-pipeline-bucket; bridges to main DB via shared system_events
+├── Postgres           ← MAIN DB govtech_intel, pgvector-enabled — shared by frontend + pipeline
+└── cms-postgres       ← rfp-crm's OWN DB (formerly govtech_cms)
+
+rfp-pipeline-bucket    ← Cloudflare R2 object store — shared by all three services
 ```
 
+Front-facing content (blog/resource/guide/testimonial/team + dynamic pages) is frontend-owned in the
+main DB (govtech_intel) — the rfp-crm content/page-block routers are superseded for it; rfp-crm's forward
+scope is CRM (customer acquisition/management, to build out later; email + social are live).
+
 One GitHub repo → three services. One push deploys all.
-Changes in `services/cms/` only rebuild the CMS service.
+Changes in `services/cms/` only rebuild the rfp-crm service.
 
 ---
 
@@ -84,6 +98,8 @@ Rename it to `govtech-frontend`.
 | `EMAIL_FROM` | `noreply@yourdomain.com` (or your Resend verified domain) |
 | `NEXT_PUBLIC_APP_URL` | `https://YOUR-APP.up.railway.app` |
 | `NODE_ENV` | `production` |
+| `ANTHROPIC_API_KEY` | From console.anthropic.com — **all three services** (frontend, pipeline, CMS) need it |
+| `ANTHROPIC_BASE_URL` | [OPTIONAL] override the Anthropic base URL (default `api.anthropic.com`); point at a gateway or the sandbox emulator |
 
 ---
 
@@ -119,7 +135,7 @@ Rename it to `govtech-frontend`.
 ## Step 5b — Add CMS Service
 
 1. In your Railway project → **+ New** → **GitHub Repo** → same repo
-2. Rename service to `govtech-cms`
+2. Rename service to `rfp-crm`
 
 **Settings → Build:**
 - Builder: `Dockerfile`
@@ -131,7 +147,7 @@ Rename it to `govtech-frontend`.
 
 **Add a separate PostgreSQL plugin:**
 1. **+ New** → **Database** → **PostgreSQL**
-2. Rename to `Postgres (CMS)`
+2. Rename to `cms-postgres`
 3. Run `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";` in the CMS database
 
 **Add a persistent volume:**
@@ -152,7 +168,7 @@ Rename it to `govtech-frontend`.
 
 **Run CMS database migration:**
 ```bash
-railway run --service govtech-cms \
+railway run --service rfp-crm \
   psql "$CMS_DATABASE_URL" -f services/cms/db/001_cms_schema.sql
 ```
 
@@ -160,7 +176,7 @@ railway run --service govtech-cms \
 
 | Variable | Value |
 |---|---|
-| `CMS_SERVICE_URL` | `http://govtech-cms.railway.internal:8000` (Railway internal networking) |
+| `CMS_SERVICE_URL` | `http://rfp-crm.railway.internal:8000` (Railway internal networking) |
 
 ---
 

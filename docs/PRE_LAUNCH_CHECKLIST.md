@@ -82,7 +82,7 @@ confirm the provider is not `skipped`:
 
 ## 3. `ANTHROPIC_API_KEY` set — pipeline **and** frontend
 
-- **Pipeline** (`agents/fabric.py:203`) **hard-raises** `"ANTHROPIC_API_KEY not set"` → every
+- **Pipeline** (`agents/fabric.py:225`) **hard-raises** `"ANTHROPIC_API_KEY not set"` → every
   woken agent (section_drafter V0, compliance/color-team reviewers, librarian, scoring) fails.
 - **Frontend** draft tool silently falls back to a **placeholder** scaffold (`model:'placeholder'`,
   no real draft) when the key is absent.

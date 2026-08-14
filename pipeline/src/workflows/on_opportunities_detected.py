@@ -5,9 +5,15 @@ Workflow: OnOpportunitiesDetected  (Scouting Spine M2 — detection → alert)
 
 TRIGGER:    finder:opportunities.detected:single
             Condition: None (any rollup emitted means >=1 new triage row was
-            created — the producer in pipeline/src/ingest/base.py only emits
-            this event when result.new_solicitations > 0, so the workflow can
-            fire once per detecting run with no extra guard).
+            created — the producer only emits when there is a new triage row,
+            so the workflow can fire once per detection with no extra guard).
+            PRODUCERS (both emit finder:opportunities.detected):
+              - pipeline/src/ingest/base.py — a batch ingest/scout RUN
+                (result.new_solicitations > 0), one event per run.
+              - frontend lib/intake.stageIntake — a single staged NOTICE
+                (the admin intake form AND the #176 scout releaseAsNew path
+                both funnel through it), one event per staged opportunity.
+                This is what wakes opportunity_scout live in the portal path.
 
 PURPOSE:    A scheduled ingest or scout run silently fills the triage queue.
             This workflow turns the single per-run detection rollup

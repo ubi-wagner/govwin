@@ -116,11 +116,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 1. The Innovation (~3 pages) ───────────────────────────
     node('s1-heading', {
-      type: 'heading', content: { level: 1, text: '1. The Innovation', numbering: '1' },
+      type: 'heading', content: { level: 1, text: 'The Innovation', numbering: '1' },
     }),
 
     node('s1-1-heading', {
-      type: 'heading', content: { level: 2, text: '1.1 The Opportunity', numbering: '1.1' },
+      type: 'heading', content: { level: 2, text: 'The Opportunity', numbering: '1.1' },
     }),
     node('s1-1-text', {
       type: 'text_block',
@@ -128,7 +128,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s1-2-heading', {
-      type: 'heading', content: { level: 2, text: '1.2 The Proposed Innovation', numbering: '1.2' },
+      type: 'heading', content: { level: 2, text: 'The Proposed Innovation', numbering: '1.2' },
     }),
     node('s1-2-text', {
       type: 'text_block',
@@ -141,7 +141,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s1-3-heading', {
-      type: 'heading', content: { level: 2, text: '1.3 Competitive Advantage and State of the Art', numbering: '1.3' },
+      type: 'heading', content: { level: 2, text: 'Competitive Advantage and State of the Art', numbering: '1.3' },
     }),
     node('s1-3-text', {
       type: 'text_block',
@@ -152,11 +152,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 2. Technical Objectives and Challenges (~2 pages) ──────
     node('s2-heading', {
-      type: 'heading', content: { level: 1, text: '2. The Technical Objectives and Challenges', numbering: '2' },
+      type: 'heading', content: { level: 1, text: 'The Technical Objectives and Challenges', numbering: '2' },
     }),
 
     node('s2-1-heading', {
-      type: 'heading', content: { level: 2, text: '2.1 Phase I Technical Objectives', numbering: '2.1' },
+      type: 'heading', content: { level: 2, text: 'Phase I Technical Objectives', numbering: '2.1' },
     }),
     node('s2-1-text', {
       type: 'text_block',
@@ -174,7 +174,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s2-2-heading', {
-      type: 'heading', content: { level: 2, text: '2.2 Key Technical Challenges and Risks', numbering: '2.2' },
+      type: 'heading', content: { level: 2, text: 'Key Technical Challenges and Risks', numbering: '2.2' },
     }),
     node('s2-2-text', {
       type: 'text_block',
@@ -202,11 +202,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 3. The R&D Plan (~4 pages) ─────────────────────────────
     node('s3-heading', {
-      type: 'heading', content: { level: 1, text: '3. The R&D Plan', numbering: '3' },
+      type: 'heading', content: { level: 1, text: 'The R&D Plan', numbering: '3' },
     }),
 
     node('s3-1-heading', {
-      type: 'heading', content: { level: 2, text: '3.1 Technical Approach', numbering: '3.1' },
+      type: 'heading', content: { level: 2, text: 'Technical Approach', numbering: '3.1' },
     }),
     node('s3-1-text', {
       type: 'text_block',
@@ -219,7 +219,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s3-2-heading', {
-      type: 'heading', content: { level: 2, text: '3.2 Tasks and Methodology', numbering: '3.2' },
+      type: 'heading', content: { level: 2, text: 'Tasks and Methodology', numbering: '3.2' },
     }),
     node('s3-2-text', {
       type: 'text_block',
@@ -238,7 +238,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s3-3-heading', {
-      type: 'heading', content: { level: 2, text: '3.3 Milestones and Success Metrics', numbering: '3.3' },
+      type: 'heading', content: { level: 2, text: 'Milestones and Success Metrics', numbering: '3.3' },
     }),
     node('s3-3-schedule', {
       type: 'table',
@@ -268,11 +268,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 4. The Team and Facilities (~2 pages) ──────────────────
     node('s4-heading', {
-      type: 'heading', content: { level: 1, text: '4. The Team and Facilities', numbering: '4' },
+      type: 'heading', content: { level: 1, text: 'The Team and Facilities', numbering: '4' },
     }),
 
     node('s4-1-heading', {
-      type: 'heading', content: { level: 2, text: '4.1 Principal Investigator', numbering: '4.1' },
+      type: 'heading', content: { level: 2, text: 'Principal Investigator', numbering: '4.1' },
     }),
     node('s4-1-text', {
       type: 'text_block',
@@ -280,7 +280,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s4-2-heading', {
-      type: 'heading', content: { level: 2, text: '4.2 Team, Advisors, and Consultants', numbering: '4.2' },
+      type: 'heading', content: { level: 2, text: 'Team, Advisors, and Consultants', numbering: '4.2' },
     }),
     node('s4-2-text', {
       type: 'text_block',
@@ -288,7 +288,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s4-3-heading', {
-      type: 'heading', content: { level: 2, text: '4.3 Facilities and Equipment', numbering: '4.3' },
+      type: 'heading', content: { level: 2, text: 'Facilities and Equipment', numbering: '4.3' },
     }),
     node('s4-3-text', {
       type: 'text_block',
@@ -297,11 +297,11 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 5. The Commercial Opportunity (~2.5 pages) ─────────────
     node('s5-heading', {
-      type: 'heading', content: { level: 1, text: '5. The Commercial Opportunity', numbering: '5' },
+      type: 'heading', content: { level: 1, text: 'The Commercial Opportunity', numbering: '5' },
     }),
 
     node('s5-1-heading', {
-      type: 'heading', content: { level: 2, text: '5.1 Market and Customer', numbering: '5.1' },
+      type: 'heading', content: { level: 2, text: 'Market and Customer', numbering: '5.1' },
     }),
     node('s5-1-text', {
       type: 'text_block',
@@ -314,7 +314,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s5-2-heading', {
-      type: 'heading', content: { level: 2, text: '5.2 Business Model and Competition', numbering: '5.2' },
+      type: 'heading', content: { level: 2, text: 'Business Model and Competition', numbering: '5.2' },
     }),
     node('s5-2-text', {
       type: 'text_block',
@@ -322,7 +322,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
     }),
 
     node('s5-3-heading', {
-      type: 'heading', content: { level: 2, text: '5.3 Path to Commercialization', numbering: '5.3' },
+      type: 'heading', content: { level: 2, text: 'Path to Commercialization', numbering: '5.3' },
     }),
     node('s5-3-text', {
       type: 'text_block',
@@ -331,7 +331,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── 6. Broader / Societal Impacts (~1 page) ────────────────
     node('s6-heading', {
-      type: 'heading', content: { level: 1, text: '6. Broader/Societal Impacts', numbering: '6' },
+      type: 'heading', content: { level: 1, text: 'Broader/Societal Impacts', numbering: '6' },
     }),
     node('s6-text', {
       type: 'text_block',
@@ -340,7 +340,7 @@ export const NSF_SBIR_PHASE1_PROJECT_DESCRIPTION: CanvasDocument = {
 
     // ─── References ─────────────────────────────────────────────
     node('refs-heading', {
-      type: 'heading', content: { level: 1, text: '7. References Cited', numbering: '7' },
+      type: 'heading', content: { level: 1, text: 'References Cited', numbering: '7' },
     }),
     node('refs-text', {
       type: 'text_block',

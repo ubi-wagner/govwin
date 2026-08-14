@@ -53,7 +53,8 @@ export async function GET(
 
     try {
       const cards = await withTenant(tenantId, async (tx) => {
-        // Explicit tenant predicate (belt) + RLS (suspenders, once the app runs as govtech_app).
+        // Explicit tenant predicate (belt) + RLS (suspenders — the app runs as govtech_app, so
+        // RLS scopes it too).
         // top_score = the card's best score across the tenant's buckets (mig 096),
         // so the pipeline is actually ranked (pinned first, then score, then recency)
         // — not just recency with a "ranked by your buckets" label.

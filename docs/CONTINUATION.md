@@ -7,6 +7,15 @@
 
 ## ⭐ SOP — LAUNCH FIRST every session (keep-alive + verify-agents)
 
+> **⛑️ RLS IS LIVE — emulate production EXACTLY.** RLS is real and enforced (two-layer): the app runs as
+> the `NOBYPASSRLS` `govtech_app` role with the per-request `SET app.tenant_id` context (migs 116/136/137).
+> Do NOT treat RLS as "inert" or the sandbox as owner-bypass — **serve the sandbox as `govtech_app` with RLS
+> on** so it behaves exactly like prod. The owner (`govtech`/`sqlBypass`) connection is ONLY for
+> bootstrap/migrations and the few legitimate cross-tenant reads (agent-workforce rollup,
+> `matched_opportunities`, rfp-curation Customer Interest — these MUST use `sqlBypass`). "No live DB /
+> RLS-inert / can't test" is never a valid excuse — bring the stack up (`rehydrate-sandbox.sh` bootstraps as
+> owner, then point the runtime `DATABASE_URL` at `govtech_app`) and prove tenant isolation for real.
+
 **1. Heartbeat keep-alive.** Before any long drive, launch the heartbeat manager as a BACKGROUND task and
 leave it running the whole session. It pings the DB + services every ~20s and auto-repairs PG / the server /
 the emulator, so the sandbox stays active + the DB stays hydrated and a mid-drive idle-reap can't interrupt work:
@@ -32,7 +41,11 @@ this closes the sandbox's AI gap. Per-agent RESPONDER registry returns each agen
 
 ## 0. LATEST — 2026-08-09 (workflow viz + compliance + full-draft landing; MERGED + DEPLOYED; READ THIS FIRST)
 
-Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162**. `tsc 0 · vitest 899`.
+Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162** at that time. `tsc 0 · vitest 899`.
+**Since then (through 2026-08-14): migration head 178** — the template-stable/bridge spine (migs 177/178;
+`lib/template-bridge.ts`, docs/TEMPLATE_BRIDGE_DESIGN.md), the NILOC gold-example proposal set
+(`frontend/scripts/niloc/`, docs/NILOC_GOLD_EXAMPLES.md), and the cost-volume common-form pass (migs 168/169).
+RLS is **live app-side** (the app runs as `govtech_app`; see the ⛑️ callout above).
 
 **Shipped this stretch:**
 - **Workflow visualization** at `/admin/workflows` — a dependency-free, by-spine **Workflow Map** (all 29
@@ -301,10 +314,13 @@ lucide-react, recharts, clsx, date-fns, dom-serializer, domutils); deleted dead 
 `DEFAULT_CATEGORIES`, dead `STORAGE_ROOT` env) + 6 orphaned frontend modules. **Cataloged (NOT blind-deleted):**
 ~28 no-caller API routes, 8 dead exports, 4 needs-review libs — a per-item decision in docs/DEPRECATION_CLEANUP_2026-07-22.md.
 
-**⚠️ Latent RLS-cutover item (NOT a current bug):** the retired-table repoints made two **direct cross-tenant
-admin/CMS reads** on `tenant_opportunity_cards` (RLS FORCED) — `app/admin/rfp-curation/[solId]` Customer Interest
-+ CMS `matched_opportunities`. Fine today (app = RLS-bypassing owner); on the `govtech_app` NOBYPASSRLS cutover
-they must run on a BYPASSRLS connection / owner-view. On the RLS-cutover checklist (launch-readiness item #9).
+**⚠️ Cross-tenant admin/CMS reads on RLS-FORCED tables — must run on the BYPASS/owner path (RLS is LIVE):**
+the retired-table repoints made two **direct cross-tenant admin/CMS reads** on `tenant_opportunity_cards` (RLS
+FORCED) — `app/admin/rfp-curation/[solId]` Customer Interest + CMS `matched_opportunities`. Because RLS is
+**enforced now** (the app connects as the `NOBYPASSRLS` `govtech_app` role, and the sandbox emulates that
+exactly), a tenant-scoped connection returns ZERO rows for these — they MUST use `sqlBypass` / an owner-view
+read (legitimate cross-tenant admin surface). Verify both are on the bypass path; treat any tenant-scoped
+cross-tenant read as a live bug, not a future-cutover item.
 
 **Automation spine — MAPPED, ready to build (the phase we're starting).** The engine is ALREADY the
 start→end gate pattern the user wants: declarative `Workflow` = `trigger` + `steps[]` (DAG via `depends_on`),

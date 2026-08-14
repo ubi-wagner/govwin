@@ -1,5 +1,7 @@
 # Common-Canvas Redesign — Sequenced Plan (Phase 4)
 
+> **Superseded plan — the current phased path is `docs/CANVAS_ARCHITECTURE.md` §7 (the single source of truth).** Kept for history.
+
 > **Status: awaiting sign-off.** This is the deliverable that closes Phases 1–4 (read → capability →
 > adversarial → plan). Nothing here is built yet. Per the agreed operating model — *"Today = stop at the
 > TODO"* — I stop at this document and wait for your steer before writing a line of feature code.

@@ -8,6 +8,23 @@ import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
+import type { Metadata } from 'next';
+
+// Per-tenant tab title — every portal page reads "<Company> · RFP Pipeline" unless the
+// page sets its own; a page-level title overrides this. Fixes the all-"RFP Pipeline" tabs.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+}): Promise<Metadata> {
+  try {
+    const { tenantSlug } = await params;
+    const tenant = await getTenantBySlug(tenantSlug);
+    return { title: (tenant?.name as string) || 'Portal' };
+  } catch {
+    return { title: 'Portal' };
+  }
+}
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -110,44 +127,38 @@ export default async function PortalLayout({
             {!isPartner && <NotificationBell tenantSlug={tenantSlug} />}
           </div>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
+          {/* Flat, slim nav (Step 0 of the unified-canvas plan — de-compartmentalized; the
+              cockpit/dashboard is the visual home, the rail is just navigation). A hairline
+              separates the daily surfaces from the setup tail; no uppercase section headers. */}
           <nav className="flex flex-col gap-1 text-sm">
-            {!isPartner && (
-              <>
-                <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>
-                {/* Admin console ("Page 2") — the setup/governance hub. Same
-                    tenant_admin floor as the other admin surfaces (serves a
-                    descended shadow admin via rank). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/manage`}>Manage</PortalNavLink>}
-                {/* BD surfaces — delegated authority, gated to tenant_admin to
-                    match the cockpit's grant model (a base tenant_user does not
-                    see Opportunities/Buckets/Builds). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
-                <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>
-                {/* Collaboration vaults ("nooks") — segregated per-partner branch
-                    libraries. tenant_admin only (manage members + harvest). */}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
-              </>
-            )}
+            {!isPartner && <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
+            {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
+            {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
+            <PortalNavLink href={`${basePath}/todos`}>To-dos</PortalNavLink>
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/processes`}>Processes</PortalNavLink>
                 <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
-                {isTenantAdmin && <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>}
-                {isTenantAdmin && (
-                  <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
-                )}
-                {isTenantAdmin && (
-                  <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>
-                )}
+                <PortalNavLink href={`${basePath}/templates`}>Templates</PortalNavLink>
               </>
             )}
+            {/* Setup tail — separated by a hairline, not a labeled section. */}
             {!isPartner && (
-              <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+              <>
+                <div className="my-2 border-t border-white/10" />
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/manage`}>Manage</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>}
+                <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+              </>
             )}
           </nav>
         </div>

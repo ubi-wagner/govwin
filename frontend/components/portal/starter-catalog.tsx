@@ -18,6 +18,9 @@ interface SystemTemplate { id: string; title: string | null; form: string | null
 
 export function StarterCatalog({ tenantSlug }: { tenantSlug: string }) {
   const [foundations, setFoundations] = useState<number | null>(null);
+  // Total library size (any grain) — the "empty" copy must key off this, not the foundation
+  // count, or it falsely claims "Your library is empty" when the tenant holds primitive atoms.
+  const [total, setTotal] = useState<number | null>(null);
   const [catalog, setCatalog] = useState<SystemTemplate[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +30,12 @@ export function StarterCatalog({ tenantSlug }: { tenantSlug: string }) {
     Promise.all([
       fetch(`/api/portal/${tenantSlug}/library/atoms?grain=foundation&limit=1`).then((r) => r.json()).catch(() => null),
       fetch(`/api/portal/${tenantSlug}/library/system-templates`).then((r) => r.json()).catch(() => null),
-    ]).then(([atoms, tpl]) => {
+      fetch(`/api/portal/${tenantSlug}/library/atoms?limit=1`).then((r) => r.json()).catch(() => null),
+    ]).then(([atoms, tpl, allAtoms]) => {
       if (cancelled) return;
       setFoundations(typeof atoms?.data?.total === 'number' ? atoms.data.total : 0);
       setCatalog(Array.isArray(tpl?.data) ? tpl.data : []);
+      setTotal(typeof allAtoms?.data?.total === 'number' ? allAtoms.data.total : 0);
     });
     return () => { cancelled = true; };
   }, [tenantSlug]);
@@ -49,13 +54,13 @@ export function StarterCatalog({ tenantSlug }: { tenantSlug: string }) {
     } catch { setError('Network error — try again.'); } finally { setBusy(false); }
   }, [tenantSlug]);
 
-  // Nothing to render until both counts are known (avoids a flash).
-  if (foundations === null || catalog === null) return null;
+  // Nothing to render until the counts are known (avoids a flash).
+  if (foundations === null || catalog === null || total === null) return null;
   // No system catalog seeded for this tenant: the prominent "add starter set" CTA would vanish and
   // leave an EMPTY library as a silent blank. Give it a first-step upload CTA instead. (A library
   // that already has content needs no CTA here.)
   if (catalog.length === 0) {
-    if (foundations > 0) return null;
+    if (total > 0) return null;
     return (
       <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
         <p className="text-sm font-semibold text-blue-900">Your library is empty</p>
@@ -65,8 +70,9 @@ export function StarterCatalog({ tenantSlug }: { tenantSlug: string }) {
     );
   }
 
-  // Compact add-anytime affordance once the library already holds foundations.
-  if (foundations > 0) {
+  // Library already holds content (atoms and/or foundations) → compact add-anytime affordance;
+  // the prominent "Your library is empty" onboarding below is reachable only when total === 0.
+  if (total > 0) {
     return (
       <div className="mb-4 flex items-center justify-end">
         <button

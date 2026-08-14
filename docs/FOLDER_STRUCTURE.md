@@ -12,7 +12,7 @@ See also: [CLAUDE.md](../CLAUDE.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md),
 govwin/
   frontend/          # Next.js 15 app (UI + API routes)
   pipeline/          # Python worker (ingest, scoring, agents)
-  services/cms/      # Live FastAPI CRM/CMS (87 endpoints, 7 worker loops, Vite SPA; email/content/social + page-block editor; own govtech_cms DB)
+  services/cms/      # FastAPI CRM — 87 endpoints, 7 worker loops, Vite SPA (Railway svc rfp-crm; own cms-postgres DB); email/social live; content/page-block routers superseded (front-facing content is frontend-owned in govtech_intel); forward scope = CRM, to build out later
   db/migrations/     # Numbered SQL migrations (applied in order)
   scripts/           # Dev helpers + one-off tasks
   docs/              # Architecture + binding convention docs

@@ -1,5 +1,7 @@
 # Canvas Geometry Redesign — frames, sections, and the annotation atomizer
 
+> **Current reference for section-layer geometry.** The canvas architecture single source is `docs/CANVAS_ARCHITECTURE.md`.
+
 **Status:** design analysis + path to completion. **Date:** 2026-07-18.
 **Premise (founder):** lean into the *x/y of rectangles* (documents, slides, pages);
 content is **atoms → groups → sections** with per-level layout intent (fit one

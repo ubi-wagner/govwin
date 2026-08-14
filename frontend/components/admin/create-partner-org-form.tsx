@@ -72,11 +72,11 @@ export function CreatePartnerOrgForm() {
             <p className="text-sm text-gray-500 mb-4">Creates an EconDev partner that runs a stable of client companies (owner-scoped, no /admin reach).</p>
             <div className="space-y-3">
               <div><label className={label}>Organization name <span className="text-red-500">*</span></label><input className={input} value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder="Youngstown Business Incubator" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={label}>Legal name</label><input className={input} value={legalName} onChange={(e) => setLegalName(e.target.value)} /></div>
                 <div><label className={label}>Website</label><input className={input} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={label}>Admin name <span className="text-red-500">*</span></label><input className={input} value={adminName} onChange={(e) => setAdminName(e.target.value)} required placeholder="Stephanie Gaffney" /></div>
                 <div><label className={label}>Admin email <span className="text-red-500">*</span></label><input type="email" className={input} value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required /></div>
               </div>

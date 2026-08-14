@@ -19,6 +19,7 @@ import type {
 import { createNode } from '@/lib/types/canvas-document';
 import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
 import { SheetMediaStrip } from './sheet-media-strip';
+import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS } from './canvas-overlays';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -40,6 +41,8 @@ interface SheetInfo {
   nodeId: string;
   name: string;
   content: TableContent;
+  /** the worksheet's table-node provenance source (for the Provenance overlay). */
+  source?: string;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -82,6 +85,7 @@ function getSheets(doc: CanvasDocument): SheetInfo[] {
       nodeId: node.id,
       name,
       content,
+      source: node.provenance?.source,
     };
   });
 }
@@ -135,6 +139,9 @@ export function SheetEditor({
   }
 
   const currentSheet = sheets[clampedSheet] ?? null;
+  // Structure-as-overlay (Phase 1): on a sheet, Atoms outlines the worksheet/table primitive
+  // and Provenance gutters it by source. Reuses the same overlay CSS via the grid's data-attrs.
+  const { active: overlays, toggle: toggleOverlay } = useOverlays();
   const headers = currentSheet?.content.headers ?? [];
   const rows = currentSheet?.content.rows ?? [];
   const colCount = Math.max(headers.length, ...rows.map((r) => r.length), 0);
@@ -679,7 +686,15 @@ export function SheetEditor({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className={`flex flex-col h-full bg-white ${overlayClass(overlays)}`}>
+      {/* Structure overlays — Atoms outlines the sheet/table primitive; Provenance gutters it. */}
+      <div className="border-b bg-white px-4 py-1.5">
+        <CanvasOverlayBar
+          active={overlays}
+          onToggle={toggleOverlay}
+          items={OVERLAYS.filter((o) => o.key === 'atoms' || o.key === 'provenance')}
+        />
+      </div>
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b bg-white flex-shrink-0">
         {/* Document title */}
@@ -935,9 +950,13 @@ export function SheetEditor({
         onDelete={handleDeleteMediaNode}
       />
 
-      {/* ── Grid ── */}
-      <div className="flex-1 overflow-auto">
-        <table className="border-collapse w-full">
+      {/* ── Grid ── (the provenance overlay borders this WRAPPER — outside the opaque cells —
+          while the atoms overlay outlines the table itself). */}
+      <div className="flex-1 overflow-auto cv-sheet-grid" data-node-source={currentSheet?.source}>
+        <table
+          className="border-collapse w-full"
+          data-node-id={currentSheet?.nodeId}
+        >
           <thead>
             {/* Column letter headers with delete buttons */}
             <tr className="bg-gray-100 sticky top-0 z-10">

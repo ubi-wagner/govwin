@@ -123,8 +123,8 @@ export default function ProposalStudio({ tenantSlug, proposalId }: Props) {
         approve → next. Advisory — drafts land in review; nothing locks or submits.
       </p>
 
-      {/* Stepper */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* Stepper — stacks to one column on mobile so each phase stays readable */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
         {PHASES.map((p, i) => {
           const done = i < activeIdx || phase === 'complete';
           const active = p.key === phase;

@@ -243,9 +243,10 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.proposal.reformat_section": "formatter",
     "tool.proposal.restyle": "stylist",
     "tool.proposal.check_continuity": "continuity_manager",
-    # Proposal Draft Manager cohort (P1 — mostly LIVE: plan_draft/audit_traceability/scan_redaction
-    # are referenced by OnFullDraftRequested + Proposal Studio; market_analyst (analyze_sota) still
-    # awaits a producer step):
+    # Proposal Draft Manager cohort (P1 — LIVE: plan_draft/audit_traceability/scan_redaction are
+    # referenced by OnFullDraftRequested + Proposal Studio; market_analyst (analyze_sota) is the
+    # AdvisoryOverlay pre_augment step — fired by Mode C's request_advisory_overlay when the
+    # adversarial gate is set, now section-anchored (OVERLAY-2 threads a market-relevant section_id)):
     #   proposal_manager     — PLANNER: skeleton + matrix + ranked atoms → a per-section draft plan
     #   traceability_auditor — requirement→coverage map (unaddressed + orphan content)
     #   redaction_guard      — cross-boundary / OPSEC leak scan over assembled content
@@ -281,6 +282,9 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.solicitation.amendment_delta": "amendment_monitor",
     "tool.proposal.cost_estimate": "cost_estimator",
     "tool.proposal.match_past_performance": "pp_matcher",
+    # Tenant R&D / market-research scout (on-demand via ai/research queue producer; ALSO a
+    # declarative AI_INVOKE step actor in OnProposalCreated — initial market/competitor brief).
+    "tool.research.scout": "research_scout",
     # POD 4 — our-org RFP-admin ops (pre-release QA gate + scheduled ops digest)
     "tool.curation.qa": "curation_qa",
     "tool.ops.digest": "ops_digest",

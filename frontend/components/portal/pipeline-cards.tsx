@@ -213,7 +213,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
               ) : (
                 <>
                   <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST')} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50">
-                    {busy === c.opportunityId ? '…' : 'Pin (copy docs)'}
+                    {busy === c.opportunityId ? '…' : 'Pin to pursue'}
                   </button>
                   <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'passed')} className="text-xs text-gray-400 hover:text-gray-700" title="Hide this from your feed — trains your matches">Not interested</button>
                 </>

@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 987 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1092 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -35,7 +35,18 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **169** — migs 163–167 per below;
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **178** — migs 163–167 per below;
+mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
+extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
+**NEW vs UPDATE** (`lib/scout/classify.ts`) and released as a new intake (`stageIntake`) or an update
+(`logAmendment` on the matched opp), or dismissed — advisory, injection-fenced, platform-scope, `/admin/scouts`;
+docs/SCOUT_INTAKE_QUEUE.md; mig 176 seeds the four **program-primer guide drafts** (BAA · OTA · CSO · Grants/NOFO)
+authored canvas-native + queued for admin review via a `content_publish` HITL ToDo — draft-gated, nothing public
+until published (docs/CONTENT_QUEUE.md); migs **177–178** add the **template-stable/bridge** spine — admin
+master templates fan forward-only onto tenant template cards → instantiate into `library_atoms`, with per-tenant
+document/template provenance (`lib/template-bridge.ts`, docs/TEMPLATE_BRIDGE_DESIGN.md); and the **NILOC
+gold-example** proposal set (`frontend/scripts/niloc/`, docs/NILOC_GOLD_EXAMPLES.md) exercises every agency
+cost-form + volume end-to-end;
 the **cost-volume common-form pass** added migs **168–169** (the Ohio TVSF Round-45 OPP card + the final Foundation
 3DCP proposal off it, for deployment verification). The cost/budget volume is now COMPUTED + agency-neutral: one
 deterministic burden engine (`lib/proposal/cost-model.ts`, a TS port of `pipeline/…/budget_model.py`, parity to the
@@ -66,10 +77,17 @@ descoped — the comp code stands in.
 The pipeline agent workforce (`AgentFabric`, **36 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
-`publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
+`publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY` — in the sandbox the committed emulator stands in for Claude:
+`EMULATE=1` points `ANTHROPIC_BASE_URL` at the :8787 test-harness so every AI-gated flow runs end-to-end
+with no live key, exactly mirroring the prod wiring, docs/AI_FLOWS_PROOF.md);
 `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance `agent_task_queue`;
 plus the greenfielded `librarian` (onto `library_atoms`, atomize→`agent_task_queue`, injection-fenced) and
-`scoring_strategist` (tenant-discretion) producers. The **Proposal Draft Manager program** (P1–P4) added +8
+`scoring_strategist` (tenant-discretion) producers, and the platform-scope `opportunity_scout` — WOKEN
+(AGENTS-LIVE): `lib/intake.stageIntake` now emits `finder:opportunities.detected` (admin intake + #176 scout
+releaseAsNew both funnel through it) → `OnOpportunitiesDetected` prioritizes the triage backlog (reads
+`scout_findings` + `curated_solicitations`; advisory, injection-fenced, guardrail-gated) → rfp_admin email +
+a `triage_new_opportunities` ToDo (docs/AGENT_WORKFORCE.md; `test_opportunity_scout_wiring.py`). The
+**Proposal Draft Manager program** (P1–P4) added +8
 archetypes (27→35): the G1 integrity cohort (`formatter`/`stylist`/`continuity_manager`), the P1 cohort
 (`proposal_manager` planner + `traceability_auditor`/`redaction_guard`/`market_analyst`), and the P1.5
 `advisory_manager` — orchestrated by the admin-run `OnFullDraftRequested{ModeA,B,C}` (V0.1 HITL / V0.2
@@ -100,11 +118,12 @@ spine, then either a **per-tenant producer** (fan-out agents) or a declarative *
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
 authority; tool schemas expose NO `tenant_id`); output is **advisory → guardrail → land-or-review** (never
 auto-writes business tables); untrusted tenant content is **injection-fenced**; runtime bounds **runaway**
-(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop is **built + applied
-in schema** — mig 116 forced RLS on `episodic_memories`, and mig 136_rls_cutover added the `NOBYPASSRLS` roles
+(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS is **LIVE (two-layer,
+enforced)** — mig 116 forced RLS on `episodic_memories`; mig 136_rls_cutover put the `NOBYPASSRLS` roles
 (`govtech_app` app / `rfp_agent` agents), `tenant_isolation` policies, and the per-request `SET app.tenant_id`
-context layer (mig 137 validates the namespace CHECK); it stays **inert until the one-op prod `DATABASE_URL`
-flip** off the owner role (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
+context in effect (mig 137 validates the namespace CHECK). The app runs as `govtech_app` and **the sandbox
+emulates production exactly (serve as `govtech_app`, RLS on)** — the owner/`sqlBypass` role is only for
+bootstrap/migrations + legitimate cross-tenant reads (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
 per-tenant usage, forward-only bridge). **Workflow visualization + compliance + full-draft landing (2026-08,
 merged via PR #205 + deployed):** `/admin/workflows` renders a dependency-free **Workflow Map** — all 29
 templates as DAGs, grouped by the two spines + platform — plus **live instance graphs** (per-step status
@@ -129,12 +148,24 @@ trigger+step templates, the start→end event gate, and the two stateless reconc
 orchestration pattern.
 
 ## Services
-1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
+1. **Frontend** (Next.js 15): Portal UI + API routes + **all front-facing content** → `frontend/`.
+   Front-facing content is **frontend-owned in the main DB**: the unified versioned `content_pages`
+   store (canonical; legacy `cms_content` is a read-fallback during transition) drives both the
+   **documents** (`blog_post`/`resource`/`guide`/`testimonial`/`team_member`) and the **dynamic pages**
+   (the page-block editor, `content_type='page'`) at `/admin/site` — draft→publish→archive
+   (`lib/content-admin.ts`), read via `lib/cms.ts`. Content is now authored **canvas-native** (the
+   proposal Canvas): the CanvasDocument is the source of truth in `metadata.canvas`; the server
+   projects the public HTML body from it on save (docs/CONTENT_STUDIO_DESIGN.md).
 2. **Pipeline** (Python 3.12): Ingestion, scoring, workers, agents → `pipeline/`
-3. **CMS/CRM** (FastAPI): Live — email automation, content pipeline, social, page-block editor; own `govtech_cms` DB → `services/cms/`
+3. **CRM service** (`rfp-crm`, FastAPI, `services/cms/`): deployed on Railway with its **own `cms-postgres`
+   DB**, bridged to the main DB via the shared `system_events` table; **email automation** (Gmail send) +
+   social are live. Its content/page-block routers are **superseded** for front-facing content (that moved
+   to the frontend per §1 — content is frontend-owned in the main DB) — the service's forward scope is
+   **CRM** (customer identification / acquisition / management), **still to be built out**.
 
-Frontend + Pipeline share one PostgreSQL database (govtech_intel); CMS/CRM has its own (govtech_cms)
-and bridges via the shared `system_events` table. Object storage is S3-compatible (Cloudflare R2) —
+Frontend + Pipeline share the main PostgreSQL database (`govtech_intel`, Railway service `Postgres`); the
+`rfp-crm` CRM service has its own (`cms-postgres`) and bridges via the shared `system_events` table. Object
+storage is the S3-compatible **`rfp-pipeline-bucket`** (Cloudflare R2), shared by all three services —
 there is no `/data` business-data volume (the dead pipeline `STORAGE_ROOT=/data` env was removed this
 cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS media).
 
@@ -174,7 +205,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (987 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1092 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
@@ -242,12 +273,14 @@ See CLAUDE_CLIFFNOTES.md for:
 - User content clearly delimited in agent prompts (prompt injection defense)
 - No committed production credentials — mig 124 rotated master_admin off the committed seed
   (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
-- RLS is ENABLE/FORCE'd and **single-layer in effect today** (the app still connects as the RLS-bypassing
-  owner role). The `NOBYPASSRLS` `govtech_app` cutover is **built + applied in schema** (mig 136_rls_cutover:
-  19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles + the per-request context layer;
-  mig 137 validates the namespace CHECK) — it stays **inert until the one-op prod `DATABASE_URL` flip** to
-  `govtech_app`. Cross-tenant admin/CMS reads on RLS-forced tables must run on a BYPASS connection /
-  owner-view — RLS-cutover checklist in docs/RLS_CUTOVER.md. Full posture: **docs/SECURITY_AND_SAFETY.md**.
+- **RLS is LIVE (two-layer, enforced) — not "inert until a future flip".** The app connects as the
+  `NOBYPASSRLS` `govtech_app` role and RLS scopes every request via the per-request `SET app.tenant_id`
+  context (mig 136_rls_cutover: 19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles;
+  mig 137 validates the namespace CHECK). **The sandbox EMULATES PRODUCTION EXACTLY — serve as
+  `govtech_app` with RLS on.** The owner/`sqlBypass` connection is only for bootstrap/migrations and
+  the few legitimate cross-tenant reads (admin/CMS on RLS-forced tables, e.g. the agent-workforce
+  rollup, `matched_opportunities`, rfp-curation Customer Interest — these MUST use `sqlBypass`).
+  Full posture: **docs/SECURITY_AND_SAFETY.md**; mechanics in docs/RLS_CUTOVER.md.
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
@@ -262,9 +295,14 @@ sprint state, how to spin up the sandbox, verified demo accounts, the live gap l
 the recurring bug-classes. Read it first when resuming; the identity model is in
 docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
 
-**Common-Canvas redesign (2026-08):** the four-phase analysis (`docs/CANVAS_ARCHITECTURE.md` →
-`CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` → `CANVAS_REDESIGN_PLAN.md`) drove a
-signed-off MVP + admin-plane build recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
+**Canvas — single source of truth is `docs/CANVAS_ARCHITECTURE.md`.** All canvas architecture is
+consolidated there: the model + as-built surfaces (one `CanvasDocument`; `canvas.format` forks into
+`CanvasRenderer`/`SlideEditor`/`SheetEditor`; PDF is an export target, not a type), the signed-off
+**one-canvas / three-surfaces / one-interaction-layer** direction (doc·pdf fluid · ppt discrete
+section-per-slide · xls grid+chart+ribbon — all sharing togglable dotted `OverlayLayer` +
+`ActOnSelection` verbs + `AssistPanel`), a realigned gap register, the phased path, and a **map of every
+other `docs/CANVAS_*.md`** (historical analysis · data-model reference · superseded design · build log).
+The 2026-08 Common-Canvas build is recorded in **`docs/CANVAS_BUILD_LOG.md`**. Shipped: the **trust
 hub** — a writable section restore path (`…/sections/[s]/versions` POST, CAS-safe, mig 163
 `content_source`), local-draft **autosave**/recover + Ctrl-S, and one-click **Accept AI drafts**
 (`accept-ai-revisions`) that lands the staged full-draft workforce onto the page; a **non-destructive

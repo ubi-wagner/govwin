@@ -3,7 +3,8 @@
 > **As-built correction (deepest-review sweep).** See **docs/START_END_FRAMEWORK.md** §4 for the verified
 > agent×scope map. Corrections: every one of the 35 archetypes now has a concrete invocation site (a
 > producer or an `AI_INVOKE` step) — the "15 dormant" framing is stale; `research_scout` is invocable via a
-> queue producer (`ai/research/route.ts`), just not as an `AI_INVOKE` step. The injection fence was hardened
+> queue producer (`ai/research/route.ts`) — and, as of AGENTS-LIVE, ALSO as an `AI_INVOKE` step
+> (`tool.research.scout` in `OnProposalCreated`, closing the last unmapped-archetype gap). The injection fence was hardened
 > this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
 > `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
 
@@ -49,13 +50,26 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
-> **Live-count reconciliation (2026-07 rebaseline).** "Awake as workflow actors" here means
-> *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full 35). That is a
-> different measure from a **proven live enqueue/inline site**, of which there are **9** today
-> (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`, `scoring_strategist`,
-> `opportunity_analyst`, `research_scout`, `library_seed_suggester`, `library_seed_mapper`). The other
-> 26 are dormant-but-mapped, woken one at a time under the automation-policy phase. Use **9** when a doc
-> means "actively firing." (CLAUDE.md's shorter "live today" list understated this.)
+> **Live-count reconciliation (2026-07 rebaseline; +opportunity_scout 2026-08).** "Awake as workflow
+> actors" here means *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full
+> 36). That is a different measure from a **proven live enqueue/inline site**, of which there are **15**
+> today (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`,
+> `scoring_strategist`, `opportunity_analyst`, `research_scout`, `library_seed_suggester`,
+> `library_seed_mapper`, `opportunity_scout`, **`onboarding_agent`**, **`outcome_analyst`**,
+> **`ingest_analyst`**, **`matrix_stager`**, **`skeleton_architect`** — the last five proven live via
+> `scripts/drive_prove_agents.py`: each producer-wired (accept route → OnApplicationAccepted; outcome
+> route → OnProposalOutcomeRecorded; rfp-upload → OnRfpUploaded) and each runs advisory on the emulator,
+> guardrail-gated + audited). The rest are dormant-but-mapped. Use **15** when a doc means "actively firing."
+>
+> **opportunity_scout WOKEN (AGENTS-LIVE).** `OnOpportunitiesDetected` (finder:opportunities.detected)
+> was dark in the frontend intake path — nothing emitted its trigger. `lib/intake.stageIntake` now emits
+> `finder:opportunities.detected` on every staged notice (both the admin intake form AND the #176 scout
+> `releaseAsNew` funnel through it), so the chain fires live: **opportunity_scout** prioritizes the
+> triage backlog (reads `curated_solicitations` + the #176 `scout_findings` queue; advisory,
+> platform-scope `tenantId=null`, injection-fenced, guardrail-gated) → rfp_admin email → a
+> `triage_new_opportunities` ToDo. Proven live on the emulator (`scripts/drive-opp-scout.mts`: 1
+> detection → agent.invoked ×2, guardrail `apply` → 1 triage ToDo); locked by
+> `pipeline/tests/test_opportunity_scout_wiring.py` (8/8).
 
 **Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
@@ -82,7 +96,7 @@ content loop), so the whole platform runs on one fabric:
 | **Content Generator** (`content_generator`) | 🌐 our-org CMS | Content requested | Drafts marketing/content-pipeline copy. |
 | **Content Curator** (`content_curator`) | 🌐 our-org CMS | Content resurface requested | Selects/repurposes existing content for resurfacing. |
 | **Social Scheduler** (`social_scheduler`) | 🌐 our-org CMS | Social schedule requested | Schedules social posts across the content calendar. |
-| **Research Scout** (`research_scout`) | 🌐 our-org | Research requested (`handle_event` only) | Produces research briefs; **not yet in `TOOL_ACTION_TO_ARCHETYPE`** (can't back an `AI_INVOKE` step until mapped). |
+| **Research Scout** (`research_scout`) | 🔒 tenant | Research requested (on-demand queue) **+ proposal created (AI_INVOKE step)** | Produces cited research briefs (market / prior-art / competitor). **MAPPED (AGENTS-LIVE)**: `tool.research.scout` → `research_scout`, now an independent `AI_INVOKE` step in `OnProposalCreated` (initial brief) alongside the on-demand `ai/research` queue path. Web results injection-fenced; safe-skips without egress. Locked by `test_research_scout_wiring.py` (10/10); proven live via `scripts/drive_research_scout.py`. |
 
 🌐 **platform-scope** agents (incl. the our-org ops/CMS set) run at our authority on master/our-org data (no
 tenant to bind to), so tenant-discretion is N/A — but they keep the **mandatory injection fence** (they read
@@ -104,7 +118,7 @@ pipeline `ANTHROPIC_API_KEY` is set (advisory, like `section_drafter`; an unkeye
 | **Continuity Manager** (`continuity_manager`) | 🔒 tenant | Mode C `gate_continuity`; overlay fan-out target | Whole-proposal cross-artifact QA vs the RFP — flags alignment gaps, contradictions, and incongruous non-customer entity (provenance) leaks. |
 | **Traceability Auditor** (`traceability_auditor`) | 🔒 tenant | Mode C `gate_traceability` step | Maps every compliance requirement to its covering section; flags unaddressed requirements and orphan sections. |
 | **Redaction Guard** (`redaction_guard`) | 🔒 tenant | Mode C `gate_redaction` step | Scans assembled content for cross-boundary agency names, CUI/markings, and competitor-sensitive text leaked by reused atoms. |
-| **Market Analyst** (`market_analyst`) | 🔒 tenant | Overlay `pre_augment` (advisory web step) | Injects fresh, cited SOTA/market/competitive context (Commercialization + Related-Work) via the controlled browser — injection-fenced, safe-skips. |
+| **Market Analyst** (`market_analyst`) | 🔒 tenant | Overlay `pre_augment` (fired by Mode C's `request_advisory_overlay` when the adversarial gate is set) | Injects fresh, cited SOTA/market/competitive context (Commercialization + Related-Work) via the controlled browser — injection-fenced, safe-skips. **OVERLAY-2 fix**: `request_advisory_overlay` now threads a market-relevant `section_id` into the payload, so `get_section_context` anchors on a real section instead of erroring. Proven live (`scripts/drive_overlay_market.py`); `test_overlay_section_thread.py` (5/5). |
 | **Advisory Manager** (`advisory_manager`) | 🔒 tenant | Advisory-overlay `reconcile` step | Wraps any advisor in a 1:n adversarial fan-out; reconciles discrepancies (majority/consensus/refute-vote) + remediation; records advisory memory only. |
 
 ### The Proposal Draft Manager program (P1–P4)

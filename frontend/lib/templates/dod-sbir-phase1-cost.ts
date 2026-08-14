@@ -38,14 +38,18 @@ const GRAND: TableCell['style'] = { bold: true, bg: '#2c3e7a', alignment: 'right
 const GRAND_L: TableCell['style'] = { bold: true, bg: '#2c3e7a' };
 
 function h(text: string): TableCell { return { text, style: HDR }; }
-function cur(formula: string, text?: string): TableCell {
-  return { text: text ?? '', formula, number_format: '$#,##0', cell_type: 'formula', style: CUR };
+// PRISTINE TEMPLATE — cells ship WITHOUT seeded example figures (no baked-in "$42,500").
+// `cur`/`pct` are formula cells whose display comes from the formula on recalc; `num` is a
+// blank input the customer fills. The 2nd arg (a typical magnitude, for the author's reference)
+// is intentionally NOT rendered, so the shipped template carries no example budget.
+function cur(formula: string, _example?: string): TableCell {
+  return { text: '', formula, number_format: '$#,##0', cell_type: 'formula', style: CUR };
 }
-function pct(formula: string, text?: string): TableCell {
-  return { text: text ?? '', formula, number_format: '0.0%', cell_type: 'formula', style: CUR };
+function pct(formula: string, _example?: string): TableCell {
+  return { text: '', formula, number_format: '0.0%', cell_type: 'formula', style: CUR };
 }
-function num(value: number, fmt?: string): TableCell {
-  return { text: String(value), value, number_format: fmt ?? '#,##0', cell_type: 'number', style: CUR };
+function num(_example: number, fmt?: string): TableCell {
+  return { text: '', number_format: fmt ?? '#,##0', cell_type: 'number', style: CUR };
 }
 
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
@@ -103,28 +107,28 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
         rows: [
           [
             { text: 'Fringe Benefits', style: CAT },
-            { text: '35.0%', value: 0.35, cell_type: 'percent', number_format: '0.0%', style: CUR },
+            { text: '', cell_type: 'percent', number_format: '0.0%', style: CUR },
             { text: 'Direct Labor $', style: CUR },
             { text: 'Provisional' },
             { text: 'Health, FICA, PTO, 401k, workers comp' },
           ],
           [
             { text: 'Overhead (OH)', style: CAT },
-            { text: '45.0%', value: 0.45, cell_type: 'percent', number_format: '0.0%', style: CUR },
+            { text: '', cell_type: 'percent', number_format: '0.0%', style: CUR },
             { text: 'Direct Labor + Fringe', style: CUR },
             { text: 'Provisional' },
             { text: 'Facilities, IT, admin support, insurance' },
           ],
           [
             { text: 'General & Administrative (G&A)', style: CAT },
-            { text: '15.0%', value: 0.15, cell_type: 'percent', number_format: '0.0%', style: CUR },
+            { text: '', cell_type: 'percent', number_format: '0.0%', style: CUR },
             { text: 'Total Costs before G&A', style: CUR },
             { text: 'Provisional' },
             { text: 'Exec mgmt, accounting, legal, BD' },
           ],
           [
             { text: 'Fee / Profit', style: CAT },
-            { text: '7.0%', value: 0.07, cell_type: 'percent', number_format: '0.0%', style: CUR },
+            { text: '', cell_type: 'percent', number_format: '0.0%', style: CUR },
             { text: 'Total Est. Cost', style: CUR },
             { text: '' },
             { text: 'Reasonable profit per FAR 15.404' },
@@ -206,10 +210,10 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
             { text: '', style: TOTAL, formula: '=SUM(D2:D5)', number_format: '#,##0', cell_type: 'formula' },
-            { text: '$102,500', style: TOTAL, formula: '=SUM(E2:E5)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(E2:E5)', number_format: '$#,##0', cell_type: 'formula' },
             { text: '', style: TOTAL },
-            { text: '$35,875', style: TOTAL, formula: '=SUM(G2:G5)', number_format: '$#,##0', cell_type: 'formula' },
-            { text: '$138,375', style: TOTAL, formula: '=SUM(H2:H5)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(G2:G5)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(H2:H5)', number_format: '$#,##0', cell_type: 'formula' },
           ],
         ],
         column_widths: [120, 120, 75, 55, 85, 65, 75, 85],
@@ -249,7 +253,7 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
             { text: 'Total Materials', style: TOTAL_L },
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
-            { text: '$6,000', style: TOTAL, formula: '=SUM(D2:D4)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(D2:D4)', number_format: '$#,##0', cell_type: 'formula' },
           ],
         ],
         column_widths: [250, 60, 90, 100],
@@ -292,7 +296,7 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
-            { text: '$2,000', style: TOTAL, formula: '=SUM(G2:G3)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(G2:G3)', number_format: '$#,##0', cell_type: 'formula' },
           ],
         ],
         column_widths: [120, 120, 55, 45, 65, 65, 80],
@@ -334,7 +338,7 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
             { text: '', style: TOTAL },
-            { text: '$23,000', style: TOTAL, formula: '=SUM(E2:E3)', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=SUM(E2:E3)', number_format: '$#,##0', cell_type: 'formula' },
           ],
         ],
         column_widths: [140, 170, 60, 70, 90],
@@ -434,12 +438,12 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
           // Subtotals
           [
             { text: 'Total Direct Costs (A+B+D+E+F+G)', style: TOTAL_L },
-            { text: '$169,375', style: TOTAL, formula: '=B2+B3+B6+B7+B8+B9', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=B2+B3+B6+B7+B8+B9', number_format: '$#,##0', cell_type: 'formula' },
             { text: '', style: TOTAL },
           ],
           [
             { text: 'Total Direct + Overhead (A+B+C+D+E+F+G)', style: TOTAL_L },
-            { text: '$231,644', style: TOTAL, formula: '=B11+B4', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: TOTAL, formula: '=B11+B4', number_format: '$#,##0', cell_type: 'formula' },
             { text: '', style: TOTAL },
           ],
           [
@@ -455,7 +459,7 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
           ],
           [
             { text: 'TOTAL ESTIMATED COST', style: GRAND_L },
-            { text: '$266,391', style: GRAND, formula: '=B12+B14', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: GRAND, formula: '=B12+B14', number_format: '$#,##0', cell_type: 'formula' },
             { text: '', style: GRAND },
           ],
           [
@@ -470,7 +474,7 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
           ],
           [
             { text: 'TOTAL PROPOSED PRICE', style: GRAND_L },
-            { text: '$285,038', style: GRAND, formula: '=B15+B17', number_format: '$#,##0', cell_type: 'formula' },
+            { text: '', style: GRAND, formula: '=B15+B17', number_format: '$#,##0', cell_type: 'formula' },
             { text: '', style: GRAND },
           ],
         ],
@@ -493,19 +497,19 @@ export const DOD_SBIR_PHASE1_COST: CanvasDocument = {
             'SBC Work %',
             pct('=(Summary!B2+Summary!B3)/(Summary!B2+Summary!B3+Summary!B8)', '85%'),
             { text: '≥ 67% (SBIR) / ≥ 40% (STTR)' },
-            { text: 'PASS', style: { bold: true } },
+            { text: '—' },
           ],
           [
             'PI Hours as % of Total',
             pct('=Labor!D2/Labor!D6', '36%'),
             { text: 'PI should be primary researcher' },
-            { text: 'CHECK' },
+            { text: '—' },
           ],
           [
             'Sub % of Total Cost',
             pct('=Summary!B8/Summary!B15', '9%'),
             { text: '< 33% (SBIR) / flexible (STTR)' },
-            { text: 'PASS', style: { bold: true } },
+            { text: '—' },
           ],
         ],
         column_widths: [160, 80, 200, 70],

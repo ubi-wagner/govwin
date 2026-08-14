@@ -232,8 +232,16 @@ export async function computeSubmissionReadiness(
     // separately below; header/footer + other softer codes stay out of the per-section pass.)
     const spec = s.artifactId ? specByArtifact.get(s.artifactId) : undefined;
     if (!spec) continue;
+    // The narrative body-font floor governs PROSE. A cost WORKBOOK (xlsx) or a webFORM is not
+    // narrative body text — federal cost tables + form fine-print are conventionally < the prose
+    // minimum yet legible, and the RFP's "text shall be ≥ N-pt" rule is a narrative/deck rule — so
+    // skip font_too_small for those artifact types (the page-count gate below already scopes itself
+    // the same way). The floor stays a HARD blocker on narrative + slide volumes, unchanged.
+    const atype = s.artifactId ? metaByArtifact.get(s.artifactId)?.artifactType : null;
+    const fontExempt = atype === 'cost' || atype === 'form';
     for (const v of validateCanvasAgainstSpec(doc, spec)) {
       if (v.code !== 'font_too_small' && v.code !== 'image_not_allowed') continue; // per-section only
+      if (v.code === 'font_too_small' && fontExempt) continue;
       formatViolations++;
       blockers.push({
         category: 'format_floor',

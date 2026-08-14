@@ -94,8 +94,9 @@ export function NewDocumentChooser({ tenantSlug }: { tenantSlug: string }) {
     }
   }, [tenantSlug, router, name]);
 
+  // The pristine starter stable lives in the owned template-card gallery now (Phase 5, template bridge);
+  // this chooser lists only the tenant's OWN saved templates (skeletons extracted from past proposals).
   const mine = useMemo(() => templates.filter((t) => t.isMine && !t.isSystem), [templates]);
-  const system = useMemo(() => templates.filter((t) => t.isSystem), [templates]);
   const filterFn = useCallback((t: TemplateRow) => {
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
@@ -103,7 +104,6 @@ export function NewDocumentChooser({ tenantSlug }: { tenantSlug: string }) {
       .join(' ').toLowerCase().includes(needle);
   }, [q]);
   const mineF = mine.filter(filterFn);
-  const systemF = system.filter(filterFn);
 
   return (
     <div className="max-w-5xl">
@@ -154,44 +154,50 @@ export function NewDocumentChooser({ tenantSlug }: { tenantSlug: string }) {
         </div>
       </section>
 
-      {/* ── Start from a template ───────────────────────────────── */}
+      {/* ── Browse the pristine template library (owned cards) ──── */}
+      <section className="mb-10">
+        <Link
+          href={`/portal/${tenantSlug}/templates`}
+          className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 hover:border-blue-300 hover:bg-blue-100 transition"
+        >
+          <div>
+            <div className="text-sm font-semibold text-blue-800">Browse the template library →</div>
+            <div className="text-xs text-blue-700/80 mt-0.5">
+              Pristine agency volumes, brochures, and capability decks — yours to reuse, with preview.
+            </div>
+          </div>
+          <span className="text-2xl text-blue-400">▦</span>
+        </Link>
+      </section>
+
+      {/* ── Start from one of your saved templates ──────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Start from a template</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Your saved templates</h2>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Filter templates…"
+            placeholder="Filter…"
             className="w-56 border border-gray-300 rounded px-2 py-1 text-xs"
           />
         </div>
 
         {loading && <p className="text-sm text-gray-400 py-6 text-center">Loading your templates…</p>}
 
-        {!loading && templates.length === 0 && (
+        {!loading && mine.length === 0 && (
           <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-            <p className="text-sm text-gray-500">No templates yet.</p>
+            <p className="text-sm text-gray-500">No saved templates yet.</p>
             <p className="text-xs text-gray-400 mt-1">
-              Save a volume as a template from a proposal, or start blank above.
+              Save a volume as a template from a proposal, start blank above, or browse the template library.
             </p>
           </div>
         )}
 
         {!loading && mineF.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your templates</h3>
-            <TemplateGrid rows={mineF} busy={busy} onUse={(id) => create({ templateId: id })} />
-          </div>
+          <TemplateGrid rows={mineF} busy={busy} onUse={(id) => create({ templateId: id })} />
         )}
 
-        {!loading && systemF.length > 0 && (
-          <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">System library</h3>
-            <TemplateGrid rows={systemF} busy={busy} onUse={(id) => create({ templateId: id })} />
-          </div>
-        )}
-
-        {!loading && templates.length > 0 && mineF.length === 0 && systemF.length === 0 && (
+        {!loading && mine.length > 0 && mineF.length === 0 && (
           <p className="text-sm text-gray-400 py-6 text-center">No templates match “{q}”.</p>
         )}
       </section>

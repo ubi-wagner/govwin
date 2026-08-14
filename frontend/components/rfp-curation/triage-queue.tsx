@@ -154,6 +154,30 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
 
   const uniqueStatuses = [...new Set(items.map((i) => i.status))].sort();
 
+  // Shared per-row actions — reused by the desktop table and the mobile card list.
+  // `big` gives ≥44px touch targets on the mobile cards.
+  const btnCls = (color: string, big: boolean) =>
+    `${big ? 'min-h-[44px] px-4 py-2 text-sm' : 'px-3 py-1 text-xs'} font-medium rounded disabled:opacity-50 ${color}`;
+  const rowActions = (item: (typeof filteredItems)[number], big = false) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {item.status === 'new' && (
+        <button onClick={() => handleClaim(item.solicitationId)} disabled={loading} className={btnCls('bg-blue-600 text-white hover:bg-blue-700', big)}>Claim</button>
+      )}
+      {item.status === 'claimed' && item.claimedBy === currentUserId && (
+        <>
+          <button onClick={() => handleRelease(item.solicitationId)} disabled={loading} className={btnCls('bg-purple-600 text-white hover:bg-purple-700', big)}>Release for AI</button>
+          <button onClick={() => handleDismiss(item.solicitationId)} disabled={loading} className={btnCls('bg-gray-300 text-gray-700 hover:bg-gray-400', big)}>Dismiss</button>
+        </>
+      )}
+      {['ai_analyzed', 'curation_in_progress', 'review_requested'].includes(item.status) && (
+        <button onClick={() => handleOpenWorkspace(item.solicitationId)} className={btnCls('bg-indigo-600 text-white hover:bg-indigo-700', big)}>Open</button>
+      )}
+      {isMasterAdmin && isStale(item) && (
+        <button onClick={(e) => { e.stopPropagation(); handleForceRelease(item.solicitationId); }} disabled={forceReleasing === item.solicitationId} className={btnCls('bg-red-600 text-white hover:bg-red-700', big)}>{forceReleasing === item.solicitationId ? '...' : 'Force Release'}</button>
+      )}
+    </div>
+  );
+
   return (
     <div>
       {error && (
@@ -184,7 +208,8 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
         </button>
       </div>
 
-      <div className="overflow-x-auto border rounded-lg">
+      {/* Desktop: full table */}
+      <div className="hidden md:block overflow-x-auto border rounded-lg">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
@@ -240,57 +265,37 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
                   {new Date(item.createdAt).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
-                    {item.status === 'new' && (
-                      <button
-                        onClick={() => handleClaim(item.solicitationId)}
-                        disabled={loading}
-                        className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Claim
-                      </button>
-                    )}
-                    {item.status === 'claimed' && item.claimedBy === currentUserId && (
-                      <>
-                        <button
-                          onClick={() => handleRelease(item.solicitationId)}
-                          disabled={loading}
-                          className="px-3 py-1 text-xs font-medium bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-                        >
-                          Release for AI
-                        </button>
-                        <button
-                          onClick={() => handleDismiss(item.solicitationId)}
-                          disabled={loading}
-                          className="px-3 py-1 text-xs font-medium bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
-                        >
-                          Dismiss
-                        </button>
-                      </>
-                    )}
-                    {['ai_analyzed', 'curation_in_progress', 'review_requested'].includes(item.status) && (
-                      <button
-                        onClick={() => handleOpenWorkspace(item.solicitationId)}
-                        className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                      >
-                        Open
-                      </button>
-                    )}
-                    {isMasterAdmin && isStale(item) && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleForceRelease(item.solicitationId); }}
-                        disabled={forceReleasing === item.solicitationId}
-                        className="px-3 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {forceReleasing === item.solicitationId ? '...' : 'Force Release'}
-                      </button>
-                    )}
-                  </div>
+                  {rowActions(item)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: each row as an actionable card — title + agency/source/status + the row's actions */}
+      <div className="md:hidden space-y-3">
+        {filteredItems.length === 0 && (
+          <p className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">No solicitations match this filter.</p>
+        )}
+        {filteredItems.map((item) => (
+          <div key={item.solicitationId} className="rounded-lg border border-gray-200 p-4">
+            <button onClick={() => handleOpenWorkspace(item.solicitationId)} className="block text-left font-semibold text-gray-900 leading-snug">
+              {item.title}
+            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={item.status} />
+              {isStale(item) && (
+                <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">stale</span>
+              )}
+            </div>
+            <dl className="mt-2 text-xs text-gray-500 space-y-0.5">
+              <div><span className="text-gray-400">Agency:</span> {item.agency ?? '—'}</div>
+              <div><span className="text-gray-400">Source:</span> {SOURCE_LABELS[item.source] ?? item.source} · {new Date(item.createdAt).toLocaleDateString()}</div>
+            </dl>
+            <div className="mt-3">{rowActions(item, true)}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

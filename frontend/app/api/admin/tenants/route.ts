@@ -17,6 +17,7 @@ import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { backfillTenantTemplates } from '@/lib/template-bridge';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
@@ -270,6 +271,12 @@ export async function POST(request: Request) {
     try { starterCopied = (await copyStarterSetToTenant(created.tenantId, { id: created.adminUserId })).added; }
     catch (e) { console.error('[admin/tenants/create] starter-set copy failed', e); }
 
+    // Template stable: copy every pristine master (100% copy-on-create) into the tenant's OWN shelf
+    // via the forward-only template bridge (mig 177). Skeleton-only, isolated per tenant — same
+    // copy-on-create pattern as the starter set. Idempotent, best-effort — creation never fails on it.
+    try { await backfillTenantTemplates(created.tenantId); }
+    catch (e) { console.error('[admin/tenants/create] template backfill failed', e); }
+
     // Fallback OFFER (P5.3): only when the eager copy landed nothing (copy failed or the catalog is
     // empty) do we drop the dismissible one-click "add the starter set" ToDo, so the tenant is never
     // left with an empty library. On the happy path the copy already seeded it, so no redundant ToDo.
@@ -296,7 +303,7 @@ export async function POST(request: Request) {
     // notice. Best-effort; the tempPassword also returns below as an admin-relay backstop.
     let emailSent = false;
     try {
-      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       if (created.isNewUser) {
         const c = applicationAcceptedEmail({ contactName: adminName ?? adminEmail, contactEmail: adminEmail, companyName: name, tempPassword: tempPw, tenantSlug: created.slug, loginUrl: `${base}/login` });
         const r = await sendEmail({ to: adminEmail, subject: c.subject, html: c.html });

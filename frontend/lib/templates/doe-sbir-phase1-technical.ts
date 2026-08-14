@@ -116,24 +116,24 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 1. Significance and Background (~3 pages) ──────────────
     node('s1-heading', {
-      type: 'heading', content: { level: 1, text: '1. Significance and Background of the Problem or Opportunity', numbering: '1' },
+      type: 'heading', content: { level: 1, text: 'Significance and Background of the Problem or Opportunity', numbering: '1' },
     }),
     node('s1-1-heading', {
-      type: 'heading', content: { level: 2, text: '1.1 The Problem and Its Significance to DOE', numbering: '1.1' },
+      type: 'heading', content: { level: 2, text: 'The Problem and Its Significance to DOE', numbering: '1.1' },
     }),
     node('s1-1-text', {
       type: 'text_block',
       content: { text: '[Open by naming the exact Subtopic {subtopic_number} and the specific need it calls out, then define the problem or opportunity your project addresses. Explain why it matters to the DOE mission — energy, science, environmental, or national-security impact — and quantify the significance (energy saved, cost reduced, capability enabled, emissions avoided). DOE weights significance heavily, so make the mission relevance unmistakable and tie every claim back to the Subtopic language. 2–3 paragraphs.]' },
     }),
     node('s1-2-heading', {
-      type: 'heading', content: { level: 2, text: '1.2 Background and State of the Art', numbering: '1.2' },
+      type: 'heading', content: { level: 2, text: 'Background and State of the Art', numbering: '1.2' },
     }),
     node('s1-2-text', {
       type: 'text_block',
       content: { text: '[Summarize the current state of the art and why existing approaches are inadequate for the DOE need. Cite the key technical literature, competing technologies, and any relevant DOE program or national-lab work. Establish the technical gap your innovation closes, and distinguish clearly between what is already known and the unknowns this project will resolve. 2–3 paragraphs.]' },
     }),
     node('s1-3-heading', {
-      type: 'heading', content: { level: 2, text: '1.3 The Proposed Innovation', numbering: '1.3' },
+      type: 'heading', content: { level: 2, text: 'The Proposed Innovation', numbering: '1.3' },
     }),
     node('s1-3-text', {
       type: 'text_block',
@@ -148,7 +148,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 2. Phase I Technical Objectives (~2 pages) ─────────────
     node('s2-heading', {
-      type: 'heading', content: { level: 1, text: '2. Phase I Technical Objectives', numbering: '2' },
+      type: 'heading', content: { level: 1, text: 'Phase I Technical Objectives', numbering: '2' },
     }),
     node('s2-text', {
       type: 'text_block',
@@ -167,7 +167,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 3. Phase I Work Plan (~5 pages) ────────────────────────
     node('s3-heading', {
-      type: 'heading', content: { level: 1, text: '3. Phase I Work Plan', numbering: '3' },
+      type: 'heading', content: { level: 1, text: 'Phase I Work Plan', numbering: '3' },
     }),
     node('s3-intro', {
       type: 'text_block',
@@ -190,7 +190,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       style: { space_before: 6, space_after: 6 },
     }),
     node('s3-deliverables-heading', {
-      type: 'heading', content: { level: 2, text: '3.1 Deliverables', numbering: '3.1' },
+      type: 'heading', content: { level: 2, text: 'Deliverables', numbering: '3.1' },
     }),
     node('s3-deliverables-text', {
       type: 'text_block',
@@ -200,7 +200,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 4. Performance Schedule (~1 page) ──────────────────────
     node('s4-heading', {
-      type: 'heading', content: { level: 1, text: '4. Performance Schedule', numbering: '4' },
+      type: 'heading', content: { level: 1, text: 'Performance Schedule', numbering: '4' },
     }),
     node('s4-text', {
       type: 'text_block',
@@ -233,7 +233,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 5. Related Research or R&D (~1 page) ───────────────────
     node('s5-heading', {
-      type: 'heading', content: { level: 1, text: '5. Related Research or R&D', numbering: '5' },
+      type: 'heading', content: { level: 1, text: 'Related Research or R&D', numbering: '5' },
     }),
     node('s5-text', {
       type: 'text_block',
@@ -242,17 +242,17 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 6. PI and Key Personnel Qualifications (~2 pages) ──────
     node('s6-heading', {
-      type: 'heading', content: { level: 1, text: '6. Principal Investigator and Key Personnel Qualifications', numbering: '6' },
+      type: 'heading', content: { level: 1, text: 'Principal Investigator and Key Personnel Qualifications', numbering: '6' },
     }),
     node('s6-1-heading', {
-      type: 'heading', content: { level: 2, text: '6.1 Principal Investigator', numbering: '6.1' },
+      type: 'heading', content: { level: 2, text: 'Principal Investigator', numbering: '6.1' },
     }),
     node('s6-1-text', {
       type: 'text_block',
       content: { text: '{pi_name}, [title], will serve as Principal Investigator at [{effort}% effort]. [Summarize the relevant degree, technical experience, publications/patents, and prior SBIR/STTR or DOE awards. For a DOE SBIR, the PI must have their primary employment with the small business at the time of award and throughout the project. 1–2 paragraphs.]' },
     }),
     node('s6-2-heading', {
-      type: 'heading', content: { level: 2, text: '6.2 Key Personnel, Consultants, and Subcontractors', numbering: '6.2' },
+      type: 'heading', content: { level: 2, text: 'Key Personnel, Consultants, and Subcontractors', numbering: '6.2' },
     }),
     node('s6-2-text', {
       type: 'text_block',
@@ -261,7 +261,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 7. Facilities and Equipment (~1 page) ──────────────────
     node('s7-heading', {
-      type: 'heading', content: { level: 1, text: '7. Facilities and Equipment', numbering: '7' },
+      type: 'heading', content: { level: 1, text: 'Facilities and Equipment', numbering: '7' },
     }),
     node('s7-text', {
       type: 'text_block',
@@ -270,10 +270,10 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
 
     // ─── 8. Commercialization and Impact (~2 pages) ─────────────
     node('s8-heading', {
-      type: 'heading', content: { level: 1, text: '8. Commercialization and Impact', numbering: '8' },
+      type: 'heading', content: { level: 1, text: 'Commercialization and Impact', numbering: '8' },
     }),
     node('s8-1-heading', {
-      type: 'heading', content: { level: 2, text: '8.1 Market Opportunity and Customers', numbering: '8.1' },
+      type: 'heading', content: { level: 2, text: 'Market Opportunity and Customers', numbering: '8.1' },
     }),
     node('s8-1-text', {
       type: 'text_block',
@@ -285,7 +285,7 @@ export const DOE_SBIR_PHASE1_TECHNICAL: CanvasDocument = {
       style: { space_before: 6, space_after: 6 },
     }),
     node('s8-2-heading', {
-      type: 'heading', content: { level: 2, text: '8.2 Path to Market and Economic/Energy Impact', numbering: '8.2' },
+      type: 'heading', content: { level: 2, text: 'Path to Market and Economic/Energy Impact', numbering: '8.2' },
     }),
     node('s8-2-text', {
       type: 'text_block',

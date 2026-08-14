@@ -48,9 +48,9 @@ the proof drive asserts all three live:
 2. **RLS** — `atom_embeddings` is `FORCE ROW LEVEL SECURITY` with the same null-safe `tenant_isolation`
    policy as mig 136. As the `NOBYPASSRLS` app role (`govtech_app`, the prod cutover role): no tenant
    context → **0 rows**; a tenant context → **only** that tenant's rows; and a **raw ANN with no app-layer
-   `WHERE`** still returns only in-tenant neighbors. (Today the app connects as the `govtech` superuser,
-   which bypasses RLS, so isolation rests on the app-layer `WHERE` below — single-layer, exactly as the
-   RLS-cutover doc describes; RLS is the armed second layer.)
+   `WHERE`** still returns only in-tenant neighbors. (In production the app connects as the
+   `NOBYPASSRLS govtech_app` role, so RLS is the enforced second layer under the app-layer `WHERE` below —
+   two-layer, exactly as the RLS-cutover doc describes.)
 3. **App layer** — the `selectForSection` query filters `a.tenant_id` **and** joins `atom_embeddings` on
    `ae.tenant_id = a.tenant_id AND ae.model = <active>`. Triple-scoped: `WHERE` + `JOIN` + RLS.
 

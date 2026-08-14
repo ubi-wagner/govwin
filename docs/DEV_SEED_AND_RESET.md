@@ -11,7 +11,7 @@ logins verified via the app's `bcryptjs.compare`.
 > (`064 = republish_launch_baseline`). A clean re-migrate currently holds **54 `content_pages`**
 > (14 active pages, 9 resources, 4 guides, 3 blog posts, 1 team member) + **130 `cms_content`** rows.
 >
-> **`govtech_cms`** (the FastAPI CMS/CRM DB) is **NOT the public site** — it's the parked
+> **`cms-postgres`** (formerly `govtech_cms`; the **`rfp-crm`** service's own DB) is **NOT the public site** — it's the parked
 > post-alpha CRM, out of the alpha path. So "kill all but the public-facing pages" means: keep
 > `content_pages`/`cms_content` in `govtech_intel`, kill the business/transactional rows around them.
 > There are **two ways** to do that — pick by whether you've made runtime `/admin/site` edits that

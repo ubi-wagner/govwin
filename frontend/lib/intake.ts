@@ -86,15 +86,36 @@ export async function stageIntake(input: IntakeInput, actorId: string | null): P
       return { opportunityId: opp.id, solicitationId: csol.id };
     });
 
-    // Head-of-river event so the intake queue / triage picks it up (finder namespace).
+    // Head-of-river events (finder namespace, platform-scope). Two consumers, best-effort:
+    //   opportunity.staged     — the intake-queue UI picks up the new row.
+    //   opportunities.detected — wakes OnOpportunitiesDetected: opportunity_scout AI prioritization
+    //     of the triage backlog + the rfp_admin "new to triage" email + a triage ToDo. One new triage
+    //     row = one detection (bounded; the processor dedups by trigger_event_id). This is the single
+    //     live producer for that chain — both the admin intake form and the scout releaseAsNew path
+    //     funnel through stageIntake, so both now announce themselves.
     try {
       const { emitEventSingle } = await import('@/lib/events');
+      const actor = { type: (actorId ? 'user' : 'system') as 'user' | 'system', id: actorId ?? 'scout' };
       await emitEventSingle({
         namespace: 'finder',
         type: 'opportunity.staged',
-        actor: { type: actorId ? 'user' : 'system', id: actorId ?? 'scout' },
+        actor,
         tenantId: null,
         payload: { correlationId: randomUUID(), opportunityId: result.opportunityId, solicitationId: result.solicitationId, foundBy },
+      });
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'opportunities.detected',
+        actor,
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          source: 'intake:' + foundBy,
+          newSolicitations: 1,
+          newTopics: 0,
+          sampleTitles: [title],
+          runId: result.solicitationId,
+        },
       });
     } catch {
       // best-effort

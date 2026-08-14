@@ -36,7 +36,7 @@ export default function IntakeForm() {
 
   return (
     <div className="border border-gray-200 rounded-xl p-5 bg-white space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label className="block text-xs text-gray-500 mb-1">Title *</label><input className={input} value={f.title} onChange={set('title')} /></div>
         <div><label className="block text-xs text-gray-500 mb-1">Agency *</label><input className={input} value={f.agency} onChange={set('agency')} /></div>
         <div><label className="block text-xs text-gray-500 mb-1">Office</label><input className={input} value={f.office} onChange={set('office')} /></div>
@@ -58,7 +58,7 @@ export default function IntakeForm() {
       <div><label className="block text-xs text-gray-500 mb-1">RFP Expert Notes</label><textarea rows={2} className={input} value={f.expertNotes} onChange={set('expertNotes')} placeholder="Internal expert notes carried on the opportunity card" /></div>
       <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={f.docsDownloadable} onChange={set('docsDownloadable')} /> Docs were downloadable</label>
       <div className="flex items-center gap-3">
-        <button disabled={busy || !f.title.trim() || !f.agency.trim()} onClick={submit} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-2 disabled:opacity-50">{busy ? 'Staging…' : 'Stage into review queue'}</button>
+        <button disabled={busy || !f.title.trim() || !f.agency.trim()} onClick={submit} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-2 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">{busy ? 'Staging…' : 'Stage into review queue'}</button>
         {result && 'solicitationId' in result && <span className="text-sm text-green-700">Staged ✓ <a className="text-blue-600 hover:underline" href="/admin/rfp-curation">Curate it →</a></span>}
         {result && 'error' in result && <span className="text-sm text-red-600">{result.error}</span>}
       </div>

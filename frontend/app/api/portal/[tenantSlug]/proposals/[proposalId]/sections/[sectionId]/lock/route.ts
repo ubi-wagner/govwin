@@ -76,7 +76,8 @@ async function guard(ctx: RouteContext): Promise<Resolved | NextResponse> {
   // This guard reads forced tables (resolveUserAccess + the proposal_sections/proposals fetch
   // below) in its OWN frame, so it must self-enter the tenant context here (same-frame forward
   // flow) — the caller's enterTenant runs only AFTER guard() returns and would not cover these.
-  // Mirrors verifyProposalAccess. Harmless pre-flip (owner bypasses RLS). (docs/RLS_CUTOVER.md)
+  // Mirrors verifyProposalAccess. Required under live RLS (govtech_app) so these forced-table
+  // reads are tenant-scoped. (docs/RLS_CUTOVER.md)
   enterTenant(tenantId);
 
   const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);

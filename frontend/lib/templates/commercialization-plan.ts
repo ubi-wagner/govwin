@@ -80,7 +80,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 1. Market Need & Size ──────────────────────────────────
     node('s1-h', {
       type: 'heading',
-      content: { level: 1, text: '1. Market Need & Size', numbering: '1' },
+      content: { level: 1, text: 'Market Need & Size', numbering: '1' },
     }),
     node('s1-p1', {
       type: 'text_block',
@@ -122,7 +122,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 2. Customer & Value Proposition ────────────────────────
     node('s2-h', {
       type: 'heading',
-      content: { level: 1, text: '2. Customer & Value Proposition', numbering: '2' },
+      content: { level: 1, text: 'Customer & Value Proposition', numbering: '2' },
     }),
     node('s2-p1', {
       type: 'text_block',
@@ -146,7 +146,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 3. Competition & IP Position ───────────────────────────
     node('s3-h', {
       type: 'heading',
-      content: { level: 1, text: '3. Competition & IP Position', numbering: '3' },
+      content: { level: 1, text: 'Competition & IP Position', numbering: '3' },
     }),
     node('s3-p1', {
       type: 'text_block',
@@ -179,7 +179,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 4. Go-to-Market & Business Model ───────────────────────
     node('s4-h', {
       type: 'heading',
-      content: { level: 1, text: '4. Go-to-Market & Business Model', numbering: '4' },
+      content: { level: 1, text: 'Go-to-Market & Business Model', numbering: '4' },
     }),
     node('s4-p1', {
       type: 'text_block',
@@ -204,7 +204,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 5. Milestones, Funding & Financials ────────────────────
     node('s5-h', {
       type: 'heading',
-      content: { level: 1, text: '5. Milestones, Funding & Financials', numbering: '5' },
+      content: { level: 1, text: 'Milestones, Funding & Financials', numbering: '5' },
     }),
     node('s5-p1', {
       type: 'text_block',
@@ -261,7 +261,7 @@ export const COMMERCIALIZATION_PLAN: CanvasDocument = {
     // ─── 6. Team & Advisors ─────────────────────────────────────
     node('s6-h', {
       type: 'heading',
-      content: { level: 1, text: '6. Team & Advisors', numbering: '6' },
+      content: { level: 1, text: 'Team & Advisors', numbering: '6' },
     }),
     node('s6-p1', {
       type: 'text_block',

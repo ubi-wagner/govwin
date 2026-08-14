@@ -108,7 +108,7 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
               <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} />
               Include closed opportunities
             </label>
-            <button disabled={busy || !name.trim()} onClick={create} className="w-full text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:opacity-50">Create</button>
+            <button disabled={busy || !name.trim()} onClick={create} className="w-full text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">Create</button>
           </div>
         )}
         <div className="space-y-2">

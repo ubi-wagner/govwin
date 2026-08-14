@@ -17,6 +17,7 @@ import { exportToDocx } from '@/lib/export/docx-exporter';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { validateStandaloneCanvas, type CanvasDocument } from '@/lib/types/canvas-document';
+import { atomizeDocumentOnExport } from '@/lib/documents/atomize-on-export';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; documentId: string }>;
@@ -120,6 +121,13 @@ export async function POST(request: Request, ctx: RouteContext) {
         payload: { documentId, format, title, compliant: violations.length === 0, complianceViolations: violations.map((v) => v.code) },
       });
     } catch (e) { console.error('[portal/documents/export] event emit failed (non-fatal):', e); }
+
+    // Atomize-on-download (template bridge Phase 2): the FIRST export of a standalone document decomposes
+    // its filled canvas into the tenant library so the content becomes reusable — "on download is a good
+    // trigger, just like the proposal artifacts". Once-only (CAS on atomized_at, mig 178); best-effort —
+    // a failure never blocks the download.
+    try { await atomizeDocumentOnExport(tenantId, documentId, doc, { id: su.id, email: su.email }); }
+    catch (e) { console.error('[portal/documents/export] atomize-on-download failed (non-fatal):', e); }
 
     const contentTypes: Record<string, string> = {
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

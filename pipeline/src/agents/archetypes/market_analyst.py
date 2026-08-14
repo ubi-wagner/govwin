@@ -13,10 +13,12 @@ ROLE:       At a draft/gate, injects fresh SOTA + market context that library at
 SCOPE:      TENANT (tenant-bound; tenant_user authority). Tool schemas expose NO
             tenant_id; the tenant comes from the trusted task context.
 
-GREENFIELDED (Proposal Draft Manager cohort, P1) onto the current spine, DORMANT: registered in the
-fabric and its AI_INVOKE action (tool.market.analyze_sota) is mapped, but NO firing hook is wired yet
-(no gate step) — it is woken later (P3/P4) as an advisory web-search step at a V-gate. handles_event
-returns False. Inert until wired.
+WIRED (OVERLAY-2): registered in the fabric, its AI_INVOKE action (tool.market.analyze_sota) is
+mapped, and it is the AdvisoryOverlay's `pre_augment` step — fired when Mode C's
+request_advisory_overlay elevates the adversarial gate. request_advisory_overlay now threads a
+market-relevant `section_id` into the overlay payload, so get_section_context anchors on a real
+section (Commercialization / Related-Work / Market) instead of erroring. handles_event returns
+False by design (it runs as a declarative AI_INVOKE step, not via event dispatch).
 
 SAFETY (mirrors research_scout, per docs/AGENT_WORKFORCE.md):
     • INJECTION-FENCED: every web search result is wrapped in the untrusted-content

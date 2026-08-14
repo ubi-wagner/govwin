@@ -7,10 +7,12 @@
  * (Playwright running templates) and real page numbers.
  *
  * Chromium is loaded via a DYNAMIC import so it is never pulled into the Next.js
- * bundle — only when a PDF is actually generated (the offline deliverable
- * generator, or a Node-runtime worker). Requires Chromium on the host
- * (PLAYWRIGHT_BROWSERS_PATH). This is an infra dependency, documented alongside
- * the pipeline worker — the native docx/pptx/xlsx exporters have no such need.
+ * bundle — only when a PDF is actually generated. `playwright`/`playwright-core`
+ * are `serverExternalPackages` (traced into the standalone output); the browser
+ * itself is a SYSTEM Chromium (prod Docker: `apk add chromium`, pointed at via
+ * `PLAYWRIGHT_CHROMIUM_EXECUTABLE`; sandbox: `PLAYWRIGHT_BROWSERS_PATH`). Launched
+ * with `--no-sandbox` (containers run as a non-root user). The native
+ * docx/pptx/xlsx exporters have no such dependency.
  */
 import { renderCanvasToHtml } from './canvas-html';
 import { inlineImageDataUris } from './image-raster';
@@ -44,11 +46,15 @@ function runningHtml(spec: RunningSpec, vars: Record<string, string>, isFooter: 
  * explicit override, else auto-detect a `chromium-*` under PLAYWRIGHT_BROWSERS_PATH.
  */
 async function resolveExecutable(): Promise<string | undefined> {
-  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE) return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+  const { existsSync } = await import('fs');
+  // 1) explicit override — prod Docker sets this to the apk-installed chromium.
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+  if (explicit && existsSync(explicit)) return explicit;
+  // 2) a Playwright-managed download under PLAYWRIGHT_BROWSERS_PATH (sandbox).
   const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
   if (root) {
     try {
-      const { readdirSync, existsSync } = await import('fs');
+      const { readdirSync } = await import('fs');
       for (const d of readdirSync(root)) {
         if (d.startsWith('chromium-') && !d.includes('headless_shell')) {
           const p = `${root}/${d}/chrome-linux/chrome`;
@@ -56,9 +62,15 @@ async function resolveExecutable(): Promise<string | undefined> {
         }
       }
     } catch {
-      /* fall through to Playwright's default */
+      /* fall through */
     }
   }
+  // 3) a system Chromium (alpine `apk add chromium`, debian, etc.) — robust to
+  //    the exact package path so a mis-set env var can't break PDF export.
+  for (const p of ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/lib/chromium/chromium']) {
+    if (existsSync(p)) return p;
+  }
+  // 4) let Playwright use its own default (a dev machine with a full install).
   return undefined;
 }
 
@@ -68,7 +80,10 @@ export async function exportToPdf(doc: CanvasDocument, variables: Record<string,
   const html = renderCanvasToHtml(await inlineImageDataUris(doc), variables);
   const { chromium } = await import('playwright');
   const executablePath = await resolveExecutable();
-  const browser = await chromium.launch(executablePath ? { executablePath } : {});
+  const browser = await chromium.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    ...(executablePath ? { executablePath } : {}),
+  });
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle' });

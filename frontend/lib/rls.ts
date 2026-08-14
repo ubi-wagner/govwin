@@ -9,9 +9,10 @@ import { sql } from '@/lib/db';
  * bridge consumer calls it per TARGET tenant as it fans a card out (so even the
  * cross-tenant fan-out writes pass the per-tenant policy, tenant by tenant).
  *
- * Enforcement is live once the app connects as the non-owner `govtech_app` role;
- * under the current owner/superuser connection the GUC is still set (harmless) and
- * the SQL tenant predicates remain the belt — so this is safe to adopt now.
+ * Enforcement is live: the app connects as the non-owner `govtech_app` (NOBYPASSRLS)
+ * role, so this GUC scopes RLS per transaction. The SQL tenant predicates remain the
+ * belt (defense-in-depth). Where a connection falls back to the owner (e.g. local dev),
+ * the GUC is harmless and the predicates still isolate.
  */
 export async function withTenant<T>(tenantId: string, fn: (tx: any) => Promise<T>): Promise<T> {
   return sql.begin(async (tx: any) => {

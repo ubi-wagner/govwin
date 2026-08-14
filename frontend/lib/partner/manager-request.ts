@@ -73,7 +73,7 @@ export async function createManagerRequest(opts: {
   // Nudge the company admin by email too (not just the in-app ToDo). Best-effort.
   if (admin?.email) {
     try {
-      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       const reviewUrl = `${base}/api/enter?slug=${encodeURIComponent(t.slug)}&next=${encodeURIComponent(`/portal/${t.slug}/team`)}`;
       const content = managerRequestEmail({ adminName: admin.name, companyName: t.name, partnerOrg, reviewUrl });
       await sendEmail({ to: admin.email, subject: content.subject, html: content.html });

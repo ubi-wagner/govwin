@@ -14,6 +14,9 @@ export interface TenantRollup {
   pins: number;
   proposals: number;
   portals: number;
+  /** Open ToDos inside the company (the "notify up" signal for the console) — the tenant-role bucket
+   *  tasks a descended manager (tenant_admin) would see + complete. Drives the console attention badge. */
+  openTodos: number;
   adminPocName: string | null;
   adminPocEmail: string | null;
 }
@@ -29,6 +32,13 @@ export async function tenantRollupStats(tenantIds: string[]): Promise<Map<string
       (SELECT count(*)::int FROM proposals p
          WHERE p.tenant_id = t.id AND p.archived_at IS NULL) AS proposals,
       (SELECT count(*)::int FROM proposal_portals pp WHERE pp.tenant_id = t.id) AS portals,
+      -- Open ToDos the descended manager (tenant_admin) would see: this tenant's tenant-role bucket
+      -- tasks that are still open. Mirrors listOpenTasksForActor's tenant branch (hierarchical roles),
+      -- so the console count matches what surfaces once they descend. Admin-bucket tasks are excluded
+      -- (not the manager's concern).
+      (SELECT count(*)::int FROM tasks tk
+         WHERE tk.tenant_id = t.id AND tk.status IN ('open', 'in_progress')
+           AND tk.assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user')) AS "openTodos",
       poc.name  AS "adminPocName",
       poc.email AS "adminPocEmail"
     FROM tenants t

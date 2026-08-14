@@ -17,6 +17,7 @@ Legend for "have it?": ✅ you already have · ⚙️ auto-injected by Railway �
 | `AUTH_SECRET` (a.k.a. `NEXTAUTH_SECRET`) | frontend | signs session JWTs — `openssl rand -base64 32` | 🔲 confirm set in prod |
 | `API_KEY_ENCRYPTION_SECRET` | frontend **+** pipeline (SAME value) | AES-256 encrypts API keys stored in the DB (frontend encrypts, pipeline decrypts) — `openssl rand -base64 32` | 🔲 confirm identical on both |
 | `ANTHROPIC_API_KEY` | frontend, pipeline, **CMS** | all AI: drafting, shredding, compliance/color-team review, opportunity analysis, CMS content | ✅ in Railway — 🔲 confirm on **all three** services (or load via admin Sources UI — the encrypted DB copy takes priority) |
+| `ANTHROPIC_BASE_URL` | frontend, pipeline, CMS | `[opt]` Anthropic API base-URL override (default `api.anthropic.com`); points at a gateway or the sandbox emulator (`:8787`) | — leave unset in prod |
 | `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` · `AWS_DEFAULT_REGION` · `AWS_ENDPOINT_URL` · **`AWS_S3_BUCKET`** (the name Railway's bucket service injects; code also accepts legacy `AWS_S3_BUCKET_NAME`) | frontend, pipeline | Cloudflare R2 object store — uploads, exports, atomize, all files | ⚙️ auto-injected when the R2 bucket service is **linked** to frontend + pipeline (reading only the legacy name was the recurring "`AWS_S3_BUCKET_NAME is required`" prod error — now fixed) |
 | `AUTH_URL` / `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` | frontend | auth redirects + public app URL — set to the real Railway domain | 🔲 |
 | `PORTAL_BASE_URL` | pipeline | the base URL baked into nudge/notification links | 🔲 |
@@ -82,7 +83,7 @@ two-voice sender model. It needs **one credential** to switch on.
 
 | Var | Purpose |
 |-----|---------|
-| `CMS_DATABASE_URL` | the CMS's own Postgres (`govtech_cms`) |
+| `CMS_DATABASE_URL` | the `rfp-crm` service's own Postgres (`cms-postgres`) |
 | `SHARED_DATABASE_URL` | the shared `system_events` bridge back to the main DB |
 | `CMS_API_KEY` | service-to-service auth (frontend → CMS) |
 | `CMS_JWT_SECRET`, `CMS_AUTH_MODE`, `CMS_BASIC_USER`, `CMS_BASIC_PASS` | CMS admin auth |
@@ -103,7 +104,7 @@ complements OCR (default on **when `ANTHROPIC_API_KEY` is present**; picks `VISI
 `claude-sonnet-4-20250514`) · `IPINFO_TOKEN` (geo
 enrichment) · `SOFFICE_PATH` / `SOFFICE_TIMEOUT` (LibreOffice doc conversion) · `LOG_LEVEL` ·
 `HEALTH_PORT` · `EVENT_POLL_INTERVAL` / `GENERATION_POLL_INTERVAL` · `USE_STUB_DATA` (dev only) ·
-`RAILWAY_*` (auto-injected) · `AGENT_DATABASE_URL` (the NOBYPASSRLS `govtech_app` role — for the
+`RAILWAY_*` (auto-injected) · `AGENT_DATABASE_URL` (the NOBYPASSRLS `rfp_agent` agent role — for the
 post-launch RLS cutover).
 
 ## F. Descoped — do NOT need for launch

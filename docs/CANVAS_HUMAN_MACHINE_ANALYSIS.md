@@ -1,5 +1,7 @@
 # Canvas Capability Analysis — Human × Machine (2026-08, re-run)
 
+> **Historical analysis (2026-08 snapshot).** Canonical canvas architecture: `docs/CANVAS_ARCHITECTURE.md`.
+
 A fresh, evidence-grounded re-run of the four-phase canvas analysis, this time along the
 two axes that matter for the ask: **how easily can a HUMAN, and how well can the MACHINE,
 _add · modify · refine · regenerate_ every common content type — with styling and

@@ -184,7 +184,7 @@ export async function POST(request: Request) {
       contactName: input.contactName,
       contactEmail: input.contactEmail,
       techSummary: input.techSummary.slice(0, 300),
-      adminDashboardUrl: `${process.env.NEXTAUTH_URL || ''}/admin/applications`,
+      adminDashboardUrl: `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || ''}/admin/applications`,
     });
     await sendEmail({
       to: adminEmail,

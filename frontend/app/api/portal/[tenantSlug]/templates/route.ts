@@ -72,11 +72,16 @@ export async function GET(request: Request, ctx: RouteContext) {
                CASE WHEN jsonb_typeof(metadata->'sections') = 'array'
                     THEN metadata->'sections' ELSE '[]'::jsonb END AS sections
         FROM document_templates
-        WHERE (tenant_id = ${tenantId}::uuid OR is_system = true)
+        -- Phase 5 (template bridge, docs/TEMPLATE_BRIDGE_DESIGN.md §6): the shared is_system reads are
+        -- RETIRED here. The pristine starter stable is now the tenant-OWNED template-card gallery
+        -- (/portal/[t]/templates page → tenant_template_cards, mig 177), so a customer never depends on a
+        -- live shared object. This chooser now returns ONLY the tenant's own SAVED templates (skeletons
+        -- extracted from their past proposals) — never another tenant's, never the shared system rows.
+        WHERE tenant_id = ${tenantId}::uuid AND is_system = false
           AND (${templateType}::text IS NULL OR template_type = ${templateType})
           AND (${programType}::text IS NULL OR program_type = ${programType})
           AND (${agency}::text IS NULL OR agency = ${agency})
-        ORDER BY is_mine DESC, is_system DESC, name ASC
+        ORDER BY name ASC
       `;
     } catch (e) {
       console.error('[portal/templates] list query failed:', e);

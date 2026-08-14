@@ -122,17 +122,6 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-image', {
-      type: 'image',
-      content: {
-        storage_key: '',
-        alt_text: 'Solution overview',
-        width: 640,
-        height: 280,
-        caption: '[Solution overview graphic — the "before → after" your product creates]',
-      },
-      style: { alignment: 'center', space_before: 16 },
-    }),
     node('s3-break', { type: 'page_break', content: null }),
 
     // ─── Slide 4: Product ───────────────────────────────────────
@@ -369,7 +358,7 @@ export const INVESTMENT_PITCH_DECK: CanvasDocument = {
     }),
     node('s11-contact', {
       type: 'text_block',
-      content: { text: '{company_name}\n{contact_email}\n[yourdomain.com]' },
+      content: { text: '{company_name}\n{contact_email}\n{website}' },
       style: { alignment: 'center', size: 18, weight: 'bold', space_before: 40 },
     }),
   ],

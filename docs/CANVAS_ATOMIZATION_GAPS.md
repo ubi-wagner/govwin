@@ -1,5 +1,7 @@
 # Gaps: canvas build-up vs. atomization (ingest → deconstruct)
 
+> **Historical analysis (dated snapshot).** Canonical canvas architecture: `docs/CANVAS_ARCHITECTURE.md`.
+
 Two opposite motions share the canvas model:
 
 - **Build-up** — blank canvas → typed blocks → styled document → export. *Hardened this

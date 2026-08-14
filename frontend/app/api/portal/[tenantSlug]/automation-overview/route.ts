@@ -4,8 +4,8 @@
  * At-a-glance monitoring for the tenant admin (UI-gaps T2/T4/T5): policy coverage by scope, the
  * team-wide open ToDo / nudge / escalation board, and a per-portal automation-config summary read
  * back from guardrail_config. tenant_admin+ with tenant access; reads run through withTenant() so
- * they stay correct under the NOBYPASSRLS cutover, with the explicit WHERE tenant_id as today's
- * load-bearing belt (RLS is inert under the bypass role).
+ * RLS scopes them under the `NOBYPASSRLS govtech_app` role, with the explicit WHERE tenant_id
+ * as the app-layer belt (defense-in-depth).
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';

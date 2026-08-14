@@ -1,6 +1,6 @@
 # START_END_FRAMEWORK.md — the embedded start→end spine (bridge · engine · agent-automation)
 
-**Status:** as-built, proven against the live tree at migration **129** (every `file:line` below was
+**Status:** as-built, proven against the live tree at migration **129** (current head **178**; every `file:line` below was
 read, not remembered). This is the canonical map of *how work starts and ends at three nested depths*,
 *every message that crosses the bridge in both directions*, and *every trigger→step→trigger chain* the
 declarative engine runs — written so a **compliance domain** can be layered on without re-deriving any of it.
@@ -258,13 +258,14 @@ POSTs `/api/admin/shadow-transition {direction:'down', tenantId}` → emits `ide
 (audit-only; it does **not** itself grant access). `app.tenant_id` is set by `withTenant(tenantId, fn)`
 (`frontend/lib/rls.ts:16-21` — `SELECT set_config('app.tenant_id', …, true)`, **SET LOCAL**, tx-scoped).
 
-**RLS is authored but INERT today (single-layer).** mig 094 ENABLE+FORCEs RLS with a
-`tenant_id = current_setting('app.tenant_id')` policy (`094:70-76`), but the app connects as the **owner role**
-and `govtech_app` is `NOLOGIN` (`094:22-28`) — an owner connection **bypasses FORCE**. So tenant isolation
-today rests on the **SQL `WHERE tenant_id` predicates + the `verifyTenantAccess` admin god-view** (returns
-`true` for any `master_admin`/`rfp_admin`, `frontend/lib/db.ts:57`). `shadow_admin_grants` (mig 097:44-59) is
-auditable, revocable **metadata — not the enforced gate**. The `NOBYPASSRLS govtech_app` cutover is the pending
-backstop (§8: compliance data will need it real).
+**RLS is authored and LIVE app-side (two-layer).** mig 094 ENABLE+FORCEs RLS with a
+`tenant_id = current_setting('app.tenant_id')` policy (`094:70-76`); **mig 136_rls_cutover** makes
+`govtech_app` LOGIN-capable (`NOBYPASSRLS`) and the app connects as it, so `withTenant`'s `SET app.tenant_id`
+(`frontend/lib/rls.ts:16-21`) makes the FORCEd policy **enforce** underneath the SQL `WHERE tenant_id`
+predicates + the `verifyTenantAccess` admin god-view (returns `true` for any `master_admin`/`rfp_admin`,
+`frontend/lib/db.ts:57`). `shadow_admin_grants` (mig 097:44-59) is auditable, revocable **metadata**
+alongside the enforced RLS gate. (The pipeline `rfp_agent` agent path is built but deploy-gated via
+`AGENT_DATABASE_URL` — see docs/AGENT_WORKFORCE.md §7.)
 
 ### 3e. Bridge invariants
 Forward-only (`094:45`) · no content backflow (up-signal is a notification only, `opportunity-bridge.ts:217-223`)
@@ -580,7 +581,7 @@ unimplemented (`rescore.py:189-190`); cron-digest *delivery* (decision ⑥) is d
   scoring is tenant-side/event-driven (§4a) and `autoScoreCard` is dead (F-A).
 - **D-Agent-1..5:** `AGENT_WORKFORCE.md`/`AGENT_FABRIC_DESIGN.md` call 15 archetypes “dormant” (all 27 have
   invocation sites), omit the `research_scout` producer, and overstate the injection-fence/test coverage (F-C).
-- **CLAUDE.md** and the migration tree are now in sync at migration **137** (the earlier 125-vs-129 drift is resolved).
+- **CLAUDE.md** and the migration tree are now in sync at migration **178**.
 
 ---
 

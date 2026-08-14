@@ -1,6 +1,6 @@
 # Multi-membership identity — design
 
-**Status:** proposed (design-first; implement in phases).
+**Status:** as-built (implemented + reconciled to the live identity model; see docs/IDENTITY_AUTHZ_MODEL.md).
 **Problem it solves:** a person is **email + company + role**, but one email can hold
 **many** of those at once. A consultant is a scoped collaborator at Acme *and* at
 Beacon; one of our employees is an RFP admin on the platform *and* a tenant_admin

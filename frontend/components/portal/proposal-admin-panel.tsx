@@ -525,21 +525,26 @@ export function ProposalAdminPanel({
 
   return (
     <div>
-      {/* Tab bar */}
-      <div className="flex gap-0 border-b border-gray-200 mb-5">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.key
-                ? 'text-blue-600 border-blue-600'
-                : 'text-gray-500 border-transparent hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Management toolset — a labeled SEGMENTED control, visually subordinate to the primary
+          section-view tabs above (which use underline styling). Two distinct navigation levels,
+          not two competing peer tab bars. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Manage</span>
+        <div className="inline-flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ─── Artifacts Tab ────────────────────────────────────────── */}
@@ -859,7 +864,7 @@ export function ProposalAdminPanel({
           {collaborators.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl p-5 mt-2">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Team Dropboxes</h3>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {collaborators.map((collab, idx) => (
                   <div key={collab.id} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">

@@ -1,5 +1,7 @@
 # Canvas — Adversarial Critique (Phase 3)
 
+> **Historical analysis (Phase 3 snapshot).** Canonical canvas architecture: `docs/CANVAS_ARCHITECTURE.md`.
+
 > **What this is.** Phase 1 (`docs/CANVAS_ARCHITECTURE.md`) mapped the canvas as-built and named 17 gaps
 > (G1–G17). Phase 2 (`docs/CANVAS_CAPABILITY_ANALYSIS.md`) scored it against the four human jobs and drew
 > up 8 table-stakes. This phase turns six adversarial actor-agents loose on *that analysis* — not to

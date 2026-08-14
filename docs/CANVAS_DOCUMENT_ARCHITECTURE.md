@@ -1,5 +1,7 @@
 # Canvas Document Architecture — RFP Pipeline
 
+> **Current reference for the node/data model** (cited by `lib/types/canvas-document.ts`). The canvas UI architecture single source is `docs/CANVAS_ARCHITECTURE.md`.
+
 **Status:** Design document. Pre-implementation.
 **Last updated:** 2026-04-25.
 

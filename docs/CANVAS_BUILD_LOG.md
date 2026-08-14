@@ -1,5 +1,7 @@
 # Canvas Redesign — Build Log (Phase 5 execution)
 
+> **Execution log of shipped canvas work.** The canvas architecture single source is `docs/CANVAS_ARCHITECTURE.md`.
+
 > **What this is.** The as-built record of the Common-Canvas redesign execution, after the four analysis
 > phases (`CANVAS_ARCHITECTURE.md` → `CANVAS_CAPABILITY_ANALYSIS.md` → `CANVAS_ADVERSARIAL.md` →
 > `CANVAS_REDESIGN_PLAN.md`) and the user's sign-off. **Signed-off scope:** the **MVP cut** (Wave 0 + the
@@ -9,6 +11,32 @@
 >
 > **Cadence.** Every wave kept the green backbone (`tsc` 0 · `vitest` 907, up from 905 — +2 new tests) and
 > was committed + pushed before the next. Live multi-actor UI evidence is the closing verification section.
+
+---
+
+## 2026-08-13 — Unified-canvas: Step 0 (flat nav) + the OverlayLayer (F3) across all four surfaces
+
+The first build of the unified-canvas direction (`CANVAS_ARCHITECTURE.md` §3/§7). **Design → build → review →
+test → document → fix**, green throughout (`tsc` 0 · `vitest` 1085/1085 · live-driven per surface, zero
+console/page errors).
+
+- **Step 0** — reverted the portal nav-sectioning back to a flat/slim rail (de-compartmentalized; the cockpit
+  is the visual home). `app/portal/[tenantSlug]/layout.tsx`.
+- **OverlayLayer (F3)** — the togglable "structure-as-overlay" made real, off by default:
+  - `components/canvas/canvas-overlays.tsx` — one reusable `CanvasOverlayBar` + `useOverlays` + `overlayClass`.
+  - `app/globals.css` — the `.cv-ov` layer block, painted off the `data-node-id`/`data-node-source` the node
+    wrapper already carries (additive attr in `canvas-renderer.tsx`).
+  - **Surfaces:** fluid document (Sections+Atoms+Provenance) · per-section editor + slides (Atoms+Provenance,
+    shared `CanvasRenderer`) · sheet grid (Atoms outline + Provenance border on the grid wrapper).
+- **Adversarial review (2 agents) → 3 proven defects, all fixed + re-verified:**
+  1. editor overlay bar scrolled out of reach (inside the scroller between two sticky bars) → lifted to an
+     always-visible header above the scroller.
+  2. provenance used `box-shadow`, colliding with Tailwind's `ring-*` selection affordance (also box-shadow) →
+     switched to a `::before` gutter (ring survives; both proven live).
+  3. sheet provenance inset gutter hid behind the opaque row-number column → moved to a `border-left` on the
+     grid **wrapper** (outside the cells; now visible).
+- **Deferred (next):** the Compliance + Budget overlay layers, a slide-rail treatment, and `ActOnSelection`
+  (Reuse / Compliance-check verbs) + `AssistPanel` per `CANVAS_ARCHITECTURE.md` §7.
 
 ---
 

@@ -47,7 +47,13 @@ export async function GET(req: NextRequest) {
       await emitEventSingle({ namespace: 'finder', type: 'partner.entered', actor: userActor(u.id, u.email), tenantId: t.id, payload: { tenantId: t.id, slug } });
     } catch { /* best-effort */ }
 
-    return NextResponse.redirect(url(`/portal/${slug}/dashboard`));
+    // Optional landing target within the descended portal (the console's "Review to-dos →" deep-link).
+    // Whitelisted to a known set of portal sub-pages — never an open redirect (only a bare suffix,
+    // no scheme/host), so a manager lands where the console sent them, not the generic dashboard.
+    const NEXT_WHITELIST = new Set(['todos', 'dashboard', 'proposals', 'cards', 'manage']);
+    const next = req.nextUrl.searchParams.get('next')?.trim() ?? '';
+    const dest = NEXT_WHITELIST.has(next) ? next : 'dashboard';
+    return NextResponse.redirect(url(`/portal/${slug}/${dest}`));
   } catch (e) {
     console.error('[partner/enter] failed:', e);
     return NextResponse.redirect(url('/partner'));
