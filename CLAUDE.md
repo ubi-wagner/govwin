@@ -157,13 +157,15 @@ orchestration pattern.
    proposal Canvas): the CanvasDocument is the source of truth in `metadata.canvas`; the server
    projects the public HTML body from it on save (docs/CONTENT_STUDIO_DESIGN.md).
 2. **Pipeline** (Python 3.12): Ingestion, scoring, workers, agents → `pipeline/`
-3. **CMS/CRM** (FastAPI): Live — **email automation** (Gmail send) + social; own `govtech_cms` DB →
-   `services/cms/`. Its content/page-block routers are **superseded** for front-facing content (moved to
-   the frontend per above) — the service's forward scope is **CRM** (customer identification / acquisition
-   / management), still to be built.
+3. **CRM service** (`rfp-crm`, FastAPI, `services/cms/`): deployed on Railway with its **own `cms-postgres`
+   DB**, bridged to the main DB via the shared `system_events` table; **email automation** (Gmail send) +
+   social are live. Its content/page-block routers are **superseded** for front-facing content (that moved
+   to the frontend per §1 — content is frontend-owned in the main DB) — the service's forward scope is
+   **CRM** (customer identification / acquisition / management), **still to be built out**.
 
-Frontend + Pipeline share one PostgreSQL database (govtech_intel); CMS/CRM has its own (govtech_cms)
-and bridges via the shared `system_events` table. Object storage is S3-compatible (Cloudflare R2) —
+Frontend + Pipeline share the main PostgreSQL database (`govtech_intel`, Railway service `Postgres`); the
+`rfp-crm` CRM service has its own (`cms-postgres`) and bridges via the shared `system_events` table. Object
+storage is the S3-compatible **`rfp-pipeline-bucket`** (Cloudflare R2), shared by all three services —
 there is no `/data` business-data volume (the dead pipeline `STORAGE_ROOT=/data` env was removed this
 cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS media).
 
