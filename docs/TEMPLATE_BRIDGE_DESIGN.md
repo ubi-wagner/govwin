@@ -141,6 +141,34 @@ Investor — One-Pager · Pitch Deck.
 - Each authored **pristine** (structure + `{anchor}` meta-tags only, per this session's rule), validated by
   the same interpolation audit.
 
+### SUITE (2026-08) — the 34-template stable, internet-researched + real-data-proven
+
+The catalog is now **34 pristine templates across 11 categories**, covering all the major forms:
+- **Agency proposals:** DoD/DoW (SBIR P1/P2 Technical · Cost · STTR P1/P2 · D2P2 · CSO Briefing · **BAA White Paper**
+  · **OTA/CSO Solution Brief**) · NSF (Project Pitch · SBIR/STTR Project Description) · DOE (SBIR · STTR) ·
+  **NASA (SBIR/STTR Phase I — 10-part EHB)** · **NIH (Research Strategy: Specific Aims + Significance/Innovation/Approach)**.
+- **Universal proposal forms (`forms`):** **Quad Chart · Executive Summary · Statement of Work (MIL-HDBK-245D) ·
+  Budget Justification (R&R A–K) · Biographical Sketch (Common Form) · Current & Pending Support · Data Management
+  & Sharing Plan · Facilities/Equipment/Other Resources · Letter of Collaboration (NSF verbatim) · SF-424A Budget**.
+- **Collateral:** Marketing (one/two-pager · whitepaper · sales deck) · Commercialization Plan · Investment
+  (one-pager · pitch deck) · **Technology Overview Deck** · **Company Capability Deck**.
+
+Each new template's **canonical structure, page limits, required tables, and compliance-critical rules were
+researched from current (2025-26) agency solicitations/guides** (AFRL BAA Guide, DIU CSO, MIL-HDBK-245D, SF-424A
+instructions, NASA/DHS SBIR solicitations, DARPA BAA Guide, NIH PHS-398/SciENcv, NSF PAPPG 24-1) — sources in the
+session log.
+
+**Proven by a fill+compliance harness (`scratchpad/fill-harness`):** every template, interpolated with **REAL
+Foundation 3DP company/actor data** (Kate Ulepic; 3D-printed formwork; TRL 6–7; $410B TAM; DoD SBIR 24.3), runs
+through the same canvas engines the live editor/export gate use — `estimatePageCount`/`estimateSlideCount` +
+`validateStandaloneCanvas` (the compliance floor). Result: **34/34 fill their pages/sections, every profile anchor
+resolves, and every one clears the compliance floor (0 violations).** The harness also caught a real defect — the
+four slide decks overflowed the 16:9 frame once real (longer) text filled their bullet slides; fixed by dropping
+the co-located images on the dense content slides (visuals stay on title/dedicated slides). Filled artifacts export
+end-to-end to docx + Chromium-rendered PDF with the real data laid out correctly. This is the OPP-ingest flywheel:
+richer templates that encode each solicitation's required layout make matching + drafting a new opportunity
+progressively easier.
+
 ## 6. Consolidation — collapse 3 systems → 1, retire the shared coupling
 
 The bridge only removes the deprecation risk if we also **stop the live cross-tenant reads**:

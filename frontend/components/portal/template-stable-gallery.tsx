@@ -32,9 +32,9 @@ interface TemplateCard {
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
-  dod_dow: 'DoD / DoW', nsf: 'NSF', doe: 'DOE',
+  dod_dow: 'DoD / DoW', nsf: 'NSF', doe: 'DOE', nasa: 'NASA', nih: 'NIH',
   marketing: 'Marketing', commercialization: 'Commercialization', investment: 'Investment',
-  tech: 'Tech Overviews', company: 'Company', grants: 'Grants',
+  tech: 'Tech Overviews', company: 'Company', grants: 'Grants', forms: 'Proposal Forms',
 };
 
 const FORMAT_BADGE: Record<string, { label: string; cls: string }> = {

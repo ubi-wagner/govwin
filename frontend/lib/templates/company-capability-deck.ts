@@ -102,11 +102,6 @@ export const COMPANY_CAPABILITY_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-image', {
-      type: 'image',
-      content: { storage_key: '', alt_text: 'Capabilities graphic', width: 720, height: 240, caption: '[Capabilities graphic or an icon row of your service areas]' },
-      style: { alignment: 'center', space_before: 16 },
-    }),
     node('s3-break', { type: 'page_break', content: null }),
 
     // ─── Slide 4: Past Performance ──────────────────────────────

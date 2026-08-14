@@ -116,17 +116,6 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-image', {
-      type: 'image',
-      content: {
-        storage_key: '',
-        alt_text: 'Market opportunity chart',
-        width: 560,
-        height: 300,
-        caption: '[Market-size or cost-of-inaction chart — quantify the pain the way customers describe it]',
-      },
-      style: { alignment: 'center', space_before: 16 },
-    }),
     node('s3-break', { type: 'page_break', content: null }),
 
     // ─── Slide 4: Our Solution & Differentiators ────────────────
@@ -146,17 +135,6 @@ export const MARKETING_SLIDE_DECK: CanvasDocument = {
         ],
       },
       style: { size: 16 },
-    }),
-    node('s4-image', {
-      type: 'image',
-      content: {
-        storage_key: '',
-        alt_text: 'Product screenshot',
-        width: 600,
-        height: 300,
-        caption: '[Product screenshot or annotated hero shot of the solution in action]',
-      },
-      style: { alignment: 'center', space_before: 16 },
     }),
     node('s4-break', { type: 'page_break', content: null }),
 

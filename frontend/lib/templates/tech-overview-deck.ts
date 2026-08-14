@@ -100,11 +100,6 @@ export const TECH_OVERVIEW_DECK: CanvasDocument = {
       },
       style: { size: 16 },
     }),
-    node('s3-image', {
-      type: 'image',
-      content: { storage_key: '', alt_text: 'Core concept diagram', width: 620, height: 300, caption: '[Concept diagram — the core mechanism or the before/after it enables]' },
-      style: { alignment: 'center', space_before: 16 },
-    }),
     node('s3-break', { type: 'page_break', content: null }),
 
     // ─── Slide 4: How It Works ──────────────────────────────────

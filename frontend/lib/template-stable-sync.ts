@@ -19,9 +19,9 @@ const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
 
 // Catalog category → agency label (mirrors scripts/seed-template-masters.mts).
 const AGENCY: Record<string, string | null> = {
-  dod_dow: 'DoD/DoW', nsf: 'NSF', doe: 'DOE',
+  dod_dow: 'DoD/DoW', nsf: 'NSF', doe: 'DOE', nasa: 'NASA', nih: 'NIH',
   marketing: null, commercialization: null, investment: null,
-  tech: null, company: null, grants: null,
+  tech: null, company: null, grants: null, forms: null,
 };
 
 export type SyncAction = 'created' | 'updated' | 'unchanged' | 'error';
