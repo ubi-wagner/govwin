@@ -445,7 +445,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
           SELECT title FROM proposals WHERE id = ${proposalId}
         `;
         const pTitle = proposalRow?.title || 'your proposal';
-        const proposalUrl = `${process.env.NEXT_PUBLIC_URL || ''}/portal/${tenantSlug}/proposals/${proposalId}`;
+        const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal/${tenantSlug}/proposals/${proposalId}`;
 
         for (const member of tenantMembers) {
           try {

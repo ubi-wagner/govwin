@@ -21,7 +21,7 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
 const WORKSPACE_EMAIL = process.env.GOOGLE_WORKSPACE_EMAIL || 'platform@rfppipeline.com';
-const FALLBACK_RESEND_KEY = process.env.RESEND_API_KEY;
+const FALLBACK_RESEND_KEY = process.env.RESEND_API_KEY || process.env.AUTH_RESEND_KEY;
 
 let _cachedAuth: InstanceType<typeof google.auth.OAuth2> | null = null;
 
