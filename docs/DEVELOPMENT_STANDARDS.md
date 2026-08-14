@@ -134,10 +134,10 @@ const safeInput = input.replace(/[%_\\]/g, '\\$&');
 
 ### Agent Security
 
-- RLS is ENABLED on 4 memory tables (`episodic_memories`, `semantic_memories`,
-  `procedural_memories`, `agent_task_log`) but **zero policies exist** in any migration.
-  In practice RLS is bypassed because both services connect as the DB owner. Tenant
-  isolation relies exclusively on explicit `WHERE tenant_id = $1` in every query.
+- RLS is ENABLED + FORCED with `tenant_isolation` policies on the memory tables (migs 116/119).
+  The frontend connects as `govtech_app` (NOBYPASSRLS) and sets `app.tenant_id` per request, so RLS
+  enforces underneath the explicit `WHERE tenant_id = $1` predicate (defense-in-depth). (Pipeline agents
+  connect as `rfp_agent` when `AGENT_DATABASE_URL` is provisioned — a separate deploy-gated step.)
 - Agent tools enforce `tenant_id` -- agents never construct SQL directly.
 - User content clearly delimited in agent prompts (prompt injection defense).
 
@@ -159,7 +159,7 @@ next is meaningful — do not skip ahead:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. Non-negotiable first gate.
 2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**828/828** at
-   migration head 137). Run on every change, not just schema changes.
+   migration head 178). Run on every change, not just schema changes.
 3. **Migration (schema changes only)** — apply the new migration via the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner is
    idempotent (tracks applied files in `_migration_history`); re-running must be a clean no-op.
@@ -177,7 +177,7 @@ next is meaningful — do not skip ahead:
    unproven "possible bug" is discarded, not filed.
 
 Sandbox DB coordinates: **`postgres://claude:claude@127.0.0.1:5433/govtech_intel`** (local PG16, trust
-auth). Migration head is **125**.
+auth). Migration head is **178**.
 
 ### Test Pyramid
 

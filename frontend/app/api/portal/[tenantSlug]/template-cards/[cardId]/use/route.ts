@@ -81,8 +81,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     let sourceTemplateKey: string | null = null;
     try {
       result = await withTenant<{ documentId: string; title: string; docType: string } | null>(tenantId, async (tx) => {
-        // Explicit tenant predicate (belt) + RLS (suspenders): the app connects as the RLS-bypassing
-        // owner today, so without the tenant_id filter this could instantiate another tenant's card.
+        // Explicit tenant predicate (belt) + RLS (suspenders): the app runs as `govtech_app` so
+        // RLS scopes it; the tenant_id filter is defense-in-depth against instantiating another
+        // tenant's card.
         const rows = await tx`
           SELECT template_key AS "templateKey", title, format, template
           FROM tenant_template_cards WHERE id = ${cardId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1

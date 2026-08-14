@@ -39,8 +39,8 @@ scoped `WHERE owner_id = me` — so two EconDev partners never see each other's 
 - Auto-landing `partner_admin` on `/partner` after login (today they navigate there; middleware allows it).
 - A partner-facing team/invite UI inside each owned company (today: the founder POC on create + the
   existing portal invite).
-- RLS `owner_id` policy once the `govtech_app` RLS cutover lands (belt-and-suspenders atop the
-  rank/handler scoping).
+- A vault-style `owner_id` RLS policy (belt-and-suspenders atop the rank/handler scoping; the
+  `govtech_app` RLS layer is already live).
 
 ## Seeded partner
 Paul Jackson (Entrepreneurs' Center), `pjackson@ecinnovates.com`, seeded `partner_admin` in mig 157

@@ -5,11 +5,12 @@
  * book an open slot up to their ACCRUED balance (15 min/month, computed — no accrual
  * table). Google-Meet auto-creation is deferred; a booking just reserves the slot.
  *
- * SINGLE-LAYER RLS posture: the app runs as the RLS-bypassing owner, so every
- * tenant-scoped query here carries an EXPLICIT `tenant_id` predicate as the belt
- * (withTenant sets app.tenant_id for the future NOBYPASSRLS cutover — suspenders).
+ * TWO-LAYER RLS posture: the app runs as `NOBYPASSRLS govtech_app`, so `withTenant`
+ * scopes each tenant read via RLS (`app.tenant_id`) AND every tenant-scoped query here
+ * carries an EXPLICIT `tenant_id` predicate as defense-in-depth. Admin cross-tenant
+ * oversight reads use `sqlBypass` (the owner connection).
  */
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 
 /** Monthly expert-time accrual. Change here if the entitlement changes. */
@@ -109,12 +110,12 @@ export async function createAvailabilityBlock(
 
 /**
  * All non-cancelled blocks (admin oversight view), with who booked each.
- * NOTE (single-layer RLS): the booked-by join reads expert_time_bookings across
- * tenants — correct under today's owner connection; post-NOBYPASSRLS cutover this
- * admin view must run on a bypass/owner connection (see docs/DEPRECATION_CLEANUP).
+ * Cross-tenant admin read: the booked-by join reads expert_time_bookings (RLS FORCED)
+ * across tenants, so under live RLS (govtech_app) it runs on `sqlBypass` (the owner
+ * connection) — a tenant-scoped connection would return 0 booking rows.
  */
 export async function listAdminAvailability(): Promise<AdminBlock[]> {
-  return sql<AdminBlock[]>`
+  return sqlBypass<AdminBlock[]>`
     SELECT b.id, b.start_at AS "startAt", b.end_at AS "endAt", b.status,
       (EXTRACT(EPOCH FROM (b.end_at - b.start_at))::int / 60) AS minutes,
       bk.tenant_id AS "tenantId", tu.email AS "bookedByEmail"

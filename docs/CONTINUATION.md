@@ -41,7 +41,11 @@ this closes the sandbox's AI gap. Per-agent RESPONDER registry returns each agen
 
 ## 0. LATEST — 2026-08-09 (workflow viz + compliance + full-draft landing; MERGED + DEPLOYED; READ THIS FIRST)
 
-Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162**. `tsc 0 · vitest 899`.
+Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162** at that time. `tsc 0 · vitest 899`.
+**Since then (through 2026-08-14): migration head 178** — the template-stable/bridge spine (migs 177/178;
+`lib/template-bridge.ts`, docs/TEMPLATE_BRIDGE_DESIGN.md), the NILOC gold-example proposal set
+(`frontend/scripts/niloc/`, docs/NILOC_GOLD_EXAMPLES.md), and the cost-volume common-form pass (migs 168/169).
+RLS is **live app-side** (the app runs as `govtech_app`; see the ⛑️ callout above).
 
 **Shipped this stretch:**
 - **Workflow visualization** at `/admin/workflows` — a dependency-free, by-spine **Workflow Map** (all 29

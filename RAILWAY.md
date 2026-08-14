@@ -84,6 +84,8 @@ Rename it to `govtech-frontend`.
 | `EMAIL_FROM` | `noreply@yourdomain.com` (or your Resend verified domain) |
 | `NEXT_PUBLIC_APP_URL` | `https://YOUR-APP.up.railway.app` |
 | `NODE_ENV` | `production` |
+| `ANTHROPIC_API_KEY` | From console.anthropic.com — **all three services** (frontend, pipeline, CMS) need it |
+| `ANTHROPIC_BASE_URL` | [OPTIONAL] override the Anthropic base URL (default `api.anthropic.com`); point at a gateway or the sandbox emulator |
 
 ---
 

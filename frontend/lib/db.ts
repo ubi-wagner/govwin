@@ -53,11 +53,11 @@ const rawSql = postgres(DATABASE_URL!, {
 /**
  * Bypass pool — the OWNER (BYPASSRLS) connection, for reads that must legitimately cross
  * tenants: auth (users lookup before any tenant context), admin cross-tenant aggregates
- * (e.g. the agent-workforce rollup), and owner-only maintenance. Post-NOBYPASSRLS-cutover
- * (docs/RLS_CUTOVER.md) `DATABASE_URL` points at the non-owner `govtech_app` role and
- * `DATABASE_URL_OWNER` carries the owner string for THIS pool. Pre-cutover both env vars
- * resolve to the same connection, so `sqlBypass` is identical to `rawSql` today — inert
- * until the flip. Admin cross-tenant routes reach it via `enterBypass()` (below) or by
+ * (e.g. the agent-workforce rollup), and owner-only maintenance. In production
+ * `DATABASE_URL` points at the non-owner `govtech_app` (NOBYPASSRLS) role and
+ * `DATABASE_URL_OWNER` carries the owner string for THIS pool, so `sqlBypass` is the real
+ * cross-tenant escape hatch. Where `DATABASE_URL_OWNER` is unset (some local setups) both
+ * fall back to one connection. Admin cross-tenant routes reach it via `enterBypass()` (below) or by
  * importing it directly (`import { sqlBypass as sql }`) for fragment/begin routes.
  */
 export const sqlBypass = postgres((process.env.DATABASE_URL_OWNER || DATABASE_URL)!, {
@@ -71,14 +71,15 @@ export const sqlBypass = postgres((process.env.DATABASE_URL_OWNER || DATABASE_UR
 /**
  * Context-aware `sql` (docs/RLS_CUTOVER.md). Transparent Proxy over the raw client, routed by
  * the per-request AsyncLocalStorage context:
- *   • NO context (the default) → EXACT passthrough to rawSql (govtech_app after the flip).
+ *   • NO context (the default) → EXACT passthrough to rawSql (which connects as govtech_app in prod).
  *   • a TENANT context (enterTenant, set in the route's own frame) → each `sql\`\`` runs inside
  *     a `SET LOCAL app.tenant_id` transaction, so RLS scopes it to that tenant under govtech_app.
  *   • a BYPASS context (enterBypass, set after an admin gate) → each `sql\`\`` is routed to the
  *     owner `sqlBypass` pool, so a privileged admin cross-tenant request AND every lib helper it
  *     calls read across tenants.
- * Inert until a request enters a context AND the app connects as govtech_app (pre-flip both pools
- * are the owner, so the GUC/route are harmless). Only the tagged-template CALL is routed —
+ * A no-op only until a request enters a context; once entered, the tenant GUC scopes RLS
+ * under govtech_app. (Where both pools resolve to the owner — e.g. local dev — the GUC/route
+ * are harmless.) Only the tagged-template CALL is routed —
  * `sql.json/array/begin/…` forward to rawSql. So FRAGMENT-composing (`sql\`${frag}\``) and
  * `sql.begin` routes must use an explicit client (withTenant for tenants, `sqlBypass as sql`
  * for admin) — the Proxy would eager-execute an interpolated fragment.
@@ -90,7 +91,7 @@ export const sql: typeof rawSql = new Proxy(rawSql, {
     const ctx = currentTenantContext();
     if (isTemplate && ctx) {
       if (ctx.bypass) {
-        // Privileged cross-tenant read: route to the owner pool (inert pre-flip — same conn).
+        // Privileged cross-tenant read: route to the owner pool (DATABASE_URL_OWNER in prod; the same conn where that's unset).
         return (sqlBypass as unknown as (...a: unknown[]) => unknown)(...args);
       }
       if (ctx.tenantId) {
@@ -190,8 +191,9 @@ export async function verifyProposalAccess(
     // below (proposals is RLS'd) — enterWith flows forward within the same frame, so the
     // bind-check below is scoped correctly under govtech_app. This does NOT cover the CALLING
     // route (context does not flow child→parent): a route that calls verifyProposalAccess must
-    // ALSO call enterTenant(tenantId) in its own frame before its own isolated reads. Harmless
-    // pre-flip (owner bypasses). The bind proves the proposal belongs to tenantId regardless.
+    // ALSO call enterTenant(tenantId) in its own frame before its own isolated reads.
+    // Belt-and-suspenders under live RLS. The bind proves the proposal belongs to tenantId
+    // regardless.
     enterTenant(tenantId);
     // The proposal MUST belong to `tenantId` FIRST. Without this bind, a tenant-wide member of
     // tenant A could pass tenant B's proposalId under their OWN slug (→ tenantId=A) and

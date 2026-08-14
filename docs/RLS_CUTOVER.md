@@ -1,10 +1,11 @@
 # RLS NOBYPASSRLS cutover — the map, the migration, the proof
 
-**Goal:** make Row-Level Security a real second layer. Today the frontend connects as the
-RLS-**bypassing owner** role, so the tenant-isolation policies are inert — the only live guard
-is the hand-written `WHERE tenant_id` predicate (one omitted predicate = cross-tenant leak with
-zero backstop). The cutover points the frontend's tenant connection at the existing
-`govtech_app` role (NOBYPASSRLS), so RLS enforces isolation underneath the app-layer predicates.
+**Status: DONE (app-side).** Row-Level Security is a real second layer for the application: the frontend's
+tenant connection points at the `govtech_app` role (NOBYPASSRLS), so RLS enforces isolation underneath the
+app-layer `WHERE tenant_id` predicates (defense-in-depth). This doc is the as-built map + migration + proof.
+(The pipeline **agent** role `rfp_agent` is built but still deploy-gated — ops provisions a LOGIN member +
+points `AGENT_DATABASE_URL` at it; until then agents run on the caller connection with the app-layer
+predicate + fail-closed guard as isolation.)
 
 **Model (two connections):**
 - **Tenant connection = `govtech_app`** (NOBYPASSRLS, LOGIN). The default. Every request opens a
@@ -111,9 +112,9 @@ gate when they call an RLS'd-table helper. **Pipeline** keeps its own owner `DAT
   drift**: the seeded working DB's table set is identical to a from-scratch migrate. So Railway's
   deploy-time `migrate.mjs` produces exactly this RLS-armed schema.
 
-Inert until the flip (owner bypasses RLS today). **Prod flip is one op the operator runs:** point
-the frontend `DATABASE_URL` at `govtech_app` and set `DATABASE_URL_OWNER` to the owner string (for
-`sqlBypass`). No code change at flip time.
+The app connects as `govtech_app` in prod (RLS live app-side): the frontend `DATABASE_URL` points at
+`govtech_app` and `DATABASE_URL_OWNER` carries the owner string (for `sqlBypass`). No code change — the
+same migration-armed schema serves it; the sandbox emulates this exactly by serving as `govtech_app`.
 
 ### Re-proven 2026-08-13 (sandbox, against the current Foundation seed)
 The prior P5 drives targeted an `immobileyes` seed no longer present; re-ran the whole proof against the
@@ -132,8 +133,9 @@ run, reverted to `NOLOGIN` after). All green:
 - **From-zero reproducibility:** `ALLOW_SCHEMA_RESET=true migrate.mjs` on an empty DB applied the full
   chain **176/176, 0 skipped**, and the fresh DB came up armed: **20 force-RLS tables · 35 policies · head 176**.
 
-Net: the isolation *mechanism* + the *route/page coverage under the flip* are proven in-sandbox. The only
-step left for prod is the env flip itself (`DATABASE_URL`→`govtech_app`) + re-running these drives against staging.
+Net: the isolation *mechanism* + the *route/page coverage under `govtech_app`* are proven in-sandbox, and
+the application runs as `govtech_app` in prod (RLS live app-side). The remaining **agent-side** step is
+provisioning `AGENT_DATABASE_URL` for the `rfp_agent` pool + re-running these drives against staging.
 
 ### Server components (page.tsx) + non-request entry points — WIRED, one open verification
 The API-route wiring doesn't cover code that also runs as govtech_app: Next **server components**

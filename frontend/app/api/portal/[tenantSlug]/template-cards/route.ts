@@ -54,9 +54,9 @@ export async function GET(
     const category = url.searchParams.get('category');
 
     try {
-      // Explicit tenant predicate (belt) + RLS via withTenant (suspenders, once the app runs as
-      // govtech_app). The belt is what scopes the read TODAY — the app still connects as the
-      // RLS-bypassing owner role, so withTenant alone would return every tenant's cards.
+      // Explicit tenant predicate (belt) + RLS via withTenant (suspenders): the app runs as
+      // `govtech_app`, so RLS scopes the read to the tenant. The explicit tenant_id predicate
+      // is the belt / defense-in-depth.
       const cards = await withTenant(tenantId, async (tx) => tx`
         SELECT id, template_id AS "templateId", template_key AS "templateKey", title, category,
                agency, format, bridge_version AS "bridgeVersion", update_available AS "updateAvailable",

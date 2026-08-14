@@ -65,9 +65,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
   const r = await resolveCtx(ctx);
   if (!r.ok) return r.res;
   try {
-    // Explicit tenant predicate (the BELT) + withTenant RLS (the suspenders, once the
-    // app runs as govtech_app). RLS is inert under today's bypass role, so the WHERE is
-    // load-bearing — without it this leaks every tenant's rows (adversarial-sweep HIGH-1).
+    // Explicit tenant predicate (the BELT) + withTenant RLS (the suspenders — the app runs
+    // as govtech_app, so RLS scopes the read). The explicit WHERE is the belt /
+    // defense-in-depth — keep it: without it a bypass-context read would span tenants
+    // (adversarial-sweep HIGH-1).
     const rows: PolicyRow[] = await withTenant(r.tenantId, async (tx) => tx<PolicyRow[]>`
       SELECT scope, trigger_key AS "triggerKey", enabled,
              recipient_roles AS "recipientRoles", recipient_users AS "recipientUsers",

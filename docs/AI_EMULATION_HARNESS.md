@@ -1,5 +1,11 @@
 # AI Emulation — being the model behind a local shim (2026-08-10)
 
+> **⚠️ SUPERSEDED (mechanism).** The canonical sandbox AI emulator is now the committed
+> `frontend/scripts/test-harness/emulated-claude.mjs` on **:8787** (enabled via `sandbox-heartbeat.sh EMULATE=1`),
+> and the canonical end-to-end proof is **docs/AI_FLOWS_PROOF.md**. This doc's specific shim (the scratchpad
+> `anthropic-shim.mjs` on :8790 with pre-authored response files) is historical; the **seam** it describes
+> — every call honors `ANTHROPIC_BASE_URL`, only the transport is substituted — remains accurate.
+
 > How the two AI P1 gaps from `docs/HUMAN_GAP_ANALYSIS.md` were proven **end-to-end without a live
 > Anthropic key**, by standing Claude in for the exact API call each agent makes. Faithful: the real
 > agent code, prompts, parsing, guardrails, and land-or-review gate all run unchanged — only the

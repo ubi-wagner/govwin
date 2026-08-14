@@ -1,7 +1,7 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
 **Last updated:** 2026-06-23 (Phase 4 reconcile — as-built baseline from ARCHITECTURE_V9.md)
-**Architecture reference:** `ARCHITECTURE_V9.md` is the authoritative as-built master (supersedes V5–V8).
+**Architecture reference:** `ARCHITECTURE_V10.md` is the authoritative as-built master (supersedes V5–V8).
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -935,8 +935,8 @@ success. Dead mechanisms: `agent_task_queue` dispatcher (NotImplementedError),
 
 **Rule:** A named executor must exist and be registered before a route references it.
 Jobs signal failure by raising, never by returning a success envelope with an error
-field. RLS is ENABLED with ZERO policies — tenant isolation rests entirely on explicit
-`WHERE tenant_id = $1` in every query (NOT on RLS, despite CLAUDE.md's claim).
+field. RLS is ENABLED + FORCED with `tenant_isolation` policies (migs 116/117/136) and LIVE: the app runs
+as `NOBYPASSRLS govtech_app`, so RLS enforces alongside the explicit `WHERE tenant_id = $1` predicate.
 
 ### Mistake 23: Re-editing an applied migration won't re-run (prod icons missing, Jun 2026)
 `db/migrations/migrate.mjs` keys applied migrations by **filename** in `_migration_history`
@@ -1096,9 +1096,9 @@ global buckets).
   The last two live reads were repointed: the admin `v_opportunity_rollup` view was **rebuilt on
   `tenant_opportunity_cards`** (ranked/pinned tenant counts now come from cards), and the admin
   rfp-curation "Customer Interest" panel + CMS `matched_opportunities` template var were repointed to
-  cards. ⚠️ Those admin/CMS reads are **direct cross-tenant reads on an RLS-FORCED table** — fine today
-  (app runs as the RLS-bypassing owner) but on the `govtech_app` (NOBYPASSRLS) cutover they must run on a
-  BYPASSRLS connection or through owner-views. See the RLS-cutover checklist in
+  cards. ⚠️ Those admin/CMS reads are **direct cross-tenant reads on an RLS-FORCED table** — because the app runs
+  as `govtech_app` (NOBYPASSRLS), they MUST run on a BYPASSRLS connection (`sqlBypass`/`enterBypass`) or
+  through owner-views; a tenant-scoped connection returns 0 rows. See the RLS-cutover checklist in
   docs/DEPRECATION_CLEANUP_2026-07-22.md.
 
 ### Mistake 39: `next/dynamic({ ssr: false })` does NOT forward `ref` (React 19 / Next 15.5)
@@ -1251,7 +1251,7 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in `fabric.invoke_agent`. Budget column is `monthly_budget` (dollars), NOT `max_cost_per_month_cents`. `human_gate` enforced.
 - Activation on deploy: set ANTHROPIC_API_KEY for real Claude calls; set EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY and run `MemoryStore.backfill_embeddings` per table for vector search. (Voyage needs a vector(1536)→1024 migration first.)
 - What runs LIVE: the memory-lifecycle/learning scheduler (`lifecycle_scheduler.py`) — decay, GC, compaction, calibration on existing rows.
-- Memory: episodic/semantic/procedural read/write wired. RLS is ENABLED with ZERO `CREATE POLICY` — isolation = explicit `WHERE tenant_id`.
+- Memory: episodic/semantic/procedural read/write wired. RLS is ENABLED + FORCED with `tenant_isolation` policies (migs 116/119) — isolation = RLS + explicit `WHERE tenant_id`.
 
 ### Execution Engine of Record: WorkflowManager (pipeline/src/workflows/manager.py)
 - Crash recovery, heartbeat (30s), stuck detection (5min stale), orphan recovery.

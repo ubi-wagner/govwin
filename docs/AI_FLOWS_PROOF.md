@@ -59,9 +59,12 @@ Fired together, then the worker processed them — **+94 emulator LLM calls** (4
   (emulator served the `[web_search, fetch_page, search_memory]` tool-loop, model `claude-haiku-4-5`).
 
 ### Deterministic "AI" routes (correctly no LLM call) ✅
-`ai/compliance` (21 variables, 17 pass / 4 partial) and `shred-audit` (31 requirements captured,
-coverage 1.0) both return 200 with real results **without** an LLM call — their checks are rule-based
-(`validateCanvasAgainstSpec` + extraction), which is correct.
+`shred-audit` (31 requirements captured, coverage 1.0) returns 200 with real results **without** an LLM
+call — its checks are rule-based (`validateCanvasAgainstSpec` + extraction), which is correct.
+
+`ai/compliance` (21 variables, 17 pass / 4 partial) is **not** in this bucket: it **does call Claude
+(Haiku, `claude-haiku-4-5`)** whenever compliance variables exist, and skips the LLM **only** when there
+are zero variables — here the emulator's dedicated `compliance_reviewer` responder serves that call.
 
 ### Gated drop-ins (no live LLM in this rig, by design)
 - **Vision caption** (`lib/vision.ts`) — the only genuinely frontend-direct LLM call; gated + unit-tested

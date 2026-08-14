@@ -56,8 +56,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
     // tenant's saved ones, EXCLUDING the is_default row — that row is the framework
     // limits/defaults document ({limits,defaults}), not an editor guardrail config, so picking it
     // would wipe the editor (sweep D2/HIGH). Most-recent first — "extend the last".
-    // Runs through withTenant so the platform∪tenant read stays correct under the NOBYPASSRLS
-    // cutover (the explicit tenant_id predicate is today's load-bearing belt; RLS is inert).
+    // Runs through withTenant so RLS scopes the platform∪tenant read under `govtech_app`
+    // (the explicit tenant_id predicate is the app-layer belt / defense-in-depth).
     const templates = await withTenant(r.tenantId, async (tx) => tx<TemplateRow[]>`
       SELECT id, name, description, config, is_default AS "isDefault",
              CASE WHEN tenant_id IS NULL THEN 'platform' ELSE 'tenant' END AS scope,

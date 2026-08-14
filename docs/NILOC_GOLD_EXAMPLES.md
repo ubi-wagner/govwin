@@ -80,7 +80,7 @@ clean *federal* license; AFRL/RI info-extraction via TechLink/Dayton-WBI.)
    queries with the semantic index on (`ATOM_EMBED=local` or Voyage). With the engine off it still
    retrieves (tag/context only), just without the semantic lift.
 3. **Tenant isolation.** The same queries run for a different tenant return **zero** NILOC-branded
-   atoms — proven at the app layer (and RLS-backstopped once the `govtech_app` cutover flips).
+   atoms — proven at the app layer and RLS-backstopped (the app runs as `govtech_app`).
 4. **Compliance + export.** All six volumes export to `docx`/`pdf` (technical) and `xlsx`/`pdf`
    (cost) via the platform's own exporters; the cost `xlsx` carries **live Excel formulas** (edit a
    rate and the waterfall recomputes).

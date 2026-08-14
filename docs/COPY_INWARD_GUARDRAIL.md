@@ -33,8 +33,8 @@ So no atom, version, or section points across a tenant boundary — the copies a
 - **EMB-6 (#145):** `atom_embeddings` tenant-isolated; hybrid retrieval ranks own-tenant atoms only.
 - **KEEP+COPY (#71):** the eager starter copy into a new tenant proven isolated (both provisioning paths).
 - **RLS cutover (mig 136/137, docs/RLS_CUTOVER.md):** `library_atoms` + friends are FORCE-RLS with a
-  `tenant_isolation` policy; the app-layer `WHERE tenant_id` is backed by RLS once the prod `DATABASE_URL`
-  flips to the `govtech_app` non-owner role.
+  `tenant_isolation` policy; the app-layer `WHERE tenant_id` is backed by RLS: the app runs
+  as the `govtech_app` non-owner role, so the `tenant_isolation` policy enforces.
 
 ## Verdict
 Sharing is copy-inward only. No cross-tenant shared objects exist (0 in data), the copy paths create

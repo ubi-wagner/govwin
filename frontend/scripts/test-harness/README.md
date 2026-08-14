@@ -7,7 +7,7 @@ in the sandbox** (which has no live key) with **zero product-code change**.
 ## `emulated-claude.mjs`
 
 A minimal Anthropic **Messages API** (`POST /v1/messages`) compatible endpoint. Both services already
-read `ANTHROPIC_BASE_URL` and gate on `ANTHROPIC_API_KEY !== 'sk-noop'`, so pointing them here activates
+read `ANTHROPIC_BASE_URL` and gate on `ANTHROPIC_API_KEY` presence (only parse-solicitation.ts + vision.ts treat `sk-noop` as OFF); `emulated-claude` passes every gate, so pointing them here activates
 every real agent/AI invoke path — the agents run their *own* code (tool loop, guardrails, landing,
 human-review UX); the emulator returns the model's side.
 

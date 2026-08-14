@@ -10,7 +10,7 @@
 > (docs/FULL_DRAFT_LANDING_DESIGN.md). The **cost/budget volume is now computed + agency-neutral** — one deterministic
 > burden engine rendered in the common government FORM the solicitation needs (DoW waterfall · NSF/DOE SF-424A · Ohio
 > TVSF OTF state budget), migs 168–169 seeding the Ohio TVSF Round-45 card + the final Foundation proposal
-> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **176**
+> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **178** (177–178 add the template-stable/bridge spine + document/template provenance)
 > (170–171 semantic-retrieval `atom_embeddings`; 172–174 scout schedule + RLS gap + tasks-broadcast; **175**
 > the scout-intake NEW-vs-UPDATE candidate queue on `scout_findings`, docs/SCOUT_INTAKE_QUEUE.md; **176**
 > the program-primer guide drafts BAA/OTA/CSO/Grants queued for review, docs/CONTENT_QUEUE.md). **Agent
@@ -94,8 +94,10 @@ carrying `opportunity_id`). Not a code-read.
 > refreshed:** the non-owner cutover is now **built + applied in schema** — mig 136_rls_cutover created the
 > `govtech_app` (app) + `rfp_agent` (agents) `NOBYPASSRLS` roles, **19 force-RLS tables**, **35
 > `tenant_isolation` policies**, and the per-request `SET app.tenant_id` context layer
-> (`frontend/lib/tenant-context.ts` + `lib/db.ts` enterTenant/enterBypass); it is **single-layer in effect
-> today only until the one-op prod `DATABASE_URL` flip** to `govtech_app` (still pending). As-built RLS record:
+> (`frontend/lib/tenant-context.ts` + `lib/db.ts` enterTenant/enterBypass); the **application** connects as
+> `govtech_app` (`NOBYPASSRLS`) with the per-request `SET app.tenant_id` context, so RLS is the enforced
+> second layer **app-side** (the pipeline `rfp_agent` agent path is built but deploy-gated via
+> `AGENT_DATABASE_URL`). As-built RLS record:
 > **`docs/RLS_CUTOVER.md`**; library/vaults design: **`docs/LIBRARY_AND_VAULTS_DESIGN.md`**. Verify snapshot:
 > `tsc` 0 · `vitest` 828 · `next build`.
 
@@ -544,9 +546,9 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 169)
+## 7. New / Changed Schema (migrations 093 → 178)
 
-Highest migration: **162** (149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **178** (149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
@@ -638,19 +640,19 @@ policies** keyed on the `app.tenant_id` GUC, and mig **116** extended forced RLS
 tables (`episodic_memories` et al., previously enabled-but-policyless). `withTenant()` (`lib/rls.ts`)
 wraps each tenant operation in a txn that `SELECT set_config('app.tenant_id', $1, true)` (SET LOCAL).
 
-**Today this is effectively a single enforced layer: the explicit `WHERE tenant_id = $1` predicate.** The
-app still connects as the schema **owner**, which **bypasses RLS**, so the FORCE policies are wired but do
-not yet bite — the WHERE predicates are the belt that actually isolates tenants. The policies become the
-second, defense-in-depth layer only on the planned cutover to the non-owner **`govtech_app`** role
-(created mig 094; the `NOBYPASSRLS` agent role is specified in `docs/AGENT_WORKFORCE.md`, wired by
-migs 116/117).
+**Isolation is two-layer and enforced (app-side).** The app connects as the non-owner **`govtech_app`**
+(`NOBYPASSRLS`) role (LOGIN-capable per mig 136_rls_cutover), so `withTenant()`'s `SET app.tenant_id` makes
+the FORCE `tenant_isolation` policies **bite** underneath the explicit `WHERE tenant_id = $1` predicate
+(defense-in-depth). The pipeline `rfp_agent` agent role (`docs/AGENT_WORKFORCE.md`, wired by migs 116/117/136)
+is built but deploy-gated — it enforces once ops points `AGENT_DATABASE_URL` at it; otherwise the agent runs
+on the caller connection with the app-layer predicate + fail-closed guard.
 
-**`govtech_app`-cutover caveat (RLS-cutover checklist, launch-readiness item #9).** The retired-table
-repoints above — the CMS `matched_opportunities` read, the rfp-curation Customer Interest panel, and
-`v_opportunity_rollup` — are **direct cross-tenant reads of `tenant_opportunity_cards` (RLS FORCED)** from
-the admin/CMS side. They work today only because the owner bypasses RLS; after the `govtech_app`
-(`NOBYPASSRLS`) cutover they would return **0** unless run on a BYPASSRLS connection or reframed as
-owner-views. Belongs on the RLS-cutover checklist — see `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
+**Cross-tenant admin/CMS reads (live invariant).** The retired-table repoints above — the CMS
+`matched_opportunities` read, the rfp-curation Customer Interest panel, and `v_opportunity_rollup` — are
+**direct cross-tenant reads of `tenant_opportunity_cards` (RLS FORCED)** from the admin/CMS side. Because the
+app runs as `govtech_app`, they MUST run on a BYPASSRLS/owner connection (`sqlBypass`/`enterBypass`) or an
+owner-view (`v_opportunity_rollup` already is) — a tenant-scoped connection returns **0** rows. Treat any
+tenant-scoped cross-tenant read here as a live bug.
 
 ---
 

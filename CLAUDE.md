@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 987 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1092 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -35,14 +35,18 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **176** — migs 163–167 per below;
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **178** — migs 163–167 per below;
 mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
 extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
 **NEW vs UPDATE** (`lib/scout/classify.ts`) and released as a new intake (`stageIntake`) or an update
 (`logAmendment` on the matched opp), or dismissed — advisory, injection-fenced, platform-scope, `/admin/scouts`;
 docs/SCOUT_INTAKE_QUEUE.md; mig 176 seeds the four **program-primer guide drafts** (BAA · OTA · CSO · Grants/NOFO)
 authored canvas-native + queued for admin review via a `content_publish` HITL ToDo — draft-gated, nothing public
-until published (docs/CONTENT_QUEUE.md);
+until published (docs/CONTENT_QUEUE.md); migs **177–178** add the **template-stable/bridge** spine — admin
+master templates fan forward-only onto tenant template cards → instantiate into `library_atoms`, with per-tenant
+document/template provenance (`lib/template-bridge.ts`, docs/TEMPLATE_BRIDGE_DESIGN.md); and the **NILOC
+gold-example** proposal set (`frontend/scripts/niloc/`, docs/NILOC_GOLD_EXAMPLES.md) exercises every agency
+cost-form + volume end-to-end;
 the **cost-volume common-form pass** added migs **168–169** (the Ohio TVSF Round-45 OPP card + the final Foundation
 3DCP proposal off it, for deployment verification). The cost/budget volume is now COMPUTED + agency-neutral: one
 deterministic burden engine (`lib/proposal/cost-model.ts`, a TS port of `pipeline/…/budget_model.py`, parity to the
@@ -73,7 +77,9 @@ descoped — the comp code stands in.
 The pipeline agent workforce (`AgentFabric`, **36 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
-`publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
+`publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY` — in the sandbox the committed emulator stands in for Claude:
+`EMULATE=1` points `ANTHROPIC_BASE_URL` at the :8787 test-harness so every AI-gated flow runs end-to-end
+with no live key, exactly mirroring the prod wiring, docs/AI_FLOWS_PROOF.md);
 `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance `agent_task_queue`;
 plus the greenfielded `librarian` (onto `library_atoms`, atomize→`agent_task_queue`, injection-fenced) and
 `scoring_strategist` (tenant-discretion) producers, and the platform-scope `opportunity_scout` — WOKEN
@@ -197,7 +203,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (987 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1092 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run

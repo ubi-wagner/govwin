@@ -90,7 +90,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       // RLS cutover (docs/RLS_CUTOVER.md): this route composes dynamic `sql``` WHERE/ORDER
       // fragments, which the context-aware `sql` Proxy would eagerly EXECUTE instead of splice.
       // So it runs inside withTenant() — the fragments are built with the raw tx client (`tx```),
-      // and the whole query is scoped by SET LOCAL app.tenant_id under govtech_app. Inert pre-flip.
+      // and the whole query is scoped by SET LOCAL app.tenant_id under govtech_app (live RLS).
       const { proposals, total } = await withTenant(tenantId, async (tx) => {
         const filters = [tx`p.tenant_id = ${tenantId}::uuid`];
         if (stageFilter) {

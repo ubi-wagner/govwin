@@ -50,8 +50,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
     type CardRow = { templateKey: string; title: string; category: string; agency: string | null; format: string; bridgeVersion: number; updateAvailable: boolean; template: unknown };
     let row: CardRow | undefined;
     try {
-      // Explicit tenant predicate (belt) + RLS (suspenders): the app connects as the RLS-bypassing
-      // owner today, so without the tenant_id filter this could read another tenant's card.
+      // Explicit tenant predicate (belt) + RLS (suspenders): the app runs as `govtech_app` so
+      // RLS scopes it; the tenant_id filter is defense-in-depth.
       [row] = await withTenant<CardRow[]>(tenantId, async (tx) => tx`
         SELECT template_key AS "templateKey", title, category, agency, format,
                bridge_version AS "bridgeVersion", update_available AS "updateAvailable", template

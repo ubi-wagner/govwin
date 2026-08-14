@@ -1,8 +1,8 @@
-# Launch Status — all big efforts (as of mig 176)
+# Launch Status — all big efforts (as of mig 178)
 
 A faithful, current status of every major launch effort. Legend: **✅ shipped + proven** ·
 **🔵 built, intentionally inert** (ships off until a one-op flip / first tenant edit) · **⏳ descoped**.
-Backbone this cycle: **`tsc` 0 · `vitest` 1085 pass (123 files) · migration head 176 · `next build` clean**,
+Backbone this cycle: **`tsc` 0 · `vitest` 1085 pass (123 files) · migration head 178 · `next build` clean**,
 plus the live proofs cited below.
 
 ## A. The customer spine (canonical surface)
@@ -103,16 +103,16 @@ plus the live proofs cited below.
 - **✅ Copy-inward-only sharing (#118)** — every share copies content INTO the recipient's own space; a live
   integrity sweep found **0 cross-tenant references** (atoms/versions/sections). "Guardrails and data
   segregation can never be compromised." (docs/COPY_INWARD_GUARDRAIL.md)
-- **🔵 RLS cutover** — mig 136_rls_cutover (19 force-RLS tables, 35 `tenant_isolation` policies, the
-  `NOBYPASSRLS` `govtech_app`/`rfp_agent` roles + per-request `SET app.tenant_id` context) is **built +
-  applied in schema**; single-layer in effect today (app still connects as the owner role), inert until the
-  one-op prod `DATABASE_URL` flip. (docs/RLS_CUTOVER.md)
+- **✅ RLS live** — mig 136_rls_cutover (19 force-RLS tables, 35 `tenant_isolation` policies, the
+  `NOBYPASSRLS` `govtech_app`/`rfp_agent` roles + per-request `SET app.tenant_id` context) is **applied and
+  in effect**: the app connects as the `NOBYPASSRLS govtech_app` role with the per-request `SET app.tenant_id`
+  context, so RLS is the enforced second layer. (docs/RLS_CUTOVER.md)
 - **✅ Credentials** — mig 124 rotated master_admin off the committed seed; `.test` accounts deactivated +
   hash-invalidated.
 
 ## G. Verification backbone (this cycle)
 
-`tsc` 0 · `vitest` **1085 pass** · migrations applied through **176** · `next build` clean · **E2E proof
+`tsc` 0 · `vitest` **1085 pass** · migrations applied through **178** · `next build` clean · **E2E proof
 across 3 solicitations** (TVSF · SBIR Phase I · DoD D2P2 STTR — admin author → tenant build → submission-ready
 → package bytes; docs/E2E_LAUNCH_PROOF.md) · **AI fabric proven on the full rig** (worker + emulator) · live
 Playwright drives for every surface touched.
@@ -130,6 +130,8 @@ Playwright drives for every surface touched.
 The greenfield opportunity-card spine is the canonical customer surface; the compliance-authoring core
 (admin author → release → provision → Studio draft → readiness → package) is proven end-to-end across three
 real solicitations; the AI agent fabric drives every gated flow with land-or-review + full auditability; and
-the two big safety layers (RLS cutover, automation-policy) are built and waiting on a single deliberate flip.
-Data segregation is intact and proven (0 cross-tenant references). What remains is deployment-time (the RLS
-`DATABASE_URL` flip, the live `ANTHROPIC_API_KEY`/`VOYAGE_API_KEY`) and the explicit descopes above.
+RLS is **live app-side** (the app runs as `govtech_app`); the automation-policy layer is built and inert
+until a tenant edits a policy, and the pipeline agent RLS role (`rfp_agent`) is built and deploy-gated on
+`AGENT_DATABASE_URL`. Data segregation is intact and proven (0 cross-tenant references). What remains is
+deployment-time (the agent `AGENT_DATABASE_URL` provisioning, the live `ANTHROPIC_API_KEY`/`VOYAGE_API_KEY`)
+and the explicit descopes above.

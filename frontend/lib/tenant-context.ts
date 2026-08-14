@@ -9,11 +9,10 @@
  * straight through. `enterWith` sets the store for the remainder of the current async
  * execution (the request), so all downstream `sql`/lib calls inherit it with no threading.
  *
- * SAFETY: with NO context entered — every code path today — `sql` is byte-identical to the
- * raw client (pure passthrough), so this is inert until the choke points are wired AND a
- * request enters a context. And because every tenant query already carries a `WHERE
- * tenant_id` predicate (verified by the launch sweep), a wrong/unset GUC can only DENY-ALL
- * (a caught break), never leak — the app-layer predicate stays the primary filter.
+ * SAFETY: with NO context entered, `sql` is byte-identical to the raw client (pure
+ * passthrough). The choke points ARE wired (routes call `enterTenant`/`enterBypass`); a
+ * wrong/unset GUC can only DENY-ALL (a caught break), never leak, since every tenant query
+ * also carries a `WHERE tenant_id` predicate.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 

@@ -7,7 +7,9 @@
  * guardrail / landing / human-review UX), which is exactly what a live key can't be used to prove here.
  *
  * Zero product-code change: both services read ANTHROPIC_BASE_URL (frontend parse-solicitation.ts:64;
- * the @anthropic-ai/sdk + python AsyncAnthropic honor it) and gate on ANTHROPIC_API_KEY !== 'sk-noop'.
+ * the @anthropic-ai/sdk + python AsyncAnthropic honor it). Most call sites gate on ANTHROPIC_API_KEY
+ * PRESENCE (only parse-solicitation.ts + vision.ts treat 'sk-noop' as OFF); the 'emulated-claude' value
+ * below passes every gate.
  * Point them here (ANTHROPIC_BASE_URL=http://127.0.0.1:8787, ANTHROPIC_API_KEY=emulated-claude) and every
  * real invoke path lands on this server. Non-streaming only (all callers use messages.create).
  *
