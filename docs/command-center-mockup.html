@@ -114,19 +114,29 @@ const R = {
           ['Foundation 3DCP — review cost volume','due Aug 15','desc'],['Bright Materials — approve teaming','due Aug 17','desc'],['Aether Robotics — upload SF424','overdue','desc'],['Vertex Additive — acknowledge kickoff','due Aug 20','desc']]}],
         note:'Every managed company’s open to-dos in one feed — the “notify-up” your /partner console already does, now tabbed. Descend to act inside the company.'},
     ]},
-  tenant:{ brand:'Foundation 3DCP', chip:'my company', bell:5, sub:'Hi Kate — <span class="n">5</span> open for your team.',
-    legend:'<b>Tenant admin</b> sees only their own company — two lanes, no descending (they’re already home).',
+  tenant:{ brand:'Foundation 3DCP', chip:'my company', bell:9, sub:'Hi Kate — <span class="n">9</span> open across your lanes.',
+    legend:'<b>Tenant admin</b> sees their own company — four lanes, no descending (they’re already home). <b>Activity</b> is admin-only. Descended RFP-admins &amp; partner-managers see this same view.',
     tabs:[
       {key:'opp',label:'Opportunities',tone:'action',count:2,
         actions:['🔍 Browse spotlight','➕ New proposal'],
         cards:[{tone:'action',title:'Your spotlight &amp; proposals',count:2,rows:[
           ['Ohio TVSF Round 45 — pinned for you','ready to build a portal'],['DoW STTR — Autonomous Concrete AM','proposal 80% · in review']]}],
         note:'Your pinned opportunities and the proposals in flight.'},
-      {key:'todos',label:'My to-dos',tone:'action',count:3,
+      {key:'todos',label:'To-dos',tone:'action',count:3,
         actions:['📨 Send a to-do','👥 Invite teammate'],
         cards:[{tone:'action',title:'Your team’s to-dos',count:3,rows:[
           ['Review the DoW STTR cost volume','due Aug 15'],['Approve the university teaming agreement','due Aug 17'],['Approve the vendor MSA','due Aug 14']]}],
         note:'Your own workflow to-dos — you act right here, no descending.'},
+      {key:'workflows',label:'Workflows',tone:'progress',count:4,
+        actions:['📝 Run full draft','🎬 Run Studio','📨 Create a to-do'],
+        cards:[{tone:'progress',title:'Active pipeline runs',count:4,rows:[
+          ['Proposal build — DoW STTR','running · Draft phase'],['Contract kickoff — TVSF R45','paused · your gate'],['Studio — Refine loop','paused · review gate'],['Project setup — NSF SBIR','running · provisioning']]}],
+        note:'Your live workflow instances (proposal builds, Studio loops, kickoffs). Paused = waiting on you; tap to advance. Reuses the existing Processes monitor.'},
+      {key:'activity',label:'Activity',tone:'progress',count:12,
+        actions:['🔎 Filter','📅 7 days'],
+        cards:[{tone:'progress',title:'Recent system activity',count:12,rows:[
+          ['Invited Jordan Vega to the DoW STTR proposal','collaborator · 2h ago'],['Kate added Priya Shah to the team','new member · today'],['DoW STTR advanced to Review','proposal · today'],['Cost volume uploaded','library · yesterday']]}],
+        note:'Admin-only feed — project invites, new members, and system events for your company. Reuses the Activity Stream (visibility tightened to admin).'},
     ]},
 };
 

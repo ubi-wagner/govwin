@@ -83,14 +83,21 @@ action-tone tabs.
 *(No Admin/System tabs — rank 50 has no `/admin` reach. Optional future "Requests" tab = pending
 `manager_request` handshakes + registration status.)*
 
-### 3.3 Tenant admin (`tenant_admin`, rank 60 — own tenant)  → tabs: Opportunities · My to-dos
+### 3.3 Tenant admin (`tenant_admin`, rank 60 — own tenant)  → tabs: Opportunities · To-dos · Workflows · Activity
+
+**Descended RFP-admins (shadow) and partner-managers (pin-up) see this SAME tenant view** — the descended
+session is the tenant portal — so these tabs serve them too. **Activity is admin-only** (`tenant_admin+`),
+so a `tenant_user` never sees it; rfp_admin passes by rank, a descended partner passes as the pinned
+`tenant_admin`.
 
 | Tab | Purpose | Data source | Count = | Row → |
 |---|---|---|---|---|
 | **Opportunities** | own spotlight + proposals | own `tenant_opportunity_cards` (pins) + active `proposals`, `sql`+`enterTenant` | # cards to act on + proposals in flight | `/portal/[slug]/cards` or `/proposals/[id]` |
-| **My to-dos** | own workflow to-dos | `/api/portal/[slug]/tasks` (tenant branch — the shipped TaskQueue) | # open to-dos | `/portal/[slug]/[entity]` |
+| **To-dos** | own workflow to-dos | `/api/portal/[slug]/tasks` (tenant branch — the shipped TaskQueue) | # open to-dos | `/portal/[slug]/[entity]` |
+| **Workflows** | live pipeline instances | `process_instances WHERE tenant_id=$t AND archived_at IS NULL AND status IN ('running','paused','pending','retrying')`, `sql`+`enterTenant`. **Reuse `<ProcessesClient>` + `classifyProcessHealth` (the shipped `/portal/[slug]/processes`).** | # active instances (mostly the **paused HITL gates** = the actionable ones — do NOT filter to `running`-only or it reads empty) | per-instance step timeline; tenant_admin **"Move to next gate"** (`forceAdvanceProcess`, `canForceAdvanceInstance`) |
+| **Activity** (admin-only) | tenant system events | `system_events WHERE tenant_id=$t ORDER BY created_at DESC LIMIT 200`. **Reuse the Activity Stream (`/portal/[slug]/activity`).** Tighten visibility `tenant_user → tenant_admin+` in **3 spots** (nav `layout.tsx`, page guard `activity/page.tsx`, cockpit indicator `cockpit.tsx`). | recent-count (no unread state today) | filterable timeline — invites (`collaborator.invited`/`team_member.invited`), member-adds, lifecycle |
 
-*(No Admin/System/shadow — they act only in their own tenant, which is where they already are.)*
+*(No Admin / System-monitor tabs — those are the RFP-admin cross-tenant console. The tenant sees only its own pipeline + activity.)*
 
 ---
 
@@ -116,7 +123,9 @@ Every button = a *create/do/jump* verb for that lane. All map to existing routes
 | Tab | Buttons → action |
 |---|---|
 | Opportunities | 🔍 **Browse spotlight** → `/portal/[slug]/cards` · ➕ **New proposal** → buy/provision from a pinned card |
-| My to-dos | 📨 **Send a to-do** → compose to my team (`assign-task-form`) · 👥 **Invite teammate** → team invite |
+| To-dos | 📨 **Send a to-do** → compose to my team (`assign-task-form`) · 👥 **Invite teammate** → team invite |
+| Workflows | 📝 **Run full draft** → `POST …/proposals/[p]/full-draft` (mode a/b/c) · 🎬 **Run Studio** → `POST …/proposals/[p]/studio` (`auto` = all 3 loops) · 📨 **Create a to-do** → `assign-task-form`. *(Real per-proposal starts only — a generic template-launcher is admin-only and NOT exposed to tenants, per the locked decision.)* |
+| Activity | 🔎 **Filter** (namespace) · 📅 **Time range** — read-only feed; reuse the Activity Stream's own controls |
 
 ---
 
@@ -159,8 +168,12 @@ entity depth from plain portal links.
 1. **RFP-admin tabbed Command Center** — evolve `/admin/command` into the 4 tabs + count badges + action
    rows + the **new tenant-surfaced/descend** query & tab. Highest daily value. (`getReviewQueue` stays for
    the Opportunities tab; add the admin-tasks, tenant-surfaced, and system tab sources.)
-2. **Extract `<CommandCenter>`** into the role-parameterized component; mount for **tenant admin** (their
-   cockpit) reusing `/api/portal/[slug]/tasks`.
+2. **Extract `<CommandCenter>`** + mount for **tenant admin** — tabs Opportunities · To-dos · **Workflows**
+   (reuse `<ProcessesClient>` / the shipped `/portal/[slug]/processes`; Start = Run full draft + Run Studio;
+   Create a to-do) · **Activity** (reuse the Activity Stream + tighten its visibility `tenant_user →
+   tenant_admin+`). Descended rfp-admins/partner-managers inherit this view. The Activity gate-tighten is a
+   small standalone security fix (a `tenant_user` should not see the full activity firehose) worth shipping
+   regardless of the Command Center.
 3. **Partner-manager mount** over the managed stable (`partnerScopeTenants` + `tenantRollupStats`); widen
    `/api/partner/enter` `next` for entity descent.
 4. *(optional)* the unread watermark + failed-workflow→to-do hook feeding the System lane.
