@@ -30,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/scouts">Scout Monitor</AdminNavLink>
           <AdminNavLink href="/admin/pipeline">Pipeline Jobs</AdminNavLink>
           <AdminNavLink href="/admin/templates">Templates</AdminNavLink>
+          <AdminNavLink href="/admin/template-stable">Template Stable</AdminNavLink>
           <AdminNavLink href="/admin/guardrail-defaults">Guardrail Defaults</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Customers</span>

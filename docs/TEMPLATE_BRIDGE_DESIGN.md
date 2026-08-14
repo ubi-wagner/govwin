@@ -195,7 +195,16 @@ The bridge only removes the deprecation risk if we also **stop the live cross-te
     filled download, "just like the proposal artifacts".)
   - Proven: data-layer (instantiate FK-safe + tenant-scoped → atomize → idempotent no-op → all atoms
     tenant-scoped → clean) + live browser (login → 18 cards → preview anchors intact → Use → editor with toast).
-- **Phase 3 (admin push + version-up), Phase 5 (consolidate/retire), Phase 6 (content-stable gaps) — PENDING.**
+- **Phase 3 (admin push + version-up) — SHIPPED.** `/admin/template-stable` roster (masters × category, format
+  badge, `master vN · bridge vN · X/Y tenants current` reach) + **Sync from catalog** (`POST …/template-stable/sync`
+  → `lib/template-stable-sync.ts`: NEW masters publish, CHANGED masters version-up + publish, UNCHANGED skipped —
+  no version churn) + per-master **Push new version** (`POST …/template-stable/[id]/publish` → `publishAndFanOutTemplate`).
+  Forward-only fan-out applies the new skeleton to every tenant card + flags `update_available` (instances
+  untouched); the tenant gallery's **Refreshed ✕** badge acks it (`POST …/template-cards/[cardId]/ack`). Emits
+  `library:template.stable_synced` + `library:template.published`. Proven live (admin drive): 18 masters,
+  Sync = "18 unchanged" (idempotent), Push "Commercialization Plan" → bridge v2 → all 4 tenant cards v2 +
+  update_available (bridge rows `1:published, 2:republished`).
+- **Phase 5 (consolidate/retire), Phase 6 (content-stable gaps) — PENDING.**
 
 ## 8. Thoughts + open calls (your "thoughts?")
 

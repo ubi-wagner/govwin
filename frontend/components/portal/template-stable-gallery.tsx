@@ -100,6 +100,14 @@ export function TemplateStableGallery({ tenantSlug }: { tenantSlug: string }) {
     }
   }, [tenantSlug]);
 
+  const ackCard = useCallback(async (card: TemplateCard) => {
+    // Optimistically clear the "Refreshed" flag; the fan-out already applied the new skeleton.
+    setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, updateAvailable: false } : c)));
+    try {
+      await fetch(`/api/portal/${tenantSlug}/template-cards/${card.id}/ack`, { method: 'POST' });
+    } catch { /* best-effort — the badge is informational */ }
+  }, [tenantSlug]);
+
   const useTemplate = useCallback(async (card: TemplateCard) => {
     setUsingId(card.id);
     try {
@@ -166,9 +174,13 @@ export function TemplateStableGallery({ tenantSlug }: { tenantSlug: string }) {
                     <div className="flex items-start justify-between gap-2">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${badge.cls}`}>{badge.label}</span>
                       {card.updateAvailable && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" title="A newer version of this template is available">
-                          Update available
-                        </span>
+                        <button
+                          onClick={() => ackCard(card)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 hover:bg-amber-200"
+                          title="This template was refreshed by an admin — the new skeleton is already on your shelf (your existing documents are untouched). Click to dismiss."
+                        >
+                          Refreshed <span aria-hidden>✕</span>
+                        </button>
                       )}
                     </div>
                     <div className="min-h-[2.5rem]">
