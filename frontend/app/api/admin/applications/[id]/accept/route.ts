@@ -10,6 +10,7 @@ import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { backfillTenantTemplates } from '@/lib/template-bridge';
 import { isRole, type Role } from '@/lib/rbac';
 import bcrypt from 'bcryptjs';
 
@@ -286,6 +287,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (copyErr) {
       console.error('[api/admin/applications/accept] starter-set copy failed (non-fatal):', copyErr);
     }
+
+    // Template stable: 100% copy-on-create of every pristine master into the tenant's OWN shelf via
+    // the forward-only template bridge (mig 177) — skeleton-only, isolated per tenant. Best-effort.
+    try { await backfillTenantTemplates(tenantId); }
+    catch (tplErr) { console.error('[api/admin/applications/accept] template backfill failed (non-fatal):', tplErr); }
 
     // Fallback OFFER (P5.3) — a one-time dismissible ToDo routing them to the Library's one-click
     // bulk add. Only when the eager copy landed nothing (copy failed or the catalog is empty), so the

@@ -17,6 +17,7 @@ import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { backfillTenantTemplates } from '@/lib/template-bridge';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
@@ -269,6 +270,12 @@ export async function POST(request: Request) {
     let starterCopied = 0;
     try { starterCopied = (await copyStarterSetToTenant(created.tenantId, { id: created.adminUserId })).added; }
     catch (e) { console.error('[admin/tenants/create] starter-set copy failed', e); }
+
+    // Template stable: copy every pristine master (100% copy-on-create) into the tenant's OWN shelf
+    // via the forward-only template bridge (mig 177). Skeleton-only, isolated per tenant — same
+    // copy-on-create pattern as the starter set. Idempotent, best-effort — creation never fails on it.
+    try { await backfillTenantTemplates(created.tenantId); }
+    catch (e) { console.error('[admin/tenants/create] template backfill failed', e); }
 
     // Fallback OFFER (P5.3): only when the eager copy landed nothing (copy failed or the catalog is
     // empty) do we drop the dismissible one-click "add the starter set" ToDo, so the tenant is never

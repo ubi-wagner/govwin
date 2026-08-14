@@ -15,6 +15,7 @@ import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { backfillTenantTemplates } from '@/lib/template-bridge';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 /**
@@ -40,6 +41,7 @@ export async function ensurePartnerOwnOrgProvisioned(
   try { await backfillTenant(tenantId); } catch (e) { console.error('[partner/own-org] backfill failed:', e); }
   try { await scoreTenantCards(tenantId); } catch (e) { console.error('[partner/own-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(tenantId, { id: userId }); } catch (e) { console.error('[partner/own-org] starter-set copy failed:', e); }
+  try { await backfillTenantTemplates(tenantId); } catch (e) { console.error('[partner/own-org] template backfill failed:', e); }
   try {
     await emitEventSingle({
       namespace: 'finder',

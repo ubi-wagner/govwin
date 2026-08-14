@@ -10,6 +10,7 @@ import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
+import { backfillTenantTemplates } from '@/lib/template-bridge';
 import { emitEventSingle, userActor } from '@/lib/events';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -93,6 +94,7 @@ export async function createPartnerOrg(input: CreatePartnerOrgInput): Promise<Cr
   try { await backfillTenant(created.tenantId); } catch (e) { console.error('[create-partner-org] backfill failed:', e); }
   try { await scoreTenantCards(created.tenantId); } catch (e) { console.error('[create-partner-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(created.tenantId, { id: created.userId }); } catch (e) { console.error('[create-partner-org] starter copy failed:', e); }
+  try { await backfillTenantTemplates(created.tenantId); } catch (e) { console.error('[create-partner-org] template backfill failed:', e); }
   try {
     await emitEventSingle({
       namespace: 'finder', type: 'tenant.created',
