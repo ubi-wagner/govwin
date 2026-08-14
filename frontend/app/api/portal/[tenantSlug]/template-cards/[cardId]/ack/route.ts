@@ -14,6 +14,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext { params: Promise<{ tenantSlug: string; cardId: string }> }
 
@@ -58,6 +59,16 @@ export async function POST(_request: Request, ctx: RouteContext) {
       console.error('[portal/template-cards/ack] update failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
+
+    // Terminal step of the template-refresh chain (detect → push → apply → ACKNOWLEDGE):
+    // audit it so a future workflow can consume "has this tenant seen the refreshed skeleton?".
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.acknowledged',
+      actor: userActor(su.id),
+      tenantId,                       // real tenant UUID — portal action
+      payload: { cardId },
+    });
 
     return NextResponse.json({ data: { acknowledged: true } });
   } catch (e) {

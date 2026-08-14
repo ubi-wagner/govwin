@@ -16,7 +16,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { sqlBypass as sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { stageIntake } from '@/lib/intake';
 import { logAmendment, type AmendmentSeverity } from '@/lib/amendments';
 import {
@@ -280,6 +280,15 @@ export async function materializeExtractedOpportunities(
   extracted: unknown[],
   actor: Actor,
 ): Promise<number> {
+  // Audit the scout→candidate-queue on-ramp as a start/end pair (independent of the best-effort
+  // per-row classify) so a future auto-triage workflow can consume this feed's reporting contract.
+  const startId = await emitEventStart({
+    namespace: 'finder',
+    type: 'candidates.materialized',
+    actor: userActor(actor.actorId, actor.actorEmail ?? undefined),
+    tenantId: null,
+    payload: { profileId, sourceName, examined: extracted.length },
+  });
   let created = 0;
   for (const item of extracted) {
     if (!item || typeof item !== 'object') continue;
@@ -305,5 +314,6 @@ export async function materializeExtractedOpportunities(
       try { await classifyFinding(rows[0].id, actor); } catch { /* best-effort */ }
     }
   }
+  await emitEventEnd(startId, { result: { created, examined: extracted.length } });
   return created;
 }
