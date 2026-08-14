@@ -169,6 +169,34 @@ The bridge only removes the deprecation risk if we also **stop the live cross-te
    the download path; migrate the code constants to the bridge as seed versions.
 6. **Content stable** — author the gap templates (§5), each pristine + interpolation-audited.
 
+### AS-BUILT (2026-08) — phases 1–3 SHIPPED + live-proven
+
+- **Phase 1 (bridge plumbing + copy-on-create) — SHIPPED.** mig **177** (`master_templates` + `template_bridge`
+  L0 forward-only + `tenant_template_cards` L1, RLS ENABLE+FORCE) · `lib/template-bridge.ts` (the quintet:
+  `buildTemplateSnapshot`/`publishTemplate`/`applyTemplateToTenant`/`fanOutTemplate`/`publishAndFanOutTemplate`
+  + `backfillTenantTemplates`/`reconcileTenantTemplates`) · `scripts/seed-template-masters.mts` (18 masters →
+  bridge v1 → fan-out). `backfillTenantTemplates` wired into all 4 creation paths next to
+  `copyStarterSetToTenant`. Proven: 18 masters → 72 owned cards (18 × 4 tenants), every card carries the full
+  `canvasDocument` (real isolated copies).
+- **Phase 2 (portal cards + preview + instantiate + atomize-on-download) — SHIPPED.**
+  - `GET /portal/[t]/template-cards` (list, meta) + `GET …/[cardId]` (body, preview) + `POST …/[cardId]/use`
+    (instantiate). All three use **explicit `tenant_id` predicate (belt) + `withTenant` (suspenders)** — the belt
+    is what scopes the read TODAY (owner role still bypasses RLS; a live browser drive caught the leak — 72 cards
+    instead of 18 — before the belt was added).
+  - `/portal/[t]/templates` page + `TemplateStableGallery` (cards grouped by category, format badge,
+    update-available badge, Preview drawer = `CanvasRenderer readOnly`, "Use this template"). Nav link added.
+  - Instantiate reuses `starterFromTemplate` → `tenant_documents`. The card is a `tenant_template_cards` snapshot,
+    NOT a `document_templates` row, so `source_template_id` (FK) stays **NULL**; provenance is the new soft
+    `source_template_key` (mig **178**).
+  - **Atomize-on-download** (`lib/documents/atomize-on-export.ts`, wired into the standalone-doc export route):
+    first export decomposes the FILLED canvas into the library (`decomposeAndIngest`), once-only via a CAS on
+    `tenant_documents.atomized_at` (mig 178) so re-exports never duplicate. Emits `library:document.atomized`.
+    (A blank skeleton instantiate does NOT atomize — the anchors would pollute the library; the trigger is the
+    filled download, "just like the proposal artifacts".)
+  - Proven: data-layer (instantiate FK-safe + tenant-scoped → atomize → idempotent no-op → all atoms
+    tenant-scoped → clean) + live browser (login → 18 cards → preview anchors intact → Use → editor with toast).
+- **Phase 3 (admin push + version-up), Phase 5 (consolidate/retire), Phase 6 (content-stable gaps) — PENDING.**
+
 ## 8. Thoughts + open calls (your "thoughts?")
 
 **My recommendation:** do it, and use it as the forcing function to **collapse the three template systems into

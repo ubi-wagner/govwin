@@ -146,6 +146,7 @@ export default async function PortalLayout({
                 <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
+                <PortalNavLink href={`${basePath}/templates`}>Templates</PortalNavLink>
               </>
             )}
             {/* Setup tail — separated by a hairline, not a labeled section. */}
