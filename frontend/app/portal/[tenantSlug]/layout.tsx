@@ -131,6 +131,9 @@ export default async function PortalLayout({
               cockpit/dashboard is the visual home, the rail is just navigation). A hairline
               separates the daily surfaces from the setup tail; no uppercase section headers. */}
           <nav className="flex flex-col gap-1 text-sm">
+            {/* Command Center — the tabbed "what needs me → act" console (Opportunities · To-dos ·
+                Workflows · Activity). The admin front door; a base member lands on the cockpit. */}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/command`}>Command Center</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}

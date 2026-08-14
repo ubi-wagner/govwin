@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { TaskQueue } from '@/components/tasks/task-queue';
+import { TodosPanel } from '@/components/tasks/todos-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,9 +25,13 @@ export default async function TodosPage({ params }: { params: Promise<{ tenantSl
   const ok = await verifyTenantAccess(u.id, role, tenant.id as string);
   if (!ok) redirect('/portal');
 
+  // tenant_admin+ can compose a to-do / broadcast here; base members (tenant_user,
+  // partner_user) see only their queue. Server-side the assign route re-enforces this.
+  const canCompose = hasRoleAtLeast(role, 'tenant_admin');
+
   return (
     <div className="max-w-2xl p-4">
-      <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
+      <TodosPanel tenantSlug={tenantSlug} canCompose={canCompose} />
     </div>
   );
 }
