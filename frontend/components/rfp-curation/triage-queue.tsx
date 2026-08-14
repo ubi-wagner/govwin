@@ -87,6 +87,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
             : i,
         ),
       );
+      toast.success('Claimed');
     } catch {
       // error displayed via useTool
     }
@@ -102,6 +103,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
             : i,
         ),
       );
+      toast.success('Released for AI analysis');
     } catch {
       // error displayed via useTool
     }
@@ -109,6 +111,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
 
   const handleDismiss = async (solId: string) => {
     const notes = prompt('Reason for dismissal (optional):');
+    if (notes === null) return; // Cancel aborts — do NOT dismiss on a cancelled prompt
     try {
       await invoke('solicitation.dismiss', {
         solicitationId: solId,
@@ -119,6 +122,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
           i.solicitationId === solId ? { ...i, status: 'dismissed' } : i,
         ),
       );
+      toast.success('Dismissed');
     } catch {
       // error displayed via useTool
     }

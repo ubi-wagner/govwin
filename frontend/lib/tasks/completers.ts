@@ -131,8 +131,8 @@ export function taskHref(opts: {
     case 'contract': return tenantSlug ? `/portal/${tenantSlug}/contracts/${entityId}` : null;
     case 'content_pages': return `/admin/site/content/${entityId}`; // resolver → Studio editor
     case 'source': return `/admin/sources/${entityId}`;
-    case 'opportunity':
-    case 'solicitation': return `/admin/rfp-curation`;
+    case 'opportunity': return `/admin/rfp-curation`; // an opp id is not a solId — land on the queue
+    case 'solicitation': return `/admin/rfp-curation/${entityId}`; // deep-link straight to the workspace
     default: return null;
   }
 }

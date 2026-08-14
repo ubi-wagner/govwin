@@ -526,6 +526,7 @@ export function CurationWorkspace({
           break;
         case 'dismiss': {
           const notes = prompt('Reason for dismissal:');
+          if (notes === null) return; // Cancel aborts — do NOT dismiss on a cancelled prompt
           await invoke('solicitation.dismiss', { solicitationId: sol.id, notes: notes || undefined });
           setSol((s) => ({ ...s, status: 'dismissed' }));
           break;
@@ -564,6 +565,15 @@ export function CurationWorkspace({
           setSol((s) => ({ ...s, status: 'pushed_to_pipeline' }));
           break;
       }
+      // Success feedback — every state transition confirms, so the culminating Push
+      // (and the rest) is never a silent badge flip. Errors surface via useTool.
+      const done: Record<string, string> = {
+        claim: 'Claimed', release: 'Released for AI analysis', dismiss: 'Dismissed',
+        start_curation: 'Curation started', request_review: 'Sent for review',
+        approve: 'Approved', reject_review: 'Sent back for revision',
+        push: 'Published to the pipeline — customer cards are live',
+      };
+      if (done[action]) toast.success(done[action]);
       router.refresh();
     } catch {
       // error shown via useTool
