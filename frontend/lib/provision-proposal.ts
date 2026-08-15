@@ -15,6 +15,7 @@
 
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
+import { runInTenant } from '@/lib/tenant-context';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
 import { preStageProposalReviewTodos } from '@/lib/automation/prestage-todos';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
@@ -242,42 +243,51 @@ export async function provisionProposalForPortal(opts: {
     });
 
     await emitEventEnd(eventId, { result: { tenantId, tenantSlug, proposalId: out.proposalId, sectionCount: out.sectionCount, title: proposalTitle } });
-    // #190 C3: pre-stage the review-gate ToDos (agent drafts V0 → human reviews),
-    // policy-parameterized + agent-first aware. Best-effort: never fails provisioning.
-    try {
-      await preStageProposalReviewTodos({ tenantId, proposalId: out.proposalId, opportunityId, label, actorId, actorEmail });
-    } catch (e) {
-      console.error('[provision-proposal] prestage review todos failed (non-fatal)', e);
-    }
 
-    // Create library seed job + enqueue suggester (best-effort, non-blocking).
-    // The suggester scans existing library atoms for prior-proposal content that
-    // matches the new compliance matrix, surfaces ranked candidates to the admin.
-    try {
-      // ON CONFLICT restates the partial-unique predicate of idx_library_seed_jobs_active
-      // (one active job per proposal): a re-provision no-ops instead of throwing a
-      // duplicate-key error. On conflict RETURNING yields no row, so the suggester
-      // isn't re-enqueued — the existing active job already owns that work.
-      const [seedJob] = await sql<{ id: string }[]>`
-        INSERT INTO library_seed_jobs (tenant_id, proposal_id, status)
-        VALUES (${tenantId}, ${out.proposalId}, 'analyzing')
-        ON CONFLICT (proposal_id) WHERE status <> ALL (ARRAY['applied', 'skipped'])
-        DO NOTHING
-        RETURNING id
-      `;
-      if (seedJob?.id) {
-        await requestAgentTask({
-          tenantId,
-          agentRole: 'library_seed_suggester',
-          taskType: 'seed_suggest',
-          input: { proposal_id: out.proposalId, tenant_id: tenantId, seed_job_id: seedJob.id },
-          proposalId: out.proposalId,
-        });
+    // The best-effort tail writes to RLS-forced tables (tasks, library_seed_jobs, the agent
+    // queue) via the context-aware `sql`, but runs OUTSIDE the withTenant block above — so it
+    // needs its OWN tenant context, else a caller without an ambient one (the admin cockpit's
+    // cross-tenant "Complete & Release", provisionAndReleasePortal) trips RLS and silently drops
+    // the buyer's review ToDos + reuse suggester. Scope the whole tail to the buyer tenant. Still
+    // best-effort — a failure inside never fails the provision.
+    await runInTenant(tenantId, async () => {
+      // #190 C3: pre-stage the review-gate ToDos (agent drafts V0 → human reviews),
+      // policy-parameterized + agent-first aware.
+      try {
+        await preStageProposalReviewTodos({ tenantId, proposalId: out.proposalId, opportunityId, label, actorId, actorEmail });
+      } catch (e) {
+        console.error('[provision-proposal] prestage review todos failed (non-fatal)', e);
       }
-    } catch (e) {
-      // Non-blocking — provision succeeds even if seed job creation fails
-      console.error('[provision-proposal] seed job init failed (non-blocking)', e);
-    }
+
+      // Create library seed job + enqueue suggester (non-blocking). The suggester scans existing
+      // library atoms for prior-proposal content that matches the new compliance matrix, surfacing
+      // ranked candidates to the admin.
+      try {
+        // ON CONFLICT restates the partial-unique predicate of idx_library_seed_jobs_active
+        // (one active job per proposal): a re-provision no-ops instead of throwing a
+        // duplicate-key error. On conflict RETURNING yields no row, so the suggester
+        // isn't re-enqueued — the existing active job already owns that work.
+        const [seedJob] = await sql<{ id: string }[]>`
+          INSERT INTO library_seed_jobs (tenant_id, proposal_id, status)
+          VALUES (${tenantId}, ${out.proposalId}, 'analyzing')
+          ON CONFLICT (proposal_id) WHERE status <> ALL (ARRAY['applied', 'skipped'])
+          DO NOTHING
+          RETURNING id
+        `;
+        if (seedJob?.id) {
+          await requestAgentTask({
+            tenantId,
+            agentRole: 'library_seed_suggester',
+            taskType: 'seed_suggest',
+            input: { proposal_id: out.proposalId, tenant_id: tenantId, seed_job_id: seedJob.id },
+            proposalId: out.proposalId,
+          });
+        }
+      } catch (e) {
+        // Non-blocking — provision succeeds even if seed job creation fails
+        console.error('[provision-proposal] seed job init failed (non-blocking)', e);
+      }
+    });
     return out;
   } catch (e) {
     console.error('[provision-proposal] transaction failed', e);
