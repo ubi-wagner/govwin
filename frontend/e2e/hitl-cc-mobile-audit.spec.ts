@@ -42,15 +42,27 @@ async function sweep(page: Page, label: string, urls: Array<[string, string]>): 
     if (bounced || status >= 400 || blank) issues.push(`❌ ${label}/${name}: HARD (status=${status} bounced=${bounced} blank=${blank})`);
     else if (overflow) {
       const culprit = await page.evaluate((vw) => {
-        let worst = ''; let worstW = 0;
+        // A real body-overflow contributor pushes past the viewport AND has no ancestor that
+        // clips/scrolls horizontally (a child inside overflow-x-auto is contained — ignore it).
+        const contained = (el: Element): boolean => {
+          let p = el.parentElement;
+          while (p && p !== document.body) {
+            const ox = getComputedStyle(p).overflowX;
+            if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') return true;
+            p = p.parentElement;
+          }
+          return false;
+        };
+        const hits: string[] = [];
         for (const el of Array.from(document.querySelectorAll('body *'))) {
           const r = (el as HTMLElement).getBoundingClientRect();
-          if (r.right > vw + 2 && r.width > worstW) {
-            worstW = r.width;
-            worst = `<${el.tagName.toLowerCase()} class="${(el.getAttribute('class') || '').slice(0, 80)}"> w=${Math.round(r.width)} right=${Math.round(r.right)}`;
+          if (r.right > vw + 2 && r.width > 0 && !contained(el)) {
+            hits.push(`<${el.tagName.toLowerCase()} class="${(el.getAttribute('class') || '').slice(0, 70)}"> w=${Math.round(r.width)} right=${Math.round(r.right)}`);
           }
         }
-        return worst;
+        // Narrowest true offenders first — the smallest element that still pokes out is the leaf to fix.
+        hits.sort((a, b) => (parseInt(a.split('w=')[1]) || 0) - (parseInt(b.split('w=')[1]) || 0));
+        return hits.slice(0, 3).join('  ||  ') || '(only contained scrollers — likely a false trip)';
       }, iw);
       issues.push(`↔️ ${label}/${name}: h-overflow ${sw}>${iw} | ${culprit}`);
     }
@@ -76,8 +88,8 @@ test('tenant CC destinations — mobile clean', async ({ page }) => {
     ['buckets', '/portal/foundation/buckets'],
   ]);
   console.log('\n=== TENANT MOBILE AUDIT ===\n' + (issues.join('\n') || 'clean'));
-  const hard = issues.filter((i) => i.startsWith('❌'));
-  expect(hard, `\n${hard.join('\n')}`).toEqual([]);
+  // Enforce ZERO: any hard failure OR horizontal overflow fails the audit.
+  expect(issues, `\n${issues.join('\n')}`).toEqual([]);
 });
 
 test('admin CC destinations — mobile clean', async ({ page }) => {
@@ -98,6 +110,6 @@ test('admin CC destinations — mobile clean', async ({ page }) => {
     ['system', '/admin/system'],
   ]);
   console.log('\n=== ADMIN MOBILE AUDIT ===\n' + (issues.join('\n') || 'clean'));
-  const hard = issues.filter((i) => i.startsWith('❌'));
-  expect(hard, `\n${hard.join('\n')}`).toEqual([]);
+  // Enforce ZERO: any hard failure OR horizontal overflow fails the audit.
+  expect(issues, `\n${issues.join('\n')}`).toEqual([]);
 });

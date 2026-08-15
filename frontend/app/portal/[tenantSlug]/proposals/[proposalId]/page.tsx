@@ -478,7 +478,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
             <h1 className="text-2xl font-bold text-gray-900 truncate">
               {proposal.title}
             </h1>
-            <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-gray-500">
               {proposal.topicNumber && <span>Topic {proposal.topicNumber}</span>}
               {proposal.agency && <span>{proposal.agency}</span>}
               {proposal.programType && (

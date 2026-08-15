@@ -138,9 +138,9 @@ function ActorDisplay({
   const label = actorEmail ?? actorId ?? actorType ?? 'unknown';
 
   return (
-    <span className="text-xs text-gray-500">
-      <span className="mr-1">{icon}</span>
-      {label}
+    <span className="text-xs text-gray-500 min-w-0 inline-flex items-center max-w-full">
+      <span className="mr-1 shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
     </span>
   );
 }

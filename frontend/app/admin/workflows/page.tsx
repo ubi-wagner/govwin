@@ -289,7 +289,7 @@ export default async function WorkflowMonitorPage({
         ))}
         <span className="mx-1 text-gray-300">|</span>
         {/* Custom bookend range (server-rendered GET form; From alone = since-date to present) */}
-        <form method="get" action="/admin/workflows" className="flex items-center gap-1.5">
+        <form method="get" action="/admin/workflows" className="flex flex-wrap items-center gap-1.5">
           <label className="text-gray-500">From</label>
           <input type="date" name="from" defaultValue={fromDate ?? ''} required
             className="border border-gray-300 rounded px-2 py-1 text-xs" />

@@ -55,7 +55,11 @@ export function NavShell({
           </button>
           {brand && <span className="text-sm font-semibold truncate">{brand}</span>}
         </div>
-        <main className={mainClassName ?? 'flex-1 min-w-0'}>{children}</main>
+        {/* overflow-x-clip is the systemic guard: the page body can never scroll sideways, while
+            inner overflow-x-auto scrollers (tables, tab bars) and position:sticky still work (clip
+            does not create a scroll container). Per-row wrapping handles the large overflows so this
+            only catches tiny decorative residuals. */}
+        <main className={mainClassName ?? 'flex-1 min-w-0 overflow-x-clip'}>{children}</main>
       </div>
     </div>
   );
