@@ -7,6 +7,7 @@ import { listSectionAssignees, type SectionAssignee } from '@/lib/proposal/secti
 import { resolveCanvasCapabilities, type CanvasPermission, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import { SectionAssignBar } from '@/components/proposal/section-assign-bar';
+import { SectionAssistBar } from '@/components/proposal/section-assist-bar';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
 import { coerceJsonb } from '@/lib/jsonb';
@@ -204,6 +205,15 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       canAssign={canAssign}
       assignees={sectionAssignees}
       todoStatus={sectionTodoStatus}
+    />
+    <SectionAssistBar
+      tenantSlug={tenantSlug}
+      proposalId={proposalId}
+      sectionId={sectionId}
+      sectionTitle={section.title ?? section.sectionNumber ?? 'Section'}
+      isEmpty={section.status === 'empty'}
+      canEdit={capabilities.canEditContent && !locked}
+      pageLimit={section.pageAllocation ?? null}
     />
     <CanvasEditorPage
       canvasDocument={canvasDoc}
