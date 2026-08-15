@@ -6,22 +6,27 @@
  * or collaborator. Assigning raises the assignee's `edit_section` ToDo (deep-linked here); locking the
  * section auto-completes it. Read-only for everyone else — they just see the owner.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
 
 export interface AssigneeOption { id: string; name: string | null; email: string; kind: 'member' | 'collaborator'; role: string | null }
 
 export function SectionAssignBar({
-  tenantSlug, proposalId, sectionId, currentAssigneeId, currentAssigneeName, canAssign, assignees, todoStatus,
+  tenantSlug, proposalId, sectionId, currentAssigneeId, currentAssigneeName, canAssign, assignees, todoStatus, locked = false,
 }: {
   tenantSlug: string; proposalId: string; sectionId: string;
   currentAssigneeId: string | null; currentAssigneeName: string | null;
-  canAssign: boolean; assignees: AssigneeOption[]; todoStatus: 'open' | 'in_progress' | 'completed' | null;
+  canAssign: boolean; assignees: AssigneeOption[]; todoStatus: 'open' | 'in_progress' | 'completed' | null; locked?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [assigneeId, setAssigneeId] = useState(currentAssigneeId ?? '');
+  // Re-sync when the prop changes after a router.refresh() or an external reassign (audit C1).
+  useEffect(() => { setAssigneeId(currentAssigneeId ?? ''); }, [currentAssigneeId]);
+  // A locked section is read-only — assigning an editor is refused server-side; keep the picker enabled
+  // only to CLEAR an existing assignment (audit H2).
+  const pickerDisabled = busy || (locked && !currentAssigneeId);
 
   async function save(next: string) {
     setBusy(true);
@@ -45,8 +50,9 @@ export function SectionAssignBar({
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
       <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Owner</span>
       {canAssign ? (
-        <select value={assigneeId} onChange={(e) => save(e.target.value)} disabled={busy}
-          className="min-w-[12rem] rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50" title="Assign this section">
+        <select value={assigneeId} onChange={(e) => save(e.target.value)} disabled={pickerDisabled}
+          className="min-w-[12rem] rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
+          title={locked ? 'Section is locked — unlock to assign an editor' : 'Assign this section'}>
           <option value="">Unassigned</option>
           {assignees.map((o) => <option key={o.id} value={o.id}>{label(o)}</option>)}
         </select>

@@ -168,14 +168,15 @@ export interface TenantTodo {
 export async function getTenantSurfacedTodos(): Promise<{ items: TenantTodo[]; count: number }> {
   const rows = await safeRows(sqlBypass<Array<{
     id: string; title: string | null; taskType: string; tenantSlug: string; tenantName: string;
-    entityType: string | null; entityId: string | null; dueAt: string | null;
+    entityType: string | null; entityId: string | null; dueAt: string | null; params: Record<string, unknown> | null;
   }>>`
     SELECT tk.id, tk.title, tk.task_type AS "taskType", ten.slug AS "tenantSlug", ten.name AS "tenantName",
-           tk.entity_type AS "entityType", tk.entity_id AS "entityId", tk.due_at AS "dueAt"
+           tk.entity_type AS "entityType", tk.entity_id AS "entityId", tk.due_at AS "dueAt", tk.params
     FROM tasks tk
     JOIN tenants ten ON ten.id = tk.tenant_id
     WHERE tk.tenant_id IS NOT NULL
-      AND tk.assignee_role IN ('tenant_admin','tenant_user','partner_user')
+      -- role-assigned OR user-assigned (a section ToDo is assigned by assignee_user_id, role NULL — audit H4)
+      AND (tk.assignee_role IN ('tenant_admin','tenant_user','partner_user') OR tk.assignee_user_id IS NOT NULL)
       AND tk.status IN ('open','in_progress')
       AND ten.archived_at IS NULL
     ORDER BY tk.due_at ASC NULLS LAST, tk.created_at ASC
@@ -184,7 +185,8 @@ export async function getTenantSurfacedTodos(): Promise<{ items: TenantTodo[]; c
   const items: TenantTodo[] = rows.map((r) => ({
     id: r.id, title: r.title || 'Untitled to-do', taskType: r.taskType,
     tenantName: r.tenantName, tenantSlug: r.tenantSlug, dueAt: r.dueAt,
-    href: taskHref({ tenantSlug: r.tenantSlug, entityType: r.entityType, entityId: r.entityId })
+    // params carries proposalId so a section entity resolves to the section editor (audit H4).
+    href: taskHref({ tenantSlug: r.tenantSlug, entityType: r.entityType, entityId: r.entityId, params: r.params })
           ?? `/portal/${r.tenantSlug}/todos`,
   }));
   return { items, count: items.length };

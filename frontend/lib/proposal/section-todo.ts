@@ -78,10 +78,15 @@ export async function assignSection(
     if (!actorAccess.canManageTeam && !opts.isManager) {
       return { ok: false, error: 'Only an admin or a portal manager can assign sections', code: 'FORBIDDEN', status: 403 };
     }
-    const [sec] = await sql<Array<{ id: string; title: string | null; volumeName: string | null }>>`
-      SELECT id, title, volume_name AS "volumeName" FROM proposal_sections
+    const [sec] = await sql<Array<{ id: string; title: string | null; volumeName: string | null; isLocked: boolean }>>`
+      SELECT id, title, volume_name AS "volumeName", is_locked AS "isLocked" FROM proposal_sections
       WHERE id = ${sectionId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1`;
     if (!sec) return { ok: false, error: 'Section not found', code: 'NOT_FOUND', status: 404 };
+    // A locked section is read-only — routing an editor to it would raise a ToDo whose "Open →" opens a
+    // read-only editor (audit H2). Refuse assigning to a locked section (clearing an assignment is fine).
+    if (assigneeUserId && sec.isLocked) {
+      return { ok: false, error: 'This section is locked — unlock it before assigning an editor', code: 'SECTION_LOCKED', status: 409 };
+    }
 
     // Re-assigning or clearing cancels the previous open section ToDo (no duplicate queue items).
     await sql`

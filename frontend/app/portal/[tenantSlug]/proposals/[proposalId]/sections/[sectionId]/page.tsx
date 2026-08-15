@@ -205,6 +205,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       canAssign={canAssign}
       assignees={sectionAssignees}
       todoStatus={sectionTodoStatus}
+      locked={locked}
     />
     <SectionAssistBar
       tenantSlug={tenantSlug}

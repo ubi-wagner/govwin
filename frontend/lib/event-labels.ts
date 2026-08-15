@@ -197,7 +197,7 @@ export function eventHref(tenantSlug: string, ev: EventLike): string | null {
   const opportunityId = str(p.opportunityId) ?? str(p.opportunity_id) ?? str(p.topicId);
 
   if (proposalId) {
-    const sectionEvents = ['section.saved', 'section.exported', 'section.locked', 'section.unlocked', 'comment.created'];
+    const sectionEvents = ['section.saved', 'section.exported', 'section.locked', 'section.unlocked', 'comment.created', 'section.assigned'];
     if (sectionId && sectionEvents.includes(ev.type)) {
       return `${base}/proposals/${proposalId}/sections/${sectionId}`;
     }
