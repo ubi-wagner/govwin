@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -66,6 +67,18 @@ def _coerce(v: Any, fallback: Any) -> Any:
         except (ValueError, TypeError):
             return fallback
     return v
+
+
+def _keyword_hit(text: str, keyword: str) -> bool:
+    """Mirror of frontend keywordHit (lib/bucket-ranking.ts): a short single-word token (<=3 chars)
+    matches only on a WORD BOUNDARY so 'ai'/'ml' don't hit 'email'/'html'; longer tokens and
+    multi-word phrases keep substring matching. Deterministic."""
+    k = keyword.strip().lower()
+    if not k:
+        return False
+    if len(k) <= 3 and " " not in k:
+        return re.search(r"\b" + re.escape(k) + r"\b", text) is not None
+    return k in text
 
 
 def _close_ms(close_date: Any) -> Optional[float]:
@@ -101,7 +114,7 @@ def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
 
     kws = criteria.get("keywords") or []
     if kws:
-        hits = sum(1 for k in kws if k and k.lower() in text)
+        hits = sum(1 for k in kws if k and _keyword_hit(text, k))
         parts.append(("keyword", hits / len(kws), w.get("keyword", 1)))
 
     naics = criteria.get("naics") or []
@@ -133,8 +146,10 @@ def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
             parts.append(("timeline", v, w.get("timeline", 0.5)))
 
     total_w = sum(p[2] for p in parts)
-    score = _js_round(100 * sum(p[1] * p[2] for p in parts) / total_w) if total_w > 0 else 0
-    factors = {p[0]: _js_round(p[1] * 100) for p in parts}
+    # Clamp to [0,100] to belt the DB CHECK (mig 180) — matches frontend scoreCard.
+    raw = _js_round(100 * sum(p[1] * p[2] for p in parts) / total_w) if total_w > 0 else 0
+    score = max(0, min(100, raw))
+    factors = {p[0]: max(0, min(100, _js_round(p[1] * 100))) for p in parts}
     return {"score": score, "factors": factors}
 
 

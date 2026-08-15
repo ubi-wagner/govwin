@@ -33,6 +33,14 @@ def test_keyword_fraction():
     assert r["factors"] == {"keyword": 50}
 
 
+def test_keyword_precision_word_boundary_for_short_tokens():
+    # Lock-down: bare short tokens ('ai'/'ml') match only on a word boundary, not substring, so
+    # they no longer false-positive on 'email'/'html'. Longer tokens/phrases stay substring.
+    assert score_card({"title": "AI radar"}, {"keywords": ["ai"]}, NOW_MS)["score"] == 100
+    assert score_card({"title": "Email marketing"}, {"keywords": ["ai", "ml"]}, NOW_MS)["score"] == 0
+    assert score_card({"title": "concrete 3d printing"}, {"keywords": ["3d print"]}, NOW_MS)["score"] == 100
+
+
 def test_naics_and_agency_weighted_average():
     r = score_card(
         {"agency": "DARPA", "naicsCodes": ["541715"]},

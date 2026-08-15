@@ -11,6 +11,24 @@
 
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
+import { coerceJsonb } from '@/lib/jsonb';
+
+/**
+ * True if `keyword` occurs in `text` (both compared lowercased). Precision rule: a short single-word
+ * token (≤3 chars) matches only on a WORD BOUNDARY, so the default buckets' bare `ai`/`ml` no longer
+ * false-positive on "email"/"html"; longer tokens and multi-word phrases keep substring matching
+ * (deliberately fuzzy — "3d print" should hit "3d printing"). Deterministic. Mirror in
+ * pipeline/src/workflows/actions/rescore.py::_keyword_hit.
+ */
+export function keywordHit(text: string, keyword: string): boolean {
+  const k = keyword.trim().toLowerCase();
+  if (!k) return false;
+  if (k.length <= 3 && !/\s/.test(k)) {
+    const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${esc}\\b`).test(text);
+  }
+  return text.includes(k);
+}
 
 export interface BucketCriteria {
   keywords?: string[];
@@ -46,7 +64,7 @@ export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: num
   const text = [card.title, card.spotlightSummary, card.description, card.office].filter(Boolean).join(' ').toLowerCase();
 
   if (criteria.keywords?.length) {
-    const hits = criteria.keywords.filter((k) => k && text.includes(k.toLowerCase())).length;
+    const hits = criteria.keywords.filter((k) => k && keywordHit(text, k)).length;
     parts.push({ key: 'keyword', v: hits / criteria.keywords.length, weight: w.keyword ?? 1 });
   }
   if (criteria.naics?.length) {
@@ -73,9 +91,12 @@ export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: num
   }
 
   const totalW = parts.reduce((s, p) => s + p.weight, 0);
-  const score = totalW > 0 ? Math.round((100 * parts.reduce((s, p) => s + p.v * p.weight, 0)) / totalW) : 0;
+  // v ∈ [0,1] for every signal so the weighted average is already in range; clamp anyway to belt the
+  // DB CHECK(score BETWEEN 0 AND 100) (mig 180) — a negative/huge criteria weight can't leak a bad score.
+  const raw = totalW > 0 ? Math.round((100 * parts.reduce((s, p) => s + p.v * p.weight, 0)) / totalW) : 0;
+  const score = Math.max(0, Math.min(100, raw));
   const factors: Record<string, number> = {};
-  for (const p of parts) factors[p.key] = Math.round(p.v * 100);
+  for (const p of parts) factors[p.key] = Math.max(0, Math.min(100, Math.round(p.v * 100)));
   return { score, factors };
 }
 
@@ -92,7 +113,10 @@ export async function rankBucket(tenantId: string, bucketId: string, nowMs: numb
       WHERE tenant_id = ${tenantId}::uuid AND id = ${bucketId}::uuid AND is_active LIMIT 1
     `;
     if (bucket.length === 0) return { ranked: 0 };
-    const criteria = bucket[0].criteria ?? {};
+    // coerceJsonb: if any writer stored criteria via `JSON.stringify(x)::jsonb` it reads back as a
+    // STRING, and `criteria.keywords` would be undefined → every card silently scores 0. Coerce to an
+    // object (docs/BUCKET_LOCKDOWN.md T2; the repo's #1 jsonb footgun, lib/jsonb.ts).
+    const criteria = coerceJsonb<BucketCriteria>(bucket[0].criteria, {});
 
     const cards = await tx<Array<{ opportunityId: string; card: CardFields }>>`
       SELECT opportunity_id, card FROM tenant_opportunity_cards
@@ -101,7 +125,7 @@ export async function rankBucket(tenantId: string, bucketId: string, nowMs: numb
     `;
     let ranked = 0;
     for (const c of cards) {
-      const { score, factors } = scoreCard(c.card ?? {}, criteria, nowMs);
+      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs);
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${bucketId}::uuid, ${c.opportunityId}::uuid, ${score}, ${sql.json(factors)})
