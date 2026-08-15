@@ -399,6 +399,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         resolved: false,
         userId: sessionUser.id,
         createdAt: comment.createdAt,
+        anchor: anchor ?? null, // echo the span anchor so an optimistic render shows the quote immediately
       },
     });
   } catch (e) {
