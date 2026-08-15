@@ -219,6 +219,29 @@ export async function provisionProposalForPortal(opts: {
           }
           count++;
         }
+        // SPINE-T4 gap fix: a REQUIRED volume with ZERO required items still got an artifact above but
+        // NO section — an invisible no-op volume (never locks, never blocks advance, invisible to
+        // readiness, skipped by the zip), so a build could be "submission-ready" with a whole required
+        // volume missing. Give every such volume a placeholder section + matrix row so it must be
+        // authored + locked like any other.
+        for (const vol of resolved.volumes) {
+          const items = (vol.items as Array<Record<string, unknown>>) ?? [];
+          if (items.length > 0) continue;
+          const volName = (vol.volumeName as string) ?? null;
+          const volNum = (vol.volumeNumber as number) ?? null;
+          const artifactId = artifactByVolKey.get(volKey(volNum, volName)) ?? null;
+          const [phSection] = await tx<{ id: string }[]>`
+            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, volume_name, volume_number)
+            VALUES (${p.id}, ${artifactId}, '1', 1, ${volName ?? 'Volume content'}, ${null}, 'empty', ${null}, ${volName}, ${volNum})
+            RETURNING id
+          `;
+          await tx`
+            INSERT INTO proposal_compliance_matrix
+              (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+            VALUES (${p.id}, ${volName ?? 'Volume content'}, ${volName ?? 'RFP'}, true, 'not_addressed', ${phSection.id})
+          `;
+          count++;
+        }
       } else {
         const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance });
         const [defArt] = await tx<{ id: string }[]>`
@@ -239,6 +262,41 @@ export async function provisionProposalForPortal(opts: {
         `;
         count = 1;
       }
+
+      // SPINE-T4 gap fix: seed the required SUPPORTING DOCUMENTS from the solicitation compliance, exactly
+      // as the legacy manual-create route does. Without this the portal-provision path left
+      // proposal_supporting_docs empty, so the `missing_document` submission blocker could NEVER fire for a
+      // portal-built proposal — the #1 avoidable administrative DQ was silently unguarded.
+      try {
+        if (t.solicitationId) {
+          const [comp] = await tx<Array<{ requiredDocuments: unknown }>>`
+            SELECT required_documents AS "requiredDocuments" FROM solicitation_compliance
+            WHERE solicitation_id = ${t.solicitationId}::uuid LIMIT 1`;
+          const reqDocs = comp?.requiredDocuments;
+          if (Array.isArray(reqDocs)) {
+            for (const doc of reqDocs) {
+              const d = doc as { name?: string; label?: string; source?: string; reference?: string; required?: boolean } | string;
+              const label = typeof d === 'string' ? d : (d.name || d.label || String(d));
+              const source = typeof d === 'object' && d !== null ? (d.source || d.reference || null) : null;
+              const required = typeof d === 'object' && d !== null ? (d.required !== false) : true;
+              await tx`
+                INSERT INTO proposal_supporting_docs
+                  (proposal_id, tenant_id, requirement_label, requirement_source, category, is_required, status)
+                VALUES (${p.id}::uuid, ${tenantId}::uuid, ${label}, ${source}, 'supporting_document', ${required}, 'missing')`;
+            }
+          }
+        }
+        // The user-upload placeholder categories (mirrors the legacy create route).
+        await tx`
+          INSERT INTO proposal_supporting_docs
+            (proposal_id, tenant_id, requirement_label, category, is_required, status)
+          VALUES
+            (${p.id}::uuid, ${tenantId}::uuid, 'Proposal Input Materials', 'proposal_input', false, 'missing'),
+            (${p.id}::uuid, ${tenantId}::uuid, 'Other Documents', 'other', false, 'missing')`;
+      } catch (docErr) {
+        console.error('[provisionProposalForPortal] supporting-doc seed failed (non-fatal):', docErr);
+      }
+
       return { proposalId: p.id as string, sectionCount: count };
     });
 
