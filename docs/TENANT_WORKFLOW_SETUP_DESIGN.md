@@ -1,5 +1,20 @@
 # Tenant Workflow Setup — design (2026-08-15)
 
+> **✅ AS-BUILT (core, TW-1..6 shipped + proven).** No migration — the model rides in the open
+> `guardrail_config` JSONB (stage `dueDate`/`gateCloser`/`agentManagerKey`/`autoAdvance`/
+> `defaultAssigneeUserId`, per-todo `dueDate`/`nudgeDays`, `_setup`). `lib/portal-workflow.ts`
+> (`projectTodoTiming`·`resolveTodoAssignee`·`validateGuardrailConfig`+`checkWorkflowComplete`·`canEditWorkflow`·
+> `editPortalWorkflow` re-projection·`isPortalManager`·`rebaselineConfig`); `lib/portal-workflow-recommend.ts`
+> (`recommendWorkflowConfig` — own accepted history, copy-inward); `lib/tasks/update-task.ts` (per-task PATCH);
+> routes `…/portals/[portalId]/workflow` (GET·PATCH save/accept·POST rebaseline) + `…/tasks/[taskId]` PATCH;
+> the required setup ToDo + `_setup:pending` from `provisionAndReleasePortal`; the page
+> `/portal/[slug]/portals/[portalId]` + `workflow-setup-client.tsx`. Proven: `drive-tenant-workflow-setup.mts`
+> 24/24 + `drive-provisioning-cockpit.mts` 25/25 + a Playwright drive as a tenant_admin; tsc 0 · vitest 1129.
+> **Fast-follow (TW-8): the AI-manager `auto` gate closer** (assisted one-click confirm works today; the
+> guarded auto-advance on cohort+adversarial-pass is the remaining piece). Deferred polish: an embedded
+> team/collaborator matrix on the page (today it links out to the existing Team surfaces) + bulk-invite.
+
+
 The **tenant-side counterpart to the provisioning cockpit**: once the RFP-admin team releases a portal
 (`curation_pending → launched`), the buying **tenant_admin** gets a full, low-lift UI to run their build
 workflow — set the stage-gate dates, name who owns each interstage ToDo, tune the nudge cadence, and add

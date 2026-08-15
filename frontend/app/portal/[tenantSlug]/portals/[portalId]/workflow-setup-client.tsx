@@ -186,6 +186,11 @@ export function WorkflowSetupClient({
         )}
       </div>
 
+      <p className="text-xs text-gray-500 mt-3">
+        Owners are your team members and collaborators.{' '}
+        <a href={`/portal/${tenantSlug}/team`} className="text-blue-600 hover:underline">Add or manage people →</a>
+      </p>
+
       {/* Nudges */}
       <section className="bg-white border border-gray-200 rounded-lg p-4 mt-5">
         <h2 className="text-sm font-semibold mb-2">Reminders (days before a to-do is due)</h2>

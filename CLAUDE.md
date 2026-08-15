@@ -41,7 +41,19 @@ master — segregation), then (2) `provisionAndReleasePortal` provisions THIS bu
 `curation_pending→launched`, and kicks off their workflow (the private portal — continuity). One shared
 `provisionAndReleasePortal` helper backs both the cockpit and the tenant-side `?action=release` (no drift);
 the provision best-effort tail (review ToDos + reuse suggester) is `runInTenant`-scoped so a cross-tenant
-admin caller never trips RLS. The
+admin caller never trips RLS. On release the buyer gets a **required tenant Workflow Setup** (recommend-but-
+require, TW-1..6, docs/TENANT_WORKFLOW_SETUP_DESIGN.md): `provisionAndReleasePortal` marks
+`guardrail_config._setup=pending` + raises a required ToDo → the tenant-owned page `/portal/[slug]/portals/
+[portalId]` where a tenant_admin/delegated-manager reviews a **history-recommended** plan (their prior
+*accepted* USAF-Phase-I/D2P2 pattern; own-history only, copy-inward) and **Accept & Starts** it. It's the
+post-launch-editable spine the frozen guardrail model never had — absolute stage-gate dates, a per-stage
+**gate closer** (Human | AI-manager), per-ToDo owner (a real person *or* a role) + date + nudge, and one-click
+**rebaseline** (shift ±N days / set from the solicitation close) — all riding the open `guardrail_config` JSONB
+(**no migration**). Edits re-project onto the live `tasks` rows via `editPortalWorkflow` (matches by title;
+resets `nudges_sent` so the pipeline nudge sweep re-fires against the new due), with a per-task
+`PATCH …/tasks/[taskId]` for day-to-day reassign/reschedule — so advancement stays task-completion-driven and
+the sweeper stays row-driven (aligned 100% with the phase-machine; the AI-manager `auto`-advance is the TW-8
+fast-follow). The
 OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
