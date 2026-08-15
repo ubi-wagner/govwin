@@ -2,6 +2,7 @@
 import { sqlBypass as sql } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import { OppWatchToggle } from '@/components/admin/opp-watch-toggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ type RollupRow = {
   proposalsArchived: number;
   lastProposalActivity: Date | null;
   contracts: number;
+  updateWatch: boolean;
 };
 
 const LIFECYCLE_COLORS: Record<string, string> = {
@@ -50,18 +52,20 @@ export default async function AdminOpportunityRollupPage() {
   let rows: RollupRow[] = [];
   try {
     rows = await sql<RollupRow[]>`
-      SELECT opportunity_id, title, agency, program_type, lifecycle_status, close_date,
-             ranked_tenants::int        AS ranked_tenants,
-             pinned_tenants::int        AS pinned_tenants,
-             proposals::int             AS proposals,
-             proposals_in_build::int    AS proposals_in_build,
-             proposals_final::int       AS proposals_final,
-             proposals_submitted::int   AS proposals_submitted,
-             proposals_archived::int    AS proposals_archived,
-             contracts::int             AS contracts,
-             last_proposal_activity
-      FROM v_opportunity_rollup
-      WHERE ranked_tenants > 0 OR proposals > 0
+      SELECT r.opportunity_id, r.title, r.agency, r.program_type, r.lifecycle_status, r.close_date,
+             r.ranked_tenants::int        AS ranked_tenants,
+             r.pinned_tenants::int        AS pinned_tenants,
+             r.proposals::int             AS proposals,
+             r.proposals_in_build::int    AS proposals_in_build,
+             r.proposals_final::int       AS proposals_final,
+             r.proposals_submitted::int   AS proposals_submitted,
+             r.proposals_archived::int    AS proposals_archived,
+             r.contracts::int             AS contracts,
+             r.last_proposal_activity,
+             COALESCE(o.update_watch, false) AS update_watch
+      FROM v_opportunity_rollup r
+      LEFT JOIN opportunities o ON o.id = r.opportunity_id
+      WHERE r.ranked_tenants > 0 OR r.proposals > 0
       ORDER BY proposals DESC, ranked_tenants DESC, last_proposal_activity DESC NULLS LAST
       LIMIT 200
     `;
@@ -93,6 +97,7 @@ export default async function AdminOpportunityRollupPage() {
                 <th className="px-4 py-3 font-medium">Pinned</th>
                 <th className="px-4 py-3 font-medium">Proposals</th>
                 <th className="px-4 py-3 font-medium">Last activity</th>
+                <th className="px-4 py-3 font-medium">Updates</th>
               </tr>
             </thead>
             <tbody>
@@ -132,6 +137,9 @@ export default async function AdminOpportunityRollupPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {r.lastProposalActivity ? new Date(r.lastProposalActivity).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <OppWatchToggle opportunityId={r.opportunityId} initial={r.updateWatch} />
                     </td>
                   </tr>
                 );
