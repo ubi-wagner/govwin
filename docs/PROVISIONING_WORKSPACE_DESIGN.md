@@ -1,5 +1,14 @@
 # Provisioning Workspace & Demand-Triggered Build-Out (2026-08-15)
 
+> **✅ AS-BUILT (PV-1..6, shipped + proven).** mig 182 `build_complete`; `lib/provisioning/{readiness,
+> complete,release-portal}.ts`; cockpit `/admin/provisioning/[portalId]` (page + `release-panel.tsx`);
+> admin route `POST …/provisioning/[portalId]/release` (two-outcome) + standalone `…/rfp-curation/[solId]/
+> complete-buildout`; purchase `proposal_setup` ToDo → `entityType:'portal'` → cockpit deep-link
+> (`taskHref` `case 'portal'`). Latent fix: the provision best-effort tail is `runInTenant`-scoped so a
+> cross-tenant admin caller no longer trips RLS on `tasks`/`library_seed_jobs`. Proven: `frontend/scripts/
+> drive-provisioning-cockpit.mts` (23/23, both outcomes + events + `cardsRefreshed`) + a Playwright browser
+> drive (`shot-provisioning-cockpit.mjs`); tsc 0 · vitest 1116. Commits `a9cbcd6·2ff1fd9·49053ff·3506823·b54a370`.
+
 The **build-side capstone**: complete a master OPP's build-out on demand (purchase-triggered, 72h
 SLA), **bank it at the master**, broadcast the completion to **all** mirror cards, and **provision the
 purchaser's portal** + kick off their workflow. This completes the documented two-release master-mirror

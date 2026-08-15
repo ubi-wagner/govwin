@@ -31,13 +31,25 @@ end-to-end (Playwright + the live Python workflow engine creating `process_insta
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
 the build UNLOCKED and instantiating the compliance matrix + molds from the master solicitation. The
+purchase's `proposal_setup` ToDo now deep-links to the **provisioning cockpit** (`/admin/provisioning/
+[portalId]`, PV-1..6, docs/PROVISIONING_WORKSPACE_DESIGN.md) — the rfp_admin surface that LANDS the 72h
+SLA: it shows the buyer + live SLA countdown + the master **build-out readiness bar** (compliance + ≥1
+volume + ≥1 required item; mig 182 `curated_solicitations.build_complete`), deep-links to the authoring
+workspace, and hosts a two-outcome **Complete & Release** — (1) `completeBuildOut` marks the master built
+out + BROADCASTS an `updated` fan-out to EVERY tenant's mirror card (`provisionReady=true`; the shared
+master — segregation), then (2) `provisionAndReleasePortal` provisions THIS buyer's private portal, flips
+`curation_pending→launched`, and kicks off their workflow (the private portal — continuity). One shared
+`provisionAndReleasePortal` helper backs both the cockpit and the tenant-side `?action=release` (no drift);
+the provision best-effort tail (review ToDos + reuse suggester) is `runInTenant`-scoped so a cross-tenant
+admin caller never trips RLS. The
 OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **181** — mig 180 the bucket-score
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **182** — mig 180 the bucket-score
 integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
-OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**: customer-admin/designee bucket
+OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
+`build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket
 authoring → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
 admin pin-for-updates (holder fan-out, pre-purchase) → notify/nudge (the hot-closing-soon start-nudge) → provision;
 migs 163–167 per below;
