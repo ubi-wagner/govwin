@@ -5,6 +5,7 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { describeEvent } from '@/lib/event-labels';
 import { listOpenTasksForActor } from '@/lib/tasks/tasks';
+import { getCommandSeen, isNew } from '@/lib/command/seen';
 import { CommandTabs, type CommandTabInput } from '@/components/command/command-tabs';
 import { TodosPanel } from '@/components/tasks/todos-panel';
 import PipelineCards from '@/components/portal/pipeline-cards';
@@ -31,7 +32,7 @@ const STAGE_LABEL: Record<string, { label: string; cls: string }> = {
   archived: { label: 'Archived', cls: 'bg-gray-100 text-gray-500' },
 };
 
-interface InFlightProposal { id: string; title: string; stage: string; isLocked: boolean }
+interface InFlightProposal { id: string; title: string; stage: string; isLocked: boolean; updatedAt: string }
 
 // Opportunities lane — the in-flight builds strip (proposals needing work) over the live
 // matched-opportunity feed (PipelineCards, self-loading, with pin/purchase actions).
@@ -145,7 +146,7 @@ export default async function TenantCommandCenterPage({
   let proposals: InFlightProposal[] = [];
   try {
     proposals = await sql<InFlightProposal[]>`
-      SELECT id, title, stage, is_locked FROM proposals
+      SELECT id, title, stage, is_locked, updated_at FROM proposals
       WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')
       ORDER BY updated_at DESC LIMIT 8`;
   } catch (e) {
@@ -153,10 +154,10 @@ export default async function TenantCommandCenterPage({
   }
 
   // ── To-dos: the actor's open queue (same query TaskQueue reads → badge never lies) ──
-  const todosCount = await (async () => {
-    try { return (await listOpenTasksForActor({ id: sessionUser.id!, role, tenantId })).length; }
-    catch (e) { console.error('[portal/command] todos count failed', e); return 0; }
-  })();
+  let todoRows: { createdAt: string }[] = [];
+  try { todoRows = await listOpenTasksForActor({ id: sessionUser.id!, role, tenantId }); }
+  catch (e) { console.error('[portal/command] todos query failed', e); }
+  const todosCount = todoRows.length;
 
   // ── Workflows: live process instances (reuse the /processes ledger rows verbatim) ──
   let processRows: ProcessRow[] | null = null;
@@ -195,9 +196,24 @@ export default async function TenantCommandCenterPage({
 
   const oppsCount = pinnedCards + activeProposalCount;
 
+  // ── "New since you last looked" (mig 179): the newest item per lane (from what we already fetched)
+  //    vs the per-tab watermark. First visit (no watermark) → no dots. Best-effort. ──
+  const scope = `tenant:${tenantId}`;
+  const seen = await getCommandSeen(sessionUser.id!, scope);
+  const newestTodo = todoRows.reduce<string | Date | null>(
+    (m, r) => (!m || new Date(r.createdAt).getTime() > new Date(m).getTime() ? r.createdAt : m),
+    null,
+  );
+  const hasNew = {
+    opp: isNew(seen, 'opp', proposals[0]?.updatedAt ?? null),
+    todos: isNew(seen, 'todos', newestTodo),
+    workflows: isNew(seen, 'workflows', (processRows ?? [])[0]?.updatedAt ?? null),
+    activity: isNew(seen, 'activity', recentEvents[0]?.createdAt ?? null),
+  };
+
   const tabs: CommandTabInput[] = [
     {
-      key: 'opp', title: 'Opportunities', tone: 'action', count: oppsCount,
+      key: 'opp', title: 'Opportunities', tone: 'action', count: oppsCount, hasNew: hasNew.opp,
       actions: [
         { label: '🔍 Browse spotlight', href: `${basePath}/cards` },
         { label: '📄 My builds', href: `${basePath}/portals` },
@@ -205,14 +221,14 @@ export default async function TenantCommandCenterPage({
       body: <OpportunitiesBody proposals={proposals} tenantSlug={tenantSlug} role={role} basePath={basePath} />,
     },
     {
-      key: 'todos', title: 'To-dos', tone: 'action', count: todosCount,
+      key: 'todos', title: 'To-dos', tone: 'action', count: todosCount, hasNew: hasNew.todos,
       actions: [
         { label: '👥 Invite teammate', href: `${basePath}/team` },
       ],
       body: <TodosPanel tenantSlug={tenantSlug} canCompose />,
     },
     {
-      key: 'workflows', title: 'Workflows', tone: 'default', count: activeInstances,
+      key: 'workflows', title: 'Workflows', tone: 'default', count: activeInstances, hasNew: hasNew.workflows,
       actions: [
         // Real per-proposal starts only (locked decision — no generic launcher for tenants). Full-draft
         // mode vs Studio is chosen on the proposal itself, so both route to the build to pick one.
@@ -229,7 +245,7 @@ export default async function TenantCommandCenterPage({
       ),
     },
     {
-      key: 'activity', title: 'Activity', tone: 'default', count: 0,
+      key: 'activity', title: 'Activity', tone: 'default', count: 0, hasNew: hasNew.activity,
       actions: [],
       body: <ActivityBody items={activity} basePath={basePath} />,
     },
@@ -247,7 +263,7 @@ export default async function TenantCommandCenterPage({
             : <>Hi {firstName} — you&apos;re all caught up. 🎉</>}
         </p>
       </header>
-      <CommandTabs tabs={tabs} initialKey="opp" />
+      <CommandTabs tabs={tabs} initialKey="opp" scope={scope} />
     </div>
   );
 }

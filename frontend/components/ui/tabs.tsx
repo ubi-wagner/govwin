@@ -23,16 +23,20 @@ export function Tabs({
   tabs,
   initialKey,
   className = '',
+  onChange,
 }: {
   tabs: TabDef[];
   initialKey?: string;
   className?: string;
+  /** Fires when the active tab changes (click or keyboard). The CC uses it to mark a tab "seen". */
+  onChange?: (key: string) => void;
 }) {
   const baseId = useId();
   const firstSelectable = tabs.find((t) => !t.locked && !t.disabled)?.key;
   const [active, setActive] = useState<string>(initialKey ?? firstSelectable ?? tabs[0]?.key ?? '');
   const activeTab = tabs.find((t) => t.key === active) ?? tabs[0];
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const select = (key: string) => { setActive(key); onChange?.(key); };
 
   // Roving keyboard nav (WAI-ARIA tabs): Left/Right (and Up/Down) move between
   // SELECTABLE tabs with wrap; Home/End jump to first/last. Combined with the
@@ -48,7 +52,7 @@ export function Tabs({
     else if (e.key === 'End') next = selectableKeys[selectableKeys.length - 1];
     if (next) {
       e.preventDefault();
-      setActive(next);
+      select(next);
       btnRefs.current[next]?.focus();
     }
   }
@@ -71,7 +75,7 @@ export function Tabs({
               aria-disabled={blocked || undefined}
               disabled={blocked}
               tabIndex={selected ? 0 : -1}
-              onClick={() => !blocked && setActive(t.key)}
+              onClick={() => !blocked && select(t.key)}
               className={[
                 'px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors',
                 selected

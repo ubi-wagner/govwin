@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { TaskQueue } from '@/components/tasks/task-queue';
 import { CommandTabs, type CommandTabInput } from '@/components/command/command-tabs';
 import {
-  getReviewQueue, getTenantSurfacedTodos, getAdminTabCount, getSystemItems,
+  getReviewQueue, getTenantSurfacedTodos, getAdminTabCount, getSystemItems, getAdminTabNewest,
   type QueueSection, type TenantTodo, type SystemItem,
 } from '@/lib/admin/review-queue';
+import { getCommandSeen, isNew } from '@/lib/command/seen';
 
 // The tabbed admin Command Center — the ONE "what needs my attention" console. Four count-badged
 // lanes (Opportunities · Admin · Tenant-surfaced · System); each row deep-links into its detail view,
@@ -118,17 +119,28 @@ export default async function CommandCenterPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
   const firstName = (session.user.name ?? session.user.email ?? 'there').split(/[\s@]/)[0];
+  const userId = (session.user as { id?: string }).id ?? '';
 
-  const [oppQueue, tenant, adminCount, system] = await Promise.all([
+  const [oppQueue, tenant, adminCount, system, newest, seen] = await Promise.all([
     getReviewQueue().catch((e) => { console.error('[admin/command] opp queue failed:', e); return { sections: [], actionable: 0 }; }),
     getTenantSurfacedTodos().catch((e) => { console.error('[admin/command] tenant todos failed:', e); return { items: [], count: 0 }; }),
     getAdminTabCount().catch((e) => { console.error('[admin/command] admin count failed:', e); return 0; }),
     getSystemItems().catch((e) => { console.error('[admin/command] system items failed:', e); return { items: [], count: 0 }; }),
+    getAdminTabNewest().catch((e) => { console.error('[admin/command] newest failed:', e); return { opp: null, admin: null, tenant: null, system: null }; }),
+    getCommandSeen(userId, 'admin'),
   ]);
+
+  // "New since you last looked" per lane (mig 179) — the newest lane item vs the per-tab watermark.
+  const hasNew = {
+    opp: isNew(seen, 'opp', newest.opp),
+    admin: isNew(seen, 'admin', newest.admin),
+    tenant: isNew(seen, 'tenant', newest.tenant),
+    system: isNew(seen, 'system', newest.system),
+  };
 
   const tabs: CommandTabInput[] = [
     {
-      key: 'opp', title: 'Opportunities', tone: 'action', count: oppQueue.actionable,
+      key: 'opp', title: 'Opportunities', tone: 'action', count: oppQueue.actionable, hasNew: hasNew.opp,
       actions: [
         { label: '📤 Upload RFP', href: '/admin/rfp-curation/upload' },
         { label: '➕ New intake', href: '/admin/intake' },
@@ -138,7 +150,7 @@ export default async function CommandCenterPage() {
       body: <OpportunityLanes sections={oppQueue.sections} />,
     },
     {
-      key: 'admin', title: 'Admin', tone: 'action', count: adminCount,
+      key: 'admin', title: 'Admin', tone: 'action', count: adminCount, hasNew: hasNew.admin,
       actions: [
         { label: '👤 Applications', href: '/admin/applications' },
         { label: '✍️ Content Studio', href: '/admin/site' },
@@ -148,12 +160,12 @@ export default async function CommandCenterPage() {
       body: <TaskQueue apiBase="/api/admin/tasks" title="Admin actions" emptyText="No admin actions pending." />,
     },
     {
-      key: 'tenant', title: 'Tenant', tone: 'shadow', count: tenant.count,
+      key: 'tenant', title: 'Tenant', tone: 'shadow', count: tenant.count, hasNew: hasNew.tenant,
       actions: [{ label: '🏢 Jump to company', href: '/admin/tenants' }],
       body: <TenantSurfacedList items={tenant.items} />,
     },
     {
-      key: 'system', title: 'System', tone: 'default', count: system.count,
+      key: 'system', title: 'System', tone: 'default', count: system.count, hasNew: hasNew.system,
       actions: [
         { label: '🔀 Workflows', href: '/admin/workflows' },
         { label: '⚙️ Automation', href: '/admin/automation' },
@@ -176,7 +188,7 @@ export default async function CommandCenterPage() {
             : <>Hi {firstName} — you&apos;re all caught up. 🎉</>}
         </p>
       </header>
-      <CommandTabs tabs={tabs} initialKey="opp" />
+      <CommandTabs tabs={tabs} initialKey="opp" scope="admin" />
     </div>
   );
 }

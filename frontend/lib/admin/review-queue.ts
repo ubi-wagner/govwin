@@ -222,3 +222,29 @@ export async function getSystemItems(): Promise<{ items: SystemItem[]; count: nu
   }));
   return { items, count: items.length };
 }
+
+/**
+ * The newest item timestamp per admin CC lane — drives the "new since you last looked" dot (mig 179).
+ * Predicates mirror each lane's count query exactly, so the dot and the badge agree. Each guarded →
+ * a failing source just contributes null (no dot), never breaks the page. Cross-tenant → sqlBypass.
+ */
+export async function getAdminTabNewest(): Promise<{ opp: string | null; admin: string | null; tenant: string | null; system: string | null }> {
+  const one = async (p: Promise<Array<{ ts: Date | string | null }>>): Promise<string | null> => {
+    try {
+      const [r] = await p;
+      const v = r?.ts;
+      return v == null ? null : v instanceof Date ? v.toISOString() : String(v);
+    } catch { return null; }
+  };
+  const [scout, curated, amend, admin, tenant, system] = await Promise.all([
+    one(sqlBypass`SELECT max(created_at) AS ts FROM scout_findings WHERE status IN ('new','reviewed')`),
+    one(sqlBypass`SELECT max(created_at) AS ts FROM curated_solicitations WHERE status IN ('new','claimed','curation_in_progress','review_requested','approved')`),
+    one(sqlBypass`SELECT max(created_at) AS ts FROM solicitation_amendments WHERE status = 'detected'`),
+    one(sqlBypass`SELECT max(created_at) AS ts FROM tasks WHERE assignee_role IN ('rfp_admin','master_admin') AND status IN ('open','in_progress')`),
+    one(sqlBypass`SELECT max(created_at) AS ts FROM tasks WHERE tenant_id IS NOT NULL AND assignee_role IN ('tenant_admin','tenant_user','partner_user') AND status IN ('open','in_progress')`),
+    one(sqlBypass`SELECT max(updated_at) AS ts FROM process_instances WHERE status = 'failed' AND archived_at IS NULL`),
+  ]);
+  // opp lane = the newest across its three sources (ISO strings sort chronologically).
+  const opp = [scout, curated, amend].filter(Boolean).sort().pop() ?? null;
+  return { opp, admin, tenant, system };
+}
