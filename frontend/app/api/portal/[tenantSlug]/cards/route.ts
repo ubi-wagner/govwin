@@ -52,13 +52,13 @@ export async function GET(
     const pinnedOnly = url.searchParams.get('pinned') === 'true';
 
     try {
-      const cards = await withTenant(tenantId, async (tx) => {
+      const { cards, buckets } = await withTenant(tenantId, async (tx) => {
         // Explicit tenant predicate (belt) + RLS (suspenders — the app runs as govtech_app, so
         // RLS scopes it too).
         // top_score = the card's best score across the tenant's buckets (mig 096),
         // so the pipeline is actually ranked (pinned first, then score, then recency)
         // — not just recency with a "ranked by your buckets" label.
-        return tx`
+        const cards = await tx`
           SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
                  c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
                  bs.top_score, bs.top_bucket_id,
@@ -98,8 +98,15 @@ export async function GET(
           ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
           LIMIT 1000
         `;
+        // The tenant's active buckets — the single mirror-OPP list carries a per-card `rankings`
+        // array keyed by bucketId, and this catalog lets the client offer "rank by bucket N"
+        // (re-sort the one list by a chosen lens; default stays best-across-buckets).
+        const buckets = await tx`
+          SELECT id, name FROM tenant_spotlight_buckets
+          WHERE tenant_id = ${tenantId}::uuid AND is_active ORDER BY created_at ASC`;
+        return { cards, buckets };
       });
-      return NextResponse.json({ data: { cards } });
+      return NextResponse.json({ data: { cards, buckets } });
     } catch (dbErr) {
       console.error('[portal/cards] query failed', dbErr);
       return NextResponse.json({ error: 'Failed to load cards', code: 'DB_ERROR' }, { status: 500 });
