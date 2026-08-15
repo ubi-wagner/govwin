@@ -3,7 +3,7 @@ import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
 import { resolveGatePolicy } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
 import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
@@ -438,6 +438,32 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       notes: notes ?? undefined,
     },
   });
+
+  // ── SPINE-T5: sync the portal WORKFLOW machine to the proposal BUILD machine ──────
+  // When a proposal reaches 'submitted' (its build is done), move its portal to 'closeout' so the two
+  // stage machines don't drift (a portal left in 'executing' behind a submitted proposal). One-way,
+  // status-only (no gate skip), best-effort — it never blocks the advance.
+  if (shouldLock) {
+    try {
+      const moved = await withTenant(tenantId, async (tx: any) => {
+        const r = await tx`
+          UPDATE proposal_portals SET status = 'closeout'
+          WHERE tenant_id = ${tenantId}::uuid AND proposal_id = ${proposalId}::uuid
+            AND status IN ('launched', 'executing')
+          RETURNING id`;
+        return r as Array<{ id: string }>;
+      });
+      if (moved.length > 0) {
+        await emitEventSingle({
+          namespace: 'capture', type: 'portal.stage_advanced',
+          actor: userActor(actorId), tenantId,
+          payload: { portalId: moved[0].id, proposalId, status: 'closeout', synced: 'proposal_submitted' },
+        });
+      }
+    } catch (e) {
+      console.error('[proposal-advance] portal closeout sync failed (non-fatal):', e);
+    }
+  }
 
   // ── Activity log ────────────────────────────────────────────────
   try {
