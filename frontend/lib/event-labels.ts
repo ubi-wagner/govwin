@@ -93,6 +93,12 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
     const tail = typeof d === 'number' ? ` — closes in ${d}d` : '';
     return `Recommended: start a proposal${t ? ` on ${t}` : ''}${tail}`;
   },
+  // Command Center read-receipt: the user cleared the "new" items in a lane (mig 179).
+  'command.acknowledged': (p) => {
+    const names: Record<string, string> = { opp: 'Opportunities', todos: 'To-dos', workflows: 'Workflows', activity: 'Activity', admin: 'Admin', tenant: 'Tenant', system: 'System' };
+    const t = str(p.tab);
+    return `Reviewed the ${t && names[t] ? names[t] : 'Command Center'} lane`;
+  },
   'opportunity.reopened': (p) => `Opportunity reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'opportunity.archived': (p) => `Opportunity archived${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'opportunity.close_date_changed': (p) => `Opportunity close date changed${str(p.newCloseDate) ? ` to ${str(p.newCloseDate)}` : ''}`,

@@ -10,7 +10,7 @@
  * a small accent dot when `hasNew` and the user hasn't viewed it this session; viewing a tab marks it
  * seen (optimistically clears the dot + POSTs the watermark). docs/COMMAND_CENTER_DESIGN.md §1, §6.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { CountBadge } from '@/components/ui/count-badge';
@@ -43,18 +43,24 @@ export function CommandTabs({
 }) {
   // Tabs viewed this session — clears their new-dot optimistically (the server watermark persists it).
   const [seen, setSeen] = useState<Set<string>>(new Set());
+  // Read via a ref so markSeen stays stable (no dep on `seen`) — else the land-effect would re-fire.
+  const seenRef = useRef(seen);
+  seenRef.current = seen;
 
   const markSeen = useCallback(
     (tab: string) => {
       if (!scope) return;
+      // Genuine acknowledgement (→ a read-receipt audit event): the lane's new-dot was showing AND we
+      // haven't cleared it yet this session. Re-viewing a quiet lane sends hadNew=false (watermark only).
+      const hadNew = !!tabs.find((x) => x.key === tab)?.hasNew && !seenRef.current.has(tab);
       setSeen((s) => (s.has(tab) ? s : new Set(s).add(tab)));
       fetch('/api/command/seen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope, tab }),
+        body: JSON.stringify({ scope, tab, hadNew }),
       }).catch(() => {});
     },
-    [scope],
+    [scope, tabs],
   );
 
   // Mark the tab the user lands on as seen (the default-active tab).
