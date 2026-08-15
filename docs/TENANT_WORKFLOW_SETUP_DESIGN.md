@@ -109,6 +109,65 @@ no storage migration required for the core.**
 
 ---
 
+## 3½. Per-stage gate closer + required setup acceptance (owner refinements)
+
+### 3½.1 The gate CLOSER is per-stage: HUMAN or AI-MANAGER
+
+Each stage declares **who closes its gate** — the axis is *who confirms the stage is done*, not *whether a
+clock fired*:
+
+- **`human` (HITL, default).** The stage advances when its human ToDos are all complete (today's
+  `advancePortalStage` predicate, `portal-workflow.ts:167-174`), or a manager force-advances. Dates nudge +
+  flag overdue.
+- **`agent_manager`.** An **agent manager** orchestrates an automated stage — e.g. a "Color Team / Review"
+  stage where the **advisory_manager** (or **color_team_reviewer**) fans out to the existing full-draft cohort
+  (**stylist · formatter · continuity_manager · editors/refiners**), waits for all to land, then the
+  **adversarial** pass (the reusable `AdvisoryOverlay`, `policy=auto`) reviews every document. When the cohort
+  has landed **and** the adversarial gate passes, the stage is **gate-ready**. This is exactly the pattern the
+  Proposal Studio already runs (`OnReviewPhaseRequested{Draft,Refine,Compliance}`, the Mode-C doorbell
+  "run all automatically", the `AdvisoryOverlay policy=auto`).
+
+Two sub-modes for an `agent_manager` stage, **tenant-chosen per stage**:
+- **assisted** — the manager does the work + lands the adversarial verdict; a **human clicks "Advance"**
+  (one-click HITL-light: "the AI manager reports ready").
+- **auto** — on manager-complete + adversarial-pass, a **guarded automation advances the stage**. The tenant's
+  per-stage opt-in *is* the human authorization; the agent never advances itself.
+
+**Invariant safety (non-negotiable).** Even in `auto`, the invariant "agents never auto-write a business table"
+holds: the agent manager produces an **advisory verdict** (lands as a review), and a **separate automation** —
+not the agent — flips `current_stage_index`, gated on (a) the cohort actually complete, (b) the adversarial
+pass, and (c) the tenant's explicit per-stage `auto` opt-in. A stage still can **never be empty** and can
+**never advance on a clock alone** (the date only nudges/escalates). So `agent_manager/auto` is the
+"advance when done" the owner described — with a real completion gate, not a time trigger, and with a human
+having pre-authorized *this* stage. (Reuses the existing agent workforce end-to-end; the only net-new wiring is
+the "manager-pass → guarded auto-advance" signal + the per-stage selector. This is the **deepest** phase and
+ships last — see §9 TW-7.)
+
+### 3½.2 Required setup acceptance (the tenant-side mirror of the admin cockpit)
+
+Provisioning a new portal now requires the tenant to **complete + accept** the workflow setup once, on the
+same dedicated page that later hosts all editing:
+
+- On release (`provisionAndReleasePortal`), the portal is `launched` **but marked `workflow_setup_status =
+  'pending'`** (rides in `guardrail_config._setup.status`, or an optional `proposal_portals.workflow_setup_status`
+  column — see §4). The tenant admin gets a **required ToDo** "Set up your build workflow" deep-linking to the
+  Workflow Setup page (reusing the `taskHref` `case 'portal'` → the *tenant* portal page).
+- The page opens **pre-filled with recommended defaults** (`recommendedGuardrails()` — 3 stages, dated off the
+  solicitation close, sensible owners/nudges) so the required step is a **review-and-tune**, not a blank form.
+  It **validates completeness** (every stage has a closer + a date + ≥1 owner) before enabling the commit.
+- The commit is **"Accept & Start"** → writes the tuned `guardrail_config`, flips `workflow_setup_status =
+  'accepted'`, (re)instantiates the current stage's ToDos from the accepted config, and clears the required
+  ToDo. Emits `capture:workflow.accepted`.
+- **Momentum vs. gate (owner sub-decision, recommended resolution):** the proposal is **buildable
+  immediately** (sections exist from provision), and the workflow runs on **defaults** until accepted — so the
+  customer is never blocked — but a **persistent banner + the required ToDo** enforce the one-time
+  completion, and the stage/nudge machinery re-projects to the accepted config on Accept. (The stricter
+  alternative — hold stage-0 ToDo creation until Accept — is a one-line switch if you prefer a hard gate.)
+
+Thereafter the **same page** is the ongoing edit surface (§5 PATCH A/B/C); "Accept & Start" becomes "Save".
+
+---
+
 ## 4. Model deltas (small, additive, all in the open JSONB / existing columns)
 
 Extend the `GuardrailConfig` TS types (`portal-workflow.ts:34-47`) — **no DB migration**:
@@ -120,7 +179,14 @@ interface Stage {
   todos?: StageTodo[];
   dueDate?: string | null;    // NEW — absolute ISO stage-gate deadline (drives nudges + overdue, NOT advancement)
   defaultAssigneeUserId?: string | null;  // NEW — a new ToDo in this stage inherits this owner
+  gateCloser?: 'human' | 'agent_manager';  // NEW — who closes the gate (default 'human')
+  agentManagerKey?: string | null;         // NEW — which manager archetype (e.g. 'advisory_manager' | 'color_team_reviewer') when agent_manager
+  autoAdvance?: boolean;                    // NEW — agent_manager only: auto (guarded) vs assisted (one-click human confirm). Default false (assisted).
 }
+
+// Config-level setup-acceptance marker (rides in the open JSONB; no migration needed):
+interface GuardrailSetup { status: 'pending' | 'accepted'; acceptedAt?: string; acceptedBy?: string }
+// GuardrailConfig gains:  _setup?: GuardrailSetup
 interface StageTodo {
   type: string; title?: string;
   assigneeRole?: string | null;
@@ -179,8 +245,11 @@ joins the portal row actions and the proposal workspace header.
 **Layout (one screen, four cards + a low-lift action bar):**
 
 1. **Timeline** (the hero) — a horizontal stage rail: each stage is a card with an inline **date picker**
-   (absolute gate date), an editable **label**, drag-to-reorder, include/exclude, and an **overdue / due-soon**
-   chip driven by `dueDate` vs now. A "critical path" line ties stage dates to the submission deadline.
+   (absolute gate date), an editable **label**, drag-to-reorder, include/exclude, an **overdue / due-soon**
+   chip driven by `dueDate` vs now, and a **gate-closer** control — **Human** (advance on ToDos done) or
+   **AI-manager** (pick the manager + assisted/auto). A "critical path" line ties stage dates to the submission
+   deadline. The page opens in **required Accept mode** for a new portal (§3½.2) — "Accept & Start" — then
+   becomes the ongoing edit surface ("Save").
 2. **Stage detail** (expand a stage) — its ToDos as rows: **type**, **title**, an **assignee picker**
    (a real person from the team **or** a role bucket), a **due** control (inherit stage date · absolute · +N days),
    and a per-ToDo **nudge** chip. Add/remove ToDos. A stage-level **default owner**. Live edits → PATCH A.
@@ -227,44 +296,61 @@ Everything is optimistic-UI with a toast on save; every write is validated + aud
 
 ---
 
-## 8. Owner decisions (the real forks — please steer)
+## 8. Decisions (LOCKED, owner-confirmed 2026-08-15)
 
-1. **Do stage-gate dates AUTO-ADVANCE, or only nudge + flag overdue?**
-   *Recommendation: nudge + overdue, advancement stays all-ToDos-done / manual.* This preserves the HITL gate
-   (invariant 1/2) — a date auto-skipping incomplete ToDos would gut the gate's purpose. A "date reached but
-   ToDos open" state surfaces a loud overdue banner + an optional escalation nudge, and a manager can
-   force-advance. (A hard date-gate is possible but is a genuine workflow-semantics change; I'd want explicit
-   opt-in.)
-2. **Editability window** — editable while `launched`/`executing`, **locked** at `closeout`/`archived`.
-   *Recommendation: yes, lock at closeout.* (Low ambiguity; stated unless you object.)
-3. **Re-projection scope** — refresh the **current stage's open tasks**; future stages inherit on advance;
-   **completed** stages untouched. *Recommendation: yes.* (Retro-editing finished stages is noise + audit risk.)
-4. **Mount** — a new `/portals/[portalId]` **Workflow Setup** page (mirrors the admin cockpit) vs. a "Workflow"
-   **tab** on the proposal workspace. *Recommendation: the dedicated page* (the proposal workspace is already
-   tab-dense; a portal-scoped page matches the cockpit and de-clutters).
+1. **Gate closer is per-stage: HUMAN (HITL) or AI-MANAGER — dates are a soft deadline/nudge overlay on
+   both, never a blind auto-advance.** A stage declares who closes its gate (see §3½). Advancement is always
+   gated on *real completion* (human ToDos done, or the agent cohort landed + the adversarial reviewer passed) —
+   never on a clock alone. Dates drive nudges + an overdue flag.
+2. **Editors = tenant_admin + delegated managers.** The account admin and any manager they appoint can edit the
+   workflow; members receive their assigned ToDos.
+3. **The dedicated page is REQUIRED once (complete + accept) per new portal, and is the same surface for all
+   later editing** (see §3½ "Required setup acceptance"). Mount: a new `/portals/[portalId]` **Workflow Setup**
+   page (mirrors the admin provisioning cockpit; keeps the tab-dense proposal workspace uncluttered).
+4. **Editability window** — editable while `launched`/`executing`; **locked** at `closeout`/`archived`.
+   **Re-projection scope** — refresh the **current stage's open tasks**; future stages inherit on advance;
+   **completed** stages untouched.
 
 ---
 
-## 9. Phased build plan (TW-1..7) — each phase green + committed
+## 9. Phased build plan (TW-1..8) — each phase green + committed
 
-- **TW-1 · Model + validate.** Extend `GuardrailConfig` types (`dueDate`, per-todo `dueDate`/`nudgeDays`,
-  stage `defaultAssigneeUserId`); extend `validateGuardrailConfig` (dates well-formed, still ≤ limits); the
-  projection helper `projectTodoTiming(stage, todo, config)`. Unit tests. (No migration.)
-- **TW-2 · `editPortalWorkflow` + PATCH A.** The post-launch config edit + re-projection lib (CAS, validate,
-  refresh current-stage open tasks, reset `nudges_sent`), the route, the bracketed `capture:workflow.reconfigured`.
-- **TW-3 · PATCH B (per-task reassign/reschedule/re-nudge)** + the single-fact events; own-tenant + open-status guards.
-- **TW-4 · Rebaseline (action C)** + "set deadline from solicitation" + the timeline recompute.
-- **TW-5 · The Workflow Setup page** — timeline + stage detail + notifications cards; `GuardrailEditor`
-  refactor to two-mode; wire PATCH A/B/C.
-- **TW-6 · People panel** — embed team invite + collaborator matrix; add **per-stage** permission editing +
-  "assign a manager" + bulk-invite.
-- **TW-7 · Verify** — tsc 0 · vitest · a `drive-tenant-workflow-setup.mts` logic proof (edit dates/assignees/
-  nudges post-launch → tasks re-projected, `nudges_sent` reset, sweep re-fires; reassign live task; rebaseline)
-  under forced-RLS `govtech_app` + a Playwright browser drive as `kate.ulepic@foundation3dp.com`; docs; commit/push.
+- **TW-1 · Model + validate + editor gate.** Extend `GuardrailConfig` types (stage `dueDate`/`defaultAssigneeUserId`/
+  `gateCloser`/`agentManagerKey`/`autoAdvance`; per-todo `dueDate`/`nudgeDays`; `_setup`); extend
+  `validateGuardrailConfig` (dates well-formed, `gateCloser` ∈ set, completeness check, still ≤ limits); the
+  projection helper `projectTodoTiming(stage, todo, config)`; a `canEditWorkflow(role)` gate = tenant_admin +
+  delegated managers. Unit tests. **No migration** (optional `workflow_setup_status` column deferred; rides in
+  `_setup` first).
+- **TW-2 · `editPortalWorkflow` + PATCH A + Accept & Start.** Post-launch config edit + re-projection (CAS
+  `status IN (launched,executing)`, validate, refresh current-stage open tasks, reset `nudges_sent`); the
+  **Accept & Start** transition (`_setup.status` pending→accepted, (re)instantiate current stage from accepted
+  config); bracketed `capture:workflow.reconfigured` + `capture:workflow.accepted`.
+- **TW-3 · Required-acceptance wiring.** `provisionAndReleasePortal` marks `_setup.status='pending'` + raises the
+  required "Set up your build workflow" ToDo (→ tenant portal page) + the persistent banner. (Momentum: runs on
+  defaults until accepted; hard-gate switch documented.)
+- **TW-4 · PATCH B (per-task reassign/reschedule/re-nudge)** + single-fact `capture:task.reassigned/rescheduled`;
+  own-tenant + open-status guards; member-of-tenant validation on the new assignee.
+- **TW-5 · Rebaseline (action C) + set-deadline-from-solicitation** + the timeline recompute + re-project.
+- **TW-6 · The Workflow Setup page** — required Accept flow → then the edit surface: **timeline** (dates/rename/
+  reorder/overdue), **stage detail** (per-ToDo assignee-person/role + date + nudge; **per-stage gate-closer
+  selector** Human | AI-manager), **notifications** (nudges + oversight + read-only escalation floor). Refactor
+  `GuardrailEditor` to `mode` (pre-launch | edit); wire PATCH A/B/C + Accept. Gate on `canEditWorkflow`.
+- **TW-7 · People panel** — embed team invite + collaborator matrix; add **per-stage** collaborator permission
+  editing + "assign a proposal manager" + bulk-invite.
+- **TW-8 · Agent-manager gate closer (deepest — ships last).** Wire an `agent_manager` stage end-to-end: the
+  manager cohort (advisory_manager / color_team_reviewer + the full-draft cohort) lands → the adversarial
+  `AdvisoryOverlay policy=auto` passes → **gate-ready**; **assisted** = a one-click human "Advance", **auto** =
+  a *guarded automation* (not the agent) advances on cohort-complete + adversarial-pass + the per-stage opt-in.
+  Reuses the Proposal Studio / AdvisoryOverlay machinery; the only net-new is the "manager-pass → guarded
+  advance" signal + the selector. Invariant-safe (agent never writes `current_stage_index`).
+- **TW-verify** (folded into each phase's close + a final pass) — tsc 0 · vitest · `drive-tenant-workflow-setup.mts`
+  (edit dates/assignees/nudges → re-projected, `nudges_sent` reset; reassign a live task; rebaseline; the
+  Accept-&-Start flow; an emulated `agent_manager` auto-advance) under forced-RLS `govtech_app` + a Playwright
+  browser drive as `kate.ulepic@foundation3dp.com`; docs; commit/push.
 
 Nudge-firing is proven by asserting the re-projected `due_at`/`nudge_schedule`/`nudges_sent` on the task rows
-(the exact fields `_sweep_task_nudges` reads) — the same technique the provisioning drive used, no live worker
-needed.
+(the exact fields `_sweep_task_nudges` reads) — the technique the provisioning drive used, no live worker
+needed. The `agent_manager` auto-advance is proven with the committed emulator standing in for the cohort.
 
 ---
 
