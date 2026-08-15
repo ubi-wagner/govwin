@@ -20,6 +20,11 @@ export interface ReviewState {
   requested: boolean; completed: boolean; verdict: string | null; completedAt: string | null;
   stageKey: string; stageLabel: string; agentManagerKey: string | null; autoAdvance: boolean;
 }
+/** A LIVE open ToDo row for this portal (TW-9) — active-instantiation management (reassign/reschedule). */
+export interface LiveTask {
+  id: string; title: string | null; taskType: string; assigneeRole: string | null; assigneeUserId: string | null;
+  dueAt: string | null; nudgeSchedule: number[] | null; stageKey: string | null; agentGate: boolean | null;
+}
 
 const TODO_TYPES = [
   { v: 'acknowledge', label: 'Acknowledge / review' },
@@ -35,12 +40,12 @@ const fromDateInput = (d: string): string | null => (d ? new Date(`${d}T00:00:00
 
 export function WorkflowSetupClient({
   tenantSlug, portalId, oppTitle, statusLabel, accepted, recommendationBasis, limits, members, initialConfig,
-  currentStageIndex, reviewState,
+  currentStageIndex, reviewState, liveTasks = [],
 }: {
   tenantSlug: string; portalId: string; oppTitle: string; statusLabel: string; accepted: boolean;
   recommendationBasis: string | null; limits: { maxStages: number; maxNudges: number };
   members: Member[]; initialConfig: Config;
-  currentStageIndex?: number; reviewState?: ReviewState | null;
+  currentStageIndex?: number; reviewState?: ReviewState | null; liveTasks?: LiveTask[];
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<Config>(() => JSON.parse(JSON.stringify(initialConfig)) as Config);
@@ -126,6 +131,26 @@ export function WorkflowSetupClient({
     } catch { if (!auto) toast('Advance failed — please retry.', 'error'); return false; }
     finally { setBusy(false); }
   }
+
+  // TW-9 — surgically reassign / reschedule a SINGLE live open ToDo (vs bulk template re-projection on Save).
+  // Hits PATCH /tasks/[taskId]; RLS-scoped + open-only + re-arms the nudges server-side.
+  async function updateLiveTask(taskId: string, patch: { assigneeUserId?: string | null; assigneeRole?: string | null; dueAt?: string | null }) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/tasks/${taskId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(j?.error ? `Update failed: ${j.error}` : 'Update failed', 'error'); return; }
+      toast.success('To-do updated.');
+      router.refresh();
+    } catch { toast('Update failed — please retry.', 'error'); } finally { setBusy(false); }
+  }
+  const liveAssigneeValue = (t: LiveTask) => (t.assigneeUserId ? `user:${t.assigneeUserId}` : t.assigneeRole ? `role:${t.assigneeRole}` : '');
+  const setLiveAssignee = (t: LiveTask, v: string) => {
+    if (v.startsWith('user:')) void updateLiveTask(t.id, { assigneeUserId: v.slice(5), assigneeRole: null });
+    else if (v.startsWith('role:')) void updateLiveTask(t.id, { assigneeUserId: null, assigneeRole: v.slice(5) });
+  };
 
   // Opt-in AUTO advance: when the cohort's review has landed AND the tenant set this stage to auto-advance,
   // close the gate automatically the first time the setup surface is observed. One-shot per mount (guarded)
@@ -279,6 +304,40 @@ export function WorkflowSetupClient({
         Owners are your team members and collaborators.{' '}
         <a href={`/portal/${tenantSlug}/team`} className="text-blue-600 hover:underline">Add or manage people →</a>
       </p>
+
+      {/* TW-9 — LIVE to-dos: manage the running instance without editing the template. Reassign or
+          reschedule a single open ToDo in place (the change re-arms its reminders server-side). */}
+      {accepted && liveTasks.length > 0 && (
+        <section className="bg-white border border-gray-200 rounded-lg p-4 mt-5">
+          <h2 className="text-sm font-semibold mb-1">Live to-dos ({liveTasks.length} open)</h2>
+          <p className="text-xs text-gray-500 mb-3">Reassign or reschedule a single running to-do — a surgical change to this instance, separate from the template above.</p>
+          <div className="space-y-2">
+            {liveTasks.map((t) => (
+              <div key={t.id} className="flex flex-wrap items-center gap-2 text-sm border-t border-gray-100 pt-2 first:border-t-0 first:pt-0">
+                <span className="flex-1 min-w-[10rem] truncate">
+                  {t.agentGate && <span className="mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">AI GATE</span>}
+                  {t.title || t.taskType.replace(/_/g, ' ')}
+                  {t.stageKey && <span className="text-gray-400"> · {t.stageKey}</span>}
+                </span>
+                <select value={liveAssigneeValue(t)} onChange={(e) => setLiveAssignee(t, e.target.value)} disabled={busy}
+                  className="border border-gray-300 rounded px-1.5 py-1 disabled:opacity-50" title="Reassign this to-do">
+                  <option value="">Unassigned</option>
+                  <optgroup label="Role">
+                    <option value="role:tenant_admin">Any admin</option>
+                    <option value="role:tenant_user">Any contributor</option>
+                  </optgroup>
+                  <optgroup label="Person">
+                    {members.map((m) => <option key={m.id} value={`user:${m.id}`}>{m.name || m.email}</option>)}
+                  </optgroup>
+                </select>
+                <input type="date" value={toDateInput(t.dueAt)} disabled={busy}
+                  onChange={(e) => updateLiveTask(t.id, { dueAt: fromDateInput(e.target.value) })}
+                  className="border border-gray-300 rounded px-1.5 py-1 disabled:opacity-50" title="Reschedule this to-do" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Nudges */}
       <section className="bg-white border border-gray-200 rounded-lg p-4 mt-5">

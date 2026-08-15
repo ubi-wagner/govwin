@@ -13,7 +13,7 @@ import {
   canEditWorkflow, isPortalManager, getGuardrailLimits, getStageReviewState, type GuardrailConfig,
 } from '@/lib/portal-workflow';
 import { recommendWorkflowConfig } from '@/lib/portal-workflow-recommend';
-import { WorkflowSetupClient, type Member } from './workflow-setup-client';
+import { WorkflowSetupClient, type Member, type LiveTask } from './workflow-setup-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +91,21 @@ export default async function WorkflowSetupPage({ params }: { params: Promise<{ 
       ORDER BY u.name NULLS LAST, u.email`;
   } catch (e) { console.error('[portal/workflow-setup] members load failed', e); }
 
+  // TW-9 — the LIVE open ToDos for this portal (the actual task rows), for active-instantiation
+  // management: reassign / reschedule a single running ToDo surgically (vs the bulk template re-projection).
+  let liveTasks: LiveTask[] = [];
+  if (accepted) {
+    try {
+      liveTasks = await sql<LiveTask[]>`
+        SELECT id, title, task_type AS "taskType", assignee_role AS "assigneeRole", assignee_user_id AS "assigneeUserId",
+               due_at AS "dueAt", nudge_schedule AS "nudgeSchedule", params->>'stage' AS "stageKey", (params->>'agentGate')::boolean AS "agentGate"
+        FROM tasks
+        WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
+          AND status IN ('open','in_progress')
+        ORDER BY due_at NULLS LAST, created_at`;
+    } catch (e) { console.error('[portal/workflow-setup] live tasks load failed', e); }
+  }
+
   return (
     <div className="p-4 sm:p-8">
       <WorkflowSetupClient
@@ -105,6 +120,7 @@ export default async function WorkflowSetupPage({ params }: { params: Promise<{ 
         initialConfig={initialConfig}
         currentStageIndex={portal.currentStageIndex}
         reviewState={reviewState}
+        liveTasks={liveTasks}
       />
     </div>
   );
