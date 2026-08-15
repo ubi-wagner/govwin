@@ -14,7 +14,7 @@
  * source of truth on the task rows.
  */
 
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { runInTenant } from '@/lib/tenant-context';
 import { createTask } from '@/lib/tasks/tasks';
@@ -530,6 +530,56 @@ export async function closeAgentGate(
     });
   }
   return { ...result, verdict: review.verdict ?? null };
+}
+
+/** Synthetic system closer for the auto-advance sweep. `tasks` has no users FK, so this id needs no row;
+ *  the ledger records `closedBy: 'ai_manager_auto'` + the event carries `auto:true`, attributing the close
+ *  to the AI manager, not a person. */
+const AUTO_ADVANCE_ACTOR_ID = '00000000-0000-0000-0000-0000000000a1';
+
+/**
+ * TW-8 auto-advance sweep — the AUTONOMOUS invoker the assisted gate-close never had (the "fast-follow").
+ * Scans active portals (cross-tenant, admin/cron scope) for a CURRENT stage that is an `agent_manager` gate
+ * with `autoAdvance=true`, and closes each whose AI-manager review has already landed — with NO human click.
+ * Idempotent + safe by construction: closeAgentGate re-checks agent-gate + review.completed + the autoAdvance
+ * opt-in and never force-waves a gate, so a portal whose cohort review is still pending is simply skipped.
+ * advancePortalStage stays the sole stage-mutation path. Invoked by the pipeline scheduler via the
+ * token-guarded POST /api/internal/agent-gates/sweep (also runnable by a master_admin on demand).
+ */
+export async function sweepAutoAdvanceGates(): Promise<{
+  scanned: number; eligible: number; advanced: number;
+  results: Array<{ portalId: string; tenantId: string; advanced: boolean; reason?: string; stageKey?: string }>;
+}> {
+  let rows: Array<{ id: string; tenantId: string; currentStageIndex: number; guardrailConfig: GuardrailConfig | null }> = [];
+  try {
+    // sqlBypass (owner) — a cross-tenant cron read, like the agent-workforce rollup. guardrail_config is
+    // keyed per row; the per-portal closeAgentGate below re-enters each tenant's RLS context to mutate.
+    rows = await sqlBypass<typeof rows>`
+      SELECT id, tenant_id AS "tenantId", current_stage_index AS "currentStageIndex", guardrail_config AS "guardrailConfig"
+      FROM proposal_portals
+      WHERE guardrail_config IS NOT NULL AND status NOT IN ('closeout', 'curation_pending')`;
+  } catch (e) {
+    console.error('[sweepAutoAdvanceGates] scan failed', e);
+    return { scanned: 0, eligible: 0, advanced: 0, results: [] };
+  }
+  const results: Array<{ portalId: string; tenantId: string; advanced: boolean; reason?: string; stageKey?: string }> = [];
+  let eligible = 0, advanced = 0;
+  for (const p of rows) {
+    const stages = p.guardrailConfig?.stages ?? [];
+    const stage = stages[p.currentStageIndex];
+    if (!stage || stage.gateCloser !== 'agent_manager' || stage.autoAdvance !== true) continue;
+    eligible++;
+    const actor = { id: AUTO_ADVANCE_ACTOR_ID, email: 'ai-manager@rfppipeline.system', role: 'master_admin' as Role, tenantId: p.tenantId };
+    try {
+      const r = await closeAgentGate(actor, p.tenantId, p.id, { auto: true });
+      results.push({ portalId: p.id, tenantId: p.tenantId, advanced: r.advanced, reason: r.reason, stageKey: stage.key });
+      if (r.advanced) advanced++;
+    } catch (e) {
+      console.error('[sweepAutoAdvanceGates] closeAgentGate failed for portal', p.id, e);
+      results.push({ portalId: p.id, tenantId: p.tenantId, advanced: false, reason: 'error', stageKey: stage.key });
+    }
+  }
+  return { scanned: rows.length, eligible, advanced, results };
 }
 
 /** Is this user a DELEGATED manager of the portal (a guardrail_config collaborator with role='manager')?
