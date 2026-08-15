@@ -107,6 +107,11 @@ try {
       SELECT status, proposal_id AS "proposalId" FROM proposal_portals WHERE id=${portalId}::uuid`;
     check("portal flipped curation_pending → launched", portalAfter?.status === 'launched');
     check('portal.proposal_id = the provisioned proposal', portalAfter?.proposalId === rel.proposalId);
+    // TW-3: release marks the workflow setup pending (recommend-but-require) + raises the required ToDo.
+    const [pg] = await sqlBypass<Array<{ guardrailConfig: { _setup?: { status?: string } } | null }>>`SELECT guardrail_config AS "guardrailConfig" FROM proposal_portals WHERE id=${portalId}::uuid`;
+    check('release stamped _setup=pending (required tenant acceptance)', pg?.guardrailConfig?._setup?.status === 'pending');
+    const [{ n: setupTodos }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM tasks WHERE tenant_id=${BUYER}::uuid AND entity_type='portal' AND entity_id=${portalId}::uuid AND params->>'setup'='true' AND status='open'`;
+    check('release raised the required "set up your workflow" ToDo', setupTodos >= 1);
     const [{ n: sectionCount }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM proposal_sections WHERE proposal_id=${rel.proposalId}::uuid`;
     check(`the build has real sections (got ${sectionCount})`, sectionCount > 0);
     // The provision best-effort tail (RLS-forced library_seed_jobs) now runs in the buyer tenant
@@ -134,8 +139,9 @@ try {
       await sqlBypass`DELETE FROM library_seed_jobs WHERE proposal_id=${proposalId}::uuid`;
       await sqlBypass`DELETE FROM proposals WHERE id=${proposalId}::uuid`;
     }
+    if (portalId) await sqlBypass`DELETE FROM tasks WHERE entity_type='portal' AND entity_id=${portalId}::uuid`;
     if (portalId) await sqlBypass`DELETE FROM proposal_portals WHERE id=${portalId}::uuid`;
-    console.log('cleanup: throwaway portal + proposal removed');
+    console.log('cleanup: throwaway portal + proposal + tasks removed');
   } catch (ce) { console.error('cleanup warning (non-fatal)', ce); }
   await sqlBypass.end({ timeout: 5 });
   process.exit(fail === 0 ? 0 : 1);

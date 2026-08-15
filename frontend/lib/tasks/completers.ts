@@ -133,7 +133,9 @@ export function taskHref(opts: {
     case 'source': return `/admin/sources/${entityId}`;
     case 'opportunity': return `/admin/rfp-curation`; // an opp id is not a solId — land on the queue
     case 'solicitation': return `/admin/rfp-curation/${entityId}`; // deep-link straight to the workspace
-    case 'portal': return `/admin/provisioning/${entityId}`; // the provisioning cockpit for a purchased portal (PV-4)
+    // A purchased portal: the TENANT's required workflow-setup page when we have their slug (TW-3),
+    // else the admin provisioning cockpit (the rfp_admin proposal_setup gate, PV-4).
+    case 'portal': return tenantSlug ? `/portal/${tenantSlug}/portals/${entityId}` : `/admin/provisioning/${entityId}`;
     default: return null;
   }
 }

@@ -14,9 +14,11 @@
  * correct RLS context (the admin is the ACTOR; the tenant is the subject).
  */
 import { withTenant } from '@/lib/rls';
+import { runInTenant } from '@/lib/tenant-context';
 import { provisionProposalForPortal } from '@/lib/provision-proposal';
 import { linkPortalProposal, releaseFromCuration } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, type GuardrailConfig } from '@/lib/portal-workflow';
+import { createTask } from '@/lib/tasks/tasks';
 import { emitEventSingle } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
@@ -48,7 +50,11 @@ export async function provisionAndReleasePortal(opts: {
   guardrailConfig?: GuardrailConfig;
 }): Promise<ReleasePortalResult> {
   const { tenantId, tenantName, tenantSlug, portalId, actor } = opts;
-  const config = (opts.guardrailConfig ?? DEFAULT_RELEASE_GUARDRAILS) as GuardrailConfig;
+  // Shallow-clone so we never mutate the shared DEFAULT_RELEASE_GUARDRAILS const. The tenant must
+  // COMPLETE + Accept the workflow once (recommend-but-require, TW-3): mark it pending — the portal
+  // runs on these defaults (momentum) until the tenant's Accept & Start installs their tuned config.
+  const config = { ...(opts.guardrailConfig ?? DEFAULT_RELEASE_GUARDRAILS) } as GuardrailConfig;
+  config._setup = { status: 'pending' };
 
   // Enforce the RFP-admin guardrail limits (max 3 stages, 10 collaborators, 1 manager, 3 nudges).
   const limits = await getGuardrailLimits();
@@ -89,6 +95,28 @@ export async function provisionAndReleasePortal(opts: {
     ({ tasksCreated } = await instantiatePortalWorkflow(wfActor, tenantId, portalId, config));
   } catch (e) {
     console.error('[provisionAndReleasePortal] instantiate todos failed (non-fatal, portal is launched)', e);
+  }
+
+  // Raise the REQUIRED "set up your workflow" ToDo for the tenant admin (recommend-but-require, TW-3).
+  // Best-effort + RLS-scoped so the cross-tenant admin caller can write to the tenant's tasks ledger.
+  // entity=portal + a tenantSlug makes taskHref deep-link to the TENANT Workflow Setup page (not the
+  // admin cockpit). Fires once — releaseFromCuration's CAS means a retry never re-reaches here.
+  try {
+    await runInTenant(tenantId, () => createTask({
+      actor: { id: actor.id, email: actor.email, role: actor.role, tenantId },
+      tenantId,
+      assigneeRole: 'tenant_admin',
+      assigneeUserId: null,
+      taskType: 'acknowledge',
+      title: 'Set up your build workflow — review the dates, owners & reminders, then Accept & Start',
+      entityType: 'portal',
+      entityId: portalId,
+      dueAt: null,
+      nudgeDays: [],
+      params: { kind: 'review', portalId, setup: true },
+    }));
+  } catch (e) {
+    console.error('[provisionAndReleasePortal] setup ToDo failed (non-fatal)', e);
   }
 
   try {

@@ -248,7 +248,9 @@ export async function instantiatePortalWorkflow(
     await tx`UPDATE proposal_portals SET current_stage_index = 0 WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
   });
   const first = config.stages?.[0];
-  const tasksCreated = first ? await createStageTodos(actor, tenantId, portalId, first, config, limits) : 0;
+  // Scope task creation to the tenant's RLS context — createTask hits the RLS-forced `tasks` ledger,
+  // and a cross-tenant caller (the admin cockpit release) has no ambient tenant context otherwise.
+  const tasksCreated = first ? await runInTenant(tenantId, () => createStageTodos(actor, tenantId, portalId, first, config, limits)) : 0;
   return { tasksCreated };
 }
 
