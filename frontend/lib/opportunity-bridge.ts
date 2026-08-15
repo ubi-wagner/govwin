@@ -14,6 +14,7 @@ import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coarseStatus, isSubmissionStage, type SubmissionStage, type BridgeEventType } from '@/lib/lifecycle';
 import { emitEventSingle, systemActor } from '@/lib/events';
+import { scoreCardForTenant } from '@/lib/bucket-ranking';
 
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
@@ -249,6 +250,15 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
     });
   } catch (emitErr) {
     console.error('[bridge] card.applied emit failed (non-fatal)', tenantId, emitErr);
+  }
+  // Synchronous scoring FALLBACK (RANK-6): rank the just-applied card against all active buckets HERE,
+  // so it ranks the instant it lands even if the pipeline OnCardApplied worker is down. Idempotent with
+  // that async path (same upsert), closing the one gap provisioning + bucket-create already cover inline.
+  // Best-effort — a scoring failure must never fail the fan-out (the async rescore still re-drives it).
+  try {
+    await scoreCardForTenant(tenantId, ev.opportunityId, Date.now());
+  } catch (scoreErr) {
+    console.error('[bridge] sync score fallback failed (non-fatal)', tenantId, scoreErr);
   }
 }
 

@@ -116,9 +116,14 @@ export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: num
     parts.push({ key: 'accessibility', v: criteria.setAsides.some((x) => s.includes(x.toLowerCase())) ? 1 : 0, weight: w.accessibility ?? 1 });
   }
   if (criteria.useTimeline !== false && card.closeDate) {
-    const days = (new Date(card.closeDate).getTime() - nowMs) / 86_400_000;
-    const v = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 0.6 : days <= 90 ? 0.3 : 0.1;
-    parts.push({ key: 'timeline', v, weight: w.timeline ?? 0.5 });
+    // Skip an UNPARSEABLE close date rather than pushing a phantom 0.1 timeline signal — parity with
+    // the Python scorer's `_close_ms is None` skip (an invalid date must not change the denominator).
+    const t = new Date(card.closeDate).getTime();
+    if (Number.isFinite(t)) {
+      const days = (t - nowMs) / 86_400_000;
+      const v = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 0.6 : days <= 90 ? 0.3 : 0.1;
+      parts.push({ key: 'timeline', v, weight: w.timeline ?? 0.5 });
+    }
   }
 
   const totalW = parts.reduce((s, p) => s + p.weight, 0);
@@ -135,6 +140,42 @@ export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: num
 // bridge fan-out emits capture:card.applied and the pipeline OnCardApplied workflow rescores
 // (pipeline/src/workflows/actions/rescore.py, a faithful port of scoreCard). The former
 // in-tx `autoScoreCard` helper was removed as dead code in the deepest-review sweep (F-A).
+
+/**
+ * Score ONE just-applied card against ALL of the tenant's active buckets — the transpose of
+ * rankBucket (one card × N buckets vs one bucket × N cards). This is the SYNCHRONOUS fallback the
+ * bridge fan-out calls (RANK-6): the OPP-push path previously only emitted capture:card.applied and
+ * depended entirely on the pipeline OnCardApplied worker, so a downed worker left pushed cards
+ * unscored — unlike provisioning (scoreTenantCards) and bucket-create (rankBucket), which both score
+ * inline. Idempotent with the async path (same ON CONFLICT upsert). A faithful peer of
+ * pipeline/.../rescore.py::rescore_tenant_card, but respecting per-bucket includeClosed like rankBucket
+ * (a closed card is scored only into buckets that include closed opps — the three writers stay consistent).
+ */
+export async function scoreCardForTenant(tenantId: string, opportunityId: string, nowMs: number): Promise<{ scored: number }> {
+  return withTenant(tenantId, async (tx) => {
+    const [row] = await tx<Array<{ card: CardFields; lifecycleStatus: string }>>`
+      SELECT card, lifecycle_status FROM tenant_opportunity_cards
+      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid LIMIT 1`;
+    if (!row) return { scored: 0 };
+    const buckets = await tx<Array<{ id: string; criteria: BucketCriteria }>>`
+      SELECT id, criteria FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}::uuid AND is_active`;
+    const cf = coerceJsonb<CardFields>(row.card, {});
+    const isOpen = row.lifecycleStatus === 'open';
+    let scored = 0;
+    for (const b of buckets) {
+      const criteria = coerceJsonb<BucketCriteria>(b.criteria, {});
+      if (!isOpen && !criteria.includeClosed) continue; // parity with rankBucket's card-set rule
+      const { score, factors } = scoreCard(cf, criteria, nowMs);
+      await tx`
+        INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
+        VALUES (${tenantId}::uuid, ${b.id}::uuid, ${opportunityId}::uuid, ${score}, ${sql.json(factors)})
+        ON CONFLICT (tenant_id, bucket_id, opportunity_id) DO UPDATE SET
+          score = EXCLUDED.score, factors = EXCLUDED.factors, computed_at = now()`;
+      scored++;
+    }
+    return { scored };
+  });
+}
 
 /** Rank a bucket against the tenant's local pipeline; upsert per-card scores. */
 export async function rankBucket(tenantId: string, bucketId: string, nowMs: number): Promise<{ ranked: number }> {

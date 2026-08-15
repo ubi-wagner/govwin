@@ -91,6 +91,23 @@ describe('keyword precision (T2 lock-down)', () => {
   });
 });
 
+describe('RANK-7 scorer parity edge-cases (TS ↔ Python)', () => {
+  it('an unparseable close date skips the timeline signal (no phantom 0.1 factor)', () => {
+    // Was: NaN days → a 0.1 timeline part that also shifted the denominator. Now skipped, matching
+    // Python's `_close_ms is None`. With only a keyword hit, the score is a clean 100.
+    const r = scoreCard({ title: 'quantum', closeDate: 'not-a-date' }, { keywords: ['quantum'], useTimeline: true }, NOW_MS);
+    expect(r).toEqual({ score: 100, factors: { keyword: 100 } });
+  });
+  it('a null/empty close date contributes no timeline signal', () => {
+    expect(scoreCard({ title: 'x', closeDate: null }, { useTimeline: true }, NOW_MS).factors).toEqual({});
+  });
+  it('a short token containing whitespace (tab) uses substring, not a word boundary', () => {
+    // len<=3 but has whitespace → substring path (parity with Python's `not re.search(r"\\s", k)`).
+    expect(keywordHit('xa\tby', 'a\tb')).toBe(true);
+    expect(keywordHit('foo bar', 'a\tb')).toBe(false);
+  });
+});
+
 describe('sanitizeBucketCriteria (T2 shape guard)', () => {
   it('keeps only non-empty strings in array fields', () => {
     expect(sanitizeBucketCriteria({ keywords: ['ai', '', '  x  ', 3, null] })).toEqual({ keywords: ['ai', 'x'] });

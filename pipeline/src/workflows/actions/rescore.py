@@ -76,7 +76,9 @@ def _keyword_hit(text: str, keyword: str) -> bool:
     k = keyword.strip().lower()
     if not k:
         return False
-    if len(k) <= 3 and " " not in k:
+    # Any whitespace (not just a literal space) marks a multi-word token → substring; parity with the
+    # frontend's `!/\s/.test(k)` (a tab/newline in a <=3-char token must behave identically both sides).
+    if len(k) <= 3 and not re.search(r"\s", k):
         return re.search(r"\b" + re.escape(k) + r"\b", text) is not None
     return k in text
 
@@ -205,15 +207,20 @@ async def rescore_tenant_card(
         return {"bucketsScored": 0, "reason": "no_active_buckets"}
 
     row = await conn.fetchrow(
-        "SELECT card FROM tenant_opportunity_cards WHERE tenant_id = $1 AND opportunity_id = $2",
+        "SELECT card, lifecycle_status FROM tenant_opportunity_cards WHERE tenant_id = $1 AND opportunity_id = $2",
         str(tenant_id), str(opportunity_id),
     )
     if not row:
         return {"bucketsScored": 0, "reason": "card_not_found"}
     card = _coerce(row["card"], {})
+    is_open = row["lifecycle_status"] == "open"
 
     to_write: list[tuple[str, str, int, dict]] = []
     for b in buckets:
+        # Card-set rule (parity with frontend rankBucket / scoreCardForTenant): a closed card is
+        # scored only into buckets that include closed opps, so all writers agree on which pairs exist.
+        if not is_open and not b["criteria"].get("includeClosed"):
+            continue
         r = score_card(card, b["criteria"], now_ms)
         to_write.append((b["id"], str(opportunity_id), r["score"], r["factors"]))
     written = await _upsert_scores(conn, tenant_id, to_write)
@@ -233,26 +240,42 @@ async def rescore_tenant(
     conn: asyncpg.Connection,
     *,
     tenant_id: str,
+    bucket_id: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Rescore ALL of a tenant's open cards against ALL active buckets
-    (capture:buckets.updated — the tenant edited their OPP list / bucket criteria)."""
+    """Rescore a tenant's cards against its active buckets (capture:buckets.updated).
+
+    TARGETED when the event carries a bucket_id (a single bucket create/edit/rank): only THAT
+    bucket is rescored, so editing one lens no longer needlessly re-scores every other bucket (the
+    frontend also rankBucket()s the changed bucket synchronously — this is the idempotent worker-side
+    recompute + audit, not a duplicate of the whole tenant). FULL when no bucket_id (the daily rescore,
+    where timeline decay shifts every bucket). Card-set rule matches rankBucket: a bucket scores a card
+    iff the card is open OR the bucket includes closed opps.
+    """
     if not tenant_id:
         return {"status": "skipped", "reason": "missing_tenant"}
 
     now_ms = time.time() * 1000.0
     buckets = await _active_buckets(conn, tenant_id)
+    if bucket_id:
+        buckets = [b for b in buckets if b["id"] == str(bucket_id)]
     if not buckets:
         return {"pairsScored": 0, "reason": "no_active_buckets"}
 
+    # Fetch ALL non-archived cards + their lifecycle so the per-bucket includeClosed rule can decide
+    # each pair (was hardcoded to open-only, which starved includeClosed buckets of closed cards).
     cards = await conn.fetch(
-        "SELECT opportunity_id, card FROM tenant_opportunity_cards WHERE tenant_id = $1 AND lifecycle_status = 'open'",
+        "SELECT opportunity_id, card, lifecycle_status FROM tenant_opportunity_cards "
+        "WHERE tenant_id = $1 AND lifecycle_status <> 'archived'",
         str(tenant_id),
     )
     to_write: list[tuple[str, str, int, dict]] = []
     for c in cards:
         card = _coerce(c["card"], {})
         opp = str(c["opportunity_id"])
+        is_open = c["lifecycle_status"] == "open"
         for b in buckets:
+            if not is_open and not b["criteria"].get("includeClosed"):
+                continue
             r = score_card(card, b["criteria"], now_ms)
             to_write.append((b["id"], opp, r["score"], r["factors"]))
     written = await _upsert_scores(conn, tenant_id, to_write)
@@ -261,7 +284,8 @@ async def rescore_tenant(
         await emit_event(
             conn, namespace="capture", type="tenant.rescored", phase="single",
             tenant_id=str(tenant_id),
-            payload={"cardsScored": len(cards), "bucketsActive": len(buckets), "pairsWritten": written},
+            payload={"cardsScored": len(cards), "bucketsActive": len(buckets),
+                     "pairsWritten": written, "bucketId": str(bucket_id) if bucket_id else None},
         )
     except Exception as exc:
         log.error("rescore_tenant: emit failed: %s", exc)
