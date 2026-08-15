@@ -133,6 +133,7 @@ export function taskHref(opts: {
     case 'source': return `/admin/sources/${entityId}`;
     case 'opportunity': return `/admin/rfp-curation`; // an opp id is not a solId — land on the queue
     case 'solicitation': return `/admin/rfp-curation/${entityId}`; // deep-link straight to the workspace
+    case 'portal': return `/admin/provisioning/${entityId}`; // the provisioning cockpit for a purchased portal (PV-4)
     default: return null;
   }
 }

@@ -201,6 +201,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
               taskType: 'proposal_setup',
               taskTitle: 'Set up the proposal workspace for this purchase',
               assigneeRole: pol.assigneeRole,
+              // Stripe checkout is descoped (comp code stands in) and this path creates NO portal, so
+              // the gate references the opportunity (→ generic curation queue). The live comp-code
+              // purchase route references the portal → the provisioning cockpit (PV-4). When Stripe is
+              // wired to provision a portal, switch this to entityType 'portal'/entityRef portalId too.
               entityType: 'opportunity',
               entityRef: opportunityId,
               nudgeDays: pol.nudgeDays,
