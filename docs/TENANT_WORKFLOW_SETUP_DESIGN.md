@@ -165,6 +165,28 @@ same dedicated page that later hosts all editing:
   alternative — hold stage-0 ToDo creation until Accept — is a one-line switch if you prefer a hard gate.)
 
 Thereafter the **same page** is the ongoing edit surface (§5 PATCH A/B/C); "Accept & Start" becomes "Save".
+A required accept is per-**proposal/portal**; a **descended shadow admin** (rfp_admin acting inside the
+tenant) may complete + accept on the tenant's behalf (same `canEditWorkflow` gate, admin included).
+
+### 3½.3 History-aware recommendations — "recommend, but require"
+
+The required setup opens **pre-filled with a recommendation learned from the tenant's own prior similar
+workflows**, not a static default — so the required step is a fast review-and-accept, and the tenant *owns*
+the outcome. `recommendWorkflowConfig(tenantId, opportunityId)`:
+
+- **Match prior accepted portals by similarity** — same **agency + program/phase family** (e.g. "USAF Phase I",
+  "Army D2P2", "Ohio TVSF"), read off `opportunities.agency`/`program_type`, most-recent-first, scoped to this
+  tenant (with a platform-wide fallback for a tenant's first proposal of a type).
+- **Carry forward what they chose last time** — the accepted `guardrail_config` of the best match: the
+  **stages** + each stage's **gate closer** (Human vs AI-manager) + **who was assigned to AI vs a human** per
+  section/ToDo + the **nudge protocol** + the per-todo dates-as-offsets (re-anchored to this opp's close date).
+- **Fallback** — when there's no history, `recommendedGuardrails()` (today's 3-stage default) still fills the
+  form. Either way the tenant reviews + **Accepts** (required once); nothing is silently applied.
+
+This is the highest-leverage "low-lift" feature: the platform learns each customer's operating pattern
+(who they trust to AI, how they gate a color-team phase, their reminder cadence) and proposes it, so setting
+up the 5th USAF Phase I is a glance, not a chore. It reads only *accepted* configs (the tenant's vetted
+choices), never live/unaccepted ones. (Built in TW-1 as the recommender + surfaced in TW-6.)
 
 ---
 
@@ -315,12 +337,14 @@ Everything is optimistic-UI with a toast on save; every write is validated + aud
 
 ## 9. Phased build plan (TW-1..8) — each phase green + committed
 
-- **TW-1 · Model + validate + editor gate.** Extend `GuardrailConfig` types (stage `dueDate`/`defaultAssigneeUserId`/
-  `gateCloser`/`agentManagerKey`/`autoAdvance`; per-todo `dueDate`/`nudgeDays`; `_setup`); extend
-  `validateGuardrailConfig` (dates well-formed, `gateCloser` ∈ set, completeness check, still ≤ limits); the
-  projection helper `projectTodoTiming(stage, todo, config)`; a `canEditWorkflow(role)` gate = tenant_admin +
-  delegated managers. Unit tests. **No migration** (optional `workflow_setup_status` column deferred; rides in
-  `_setup` first).
+- **TW-1 · Model + validate + editor gate + recommender.** Extend `GuardrailConfig` types (stage `dueDate`/
+  `defaultAssigneeUserId`/`gateCloser`/`agentManagerKey`/`autoAdvance`; per-todo `dueDate`/`nudgeDays`;
+  `_setup`); extend `validateGuardrailConfig` (dates well-formed, `gateCloser` ∈ set, completeness check, still
+  ≤ limits); the projection helper `projectTodoTiming(stage, todo, config)`; a `canEditWorkflow(role)` gate =
+  tenant_admin + delegated managers (+ descended shadow admin); **`recommendWorkflowConfig(tenantId,
+  opportunityId)`** — match prior *accepted* portals by agency+program/phase, carry forward stages/gate-closer/
+  assignees/nudges re-anchored to this close date, fall back to `recommendedGuardrails()`. Unit tests. **No
+  migration** (optional `workflow_setup_status` column deferred; rides in `_setup` first).
 - **TW-2 · `editPortalWorkflow` + PATCH A + Accept & Start.** Post-launch config edit + re-projection (CAS
   `status IN (launched,executing)`, validate, refresh current-stage open tasks, reset `nudges_sent`); the
   **Accept & Start** transition (`_setup.status` pending→accepted, (re)instantiate current stage from accepted
