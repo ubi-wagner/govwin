@@ -216,7 +216,106 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
     except Exception as e:
         logger.error("daily bucket rescore setup failed: %s", e)
 
+    # 4. Pre-purchase START nudges (RANK-9) — nudge a customer to start a proposal on a hot,
+    #    unpursued, soon-closing card. In-app + email, hard-bounded per card.
+    try:
+        await _run_start_nudges(conn)
+    except Exception as e:
+        logger.error("start nudges setup failed: %s", e)
+
     logger.info("=== Daily lifecycle jobs complete ===")
+
+
+async def _run_start_nudges(conn: asyncpg.Connection) -> None:
+    """Pre-purchase START nudge (RANK-9).
+
+    A HOT (best bucket score >= threshold), UNPURSUED, SOON-CLOSING mirror card nudges the customer to
+    start a proposal — in-app (capture:opportunity.start_recommended, per card → the notification bell +
+    Command Center) AND email (one grouped system:notification.requested, template `start_nudge`, gated
+    per tenant by their notify_on_new_priority_opp preference — the same delivery path as the digest).
+
+    Hard-bounded so it can never spam: at most `max_nudges_per_gate` (mig 126, default 3) per card
+    (mig 181 start_nudges_sent watermark) and re-nudged at most once every few days (start_nudged_at).
+    Skips cards already purchased (a proposal_portals row exists). Best-effort — never raises into the loop.
+    The scheduler connects as the owner, so these cross-tenant reads/writes need no per-tenant RLS context.
+    """
+    THRESHOLD = 50   # matches the digest's NOTIFICATION_THRESHOLD — a "priority" match
+    WINDOW_DAYS = 21  # only nudge when there's still time to actually start + submit
+    SPACING_DAYS = 3  # never re-nudge the same card more often than this
+    try:
+        max_nudges = await conn.fetchval("SELECT max_nudges_per_gate FROM automation_framework WHERE id = 1")
+        max_nudges = int(max_nudges) if max_nudges else 3
+    except Exception:
+        max_nudges = 3
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT c.tenant_id::text AS tenant_id, c.opportunity_id::text AS opportunity_id,
+                   c.card->>'title' AS title, bs.top_score::int AS top_score,
+                   GREATEST(0, EXTRACT(DAY FROM (o.close_date - now()))::int) AS days_to_close
+            FROM tenant_opportunity_cards c
+            JOIN opportunities o ON o.id = c.opportunity_id
+            LEFT JOIN LATERAL (
+              SELECT max(s.score) AS top_score FROM tenant_bucket_scores s
+              WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
+            ) bs ON true
+            WHERE c.lifecycle_status = 'open'
+              AND c.archived_at IS NULL
+              AND c.is_pinned = false
+              AND c.pursuit_status NOT IN ('pursuing', 'passed')
+              AND o.close_date IS NOT NULL
+              AND o.close_date > now()
+              AND o.close_date <= now() + make_interval(days => $1)
+              AND bs.top_score >= $2
+              AND c.start_nudges_sent < $3
+              AND (c.start_nudged_at IS NULL OR c.start_nudged_at < now() - make_interval(days => $4))
+              AND NOT EXISTS (
+                SELECT 1 FROM proposal_portals pp
+                WHERE pp.tenant_id = c.tenant_id AND pp.opportunity_id = c.opportunity_id
+              )
+            ORDER BY bs.top_score DESC
+            LIMIT 500
+            """,
+            WINDOW_DAYS, THRESHOLD, max_nudges, SPACING_DAYS,
+        )
+        if not rows:
+            logger.info("start nudges: nothing hot + closing-soon + unpursued")
+            return
+        from collections import defaultdict
+        per_tenant: dict[str, list] = defaultdict(list)
+        nudged = 0
+        for r in rows:
+            tid, opp = r["tenant_id"], r["opportunity_id"]
+            try:
+                await emit_event(
+                    conn, namespace="capture", type="opportunity.start_recommended", phase="single",
+                    actor_type="system", actor_id="lifecycle_scheduler", tenant_id=tid,
+                    payload={"tenantId": tid, "opportunityId": opp, "title": r["title"],
+                             "topScore": r["top_score"], "daysToClose": r["days_to_close"]},
+                )
+                await conn.execute(
+                    "UPDATE tenant_opportunity_cards SET start_nudges_sent = start_nudges_sent + 1, "
+                    "start_nudged_at = now() WHERE tenant_id = $1 AND opportunity_id = $2", tid, opp,
+                )
+                per_tenant[tid].append({"title": r["title"], "daysToClose": r["days_to_close"], "score": r["top_score"]})
+                nudged += 1
+            except Exception as ce:
+                logger.error("start nudge emit/update failed for %s/%s: %s", tid, opp, ce)
+        tenant_ids = list(per_tenant.keys())
+        if tenant_ids:
+            try:
+                await emit_event(
+                    conn, namespace="system", type="notification.requested", phase="single",
+                    actor_type="system", actor_id="lifecycle_scheduler", tenant_id=None,
+                    payload={"channel": "email", "template": "start_nudge", "tenant_ids": tenant_ids,
+                             "tenant_pref": "notify_on_new_priority_opp",
+                             "digest": {tid: per_tenant[tid] for tid in tenant_ids}},
+                )
+            except Exception as ee:
+                logger.error("start nudge email emit failed: %s", ee)
+        logger.info("start nudges: nudged %d card(s) across %d tenant(s)", nudged, len(tenant_ids))
+    except Exception as e:
+        logger.error("start nudges failed: %s", e)
 
 
 async def _run_weekly_jobs(conn: asyncpg.Connection) -> None:
