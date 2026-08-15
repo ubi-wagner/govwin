@@ -59,7 +59,7 @@ export function Tabs({
 
   return (
     <div className={className}>
-      <div role="tablist" aria-label="Card sections" onKeyDown={onKeyDown} className="flex items-center gap-1 border-b border-gray-200">
+      <div role="tablist" aria-label="Card sections" onKeyDown={onKeyDown} className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
         {tabs.map((t) => {
           const selected = t.key === active;
           const blocked = t.locked || t.disabled;

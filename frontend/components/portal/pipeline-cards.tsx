@@ -132,7 +132,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       {err && (
         <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{err}</div>
       )}
-      <div className="flex items-center gap-3 mb-4 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-4 text-sm">
         <label className="flex items-center gap-1.5 text-gray-600">
           <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} /> Include closed
         </label>
