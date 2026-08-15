@@ -82,6 +82,25 @@ spine is built; this pass closes named gaps and wires the last-mile capabilities
 - Scorer parity: every scorer change lands in BOTH `lib/bucket-ranking.ts` and
   `pipeline/.../rescore.py` with mirrored tests.
 
-## Verify — PENDING
-Green backbone (tsc/vitest/pytest) · mig 181 against sandbox · live Playwright drive under the
-forced-RLS `govtech_app` role of the full chain.
+## Verify — DONE ✅
+- **Green backbone:** `tsc` 0 · `vitest` **1116** (125 files — incl. the RANK-7 parity cases; event-contract +
+  audit-coverage guards pass, so every new emit site is conformant) · `pytest` 17 pure scorer cases · mig 181
+  applied against the sandbox (cap=6, all columns present) · `next build` clean.
+- **Live under the forced-RLS `govtech_app` role** (served as `postgres://govtech_app:apppass@…`, NOBYPASSRLS —
+  proven: reads **0** bucket rows without `app.tenant_id`):
+  - `hitl-ranking-spine.spec.ts` — the per-bucket ranking (cards route returns the bucket catalog + per-card
+    `rankings`), the **cap** (create → 409 `BUCKET_LIMIT` at the ceiling), the **edit** PATCH, and the **designee
+    grant** write all pass. RANK-2/3/4/5.
+  - `hitl-bucket-rls` + `hitl-cc-actors` (bucket lifecycle + all 4 CC actors) still pass on the new build — no
+    regression from the gate loosening.
+- **RANK-7 de-dup proven** at the resolver: `OnBucketsUpdated` input_map resolves `payload.bucketId` → `None` for
+  the daily rescore (full-tenant) and → the bucket id for a create/edit/rank (targeted). Both workflows `validate()`.
+- **RANK-9 proven live**: running `_run_start_nudges` against the sandbox emitted **3** in-app
+  `capture:opportunity.start_recommended` + **1** grouped `start_nudge` email event and watermarked 3 cards; a
+  second immediate run emitted **+0** — the spacing guard suppresses re-nudging (the anti-spam proof). The sweep
+  SQL executes against real Postgres.
+
+## Deferred (follow-on)
+- Activating TRL + prior-funding signals (needs opp-TRL extraction + tenant→award linkage).
+- Making the start-nudge cadence / thresholds tenant-tunable via the automation-policy editor (today they're
+  code constants, hard-bounded by `max_nudges_per_gate`).

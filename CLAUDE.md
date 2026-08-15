@@ -35,7 +35,12 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **178** — migs 163–167 per below;
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **181** — mig 180 the bucket-score
+integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
+OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**: customer-admin/designee bucket
+authoring → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
+admin pin-for-updates (holder fan-out, pre-purchase) → notify/nudge (the hot-closing-soon start-nudge) → provision;
+migs 163–167 per below;
 mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
 extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
 **NEW vs UPDATE** (`lib/scout/classify.ts`) and released as a new intake (`stageIntake`) or an update
