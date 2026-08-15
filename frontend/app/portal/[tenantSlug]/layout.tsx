@@ -126,7 +126,8 @@ export default async function PortalLayout({
         <div className="flex-1 min-h-0">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-lg font-bold truncate">{companyName}</h2>
-            {!isPartner && <NotificationBell tenantSlug={tenantSlug} />}
+            {/* B2/H1: a partner_user gets a bell too — the feed is collaborator-scoped server-side. */}
+            <NotificationBell tenantSlug={tenantSlug} />
           </div>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
           {/* Flat, slim nav (Step 0 of the unified-canvas plan — de-compartmentalized; the
