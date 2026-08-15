@@ -67,6 +67,9 @@ export async function recommendWorkflowConfig(tenantId: string, opportunityId: s
           WHERE pp.tenant_id = ${tenantId}::uuid
             AND pp.opportunity_id <> ${opportunityId}::uuid
             AND jsonb_array_length(COALESCE(pp.guardrail_config->'stages', '[]'::jsonb)) > 0
+            -- learn ONLY from a real tenant-vetted setup (the tenant's Accept & Start), never the bare
+            -- auto-release skeleton — so the recommendation carries their real dates/owners/nudges.
+            AND pp.guardrail_config->'_setup'->>'status' = 'accepted'
             AND pp.status IN ('launched','executing','closeout','archived')
             AND ( (${opp.agency}::text IS NOT NULL AND o.agency = ${opp.agency})
                OR (${opp.programType}::text IS NOT NULL AND o.program_type = ${opp.programType}) )
@@ -87,6 +90,14 @@ export async function recommendWorkflowConfig(tenantId: string, opportunityId: s
     }
   }
 
-  // 3. Fallback — the static recommended default, anchored to this close date.
-  return { config: recommendedGuardrails({ closeDate: newCloseIso }) as unknown as GuardrailConfig, source: 'default' };
+  // 3. Fallback — the static recommended default, anchored to this close date. Derive an ABSOLUTE stage
+  //    dueDate from each stage's latest relative dueDays so the recommendation is complete (a date per
+  //    stage) and immediately acceptable — the tenant just reviews + tunes.
+  const rec = recommendedGuardrails({ closeDate: newCloseIso }) as unknown as GuardrailConfig;
+  const nowMs = Date.now();
+  for (const s of rec.stages ?? []) {
+    const maxDue = Math.max(0, ...((s.todos ?? []).map((t) => (typeof t.dueDays === 'number' ? t.dueDays : 0))));
+    if (maxDue > 0 && !s.dueDate) s.dueDate = new Date(nowMs + maxDue * 86_400_000).toISOString();
+  }
+  return { config: rec, source: 'default' };
 }
