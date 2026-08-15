@@ -190,6 +190,32 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
     except Exception as e:
         logger.error("preference extraction setup failed: %s", e)
 
+    # 3. Spotlight bucket rescore — refresh scores daily so the timeline signal (close-date decay)
+    #    doesn't go stale between card arrivals / bucket edits (docs/BUCKET_LOCKDOWN.md T3). Emit one
+    #    capture:buckets.updated per tenant that has active buckets; OnBucketsUpdated does the rescore.
+    try:
+        rows = await conn.fetch(
+            "SELECT DISTINCT tenant_id::text AS tid FROM tenant_spotlight_buckets WHERE is_active"
+        )
+        for r in rows:
+            tid = r["tid"]
+            try:
+                await emit_event(
+                    conn,
+                    namespace="capture",
+                    type="buckets.updated",
+                    phase="single",
+                    actor_type="system",
+                    actor_id="lifecycle_scheduler",
+                    tenant_id=tid,
+                    payload={"tenantId": tid, "action": "daily_rescore"},
+                )
+            except Exception as te:
+                logger.error("daily bucket rescore emit failed for tenant %s: %s", tid, te)
+        logger.info("daily bucket rescore: emitted for %d tenants", len(rows))
+    except Exception as e:
+        logger.error("daily bucket rescore setup failed: %s", e)
+
     logger.info("=== Daily lifecycle jobs complete ===")
 
 

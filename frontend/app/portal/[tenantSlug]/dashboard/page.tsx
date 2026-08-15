@@ -82,7 +82,7 @@ export default async function DashboardPage({
     try { return (await listOpenTasksForActor({ id: sessionUser.id!, role, tenantId })).length; }
     catch (e) { console.error('[dashboard] todos count failed', e); return 0; }
   })();
-  const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}`);
+  const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId} AND is_active`);
   const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
 
   // ── Accessible active proposals (the cockpit center) ──
