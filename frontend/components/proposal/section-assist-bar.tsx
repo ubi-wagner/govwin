@@ -66,12 +66,20 @@ export function SectionAssistBar({
 
   async function checkCompliance() {
     setBusy('compliance');
+    setResearch(null);
     try {
+      // ai/compliance is synchronous — it returns the per-variable checks for this section directly.
       const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai/compliance`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sectionId }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { toast(j?.error ? `Compliance check failed: ${j.error}` : 'Compliance check failed', 'error'); return; }
+      const d = j?.data ?? {};
+      const passed = Number(d.passed ?? 0), failed = Number(d.failed ?? 0), partial = Number(d.partial ?? 0);
+      const failing = Array.isArray(d.checks) ? d.checks.filter((c: { status?: string }) => c?.status === 'fail' || c?.status === 'partial') : [];
+      const lines = failing.slice(0, 6).map((c: { requirement?: string; label?: string; detail?: string; status?: string }) =>
+        `• [${c.status}] ${c.requirement ?? c.label ?? 'requirement'}${c.detail ? ` — ${c.detail}` : ''}`).join('\n');
+      setResearch(`Compliance for this section — ${passed} pass · ${failed} fail · ${partial} partial${lines ? `\n${lines}` : (failed + partial === 0 ? '\nAll checked requirements pass.' : '')}`);
       toast.success('Compliance checked for this section.');
       router.refresh();
     } catch { toast('Compliance check failed — please retry.', 'error'); } finally { setBusy(null); }
@@ -79,15 +87,31 @@ export function SectionAssistBar({
 
   async function doResearch() {
     setBusy('research');
+    setResearch(null);
     try {
+      // research_scout is ASYNC: POST queues the task + returns a taskId; the cited brief arrives on a
+      // later GET poll (the scout browses the web, fences the results). Poll a bounded number of times.
       const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai/research`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sectionId, question: sectionTitle }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { toast(j?.error ? `Research failed: ${j.error}` : 'Research failed', 'error'); return; }
-      const brief = j?.data?.brief ?? j?.data?.summary ?? j?.data?.answer ?? null;
-      setResearch(typeof brief === 'string' && brief.trim() ? brief : 'Research complete — see the section notes / activity for the brief.');
-      toast.success('Research brief ready.');
+      const taskId = j?.data?.taskId;
+      if (!taskId) { setResearch('Research queued — the brief will appear in Activity.'); return; }
+      setResearch('Researching… the scout is browsing sources for this section.');
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const g = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai/research?taskId=${encodeURIComponent(taskId)}`);
+        const gj = await g.json().catch(() => ({}));
+        if (gj?.data?.status === 'complete') {
+          const r = gj.data.result;
+          const text = typeof r === 'string' ? r : (r?.summary ?? r?.brief ?? r?.answer ?? JSON.stringify(r, null, 2));
+          setResearch(typeof text === 'string' && text.trim() ? text : 'Research complete.');
+          toast.success('Research brief ready.');
+          return;
+        }
+      }
+      setResearch('Research is still running — the brief will appear in Activity when the scout finishes.');
     } catch { toast('Research failed — please retry.', 'error'); } finally { setBusy(null); }
   }
 

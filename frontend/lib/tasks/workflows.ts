@@ -80,6 +80,19 @@ export const TASK_WORKFLOWS: Record<string, TaskWorkflowDef> = {
     completer: 'review',
     producedBy: ['human', 'engine', 'agent'],
   },
+  // The per-section edit ToDo raised when a section is assigned (SPINE-T1). Deep-links to the section
+  // editor (taskHref 'section' case); auto-completes when the section is locked. First-class so it never
+  // falls to the broadcast default — its params.kind='review' already drives the completer.
+  edit_section: {
+    key: 'edit_section',
+    name: 'Edit section',
+    description: 'Draft & edit your assigned section on the canvas, then it locks.',
+    side: 'tenant',
+    steps: ['Open section', 'Draft & edit', 'Save', 'Accept & Lock'],
+    actionStep: 1,
+    completer: 'review',
+    producedBy: ['human', 'engine'],
+  },
   proposal_setup: {
     key: 'proposal_setup',
     name: 'Proposal setup',
