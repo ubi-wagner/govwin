@@ -153,6 +153,7 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
                 )}
                 {(p.status === 'launched' || p.status === 'executing') && (
                   <>
+                    <a href={`/portal/${tenantSlug}/portals/${p.id}`} className="text-xs font-medium text-indigo-700 border border-indigo-200 rounded px-3 py-1 hover:bg-indigo-50">Manage workflow &rarr;</a>
                     <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'advance-stage')} className="text-xs font-medium text-blue-700 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50">Advance stage</button>
                     <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'advance-stage', { force: true })} className="text-xs text-gray-500 border border-gray-200 rounded px-3 py-1 hover:bg-gray-50">Force advance</button>
                   </>

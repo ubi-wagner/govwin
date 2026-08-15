@@ -43,6 +43,13 @@ export function WorkflowSetupClient({
   const stages = config.stages ?? [];
   const setStages = (next: Stage[]) => setConfig((c) => ({ ...c, stages: next }));
   const patchStage = (i: number, p: Partial<Stage>) => setStages(stages.map((s, idx) => (idx === i ? { ...s, ...p } : s)));
+  const moveStage = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= stages.length) return;
+    const next = stages.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    setStages(next);
+  };
   const patchTodo = (si: number, ti: number, p: Partial<Todo>) =>
     setStages(stages.map((s, idx) => (idx === si ? { ...s, todos: (s.todos ?? []).map((t, tj) => (tj === ti ? { ...t, ...p } : t)) } : s)));
 
@@ -135,6 +142,10 @@ export function WorkflowSetupClient({
                   <option value="human">Closed by: Human</option>
                   <option value="agent_manager">Closed by: AI manager</option>
                 </select>
+                <div className="flex items-center gap-0.5">
+                  <button onClick={() => moveStage(si, -1)} disabled={si === 0} className="px-1 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Move earlier">↑</button>
+                  <button onClick={() => moveStage(si, 1)} disabled={si === stages.length - 1} className="px-1 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Move later">↓</button>
+                </div>
                 {stages.length > 1 && (
                   <button onClick={() => setStages(stages.filter((_, idx) => idx !== si))} className="text-xs text-red-600 hover:underline">remove</button>
                 )}
