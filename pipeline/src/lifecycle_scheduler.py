@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import date, datetime, timezone
 
 import asyncpg
@@ -193,6 +194,17 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
     # 3. Spotlight bucket rescore — refresh scores daily so the timeline signal (close-date decay)
     #    doesn't go stale between card arrivals / bucket edits (docs/BUCKET_LOCKDOWN.md T3). Emit one
     #    capture:buckets.updated per tenant that has active buckets; OnBucketsUpdated does the rescore.
+    # Bracket the batch start/end (the per-tenant capture:buckets.updated each triggers an
+    # OnBucketsUpdated WORKFLOW instance — itself a managed process; this brackets the emitter sweep).
+    dr_start = ""
+    try:
+        dr_start = await emit_event(
+            conn, namespace="finder", type="daily_rescore.completed", phase="start",
+            actor_type="system", actor_id="lifecycle_scheduler", payload={},
+        )
+    except Exception as exc:
+        logger.error("daily rescore: start emit failed: %s", exc)
+    dr_tenants = 0
     try:
         rows = await conn.fetch(
             "SELECT DISTINCT tenant_id::text AS tid FROM tenant_spotlight_buckets WHERE is_active"
@@ -208,13 +220,24 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
                     actor_type="system",
                     actor_id="lifecycle_scheduler",
                     tenant_id=tid,
+                    parent_event_id=dr_start or None,
                     payload={"tenantId": tid, "action": "daily_rescore"},
                 )
+                dr_tenants += 1
             except Exception as te:
                 logger.error("daily bucket rescore emit failed for tenant %s: %s", tid, te)
-        logger.info("daily bucket rescore: emitted for %d tenants", len(rows))
+        logger.info("daily bucket rescore: emitted for %d tenants", dr_tenants)
     except Exception as e:
         logger.error("daily bucket rescore setup failed: %s", e)
+    finally:
+        try:
+            await emit_event(
+                conn, namespace="finder", type="daily_rescore.completed", phase="end",
+                parent_event_id=dr_start or None, actor_type="system", actor_id="lifecycle_scheduler",
+                payload={"tenantsRescored": dr_tenants},
+            )
+        except Exception as exc:
+            logger.error("daily rescore: end emit failed: %s", exc)
 
     # 4. Pre-purchase START nudges (RANK-9) — nudge a customer to start a proposal on a hot,
     #    unpursued, soon-closing card. In-app + email, hard-bounded per card.
@@ -247,6 +270,22 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
         max_nudges = int(max_nudges) if max_nudges else 3
     except Exception:
         max_nudges = 3
+
+    # The sweep is an automation PROCESS → bracket it start/end (parent-linked) with the outcome counts,
+    # exactly like score_tenants.py's scoring.completed. The `finally` guarantees the :end even on an
+    # early return / exception, so there is never an orphan start (event-contract invariant).
+    start_ms = time.monotonic()
+    start_id = ""
+    try:
+        start_id = await emit_event(
+            conn, namespace="finder", type="nudge_sweep.completed", phase="start",
+            actor_type="system", actor_id="lifecycle_scheduler", payload={},
+        )
+    except Exception as exc:
+        logger.error("start nudge sweep: start emit failed: %s", exc)
+
+    nudged = 0
+    tenant_ids: list[str] = []
     try:
         rows = await conn.fetch(
             """
@@ -278,44 +317,55 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
             """,
             WINDOW_DAYS, THRESHOLD, max_nudges, SPACING_DAYS,
         )
-        if not rows:
+        if rows:
+            from collections import defaultdict
+            per_tenant: dict[str, list] = defaultdict(list)
+            for r in rows:
+                tid, opp = r["tenant_id"], r["opportunity_id"]
+                try:
+                    await emit_event(
+                        conn, namespace="capture", type="opportunity.start_recommended", phase="single",
+                        actor_type="system", actor_id="lifecycle_scheduler", tenant_id=tid,
+                        parent_event_id=start_id or None,
+                        payload={"tenantId": tid, "opportunityId": opp, "title": r["title"],
+                                 "topScore": r["top_score"], "daysToClose": r["days_to_close"]},
+                    )
+                    await conn.execute(
+                        "UPDATE tenant_opportunity_cards SET start_nudges_sent = start_nudges_sent + 1, "
+                        "start_nudged_at = now() WHERE tenant_id = $1 AND opportunity_id = $2", tid, opp,
+                    )
+                    per_tenant[tid].append({"title": r["title"], "daysToClose": r["days_to_close"], "score": r["top_score"]})
+                    nudged += 1
+                except Exception as ce:
+                    logger.error("start nudge emit/update failed for %s/%s: %s", tid, opp, ce)
+            tenant_ids = list(per_tenant.keys())
+            if tenant_ids:
+                try:
+                    await emit_event(
+                        conn, namespace="system", type="notification.requested", phase="single",
+                        actor_type="system", actor_id="lifecycle_scheduler", tenant_id=None,
+                        parent_event_id=start_id or None,
+                        payload={"channel": "email", "template": "start_nudge", "tenant_ids": tenant_ids,
+                                 "tenant_pref": "notify_on_new_priority_opp",
+                                 "digest": {tid: per_tenant[tid] for tid in tenant_ids}},
+                    )
+                except Exception as ee:
+                    logger.error("start nudge email emit failed: %s", ee)
+            logger.info("start nudges: nudged %d card(s) across %d tenant(s)", nudged, len(tenant_ids))
+        else:
             logger.info("start nudges: nothing hot + closing-soon + unpursued")
-            return
-        from collections import defaultdict
-        per_tenant: dict[str, list] = defaultdict(list)
-        nudged = 0
-        for r in rows:
-            tid, opp = r["tenant_id"], r["opportunity_id"]
-            try:
-                await emit_event(
-                    conn, namespace="capture", type="opportunity.start_recommended", phase="single",
-                    actor_type="system", actor_id="lifecycle_scheduler", tenant_id=tid,
-                    payload={"tenantId": tid, "opportunityId": opp, "title": r["title"],
-                             "topScore": r["top_score"], "daysToClose": r["days_to_close"]},
-                )
-                await conn.execute(
-                    "UPDATE tenant_opportunity_cards SET start_nudges_sent = start_nudges_sent + 1, "
-                    "start_nudged_at = now() WHERE tenant_id = $1 AND opportunity_id = $2", tid, opp,
-                )
-                per_tenant[tid].append({"title": r["title"], "daysToClose": r["days_to_close"], "score": r["top_score"]})
-                nudged += 1
-            except Exception as ce:
-                logger.error("start nudge emit/update failed for %s/%s: %s", tid, opp, ce)
-        tenant_ids = list(per_tenant.keys())
-        if tenant_ids:
-            try:
-                await emit_event(
-                    conn, namespace="system", type="notification.requested", phase="single",
-                    actor_type="system", actor_id="lifecycle_scheduler", tenant_id=None,
-                    payload={"channel": "email", "template": "start_nudge", "tenant_ids": tenant_ids,
-                             "tenant_pref": "notify_on_new_priority_opp",
-                             "digest": {tid: per_tenant[tid] for tid in tenant_ids}},
-                )
-            except Exception as ee:
-                logger.error("start nudge email emit failed: %s", ee)
-        logger.info("start nudges: nudged %d card(s) across %d tenant(s)", nudged, len(tenant_ids))
     except Exception as e:
         logger.error("start nudges failed: %s", e)
+    finally:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="nudge_sweep.completed", phase="end",
+                parent_event_id=start_id or None, actor_type="system", actor_id="lifecycle_scheduler",
+                payload={"cardsNudged": nudged, "tenantsNotified": len(tenant_ids), "durationMs": duration_ms},
+            )
+        except Exception as exc:
+            logger.error("start nudge sweep: end emit failed: %s", exc)
 
 
 async def _run_weekly_jobs(conn: asyncpg.Connection) -> None:

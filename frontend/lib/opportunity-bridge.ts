@@ -13,7 +13,7 @@
 import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coarseStatus, isSubmissionStage, type SubmissionStage, type BridgeEventType } from '@/lib/lifecycle';
-import { emitEventSingle, systemActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, systemActor } from '@/lib/events';
 import { scoreCardForTenant } from '@/lib/bucket-ranking';
 
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
@@ -190,7 +190,7 @@ export async function publishToBridge(
 /** Upsert one tenant's denormalized card from a bridge event (tenant-scoped via RLS GUC).
  *  `watched` (RANK-8) = this master opp is admin-pinned for updates, so a newer version landing on an
  *  EXISTING mirror card fans an elevated update notification to this holder (pre-purchase reach). */
-async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false): Promise<void> {
+async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false): Promise<boolean> {
   // Canonical stage from the card drives the coarse lifecycle_status the feed uses.
   // Fall back to the event type / coarse lifecycleStatus for LEGACY cards whose JSON
   // predates submission_stage — otherwise a re-fanned/backfilled closed or archived
@@ -233,7 +233,7 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
     `;
     return { applied: rows.length > 0, existedBefore: !!prior };
   });
-  if (!applied) return;
+  if (!applied) return false;
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`
@@ -285,6 +285,8 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
       console.error('[bridge] opportunity.updated emit failed (non-fatal)', tenantId, e);
     }
   }
+  // Return whether THIS holder got an update notification, so the fan-out can bracket + count them (RANK-8).
+  return watched && existedBefore;
 }
 
 /** Fan a published card version out to every subscribed tenant (all-opps replication). */
@@ -307,14 +309,33 @@ export async function fanOutBridgeEvent(ev: BridgeEvent): Promise<number> {
   } catch (e) {
     console.error('[bridge] watch lookup failed (non-fatal)', ev.opportunityId, e);
   }
+  // A WATCHED opp's holder fan-out is an automation PROCESS → bracket it start/end with the holder count
+  // (RANK-8). Unwatched routine pushes are not bracketed. The per-holder capture:opportunity.updated
+  // events are the fine-grained audit; this is the process-level one. Best-effort; paired start/end.
+  let notifStart = '';
+  if (watched) {
+    try {
+      notifStart = await emitEventStart({
+        namespace: 'finder', type: 'opportunity.update_fanned', actor: systemActor('bridge'),
+        tenantId: null, payload: { opportunityId: ev.opportunityId, version: ev.version },
+      });
+    } catch (e) { console.error('[bridge] update fan-out start emit failed (non-fatal)', e); }
+  }
   let applied = 0;
+  let holdersNotified = 0;
   for (const t of tenants) {
     try {
-      await applyToTenant(t.id, ev, watched);
+      const notified = await applyToTenant(t.id, ev, watched);
       applied++;
+      if (notified) holdersNotified++;
     } catch (e) {
       console.error('[bridge] fan-out to tenant failed', t.id, e);
     }
+  }
+  if (watched && notifStart) {
+    try {
+      await emitEventEnd(notifStart, { result: { opportunityId: ev.opportunityId, holdersNotified, tenantsReached: applied } });
+    } catch (e) { console.error('[bridge] update fan-out end emit failed (non-fatal)', e); }
   }
   return applied;
 }
