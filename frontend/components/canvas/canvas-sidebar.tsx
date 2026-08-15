@@ -102,7 +102,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: 
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean; recommendationType?: string; category?: string | null }) => ({
+          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean; recommendationType?: string; category?: string | null; anchor?: { nodeId?: string; quote?: string } | null }) => ({
             id: c.id,
             actor_id: c.userId,
             actor_name: c.userName ?? 'Unknown',
@@ -111,6 +111,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: 
             resolved: c.resolved ?? false,
             recommendation_type: c.recommendationType,
             category: c.category ?? null,
+            anchor: c.anchor ?? null,
           })));
         }
       }

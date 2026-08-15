@@ -917,21 +917,28 @@ function CanvasEditorInner({
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
   }, [proposalId, handleReviseNode]);
 
-  /** Annotate a highlighted span — attach a note (comment) to THIS section, quoting the span. */
+  /** Annotate a highlighted span — attach a note (comment) ANCHORED to the specific block + quoted span
+   *  (SPINE-T7), not just floating at the section level. section_id still scopes the comment; the block
+   *  anchor {nodeId, quote} pins it to what the reviewer highlighted. */
   const selectionAnnotate = useCallback(async (sel: CanvasSelection) => {
     if (!tenantSlug || !proposalId || !sectionId) return;
     const note = typeof window !== 'undefined' ? window.prompt(`Add a note on “${selectionLabel(sel)}”:`) : null;
     if (!note || !note.trim()) return;
-    const snippet = sel.text.slice(0, 140) + (sel.text.length > 140 ? '…' : '');
+    const snippet = sel.text.slice(0, 200) + (sel.text.length > 200 ? '…' : '');
+    const anchorNodeId = sel.nodeIds?.[0] ?? null;
     setSelBusy(true);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: sectionId, text: `“${snippet}” — ${note.trim()}` }),
+        body: JSON.stringify({
+          nodeId: sectionId,
+          text: note.trim(),
+          ...(anchorNodeId ? { anchor: { nodeId: anchorNodeId, quote: snippet } } : {}),
+        }),
       });
       const j = await res.json().catch(() => ({}));
-      if (res.ok) toast.success('Note added to this section.');
+      if (res.ok) toast.success(anchorNodeId ? 'Note pinned to the selected text.' : 'Note added to this section.');
       else toast.error(j?.error ?? 'Could not add the note.');
     } catch { toast.error('Could not add the note.'); }
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }

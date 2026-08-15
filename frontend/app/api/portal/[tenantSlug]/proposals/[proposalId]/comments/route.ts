@@ -110,6 +110,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       createdAt: Date;
       recommendationType: string;
       category: string | null;
+      anchor: { nodeId?: string; quote?: string } | null;
       userName: string | null;
       userEmail: string | null;
     }[];
@@ -127,6 +128,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.created_at,
           pc.recommendation_type,
           pc.category,
+          pc.anchor,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -148,6 +150,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.created_at,
           pc.recommendation_type,
           pc.category,
+          pc.anchor,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -169,6 +172,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.created_at,
           pc.recommendation_type,
           pc.category,
+          pc.anchor,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -194,6 +198,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         createdAt: c.createdAt,
         recommendationType: c.recommendationType,
         category: c.category,
+        anchor: c.anchor ?? null,
         userName: c.userName,
         userEmail: c.userEmail,
       })),
@@ -251,11 +256,21 @@ export async function POST(request: Request, ctx: RouteContext) {
     enterTenant(tenantId);
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { nodeId?: unknown; text?: unknown };
+    let body: { nodeId?: unknown; text?: unknown; anchor?: unknown };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    // SPINE-T7: optional BLOCK anchor { nodeId, quote } pinning the comment to a specific canvas node +
+    // the highlighted span within the section. Kept only when it carries a nodeId; quote is bounded.
+    let anchor: { nodeId: string; quote: string } | null = null;
+    if (body.anchor && typeof body.anchor === 'object' && !Array.isArray(body.anchor)) {
+      const a = body.anchor as { nodeId?: unknown; quote?: unknown };
+      if (typeof a.nodeId === 'string' && a.nodeId.trim()) {
+        anchor = { nodeId: a.nodeId.trim().slice(0, 200), quote: (typeof a.quote === 'string' ? a.quote : '').slice(0, 500) };
+      }
     }
 
     if (typeof body.nodeId !== 'string' || !body.nodeId.trim()) {
@@ -329,8 +344,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     let comment: { id: string; createdAt: Date };
     try {
       [comment] = await sql<{ id: string; createdAt: Date }[]>`
-        INSERT INTO proposal_comments (proposal_id, section_id, user_id, content)
-        VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text})
+        INSERT INTO proposal_comments (proposal_id, section_id, user_id, content, anchor)
+        VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text},
+                ${anchor ? sql.json(anchor) : null})
         RETURNING id, created_at
       `;
     } catch (dbErr) {

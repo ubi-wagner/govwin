@@ -81,6 +81,8 @@ export interface NodeComment {
   /** 'human' (default) | 'ai_review' | 'ai_suggestion' — AI recommendations render distinctly. */
   recommendation_type?: string;
   category?: string | null;
+  /** SPINE-T7: optional block anchor {nodeId, quote} pinning this comment to the highlighted span. */
+  anchor?: { nodeId?: string; quote?: string } | null;
 }
 
 interface CommentThreadProps {
@@ -117,6 +119,11 @@ export function CommentThread({ comments, onAddComment, onResolve, canComment = 
               </span>
               <span className="text-[10px] text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
             </div>
+            {c.anchor?.quote ? (
+              <blockquote className="mt-1 border-l-2 border-amber-300 bg-amber-50 pl-2 pr-1 py-0.5 text-[11px] italic text-amber-800">
+                “{c.anchor.quote}”
+              </blockquote>
+            ) : null}
             <p className="text-xs text-gray-700 mt-1 whitespace-pre-wrap">{c.text}</p>
             <button
               onClick={() => onResolve(c.id)}
