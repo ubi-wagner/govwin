@@ -9,13 +9,13 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import {
   editPortalWorkflow, canEditWorkflow, isPortalManager, getGuardrailLimits,
-  checkWorkflowComplete, type GuardrailConfig,
+  checkWorkflowComplete, rebaselineConfig, type GuardrailConfig,
 } from '@/lib/portal-workflow';
 import { recommendWorkflowConfig } from '@/lib/portal-workflow-recommend';
 
@@ -87,5 +87,48 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
   } catch (err) {
     console.error('[portal/workflow] PATCH error', err);
     return NextResponse.json({ error: 'Failed to save workflow', code: 'DB_ERROR' }, { status: 500 });
+  }
+}
+
+/**
+ * POST … { action:'rebaseline', shiftDays? | newSubmissionDate? | fromSolicitation? } — shift the whole
+ * timeline in one click (TW-5). fromSolicitation anchors the last stage to the opportunity's close date.
+ * Re-projects via editPortalWorkflow(save).
+ */
+export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string; portalId: string }> }) {
+  try {
+    const { tenantSlug, portalId } = await params;
+    const g = await gate(tenantSlug, portalId);
+    if ('error' in g) return g.error;
+    let body: { action?: string; shiftDays?: number; newSubmissionDate?: string; fromSolicitation?: boolean };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+    if (body.action !== 'rebaseline') return NextResponse.json({ error: 'Unknown action', code: 'VALIDATION_ERROR' }, { status: 400 });
+
+    const portal = await withTenant(g.tenantId, async (tx) => {
+      const [p] = await tx<Array<{ opportunityId: string; status: string; guardrailConfig: GuardrailConfig | null }>>`
+        SELECT opportunity_id AS "opportunityId", status, guardrail_config AS "guardrailConfig"
+        FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`;
+      return p ?? null;
+    });
+    if (!portal) return NextResponse.json({ error: 'Portal not found', code: 'NOT_FOUND' }, { status: 404 });
+
+    let anchor: string | null = body.newSubmissionDate ?? null;
+    if (body.fromSolicitation && portal.opportunityId) {
+      const [o] = await sql<Array<{ closeDate: Date | null }>>`SELECT close_date AS "closeDate" FROM opportunities WHERE id = ${portal.opportunityId}::uuid LIMIT 1`;
+      anchor = o?.closeDate ? new Date(o.closeDate).toISOString() : null;
+      if (!anchor) return NextResponse.json({ error: 'The solicitation has no close date to anchor to', code: 'VALIDATION_ERROR' }, { status: 422 });
+    }
+    if (body.shiftDays == null && !anchor) {
+      return NextResponse.json({ error: 'Provide shiftDays, a new submission date, or fromSolicitation', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    const rebased = rebaselineConfig((portal.guardrailConfig ?? {}) as GuardrailConfig, { shiftDays: body.shiftDays, anchorLastStageTo: anchor });
+    const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
+    const result = await editPortalWorkflow(actor, g.tenantId, portalId, rebased, {});
+    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status ?? 500 });
+    return NextResponse.json({ data: { ok: true, reprojected: result.reprojected, anchoredTo: anchor, shiftDays: body.shiftDays ?? null } });
+  } catch (err) {
+    console.error('[portal/workflow] POST error', err);
+    return NextResponse.json({ error: 'Failed to rebaseline', code: 'DB_ERROR' }, { status: 500 });
   }
 }

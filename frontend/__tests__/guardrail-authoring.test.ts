@@ -17,7 +17,7 @@ vi.mock('@/lib/tasks/tasks', () => ({ createTask: vi.fn() }));
 
 import {
   validateGuardrailConfig, projectTodoTiming, resolveTodoAssignee, checkWorkflowComplete, canEditWorkflow,
-  type Stage, type StageTodo, type GuardrailConfig,
+  rebaselineConfig, type Stage, type StageTodo, type GuardrailConfig,
 } from '@/lib/portal-workflow';
 import { recommendedGuardrails } from '@/lib/guardrail-defaults';
 
@@ -206,6 +206,29 @@ describe('checkWorkflowComplete (the Accept & Start gate)', () => {
   it('an agent_manager stage needs a date + a manager (no human to-dos required)', () => {
     expect(checkWorkflowComplete({ stages: [{ key: 'r', dueDate: '2026-05-01T00:00:00Z', gateCloser: 'agent_manager', agentManagerKey: 'advisory_manager' }] }).complete).toBe(true);
     expect(checkWorkflowComplete({ stages: [{ key: 'r', dueDate: '2026-05-01T00:00:00Z', gateCloser: 'agent_manager' }] }).missing.join()).toMatch(/an AI manager/);
+  });
+});
+
+describe('rebaselineConfig (shift the whole timeline)', () => {
+  const base: GuardrailConfig = { stages: [
+    { key: 'a', dueDate: '2026-06-01T00:00:00.000Z', todos: [{ type: 'acknowledge', dueDate: '2026-05-25T00:00:00.000Z' }] },
+    { key: 'b', dueDate: '2026-06-15T00:00:00.000Z' },
+  ] };
+  it('shiftDays moves every stage + todo date by N days', () => {
+    const r = rebaselineConfig(base, { shiftDays: 10 });
+    expect(r.stages![0].dueDate).toBe('2026-06-11T00:00:00.000Z');
+    expect(r.stages![0].todos![0].dueDate).toBe('2026-06-04T00:00:00.000Z');
+    expect(r.stages![1].dueDate).toBe('2026-06-25T00:00:00.000Z');
+    expect(base.stages![0].dueDate).toBe('2026-06-01T00:00:00.000Z'); // pure — input untouched
+  });
+  it('anchorLastStageTo lands the last dated stage on the anchor, keeping intervals', () => {
+    const r = rebaselineConfig(base, { anchorLastStageTo: '2026-07-15T00:00:00.000Z' }); // last 06-15 → +30d
+    expect(r.stages![1].dueDate).toBe('2026-07-15T00:00:00.000Z');
+    expect(r.stages![0].dueDate).toBe('2026-07-01T00:00:00.000Z');
+  });
+  it('no-op when neither shiftDays nor a usable anchor is given', () => {
+    expect(rebaselineConfig(base, {}).stages![0].dueDate).toBe('2026-06-01T00:00:00.000Z');
+    expect(rebaselineConfig(base, { anchorLastStageTo: 'nope' }).stages![1].dueDate).toBe('2026-06-15T00:00:00.000Z');
   });
 });
 

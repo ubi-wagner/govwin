@@ -107,6 +107,37 @@ export function resolveTodoAssignee(stage: Stage, todo: StageTodo): { assigneeRo
 }
 
 /**
+ * Rebaseline the whole timeline (TW-5): shift every stage/todo absolute date by `shiftDays`, OR move the
+ * timeline so the LAST dated stage (the submission deadline) lands on `anchorLastStageTo` — preserving the
+ * intervals between stages. Pure; the caller re-projects via editPortalWorkflow(save). The "set deadline
+ * from the solicitation" action passes the opportunity's close_date as the anchor.
+ */
+export function rebaselineConfig(config: GuardrailConfig, opts: { shiftDays?: number; anchorLastStageTo?: string | null }): GuardrailConfig {
+  const clone = JSON.parse(JSON.stringify(config)) as GuardrailConfig;
+  const stages = Array.isArray(clone.stages) ? clone.stages : [];
+  let shiftMs = 0;
+  if (typeof opts.shiftDays === 'number' && Number.isFinite(opts.shiftDays)) {
+    shiftMs = Math.round(opts.shiftDays) * 86_400_000;
+  } else if (opts.anchorLastStageTo) {
+    const anchor = new Date(opts.anchorLastStageTo).getTime();
+    let lastDue = NaN;
+    for (const s of stages) { if (s.dueDate) { const t = new Date(s.dueDate).getTime(); if (!Number.isNaN(t)) lastDue = t; } }
+    if (!Number.isNaN(anchor) && !Number.isNaN(lastDue)) shiftMs = anchor - lastDue;
+  }
+  if (!shiftMs) return clone;
+  const shift = (iso: string | null | undefined): string | null | undefined => {
+    if (!iso) return iso;
+    const t = new Date(iso).getTime();
+    return Number.isNaN(t) ? iso : new Date(t + shiftMs).toISOString();
+  };
+  for (const s of stages) {
+    if (s.dueDate) s.dueDate = shift(s.dueDate);
+    for (const t of s.todos ?? []) { if (t.dueDate) t.dueDate = shift(t.dueDate); }
+  }
+  return clone;
+}
+
+/**
  * Who may edit a portal's Workflow Setup (docs/TENANT_WORKFLOW_SETUP_DESIGN.md): tenant_admin+ — which
  * covers a descended rfp_admin/master_admin shadow admin and a partner_admin descended as tenant_admin —
  * OR a delegated per-portal MANAGER. The manager check needs portal context (the guardrail_config manager

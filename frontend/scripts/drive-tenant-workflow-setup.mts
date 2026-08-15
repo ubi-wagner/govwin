@@ -7,7 +7,7 @@
 // Grows across TW-4/5/7 (per-task PATCH, rebaseline, browser). Run:
 //   DATABASE_URL=<govtech_app> DATABASE_URL_OWNER=<owner> node --import tsx scripts/drive-tenant-workflow-setup.mts
 import { sqlBypass } from '@/lib/db';
-import { editPortalWorkflow, type GuardrailConfig } from '@/lib/portal-workflow';
+import { editPortalWorkflow, rebaselineConfig, type GuardrailConfig } from '@/lib/portal-workflow';
 import { updateTask } from '@/lib/tasks/update-task';
 
 const FND = '17780cad-76c0-4cef-95ec-2a536bcf5c8f';                 // Foundation
@@ -102,6 +102,16 @@ try {
     await sqlBypass`UPDATE tasks SET status='completed' WHERE id=${tf.id}::uuid`;
     check('updateTask rejects editing a completed to-do', (await updateTask({ actor, tenantId: FND, taskId: tf.id, dueAt: D3 })).code === 'CONFLICT');
   }
+
+  // ── TW-5: rebaseline shifts the whole timeline + re-projects the current stage ──
+  const rebStage = { key: 'kickoff', label: 'Kickoff', dueDate: D2, todos: [{ type: 'acknowledge' as const, title: 'Rebaseline ack', assigneeRole: 'tenant_admin' }] };
+  await editPortalWorkflow(actor, FND, portalId, cfg({ stages: [rebStage], _setup: { status: 'accepted' } }), {});
+  const rebased = rebaselineConfig(cfg({ stages: [rebStage], _setup: { status: 'accepted' } }), { shiftDays: 7 });
+  const reb = await editPortalWorkflow(actor, FND, portalId, rebased, {});
+  check('rebaseline (+7d) re-projected the task', (reb.reprojected ?? 0) === 1);
+  const tr = await stageTask(portalId);
+  check('rebaseline shifted the task due_at by 7 days',
+    !!tr?.dueAt && new Date(tr.dueAt).getTime() === new Date(D2).getTime() + 7 * 86_400_000);
 
   console.log(`\n${fail === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fail} failed`);
 } catch (e) {
