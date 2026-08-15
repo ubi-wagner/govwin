@@ -8,6 +8,7 @@
 //   DATABASE_URL=<govtech_app> DATABASE_URL_OWNER=<owner> node --import tsx scripts/drive-tenant-workflow-setup.mts
 import { sqlBypass } from '@/lib/db';
 import { editPortalWorkflow, type GuardrailConfig } from '@/lib/portal-workflow';
+import { updateTask } from '@/lib/tasks/update-task';
 
 const FND = '17780cad-76c0-4cef-95ec-2a536bcf5c8f';                 // Foundation
 const OPP = 'd53a22e4-792d-4fe7-8253-a42270fd9981';                 // TVSF Round 45
@@ -80,6 +81,27 @@ try {
   // ── Guard: a below-bar accept is rejected ──
   const bad = await editPortalWorkflow(actor, FND, portalId, cfg({ stages: [{ key: 'k2', todos: [{ type: 'acknowledge' }] }] }), { accept: true });
   check('accept rejects an incomplete config (no date/owner)', bad.ok === false && bad.code === 'INCOMPLETE');
+
+  // ── TW-4: per-task reassign / reschedule / re-nudge (a fresh open task) ──
+  const D3 = '2026-08-20T00:00:00.000Z';
+  await editPortalWorkflow(actor, FND, portalId, cfg({
+    stages: [{ key: 'kickoff', label: 'Kickoff', dueDate: D2, todos: [{ type: 'acknowledge', title: 'Fresh ack', assigneeRole: 'tenant_admin' }] }],
+    _setup: { status: 'accepted' },
+  }), {});
+  const tf = await stageTask(portalId);
+  check('re-added a fresh open task for the PATCH test', !!tf && tf.status === 'open');
+  if (tf) {
+    check('updateTask reassign to a named person ok', (await updateTask({ actor, tenantId: FND, taskId: tf.id, assigneeUserId: KATE })).ok === true);
+    await sqlBypass`UPDATE tasks SET nudges_sent='[2]'::jsonb WHERE id=${tf.id}::uuid`;
+    check('updateTask reschedule ok', (await updateTask({ actor, tenantId: FND, taskId: tf.id, dueAt: D3, nudgeSchedule: [2] })).ok === true);
+    const tg = await stageTask(portalId);
+    check('task reassigned to the named person (role cleared)', tg?.assigneeUserId === KATE && !tg?.assigneeRole);
+    check('task rescheduled to D3 + nudge [2] + nudges_sent reset',
+      !!tg?.dueAt && new Date(tg.dueAt).toISOString() === D3 && JSON.stringify(tg?.nudgeSchedule) === JSON.stringify([2]) && JSON.stringify(tg?.nudgesSent) === JSON.stringify([]));
+    check('updateTask rejects a non-member assignee', (await updateTask({ actor, tenantId: FND, taskId: tf.id, assigneeUserId: '00000000-0000-0000-0000-000000000000' })).code === 'VALIDATION_ERROR');
+    await sqlBypass`UPDATE tasks SET status='completed' WHERE id=${tf.id}::uuid`;
+    check('updateTask rejects editing a completed to-do', (await updateTask({ actor, tenantId: FND, taskId: tf.id, dueAt: D3 })).code === 'CONFLICT');
+  }
 
   console.log(`\n${fail === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fail} failed`);
 } catch (e) {
