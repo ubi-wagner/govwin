@@ -16,9 +16,12 @@
 
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
+import { runInTenant } from '@/lib/tenant-context';
 import { createTask } from '@/lib/tasks/tasks';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
+
+const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
 
 export interface GuardrailLimits {
   maxStages: number;
@@ -308,5 +311,139 @@ async function emitPortalStageAdvanced(
     actor: userActor(actor.id, actor.email ?? undefined),
     tenantId,
     payload: { portalId, fromStageIndex, toStageIndex, status },
+  });
+}
+
+/** Is this user a DELEGATED manager of the portal (a guardrail_config collaborator with role='manager')?
+ *  Lets a non-admin manager edit the workflow (canEditWorkflow's isDelegatedManager). */
+export async function isPortalManager(tenantId: string, portalId: string, userEmail: string | null): Promise<boolean> {
+  if (!userEmail) return false;
+  const email = userEmail.toLowerCase();
+  try {
+    return await withTenant(tenantId, async (tx) => {
+      const [p] = await tx<Array<{ guardrailConfig: GuardrailConfig | null }>>`
+        SELECT guardrail_config AS "guardrailConfig" FROM proposal_portals
+        WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`;
+      const cols: Collaborator[] = Array.isArray(p?.guardrailConfig?.collaborators) ? p!.guardrailConfig!.collaborators! : [];
+      return cols.some((c: Collaborator) => c && c.role === 'manager' && typeof c.email === 'string' && c.email.toLowerCase() === email);
+    });
+  } catch { return false; }
+}
+
+export interface EditWorkflowResult {
+  ok: boolean;
+  error?: string; code?: string; status?: number;
+  reprojected?: number; created?: number; cancelled?: number; accepted?: boolean;
+}
+
+/**
+ * Edit a LAUNCHED portal's workflow config + reconcile the current stage's tasks — the post-launch edit
+ * path the frozen guardrail model never had (TW-2, docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3-§5). Two modes:
+ *   • save (default) — re-project the current stage's OPEN tasks onto the new dates/assignees/nudges
+ *     (reset `nudges_sent` so a rescheduled nudge re-fires), create newly-added todos, cancel removed
+ *     ones. Bracketed `capture:workflow.reconfigured` (a process touching N tasks).
+ *   • accept — the required one-time "Accept & Start": also require checkWorkflowComplete + stamp
+ *     `_setup=accepted`. Single `capture:workflow.accepted`.
+ * CAS to status IN (launched, executing) so a closeout/archived portal is never re-armed and the
+ * pre-launch entry states stay owned by accept/release (adversarial-sweep B4). Runs in the buyer tenant's
+ * RLS context (createTask + the task UPDATEs hit the RLS-forced `tasks` ledger). Reconcile matches an open
+ * task to a config todo by title, so a pure date/assignee/nudge edit updates in place (task identity +
+ * any progress preserved); a title/structure change cancels + recreates.
+ */
+export async function editPortalWorkflow(
+  actor: { id: string; email: string | null; role: Role; tenantId: string },
+  tenantId: string,
+  portalId: string,
+  newConfig: GuardrailConfig,
+  opts: { accept?: boolean } = {},
+): Promise<EditWorkflowResult> {
+  const limits = await getGuardrailLimits();
+  const v = validateGuardrailConfig(newConfig, limits);
+  if (!v.ok) return { ok: false, error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT', status: 422 };
+  if (opts.accept) {
+    const c = checkWorkflowComplete(newConfig);
+    if (!c.complete) return { ok: false, error: `Complete the setup first — missing: ${c.missing.join(', ')}`, code: 'INCOMPLETE', status: 422 };
+  }
+
+  return runInTenant(tenantId, async (): Promise<EditWorkflowResult> => {
+    const [portal] = await sql<Array<{ currentStageIndex: number; guardrailConfig: GuardrailConfig; status: string }>>`
+      SELECT current_stage_index, guardrail_config, status
+      FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`;
+    if (!portal) return { ok: false, error: 'portal not found', code: 'NOT_FOUND', status: 404 };
+    if (portal.status !== 'launched' && portal.status !== 'executing') {
+      return { ok: false, error: 'the workflow is not editable in this state', code: 'CONFLICT', status: 409 };
+    }
+
+    const config: GuardrailConfig = { ...newConfig };
+    config._setup = opts.accept
+      ? { status: 'accepted', acceptedAt: new Date().toISOString(), acceptedBy: actor.id }
+      : (portal.guardrailConfig?._setup ?? newConfig._setup);
+
+    const [wrote] = await sql<Array<{ id: string }>>`
+      UPDATE proposal_portals SET guardrail_config = ${jsonParam(config)}
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid AND status IN ('launched','executing')
+      RETURNING id`;
+    if (!wrote) return { ok: false, error: 'the workflow is not editable in this state', code: 'CONFLICT', status: 409 };
+
+    // Reconcile the CURRENT stage's tasks onto the new config.
+    const stages = Array.isArray(config.stages) ? config.stages : [];
+    const curStage = stages[portal.currentStageIndex];
+    let reprojected = 0, created = 0, cancelled = 0;
+    if (curStage) {
+      const existing = await sql<Array<{ id: string; title: string | null }>>`
+        SELECT id, title FROM tasks
+        WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
+          AND params->>'stage' = ${curStage.key} AND status IN ('open','in_progress')`;
+      const used = new Set<string>();
+      for (const todo of curStage.todos ?? []) {
+        const title = todo.title ?? `${curStage.label ?? curStage.key}: ${todo.type.replace(/_/g, ' ')}`;
+        const { dueAt, nudgeDays } = projectTodoTiming(curStage, todo, config);
+        const { assigneeRole, assigneeUserId } = resolveTodoAssignee(curStage, todo);
+        const sched = nudgeDays.slice(0, limits.maxNudges);
+        const match = existing.find((e) => !used.has(e.id) && e.title === title);
+        if (match) {
+          used.add(match.id);
+          await sql`
+            UPDATE tasks SET due_at = ${dueAt}, assignee_role = ${assigneeRole}, assignee_user_id = ${assigneeUserId},
+              nudge_schedule = ${jsonParam(sched)}, nudges_sent = '[]'::jsonb
+            WHERE tenant_id = ${tenantId}::uuid AND id = ${match.id}::uuid AND status IN ('open','in_progress')`;
+          reprojected++;
+        } else {
+          const res = await createTask({
+            actor, tenantId, assigneeRole, assigneeUserId, taskType: todo.type, title,
+            entityType: 'portal', entityId: portalId, dueAt, nudgeDays: sched,
+            params: { kind: TODO_KIND[todo.type] ?? 'review', portalId, stage: curStage.key },
+          });
+          if (res.ok) created++;
+        }
+      }
+      for (const e of existing) {
+        if (!used.has(e.id)) {
+          await sql`UPDATE tasks SET status = 'cancelled' WHERE tenant_id = ${tenantId}::uuid AND id = ${e.id}::uuid AND status IN ('open','in_progress')`;
+          cancelled++;
+        }
+      }
+    }
+
+    if (opts.accept) {
+      try {
+        await emitEventSingle({
+          namespace: 'capture', type: 'workflow.accepted',
+          actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+          payload: { portalId, stages: stages.length, tasksCreated: created },
+        });
+      } catch (e) { console.error('[editPortalWorkflow] accepted emit failed (non-fatal)', e); }
+    } else {
+      try {
+        const startId = await emitEventStart({
+          namespace: 'capture', type: 'workflow.reconfigured',
+          actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+          payload: { portalId },
+        });
+        await emitEventEnd(startId, { result: { portalId, reprojected, created, cancelled } });
+      } catch (e) { console.error('[editPortalWorkflow] reconfigured emit failed (non-fatal)', e); }
+    }
+
+    return { ok: true, reprojected, created, cancelled, accepted: opts.accept === true };
   });
 }

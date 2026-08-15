@@ -109,6 +109,11 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'opportunity.close_date_changed': (p) => `Opportunity close date changed${str(p.newCloseDate) ? ` to ${str(p.newCloseDate)}` : ''}`,
   'profile.updated': 'Company profile updated',
   'process.force_advanced': 'Process advanced',
+  // Tenant Workflow Setup (TW): the required one-time accept + later re-configuration of a portal's workflow.
+  'workflow.accepted': (p) => `Build workflow set up & started${typeof p.stages === 'number' ? ` (${p.stages} phase${p.stages === 1 ? '' : 's'})` : ''}`,
+  'workflow.reconfigured': 'Build workflow updated',
+  'task.reassigned': (p) => `To-do reassigned${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'task.rescheduled': (p) => `To-do rescheduled${str(p.title) ? `: ${str(p.title)}` : ''}`,
 
   // ── Gates / compliance setup ────────────────────────────────────────
   'gate_requirement.created': 'Gate requirement added',
