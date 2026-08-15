@@ -14,6 +14,8 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { rankBucket, sanitizeBucketCriteria, type BucketCriteria } from '@/lib/bucket-ranking';
+import { coerceJsonb } from '@/lib/jsonb';
 
 async function gate(tenantSlug: string, bucketId: string, minRole: Role) {
   const session = await auth();
@@ -86,14 +88,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     let body: { name?: string; description?: string; criteria?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     await withTenant(g.tenantId, async (tx) => {
+      let criteriaJson: ReturnType<typeof sql.json> | null = null;
+      if (body.criteria !== undefined) {
+        // MERGE, don't clobber: a partial PATCH that sends only {keywords} must keep the existing
+        // weights/toggles. Sanitize the incoming shape, then shallow-merge over what's stored.
+        const [existing] = await tx<Array<{ criteria: unknown }>>`
+          SELECT criteria FROM tenant_spotlight_buckets
+          WHERE tenant_id = ${g.tenantId}::uuid AND id = ${bucketId}::uuid LIMIT 1`;
+        const merged: BucketCriteria = { ...coerceJsonb<BucketCriteria>(existing?.criteria, {}), ...sanitizeBucketCriteria(body.criteria) };
+        criteriaJson = sql.json(merged as Parameters<typeof sql.json>[0]);
+      }
       await tx`
         UPDATE tenant_spotlight_buckets SET
           name = COALESCE(${body.name ?? null}, name),
           description = COALESCE(${body.description ?? null}, description),
-          criteria = COALESCE(${body.criteria !== undefined ? sql.json(body.criteria as Parameters<typeof sql.json>[0]) : null}, criteria)
+          criteria = COALESCE(${criteriaJson}, criteria)
         WHERE tenant_id = ${g.tenantId}::uuid AND id = ${bucketId}::uuid
       `;
     });
+    // Re-rank SYNCHRONOUSLY so the edit reflects immediately (parity with create; the async
+    // OnBucketsUpdated below also rescores, but this doesn't depend on the pipeline running).
+    try { await rankBucket(g.tenantId, bucketId, Date.now()); } catch (e) { console.error('[portal/buckets/:id] rank failed (non-fatal)', e); }
     // The criteria changed → emit buckets.updated; the pipeline OnBucketsUpdated
     // workflow rescores every open card against all active buckets (tenant-side,
     // event-driven — scoring is no longer inline here).
@@ -118,6 +133,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if ('error' in g) return g.error;
     await withTenant(g.tenantId, async (tx) => {
       await tx`UPDATE tenant_spotlight_buckets SET is_active = false WHERE tenant_id = ${g.tenantId}::uuid AND id = ${bucketId}::uuid`;
+      // Prune this bucket's score rows now (deactivation used to leave them behind — hidden by the
+      // /cards is_active join but skewing the digest's LEFT-joined reads). docs/BUCKET_LOCKDOWN.md T1.
+      await tx`DELETE FROM tenant_bucket_scores WHERE tenant_id = ${g.tenantId}::uuid AND bucket_id = ${bucketId}::uuid`;
     });
     await emitEventSingle({
       namespace: 'capture',

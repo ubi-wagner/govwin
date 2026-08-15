@@ -43,6 +43,37 @@ export interface BucketCriteria {
   weights?: Record<string, number>;
 }
 
+/**
+ * Coerce arbitrary client input into a valid BucketCriteria (docs/BUCKET_LOCKDOWN.md T2). Drops
+ * junk rather than 400-ing: string-array fields keep only non-empty strings; toggles must be real
+ * booleans; weights keep only finite, non-negative numbers. An explicit empty array is preserved
+ * (so a client can clear keywords); an omitted field stays absent (so a PATCH can merge). Guarantees
+ * the stored jsonb is always shaped the way scoreCard expects — no silent all-zero from bad shapes.
+ */
+export function sanitizeBucketCriteria(input: unknown): BucketCriteria {
+  const c = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const strArr = (v: unknown): string[] | undefined =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()) : undefined;
+  const out: BucketCriteria = {};
+  const set = (k: 'keywords' | 'naics' | 'agencies' | 'programTypes' | 'setAsides') => {
+    const a = strArr(c[k]);
+    if (a !== undefined) out[k] = a;
+  };
+  set('keywords'); set('naics'); set('agencies'); set('programTypes'); set('setAsides');
+  if (typeof c.useAccessibility === 'boolean') out.useAccessibility = c.useAccessibility;
+  if (typeof c.useTimeline === 'boolean') out.useTimeline = c.useTimeline;
+  if (typeof c.includeClosed === 'boolean') out.includeClosed = c.includeClosed;
+  if (typeof c.trlBand === 'string' || c.trlBand === null) out.trlBand = c.trlBand as string | null;
+  if (c.weights && typeof c.weights === 'object' && !Array.isArray(c.weights)) {
+    const w: Record<string, number> = {};
+    for (const [k, v] of Object.entries(c.weights as Record<string, unknown>)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) w[k] = v;
+    }
+    if (Object.keys(w).length) out.weights = w;
+  }
+  return out;
+}
+
 export interface CardFields {
   title?: string | null;
   description?: string | null;

@@ -5,7 +5,7 @@
  * two implementations are pinned together, plus the new keyword-precision + clamp guards.
  */
 import { describe, it, expect } from 'vitest';
-import { scoreCard, keywordHit } from '@/lib/bucket-ranking';
+import { scoreCard, keywordHit, sanitizeBucketCriteria } from '@/lib/bucket-ranking';
 
 const NOW_MS = 1_700_000_000_000;
 const DAY = 86_400_000;
@@ -88,6 +88,24 @@ describe('keyword precision (T2 lock-down)', () => {
     // "ai"/"ml" against an email-marketing card → 0 (was 100 under substring).
     const r = scoreCard({ title: 'Email marketing platform' }, { keywords: ['ai', 'ml'] }, NOW_MS);
     expect(r.score).toBe(0);
+  });
+});
+
+describe('sanitizeBucketCriteria (T2 shape guard)', () => {
+  it('keeps only non-empty strings in array fields', () => {
+    expect(sanitizeBucketCriteria({ keywords: ['ai', '', '  x  ', 3, null] })).toEqual({ keywords: ['ai', 'x'] });
+  });
+  it('drops non-boolean toggles and non-finite/negative weights', () => {
+    expect(sanitizeBucketCriteria({ useTimeline: 'yes', weights: { keyword: 2, naics: -1, agency: Infinity, x: 'nope' } }))
+      .toEqual({ weights: { keyword: 2 } });
+  });
+  it('preserves an explicit empty array (clear) but omits absent fields (merge-safe)', () => {
+    expect(sanitizeBucketCriteria({ keywords: [] })).toEqual({ keywords: [] });
+    expect(sanitizeBucketCriteria({ useTimeline: false })).toEqual({ useTimeline: false });
+  });
+  it('non-object input → empty criteria', () => {
+    expect(sanitizeBucketCriteria('garbage')).toEqual({});
+    expect(sanitizeBucketCriteria(null)).toEqual({});
   });
 });
 

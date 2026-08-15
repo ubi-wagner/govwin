@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { rankBucket } from '@/lib/bucket-ranking';
+import { rankBucket, sanitizeBucketCriteria } from '@/lib/bucket-ranking';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if (!body.name || typeof body.name !== 'string') {
       return NextResponse.json({ error: 'name is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    const criteria = (body.criteria && typeof body.criteria === 'object') ? body.criteria : {};
+    const criteria = sanitizeBucketCriteria(body.criteria);
     const [row] = await withTenant(g.tenantId, async (tx) =>
       tx<Array<{ id: string }>>`
         INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, created_by)
