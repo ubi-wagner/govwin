@@ -165,6 +165,18 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   const parsedContent = coerceJsonb<CanvasDocument | null>(section.content, null);
   if (parsedContent && typeof parsedContent === 'object' && 'version' in parsedContent) {
     canvasDoc = parsedContent;
+    // A legacy/partial stored doc can carry `version` yet lack `metadata`/`canvas` (the editor reads both).
+    // Backfill the missing blocks so no downstream component white-screens on an incomplete doc.
+    if (!canvasDoc.metadata) {
+      canvasDoc.metadata = {
+        title: section.title ?? 'Untitled Section', volume_id: '', required_item_id: '',
+        proposal_id: proposalId, solicitation_id: proposal.solicitationId ?? '',
+        created_at: new Date().toISOString(), last_modified_at: new Date().toISOString(),
+        last_modified_by: userId, version_number: 1, status: (section.status as CanvasDocument['metadata']['status']) ?? 'empty',
+      };
+    }
+    if (!canvasDoc.canvas) canvasDoc.canvas = CANVAS_PRESETS.letter_sbir_phase1;
+    if (!Array.isArray(canvasDoc.nodes)) canvasDoc.nodes = [];
   } else {
     canvasDoc = createEmptyCanvas({
       documentId: sectionId,

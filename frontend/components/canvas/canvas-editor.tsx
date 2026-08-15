@@ -785,7 +785,7 @@ function CanvasEditorInner({
           suggestedType: typeFromLibraryTags(n.library_tags),
           sectionType: typeFromLibraryTags(n.library_tags),
           tags: (n.library_tags ?? []).filter((t) => !t.startsWith('type:')),
-          status: acceptedNodeIds.has(n.id) || n.provenance.library_unit_id ? 'approved' : 'draft',
+          status: acceptedNodeIds.has(n.id) || n.provenance?.library_unit_id ? 'approved' : 'draft',
         })),
     [doc.nodes, acceptedNodeIds],
   );
@@ -850,7 +850,7 @@ function CanvasEditorInner({
               text: getNodeText(node),
               sectionType: typeFromLibraryTags(node.library_tags),
               tags: (node.library_tags ?? []).filter((t) => !t.startsWith('type:')),
-              parentUnitId: node.provenance.library_unit_id ?? null,
+              parentUnitId: node.provenance?.library_unit_id ?? null,
             }),
           },
         );
@@ -938,8 +938,11 @@ function CanvasEditorInner({
         }),
       });
       const j = await res.json().catch(() => ({}));
-      if (res.ok) toast.success(anchorNodeId ? 'Note pinned to the selected text.' : 'Note added to this section.');
-      else toast.error(j?.error ?? 'Could not add the note.');
+      if (res.ok) {
+        toast.success(anchorNodeId ? 'Note pinned to the selected text.' : 'Note added to this section.');
+        // Nudge an already-open comment thread (sidebar) to re-fetch so the pinned note appears at once.
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('canvas:comment-added', { detail: { sectionId } }));
+      } else toast.error(j?.error ?? 'Could not add the note.');
     } catch { toast.error('Could not add the note.'); }
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
   }, [tenantSlug, proposalId, sectionId]);

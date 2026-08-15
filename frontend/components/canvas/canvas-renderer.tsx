@@ -498,11 +498,11 @@ function NodeRenderer({
     ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
     : 'hover:ring-1 hover:ring-gray-200';
 
-  const provenanceBadge = node.provenance.source === 'ai_draft'
+  const provenanceBadge = node.provenance?.source === 'ai_draft'
     ? 'bg-yellow-100 text-yellow-700'
-    : node.provenance.source === 'library'
+    : node.provenance?.source === 'library'
     ? 'bg-indigo-100 text-indigo-700'
-    : node.provenance.source === 'template'
+    : node.provenance?.source === 'template'
     ? 'bg-gray-100 text-gray-500'
     : null;
 
@@ -565,7 +565,7 @@ function NodeRenderer({
       {/* Provenance badge */}
       {provenanceBadge && isSelected && (
         <span className={`absolute -top-2 -right-1 text-[9px] px-1 py-0.5 rounded ${provenanceBadge}`}>
-          {node.provenance.source.replace('_', ' ')}
+          {(node.provenance?.source ?? 'manual').replace('_', ' ')}
         </span>
       )}
 
