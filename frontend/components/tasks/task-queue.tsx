@@ -242,7 +242,7 @@ function TaskCompleter({
   if (task.taskType === 'manager_request') return <ManagerRequestCompleter tenantSlug={tenantSlug} />;
 
   // "Open the thing this ToDo is about" deep-link (HITL P4) — shown on review/upload gates.
-  const openHref = taskHref({ tenantSlug, entityType: task.entityType, entityId: task.entityId });
+  const openHref = taskHref({ tenantSlug, entityType: task.entityType, entityId: task.entityId, params: task.params });
 
   // Explicit params.kind wins; otherwise the ToDo completes the way its defined
   // workflow prescribes (e.g. broadcast → acknowledge, review_section → review).

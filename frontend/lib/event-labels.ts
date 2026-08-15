@@ -59,6 +59,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'section.locked': (p) => `Section accepted & locked${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.unlocked': (p) => `Section reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.harvested': 'Accepted content saved to library',
+  'section.assigned': (p) => str(p.assigneeUserId) ? `Section assigned${str(p.sectionTitle) ? `: ${str(p.sectionTitle)}` : ''}` : `Section unassigned${str(p.sectionTitle) ? `: ${str(p.sectionTitle)}` : ''}`,
 
   // ── Collaboration ───────────────────────────────────────────────────
   'comment.created': 'Comment added',

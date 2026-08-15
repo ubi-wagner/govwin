@@ -123,11 +123,19 @@ export function taskHref(opts: {
   tenantSlug?: string | null;
   entityType: string | null;
   entityId: string | null;
+  params?: Record<string, unknown> | null;
 }): string | null {
-  const { tenantSlug, entityType, entityId } = opts;
+  const { tenantSlug, entityType, entityId, params } = opts;
   if (!entityType || !entityId) return null;
   switch (entityType) {
     case 'proposal': return tenantSlug ? `/portal/${tenantSlug}/proposals/${entityId}` : null;
+    // A section-scoped ToDo (SPINE-T1): deep-link straight to the section editor. entityId is the
+    // section id; the owning proposalId rides in params (a section URL nests under its proposal).
+    case 'section': {
+      const proposalId = params && typeof params === 'object' ? (params as { proposalId?: unknown }).proposalId : null;
+      return tenantSlug && typeof proposalId === 'string'
+        ? `/portal/${tenantSlug}/proposals/${proposalId}/sections/${entityId}` : null;
+    }
     case 'contract': return tenantSlug ? `/portal/${tenantSlug}/contracts/${entityId}` : null;
     case 'content_pages': return `/admin/site/content/${entityId}`; // resolver → Studio editor
     case 'source': return `/admin/sources/${entityId}`;

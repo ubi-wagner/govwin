@@ -20,6 +20,7 @@
  */
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { completeSectionTodos } from '@/lib/proposal/section-todo';
 import { harvestSectionToAtomLibrary } from '@/lib/proposal-atom-harvest';
 import { advanceProposalStage } from '@/lib/proposal-advance';
 import type { Role } from '@/lib/rbac';
@@ -97,6 +98,14 @@ export async function lockSectionCore(g: LockSectionCtx): Promise<LockSectionRes
     `;
   } catch (e) {
     console.error('[lockSectionCore] compliance matrix update failed (non-fatal):', e);
+  }
+
+  // 3b. Close the section's open edit ToDo — locking IS the completion signal (SPINE-T1). The
+  //     assignee's section-editing ToDo auto-completes so the queue reflects the finished work.
+  try {
+    await completeSectionTodos(tenantId, section.id, userId, 'locked');
+  } catch (e) {
+    console.error('[lockSectionCore] section ToDo auto-complete failed (non-fatal):', e);
   }
 
   // 4. Snapshot the accepted canvas version.
