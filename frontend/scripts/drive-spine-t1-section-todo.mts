@@ -75,6 +75,12 @@ try {
   check('clear assignment ok', r4.ok === true && (r4 as { assigned: boolean }).assigned === false);
   check('  …assigned_to is NULL', (await assignedTo()) === null);
 
+  // 8. H2 guard: assigning a LOCKED (read-only) section is refused.
+  await sqlBypass`UPDATE proposal_sections SET is_locked=true WHERE id=${SEC}::uuid`;
+  const rLocked = await assignSection(kate, FND, PROP, SEC, CONNOR);
+  check('assign to a LOCKED section is refused (SECTION_LOCKED)', rLocked.ok === false && (rLocked as { code?: string }).code === 'SECTION_LOCKED');
+  await sqlBypass`UPDATE proposal_sections SET is_locked=false WHERE id=${SEC}::uuid`;
+
   console.log(`\n${fail === 0 ? '✅ ALL PASS' : `❌ ${fail} FAIL`} — SPINE-T1 section-ToDo spine (${pass} checks)`);
 } finally {
   // Teardown.
