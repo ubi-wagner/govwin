@@ -87,6 +87,12 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'opportunity.closed': (p) => `Opportunity closed${str(p.title) ? `: ${str(p.title)}` : ''}`,
   // Admin pin-for-updates (RANK-8): a watched opp changed → holders hear about it pre-purchase.
   'opportunity.updated': (p) => `Opportunity updated${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // Provisioning (PV-2): the master OPP build-out was completed + broadcast to all mirror cards.
+  'opportunity.build_completed': (p) => {
+    const n = typeof p.opportunitiesRepublished === 'number' ? p.opportunitiesRepublished
+            : typeof p.opportunities === 'number' ? p.opportunities : null;
+    return `OPP build-out completed${n != null ? ` — ${n} card${n === 1 ? '' : 's'} refreshed` : ''}`;
+  },
   // Pre-purchase start nudge (RANK-9): a hot, closing-soon opp the customer hasn't started yet.
   'opportunity.start_recommended': (p) => {
     const t = str(p.title); const d = p.daysToClose;
