@@ -44,10 +44,16 @@ Tier 1+2+3. Harden keyword matching.
 10. `is_active` count mismatch (dashboard counts deactivated; manage doesn't).
 11. Doc drift: several docs still describe the retired in-tx `autoScoreCard` path.
 
-## Verify
+## Verify — DONE ✅
 
-Green backbone (`tsc` · `vitest` · `pytest`) + a live drive of create/edit/rank/delete as `tenant_admin`
-**served under the forced-RLS `govtech_app` role** (folds in the CC RLS-verification caveat).
+- Green backbone: `tsc` 0 · `vitest` 1109 (incl. 17 new bucket cases) · `pytest` 15 pure scorer cases.
+- **Live drive under the forced-RLS `govtech_app` role** (served as `postgres://govtech_app:apppass@…`,
+  NOBYPASSRLS — proven: reads 0 bucket rows without `app.tenant_id`). `hitl-bucket-rls.spec.ts` drives
+  list → create → rank → edit(merge) → delete(prune) and passes — the RLS-scoped routes + `rankBucket`
+  work under enforced RLS, the PATCH merge preserved `useTimeline:false`, and DELETE pruned the scores.
+- **CC RLS caveat CLOSED:** `hitl-cc-actors.spec.ts` (all 3 roles + the tenant_user gate, desktop +
+  mobile) also passes against the same `govtech_app` server — the Command Center's tenant-scoped
+  queries run correctly under the production-equivalent role.
 
 ## Explicitly OUT of scope (follow-on)
 
