@@ -66,6 +66,14 @@ type StatsRow = {
   failed24h: number;
 };
 
+// TW-10 — a portal build phase-machine row for the admin in-flight index.
+type BuildStage = { key?: string; label?: string; gateCloser?: string; agentManagerKey?: string | null };
+type BuildWorkflow = {
+  id: string; label: string | null; status: string; currentStageIndex: number;
+  setupStatus: string | null; stages: BuildStage[] | null;
+  tenantName: string | null; tenantSlug: string | null; oppTitle: string | null; topicNumber: string | null;
+};
+
 function mapRow(r: WorkflowInstanceRow): WorkflowInstance {
   return {
     id: r.id,
@@ -252,6 +260,25 @@ export default async function WorkflowMonitorPage({
     );
   }
 
+  // TW-10 — the in-flight PORTAL BUILD workflows (the tenant phase-machine, a subsystem distinct from the
+  // process_instances monitor above). Admins manage each via the SAME tenant Workflow Setup UI, entered
+  // through the tenant slug (shadow). Legitimate admin cross-tenant read on the RLS-forced table → sqlBypass.
+  let builds: BuildWorkflow[] = [];
+  try {
+    builds = await sql<BuildWorkflow[]>`
+      SELECT pp.id, pp.label, pp.status, pp.current_stage_index AS "currentStageIndex",
+             pp.guardrail_config->'_setup'->>'status' AS "setupStatus",
+             pp.guardrail_config->'stages' AS "stages",
+             t.name AS "tenantName", t.slug AS "tenantSlug",
+             o.title AS "oppTitle", o.topic_number AS "topicNumber"
+      FROM proposal_portals pp
+      JOIN tenants t ON t.id = pp.tenant_id
+      LEFT JOIN opportunities o ON o.id = pp.opportunity_id
+      WHERE pp.status IN ('launched','executing','closeout')
+      ORDER BY pp.updated_at DESC NULLS LAST
+      LIMIT 100`;
+  } catch (e) { console.error('[admin/workflows] build workflows query failed:', e); }
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -314,6 +341,61 @@ export default async function WorkflowMonitorPage({
         stats={stats}
         rangeLabel={rangeLabel}
       />
+
+      {/* TW-10 — In-flight proposal BUILD workflows (the portal phase-machine). A distinct subsystem from
+          the instance monitor above; managed through the SAME tenant Workflow Setup UI (entered by slug). */}
+      <section className="mt-8">
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="text-lg font-semibold">Proposal build workflows</h2>
+          <span className="text-xs text-gray-500">{builds.length} in flight · manage each in the tenant’s Workflow Setup</span>
+        </div>
+        {builds.length === 0 ? (
+          <p className="text-sm text-gray-500 border border-gray-200 rounded-lg p-4 bg-white">No launched build workflows right now.</p>
+        ) : (
+          <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                  <th className="text-left font-medium px-3 py-2">Tenant</th>
+                  <th className="text-left font-medium px-3 py-2">Opportunity</th>
+                  <th className="text-left font-medium px-3 py-2">Current stage</th>
+                  <th className="text-left font-medium px-3 py-2">Gate</th>
+                  <th className="text-left font-medium px-3 py-2">Setup</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {builds.map((b) => {
+                  const stage = (b.stages ?? [])[b.currentStageIndex] ?? null;
+                  const opp = b.oppTitle ? (b.topicNumber ? `${b.topicNumber}: ${b.oppTitle}` : b.oppTitle) : (b.label ?? '—');
+                  const gate = stage?.gateCloser === 'agent_manager'
+                    ? `AI: ${(stage.agentManagerKey ?? 'manager').replace(/_/g, ' ')}` : 'Human';
+                  return (
+                    <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap">{b.tenantName ?? b.tenantSlug ?? '—'}</td>
+                      <td className="px-3 py-2 max-w-[22rem] truncate" title={opp}>{opp}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{stage?.label ?? stage?.key ?? `stage ${b.currentStageIndex + 1}`}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${stage?.gateCloser === 'agent_manager' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>{gate}</span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${b.setupStatus === 'accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {b.setupStatus === 'accepted' ? 'accepted' : 'pending'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {b.tenantSlug
+                          ? <Link href={`/portal/${b.tenantSlug}/portals/${b.id}`} className="text-blue-600 hover:underline">Manage →</Link>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
