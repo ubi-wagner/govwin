@@ -45,6 +45,9 @@ export interface OppCard {
   expertNotes: string | null;
   lifecycleStatus: string | null;
   submissionStage: SubmissionStage;
+  /** The master OPP is fully built out (mig 182 curated_solicitations.build_complete) → provision-ready.
+   *  Drives the mirror card's "ready to build" badge; refreshed to all tenants on the completion re-publish. */
+  provisionReady: boolean;
   namespace: string | null;
   builtBy: string | null;
   builtByEmail: string | null;
@@ -73,7 +76,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.lifecycle_status, o.submission_stage,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
-             cs.namespace, cs.spotlight_summary,
+             cs.namespace, cs.spotlight_summary, cs.build_complete,
              sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
              (SELECT count(*)::int FROM solicitation_volumes sv
                 WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
@@ -122,6 +125,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       expertNotes: (o.expertNotes as string) ?? null,
       lifecycleStatus: (o.lifecycleStatus as string) ?? null,
       submissionStage: isSubmissionStage(o.submissionStage) ? o.submissionStage : 'open',
+      provisionReady: o.buildComplete === true,
       namespace: (o.namespace as string) ?? null,
       builtBy: str(o.builtBy),
       builtByEmail: (o.builtByEmail as string) ?? null,
