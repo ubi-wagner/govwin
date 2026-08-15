@@ -15,7 +15,10 @@ vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: 
 vi.mock('@/lib/rls', () => ({ withTenant: vi.fn() }));
 vi.mock('@/lib/tasks/tasks', () => ({ createTask: vi.fn() }));
 
-import { validateGuardrailConfig } from '@/lib/portal-workflow';
+import {
+  validateGuardrailConfig, projectTodoTiming, resolveTodoAssignee, checkWorkflowComplete, canEditWorkflow,
+  type Stage, type StageTodo, type GuardrailConfig,
+} from '@/lib/portal-workflow';
 import { recommendedGuardrails } from '@/lib/guardrail-defaults';
 
 const LIMITS = { maxStages: 3, maxCollaborators: 25, maxManagers: 25, maxNudges: 3 };
@@ -136,5 +139,83 @@ describe('validateGuardrailConfig — malformed shapes never throw (Bug 2)', () 
     }
     // A clean two-stage config still passes (the guard doesn't over-reject).
     expect(validateGuardrailConfig({ stages: [good, { key: 's1', todos: [] }], nudgeDays: [] }, LIMITS).ok).toBe(true);
+  });
+});
+
+// ── Tenant Workflow Setup (TW-1) — absolute dates, gate closer, per-stage owner, editor gate ──
+describe('projectTodoTiming (absolute date wins over relative days)', () => {
+  const cfg: GuardrailConfig = { nudgeDays: [5, 2, 1] };
+  it('a todo absolute dueDate wins over the stage date and relative days', () => {
+    const stage: Stage = { key: 'k', dueDate: '2026-02-01T00:00:00.000Z' };
+    const todo: StageTodo = { type: 'acknowledge', dueDate: '2026-03-15T00:00:00.000Z', dueDays: 7 };
+    const r = projectTodoTiming(stage, todo, cfg);
+    expect(r.dueAt).toBe('2026-03-15T00:00:00.000Z');
+    expect(r.nudgeDays).toEqual([5, 2, 1]); // inherits the portal-wide cadence
+  });
+  it('falls back to the stage date, then to relative dueDays, then null', () => {
+    expect(projectTodoTiming({ key: 'k', dueDate: '2026-02-01T00:00:00.000Z' }, { type: 'acknowledge' }, cfg).dueAt)
+      .toBe('2026-02-01T00:00:00.000Z');
+    const rel = projectTodoTiming({ key: 'k' }, { type: 'acknowledge', dueDays: 10 }, cfg).dueAt;
+    expect(rel).not.toBeNull();
+    expect(Math.abs(new Date(rel!).getTime() - (Date.now() + 10 * 86_400_000))).toBeLessThan(5000);
+    expect(projectTodoTiming({ key: 'k' }, { type: 'acknowledge' }, cfg).dueAt).toBeNull();
+  });
+  it('an invalid absolute date → null (never NaN/throw); per-todo nudge overrides the portal cadence', () => {
+    expect(projectTodoTiming({ key: 'k', dueDate: 'not-a-date' }, { type: 'acknowledge' }, cfg).dueAt).toBeNull();
+    expect(projectTodoTiming({ key: 'k' }, { type: 'acknowledge', nudgeDays: [3] }, cfg).nudgeDays).toEqual([3]);
+  });
+});
+
+describe('resolveTodoAssignee (a named person wins over a role)', () => {
+  it('todo person > stage default > role fallback', () => {
+    expect(resolveTodoAssignee({ key: 'k' }, { type: 'acknowledge', assigneeUserId: 'u1' }))
+      .toEqual({ assigneeUserId: 'u1', assigneeRole: null });
+    expect(resolveTodoAssignee({ key: 'k', defaultAssigneeUserId: 'u2' }, { type: 'acknowledge' }))
+      .toEqual({ assigneeUserId: 'u2', assigneeRole: null });
+    expect(resolveTodoAssignee({ key: 'k' }, { type: 'acknowledge', assigneeRole: 'tenant_admin' }))
+      .toEqual({ assigneeUserId: null, assigneeRole: 'tenant_admin' });
+    expect(resolveTodoAssignee({ key: 'k' }, { type: 'acknowledge' }))
+      .toEqual({ assigneeUserId: null, assigneeRole: 'tenant_user' });
+  });
+});
+
+describe('validateGuardrailConfig — gate closer + dates (TW-1)', () => {
+  const base = (extra: Partial<Stage>) => ({ stages: [{ key: 'k', todos: [{ type: 'acknowledge' as const }], ...extra }], nudgeDays: [] });
+  it('accepts a valid gate closer + ISO stage date', () => {
+    expect(validateGuardrailConfig(base({ gateCloser: 'agent_manager', dueDate: '2026-05-01T00:00:00Z' }), LIMITS).ok).toBe(true);
+  });
+  it('rejects an invalid gate closer', () => {
+    const r = validateGuardrailConfig(base({ gateCloser: 'robot' as unknown as 'human' }), LIMITS);
+    expect(r.ok).toBe(false); expect(r.errors.join()).toMatch(/invalid gate closer/);
+  });
+  it('rejects an invalid stage date', () => {
+    const r = validateGuardrailConfig(base({ dueDate: 'someday' }), LIMITS);
+    expect(r.ok).toBe(false); expect(r.errors.join()).toMatch(/invalid date/);
+  });
+});
+
+describe('checkWorkflowComplete (the Accept & Start gate)', () => {
+  it('a human stage needs a date + a to-do + an owner', () => {
+    const ok: GuardrailConfig = { stages: [{ key: 'k', label: 'Kickoff', dueDate: '2026-05-01T00:00:00Z',
+      todos: [{ type: 'acknowledge', assigneeRole: 'tenant_admin' }] }] };
+    expect(checkWorkflowComplete(ok).complete).toBe(true);
+    expect(checkWorkflowComplete({ stages: [{ key: 'k', todos: [{ type: 'acknowledge', assigneeRole: 'x' }] }] }).missing.join()).toMatch(/a date/);
+    expect(checkWorkflowComplete({ stages: [{ key: 'k', dueDate: '2026-05-01T00:00:00Z', todos: [] }] }).missing.join()).toMatch(/at least one to-do/);
+    expect(checkWorkflowComplete({ stages: [{ key: 'k', dueDate: '2026-05-01T00:00:00Z', todos: [{ type: 'acknowledge' }] }] }).missing.join()).toMatch(/an owner/);
+  });
+  it('an agent_manager stage needs a date + a manager (no human to-dos required)', () => {
+    expect(checkWorkflowComplete({ stages: [{ key: 'r', dueDate: '2026-05-01T00:00:00Z', gateCloser: 'agent_manager', agentManagerKey: 'advisory_manager' }] }).complete).toBe(true);
+    expect(checkWorkflowComplete({ stages: [{ key: 'r', dueDate: '2026-05-01T00:00:00Z', gateCloser: 'agent_manager' }] }).missing.join()).toMatch(/an AI manager/);
+  });
+});
+
+describe('canEditWorkflow (tenant_admin + delegated managers)', () => {
+  it('admins can; a member cannot unless a delegated manager', () => {
+    expect(canEditWorkflow('tenant_admin')).toBe(true);
+    expect(canEditWorkflow('rfp_admin')).toBe(true);
+    expect(canEditWorkflow('master_admin')).toBe(true);
+    expect(canEditWorkflow('tenant_user')).toBe(false);
+    expect(canEditWorkflow('tenant_user', { isDelegatedManager: true })).toBe(true);
+    expect(canEditWorkflow('partner_user')).toBe(false);
   });
 });

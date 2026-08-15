@@ -2,16 +2,23 @@
  * Per-portal workflow (greenfield, mig 097/098). The guardrail template the customer
  * admin accepts at launch is instantiated as that portal's workflow — its stages
  * become HITL ToDo gates in the existing tasks/nudge ledger. Bounded by RFP-admin
- * limits (max 3 stages, 10 collaborators, 1 manager, 3 nudges). Completion is
- * all-or-nothing per stage now (a stage advances only when every ToDo is complete or
- * the manager/admin force-advances); save-progress is a future extension.
+ * limits (max 3 stages, 25 collaborators, 25 managers, 3 nudges — mig 123). Completion is
+ * all-or-nothing per stage (a stage advances only when every ToDo is complete or the
+ * manager/admin force-advances).
+ *
+ * Tenant Workflow Setup (docs/TENANT_WORKFLOW_SETUP_DESIGN.md) extends the config with
+ * ABSOLUTE stage-gate dates, a per-stage GATE CLOSER (human | agent_manager), a per-stage
+ * default owner, and per-todo date/nudge overrides — all in the open JSONB (no migration).
+ * `projectTodoTiming` is the single place a todo's live `due_at`/`nudge_schedule` are derived
+ * (absolute date wins over relative days), so the phase-machine + the nudge sweeper stay the
+ * source of truth on the task rows.
  */
 
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { createTask } from '@/lib/tasks/tasks';
 import { emitEventSingle, userActor } from '@/lib/events';
-import type { Role } from '@/lib/rbac';
+import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 export interface GuardrailLimits {
   maxStages: number;
@@ -31,19 +38,79 @@ const TODO_KIND: Record<string, 'review' | 'form' | 'upload'> = {
   upload_documents: 'upload',
 };
 
+/** Who closes a stage's gate. 'human' = advance when the stage's ToDos are all done (or force);
+ *  'agent_manager' = an agent manager (e.g. advisory_manager / color_team_reviewer) lands its cohort +
+ *  the adversarial pass, then the stage is gate-ready (TW-8 wires the auto-advance). */
+export type GateCloser = 'human' | 'agent_manager';
+export const GATE_CLOSERS: ReadonlySet<string> = new Set<GateCloser>(['human', 'agent_manager']);
+
 export interface StageTodo {
   type: string;                 // acknowledge | complete_sections | upload_documents
   assigneeRole?: string | null;
   assigneeUserId?: string | null;
   title?: string;
-  dueDays?: number;
+  dueDays?: number | null;      // relative fallback (days from creation) when there's no absolute date
+  dueDate?: string | null;      // NEW — absolute ISO override of the stage date, per todo
+  nudgeDays?: number[];         // NEW — per-todo nudge override; default = the portal-wide config.nudgeDays
 }
-export interface Stage { key: string; label?: string; todos?: StageTodo[]; }
+export interface Stage {
+  key: string;
+  label?: string;
+  todos?: StageTodo[];
+  dueDate?: string | null;                 // NEW — absolute ISO stage-gate deadline (nudges + overdue, NOT advancement)
+  defaultAssigneeUserId?: string | null;   // NEW — a new/unassigned ToDo in this stage inherits this owner
+  gateCloser?: GateCloser;                 // NEW — 'human' (default) | 'agent_manager'
+  agentManagerKey?: string | null;         // NEW — which manager archetype when gateCloser='agent_manager'
+  autoAdvance?: boolean;                    // NEW — agent_manager only: auto (guarded, TW-8) vs assisted (one-click)
+}
 export interface Collaborator { email: string; role: 'manager' | 'collaborator'; stages?: string[]; }
+/** Setup-acceptance marker — rides in the open JSONB (no migration). A new portal opens 'pending'
+ *  (recommend-but-require); "Accept & Start" flips it to 'accepted'. */
+export interface GuardrailSetup { status: 'pending' | 'accepted'; acceptedAt?: string; acceptedBy?: string | null }
 export interface GuardrailConfig {
   stages?: Stage[];
   collaborators?: Collaborator[];
   nudgeDays?: number[];
+  _setup?: GuardrailSetup;
+}
+
+/**
+ * Derive a todo's LIVE timing (what lands on the task row + what the nudge sweeper reads).
+ * Absolute date wins: todo.dueDate → stage.dueDate → (relative) todo.dueDays from now. Nudge
+ * schedule: todo.nudgeDays → the portal-wide config.nudgeDays. One place, so the editor gauge,
+ * instantiation, and re-projection can never disagree.
+ */
+export function projectTodoTiming(
+  stage: Stage, todo: StageTodo, config: GuardrailConfig,
+): { dueAt: string | null; nudgeDays: number[] } {
+  const abs = todo.dueDate ?? stage.dueDate ?? null;
+  let dueAt: string | null = null;
+  if (abs) {
+    const d = new Date(abs);
+    if (!Number.isNaN(d.getTime())) dueAt = d.toISOString();
+  } else if (typeof todo.dueDays === 'number' && todo.dueDays > 0) {
+    dueAt = new Date(Date.now() + todo.dueDays * 86_400_000).toISOString();
+  }
+  const nudgeDays = Array.isArray(todo.nudgeDays)
+    ? todo.nudgeDays
+    : (Array.isArray(config.nudgeDays) ? config.nudgeDays : []);
+  return { dueAt, nudgeDays };
+}
+
+/** The stage's chosen owner for a todo: a specific person wins (todo → stage default), else the role. */
+export function resolveTodoAssignee(stage: Stage, todo: StageTodo): { assigneeRole: string | null; assigneeUserId: string | null } {
+  const assigneeUserId = todo.assigneeUserId ?? stage.defaultAssigneeUserId ?? null;
+  return { assigneeUserId, assigneeRole: assigneeUserId ? null : (todo.assigneeRole ?? 'tenant_user') };
+}
+
+/**
+ * Who may edit a portal's Workflow Setup (docs/TENANT_WORKFLOW_SETUP_DESIGN.md): tenant_admin+ — which
+ * covers a descended rfp_admin/master_admin shadow admin and a partner_admin descended as tenant_admin —
+ * OR a delegated per-portal MANAGER. The manager check needs portal context (the guardrail_config manager
+ * list), so callers resolve `isDelegatedManager` and pass it in.
+ */
+export function canEditWorkflow(role: Role, opts: { isDelegatedManager?: boolean } = {}): boolean {
+  return hasRoleAtLeast(role, 'tenant_admin') || opts.isDelegatedManager === true;
 }
 
 /** Read the RFP-admin-settable limits from the global default template (fallback: 3/25/25/3). */
@@ -90,37 +157,75 @@ export function validateGuardrailConfig(config: GuardrailConfig, limits: Guardra
   if (managers > limits.maxManagers) errors.push(`too many managers (max ${limits.maxManagers})`);
   if (nudgeDays.length > limits.maxNudges) errors.push(`too many nudges (max ${limits.maxNudges})`);
   for (const s of stages) {
+    if (s && s.gateCloser != null && !GATE_CLOSERS.has(s.gateCloser)) {
+      errors.push(`invalid gate closer "${s.gateCloser}" (allowed: ${[...GATE_CLOSERS].join(', ')})`);
+    }
+    if (s && s.dueDate != null && Number.isNaN(new Date(s.dueDate).getTime())) {
+      errors.push(`stage "${s.key}" has an invalid date`);
+    }
     for (const t of (Array.isArray(s?.todos) ? s.todos : [])) {
       if (!TODO_TYPES.has(t.type)) errors.push(`invalid todo type "${t.type}" (allowed: ${[...TODO_TYPES].join(', ')})`);
+      if (t.dueDate != null && Number.isNaN(new Date(t.dueDate).getTime())) errors.push(`a to-do in "${s.key}" has an invalid date`);
+      if (t.nudgeDays != null && !Array.isArray(t.nudgeDays)) errors.push(`a to-do in "${s.key}" has an invalid nudge schedule`);
     }
   }
   return { ok: errors.length === 0, errors };
 }
 
-/** Create the ToDos for a given stage (all-or-nothing gate) into the tasks/nudge ledger. */
+/**
+ * Stricter "ready to Accept & Start" check (docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½.2) — the required
+ * one-time tenant acceptance. Every stage needs a gate date + a way to close its gate (a human stage needs
+ * ≥1 ToDo with an owner; an AI-manager stage needs a manager archetype). Advisory to the UI (enables the
+ * Accept button); `validateGuardrailConfig` remains the hard limit/shape gate the routes enforce.
+ */
+export function checkWorkflowComplete(config: GuardrailConfig): { complete: boolean; missing: string[] } {
+  const missing: string[] = [];
+  const stages = Array.isArray(config.stages) ? config.stages : [];
+  if (stages.length < 1) missing.push('at least one stage');
+  stages.forEach((s, i) => {
+    const label = (s?.label || s?.key || `stage ${i + 1}`);
+    if (!s?.dueDate) missing.push(`a date for "${label}"`);
+    const closer: GateCloser = s?.gateCloser ?? 'human';
+    if (closer === 'agent_manager') {
+      if (!s?.agentManagerKey) missing.push(`an AI manager for "${label}"`);
+    } else {
+      const todos = Array.isArray(s?.todos) ? s.todos : [];
+      if (todos.length < 1) missing.push(`at least one to-do for "${label}"`);
+      const hasOwner = !!s?.defaultAssigneeUserId || todos.some((t) => t.assigneeUserId || t.assigneeRole);
+      if (todos.length > 0 && !hasOwner) missing.push(`an owner for "${label}"`);
+    }
+  });
+  return { complete: missing.length === 0, missing };
+}
+
+/** Create the ToDos for a given stage (all-or-nothing gate) into the tasks/nudge ledger.
+ *  Timing + assignee are derived per todo via projectTodoTiming/resolveTodoAssignee (absolute
+ *  stage/todo dates win over relative days; a named person wins over a role). */
 async function createStageTodos(
   actor: { id: string; email: string | null; role: Role; tenantId: string },
   tenantId: string,
   portalId: string,
   stage: Stage,
-  nudgeDays: number[],
+  config: GuardrailConfig,
+  limits: GuardrailLimits,
 ): Promise<number> {
   let n = 0;
   // Defense-in-depth: a legacy row persisted before the validator rejected null stages could
   // still carry one; `stage?.todos` keeps advancePortalStage from throwing on it (sweep DEFECT#1).
   for (const t of stage?.todos ?? []) {
-    const dueAt = t.dueDays ? new Date(Date.now() + t.dueDays * 86_400_000).toISOString() : null;
+    const { dueAt, nudgeDays } = projectTodoTiming(stage, t, config);
+    const { assigneeRole, assigneeUserId } = resolveTodoAssignee(stage, t);
     const res = await createTask({
       actor,
       tenantId,
-      assigneeRole: t.assigneeUserId ? null : (t.assigneeRole ?? 'tenant_user'),
-      assigneeUserId: t.assigneeUserId ?? null,
+      assigneeRole,
+      assigneeUserId,
       taskType: t.type,
       title: t.title ?? `${stage.label ?? stage.key}: ${t.type.replace(/_/g, ' ')}`,
       entityType: 'portal',
       entityId: portalId,
       dueAt,
-      nudgeDays,
+      nudgeDays: nudgeDays.slice(0, limits.maxNudges),
       params: { kind: TODO_KIND[t.type] ?? 'review', portalId, stage: stage.key },
     });
     if (res.ok) n++;
@@ -136,12 +241,11 @@ export async function instantiatePortalWorkflow(
   config: GuardrailConfig,
 ): Promise<{ tasksCreated: number }> {
   const limits = await getGuardrailLimits();
-  const nudgeDays = (config.nudgeDays ?? []).slice(0, limits.maxNudges);
   await withTenant(tenantId, async (tx) => {
     await tx`UPDATE proposal_portals SET current_stage_index = 0 WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
   });
   const first = config.stages?.[0];
-  const tasksCreated = first ? await createStageTodos(actor, tenantId, portalId, first, nudgeDays) : 0;
+  const tasksCreated = first ? await createStageTodos(actor, tenantId, portalId, first, config, limits) : 0;
   return { tasksCreated };
 }
 
@@ -175,7 +279,6 @@ export async function advancePortalStage(
 
   const nextIndex = portal.currentStageIndex + 1;
   const limits = await getGuardrailLimits();
-  const nudgeDays = (portal.guardrailConfig?.nudgeDays ?? []).slice(0, limits.maxNudges);
 
   if (nextIndex >= stages.length) {
     await withTenant(tenantId, async (tx) => {
@@ -189,7 +292,7 @@ export async function advancePortalStage(
     await tx`UPDATE proposal_portals SET status = 'executing', current_stage_index = ${nextIndex} WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
   });
   await emitPortalStageAdvanced(actor, tenantId, portalId, portal.currentStageIndex, nextIndex, 'executing');
-  await createStageTodos(actor, tenantId, portalId, stages[nextIndex], nudgeDays);
+  await createStageTodos(actor, tenantId, portalId, stages[nextIndex], portal.guardrailConfig, limits);
   return { advanced: true, stageIndex: nextIndex, status: 'executing' };
 }
 
