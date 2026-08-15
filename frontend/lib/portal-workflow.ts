@@ -244,6 +244,28 @@ async function createStageTodos(
   limits: GuardrailLimits,
 ): Promise<number> {
   let n = 0;
+  // AGENT-MANAGER stage: the gate is closed by an AI manager (TW-8). Create exactly ONE gate ToDo so the
+  // stage is NEVER empty — an empty stage would let the all-or-nothing gate wave straight through with no
+  // review (the wave-through the validator guards for null stages). Its completion IS the gate close:
+  // assisted → a human ticks it after reviewing the cohort; auto (opt-in) → a service actor completes it
+  // when the cohort lands + the adversarial pass reconciles (TW-8c). The cohort itself runs in the engine,
+  // launched by the capture:portal.stage_review.requested event this stage's entry emits (TW-8b).
+  if (stage?.gateCloser === 'agent_manager') {
+    const { dueAt, nudgeDays } = projectTodoTiming(stage, {} as StageTodo, config);
+    const assigneeUserId = stage.defaultAssigneeUserId ?? null;
+    const mgr = stage.agentManagerKey ? ` (${stage.agentManagerKey.replace(/_/g, ' ')})` : '';
+    const res = await createTask({
+      actor, tenantId,
+      assigneeRole: assigneeUserId ? null : 'tenant_admin',
+      assigneeUserId,
+      taskType: 'acknowledge',
+      title: `AI review gate — ${stage.label ?? stage.key}${mgr}`,
+      entityType: 'portal', entityId: portalId,
+      dueAt, nudgeDays: nudgeDays.slice(0, limits.maxNudges),
+      params: { kind: 'review', portalId, stage: stage.key, agentGate: true, agentManagerKey: stage.agentManagerKey ?? null, autoAdvance: stage.autoAdvance === true },
+    });
+    return res.ok ? 1 : 0;
+  }
   // Defense-in-depth: a legacy row persisted before the validator rejected null stages could
   // still carry one; `stage?.todos` keeps advancePortalStage from throwing on it (sweep DEFECT#1).
   for (const t of stage?.todos ?? []) {
@@ -282,6 +304,7 @@ export async function instantiatePortalWorkflow(
   // Scope task creation to the tenant's RLS context — createTask hits the RLS-forced `tasks` ledger,
   // and a cross-tenant caller (the admin cockpit release) has no ambient tenant context otherwise.
   const tasksCreated = first ? await runInTenant(tenantId, () => createStageTodos(actor, tenantId, portalId, first, config, limits)) : 0;
+  if (first) await emitStageReviewRequested(actor, tenantId, portalId, first);
   return { tasksCreated };
 }
 
@@ -303,13 +326,17 @@ export async function advancePortalStage(
   const stages = portal.guardrailConfig?.stages ?? [];
   const curKey = stages[portal.currentStageIndex]?.key ?? null;
 
-  // All-or-nothing gate: block unless every ToDo for this stage is complete (or force).
+  // All-or-nothing gate: block unless every ToDo for this stage is complete (or force). Count via
+  // withTenant so the RLS-forced `tasks` ledger is scoped regardless of the caller's ambient context —
+  // a bare `sql` here returns 0 under forced-RLS with no context, which would WAVE THE GATE THROUGH.
   if (!opts.force && curKey) {
-    const [{ open }] = await sql<Array<{ open: number }>>`
-      SELECT count(*)::int AS open FROM tasks
-      WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
-        AND params->>'stage' = ${curKey} AND status NOT IN ('completed', 'cancelled')
-    `;
+    const open = await withTenant(tenantId, async (tx) => {
+      const [{ open: n }] = await tx<Array<{ open: number }>>`
+        SELECT count(*)::int AS open FROM tasks
+        WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
+          AND params->>'stage' = ${curKey} AND status NOT IN ('completed', 'cancelled')`;
+      return n;
+    });
     if (open > 0) return { advanced: false, reason: 'incomplete_todos' };
   }
 
@@ -329,6 +356,7 @@ export async function advancePortalStage(
   });
   await emitPortalStageAdvanced(actor, tenantId, portalId, portal.currentStageIndex, nextIndex, 'executing');
   await createStageTodos(actor, tenantId, portalId, stages[nextIndex], portal.guardrailConfig, limits);
+  await emitStageReviewRequested(actor, tenantId, portalId, stages[nextIndex]);
   return { advanced: true, stageIndex: nextIndex, status: 'executing' };
 }
 
@@ -345,6 +373,36 @@ async function emitPortalStageAdvanced(
     tenantId,
     payload: { portalId, fromStageIndex, toStageIndex, status },
   });
+}
+
+/**
+ * TW-8b — when a portal enters an `agent_manager` stage, emit the TRIGGER that launches the manager cohort
+ * in the engine: `capture:stage_review.requested` (start/end, carrying the correlation keys proposalId /
+ * opportunityId / tenantId so a downstream HITL resume can entity-correlate). A pipeline Workflow reacts to
+ * this to run the cohort (advisory_manager / color_team_reviewer + the adversarial overlay) and emit
+ * `capture:stage_review.completed` — the trigger→action→action→trigger chain. Best-effort: the gate ToDo
+ * already exists (assisted still works) if the emit fails.
+ */
+async function emitStageReviewRequested(
+  actor: { id: string; email: string | null },
+  tenantId: string, portalId: string, stage: Stage,
+): Promise<void> {
+  if (stage?.gateCloser !== 'agent_manager') return;
+  try {
+    const [p] = await withTenant(tenantId, async (tx) =>
+      tx<Array<{ proposalId: string | null; opportunityId: string | null }>>`
+        SELECT proposal_id AS "proposalId", opportunity_id AS "opportunityId"
+        FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`);
+    const startId = await emitEventStart({
+      namespace: 'capture', type: 'stage_review.requested',
+      actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+      payload: {
+        portalId, proposalId: p?.proposalId ?? null, opportunityId: p?.opportunityId ?? null,
+        stageKey: stage.key, agentManagerKey: stage.agentManagerKey ?? null, autoAdvance: stage.autoAdvance === true,
+      },
+    });
+    await emitEventEnd(startId, { result: { portalId, stageKey: stage.key } });
+  } catch (e) { console.error('[emitStageReviewRequested] failed (non-fatal)', e); }
 }
 
 /** Is this user a DELEGATED manager of the portal (a guardrail_config collaborator with role='manager')?
@@ -427,34 +485,52 @@ export async function editPortalWorkflow(
         SELECT id, title FROM tasks
         WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
           AND params->>'stage' = ${curStage.key} AND status IN ('open','in_progress')`;
-      const used = new Set<string>();
-      for (const todo of curStage.todos ?? []) {
-        const title = todo.title ?? `${curStage.label ?? curStage.key}: ${todo.type.replace(/_/g, ' ')}`;
-        const { dueAt, nudgeDays } = projectTodoTiming(curStage, todo, config);
-        const { assigneeRole, assigneeUserId } = resolveTodoAssignee(curStage, todo);
-        const sched = nudgeDays.slice(0, limits.maxNudges);
-        const match = existing.find((e) => !used.has(e.id) && e.title === title);
-        if (match) {
-          used.add(match.id);
-          await sql`
-            UPDATE tasks SET due_at = ${dueAt}, assignee_role = ${assigneeRole}, assignee_user_id = ${assigneeUserId},
-              nudge_schedule = ${jsonParam(sched)}, nudges_sent = '[]'::jsonb
-            WHERE tenant_id = ${tenantId}::uuid AND id = ${match.id}::uuid AND status IN ('open','in_progress')`;
-          reprojected++;
-        } else {
-          const res = await createTask({
-            actor, tenantId, assigneeRole, assigneeUserId, taskType: todo.type, title,
-            entityType: 'portal', entityId: portalId, dueAt, nudgeDays: sched,
-            params: { kind: TODO_KIND[todo.type] ?? 'review', portalId, stage: curStage.key },
-          });
-          if (res.ok) created++;
+      if (curStage.gateCloser === 'agent_manager') {
+        // Agent-manager stage: keep exactly ONE gate ToDo (never empty). Cancel any human leftovers from a
+        // prior config; create the gate if absent (createStageTodos makes the "AI review gate" ToDo).
+        const isGate = (t: { title: string | null }) => (t.title ?? '').startsWith('AI review gate');
+        for (const e of existing) {
+          if (!isGate(e)) {
+            await sql`UPDATE tasks SET status = 'cancelled' WHERE tenant_id = ${tenantId}::uuid AND id = ${e.id}::uuid AND status IN ('open','in_progress')`;
+            cancelled++;
+          }
+        }
+        if (existing.some(isGate)) reprojected++;
+        else created += await createStageTodos(actor, tenantId, portalId, curStage, config, limits);
+      } else {
+        const used = new Set<string>();
+        for (const todo of curStage.todos ?? []) {
+          const title = todo.title ?? `${curStage.label ?? curStage.key}: ${todo.type.replace(/_/g, ' ')}`;
+          const { dueAt, nudgeDays } = projectTodoTiming(curStage, todo, config);
+          const { assigneeRole, assigneeUserId } = resolveTodoAssignee(curStage, todo);
+          const sched = nudgeDays.slice(0, limits.maxNudges);
+          const match = existing.find((e) => !used.has(e.id) && e.title === title);
+          if (match) {
+            used.add(match.id);
+            await sql`
+              UPDATE tasks SET due_at = ${dueAt}, assignee_role = ${assigneeRole}, assignee_user_id = ${assigneeUserId},
+                nudge_schedule = ${jsonParam(sched)}, nudges_sent = '[]'::jsonb
+              WHERE tenant_id = ${tenantId}::uuid AND id = ${match.id}::uuid AND status IN ('open','in_progress')`;
+            reprojected++;
+          } else {
+            const res = await createTask({
+              actor, tenantId, assigneeRole, assigneeUserId, taskType: todo.type, title,
+              entityType: 'portal', entityId: portalId, dueAt, nudgeDays: sched,
+              params: { kind: TODO_KIND[todo.type] ?? 'review', portalId, stage: curStage.key },
+            });
+            if (res.ok) created++;
+          }
+        }
+        for (const e of existing) {
+          if (!used.has(e.id)) {
+            await sql`UPDATE tasks SET status = 'cancelled' WHERE tenant_id = ${tenantId}::uuid AND id = ${e.id}::uuid AND status IN ('open','in_progress')`;
+            cancelled++;
+          }
         }
       }
-      for (const e of existing) {
-        if (!used.has(e.id)) {
-          await sql`UPDATE tasks SET status = 'cancelled' WHERE tenant_id = ${tenantId}::uuid AND id = ${e.id}::uuid AND status IN ('open','in_progress')`;
-          cancelled++;
-        }
+      // On acceptance (or entering an agent stage), fire the engine trigger to run the manager cohort.
+      if (opts.accept && curStage.gateCloser === 'agent_manager') {
+        await emitStageReviewRequested(actor, tenantId, portalId, curStage);
       }
     }
 

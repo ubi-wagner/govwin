@@ -114,6 +114,10 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'workflow.reconfigured': 'Build workflow updated',
   'task.reassigned': (p) => `To-do reassigned${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'task.rescheduled': (p) => `To-do rescheduled${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // TW-8: the AI-manager stage gate — the cohort is requested on stage entry, then completes.
+  'stage_review.requested': 'AI review started for the stage',
+  'stage_review.completed': (p) => `AI review complete${str(p.verdict) ? ` — ${str(p.verdict)}` : ''}`,
+  'stage_review.advanced': 'AI manager advanced the stage',
 
   // ── Gates / compliance setup ────────────────────────────────────────
   'gate_requirement.created': 'Gate requirement added',

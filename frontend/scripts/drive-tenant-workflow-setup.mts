@@ -7,7 +7,7 @@
 // Grows across TW-4/5/7 (per-task PATCH, rebaseline, browser). Run:
 //   DATABASE_URL=<govtech_app> DATABASE_URL_OWNER=<owner> node --import tsx scripts/drive-tenant-workflow-setup.mts
 import { sqlBypass } from '@/lib/db';
-import { editPortalWorkflow, rebaselineConfig, type GuardrailConfig } from '@/lib/portal-workflow';
+import { editPortalWorkflow, rebaselineConfig, advancePortalStage, type GuardrailConfig } from '@/lib/portal-workflow';
 import { updateTask } from '@/lib/tasks/update-task';
 
 const FND = '17780cad-76c0-4cef-95ec-2a536bcf5c8f';                 // Foundation
@@ -112,6 +112,38 @@ try {
   const tr = await stageTask(portalId);
   check('rebaseline shifted the task due_at by 7 days',
     !!tr?.dueAt && new Date(tr.dueAt).getTime() === new Date(D2).getTime() + 7 * 86_400_000);
+
+  // ── TW-8a: agent-manager stage gate (never empty; emits the engine trigger; assisted advance) ──
+  const [pp2] = await sqlBypass<Array<{ id: string }>>`
+    INSERT INTO proposal_portals (tenant_id, opportunity_id, proposal_id, label, status, current_stage_index, guardrail_config, created_by)
+    VALUES (${FND}::uuid, ${OPP}::uuid, NULL, 'tw-agent', 'launched', 0, ${sqlBypass.json({ _setup: { status: 'pending' } } as never)}, ${KATE}::uuid)
+    RETURNING id`;
+  const portalId2 = pp2.id;
+  const agentCfg: GuardrailConfig = {
+    nudgeDays: [5, 2, 1],
+    stages: [
+      { key: 'aireview', label: 'AI Review', dueDate: D2, gateCloser: 'agent_manager', agentManagerKey: 'advisory_manager', autoAdvance: false },
+      { key: 'final', label: 'Final', dueDate: D3, todos: [{ type: 'acknowledge', title: 'Submit', assigneeRole: 'tenant_admin' }] },
+    ],
+    _setup: { status: 'pending' },
+  };
+  const accA = await editPortalWorkflow(actor, FND, portalId2, agentCfg, { accept: true });
+  check('agent-stage accept ok', accA.ok === true);
+  check('agent stage created exactly 1 gate ToDo (never empty → no wave-through)', (accA.created ?? 0) === 1);
+  const [{ n: gateTodos }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM tasks WHERE entity_type='portal' AND entity_id=${portalId2}::uuid AND params->>'agentGate'='true' AND status='open'`;
+  check('the agent gate ToDo exists', gateTodos === 1);
+  const [{ n: srr }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM system_events WHERE namespace='capture' AND type='stage_review.requested' AND payload->>'portalId'=${portalId2}`;
+  check('capture:stage_review.requested emitted (the engine trigger to run the cohort)', srr >= 1);
+  // assisted: with the gate open, advance is BLOCKED (no wave-through)…
+  const advBlocked = await advancePortalStage(actor, FND, portalId2);
+  check('agent stage does NOT wave through while the gate ToDo is open', advBlocked.advanced === false && advBlocked.reason === 'incomplete_todos');
+  // …completing the gate (the assisted close) advances past the agent stage.
+  await sqlBypass`UPDATE tasks SET status='completed' WHERE entity_type='portal' AND entity_id=${portalId2}::uuid AND params->>'agentGate'='true'`;
+  const adv = await advancePortalStage(actor, FND, portalId2);
+  check('assisted: completing the gate advances past the agent stage', adv.advanced === true && adv.stageIndex === 1);
+  // cleanup portal2
+  await sqlBypass`DELETE FROM tasks WHERE entity_type='portal' AND entity_id=${portalId2}::uuid`;
+  await sqlBypass`DELETE FROM proposal_portals WHERE id=${portalId2}::uuid`;
 
   console.log(`\n${fail === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fail} failed`);
 } catch (e) {
