@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
+import { isRole, type Role } from '@/lib/rbac';
 import SpotlightBuckets from '@/components/portal/spotlight-buckets';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +17,9 @@ export default async function BucketsPage({ params }: { params: Promise<{ tenant
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');
   if (!(await verifyTenantAccess(su.id, role, tenant.id as string))) redirect('/portal');
-  // BD surface — delegated authority, tenant_admin only (matches the cockpit + nav).
-  if (!hasRoleAtLeast(role, 'tenant_admin')) redirect(`/portal/${tenantSlug}/proposals`);
+  // BD surface — tenant_admin OR a delegated designee (mig 181 can_manage_buckets).
+  const canManage = await canManageBuckets(su.id, role, tenant.id as string);
+  if (!canManage) redirect(`/portal/${tenantSlug}/proposals`);
 
   return (
     <div>
@@ -26,7 +27,7 @@ export default async function BucketsPage({ params }: { params: Promise<{ tenant
         <h1 className="text-2xl font-bold">Spotlight Buckets</h1>
         <p className="text-gray-500 mt-1 text-sm">Your ranking lenses — each ranks the whole pipeline by the criteria you set.</p>
       </div>
-      <SpotlightBuckets tenantSlug={tenantSlug} canEdit={hasRoleAtLeast(role, 'tenant_admin')} />
+      <SpotlightBuckets tenantSlug={tenantSlug} canEdit={canManage} />
     </div>
   );
 }

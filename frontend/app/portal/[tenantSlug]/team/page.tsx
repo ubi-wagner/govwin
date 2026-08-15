@@ -54,6 +54,7 @@ export default async function TeamPage({ params }: Props) {
     email: string;
     role: string;
     isActive: boolean;
+    canManageBuckets: boolean;
     lastLoginAt: Date | null;
     createdAt: Date;
   }
@@ -65,7 +66,7 @@ export default async function TeamPage({ params }: Props) {
     // their access follows the membership (verifyTenantAccess is membership-based).
     members = await sql<TeamMember[]>`
       SELECT u.id, u.name, u.email, m.role, (m.status = 'active') AS is_active,
-             u.last_login_at, u.created_at
+             m.can_manage_buckets, u.last_login_at, u.created_at
       FROM user_memberships m
       JOIN users u ON u.id = m.user_id
       WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')
@@ -225,6 +226,7 @@ export default async function TeamPage({ params }: Props) {
                               userId={m.id}
                               active={m.isActive}
                               role={m.role}
+                              canManageBuckets={m.canManageBuckets}
                               isLastAdmin={m.role === 'tenant_admin' && activeAdmins <= 1}
                             />
                           )}

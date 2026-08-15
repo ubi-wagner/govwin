@@ -168,6 +168,30 @@ export async function verifyTenantAccess(userId: string, role: string, tenantId:
 }
 
 /**
+ * Bucket-authoring capability — may this actor create/edit/delete spotlight buckets in
+ * `tenantId`? tenant_admin+ (incl. descended admins) always may. A plain tenant_user may
+ * be DELEGATED the capability by a tenant_admin — an audited, revocable per-membership grant
+ * (mig 181 `user_memberships.can_manage_buckets`). Reads the RLS-off memberships table via
+ * `sql`, exactly like verifyTenantAccess (which the caller runs FIRST for tenant access).
+ * The grant only matters at the member's OWN tenant; an archived company denies.
+ */
+export async function canManageBuckets(userId: string, role: string, tenantId: string): Promise<boolean> {
+  if (isRole(role) && hasRoleAtLeast(role, 'tenant_admin')) return true;
+  try {
+    const rows = await sql<{ canManageBuckets: boolean }[]>`
+      SELECT m.can_manage_buckets FROM user_memberships m
+        JOIN tenants t ON t.id = m.tenant_id
+        WHERE m.user_id = ${userId} AND m.tenant_id = ${tenantId}
+          AND m.status = 'active' AND t.archived_at IS NULL AND m.can_manage_buckets = true
+      LIMIT 1`;
+    return rows.length > 0;
+  } catch (e) {
+    console.error('[canManageBuckets] Error:', e);
+    return false;
+  }
+}
+
+/**
  * Proposal-scoped access gate — the collaborator-aware widening of
  * verifyTenantAccess. Returns true if the actor has tenant-wide access to the
  * proposal's tenant (isTenantWideMember) OR is an ACCEPTED collaborator on THIS

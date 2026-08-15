@@ -56,13 +56,14 @@ export async function GET(_request: Request, ctx: RouteContext) {
       name: string | null;
       role: string;
       isActive: boolean;
+      canManageBuckets: boolean;
       lastLoginAt: string | null;
       createdAt: string;
     }[];
     try {
       members = await sql<typeof members>`
         SELECT u.id, u.email, u.name, m.role, (m.status = 'active') AS is_active,
-               u.last_login_at, u.created_at
+               m.can_manage_buckets, u.last_login_at, u.created_at
         FROM user_memberships m
         JOIN users u ON u.id = m.user_id
         WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')

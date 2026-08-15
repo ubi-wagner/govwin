@@ -84,6 +84,26 @@ interface TenantPolicyRow {
   maxFiresPerHour: number;
 }
 
+/**
+ * The platform cap on spotlight buckets per tenant (automation_framework
+ * .max_buckets_per_tenant, mig 126; default raised 12→6 in mig 181). rfp_admin tunes it
+ * globally at /admin/automation-framework. Framework-HARD: a tenant may not exceed it.
+ * Falls back to DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
+ */
+export const DEFAULT_MAX_BUCKETS = 6;
+export async function getMaxBucketsPerTenant(): Promise<number> {
+  try {
+    // camelCase off toCamel: max_buckets_per_tenant → maxBucketsPerTenant (declare + read camelCase).
+    const [row] = await sql<Array<{ maxBucketsPerTenant: number }>>`
+      SELECT max_buckets_per_tenant FROM automation_framework WHERE id = 1`;
+    const n = row?.maxBucketsPerTenant;
+    return typeof n === 'number' && n > 0 ? n : DEFAULT_MAX_BUCKETS;
+  } catch (e) {
+    log.warn?.({ msg: 'max-buckets read failed — using default', err: e instanceof Error ? e.message : String(e) });
+    return DEFAULT_MAX_BUCKETS;
+  }
+}
+
 /** Read the singleton framework row (mig 126). Null on any error (caller falls back). */
 export async function getAutomationFramework(): Promise<FrameworkRow | null> {
   try {

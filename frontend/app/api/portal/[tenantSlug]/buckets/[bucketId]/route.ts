@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
@@ -29,7 +29,7 @@ async function gate(tenantSlug: string, bucketId: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id, email: u.email ?? null };
+  return { tenantId, userId: u.id, email: u.email ?? null, role };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; bucketId: string }> }) {
@@ -83,8 +83,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
 export async function PATCH(request: Request, { params }: { params: Promise<{ tenantSlug: string; bucketId: string }> }) {
   try {
     const { tenantSlug, bucketId } = await params;
-    const g = await gate(tenantSlug, bucketId, 'tenant_admin');
+    const g = await gate(tenantSlug, bucketId, 'tenant_user');
     if ('error' in g) return g.error;
+    if (!(await canManageBuckets(g.userId, g.role, g.tenantId))) {
+      return NextResponse.json({ error: 'Bucket management not permitted', code: 'FORBIDDEN' }, { status: 403 });
+    }
     let body: { name?: string; description?: string; criteria?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     await withTenant(g.tenantId, async (tx) => {
@@ -129,8 +132,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
 export async function DELETE(_request: Request, { params }: { params: Promise<{ tenantSlug: string; bucketId: string }> }) {
   try {
     const { tenantSlug, bucketId } = await params;
-    const g = await gate(tenantSlug, bucketId, 'tenant_admin');
+    const g = await gate(tenantSlug, bucketId, 'tenant_user');
     if ('error' in g) return g.error;
+    if (!(await canManageBuckets(g.userId, g.role, g.tenantId))) {
+      return NextResponse.json({ error: 'Bucket management not permitted', code: 'FORBIDDEN' }, { status: 403 });
+    }
     await withTenant(g.tenantId, async (tx) => {
       await tx`UPDATE tenant_spotlight_buckets SET is_active = false WHERE tenant_id = ${g.tenantId}::uuid AND id = ${bucketId}::uuid`;
       // Prune this bucket's score rows now (deactivation used to leave them behind — hidden by the

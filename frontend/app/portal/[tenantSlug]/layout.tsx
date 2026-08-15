@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
@@ -116,6 +116,8 @@ export default async function PortalLayout({
   const basePath = `/portal/${tenantSlug}`;
   const isPartner = role === 'partner_user';
   const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
+  // A delegated designee (tenant_user + can_manage_buckets, mig 181) also reaches Opportunities + Buckets.
+  const canManageBucketsHere = isTenantAdmin || (await canManageBuckets(userId, role, tenantId));
 
   return (
     <NavShell
@@ -135,8 +137,8 @@ export default async function PortalLayout({
                 Workflows · Activity). The admin front door; a base member lands on the cockpit. */}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/command`}>Command Center</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>}
-            {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
-            {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
+            {canManageBucketsHere && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
+            {canManageBucketsHere && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
             {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
