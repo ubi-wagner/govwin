@@ -18,6 +18,7 @@ interface Config { stages?: Stage[]; collaborators?: unknown[]; nudgeDays?: numb
 /** The current AI-manager stage's review state (TW-8c) — null unless the live stage is agent-gated. */
 export interface ReviewState {
   requested: boolean; completed: boolean; verdict: string | null; completedAt: string | null;
+  summary: string | null; noteCount: number | null;
   stageKey: string; stageLabel: string; agentManagerKey: string | null; autoAdvance: boolean;
 }
 /** A LIVE open ToDo row for this portal (TW-9) — active-instantiation management (reassign/reschedule). */
@@ -207,6 +208,12 @@ export function WorkflowSetupClient({
                   ? (reviewState.autoAdvance ? 'Auto-advance is on — the stage advances on its own once the review lands.' : 'The cohort landed its review and the adversarial pass reconciled. Advance when you’re ready.')
                   : 'The manager cohort is running. This gate opens when it lands its review.'}
               </p>
+              {reviewState.completed && reviewState.summary && (
+                <p className="text-xs mt-1 font-medium text-emerald-900">
+                  {reviewState.summary}
+                  {typeof reviewState.noteCount === 'number' && reviewState.noteCount > 0 && ' Review the section threads for the cohort’s notes.'}
+                </p>
+              )}
             </div>
             {reviewState.completed && !reviewState.autoAdvance && (
               <button onClick={() => gateAdvance(false)} disabled={busy}

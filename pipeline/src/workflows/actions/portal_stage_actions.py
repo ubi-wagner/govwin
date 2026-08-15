@@ -13,8 +13,32 @@ frontend can close the gate. Mirrors studio_actions.advance_studio_phase (which 
 completion and owns no business content).
 """
 import logging
+import uuid as _uuid
 
 logger = logging.getLogger(__name__)
+
+
+async def _summarize_review(conn, proposal_id):
+    """Roll up the review cohort's advisory findings (the ai_review comments the color-team / section
+    reviewers posted per section) into a short human summary + count. Reads the DB directly — the
+    ACTION's own logic, NOT an input-map dependency, so the input-map-ancestor invariant is untouched.
+    Best-effort: returns (0, None) on any error so the gate never dead-ends."""
+    if not proposal_id:
+        return 0, None
+    try:
+        pid = _uuid.UUID(proposal_id) if isinstance(proposal_id, str) else proposal_id
+        rows = await conn.fetch(
+            """SELECT content FROM proposal_comments
+               WHERE proposal_id = $1 AND recommendation_type = 'ai_review' AND resolved = false
+               ORDER BY created_at DESC LIMIT 5""",
+            pid,
+        )
+        note_count = len(rows)
+        sample = ((rows[0]["content"] or "")[:280]) if rows else None
+        return note_count, sample
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("record_stage_review: review-note summary failed: %s", exc)
+        return 0, None
 
 
 async def record_stage_review(
@@ -27,10 +51,19 @@ async def record_stage_review(
     auto=None,
     **_ignored,
 ):
-    """Emit capture:stage_review.completed (the cohort has reviewed the stage). Safe no-op on bad
-    input — never dead-ends the workflow. Advisory: no advance, no business-table write."""
+    """Emit capture:stage_review.completed (the cohort has reviewed the stage), carrying a SUMMARY of
+    what the manager found so the human closing the gate sees the review, not just "reviewed". Safe
+    no-op on bad input — never dead-ends the workflow. Advisory: no advance, no business-table write."""
     if not portal_id:
         return {"completed": False, "reason": "bad_input"}
+
+    note_count, sample = await _summarize_review(conn, proposal_id)
+    plural = "s" if note_count != 1 else ""
+    summary = (
+        f"AI manager review complete — {note_count} advisory note{plural} from the cohort."
+        if note_count
+        else "AI manager review complete — no blocking notes."
+    )
 
     from events import emit_event  # noqa: PLC0415
 
@@ -48,9 +81,12 @@ async def record_stage_review(
                 "agentManagerKey": agent_manager_key,
                 "auto": bool(auto),
                 "verdict": "reviewed",
+                "summary": summary,
+                "noteCount": note_count,
+                "sample": sample,
             },
         )
     except Exception as exc:  # noqa: BLE001
         logger.error("record_stage_review: completed emit failed: %s", exc)
 
-    return {"completed": True, "portalId": portal_id, "auto": bool(auto)}
+    return {"completed": True, "portalId": portal_id, "auto": bool(auto), "noteCount": note_count}

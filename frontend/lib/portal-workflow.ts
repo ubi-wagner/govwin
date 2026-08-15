@@ -425,13 +425,17 @@ export interface StageReviewState {
   requested: boolean;
   completed: boolean;
   verdict: string | null;
+  summary: string | null;
+  noteCount: number | null;
   completedAt: string | null;
 }
 export async function getStageReviewState(
   portalId: string, stageKey: string,
 ): Promise<StageReviewState> {
   try {
-    const [r] = await sql<Array<{ requestedAt: Date | null; completedAt: Date | null; verdict: string | null }>>`
+    // Scalar subqueries (always exactly one row, even with no completion yet), pulling the latest
+    // completion's verdict + the manager's SUMMARY of what the cohort found (SPINE-T3).
+    const [r] = await sql<Array<{ requestedAt: Date | null; completedAt: Date | null; verdict: string | null; summary: string | null; noteCount: string | null }>>`
       SELECT
         (SELECT max(created_at) FROM system_events
            WHERE namespace = 'capture' AND type = 'stage_review.requested'
@@ -442,19 +446,30 @@ export async function getStageReviewState(
         (SELECT payload->>'verdict' FROM system_events
            WHERE namespace = 'capture' AND type = 'stage_review.completed'
              AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
-           ORDER BY created_at DESC LIMIT 1) AS "verdict"`;
+           ORDER BY created_at DESC LIMIT 1) AS "verdict",
+        (SELECT payload->>'summary' FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.completed'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
+           ORDER BY created_at DESC LIMIT 1) AS "summary",
+        (SELECT payload->>'noteCount' FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.completed'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
+           ORDER BY created_at DESC LIMIT 1) AS "noteCount"`;
     const requestedAt = r?.requestedAt ? new Date(r.requestedAt) : null;
     const completedAt = r?.completedAt ? new Date(r.completedAt) : null;
     const completed = !!completedAt && (!requestedAt || completedAt >= requestedAt);
+    const n = r?.noteCount != null ? Number(r.noteCount) : null;
     return {
       requested: !!requestedAt,
       completed,
       verdict: completed ? (r?.verdict ?? null) : null,
+      summary: completed ? (r?.summary ?? null) : null,
+      noteCount: completed && Number.isFinite(n) ? n : null,
       completedAt: completed && completedAt ? completedAt.toISOString() : null,
     };
   } catch (e) {
     console.error('[getStageReviewState] failed (non-fatal)', e);
-    return { requested: false, completed: false, verdict: null, completedAt: null };
+    return { requested: false, completed: false, verdict: null, summary: null, noteCount: null, completedAt: null };
   }
 }
 
