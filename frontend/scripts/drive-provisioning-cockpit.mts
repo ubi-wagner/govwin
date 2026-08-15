@@ -67,6 +67,8 @@ try {
   const bo = await completeBuildOut(SOL, { id: ADMIN, email: ADMIN_EMAIL });
   check('completeBuildOut ok', bo.ok === true);
   check(`re-published >=1 activated opp (got ${bo.opportunitiesRepublished})`, bo.opportunitiesRepublished >= 1);
+  // The TRUE broadcast reach: the fan-out touched BOTH tenant cards (buyer + Foundation).
+  check(`cardsRefreshed counts every holder (got ${bo.cardsRefreshed}, expect >=2)`, bo.cardsRefreshed >= 2);
 
   const [solAfter] = await sqlBypass<Array<{ buildComplete: boolean; buildCompletedBy: string | null }>>`
     SELECT build_complete, build_completed_by FROM curated_solicitations WHERE id=${SOL}::uuid`;

@@ -42,7 +42,8 @@ export function ReleasePanel({
       }
       const d = json.data ?? {};
       const parts = ['Released.'];
-      if (d.buildOut?.opportunitiesRepublished != null) parts.push(`${d.buildOut.opportunitiesRepublished} mirror card(s) refreshed.`);
+      const cards = d.buildOut?.cardsRefreshed;
+      if (typeof cards === 'number') parts.push(`${cards} tenant card${cards === 1 ? '' : 's'} refreshed.`);
       if (d.tasksCreated != null) parts.push(`${d.tasksCreated} workflow to-do(s) created.`);
       toast.success(parts.join(' '));
       router.refresh();

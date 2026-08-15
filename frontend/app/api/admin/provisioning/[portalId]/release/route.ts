@@ -117,7 +117,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ por
         released: true,
         proposalId: released.proposalId,
         tasksCreated: released.tasksCreated,
-        buildOut: buildOut ? { opportunitiesRepublished: buildOut.opportunitiesRepublished, readiness: buildOut.readiness } : null,
+        buildOut: buildOut ? { opportunitiesRepublished: buildOut.opportunitiesRepublished, cardsRefreshed: buildOut.cardsRefreshed, readiness: buildOut.readiness } : null,
       },
     });
   } catch (err) {

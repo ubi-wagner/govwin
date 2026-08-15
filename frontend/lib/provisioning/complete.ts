@@ -21,6 +21,8 @@ export interface CompleteBuildOutResult {
   ok: boolean;
   readiness: BuildReadiness;
   opportunitiesRepublished: number;
+  /** Total tenant mirror cards refreshed by the fan-out (the true broadcast reach — one opp fans to N holders). */
+  cardsRefreshed: number;
 }
 
 export async function completeBuildOut(
@@ -53,16 +55,20 @@ export async function completeBuildOut(
   } catch (e) { console.error('[completeBuildOut] start emit failed (non-fatal)', e); }
 
   let republished = 0;
+  let cardsRefreshed = 0;
   const now = new Date().toISOString();
   for (const o of opps) {
-    try { await publishAndFanOut(o.id, 'updated', actor.id, now); republished++; }
-    catch (e) { console.error('[completeBuildOut] republish failed', o.id, e); }
+    try {
+      const r = await publishAndFanOut(o.id, 'updated', actor.id, now);
+      republished++;
+      cardsRefreshed += r?.tenantsApplied ?? 0;
+    } catch (e) { console.error('[completeBuildOut] republish failed', o.id, e); }
   }
 
   if (startId) {
-    try { await emitEventEnd(startId, { result: { solicitationId: solId, opportunitiesRepublished: republished } }); }
+    try { await emitEventEnd(startId, { result: { solicitationId: solId, opportunitiesRepublished: republished, cardsRefreshed } }); }
     catch (e) { console.error('[completeBuildOut] end emit failed (non-fatal)', e); }
   }
 
-  return { ok: true, readiness, opportunitiesRepublished: republished };
+  return { ok: true, readiness, opportunitiesRepublished: republished, cardsRefreshed };
 }

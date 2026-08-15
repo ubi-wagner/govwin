@@ -89,9 +89,8 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'opportunity.updated': (p) => `Opportunity updated${str(p.title) ? `: ${str(p.title)}` : ''}`,
   // Provisioning (PV-2): the master OPP build-out was completed + broadcast to all mirror cards.
   'opportunity.build_completed': (p) => {
-    const n = typeof p.opportunitiesRepublished === 'number' ? p.opportunitiesRepublished
-            : typeof p.opportunities === 'number' ? p.opportunities : null;
-    return `OPP build-out completed${n != null ? ` — ${n} card${n === 1 ? '' : 's'} refreshed` : ''}`;
+    const n = typeof p.cardsRefreshed === 'number' ? p.cardsRefreshed : null;
+    return `OPP build-out completed${n != null ? ` — ${n} tenant card${n === 1 ? '' : 's'} refreshed` : ''}`;
   },
   // Pre-purchase start nudge (RANK-9): a hot, closing-soon opp the customer hasn't started yet.
   'opportunity.start_recommended': (p) => {
