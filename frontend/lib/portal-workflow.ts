@@ -355,7 +355,11 @@ export async function advancePortalStage(
     await tx`UPDATE proposal_portals SET status = 'executing', current_stage_index = ${nextIndex} WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
   });
   await emitPortalStageAdvanced(actor, tenantId, portalId, portal.currentStageIndex, nextIndex, 'executing');
-  await createStageTodos(actor, tenantId, portalId, stages[nextIndex], portal.guardrailConfig, limits);
+  // Scope next-stage ToDo creation to the tenant's RLS context — createTask hits the RLS-forced `tasks`
+  // ledger, and the callers here (the tasks-route completion hook, closeAgentGate) carry NO ambient
+  // tenant context, so a bare call fails the tasks INSERT policy under production RLS (mirrors
+  // instantiatePortalWorkflow's runInTenant wrap; found by the govtech_app-faithful TW-8c drive).
+  await runInTenant(tenantId, () => createStageTodos(actor, tenantId, portalId, stages[nextIndex], portal.guardrailConfig, limits));
   await emitStageReviewRequested(actor, tenantId, portalId, stages[nextIndex]);
   return { advanced: true, stageIndex: nextIndex, status: 'executing' };
 }
@@ -393,16 +397,124 @@ async function emitStageReviewRequested(
       tx<Array<{ proposalId: string | null; opportunityId: string | null }>>`
         SELECT proposal_id AS "proposalId", opportunity_id AS "opportunityId"
         FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`);
+    // The pipeline OnPortalStageReviewRequested triggers on the END event and reads every key off
+    // payload.* (resolve_input has NO access to the top-level tenant_id COLUMN) — so `tenantId` MUST
+    // ride IN the payload, and the END `result` MUST carry the FULL payload, not a thin echo (mirrors
+    // lib/proposal-full-draft.ts, whose end `result` === the start `payload`). Emitting a thin end
+    // result would null out proposalId / tenantId / agentManagerKey / autoAdvance in the record step.
+    const payload = {
+      portalId, tenantId,
+      proposalId: p?.proposalId ?? null, opportunityId: p?.opportunityId ?? null,
+      stageKey: stage.key, agentManagerKey: stage.agentManagerKey ?? null, autoAdvance: stage.autoAdvance === true,
+    };
     const startId = await emitEventStart({
       namespace: 'capture', type: 'stage_review.requested',
       actor: userActor(actor.id, actor.email ?? undefined), tenantId,
-      payload: {
-        portalId, proposalId: p?.proposalId ?? null, opportunityId: p?.opportunityId ?? null,
-        stageKey: stage.key, agentManagerKey: stage.agentManagerKey ?? null, autoAdvance: stage.autoAdvance === true,
-      },
+      payload,
     });
-    await emitEventEnd(startId, { result: { portalId, stageKey: stage.key } });
+    await emitEventEnd(startId, { result: payload });
   } catch (e) { console.error('[emitStageReviewRequested] failed (non-fatal)', e); }
+}
+
+/** The AI-manager review state for a portal's stage (TW-8c) — the completion TRIGGER the frontend
+ *  gate-close consumes. `completed` is true only when a `stage_review.completed` landed AT/AFTER the
+ *  latest `stage_review.requested` for the stage, so a re-instantiation's fresh request re-opens the
+ *  gate until a NEW cohort lands. system_events is NOT RLS-forced + rows are keyed by payload.portalId,
+ *  so a bare `sql` read is correct (no tenant context needed). */
+export interface StageReviewState {
+  requested: boolean;
+  completed: boolean;
+  verdict: string | null;
+  completedAt: string | null;
+}
+export async function getStageReviewState(
+  portalId: string, stageKey: string,
+): Promise<StageReviewState> {
+  try {
+    const [r] = await sql<Array<{ requestedAt: Date | null; completedAt: Date | null; verdict: string | null }>>`
+      SELECT
+        (SELECT max(created_at) FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.requested'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}) AS "requestedAt",
+        (SELECT max(created_at) FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.completed'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}) AS "completedAt",
+        (SELECT payload->>'verdict' FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.completed'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
+           ORDER BY created_at DESC LIMIT 1) AS "verdict"`;
+    const requestedAt = r?.requestedAt ? new Date(r.requestedAt) : null;
+    const completedAt = r?.completedAt ? new Date(r.completedAt) : null;
+    const completed = !!completedAt && (!requestedAt || completedAt >= requestedAt);
+    return {
+      requested: !!requestedAt,
+      completed,
+      verdict: completed ? (r?.verdict ?? null) : null,
+      completedAt: completed && completedAt ? completedAt.toISOString() : null,
+    };
+  } catch (e) {
+    console.error('[getStageReviewState] failed (non-fatal)', e);
+    return { requested: false, completed: false, verdict: null, completedAt: null };
+  }
+}
+
+/**
+ * TW-8c — close an AI-manager stage gate: the FRONTEND authority that consumes `stage_review.completed`
+ * and advances the portal. advancePortalStage stays the sole stage-mutation path (the pipeline never
+ * advances a business table); this just (1) confirms the cohort's review landed, (2) closes the gate
+ * ToDo (recording the AI verdict + who/what closed it), (3) advances, and (4) audits the close as
+ * `capture:stage_review.advanced`. Two callers:
+ *   • assisted (opts.auto=false): a manager/admin clicks "AI review complete → advance".
+ *   • auto     (opts.auto=true) : opt-in only — refuses unless the stage has autoAdvance=true.
+ * Idempotent: a non-agent stage, a pending review, or a not-opted-in auto call returns advanced:false
+ * with a reason (never throws, never force-waves the gate).
+ */
+export async function closeAgentGate(
+  actor: { id: string; email: string | null; role: Role; tenantId: string },
+  tenantId: string,
+  portalId: string,
+  opts: { auto?: boolean } = {},
+): Promise<{ advanced: boolean; reason?: string; stageIndex?: number; status?: string; verdict?: string | null }> {
+  const portal = await withTenant(tenantId, async (tx) => {
+    const [p] = await tx<Array<{ currentStageIndex: number; guardrailConfig: GuardrailConfig | null }>>`
+      SELECT current_stage_index AS "currentStageIndex", guardrail_config AS "guardrailConfig"
+      FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`;
+    return p ?? null;
+  });
+  if (!portal) return { advanced: false, reason: 'not_found' };
+  const stages = portal.guardrailConfig?.stages ?? [];
+  const stage = stages[portal.currentStageIndex] ?? null;
+  if (!stage || stage.gateCloser !== 'agent_manager') return { advanced: false, reason: 'not_agent_gate' };
+
+  // The completion TRIGGER must be present for THIS stage — the cohort has landed its review.
+  const review = await getStageReviewState(portalId, stage.key);
+  if (!review.completed) return { advanced: false, reason: 'review_pending' };
+
+  // Auto is opt-in per stage — never auto-advance a stage the tenant didn't set to autoAdvance.
+  if (opts.auto && stage.autoAdvance !== true) return { advanced: false, reason: 'auto_not_enabled' };
+
+  // Close the gate ToDo (its completion IS the gate close). RLS-scoped update (prod app role is
+  // subject to tasks RLS). Record the AI verdict + closer so the ledger shows who/what closed it.
+  await withTenant(tenantId, async (tx) => {
+    await tx`
+      UPDATE tasks SET status = 'completed', completed_at = now(),
+        result = ${jsonParam({ closedBy: opts.auto ? 'ai_manager_auto' : 'assisted', verdict: review.verdict, by: actor.id })}
+      WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
+        AND params->>'stage' = ${stage.key} AND params->>'agentGate' = 'true'
+        AND status NOT IN ('completed', 'cancelled')`;
+  });
+
+  // Advance (the gate is now clear). advancePortalStage re-checks ALL open ToDos (all-or-nothing) and
+  // owns the transition audit (portal.stage_advanced + next-stage ToDos + the next stage_review.requested).
+  const result = await advancePortalStage(actor, tenantId, portalId);
+  if (result.advanced) {
+    await emitEventSingle({
+      namespace: 'capture', type: 'stage_review.advanced',
+      actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+      payload: { portalId, stageKey: stage.key, auto: opts.auto === true, verdict: review.verdict ?? null, agentManagerKey: stage.agentManagerKey ?? null },
+    });
+  }
+  return { ...result, verdict: review.verdict ?? null };
 }
 
 /** Is this user a DELEGATED manager of the portal (a guardrail_config collaborator with role='manager')?

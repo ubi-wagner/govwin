@@ -10,7 +10,7 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import {
-  canEditWorkflow, isPortalManager, getGuardrailLimits, type GuardrailConfig,
+  canEditWorkflow, isPortalManager, getGuardrailLimits, getStageReviewState, type GuardrailConfig,
 } from '@/lib/portal-workflow';
 import { recommendWorkflowConfig } from '@/lib/portal-workflow-recommend';
 import { WorkflowSetupClient, type Member } from './workflow-setup-client';
@@ -42,10 +42,10 @@ export default async function WorkflowSetupPage({ params }: { params: Promise<{ 
 
   enterTenant(tenantId); // RLS choke point — subsequent sql reads are tenant-scoped
 
-  let portal: { opportunityId: string; label: string; status: string; guardrailConfig: GuardrailConfig | null } | undefined;
+  let portal: { opportunityId: string; label: string; status: string; currentStageIndex: number; guardrailConfig: GuardrailConfig | null } | undefined;
   try {
-    [portal] = await sql<Array<{ opportunityId: string; label: string; status: string; guardrailConfig: GuardrailConfig | null }>>`
-      SELECT opportunity_id AS "opportunityId", label, status, guardrail_config AS "guardrailConfig"
+    [portal] = await sql<Array<{ opportunityId: string; label: string; status: string; currentStageIndex: number; guardrailConfig: GuardrailConfig | null }>>`
+      SELECT opportunity_id AS "opportunityId", label, status, current_stage_index AS "currentStageIndex", guardrail_config AS "guardrailConfig"
       FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`;
   } catch (e) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
@@ -74,6 +74,14 @@ export default async function WorkflowSetupPage({ params }: { params: Promise<{ 
 
   const limits = await getGuardrailLimits();
 
+  // TW-8c — when the CURRENT stage is an AI-manager gate, surface its review state so the client can show
+  // "AI review pending / complete" + a one-click advance (assisted) and fire the opt-in auto-advance.
+  const curStage = (savedConfig.stages ?? [])[portal.currentStageIndex] ?? null;
+  const reviewState = accepted && curStage?.gateCloser === 'agent_manager' && curStage.key
+    ? { ...(await getStageReviewState(portalId, curStage.key)), stageKey: curStage.key, stageLabel: curStage.label ?? curStage.key,
+        agentManagerKey: curStage.agentManagerKey ?? null, autoAdvance: curStage.autoAdvance === true }
+    : null;
+
   let members: Member[] = [];
   try {
     members = await sql<Member[]>`
@@ -95,6 +103,8 @@ export default async function WorkflowSetupPage({ params }: { params: Promise<{ 
         limits={{ maxStages: limits.maxStages, maxNudges: limits.maxNudges }}
         members={members}
         initialConfig={initialConfig}
+        currentStageIndex={portal.currentStageIndex}
+        reviewState={reviewState}
       />
     </div>
   );

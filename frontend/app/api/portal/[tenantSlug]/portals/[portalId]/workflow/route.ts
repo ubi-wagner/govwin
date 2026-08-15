@@ -15,7 +15,7 @@ import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import {
   editPortalWorkflow, canEditWorkflow, isPortalManager, getGuardrailLimits,
-  checkWorkflowComplete, rebaselineConfig, type GuardrailConfig,
+  checkWorkflowComplete, rebaselineConfig, closeAgentGate, getStageReviewState, type GuardrailConfig,
 } from '@/lib/portal-workflow';
 import { recommendWorkflowConfig } from '@/lib/portal-workflow-recommend';
 
@@ -55,6 +55,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const limits = await getGuardrailLimits();
     // When the required setup hasn't been accepted yet, offer the history recommendation to pre-fill.
     const recommendation = accepted ? null : await recommendWorkflowConfig(g.tenantId, portal.opportunityId);
+    // TW-8c — when the CURRENT stage is an AI-manager gate, surface the review state so the setup UI can
+    // show "AI review pending / complete" + a one-click advance (assisted) without a second round-trip.
+    const stages = config.stages ?? [];
+    const curStage = stages[portal.currentStageIndex] ?? null;
+    const reviewState = curStage?.gateCloser === 'agent_manager' && curStage.key
+      ? { ...(await getStageReviewState(portalId, curStage.key)), stageKey: curStage.key, autoAdvance: curStage.autoAdvance === true }
+      : null;
     return NextResponse.json({
       data: {
         portal: { opportunityId: portal.opportunityId, label: portal.label, status: portal.status, currentStageIndex: portal.currentStageIndex, config },
@@ -62,6 +69,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
         limits,
         completeness: checkWorkflowComplete(config),
         recommendation,
+        reviewState,
       },
     });
   } catch (err) {
@@ -100,8 +108,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, portalId } = await params;
     const g = await gate(tenantSlug, portalId);
     if ('error' in g) return g.error;
-    let body: { action?: string; shiftDays?: number; newSubmissionDate?: string; fromSolicitation?: boolean };
+    let body: { action?: string; shiftDays?: number; newSubmissionDate?: string; fromSolicitation?: boolean; auto?: boolean };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+
+    // TW-8c — close the current AI-manager stage gate + advance. assisted (auto:false) is the one-click
+    // "AI review complete → advance"; auto:true is the opt-in path (refused unless the stage set autoAdvance).
+    if (body.action === 'gate-advance') {
+      const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
+      const result = await closeAgentGate(actor, g.tenantId, portalId, { auto: body.auto === true });
+      if (!result.advanced) {
+        const status = result.reason === 'not_found' ? 404 : 409;
+        return NextResponse.json({ error: `Cannot advance the gate: ${result.reason}`, code: 'STAGE_GATE' }, { status });
+      }
+      return NextResponse.json({ data: result });
+    }
+
     if (body.action !== 'rebaseline') return NextResponse.json({ error: 'Unknown action', code: 'VALIDATION_ERROR' }, { status: 400 });
 
     const portal = await withTenant(g.tenantId, async (tx) => {
