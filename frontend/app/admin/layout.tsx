@@ -41,6 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/waitlist">Waitlist</AdminNavLink>
           <AdminNavLink href="/admin/purchases">Purchases</AdminNavLink>
           <AdminNavLink href="/admin/proposals">Proposals</AdminNavLink>
+          <AdminNavLink href="/admin/provisioning">Releases / SLA</AdminNavLink>
           <AdminNavLink href="/admin/expert-time">Expert Time</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
