@@ -99,3 +99,46 @@ confirmed before building.
 **Uniform caveat:** several agents only *run* in production once the pipeline's `ANTHROPIC_API_KEY` is
 live (a known launch-cut item). The delivery gaps above hold regardless of that switch — they're about
 wiring outputs to screens, not whether the model runs.
+
+---
+
+## Grounding pass — verified outcomes (2026-08-16)
+
+All 17 items were run to ground against the code (four parallel passes; every load-bearing claim
+re-verified, premises overturned where wrong). Net changes:
+
+### Refuted / re-sized by grounding
+- **#3 → SHIPPED (S, not M).** Not "wake an agent" — the pin route already enqueues `opportunity_analyst`.
+  The ✨AI-fit chip was silently broken by a result-shape mismatch (`invoke_agent` nests the prose at
+  `output.result.text`; the chip read a flat `output.text`). Fixed in `744c348f` (defensive read).
+- **#9 → S (was M / greenfield).** Premise refuted: the per-portal cockpit `/admin/provisioning/[portalId]`
+  already reads `proposal_portals` + `curation_due_at` and renders a 72h `SlaCountdown`, and a full admin
+  release path exists. The only real gap is a **root list + nav link** — there is no `/admin/provisioning/page.tsx`.
+- **#10 → L (was M).** Three blockers: no `solicitation ↔ source_profiles` link; `amendment_monitor` is
+  advisory + `human_gate` and does not call `logAmendment`; and **no per-solicitation URL is captured
+  anywhere today.** Needs a URL-capture + correlation-link design first — not a quick wire.
+- **#5 → decision-gated.** `librarian` already emits `vol`/`kind`/`suggested_tags`, but the frontend parser
+  (`lib/atom-review.ts`) drops them, and the manual atomizer discards the `suggestedVol` the upload route
+  already computes. Minimal slice (apply that `suggestedVol` + heuristic `party_role`/`access`) is S.
+- **#1 / #8** — agent output lands in `process_instances.step_results['<step>'].result.result.text` (note
+  camelCase `payload->>'proposalId'` for `OnProposalCreated`); reads are RLS-safe after `enterTenant`. #8's
+  land+accept **must stay browser-triggered** (the engine forbids a pipeline consumer of agent output).
+
+### Build-now queue (verified, no product decision, ordered by value ÷ effort)
+1. ✅ **#3 AI-fit chip** — DONE (`744c348f`)
+2. **#9 Release / SLA board** — S — new `/admin/provisioning/page.tsx` list (cross-tenant `sqlBypass`) + reuse `SlaCountdown` + nav link
+3. **#4 ops_digest → System lane** — S — `getOpsDigest()` reads the digest `step_results` → a Command-Center System card (+ the "new" dot)
+4. **#17 workflow retry-all** — S — multi-select in `app/admin/workflows/workflow-monitor-client.tsx` looping the existing retry route
+5. **#14 compliance-aware section AI** — S — add `sectionId` to `proposal.draft_section`, load `proposal_compliance_matrix`, inject as a fenced block (one server change fixes all four callers)
+6. **#1 Strategy panel (read-only)** — S–M — `GET .../strategy` reads `OnProposalCreated` step_results → an admin tab in the workspace
+7. **#6 auto-atomize on upload** — M — mirror the atomize-package `librarian` producer into the upload route (review-queue landing already exists)
+8. **#12 ingest & stage + render the QA** — M — chain ingest-assist+shred-audit + a route to read `curation_qa`/`rfp_ingest_manager` step_results
+9. **#13 post-submission outcome nudge** — S–M — `createTask` at submission + a `record_outcome` completer that POSTs the outcome route
+10. **#16 partner cross-stable to-do feed** — S–M — scoped clone of `getTenantSurfacedTodos` + render in the console
+
+### Decision-gated (need a product call before building)
+- **#15** expose discovery to `tenant_user`? The cards API already permits it; only the page/nav block it — an access-policy choice, ready either way.
+- **#5** auto-tag atoms: deterministic heuristic (A, instant/cheap) vs surface+apply `librarian`'s proposals (B, better, async, depends on #6)?
+- **#7** instant strawman: rfp_admin fast-path only (build-now, M), or *also* a read-only preview build on purchase (product risk: undercuts paid curation)?
+- **#8** one-click draft&land: auto-accept into live sections, or stop at staged proposed versions for a human "Accept" click (the current design's deliberate posture) + poll `process_instances` vs add a `full_draft_status` column?
+- **#11** unify attention feed — L; sequence *after* #13/#16, which produce the task sources it should surface.
