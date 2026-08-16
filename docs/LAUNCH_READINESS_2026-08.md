@@ -101,7 +101,7 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
   pipeline key + per-producer wiring. Reconcile + wake the next highest-value (`amendment_monitor`) as fast-follow.
 - **RLS backstop for `tasks` + `process_instances`** — the with-shared policy still lets a tenant session write a
   NULL/global row (not app-reachable; documented in COPY_INWARD_VERIFICATION.md §3, needs a no-context carve-out).
-- Dead **Paste Topics** modal + **CRM "coming soon"** placeholder (§5.2–5.3).
+- **Retired the dead Paste Topics modal** (§5.2, **DONE 2026-08-16**); the honest **CRM "coming soon"** placeholder remains (§5.3, lowest priority).
 
 ### 4.C — BY-DESIGN (deliberate descope — call out, don't "fix")
 
@@ -121,12 +121,14 @@ the shared *atom* library (each tenant holds isolated copies by segregation desi
    the client shows *"AI region detection isn't available on this deployment — draw the boxes manually"* instead of
    fabricating boxes (mirrors `lib/vision.ts`). The deterministic demo stand-in is opt-in for dev/demo via
    `REGION_PROPOSER=demo`; a real vision detector still swaps in server-side as `engine:'vision'`. `tsc` 0 · `vitest` 1129.
-2. **POLISH — orphaned "Paste Topics" modal** (`components/admin/source-card-actions.tsx`): ~180 lines,
-   `setShowPasteModal(true)` is never called (unreachable), and its handler targets an endpoint that always 400s.
-   Its own TODO says "wire to a real endpoint or retire." Not user-facing; a maintenance trap. Retire it.
+2. **FIXED (2026-08-16) — retired the orphaned "Paste Topics" modal** (`components/admin/source-card-actions.tsx`).
+   The ~200-line `PasteTopicsModal` component, its `showPasteModal` state, and its (already-unreachable) render block
+   were removed and the single-child fragment collapsed. The button had already been retired; the handler targeted
+   `/api/admin/extract-topics`, which only extracts from a stored solicitation's `solicitationId` (never pasted rows)
+   and so always 400'd. `tsc` 0 · `vitest` 1129 · `next build` clean.
 3. **POLISH — CRM admin nav → "Coming soon"** (`app/admin/crm/page.tsx`): honest + documented, lowest priority.
 
-**Marker census (clean):** frontend — 2 `TODO` comments (the two above), 1 legit `@ts-ignore`, **0** real
+**Marker census (clean):** frontend — 1 `TODO` comment (the paste-topics one was removed with the retired modal), 1 legit `@ts-ignore`, **0** real
 `console.log`, **0** bare `alert()`, 27 `confirm()` (all legit destructive gates), **0** `JSON.stringify::jsonb`,
 **0** snake-cased `sql<typeof rows>` traps. Pipeline — **0** real code TODOs, 3 intentional `NotImplementedError`
 contract guards. The codebase is disciplined.
