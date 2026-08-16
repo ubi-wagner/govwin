@@ -347,7 +347,7 @@ AUTOMATION_SPINE_MAP, LAUNCH_READINESS_2026-07-22.
 
 ---
 
-**AGENT WORKFORCE — COMPLETE + EXPANDED (27 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
+**AGENT WORKFORCE — COMPLETE + EXPANDED (36 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
 forward plan: `docs/archive/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
 
 - **#117 DONE — all 10 original archetypes awake as workflow actors.** section_drafter / compliance_reviewer /
