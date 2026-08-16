@@ -45,6 +45,15 @@ Carry global/shared rows that the app deliberately surfaces to tenants:
 - `document_templates` — 3/12 null: the shared template catalog (like `system_starter`) must be
   visible to every tenant; `OR NULL` = own + shared.
 
+> **Hardening — mig 184 (see docs/COPY_INWARD_VERIFICATION.md).** The mig-136 `FOR ALL` policy shares
+> one USING/CHECK across every command, so `OR tenant_id IS NULL` — correct for READ — also let a
+> `govtech_app` tenant session UPDATE/DELETE/re-mint the shared `NULL` rows (proven live: a tenant
+> could mutate or delete all 9 global `document_templates`). **mig 184** splits `document_templates`
+> into per-command policies (SELECT reads own+shared; INSERT/UPDATE/DELETE own-only), closing it while
+> preserving read-shared + own-writes. `tasks` + `process_instances` are deferred: they have a
+> legitimate `govtech_app` `NULL`-row writer (automation admin-ToDos / workflow reconcilers), so their
+> tightening needs a no-context carve-out — tracked, not app-exploitable today.
+
 ### BYPASS — leave RLS off  · 7 tables
 Read cross-tenant by design; app-layer already filters portal reads:
 - `users` — auth looks up by email **before** any tenant context. Isolating breaks login.
