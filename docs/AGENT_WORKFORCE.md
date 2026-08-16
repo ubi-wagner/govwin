@@ -142,6 +142,14 @@ verify routing + producer/step + tool SQL against the live schema.
 > `triage_new_opportunities` ToDo. Proven live on the emulator (`scripts/drive-opp-scout.mts`: 1
 > detection → agent.invoked ×2, guardrail `apply` → 1 triage ToDo); locked by
 > `pipeline/tests/test_opportunity_scout_wiring.py` (8/8).
+>
+> **amendment_monitor WOKEN / reconciled (AGENTS-LIVE).** Carried in the docs as dormant, but the code was
+> already fully wired: the archetype (platform-scope, injection-fenced, read-only `curated_solicitations`), the
+> `tool.solicitation.amendment_delta` → `amendment_monitor` map, and the **independent** `ai_amendment_monitor`
+> AI step in `OnSourceChangeDetected` — and its trigger `finder:source.change_detected` is emitted by BOTH the
+> frontend source-scout tool (`lib/tools/source-scout.ts`) and the pipeline `source_scout` worker, so it fires
+> live on a scan with meaningful changes. The only gap was a test proving it; now locked by
+> `pipeline/tests/test_amendment_monitor_wiring.py` (9/9).
 
 **Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
@@ -154,7 +162,7 @@ pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a
 | **Matrix Stager** (`matrix_stager`) | 🌐 platform | RFP uploaded | Curated solicitation → compliance-matrix rows. |
 | **Skeleton Architect** (`skeleton_architect`) | 🌐 platform | RFP uploaded | Matrix → master response skeleton (tenant architect tailors it). |
 | **Outcome Analyst** (`outcome_analyst`) | 🔒 tenant | Outcome recorded | Win/loss lesson → memory → scoring calibration. |
-| **Amendment Monitor** (`amendment_monitor`) | 🌐 platform | Source change detected | Flags compliance-affecting amendments. |
+| **Amendment Monitor** (`amendment_monitor`) | 🌐 platform | Source change detected | Flags compliance-affecting amendments — ADVISORY. **WOKEN / reconciled (AGENTS-LIVE)**: archetype + `tool.solicitation.amendment_delta` map + the **independent** `ai_amendment_monitor` step in `OnSourceChangeDetected` were already wired, and its trigger `finder:source.change_detected` is emitted by both the frontend source-scout tool and the pipeline `source_scout` worker — so it fires live. Locked by `test_amendment_monitor_wiring.py` (9/9). |
 | **Cost Estimator** (`cost_estimator`) | 🔒 tenant | Proposal created; **woken** in Mode C (`cost_estimate` step) | Cost-volume realism guidance — now **WOKEN** with a `compute_budget` tool over the deterministic `proposal.budget_model` burden-waterfall/PoP engine (exact bucketed costs, no invented dollars). |
 | **PP Matcher** (`pp_matcher`) | 🔒 tenant | Proposal created | Surfaces PP atoms + flags teaming gaps. |
 

@@ -96,9 +96,12 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
   poker logs once and returns); assisted one-click gate-close works regardless. Set it to make auto-advance autonomous.
 - **`AGENT_DATABASE_URL` (the `rfp_agent` NOBYPASSRLS role)** — agents run on the owner connection today; the
   RLS-enforced agent role is built but deploy-gated (defense-in-depth, not a blocker).
-- **Wake more agents** — the workforce is registered (36 archetypes) and the core journey's agents are live; the
-  exact "fires live in prod" count is disputed across docs (a known agent-report discrepancy) and depends on the
-  pipeline key + per-producer wiring. Reconcile + wake the next highest-value (`amendment_monitor`) as fast-follow.
+- **Wake more agents** — the workforce is registered (36 archetypes) and the core journey's agents are live. The
+  next highest-value, `amendment_monitor`, is now **reconciled + proven WOKEN (2026-08-16)**: it was already fully
+  wired (archetype + `tool.solicitation.amendment_delta` map + the independent `ai_amendment_monitor` step in
+  `OnSourceChangeDetected` + its `finder:source.change_detected` trigger emitted from both the frontend
+  source-scout tool and the pipeline `source_scout` worker); now locked by `test_amendment_monitor_wiring.py`
+  (9/9). The remaining dormant agents still depend on the pipeline key + per-producer wiring.
 - **RLS backstop for `tasks` + `process_instances`** — **DONE 2026-08-16 (mig 185)**: per-command policy split so a
   tenant session can no longer mutate/delete a shared (`NULL`) row or promote its own row to global; read-shared and
   the automation `NULL`-writer are preserved. Live-proven on a throwaway PG16. The residual `INSERT`-mint (needs the
