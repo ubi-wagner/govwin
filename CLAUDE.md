@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1092 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1129 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,12 +58,17 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **182** — mig 180 the bucket-score
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **184** — mig 180 the bucket-score
 integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
 OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
 `build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket
 authoring → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
 admin pin-for-updates (holder fan-out, pre-purchase) → notify/nudge (the hot-closing-soon start-nudge) → provision;
+mig **179** the **Command Center** watermark (`command_seen_state` — the tenant · admin · partner "new since you
+looked" cockpits, docs/COMMAND_CENTER_DESIGN.md); mig **183** span/node-anchored comments — the rebuilt
+**section-editing spine** (section-scoped ToDos → editor routing · AI assist from the section bar · AI-manager
+auto-advance · partner_user-scoped bell); mig **184** **cross-tenant isolation hardening** — per-command RLS on
+the shared `document_templates` catalog, adversarially verified copy-inward (docs/COPY_INWARD_VERIFICATION.md);
 migs 163–167 per below;
 mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
 extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
@@ -304,7 +309,7 @@ See CLAUDE_CLIFFNOTES.md for:
   (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
 - **RLS is LIVE (two-layer, enforced) — not "inert until a future flip".** The app connects as the
   `NOBYPASSRLS` `govtech_app` role and RLS scopes every request via the per-request `SET app.tenant_id`
-  context (mig 136_rls_cutover: 19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles;
+  context (mig 136_rls_cutover: 19 force-RLS tables + 35 policies at that cutover — since extended by migs 171 (`atom_embeddings`) · 173 (amendment/notification) · 184 (per-command `document_templates`); the `govtech_app`/`rfp_agent` roles;
   mig 137 validates the namespace CHECK). **The sandbox EMULATES PRODUCTION EXACTLY — serve as
   `govtech_app` with RLS on.** The owner/`sqlBypass` connection is only for bootstrap/migrations and
   the few legitimate cross-tenant reads (admin/CMS on RLS-forced tables, e.g. the agent-workforce

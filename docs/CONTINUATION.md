@@ -1,6 +1,6 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-09 (workflow viz + compliance enforcement + full-draft landing — MERGED to `main` via PR #205 and DEPLOYED)
+**Last updated:** 2026-08-16 (migration head **184** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening; a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
 **Branch:** `claude/nice-hamilton-kBqtD` — the prior PR is MERGED; on resume RESTART the branch from `origin/main` (`git fetch origin && git checkout -B claude/nice-hamilton-kBqtD origin/main`), do NOT stack on the old history.
 
 ---
@@ -42,7 +42,12 @@ this closes the sandbox's AI gap. Per-agent RESPONDER registry returns each agen
 ## 0. LATEST — 2026-08-09 (workflow viz + compliance + full-draft landing; MERGED + DEPLOYED; READ THIS FIRST)
 
 Everything below is **merged to `main` (PR #205) and deployed**. Migration head **162** at that time. `tsc 0 · vitest 899`.
-**Since then (through 2026-08-14): migration head 178** — the template-stable/bridge spine (migs 177/178;
+**Since then (through 2026-08-16): migration head 184** — the **Command Center** cockpits (179) · **bucket-score
+integrity** (180, docs/BUCKET_LOCKDOWN.md) · the **ranking spine** (181, docs/RANKING_SPINE.md) · the
+**provisioning cockpit** + master `build_complete` (182, docs/PROVISIONING_WORKSPACE_DESIGN.md) · **tenant Workflow
+Setup** (the `tw` series, no migration, docs/TENANT_WORKFLOW_SETUP_DESIGN.md) · the rebuilt **section-editing spine**
+(section ToDos · editor AI · span-anchored comments 183 · AI-manager auto-advance · partner-scoped bell) · and
+**cross-tenant isolation hardening** (184, docs/COPY_INWARD_VERIFICATION.md); plus the template-stable/bridge spine (migs 177/178;
 `lib/template-bridge.ts`, docs/TEMPLATE_BRIDGE_DESIGN.md), the NILOC gold-example proposal set
 (`frontend/scripts/niloc/`, docs/NILOC_GOLD_EXAMPLES.md), and the cost-volume common-form pass (migs 168/169).
 RLS is **live app-side** (the app runs as `govtech_app`; see the ⛑️ callout above).

@@ -10,7 +10,7 @@
 > (docs/FULL_DRAFT_LANDING_DESIGN.md). The **cost/budget volume is now computed + agency-neutral** — one deterministic
 > burden engine rendered in the common government FORM the solicitation needs (DoW waterfall · NSF/DOE SF-424A · Ohio
 > TVSF OTF state budget), migs 168–169 seeding the Ohio TVSF Round-45 card + the final Foundation proposal
-> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **178** (177–178 add the template-stable/bridge spine + document/template provenance)
+> (docs/COST_VOLUME_FORMS.md). Reconciliations: migration head is now **184** — **179** Command Center watermark (`command_seen_state`, tenant/admin/partner cockpits, docs/COMMAND_CENTER_DESIGN.md) · **180** bucket-score integrity (docs/BUCKET_LOCKDOWN.md) · **181** the opportunity ranking spine (docs/RANKING_SPINE.md) · **182** the master `build_complete` flag behind the provisioning cockpit (docs/PROVISIONING_WORKSPACE_DESIGN.md) · **183** span/node-anchored comments of the rebuilt section-editing spine · **184** per-command RLS on the shared `document_templates` catalog (docs/COPY_INWARD_VERIFICATION.md); 177–178 add the template-stable/bridge spine + document/template provenance
 > (170–171 semantic-retrieval `atom_embeddings`; 172–174 scout schedule + RLS gap + tasks-broadcast; **175**
 > the scout-intake NEW-vs-UPDATE candidate queue on `scout_findings`, docs/SCOUT_INTAKE_QUEUE.md; **176**
 > the program-primer guide drafts BAA/OTA/CSO/Grants queued for review, docs/CONTENT_QUEUE.md). **Agent
@@ -546,9 +546,9 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 178)
+## 7. New / Changed Schema (migrations 093 → 184)
 
-Highest migration: **178** (149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **184** (179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the

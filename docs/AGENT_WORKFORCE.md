@@ -1,7 +1,7 @@
 # The Agent Workforce — wiring, oversight, tenant-discretion (#117)
 
 > **As-built correction (deepest-review sweep).** See **docs/START_END_FRAMEWORK.md** §4 for the verified
-> agent×scope map. Corrections: every one of the 35 archetypes now has a concrete invocation site (a
+> agent×scope map. Corrections: every one of the 36 archetypes now has a concrete invocation site (a
 > producer or an `AI_INVOKE` step) — the "15 dormant" framing is stale; `research_scout` is invocable via a
 > queue producer (`ai/research/route.ts`) — and, as of AGENTS-LIVE, ALSO as an `AI_INVOKE` step
 > (`tool.research.scout` in `OnProposalCreated`, closing the last unmapped-archetype gap). The injection fence was hardened
