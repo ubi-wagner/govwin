@@ -91,7 +91,7 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
 
 ### 4.B — FAST-FOLLOW (launch without; works or degrades cleanly)
 
-- **Fix the lying "Suggest regions" button** (§5.1) — the one customer-facing credibility crack; small fix.
+- **Fixed the lying "Suggest regions" button** (§5.1) — **DONE 2026-08-16**: route honest-inert by default, client degrades honestly. The one customer-facing credibility crack, closed.
 - **`AGENT_GATE_SWEEP_URL` (+`CRON_SECRET`)** — until set, AI-manager auto-advance ships **inert** (the pipeline
   poker logs once and returns); assisted one-click gate-close works regardless. Set it to make auto-advance autonomous.
 - **`AGENT_DATABASE_URL` (the `rfp_agent` NOBYPASSRLS role)** — agents run on the owner connection today; the
@@ -113,14 +113,14 @@ the shared *atom* library (each tenant holds isolated copies by segregation desi
 
 ## 5. Visible cracks (proven, file:line)
 
-1. **SHARP-EDGE — the "✨ Suggest regions" button is a lying AI button.** `[verified]`
-   `lib/propose-regions.ts:26-39` returns two **hardcoded** boxes at fixed fractional positions (figure at
-   10/12/52×30 %, table at 10/55/80×32 %) scaled only to frame size — it **never reads the document pixels**. The
-   route (`atoms/propose-regions/route.ts`) reports `engine:'demo'`. On the live `/atoms` Capture tab, a user clicks
-   the sparkle "Suggest regions" and always gets the same two boxes regardless of content. Advisory (they edit before
-   Atomize, no corruption) — but it's exactly the "lying button" class this codebase has purged (cf. the retired
-   "Draft with AI" button). **Fix:** degrade honestly like `lib/vision.ts` (return empty + a toast "AI region
-   detection isn't available on this deployment"), or hide the button when the engine is `demo`.
+1. **FIXED (2026-08-16) — the "✨ Suggest regions" button no longer fabricates AI output.** `[verified]`
+   Previously `lib/propose-regions.ts` returned two hardcoded boxes at fixed fractional positions (never reading the
+   document pixels) that the client presented as AI suggestions — exactly the "lying button" class this codebase has
+   purged (cf. the retired "Draft with AI" button). **Fix shipped:** the route (`atoms/propose-regions/route.ts`) is
+   now **honest-inert by default** — with no vision detector wired it returns no regions and `available:false`, and
+   the client shows *"AI region detection isn't available on this deployment — draw the boxes manually"* instead of
+   fabricating boxes (mirrors `lib/vision.ts`). The deterministic demo stand-in is opt-in for dev/demo via
+   `REGION_PROPOSER=demo`; a real vision detector still swaps in server-side as `engine:'vision'`. `tsc` 0 · `vitest` 1129.
 2. **POLISH — orphaned "Paste Topics" modal** (`components/admin/source-card-actions.tsx`): ~180 lines,
    `setShowPasteModal(true)` is never called (unreachable), and its handler targets an endpoint that always 400s.
    Its own TODO says "wire to a real endpoint or retire." Not user-facing; a maintenance trap. Retire it.

@@ -6,11 +6,12 @@
  * tool with them; the human confirms/edits/deletes before anything is atomized (advisory — never
  * writes a business row here). Tenant-isolated via verifyTenantAccess.
  *
- * VISION-GATED: a vision model would look at the actual frame pixels and detect regions. This
- * deployment's LLM is `sk-noop` (no vision), so we return the deterministic demo proposal
- * (`proposeDemoRegions`, same shape a detector returns) and report `engine: 'demo'`. When a vision
- * model is wired, this route reads the frame image + calls the detector and reports `engine:'vision'`
- * — a server-only swap; the client already consumes `{ regions }` unchanged.
+ * VISION-GATED (honest-inert by default): a vision model would look at the actual frame pixels and
+ * detect regions (engine 'vision'). None is wired yet, so this route reports `available:false` and
+ * returns NO regions — it never presents a fixed heuristic as if it were AI. A deterministic demo
+ * stand-in (`proposeDemoRegions`) is opt-in for dev/demo via REGION_PROPOSER=demo (engine 'demo').
+ * When a vision model is wired, this reads the frame image + calls the detector (engine 'vision') —
+ * a server-only swap; the client consumes `{ regions, engine, available }` unchanged.
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -42,10 +43,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ error: 'width and height must be positive frame dimensions', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    // TODO(vision): when a vision model is configured, read the frame image from the request and
-    // call the detector here → engine 'vision'. Until then, seed the deterministic demo regions.
-    const regions = proposeDemoRegions(width, height);
-    return NextResponse.json({ data: { regions, engine: 'demo' } });
+    // TODO(vision): when a vision model is configured, read the frame image here → engine 'vision'.
+    // Default is honest-inert: no detector wired → no regions + available:false (never fake AI output).
+    // The deterministic demo stand-in is opt-in for dev/demo only.
+    const engine = process.env.REGION_PROPOSER === 'demo' ? 'demo' : 'off';
+    const regions = engine === 'demo' ? proposeDemoRegions(width, height) : [];
+    return NextResponse.json({ data: { regions, engine, available: engine !== 'off' } });
   } catch (err) {
     console.error('[atoms/propose-regions] error', err);
     return NextResponse.json({ error: 'Could not propose regions', code: 'SERVER_ERROR' }, { status: 500 });

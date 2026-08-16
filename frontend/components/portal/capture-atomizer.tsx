@@ -162,6 +162,12 @@ export function CaptureAtomizer({ tenantSlug }: { tenantSlug: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Could not propose regions');
       const proposed: Array<{ x: number; y: number; w: number; h: number; title: string; kind: string }> = json.data?.regions ?? [];
+      if (json.data?.available === false) {
+        // Honest degrade (mirrors lib/vision.ts): no AI region detector on this deployment — never
+        // fabricate boxes and present them as AI. Say so plainly; the user draws regions manually.
+        setMsg("AI region detection isn't available on this deployment — draw the boxes manually below.");
+        return;
+      }
       if (proposed.length === 0) { setMsg('No regions suggested for this frame.'); return; }
       const added: Box[] = proposed.map((r, i) => ({
         id: `box_ai_${i}_${Math.round(r.x)}_${Math.round(r.y)}`,
