@@ -109,13 +109,38 @@ P4 own-tenant insert ............ 1 row          own writes unaffected
 P5 mint fake global (NULL) ...... BLOCKED [42501]
 ```
 
-**Deferred (documented): `tasks` + `process_instances`.** These *do* have a legitimate `govtech_app`
-writer of `NULL` rows — the automation engine creates `rfp_admin` admin ToDos (`tenant_id NULL`) via
-`lib/automation/triggers.ts` *during* tenant-context requests (e.g. purchase → curation), and the
-workflow reconcilers touch admin/global `process_instances`. Restricting their write side to
-own-tenant-only would fail-closed on those flows, so it needs a per-command policy **plus** a verified
-carve-out for the no-context/system writer (`INSERT … WITH CHECK (own OR (NULL AND app.tenant_id
-unset))`). Tracked as a follow-up; not app-exploitable today.
+**Fixed: `tasks` + `process_instances` (mig 185).** These *do* have a legitimate `govtech_app` writer of
+`NULL` rows — the automation engine creates `rfp_admin` admin ToDos (`tenant_id NULL`) via
+`lib/automation/triggers.ts` (`import { sql }`) *during* tenant-context requests (e.g. purchase →
+curation), and the workflow reconcilers create admin/global `process_instances`. That writer runs on the
+RLS-enforced `govtech_app` pool with `app.tenant_id` **set**, so a legitimate `NULL`-INSERT and a
+malicious tenant `NULL`-INSERT are byte-identical at the RLS layer — the mig-136-era carve-out sketch
+(`INSERT … (NULL AND app.tenant_id unset)`) does **not** cover the real writer (it fires with
+`app.tenant_id` *set*). So mig 185 splits the `FOR ALL` policy per-command and restricts only the vectors
+with **no** legitimate `govtech_app` writer, leaving `INSERT` permissive:
+
+- `SELECT` own + shared (unchanged) · `INSERT` own **or** `NULL` (preserves the automation writer)
+- `UPDATE` own-only (USING + CHECK — no mutating a shared row, no promoting own→global)
+- `DELETE` own-only (USING — no deleting a shared row)
+
+Re-proven live (throwaway PG16, `govtech_app` role, ctx = a tenant, before → after mig 185):
+
+```
+                             OLD(136)   NEW(185)
+UPDATE shared tasks .........   1    ->    0       BLOCKED
+DELETE shared tasks .........   1    ->    0       BLOCKED
+promote own -> NULL .........   1    ->  ERROR     BLOCKED (RLS check)
+read own+shared .............   2    ->    2       preserved
+UPDATE / INSERT own .........   -    ->    1       preserved
+INSERT NULL admin ToDo ......   -    ->    1       automation writer preserved
+UPDATE / DELETE shared PI ...   -    ->    0       BLOCKED
+```
+
+**Residual (documented).** A tenant session can still `INSERT` a *new* `tenant_id=NULL` row (mint a global
+admin ToDo / workflow instance) — the one vector byte-identical to the legitimate writer, unclosable by
+policy alone. Closing it requires routing `lib/automation/triggers.ts`'s `NULL`-row writes through the
+owner/`sqlBypass` pool, after which `INSERT` can also be restricted own-only (as mig 184 did for
+`document_templates`). Not app-exploitable today (no tenant route mints a `NULL` task / instance).
 
 **Secondary (documented, not fixed): `system_starter` house catalog.** `lib/library/foundation.ts`
 (`listSystemFoundations`/`copyFoundationToTenant`) trusts a tenant-settable `collection=system_starter`

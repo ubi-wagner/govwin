@@ -1,6 +1,6 @@
 # LAUNCH_READINESS_2026-08.md — retrospective, cracks, and the launch punch list
 
-**Date:** 2026-08-16 · **Migration head:** 184 · **Branch:** `claude/nice-hamilton-kBqtD`
+**Date:** 2026-08-16 · **Migration head:** 185 · **Branch:** `claude/nice-hamilton-kBqtD`
 **Backbone:** frontend `tsc` 0 · `vitest` 1129 · `next build` clean; pipeline workflow-invariant suite green
 (the no-deadend CI failure fixed this session). **Method:** four parallel code sweeps (doc-currency,
 visible-cracks, launch-functionality, retrospective+seams) + targeted live re-verification of every sharp claim.
@@ -99,8 +99,10 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
 - **Wake more agents** — the workforce is registered (36 archetypes) and the core journey's agents are live; the
   exact "fires live in prod" count is disputed across docs (a known agent-report discrepancy) and depends on the
   pipeline key + per-producer wiring. Reconcile + wake the next highest-value (`amendment_monitor`) as fast-follow.
-- **RLS backstop for `tasks` + `process_instances`** — the with-shared policy still lets a tenant session write a
-  NULL/global row (not app-reachable; documented in COPY_INWARD_VERIFICATION.md §3, needs a no-context carve-out).
+- **RLS backstop for `tasks` + `process_instances`** — **DONE 2026-08-16 (mig 185)**: per-command policy split so a
+  tenant session can no longer mutate/delete a shared (`NULL`) row or promote its own row to global; read-shared and
+  the automation `NULL`-writer are preserved. Live-proven on a throwaway PG16. The residual `INSERT`-mint (needs the
+  automation writer moved to `sqlBypass`) is documented in COPY_INWARD_VERIFICATION.md §3.
 - **Retired the dead Paste Topics modal** (§5.2, **DONE 2026-08-16**); the honest **CRM "coming soon"** placeholder remains (§5.3, lowest priority).
 
 ### 4.C — BY-DESIGN (deliberate descope — call out, don't "fix")
