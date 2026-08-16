@@ -147,9 +147,14 @@ spine/mig-184 in the overview + vitest 1129 + RLS-totals wording), **CLAUDE_CLIF
 `rank_score` column** in the SQL-guidance section — it exists nowhere; added a migs 179–184 schema delta),
 **ARCHITECTURE_V10.md** (head + §7 + a 179–184 reconciliation), **CONTINUATION.md** (date + head + the recent arc;
 the stale "branch already merged" note), **AGENT_WORKFORCE.md** (35→36), **START_END_FRAMEWORK / DATA_FLOW /
-LAUNCH_STATUS** (head 178→184, counts), and an AS-BUILT banner on **SECTION_SPINE_DESIGN.md**. Still owed (fast-
-follow): re-run `PROJECT_AUDIT.md` (frozen at mig 141) and stamp superseded banners on `EVENT_CONTRACT` v1/v2 and
-the historical `CANVAS_*` cluster.
+LAUNCH_STATUS** (head 178→184, counts), and an AS-BUILT banner on **SECTION_SPINE_DESIGN.md**.
+
+**Follow-up currency sweep (2026-08-16, → head 185).** Brought the binding + standards docs from 184→185 (the
+four launch fast-follows + mig 185 RLS + `amendment_monitor` reconciled WOKEN): CLAUDE.md · ARCHITECTURE_V10 ·
+CONTINUATION · LAUNCH_STATUS · DATA_FLOW · COPY_INWARD_VERIFICATION · DEFINITION_OF_DONE · DEVELOPMENT_STANDARDS ·
+TESTING_STRATEGY · AGENT_WORKFORCE. Stamped **PROJECT_AUDIT.md** FROZEN-at-141 (a fresh re-run at 185 deferred).
+The superseded banners were already in place — `EVENT_CONTRACT` v2/v3 and the historical `CANVAS_*` cluster each
+already carry a "no-longer-authoritative / historical snapshot" header.
 
 ---
 
