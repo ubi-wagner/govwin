@@ -26,7 +26,7 @@ documented).
 | C — Partner / collab / notify / comments | partner-manager descent, `partner_user` scope, notification bell, comments | **GATED-SAFE except one LEAK** — descent/comments/bell correctly scoped; **artifact export/layout leaked** (see §2) |
 | D — RLS census + bypass hunt | every `tenant_id` table across migs 001–184; every `sqlBypass`/`enterBypass` use | **0 uncovered live tables · 0 suspicious bypass uses** |
 
-**Live DB census (running schema, head 184):** 39 tables carry `tenant_id`; the only 5 without RLS
+**Live DB census (running schema, head 185):** 39 tables carry `tenant_id`; the only 5 without RLS
 are the documented identity/audit/bridge bypasses (`users`, `user_memberships`, `system_events`,
 `tenant_bridge_cursor`, `tool_invocation_metrics`). All **34** genuinely tenant-scoped tables have a
 `tenant_isolation` policy — including every post-cutover table (`atom_embeddings`,
@@ -152,7 +152,7 @@ before any such change.
 ---
 
 ## 4. Verification backbone
-`tsc` 0 · `vitest` 1096/1096 · mig chain applies clean to head 184 (sandbox) · live isolation proof
+`tsc` 0 · `vitest` 1129/1129 · mig chain applies clean to head 185 (sandbox) · live isolation proof
 green (`frontend/scripts/drive-copy-inward-isolation.sql`). App role reverted to `NOLOGIN` after the run.
 
 ## 5. Net
