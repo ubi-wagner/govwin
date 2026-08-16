@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **184** — mig 180 the bucket-score
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **185**; migs 183–185 add section-comment anchors + the per-command RLS backstop closing shared writes on `document_templates` then `tasks`/`process_instances` — mig 180 the bucket-score
 integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
 OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
 `build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket
@@ -239,7 +239,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1092 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1129 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run

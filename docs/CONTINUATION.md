@@ -1,7 +1,7 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-16 (migration head **184** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening; a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
-**Branch:** `claude/nice-hamilton-kBqtD` — the prior PR is MERGED; on resume RESTART the branch from `origin/main` (`git fetch origin && git checkout -B claude/nice-hamilton-kBqtD origin/main`), do NOT stack on the old history.
+**Last updated:** 2026-08-16 (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
+**Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
 
 ---
 
