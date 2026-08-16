@@ -12,9 +12,11 @@ PURPOSE:    Make the AI-manager stage gate a first-class ENGINE reaction, not a 
             enters an agent_manager stage, run the review MANAGER cohort (advisory) then emit
             `capture:stage_review.completed` — the completion TRIGGER the frontend gate-close consumes
             (assisted: a human ticks the gate ToDo; auto: the opted-in gate-advance route). This is the
-            trigger → action → action → trigger chain:
-                stage_review.requested → [review_manager] → [record] → stage_review.completed
-            which the frontend then turns into portal.stage_advanced (the next trigger).
+            trigger → (advisory agent ∥ hard action) → trigger chain:
+                stage_review.requested → [record] → stage_review.completed
+                                       ↘ [review_manager]  (advisory leaf, parallel; never gates)
+            which the frontend then turns into portal.stage_advanced (the next trigger). `record` is
+            INDEPENDENT of review_manager — an advisory agent never gates a hard step (no-deadend).
 
 SAFETY:     Advisory-only, per the platform invariants. The AI_INVOKE manager output is never auto-applied
             (advisory), and the record ACTION writes NO business table and NEVER advances the portal —
@@ -57,13 +59,16 @@ class OnPortalStageReviewRequested(Workflow):
             },
             timeout_minutes=15,
         ),
-        # Land the review as the completion event (advisory — no advance, no business write). Only
-        # references payload.* (not the agent step's result), honoring the input-map-ancestor invariant.
+        # Emit the completion event (advisory — no advance, no business write). INDEPENDENT of the
+        # review_manager by design: an advisory AI_INVOKE must NEVER gate a hard step (the no-deadend
+        # invariant — test_ai_invoke_steps_never_block_the_pipeline), and the manager safe-skips when
+        # the fabric/key is absent. `record` references only payload.* (not the agent's result), so it
+        # needs no ordering dependency; the manager runs in parallel as an advisory leaf and its
+        # findings surface at the gate via its own landing. Same shape as on_source_change_detected.
         Step(
             name="record",
             step_type=StepType.ACTION,
             action="workflows.actions.portal_stage_actions.record_stage_review",
-            depends_on="review_manager",
             input_map={
                 "portal_id": "payload.portalId",
                 "proposal_id": "payload.proposalId",

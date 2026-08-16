@@ -45,13 +45,18 @@ def test_review_manager_is_the_advisory_reconcile_step():
     assert TOOL_ACTION_TO_ARCHETYPE.get(mgr.action) == "advisory_manager"
 
 
-def test_record_action_lands_completion_and_depends_on_manager():
+def test_record_action_is_independent_of_the_advisory_manager():
+    """record emits the completion event and must NOT gate behind the advisory review_manager: the
+    platform no-deadend invariant (test_ai_invoke_steps_never_block_the_pipeline) forbids a hard step
+    depending on an AI_INVOKE, which safe-skips when the fabric/key is absent. record reads only
+    payload.* (see the test below), so it needs no ordering dependency; the manager runs in parallel
+    as an advisory leaf and its findings surface at the gate via its own landing."""
     rec = next((s for s in W.steps if s.name == "record"), None)
     assert rec is not None
     assert rec.step_type == StepType.ACTION
     assert rec.action == "workflows.actions.portal_stage_actions.record_stage_review"
-    # depends_on is a single step-name STRING (base.validate rejects a list), gating record on the manager.
-    assert rec.depends_on == "review_manager"
+    # Independent — NOT gated on the advisory agent (an AI_INVOKE never gates a hard step).
+    assert rec.depends_on is None
 
 
 def test_record_reads_full_correlation_off_payload_not_agent_result():
