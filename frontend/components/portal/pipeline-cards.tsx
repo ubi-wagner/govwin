@@ -37,9 +37,13 @@ function closeChip(dateStr: string | null): { label: string; cls: string } | nul
   if (d <= 14) return { label, cls: 'bg-amber-100 text-amber-700' };
   return { label, cls: 'bg-gray-100 text-gray-500' };
 }
-/** Concise AI fit level from the analyst's output.text (matches its summarize_result buckets); null when absent. */
+/** Concise AI fit level from the analyst's output text; null when absent. `invoke_agent` nests the
+ *  string at output.result.text (the queue stores the whole invoke result), so read that first and
+ *  fall back to a flat output.text — matching the analyst's summarize_result "…match" buckets. */
 function fitFromOutput(out: unknown): { label: string; cls: string; full: string } | null {
-  const text = out && typeof out === 'object' && typeof (out as { text?: unknown }).text === 'string' ? (out as { text: string }).text.trim() : '';
+  const o = out && typeof out === 'object' ? (out as { text?: unknown; result?: { text?: unknown } }) : null;
+  const raw = typeof o?.result?.text === 'string' ? o.result.text : typeof o?.text === 'string' ? o.text : '';
+  const text = raw.trim();
   if (!text) return null;
   if (/strong match/i.test(text)) return { label: 'Strong fit', cls: 'bg-emerald-100 text-emerald-700', full: text };
   if (/moderate match/i.test(text)) return { label: 'Moderate fit', cls: 'bg-blue-100 text-blue-700', full: text };
