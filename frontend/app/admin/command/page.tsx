@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { TaskQueue } from '@/components/tasks/task-queue';
 import { CommandTabs, type CommandTabInput } from '@/components/command/command-tabs';
 import {
-  getReviewQueue, getTenantSurfacedTodos, getAdminTabCount, getSystemItems, getAdminTabNewest,
-  type QueueSection, type TenantTodo, type SystemItem,
+  getReviewQueue, getTenantSurfacedTodos, getAdminTabCount, getSystemItems, getAdminTabNewest, getOpsDigest,
+  type QueueSection, type TenantTodo, type SystemItem, type OpsDigest,
 } from '@/lib/admin/review-queue';
 import { getCommandSeen, isNew } from '@/lib/command/seen';
 
@@ -93,6 +93,33 @@ function TenantSurfacedList({ items }: { items: TenantTodo[] }) {
   );
 }
 
+// Ops digest — the daily workforce/pipeline health headline (ai_ops_digest), above the failed-instance
+// list. Silent until a digest has run; alerts sorted high→low with a severity dot.
+function OpsDigestCard({ digest }: { digest: OpsDigest | null }) {
+  if (!digest || (!digest.headline && digest.alerts.length === 0)) return null;
+  const high = digest.alerts.filter((a) => a.severity === 'high' || a.severity === 'critical');
+  const rest = digest.alerts.filter((a) => a.severity !== 'high' && a.severity !== 'critical');
+  return (
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 mb-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Daily ops digest</span>
+        {digest.generatedAt && <span className="text-xs text-indigo-400">{new Date(digest.generatedAt).toLocaleString()}</span>}
+      </div>
+      {digest.headline && <p className="mt-1.5 text-sm font-medium text-gray-900">{digest.headline}</p>}
+      {(high.length > 0 || rest.length > 0) && (
+        <ul className="mt-2 space-y-1">
+          {[...high, ...rest].slice(0, 6).map((a, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm">
+              <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === 'high' || a.severity === 'critical' ? 'bg-red-500' : 'bg-amber-400'}`} aria-hidden />
+              <span className="text-gray-700">{[a.label, a.message].filter(Boolean).join(' — ') || 'alert'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // System lane — pipeline instances needing attention (failed).
 function SystemList({ items }: { items: SystemItem[] }) {
   if (items.length === 0) return <EmptyLane text="No system issues — the pipeline is healthy. Use the buttons above to open the monitors." />;
@@ -121,13 +148,14 @@ export default async function CommandCenterPage() {
   const firstName = (session.user.name ?? session.user.email ?? 'there').split(/[\s@]/)[0];
   const userId = (session.user as { id?: string }).id ?? '';
 
-  const [oppQueue, tenant, adminCount, system, newest, seen] = await Promise.all([
+  const [oppQueue, tenant, adminCount, system, newest, seen, opsDigest] = await Promise.all([
     getReviewQueue().catch((e) => { console.error('[admin/command] opp queue failed:', e); return { sections: [], actionable: 0 }; }),
     getTenantSurfacedTodos().catch((e) => { console.error('[admin/command] tenant todos failed:', e); return { items: [], count: 0 }; }),
     getAdminTabCount().catch((e) => { console.error('[admin/command] admin count failed:', e); return 0; }),
     getSystemItems().catch((e) => { console.error('[admin/command] system items failed:', e); return { items: [], count: 0 }; }),
     getAdminTabNewest().catch((e) => { console.error('[admin/command] newest failed:', e); return { opp: null, admin: null, tenant: null, system: null }; }),
     getCommandSeen(userId, 'admin'),
+    getOpsDigest().catch((e) => { console.error('[admin/command] ops digest failed:', e); return null; }),
   ]);
 
   // "New since you last looked" per lane (mig 179) — the newest lane item vs the per-tab watermark.
@@ -172,7 +200,7 @@ export default async function CommandCenterPage() {
         { label: '📡 Events', href: '/admin/events' },
         { label: '❤️ Health', href: '/admin/system' },
       ],
-      body: <SystemList items={system.items} />,
+      body: <><OpsDigestCard digest={opsDigest} /><SystemList items={system.items} /></>,
     },
   ];
 

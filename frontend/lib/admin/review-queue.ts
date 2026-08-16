@@ -225,6 +225,45 @@ export async function getSystemItems(): Promise<{ items: SystemItem[]; count: nu
   return { items, count: items.length };
 }
 
+/** The latest ops_digest (daily cron `ai_ops_digest` step) — surfaces the workforce/pipeline health
+ *  headline in the Command Center instead of only email / buried in /admin/agents. null until one runs. */
+export interface OpsDigest {
+  headline: string | null;
+  alerts: Array<{ severity?: string; message?: string; label?: string }>;
+  generatedAt: string | null;
+}
+export async function getOpsDigest(): Promise<OpsDigest | null> {
+  const [row] = await safeRows(sqlBypass<Array<{ stepResults: unknown; createdAt: Date | string | null }>>`
+    SELECT step_results AS "stepResults", created_at AS "createdAt"
+    FROM process_instances
+    WHERE workflow_name = 'OnOpsDigestRequested' AND status IN ('completed','running','paused')
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+  if (!row) return null;
+  const sr = row.stepResults;
+  const step = sr && typeof sr === 'object' ? (sr as Record<string, unknown>).ai_ops_digest : null;
+  const text = (step as { result?: { result?: { text?: unknown } } } | null)?.result?.result?.text;
+  if (typeof text !== 'string') return null;
+  let parsed: { headline?: unknown; alerts?: unknown };
+  try { parsed = JSON.parse(text) as { headline?: unknown; alerts?: unknown }; } catch { return null; }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const alerts = Array.isArray(parsed.alerts)
+    ? parsed.alerts
+        .filter((a): a is Record<string, unknown> => !!a && typeof a === 'object')
+        .map((a) => ({
+          severity: typeof a.severity === 'string' ? a.severity : undefined,
+          message: typeof a.message === 'string' ? a.message : typeof a.detail === 'string' ? a.detail : undefined,
+          label: typeof a.label === 'string' ? a.label : undefined,
+        }))
+    : [];
+  return {
+    headline: typeof parsed.headline === 'string' ? parsed.headline : null,
+    alerts,
+    generatedAt: row.createdAt == null ? null : row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+  };
+}
+
 /**
  * The newest item timestamp per admin CC lane — drives the "new since you last looked" dot (mig 179).
  * Predicates mirror each lane's count query exactly, so the dot and the badge agree. Each guarded →
@@ -238,15 +277,17 @@ export async function getAdminTabNewest(): Promise<{ opp: string | null; admin: 
       return v == null ? null : v instanceof Date ? v.toISOString() : String(v);
     } catch { return null; }
   };
-  const [scout, curated, amend, admin, tenant, system] = await Promise.all([
+  const [scout, curated, amend, admin, tenant, sysFailed, digestTs] = await Promise.all([
     one(sqlBypass`SELECT max(created_at) AS ts FROM scout_findings WHERE status IN ('new','reviewed')`),
     one(sqlBypass`SELECT max(created_at) AS ts FROM curated_solicitations WHERE status IN ('new','claimed','curation_in_progress','review_requested','approved')`),
     one(sqlBypass`SELECT max(created_at) AS ts FROM solicitation_amendments WHERE status = 'detected'`),
     one(sqlBypass`SELECT max(created_at) AS ts FROM tasks WHERE assignee_role IN ('rfp_admin','master_admin') AND status IN ('open','in_progress')`),
     one(sqlBypass`SELECT max(created_at) AS ts FROM tasks WHERE tenant_id IS NOT NULL AND assignee_role IN ('tenant_admin','tenant_user','partner_user') AND status IN ('open','in_progress')`),
     one(sqlBypass`SELECT max(updated_at) AS ts FROM process_instances WHERE status = 'failed' AND archived_at IS NULL`),
+    one(sqlBypass`SELECT max(created_at) AS ts FROM process_instances WHERE workflow_name = 'OnOpsDigestRequested' AND status IN ('completed','running','paused')`),
   ]);
-  // opp lane = the newest across its three sources (ISO strings sort chronologically).
+  // opp lane = the newest across its three sources; system lane = a failed instance OR a fresh ops digest.
   const opp = [scout, curated, amend].filter(Boolean).sort().pop() ?? null;
+  const system = [sysFailed, digestTs].filter(Boolean).sort().pop() ?? null;
   return { opp, admin, tenant, system };
 }
