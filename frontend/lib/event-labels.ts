@@ -79,6 +79,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'document.atomized': 'Document atomized into library',
   'document.reatomized': 'Document re-atomized',
   'atom.saved': 'Library atom saved',
+  'atom.retagged': 'Library atom retagged',
 
   // ── Capture / pipeline ──────────────────────────────────────────────
   'topic.pinned': 'Opportunity pinned',

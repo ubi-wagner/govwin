@@ -53,6 +53,8 @@ export interface LibraryReview {
 }
 
 export type LibrarianAction = 'keep' | 'retag' | 'merge' | 'reject';
+/** A tag the librarian proposes (dimension:value), applied UNconfirmed via apply-librarian-tags. */
+export interface SuggestedTag { dimension: string; value: string }
 export interface LibrarianAssessment {
   atomId: string;
   title: string | null;         // from the REAL atom (never the model's echo)
@@ -63,6 +65,11 @@ export interface LibrarianAssessment {
   reason: string | null;
   mergeIntoAtomId: string | null; // validated to a real tenant atom, else null
   summary: string | null;
+  // The librarian's proposed taxonomy (mig-free; applied as unconfirmed tags on request).
+  // Previously parsed-and-dropped — surfacing them lets a `retag` recommendation be acted on.
+  vol: string | null;
+  kind: string | null;
+  suggestedTags: SuggestedTag[];
 }
 export interface LibrarianLayer {
   assessments: LibrarianAssessment[];
@@ -148,6 +155,31 @@ const _num = (v: unknown): number | null => (typeof v === 'number' && Number.isF
 const _str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const _ACTIONS: LibrarianAction[] = ['keep', 'retag', 'merge', 'reject'];
 
+// Slugify a taxonomy token to match how tags are stored (lowercase, non-alnum → underscore),
+// so a model's "Past Performance" collapses to the canonical `past_performance` value.
+const _tagSlug = (s: string): string => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+/** Parse the librarian's `suggested_tags: ["dimension:value", ...]` into validated {dimension,value}
+ *  pairs. Drops any entry without exactly one colon-separated dimension + value; deduped. */
+function parseSuggestedTags(raw: unknown): SuggestedTag[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SuggestedTag[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const idx = item.indexOf(':');
+    if (idx <= 0 || idx >= item.length - 1) continue; // need non-empty dimension AND value
+    const dimension = _tagSlug(item.slice(0, idx));
+    const value = _tagSlug(item.slice(idx + 1));
+    if (!dimension || !value) continue;
+    const key = `${dimension}:${value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ dimension, value });
+  }
+  return out;
+}
+
 /**
  * Parse the librarian agent's catalog JSON (model-produced, UNVALIDATED — it arrives as a raw
  * string at agent_task_results.output.result.text) into a clean, safe layer. Every atom_id is
@@ -187,6 +219,9 @@ export function parseLibrarianCatalog(
       reason: _str(rec.reason),
       mergeIntoAtomId: mergeInto && validAtoms.has(mergeInto) ? mergeInto : null,
       summary: _str(a.summary),
+      vol: _str(a.vol) ? _tagSlug(_str(a.vol) as string) : null,
+      kind: _str(a.kind) ? _tagSlug(_str(a.kind) as string) : null,
+      suggestedTags: parseSuggestedTags(a.suggested_tags),
     });
   }
 

@@ -22,14 +22,24 @@ const MAX_ATOMS_PER_DOC = 80;
 const MIN_ATOM_WORDS = 10; // below this a block is skipped (headings / noise)
 
 // Reader's legacy category → unified vol / kind (best-effort; confirmable later).
+// Covers every category the reader emits (lib/import) — an unmapped category simply drafts
+// with no vol guess (the same graceful fallback as before). vol values are drawn from the
+// canonical set the section selector + librarian use (technical | cost | past_performance |
+// key_personnel | commercialization | overview | management | abstract | milestones |
+// facilities | transition_plan | supporting).
 const CATEGORY_TO_VOL: Record<string, string> = {
   technical_approach: 'technical', past_performance: 'past_performance', key_personnel: 'key_personnel',
   capability_statement: 'overview', cost_volume: 'cost', management_approach: 'management',
   commercialization: 'commercialization', abstract: 'abstract', qualifications: 'key_personnel',
   schedule: 'milestones', facilities: 'facilities', teaming: 'key_personnel', transition_plan: 'transition_plan',
+  // Newly covered reader categories → the nearest canonical vol.
+  risk_management: 'management', quality: 'management', security: 'supporting', data_rights: 'supporting',
 };
 const CATEGORY_TO_KIND: Record<string, string> = {
   key_personnel: 'bio', qualifications: 'bio', teaming: 'bio', cost_volume: 'budget_data',
+  // past-performance write-ups are the distinctive `past_perf_blurb` kind (matches the section
+  // selector's VOL_DEFAULT_KINDS), so they broaden recall past the vol tag alone.
+  past_performance: 'past_perf_blurb',
 };
 const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc', txt: 'doc', md: 'doc', xlsx: 'table' };
 

@@ -62,6 +62,22 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
     else toast.error('Nothing was archived.');
   }, [tenantSlug, load]);
 
+  // Apply the librarian's proposed vol/kind/tags to one atom (as UNconfirmed tags — a human still
+  // confirms in the Library). Surfaces the previously parsed-and-dropped `retag` suggestion (#5).
+  const applyTags = useCallback(async (atomId: string) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/portal/${tenantSlug}/atoms/apply-librarian-tags`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ atomId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j.data?.applied ?? 0) > 0) { toast.success(`Applied ${j.data.applied} suggested tag${j.data.applied > 1 ? 's' : ''} (unconfirmed).`); load(); }
+      else if (r.ok) toast('No new tags to apply — they may already be on the atom.', 'info');
+      else toast.error(j.error || 'Could not apply tags.');
+    } catch { toast.error('Could not apply tags.'); }
+    setBusy(false);
+  }, [tenantSlug, load]);
+
   if (state === 'loading') return <div className="py-16 text-center text-sm text-gray-400 animate-pulse">Reviewing your library…</div>;
   if (state === 'error') return <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center text-sm text-rose-600">Could not review the library. Try reloading.</div>;
   if (!review) return null;
@@ -116,6 +132,17 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
                     {a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0">archive</button>}
                   </div>
                   {a.reason && <p className="text-[11px] text-gray-500 mt-0.5">{a.reason}</p>}
+                  {/* The librarian's proposed taxonomy (#5) — apply as unconfirmed tags in one click. */}
+                  {(a.vol || a.kind || a.suggestedTags.length > 0) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {a.vol && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">vol:{a.vol}</span>}
+                      {a.kind && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">kind:{a.kind}</span>}
+                      {a.suggestedTags.map((t) => (
+                        <span key={`${t.dimension}:${t.value}`} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{t.dimension}:{t.value}</span>
+                      ))}
+                      <button onClick={() => applyTags(a.atomId)} disabled={busy} className="text-[11px] text-violet-600 hover:underline shrink-0 ml-0.5">apply tags</button>
+                    </div>
+                  )}
                 </li>
               );
             })}
