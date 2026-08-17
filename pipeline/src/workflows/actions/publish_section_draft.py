@@ -108,6 +108,11 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     else:
         content_json = json.dumps(content)
     new_version = int(row["version"] or 0) + 1
+    # Advance the LIVE version pointer PAST the snapshot so proposal_sections.version stays STRICTLY
+    # greater than MAX(canvas_versions.version_number) — the same invariant the human save/lock/advance
+    # paths hold. Numbering the snapshot at the advanced version (the old behaviour) let a later human
+    # save's archive collide on the slot (ON CONFLICT DO NOTHING drops it + keeps the ai_strawman label).
+    live_version = new_version + 1
     char_count, word_count = _counts(content)
     # canvas_versions.source is a constrained enum; map the logical source label
     # (strawman/ai/tool) onto it. The label is preserved in edit_summary + the event.
@@ -120,7 +125,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
             SET content = $2, status = 'ai_drafted', version = $3, updated_at = now()
             WHERE id = $1::uuid
             """,
-            row["id"], content_json, new_version,
+            row["id"], content_json, live_version,
         )
         await conn.execute(
             """
@@ -145,12 +150,12 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
             payload={
                 "proposalId": str(proposal_id),
                 "sectionId": str(section_id),
-                "version": new_version,
+                "version": live_version,  # the section's CURRENT version (snapshot lives at new_version)
                 "source": source,
             },
         )
     except Exception as e:
         log.warning("publish_section_draft: event emit failed (non-fatal): %s", e)
 
-    log.info("publish_section_draft: landed v%d into section %s (source=%s)", new_version, section_id, source)
-    return {"published": True, "section_id": str(section_id), "version": new_version, "source": source}
+    log.info("publish_section_draft: landed v%d into section %s (source=%s)", live_version, section_id, source)
+    return {"published": True, "section_id": str(section_id), "version": live_version, "source": source}

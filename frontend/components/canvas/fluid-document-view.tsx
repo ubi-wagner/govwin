@@ -106,9 +106,15 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
 
   const budget = useMemo(() => {
     const est = estimatePageCount(doc);
-    const max = (doc.canvas as { max_pages?: number | null } | undefined)?.max_pages ?? null;
+    // Whole-doc page budget = the SUM of each section's OWN page limit. The assembled canvas adopts only
+    // the LAST narrative section's frame, so reading doc.canvas.max_pages compared a whole-doc estimate
+    // against a single section's cap (a misleading "~N of M" read-out). null when no section caps pages.
+    const perSection = sections
+      .map((s) => (s.canvas as { max_pages?: number | null } | null | undefined)?.max_pages)
+      .filter((m): m is number => typeof m === 'number' && m > 0);
+    const max = perSection.length ? perSection.reduce((a, b) => a + b, 0) : null;
     return { est, max };
-  }, [doc]);
+  }, [doc, sections]);
   const sectionsById = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
   const anyEditable = useMemo(() => sections.some((s) => s.editable), [sections]);
   const statusOf = useMemo(() => new Map(sections.map((s) => [s.id, s.status])), [sections]);

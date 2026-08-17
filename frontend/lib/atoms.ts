@@ -171,11 +171,18 @@ export async function createAtom(
       await tx`UPDATE library_atoms SET member_summary = ${tx.json(rollup)} WHERE id = ${atomId}::uuid`;
     }
 
-    // lineage (this atom derived_from parents; a child ← many parents). Only bump
-    // the parent's usage_count when the edge is NEWLY inserted, so an idempotent
-    // re-harvest of the same section doesn't inflate the source atom's usage.
-    for (const p of input.parentAtomIds ?? []) {
-      if (p === atomId) continue;
+    // lineage (this atom derived_from parents; a child ← many parents). Defense-in-depth: like the
+    // members filter above, ONLY parents that belong to THIS tenant may form a lineage edge —
+    // atom_lineage has no RLS (mig 117 covered atom_tags only), so a caller-supplied FOREIGN parent id
+    // could otherwise insert an edge that inflates a victim atom's child_count. Only bump the parent's
+    // usage_count when the edge is NEWLY inserted, so an idempotent re-harvest of the same section
+    // doesn't inflate the source atom's usage.
+    const requestedParents = (input.parentAtomIds ?? []).filter((p) => p !== atomId);
+    const ownedParents = requestedParents.length
+      ? new Set((await tx<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${requestedParents}::uuid[])`).map((r: { id: string }) => r.id))
+      : new Set<string>();
+    for (const p of requestedParents) {
+      if (!ownedParents.has(p)) continue;
       const linked = await tx<Array<{ parentAtomId: string }>>`
         INSERT INTO atom_lineage (parent_atom_id, child_atom_id, relation)
         VALUES (${p}::uuid, ${atomId}::uuid, 'derived_from')
