@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { TeamInviteForm } from '@/components/portal/team-invite-form';
 import { TeamMemberActions } from '@/components/portal/team-member-actions';
 import { ManagerRequestActions } from '@/components/portal/manager-request-actions';
+import { ManagerRemoveAction } from '@/components/portal/manager-remove-action';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,13 +112,13 @@ export default async function TeamPage({ params }: Props) {
   }
 
   // ── Managers (partner_manager memberships) + pending manager-access requests ──────
-  interface Manager { id: string; name: string | null; email: string; createdAt: Date }
+  interface Manager { id: string; membershipId: string; name: string | null; email: string; createdAt: Date }
   interface MgrRequest { id: string; partnerOrg: string | null; partnerEmail: string | null; createdAt: Date }
   let managers: Manager[] = [];
   let mgrRequests: MgrRequest[] = [];
   try {
     managers = await sql<Manager[]>`
-      SELECT u.id, u.name, u.email, m.created_at
+      SELECT u.id, m.id AS membership_id, u.name, u.email, m.created_at
       FROM user_memberships m JOIN users u ON u.id = m.user_id
       WHERE m.tenant_id = ${tenantId} AND m.status = 'active' AND m.source = 'partner_manager'
       ORDER BY m.created_at ASC`;
@@ -253,6 +254,7 @@ export default async function TeamPage({ params }: Props) {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Email</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Manager since</th>
+                  {isAdmin && <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -263,6 +265,11 @@ export default async function TeamPage({ params }: Props) {
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-right">
+                        <ManagerRemoveAction tenantSlug={tenantSlug} membershipId={m.membershipId} managerLabel={m.name ?? m.email} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
