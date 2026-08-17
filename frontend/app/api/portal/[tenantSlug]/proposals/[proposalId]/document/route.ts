@@ -24,8 +24,9 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
-import { resolveUserAccess } from '@/lib/proposal-access';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { assembleProposalDocument, type ProposalSectionInput } from '@/lib/canvas/assemble-proposal';
+import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export async function GET(
   _request: Request,
@@ -98,7 +99,26 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to load sections', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    const inputs: ProposalSectionInput[] = rows.map((r) => ({
+    // ---------- Per-section access: write allowlist + VIEW gate ----------
+    // resolveUserAccess is THE per-section allowlist (locked proposal → empty editable, current-
+    // stage sections, collaborator scope). We use it for BOTH: `editable` (the write allowlist the
+    // section save route re-enforces) AND a view gate. A CAP-3 proposal-scoped tenant_user or a
+    // non-collaborator resolves to ZERO viewable sections — the workspace hides the Document tab
+    // from them, and this route MUST refuse too rather than return the whole assembled proposal.
+    // resolveUserAccess returns NO_ACCESS on its own internal error, so this fails CLOSED.
+    const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+    const viewable = new Set(access.viewableSections);
+    const editableSections = new Set(access.editableSections);
+    const canManage = access.role === 'admin';
+    if (!hasProposalVisibility(access)) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Restrict the assembled document to sections the caller may VIEW (tenant-wide → all sections;
+    // a collaborator → only their granted sections). Strictly RESTRICTING — never widens.
+    const visibleRows = rows.filter((r) => viewable.has(r.id));
+
+    const inputs: ProposalSectionInput[] = visibleRows.map((r) => ({
       id: r.id,
       title: r.title,
       content: (r.content as ProposalSectionInput['content']) ?? null,
@@ -107,24 +127,13 @@ export async function GET(
 
     const assembled = assembleProposalDocument(inputs);
 
-    // ---------- Per-section save metadata (F2 editable surface) ----------
-    // resolveUserAccess is THE per-section write allowlist (accounts for locked proposal →
-    // empty, current-stage sections, collaborator scope). `editable` here mirrors exactly what
-    // the section save route re-enforces, so the fluid surface never offers an edit the API 423s.
-    let editableSections = new Set<string>();
-    let canManage = false;
-    try {
-      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
-      editableSections = new Set(access.editableSections);
-      canManage = access.role === 'admin';
-    } catch (e) {
-      console.error('[proposal/document] access resolve failed (fluid stays read-only)', e);
-    }
-
-    const sections = rows.map((r) => {
+    const sections = visibleRows.map((r) => {
       // The section's OWN canvas frame + metadata (margins/format/title) — a reconstructed
-      // per-section save-doc must carry these, not the assembled doc's adopted single frame.
-      const parsed = coerceJsonb<{ canvas?: unknown; metadata?: unknown }>(r.content, {});
+      // per-section save-doc must carry these, not the assembled doc's adopted single frame. For a
+      // v2 (section-layer) doc we ALSO hand back the full `sourceDoc` so the fluid save can rebuild
+      // its `sections[]`/layout/section_type/atom lineage instead of flattening it to v1.
+      const parsed = coerceJsonb<CanvasDocument | null>(r.content, null);
+      const isV2 = Array.isArray(parsed?.sections) && (parsed?.sections?.length ?? 0) > 0;
       return {
         id: r.id,
         title: r.title,
@@ -134,8 +143,9 @@ export async function GET(
         editable: editableSections.has(r.id),
         status: r.status ?? 'empty',
         completedStage: r.completedStage ?? null,
-        canvas: parsed.canvas ?? null,
-        metadata: parsed.metadata ?? null,
+        canvas: parsed?.canvas ?? null,
+        metadata: parsed?.metadata ?? null,
+        sourceDoc: isV2 ? parsed : null,
       };
     });
 

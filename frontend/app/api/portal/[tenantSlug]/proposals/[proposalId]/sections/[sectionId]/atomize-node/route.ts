@@ -18,6 +18,8 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { coerceJsonb } from '@/lib/jsonb';
+import { docNodes, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 export async function POST(
   request: Request,
@@ -99,6 +101,21 @@ export async function POST(
     if (!body.text || typeof body.text !== 'string' || body.text.trim().length < 20) {
       return NextResponse.json({ error: 'text is required (min 20 chars of content)', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
+    // Carry the node's STRUCTURED content (image / table / chart) into the atom — not just its text —
+    // so a harvested figure or table stays faithful in the library and inserts back with real nodes.
+    // The route already owns proposalId + sectionId + nodeId, so it reads the node from the section
+    // itself (no reliance on the client to send it). Best-effort: falls back to text-only on any miss.
+    let nodeCanvas: CanvasNode[] | undefined;
+    try {
+      const [sec] = await sql<Array<{ content: unknown }>>`
+        SELECT content FROM proposal_sections WHERE id = ${sectionId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1`;
+      const parsed = coerceJsonb<CanvasDocument | null>(sec?.content, null);
+      const node = (parsed ? docNodes(parsed) : []).find((n) => (n as { id?: string }).id === body.nodeId);
+      if (node) nodeCanvas = [node];
+    } catch (e) {
+      console.error('[atomize-node] section content read failed (atomizing text only)', e);
+    }
+
     // ---------- Create an atom from the accepted node ----------
     // Node-level accept crystallizes ONE primitive atom in the canonical library
     // (library_atoms), tagged so it is immediately selectable for the next mold.
@@ -116,6 +133,7 @@ export async function POST(
           grain: 'primitive',
           title: body.heading ?? null,
           content: body.text,
+          canvasNodes: nodeCanvas,
           source: 'harvest',
           creatorKind: 'collaborator',
           status: 'approved',

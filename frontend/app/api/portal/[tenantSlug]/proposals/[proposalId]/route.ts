@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 
@@ -55,6 +56,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
     enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
+
+    // CAP-3: verifyTenantAccess ignores membership.scope, so a proposal-scoped tenant_user could read
+    // this proposal's detail + section list + supporting-doc metadata. Gate on resolveUserAccess.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
 
     // ── Load proposal with opportunity context ──────────────────────
     let proposal: {

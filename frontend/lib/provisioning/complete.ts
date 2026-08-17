@@ -31,11 +31,18 @@ export async function completeBuildOut(
 ): Promise<CompleteBuildOutResult> {
   const readiness = await getBuildReadiness(solId);
 
-  // The deliberate "done" flag (idempotent).
-  await sqlBypass`
-    UPDATE curated_solicitations
-    SET build_complete = true, build_completed_at = now(), build_completed_by = ${actor.id}::uuid
-    WHERE id = ${solId}::uuid`;
+  // The deliberate "done" flag (idempotent). Best-effort: a schema-drifted deploy (mig 182 not yet
+  // applied → column absent) must NOT 500 the whole two-outcome release before outcome 2 (provisioning
+  // the buyer's private portal) — the two outcomes are independent, and getBuildReadiness already
+  // degrades gracefully when the column is missing.
+  try {
+    await sqlBypass`
+      UPDATE curated_solicitations
+      SET build_complete = true, build_completed_at = now(), build_completed_by = ${actor.id}::uuid
+      WHERE id = ${solId}::uuid`;
+  } catch (e) {
+    console.error('[completeBuildOut] build_complete flag update failed (non-fatal; continuing to broadcast + release)', e);
+  }
 
   // Every activated opp of the solicitation — the umbrella (cs.opportunity_id) + its topics
   // (o.solicitation_id = cs.id). Re-publishing each broadcasts its refreshed card to all tenants.

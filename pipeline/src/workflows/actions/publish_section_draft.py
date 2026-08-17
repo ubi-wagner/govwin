@@ -71,7 +71,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     # be safe to fill (untouched or prior auto-draft). One row, one lock.
     row = await conn.fetchrow(
         """
-        SELECT id, status, version
+        SELECT id, status, version, content_source
         FROM proposal_sections
         WHERE id = $1::uuid AND proposal_id = $2::uuid
         FOR UPDATE
@@ -86,6 +86,15 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
         log.info("publish_section_draft: section %s is '%s' (human-owned) — leaving it alone",
                  section_id, row["status"])
         return {"published": False, "skipped": True, "reason": f"status_{row['status']}"}
+    # AUTHORITATIVE anti-clobber guard: a released-UNLOCKED build lets the customer edit an
+    # 'ai_drafted' section immediately; a plain content save leaves status='ai_drafted' but stamps
+    # content_source='human_edit'. Status alone would still admit it into the landable set and this
+    # action would overwrite the human's work (unrecoverably — the prior human content isn't archived
+    # here). Refuse the moment a human has touched it, regardless of status. (The save route also
+    # advances such a section to 'in_progress'; this is the belt to that suspenders.)
+    if row["content_source"] == "human_edit":
+        log.info("publish_section_draft: section %s carries a human edit (content_source=human_edit) — leaving it alone", section_id)
+        return {"published": False, "skipped": True, "reason": "human_edited"}
 
     # canvas_versions.content is jsonb NOT NULL. A str must be valid JSON text; a bare
     # plain-text string would fail the jsonb bind (invalid input syntax for type json).
@@ -99,6 +108,11 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     else:
         content_json = json.dumps(content)
     new_version = int(row["version"] or 0) + 1
+    # Advance the LIVE version pointer PAST the snapshot so proposal_sections.version stays STRICTLY
+    # greater than MAX(canvas_versions.version_number) — the same invariant the human save/lock/advance
+    # paths hold. Numbering the snapshot at the advanced version (the old behaviour) let a later human
+    # save's archive collide on the slot (ON CONFLICT DO NOTHING drops it + keeps the ai_strawman label).
+    live_version = new_version + 1
     char_count, word_count = _counts(content)
     # canvas_versions.source is a constrained enum; map the logical source label
     # (strawman/ai/tool) onto it. The label is preserved in edit_summary + the event.
@@ -111,7 +125,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
             SET content = $2, status = 'ai_drafted', version = $3, updated_at = now()
             WHERE id = $1::uuid
             """,
-            row["id"], content_json, new_version,
+            row["id"], content_json, live_version,
         )
         await conn.execute(
             """
@@ -136,12 +150,12 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
             payload={
                 "proposalId": str(proposal_id),
                 "sectionId": str(section_id),
-                "version": new_version,
+                "version": live_version,  # the section's CURRENT version (snapshot lives at new_version)
                 "source": source,
             },
         )
     except Exception as e:
         log.warning("publish_section_draft: event emit failed (non-fatal): %s", e)
 
-    log.info("publish_section_draft: landed v%d into section %s (source=%s)", new_version, section_id, source)
-    return {"published": True, "section_id": str(section_id), "version": new_version, "source": source}
+    log.info("publish_section_draft: landed v%d into section %s (source=%s)", live_version, section_id, source)
+    return {"published": True, "section_id": str(section_id), "version": live_version, "source": source}

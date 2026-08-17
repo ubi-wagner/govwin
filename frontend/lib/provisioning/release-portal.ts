@@ -80,8 +80,19 @@ export async function provisionAndReleasePortal(opts: {
     if ('error' in prov) {
       return { ok: false, error: `Could not provision the build (please retry): ${prov.error}`, code: 'PROVISION_FAILED', status: 500 };
     }
-    await linkPortalProposal(tenantId, portalId, prov.proposalId);
-    proposalId = prov.proposalId;
+    // linkPortalProposal CAS-links only while proposal_id IS NULL. If it returns false a CONCURRENT
+    // release (admin cockpit + tenant ?action=release, or a double-click) already provisioned + linked
+    // this portal — adopt the WINNER's proposal so we don't double-link / drive the wrong build. (Our
+    // just-provisioned proposal is left unlinked + inert; the release itself still CAS-guards below.)
+    const linked = await linkPortalProposal(tenantId, portalId, prov.proposalId);
+    if (linked) {
+      proposalId = prov.proposalId;
+    } else {
+      const [winner] = await withTenant(tenantId, async (tx) =>
+        tx<Array<{ proposalId: string | null }>>`
+          SELECT proposal_id AS "proposalId" FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`);
+      proposalId = winner?.proposalId ?? prov.proposalId;
+    }
   }
 
   // Build is ready + linked — NOW flip live (CAS on curation_pending). 409 if not awaiting curation.

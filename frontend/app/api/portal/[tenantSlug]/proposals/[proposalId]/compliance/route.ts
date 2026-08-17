@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
@@ -66,6 +67,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     `;
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // CAP-3: verifyTenantAccess ignores membership.scope, so a proposal-scoped tenant_user could pull
+    // this proposal's full compliance matrix. Gate on the scope-aware resolveUserAccess.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // The compliance MATRIX is the LIVE proposal_compliance_matrix: one requirement row

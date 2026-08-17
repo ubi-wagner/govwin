@@ -69,6 +69,20 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
   // Per-section CAS base version (seeded from the load; advanced on each save response).
   const versionRef = useRef<Map<string, number>>(new Map(sections.map((s) => [s.id, s.version])));
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Save-integrity refs (F2 autosave hardening — proven bug sweep):
+  //  · failedRef — sections whose LAST save failed (423 lock / declined 409 / error). Excluded from
+  //    the debounced auto-retry so a lock or a declined conflict can't storm the endpoint or re-pop
+  //    window.confirm every 1.5s; a fresh edit (or an explicit Save) re-enables the retry.
+  //  · editedDuringSaveRef — sections edited WHILE a flush was in flight; kept dirty so mid-save
+  //    keystrokes aren't dropped when the in-flight save resolves.
+  //  · dirtyRef / savingRef / flushRef — synchronous mirrors so the UNMOUNT flush (a tab switch
+  //    unmounts this surface; beforeunload does NOT fire on a React unmount) and the edit-time
+  //    gating read live values without waiting on a re-render.
+  const failedRef = useRef<Set<string>>(new Set());
+  const editedDuringSaveRef = useRef<Set<string>>(new Set());
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
+  const flushRef = useRef<null | (() => void | Promise<void>)>(null);
   // Structure-as-overlay (Phase 1): togglable dotted Sections / Atoms / Provenance layers.
   const { active: overlays, toggle: toggleOverlay } = useOverlays();
   // F3 — the two remaining overlay layers (Compliance coverage · Budget/pages), wired here off
@@ -92,9 +106,15 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
 
   const budget = useMemo(() => {
     const est = estimatePageCount(doc);
-    const max = (doc.canvas as { max_pages?: number | null } | undefined)?.max_pages ?? null;
+    // Whole-doc page budget = the SUM of each section's OWN page limit. The assembled canvas adopts only
+    // the LAST narrative section's frame, so reading doc.canvas.max_pages compared a whole-doc estimate
+    // against a single section's cap (a misleading "~N of M" read-out). null when no section caps pages.
+    const perSection = sections
+      .map((s) => (s.canvas as { max_pages?: number | null } | null | undefined)?.max_pages)
+      .filter((m): m is number => typeof m === 'number' && m > 0);
+    const max = perSection.length ? perSection.reduce((a, b) => a + b, 0) : null;
     return { est, max };
-  }, [doc]);
+  }, [doc, sections]);
   const sectionsById = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
   const anyEditable = useMemo(() => sections.some((s) => s.editable), [sections]);
   const statusOf = useMemo(() => new Map(sections.map((s) => [s.id, s.status])), [sections]);
@@ -155,7 +175,10 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
     );
     anchors.forEach((a) => io.observe(a));
     return () => io.disconnect();
-  }, [outline, doc]);
+    // `outline` (not `doc`) is the dep: the scroll anchors are the stable `sec:` boundary headings,
+    // which don't change on a content edit — only when sections are added/removed (⇒ new outline).
+    // Depending on `doc` here rebuilt the observer on every keystroke (perf churn, no correctness win).
+  }, [outline]);
 
   const scrollTo = useCallback((anchorNodeId: string, sectionId: string) => {
     setActiveSection(sectionId);
@@ -186,6 +209,8 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
       ),
     }));
     setDirty((prev) => { const next = new Set(prev); next.add(sec.id); return next; });
+    failedRef.current.delete(sec.id);                              // a fresh edit re-enables auto-save retry
+    if (savingRef.current) editedDuringSaveRef.current.add(sec.id); // don't let an in-flight flush clear it
   }, [editableOf]);
 
   // Build a section's OWN flat save-doc from the (edited) assembled doc — the pure inverse of the
@@ -199,6 +224,7 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
       secId,
       (sec?.canvas ?? docRef.current.canvas) as CanvasDocument['canvas'],
       (sec?.metadata ?? { title: sec?.title ?? '' }) as CanvasDocument['metadata'],
+      (sec?.sourceDoc ?? null) as CanvasDocument | null, // v2: preserve the section-layer structure
     );
   }, [sectionOf, sectionsById]);
 
@@ -241,22 +267,39 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
   }, [sectionsById, tenantSlug, proposalId, buildSaveDoc]);
 
   const flushSaves = useCallback(async () => {
-    const ids = [...dirty];
-    if (!ids.length || saving) return;
-    setSaving(true);
-    const stillDirty = new Set<string>();
+    // Only auto-flush sections that haven't already failed (a lock / declined conflict must not
+    // storm the endpoint or re-pop confirm). Manual Save clears failedRef first so an explicit
+    // save always retries.
+    const ids = [...dirty].filter((id) => !failedRef.current.has(id));
+    if (!ids.length || savingRef.current) return;
+    setSaving(true); savingRef.current = true;
+    editedDuringSaveRef.current = new Set();          // track edits that land WHILE this flush runs
+    const succeeded = new Set<string>();
     for (const id of ids) {
       const ok = await saveSection(id);
-      if (!ok) stillDirty.add(id);
+      if (ok) succeeded.add(id); else failedRef.current.add(id);
     }
-    setDirty(stillDirty);
-    setSaving(false);
-    if (stillDirty.size === 0) setSavedAt(Date.now());
-  }, [dirty, saving, saveSection]);
+    // Clear ONLY sections that saved AND weren't edited again mid-flush — otherwise keep them dirty
+    // so the just-typed keystrokes aren't dropped (they flush on the next cycle).
+    if (succeeded.size) {
+      setDirty((prev) => {
+        const next = new Set(prev);
+        for (const id of succeeded) if (!editedDuringSaveRef.current.has(id)) next.delete(id);
+        return next;
+      });
+      setSavedAt(Date.now());
+    }
+    setSaving(false); savingRef.current = false;
+  }, [dirty, saveSection]);
 
-  // Autosave: 1.5s after edits settle. Manual Save + Ctrl-S also flush.
+  // Explicit Save (button / Ctrl-S): retry even sections that previously failed — the user asked.
+  const manualFlush = useCallback(() => { failedRef.current.clear(); void flushSaves(); }, [flushSaves]);
+
+  // Autosave: 1.5s after edits settle. Manual Save + Ctrl-S also flush. Sections whose last save
+  // FAILED are excluded here (no auto-retry storm) — a fresh edit clears the flag and re-arms them.
   useEffect(() => {
-    if (dirty.size === 0) return;
+    const pending = [...dirty].filter((id) => !failedRef.current.has(id));
+    if (!pending.length) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => { void flushSaves(); }, 1500);
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
@@ -264,17 +307,24 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void flushSaves(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); manualFlush(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [flushSaves]);
+  }, [manualFlush]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => { if (dirty.size > 0) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
+
+  // Keep flushRef pointed at the latest flushSaves so the unmount cleanup calls the current one.
+  useEffect(() => { flushRef.current = flushSaves; });
+  // Flush pending saves on UNMOUNT — a workspace tab switch unmounts this surface, and beforeunload
+  // does NOT fire on a React unmount, so without this the debounced autosave would be silently
+  // dropped. The in-flight fetch survives the unmount (the page itself stays), so the edit persists.
+  useEffect(() => () => { if (dirtyRef.current.size) void flushRef.current?.(); }, []);
 
   // ── Selection verbs (F0/F2/F4) ──────────────────────────────────────
   // F4 multi-target: a selection spanning N sections atomizes EACH section's own portion into its
@@ -402,7 +452,7 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
             {dirtyCount > 0 && !saving && <span className="text-[11px] text-amber-600">{dirtyCount} unsaved</span>}
             {savedAt && dirtyCount === 0 && !saving && <span className="text-[11px] text-gray-400">All changes saved</span>}
             <button
-              onClick={() => void flushSaves()}
+              onClick={manualFlush}
               disabled={saving || dirtyCount === 0}
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
             >

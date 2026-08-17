@@ -14,7 +14,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { DOC_TYPES } from '@/lib/documents/starter';
 
@@ -46,6 +46,8 @@ export async function GET(request: Request, ctx: RouteContext) {
     if (!(await verifyTenantAccess(su.id, role, tenantId))) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS: own-tenant document_templates are RLS-forced (mig 184) — without the
+    // context the tenant's OWN saved templates return 0 rows under the prod govtech_app role.
 
     const url = new URL(request.url);
     const templateType = url.searchParams.get('templateType');
