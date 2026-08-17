@@ -1,15 +1,19 @@
 'use client';
 
 /**
- * Ingest coordination-plan panel (#12) — renders the rfp_ingest_manager's advisory plan.
+ * Ingest coordination-plan overlay (#12) — renders the rfp_ingest_manager's advisory plan.
  *
  * The "Assess readiness" button returns an immediate DETERMINISTIC snapshot; the manager's richer
- * LLM plan (agent plan · blockers · next actions) lands async in the workflow instance. This panel
- * reads it back from GET .../assessment and renders it. It self-hides until a real structured plan
- * exists, and re-fetches when `refreshKey` bumps (so it appears once the async plan lands).
- * Advisory + read-only — nothing here runs an agent or changes state.
+ * LLM plan (agent plan · blockers · next actions) lands async in the workflow instance. This reads
+ * it back from GET .../assessment and renders it through the shared `AdvisoryOverlay` — advisory
+ * agent output laid OVER the workspace in the overlay language (dotted accent, summonable,
+ * dismissible), not a card blended into the native curation furniture. Recommended agents render as
+ * `OverlayVerb` chips (the ActOnSelection language). Self-hides until a real structured plan exists,
+ * and re-fetches when `refreshKey` bumps (so it appears once the async plan lands). Advisory +
+ * read-only — nothing here runs an agent or changes state.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { AdvisoryOverlay, OverlayVerb } from '@/components/ui/advisory-overlay';
 
 interface AgentAction { agent: string; action: string; why: string; priority: number | null }
 interface Blocker { area: string; issue: string; fix: string }
@@ -23,6 +27,8 @@ interface Assessment {
   generatedAt: string | null;
   hasAny: boolean;
 }
+
+const OVERLAY_ACCENT = '#6d5ef0'; // the overlay-language indigo (matches ov-sections)
 
 const AREA_CLS: Record<string, string> = {
   shred: 'bg-amber-100 text-amber-800', extract: 'bg-cyan-100 text-cyan-800',
@@ -39,7 +45,7 @@ export function IngestPlanPanel({ solId, refreshKey = 0 }: { solId: string; refr
     try {
       const res = await fetch(`/api/admin/rfp-curation/${solId}/assessment`);
       if (res.ok) { const j = await res.json().catch(() => ({})); setData((j.data as Assessment) ?? null); }
-    } catch { /* best-effort — the panel just stays hidden */ } finally { setBusy(false); }
+    } catch { /* best-effort — the overlay just stays hidden */ } finally { setBusy(false); }
   }, [solId]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
@@ -49,26 +55,24 @@ export function IngestPlanPanel({ solId, refreshKey = 0 }: { solId: string; refr
   const pct = data.readiness != null ? Math.round(Math.max(0, Math.min(1, data.readiness)) * 100) : null;
 
   return (
-    <div className="mb-4 rounded-lg border border-indigo-200 bg-white px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-indigo-900">🤖 Ingest coordination plan</span>
-          <span className="text-[11px] text-gray-400">rfp_ingest_manager · advisory</span>
-        </div>
-        <button onClick={load} disabled={busy} className="text-xs text-indigo-600 hover:underline disabled:opacity-50">
-          {busy ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-
-      {data.summary && <p className="mt-2 text-sm text-gray-800">{data.summary}</p>}
+    <AdvisoryOverlay
+      title="Ingest coordination plan"
+      agent="rfp_ingest_manager"
+      accent={OVERLAY_ACCENT}
+      onRefresh={load}
+      busy={busy}
+      generatedAt={data.generatedAt}
+      summonLabel="Advisory: ingest plan"
+    >
+      {data.summary && <p className="text-sm text-gray-800">{data.summary}</p>}
 
       {pct != null && (
         <div className="mt-2 flex items-center gap-2">
           <span className="text-[11px] text-gray-500 w-16">Readiness</span>
           <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden max-w-xs">
-            <div className="h-full bg-indigo-500" style={{ width: `${pct}%` }} />
+            <div className="h-full" style={{ width: `${pct}%`, backgroundColor: OVERLAY_ACCENT }} />
           </div>
-          <span className="text-xs font-medium text-indigo-800 tabular-nums">{pct}%</span>
+          <span className="text-xs font-medium tabular-nums" style={{ color: OVERLAY_ACCENT }}>{pct}%</span>
         </div>
       )}
 
@@ -79,8 +83,8 @@ export function IngestPlanPanel({ solId, refreshKey = 0 }: { solId: string; refr
             {data.agentPlan.map((p, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
                 {p.priority != null && <span className="text-gray-400 tabular-nums">{p.priority}.</span>}
-                <span className="font-mono text-indigo-700">{p.agent}</span>
-                <span className="rounded bg-gray-100 px-1 text-[10px] uppercase text-gray-600">{p.action}</span>
+                <span className="font-mono" style={{ color: OVERLAY_ACCENT }}>{p.agent}</span>
+                <OverlayVerb label={p.action} accent={OVERLAY_ACCENT} title={`Recommended: ${p.action} ${p.agent}`} />
                 {p.why && <span className="text-gray-600 break-words">— {p.why}</span>}
               </li>
             ))}
@@ -111,10 +115,6 @@ export function IngestPlanPanel({ solId, refreshKey = 0 }: { solId: string; refr
           </ol>
         </div>
       )}
-
-      {data.generatedAt && (
-        <p className="mt-2 text-[11px] text-gray-400">Generated {new Date(data.generatedAt).toLocaleString()} — advisory; you decide what runs.</p>
-      )}
-    </div>
+    </AdvisoryOverlay>
   );
 }
