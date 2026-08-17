@@ -29,7 +29,62 @@ export interface AssembledProposal {
   outline: Array<{ sectionId: string; title: string; anchorNodeId: string; volumeName?: string | null }>;
 }
 
+/**
+ * Per-section save metadata for the EDITABLE fluid surface (F2). The document GET route
+ * returns one of these per section alongside the assembled `doc`; the fluid view reconstructs
+ * an edited section's flat save-doc from the assembled doc + this section's own `canvas` frame +
+ * `metadata`, then PUTs it through the per-section save route (which owns the canvas_versions
+ * CAS + lock/stage/access enforcement). `editable` mirrors resolveUserAccess.editableSections
+ * exactly, so the surface never offers an edit the API will 423.
+ */
+export interface FluidSectionMeta {
+  id: string;
+  title: string | null;
+  volumeName: string | null;
+  version: number;
+  isLocked: boolean;
+  editable: boolean;
+  status: string;
+  completedStage: string | null;
+  /** the section's OWN canvas frame (margins/format) — a reconstructed save-doc must carry it. */
+  canvas: unknown | null;
+  /** the section's OWN document metadata (title/status). */
+  metadata: unknown | null;
+}
+
 const anchorId = (sectionId: string) => `sec:${sectionId}`;
+
+/** Recover the in-section node id from an assembled id (`${sectionId}__${nodeId}`). */
+export function originalNodeId(assembledId: string, sectionId: string): string {
+  return assembledId.startsWith(`${sectionId}__`) ? assembledId.slice(sectionId.length + 2) : assembledId;
+}
+
+/**
+ * Reconstruct a SINGLE section's own flat save-doc from the (edited) assembled document — the
+ * inverse of the concatenation `assembleProposalDocument` performs. Used by the editable fluid
+ * surface (F2) to PUT one section through the per-section save route: take the assembled nodes
+ * that belong to `sectionId` (via `sectionOf`), drop the synthetic `sec:` boundary heading,
+ * un-prefix their ids back to the in-section ids, and wrap them in the section's OWN frame +
+ * metadata (NOT the assembled doc's adopted single frame). Pure + order-preserving.
+ */
+export function reconstructSectionDoc(
+  assembledDoc: CanvasDocument,
+  sectionOf: Record<string, { id: string; title: string }>,
+  sectionId: string,
+  frame: CanvasDocument['canvas'],
+  metadata: CanvasDocument['metadata'],
+): CanvasDocument {
+  const nodes = assembledDoc.nodes
+    .filter((n) => !n.id.startsWith('sec:') && sectionOf[n.id]?.id === sectionId)
+    .map((n) => ({ ...n, id: originalNodeId(n.id, sectionId) }));
+  return {
+    version: 1,
+    document_id: `section-${sectionId}`,
+    canvas: frame,
+    metadata,
+    nodes,
+  } as CanvasDocument;
+}
 
 /** Assemble a proposal's sections into one continuous, section-tagged document. */
 export function assembleProposalDocument(sections: ProposalSectionInput[]): AssembledProposal {

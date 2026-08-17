@@ -2,19 +2,29 @@
  * GET /api/portal/[tenantSlug]/proposals/[proposalId]/document
  *
  * Assemble the whole proposal into ONE continuous CanvasDocument for the fluid
- * "Document view" (fluid-canvas F1). Reads every section's canvas (ordered by
- * volume → sort_index → section_number, matching the workspace + package export)
- * and delegates to assembleProposalDocument, which concatenates them into a single
- * section-tagged document + an outline. Read-only aggregate; the per-span atomize
- * action is separately gated by the atomize-node route (per-section edit access).
+ * "Document view" (fluid-canvas F1) — now the editable one-canvas surface (F2). Reads
+ * every section's canvas (ordered by volume → sort_index → section_number, matching the
+ * workspace + package export) and delegates to assembleProposalDocument, which
+ * concatenates them into a single section-tagged document + an outline.
  *
- * Returns: { data: AssembledProposal }
+ * F2 additions: alongside the assembled `doc`, returns a per-section `sections[]` carrying
+ * everything the editable fluid surface needs to save each edit back to its OWNING section
+ * through the SAME per-section save route (no new save path): `version` (the CAS baseVersion),
+ * `isLocked`/`editable` (write gating — `editable` = resolveUserAccess.editableSections), the
+ * section's own `canvas` frame + `metadata` (so a reconstructed per-section save-doc keeps its
+ * own margins/format), plus `status`/`completedStage` for the readiness rollup. Reconstruction
+ * happens at save time on the client from the (edited) assembled doc + these frames — so the
+ * payload stays lean and the fragile canvas_versions CAS lives only in the section save route.
+ *
+ * Returns: { data: AssembledProposal & { sections: FluidSectionMeta[]; canManage: boolean } }
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { coerceJsonb } from '@/lib/jsonb';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { assembleProposalDocument, type ProposalSectionInput } from '@/lib/canvas/assemble-proposal';
 
 export async function GET(
@@ -67,13 +77,18 @@ export async function GET(
 
     // ---------- Sections (whole proposal, in reading order) ----------
     // NOTE: lib/db.ts applies a global `postgres.toCamel` column transform, so `ps.volume_name`
-    // comes back as `volumeName`. The row type + reads MUST be camelCase — snake_case here
-    // silently yields undefined (tsc can't see through the `sql<typeof rows>` assertion), which
-    // dropped every section's volume grouping from the assembled document.
-    let rows: Array<{ id: string; title: string | null; content: unknown; volumeName: string | null }> = [];
+    // comes back as `volumeName`, `ps.is_locked` as `isLocked`, `ps.completed_stage` as
+    // `completedStage`. The row type + reads MUST be camelCase — snake_case here silently yields
+    // undefined (tsc can't see through the `sql<typeof rows>` assertion), which dropped every
+    // section's volume grouping from the assembled document.
+    let rows: Array<{
+      id: string; title: string | null; content: unknown; volumeName: string | null;
+      version: number; isLocked: boolean; completedStage: string | null; status: string | null;
+    }> = [];
     try {
       rows = await sql<typeof rows>`
-        SELECT ps.id, ps.title, ps.content, ps.volume_name
+        SELECT ps.id, ps.title, ps.content, ps.volume_name,
+               ps.version, ps.is_locked, ps.completed_stage, ps.status
         FROM proposal_sections ps
         WHERE ps.proposal_id = ${proposalId}::uuid
         ORDER BY ps.volume_number ASC NULLS LAST, ps.sort_index ASC NULLS LAST, ps.section_number ASC
@@ -91,7 +106,40 @@ export async function GET(
     }));
 
     const assembled = assembleProposalDocument(inputs);
-    return NextResponse.json({ data: assembled });
+
+    // ---------- Per-section save metadata (F2 editable surface) ----------
+    // resolveUserAccess is THE per-section write allowlist (accounts for locked proposal →
+    // empty, current-stage sections, collaborator scope). `editable` here mirrors exactly what
+    // the section save route re-enforces, so the fluid surface never offers an edit the API 423s.
+    let editableSections = new Set<string>();
+    let canManage = false;
+    try {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      editableSections = new Set(access.editableSections);
+      canManage = access.role === 'admin';
+    } catch (e) {
+      console.error('[proposal/document] access resolve failed (fluid stays read-only)', e);
+    }
+
+    const sections = rows.map((r) => {
+      // The section's OWN canvas frame + metadata (margins/format/title) — a reconstructed
+      // per-section save-doc must carry these, not the assembled doc's adopted single frame.
+      const parsed = coerceJsonb<{ canvas?: unknown; metadata?: unknown }>(r.content, {});
+      return {
+        id: r.id,
+        title: r.title,
+        volumeName: r.volumeName,
+        version: Number(r.version ?? 0),
+        isLocked: r.isLocked === true,
+        editable: editableSections.has(r.id),
+        status: r.status ?? 'empty',
+        completedStage: r.completedStage ?? null,
+        canvas: parsed.canvas ?? null,
+        metadata: parsed.metadata ?? null,
+      };
+    });
+
+    return NextResponse.json({ data: { ...assembled, sections, canManage } });
   } catch (err) {
     console.error('[proposal/document] error', err);
     return NextResponse.json({ error: 'Failed to assemble document', code: 'DB_ERROR' }, { status: 500 });
