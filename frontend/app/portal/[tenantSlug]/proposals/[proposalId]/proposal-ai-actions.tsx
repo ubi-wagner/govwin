@@ -78,13 +78,6 @@ export function ProposalAiActions({
   const [brief, setBrief] = useState<any | null>(null);
   const [researchErr, setResearchErr] = useState<string | null>(null);
 
-  // Outcome state
-  const [outcomeLoading, setOutcomeLoading] = useState(false);
-  const [selectedOutcome, setSelectedOutcome] = useState<
-    'awarded' | 'rejected' | 'withdrawn' | null
-  >(null);
-  const [outcomeNotes, setOutcomeNotes] = useState('');
-  const [outcomeRecorded, setOutcomeRecorded] = useState(false);
 
   const isAdmin = userRole === 'admin';
 
@@ -92,11 +85,6 @@ export function ProposalAiActions({
   const canDraft = isAdmin && !isLocked;
 
   // Outcome: available for admin only when the proposal is in a stage the
-  // outcome route accepts as a precondition (submitted | final). It 409s on
-  // 'archived' (outcome already recorded) and 400s on any other stage, so
-  // those must not surface the panel.
-  const canRecordOutcome =
-    isAdmin && ['submitted', 'final'].includes(stage);
 
   // AI color-team review — enqueues a color_team_reviewer task per section with content; each
   // review posts back as an `ai_review` recommendation in the section's context-box thread.
@@ -408,77 +396,8 @@ export function ProposalAiActions({
     }
   }, [researching, researchQ, tenantSlug, proposalId]);
 
-  const handleOutcome = useCallback(async () => {
-    if (!selectedOutcome || outcomeLoading) return;
-    setOutcomeLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/outcome`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            outcome: selectedOutcome,
-            notes: outcomeNotes.trim() || undefined,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Failed' }));
-        setMessage({
-          type: 'error',
-          text: err.error || 'Failed to record outcome',
-        });
-      } else {
-        const json = await res.json();
-        const atomsUpdated = json.data?.atomsUpdated ?? 0;
-        const contract = json.data?.contractStarted as { contractId: string; kickoffLaunched: boolean } | null;
-        setOutcomeRecorded(true);
-        setMessage({
-          type: 'success',
-          text:
-            `Outcome recorded as "${selectedOutcome}". ${atomsUpdated} library atom${atomsUpdated !== 1 ? 's' : ''} updated.` +
-            (contract
-              ? ` 🏆 Contract started${contract.kickoffLaunched ? ' — a kickoff task is in your queue.' : '.'}`
-              : ''),
-        });
-        router.refresh();
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setOutcomeLoading(false);
-    }
-  }, [selectedOutcome, outcomeLoading, outcomeNotes, tenantSlug, proposalId, router]);
-
   if (!isAdmin) return null;
 
-  const outcomeOptions: {
-    value: 'awarded' | 'rejected' | 'withdrawn';
-    label: string;
-    color: string;
-    activeColor: string;
-  }[] = [
-    {
-      value: 'awarded',
-      label: 'Won',
-      color: 'border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50',
-      activeColor: 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500',
-    },
-    {
-      value: 'rejected',
-      label: 'Lost',
-      color: 'border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50',
-      activeColor: 'border-red-500 bg-red-50 text-red-700 ring-1 ring-red-500',
-    },
-    {
-      value: 'withdrawn',
-      label: 'Withdrawn',
-      color: 'border-gray-200 text-gray-600 hover:border-amber-300 hover:bg-amber-50',
-      activeColor: 'border-amber-500 bg-amber-50 text-amber-700 ring-1 ring-amber-500',
-    },
-  ];
 
   return (
     <div className="space-y-5">
@@ -823,89 +742,6 @@ export function ProposalAiActions({
         )}
       </div>
 
-      {/* ── Outcome Recording ──────────────────────────────────────── */}
-      {canRecordOutcome && !outcomeRecorded && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            Record Outcome
-          </h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Record the final outcome for this proposal. This updates library
-            atom scores to improve future drafts.
-          </p>
-
-          {/* Outcome buttons */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            {outcomeOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setSelectedOutcome(opt.value)}
-                disabled={outcomeLoading}
-                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-all disabled:opacity-50 ${
-                  selectedOutcome === opt.value ? opt.activeColor : opt.color
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Notes textarea */}
-          {selectedOutcome && (
-            <div className="space-y-3">
-              <textarea
-                value={outcomeNotes}
-                onChange={(e) => setOutcomeNotes(e.target.value)}
-                placeholder="Optional notes (e.g., feedback from evaluators, reason for withdrawal)..."
-                maxLength={2000}
-                rows={3}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">
-                  {outcomeNotes.length}/2000
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedOutcome(null);
-                      setOutcomeNotes('');
-                    }}
-                    disabled={outcomeLoading}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleOutcome}
-                    disabled={outcomeLoading}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {outcomeLoading ? (
-                      <>
-                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      `Record as ${outcomeOptions.find((o) => o.value === selectedOutcome)?.label}`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Outcome already recorded confirmation */}
-      {outcomeRecorded && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-emerald-700">
-            Outcome recorded successfully. Library atom scores have been
-            updated.
-          </p>
-        </div>
-      )}
 
       {/* ── Status message ─────────────────────────────────────────── */}
       {message && (

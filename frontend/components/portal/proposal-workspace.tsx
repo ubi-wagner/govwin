@@ -15,6 +15,7 @@ import { ProposalAdminPanel } from './proposal-admin-panel';
 import { ProposalContributorView } from './proposal-contributor-view';
 import { ProposalTimeline } from './proposal-timeline';
 import { StageControl } from './stage-control';
+import { OutcomeRecorder } from './outcome-recorder';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -206,6 +207,10 @@ export function ProposalWorkspace({
         userRole={userRole}
         closeDate={closeDate}
       />
+
+      {/* Outcome recording — first-class + discoverable the moment a proposal is submitted (a win
+          starts the contract + kickoff). Self-hides unless admin + submitted/final. */}
+      <OutcomeRecorder tenantSlug={tenantSlug} proposalId={proposalId} stage={proposalStage} isAdmin={userRole === 'admin'} />
 
       {/* Workspace-level tab bar */}
       <div className="flex gap-0 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
