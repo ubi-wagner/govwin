@@ -114,6 +114,22 @@ resolve to the gated `GET/PUT /api/storage/local/<key>` route — so uploads, bo
 and export image-inlining all work end-to-end. Prod (no flag) is unchanged (real R2). Verify with
 `frontend/scripts/verify-local-storage.mts` (driver) + `verify-storage-server.mts` (upload→serve).
 
+**⚠️ The sandbox now serves as `govtech_app` — RLS is ENFORCED here (2026-08-17).** `sandbox-heartbeat.sh`
+used to hand the server the **superuser** `govtech` connection, which bypasses every RLS policy — so the
+whole missing-`enterTenant` bug class was INVISIBLE to `tsc`, `vitest`, and live drives, and only appeared
+in production as 0 rows / 404 / RLS-violation. It now passes `DATABASE_URL=govtech_app` (NOBYPASSRLS) +
+`DATABASE_URL_OWNER=govtech` (for `sqlBypass`), matching prod exactly per CLAUDE.md. Set `RLS_FAITHFUL=0`
+to fall back to the old superuser behaviour. **Consequence: a route that forgets `enterTenant(tenantId)`
+in its OWN handler frame now fails HERE, which is the point.** To check a table by hand:
+`PGPASSWORD=changeme psql -U govtech_app -d govtech_intel -c "SET app.tenant_id='<uuid>'; SELECT …"` —
+with no `SET`, every RLS-gated table correctly returns 0 rows.
+
+**Login rate limit while drive-testing:** `middleware.ts` caps `/api/auth/*` at **20 requests / 15 min
+per IP** (in-process Map). A multi-actor script burns that fast and then every later login returns
+`RATE_LIMITED` — which reads exactly like a broken password. Pace the logins, reuse cookie jars, or
+restart the server process to clear it (kill by PID: the heartbeat launches a bare `node server.js`,
+so `pkill -f standalone/server.js` does NOT match it).
+
 **Verified demo accounts:** `kate.ulepic@foundation3dp.com` / `DemoPass123!` (Foundation tenant_admin) ·
 `eric@rfppipeline.com` / `RFPAdmin2026!` (rfp_admin). Foundation TVSF proposal `c3db60b1-…` (submitted/locked;
 `scripts/rebuild-tvsf.mjs` restores it to canonical — run with `NODE_PATH=frontend/node_modules`).
