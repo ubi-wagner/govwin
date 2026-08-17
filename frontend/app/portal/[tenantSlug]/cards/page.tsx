@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
+import { isRole, type Role } from '@/lib/rbac';
 import PipelineCards from '@/components/portal/pipeline-cards';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +17,8 @@ export default async function CardsPage({ params }: { params: Promise<{ tenantSl
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');
   if (!(await verifyTenantAccess(su.id, role, tenant.id as string))) redirect('/portal');
-  // BD surface — delegated authority, tenant_admin only (matches the cockpit + nav).
-  if (!hasRoleAtLeast(role, 'tenant_admin')) redirect(`/portal/${tenantSlug}/proposals`);
+  // BD surface — tenant_admin OR a delegated bucket designee (mig 181 can_manage_buckets).
+  if (!(await canManageBuckets(su.id, role, tenant.id as string))) redirect(`/portal/${tenantSlug}/proposals`);
 
   return (
     <div>

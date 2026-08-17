@@ -829,3 +829,14 @@ export async function POST(request: Request, ctx: RouteContext) {
     );
   }
 }
+
+/**
+ * GET — identical to POST. The in-workspace "Download DOCX/PDF/ZIP/JSON" controls
+ * (stage-control.tsx) are plain `<a href=…/package?format=X>` anchors, i.e. a browser
+ * GET — so the export MUST answer GET, not only the fetch-based POST callers, or the
+ * download links 405. `format` comes from the query string and the handler reads no
+ * request body, so GET delegates to POST verbatim (same auth, same audit events).
+ */
+export async function GET(request: Request, ctx: RouteContext) {
+  return POST(request, ctx);
+}

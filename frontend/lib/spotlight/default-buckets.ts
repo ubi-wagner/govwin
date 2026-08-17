@@ -1,8 +1,8 @@
 /**
  * Default spotlight buckets (#104).
  *
- * A new tenant had ZERO spotlight buckets, so `autoScoreCard` had nothing to score
- * against and every fanned card ranked null — the Opportunity Pipeline never
+ * A new tenant had ZERO spotlight buckets, so the scorer (rankBucket / rescore) had nothing to
+ * score against and every fanned card ranked null — the Opportunity Pipeline never
  * ordered itself. This seeds a sound STARTER set of theme + program buckets on
  * tenant creation (idempotent) so cards rank the moment they arrive; the tenant
  * then customizes from there.

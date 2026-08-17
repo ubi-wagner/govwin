@@ -558,7 +558,7 @@ export default function AdminFileManager() {
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b">

@@ -1,6 +1,8 @@
+import { Fragment } from 'react';
 import { AdminNavLink } from '@/components/admin/admin-nav-link';
 import { AdminNavProvider } from '@/components/admin/admin-nav-context';
 import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
+import { ADMIN_NAV } from '@/components/admin/admin-nav-data';
 import { NavShell } from '@/components/ui/nav-shell';
 
 export const metadata = { title: 'Admin' };
@@ -10,58 +12,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AdminNavProvider>
     <NavShell
       brand="RFP Admin"
-      mainClassName="flex-1 min-w-0 p-8 bg-gray-50 min-h-screen"
+      mainClassName="flex-1 min-w-0 overflow-x-clip p-4 sm:p-8 bg-gray-50 min-h-screen"
       rail={<>
         <AdminNavLink href="/admin/dashboard">
           <span className="text-lg font-bold">RFP Admin</span>
         </AdminNavLink>
 
+        {/* Rendered from ADMIN_NAV — the single source shared with the breadcrumb (admin-nav-data.ts).
+            A grouped item (children) shows its primary link with the secondaries indented beneath it. */}
         <nav className="flex flex-col gap-1 text-sm flex-1 mt-4">
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-2 mb-1">Overview</span>
-          <AdminNavLink href="/admin/dashboard">Dashboard</AdminNavLink>
-          <AdminNavLink href="/portal/rfp-pipeline/dashboard">Our Workspace</AdminNavLink>
-
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Opportunities</span>
-          <AdminNavLink href="/admin/intake">Intake</AdminNavLink>
-          <AdminNavLink href="/admin/rfp-curation">RFP Curation</AdminNavLink>
-          <AdminNavLink href="/admin/cards">Opportunity Cards</AdminNavLink>
-          <AdminNavLink href="/admin/opportunities">Opportunity Rollup</AdminNavLink>
-          <AdminNavLink href="/admin/sources">Sources</AdminNavLink>
-          <AdminNavLink href="/admin/scouts">Scout Monitor</AdminNavLink>
-          <AdminNavLink href="/admin/pipeline">Pipeline Jobs</AdminNavLink>
-          <AdminNavLink href="/admin/templates">Templates</AdminNavLink>
-          <AdminNavLink href="/admin/template-stable">Template Stable</AdminNavLink>
-          <AdminNavLink href="/admin/guardrail-defaults">Guardrail Defaults</AdminNavLink>
-
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Customers</span>
-          <AdminNavLink href="/admin/applications">Applications</AdminNavLink>
-          <AdminNavLink href="/admin/tenants">Tenants</AdminNavLink>
-          <AdminNavLink href="/admin/billing">Billing</AdminNavLink>
-          <AdminNavLink href="/admin/waitlist">Waitlist</AdminNavLink>
-          <AdminNavLink href="/admin/purchases">Purchases</AdminNavLink>
-          <AdminNavLink href="/admin/proposals">Proposals</AdminNavLink>
-          <AdminNavLink href="/admin/expert-time">Expert Time</AdminNavLink>
-
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
-          <AdminNavLink href="/admin/site">Site Content</AdminNavLink>
-          <AdminNavLink href="/admin/documents">Document Builder</AdminNavLink>
-          <AdminNavLink href="/admin/storage">S3 Storage</AdminNavLink>
-
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">System</span>
-          <AdminNavLink href="/admin/architecture">Architecture</AdminNavLink>
-          <AdminNavLink href="/admin/system-state">System State</AdminNavLink>
-          <AdminNavLink href="/admin/events">Event Stream</AdminNavLink>
-          <AdminNavLink href="/admin/agents">Agents</AdminNavLink>
-          <AdminNavLink href="/admin/automation">Automation</AdminNavLink>
-          <AdminNavLink href="/admin/automation-framework">Automation Framework</AdminNavLink>
-          <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
-          <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
-          <AdminNavLink href="/admin/processes">Process Ledger</AdminNavLink>
-          <AdminNavLink href="/admin/system">System Health</AdminNavLink>
-          <AdminNavLink href="/admin/analytics">Analytics</AdminNavLink>
-
-          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">CRM</span>
-          <AdminNavLink href="/admin/crm">CRM Console</AdminNavLink>
+          {ADMIN_NAV.map((section, si) => (
+            <Fragment key={section.title}>
+              <span className={`text-xs text-gray-500 uppercase tracking-wider mb-1 ${si === 0 ? 'mt-2' : 'mt-4'}`}>{section.title}</span>
+              {section.items.map((item) => (
+                <Fragment key={item.href}>
+                  <AdminNavLink href={item.href}>
+                    {item.icon && <span className="mr-1">{item.icon}</span>}{item.label}
+                  </AdminNavLink>
+                  {item.children?.map((child) => (
+                    <AdminNavLink key={child.href} href={child.href}>
+                      {/* No text-color here — let AdminNavLink's active/inactive color win (an active
+                          child must render white on the blue pill, not a hardcoded gray). The smaller
+                          size + indent + rule already read it as a sub-item. */}
+                      <span className="pl-4 text-[13px] border-l border-gray-700 ml-1">{child.label}</span>
+                    </AdminNavLink>
+                  ))}
+                </Fragment>
+              ))}
+            </Fragment>
+          ))}
         </nav>
         <div className="text-xs text-gray-600 mt-4">
           <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>

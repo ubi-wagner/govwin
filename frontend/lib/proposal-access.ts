@@ -8,6 +8,7 @@
  */
 
 import { sql } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export interface UserAccess {
   role: 'admin' | 'contributor' | 'external';
@@ -83,8 +84,8 @@ export async function resolveUserAccess(
   // full proposal access (edit current-stage sections, comment/view all,
   // upload, export). Team management + stage advance stay admin-only so the UI
   // never offers a tenant_user an action the API will 403.
-  const [membership] = await sql<{ role: string }[]>`
-    SELECT role FROM user_memberships
+  const [membership] = await sql<{ role: string; scope: unknown }[]>`
+    SELECT role, scope FROM user_memberships
     WHERE user_id = ${userId}::uuid AND tenant_id = ${tenantId}::uuid
       AND status = 'active' AND role IN ('tenant_admin', 'tenant_user')
     LIMIT 1
@@ -95,7 +96,16 @@ export async function resolveUserAccess(
   // team member (membership revoked, users row untouched) keep edit/export permissions here, the
   // second gate the section-save route reads (identity-audit HIGH: offboarding bypass).
   const isTenantAdmin = isPlatformAdmin || membership?.role === 'tenant_admin';
-  const isTenantWide = isTenantAdmin || membership?.role === 'tenant_user';
+  // Per-proposal scoping (CAP-3): a tenant_user whose membership.scope marks them proposalScoped is
+  // NOT tenant-wide — they get contributor access ONLY to the proposals listed in scope.proposals.
+  // Default (scope {}) → tenant-wide, so existing internal users are unaffected. RESTRICTING only.
+  const scopeObj = coerceJsonb<{ proposalScoped?: boolean; proposals?: unknown }>(membership?.scope, {});
+  const proposalScoped = membership?.role === 'tenant_user' && scopeObj.proposalScoped === true;
+  const grantedProposals = proposalScoped && Array.isArray(scopeObj.proposals)
+    ? (scopeObj.proposals as unknown[]).filter((p): p is string => typeof p === 'string')
+    : [];
+  const tenantUserWide = membership?.role === 'tenant_user' && (!proposalScoped || grantedProposals.includes(proposalId));
+  const isTenantWide = isTenantAdmin || tenantUserWide;
 
   if (isTenantWide) {
     // Full access to all sections; edit is restricted to current-stage sections.

@@ -642,6 +642,16 @@ TEMPLATES.update({
         <p>A solicitation was pushed with new topics for matched tenants.</p>
         <p><strong>Solicitation:</strong> {_e(str(p.get('solicitationId') or p.get('title') or 'see Spotlight'))}</p>
     '''),
+    # RANK-9 pre-purchase start nudge: a high-fit opportunity is closing soon and the customer hasn't
+    # started a proposal. Generic urgency + a CTA into their pipeline (multi-tenant: one render, sent per
+    # tenant, gated by notify_on_new_priority_opp).
+    'start_nudge': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">A high-fit opportunity is closing soon</h2>
+        <p>One or more opportunities that score well against your spotlight buckets are approaching their
+        close date, and you haven't started a proposal yet. There's still time — starting now gives you
+        the runway to put together a strong submission.</p>
+        {_button('Review your pipeline', '/portal')}
+    '''),
     'source_scout_changes': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Source Scout detected changes</h2>
         <p>Source Scout found changes on a monitored source and created draft solicitations for review.</p>

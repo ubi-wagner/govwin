@@ -122,210 +122,6 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
 };
 
-// ── Paste Topics Modal ──────────────────────────────────────────────
-
-interface PasteModalProps {
-  profileId: string;
-  sourceName: string;
-  onClose: () => void;
-  onImported: () => void;
-}
-
-function PasteTopicsModal({ profileId, sourceName, onClose, onImported }: PasteModalProps) {
-  const [raw, setRaw] = useState('');
-  const [parsed, setParsed] = useState<string[][] | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [importing, setImporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<string | null>(null);
-
-  const detectAndParse = useCallback(() => {
-    setError(null);
-    setParsed(null);
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      setError('Please paste some data first.');
-      return;
-    }
-
-    const lines = trimmed.split('\n').filter((l) => l.trim());
-    if (lines.length < 2) {
-      setError('Need at least a header row and one data row.');
-      return;
-    }
-
-    // Detect delimiter: tab > pipe > comma
-    let delimiter = '\t';
-    const firstLine = lines[0];
-    if (firstLine.includes('\t')) {
-      delimiter = '\t';
-    } else if (firstLine.includes('|')) {
-      delimiter = '|';
-    } else if (firstLine.includes(',')) {
-      delimiter = ',';
-    }
-
-    const rows = lines.map((line) =>
-      line.split(delimiter).map((cell) => cell.trim()),
-    );
-
-    const headerRow = rows[0];
-    const dataRows = rows.slice(1);
-
-    setHeaders(headerRow);
-    setParsed(dataRows);
-  }, [raw]);
-
-  const handleImport = useCallback(async () => {
-    if (!parsed || parsed.length === 0) return;
-    setImporting(true);
-    setError(null);
-
-    try {
-      // Log the paste event
-      await fetch(`/api/admin/sources/${profileId}/visit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'paste_topics',
-          notes: `Pasted ${parsed.length} rows from ${sourceName}`,
-          topicsCount: parsed.length,
-        }),
-      });
-
-      // Call the extract-topics endpoint with the raw pasted data
-      const res = await fetch('/api/admin/extract-topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawText: raw,
-          source: sourceName,
-          sourceProfileId: profileId,
-          headers,
-          rows: parsed,
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        // /api/admin/extract-topics only extracts topics from a STORED
-        // solicitation's document text (keyed by solicitationId); it does not
-        // consume pasted rows, and no raw-row ingestion backend exists yet — so
-        // a paste always 400s here. Surface an honest message instead of the
-        // route's misleading "solicitationId required".
-        // TODO(paste-topics): wire this to a real raw-topic ingestion endpoint,
-        // or retire the Paste Topics action in favour of Bulk Import.
-        throw new Error(
-          body.code === 'VALIDATION_ERROR'
-            ? 'Pasted-topic import isn’t supported yet — this endpoint extracts topics from an uploaded solicitation document, not pasted rows. Use Bulk Import or +Add Topic instead.'
-            : (body.error ?? `Import failed (HTTP ${res.status})`),
-        );
-      }
-
-      const result = await res.json();
-      const count = result.data?.topics?.length ?? parsed.length;
-      setImportResult(`Successfully imported ${count} topics from ${sourceName}.`);
-      onImported();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
-    } finally {
-      setImporting(false);
-    }
-  }, [parsed, raw, headers, profileId, sourceName, onImported]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <h2 className="text-lg font-semibold">Paste Topics</h2>
-            <p className="text-sm text-gray-500">Source: {sourceName}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
-          <textarea
-            className="w-full h-40 border rounded-lg p-3 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            placeholder="Copy a topic table from DSIP, AFWERX, or any source site and paste here. Accepts tab-separated, pipe-separated, or comma-separated data."
-            value={raw}
-            onChange={(e) => {
-              setRaw(e.target.value);
-              setParsed(null);
-              setImportResult(null);
-            }}
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={detectAndParse}
-              disabled={!raw.trim()}
-              className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Parse Preview
-            </button>
-            {parsed && parsed.length > 0 && (
-              <button
-                onClick={handleImport}
-                disabled={importing}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {importing ? 'Importing...' : `Import ${parsed.length} Topics`}
-              </button>
-            )}
-          </div>
-
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</div>
-          )}
-
-          {importResult && (
-            <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">{importResult}</div>
-          )}
-
-          {/* Preview table */}
-          {parsed && parsed.length > 0 && (
-            <div className="border rounded-lg overflow-auto max-h-64">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {headers.map((h, i) => (
-                      <th key={i} className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
-                        {h || `Col ${i + 1}`}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {parsed.slice(0, 20).map((row, ri) => (
-                    <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      {headers.map((_, ci) => (
-                        <td key={ci} className="px-3 py-1.5 text-gray-700 whitespace-nowrap max-w-xs truncate">
-                          {row[ci] ?? ''}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {parsed.length > 20 && (
-                <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t">
-                  Showing 20 of {parsed.length} rows
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Source Card ──────────────────────────────────────────────────────
 
 interface SourceCardProps {
@@ -336,7 +132,6 @@ interface SourceCardProps {
 function SourceCard({ source, onRefresh }: SourceCardProps) {
   const [showNotes, setShowNotes] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [showPasteModal, setShowPasteModal] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
@@ -457,7 +252,6 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
   const badgeColor = SITE_TYPE_COLORS[source.siteType] ?? SITE_TYPE_COLORS.custom;
 
   return (
-    <>
       <div className="bg-white rounded-lg border shadow-sm p-5 space-y-3">
         {/* Header row */}
         <div className="flex items-start justify-between gap-3">
@@ -635,20 +429,6 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
           </div>
         )}
       </div>
-
-      {/* Paste Topics Modal */}
-      {showPasteModal && (
-        <PasteTopicsModal
-          profileId={source.id}
-          sourceName={source.name}
-          onClose={() => setShowPasteModal(false)}
-          onImported={() => {
-            setShowPasteModal(false);
-            onRefresh();
-          }}
-        />
-      )}
-    </>
   );
 }
 

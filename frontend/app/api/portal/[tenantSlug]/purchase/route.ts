@@ -164,8 +164,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
           taskType: 'proposal_setup',
           taskTitle: 'Curate + release the purchased proposal workspace',
           assigneeRole: pol.assigneeRole,
-          entityType: 'opportunity',
-          entityRef: opportunityId,
+          // Reference the specific purchased PORTAL (one per purchase — many tenants buy one OPP), so
+          // the ToDo deep-links straight to that buyer's provisioning cockpit (PV-4). The process is
+          // still opp-scoped for spine roll-up; entity is only the ToDo's link/display target.
+          entityType: 'portal',
+          entityRef: result.portalId,
           nudgeDays: pol.nudgeDays,
           dueMinutes: pol.dueInMinutes,
         });

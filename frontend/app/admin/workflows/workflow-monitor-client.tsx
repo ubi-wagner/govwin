@@ -212,6 +212,8 @@ export function WorkflowMonitorClient({
   const router = useRouter();
   const [, setTick] = useState(0);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
 
@@ -382,6 +384,21 @@ export function WorkflowMonitorClient({
     });
   const filteredActive = sortList(active.filter(matches));
   const filteredRecent = sortList(recent.filter(matches));
+  const failedInView = filteredRecent.filter((w) => w.status === 'failed');
+  // Retry every failed instance currently in view — loops the existing per-instance retry route
+  // (no new endpoint). One filtered "retry all" instead of N single clicks during an outage.
+  const retryAllFailed = async () => {
+    if (failedInView.length === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    setBulkMsg(null);
+    const outcomes = await Promise.allSettled(
+      failedInView.map((w) => fetch(`/api/admin/workflows/${w.id}/retry`, { method: 'POST' }).then((r) => r.ok)),
+    );
+    const ok = outcomes.filter((o) => o.status === 'fulfilled' && o.value === true).length;
+    setBulkMsg(`Retried ${ok}/${failedInView.length} failed.`);
+    setBulkBusy(false);
+    router.refresh();
+  };
 
   return (
     <div className="space-y-6">
@@ -550,7 +567,17 @@ export function WorkflowMonitorClient({
 
       {/* ── Recent History ─────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent History ({rangeLabel}) · {filteredRecent.length} shown</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-gray-900">Recent History ({rangeLabel}) · {filteredRecent.length} shown</h2>
+          {failedInView.length > 0 && (
+            <div className="flex items-center gap-2">
+              {bulkMsg && <span className="text-xs text-gray-500">{bulkMsg}</span>}
+              <button onClick={retryAllFailed} disabled={bulkBusy} className="rounded bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                {bulkBusy ? 'Retrying…' : `Retry all failed (${failedInView.length})`}
+              </button>
+            </div>
+          )}
+        </div>
         {filteredRecent.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
             No completed workflows{recent.length > 0 ? ' match the current filters' : ` in the last ${rangeLabel}`}

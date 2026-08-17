@@ -162,15 +162,16 @@ export function UploadForm() {
         }
         throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
       }
-      // Ingest Assist — auto-build the matrix, volumes & section molds and publish
-      // the card(s) right after upload. The same materializer the Scouts feed.
-      // Best-effort: on failure, the workspace still has the manual button.
+      // Ingest Assist — auto-build the matrix, volumes & section molds FOR REVIEW right
+      // after upload. Review-gated: it does NOT publish to customers — the upload lands in
+      // your curation queue, and you release it with Push after review. Same materializer the
+      // Scouts feed. Best-effort: on failure, the workspace still has the manual button.
       const solId = json.data.solicitation_id as string;
       if (runAssist && solId) {
         setStatus('assisting');
         try {
           await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
           });
         } catch { /* non-fatal */ }
       }
@@ -434,8 +435,9 @@ export function UploadForm() {
         <span className="text-sm">
           <span className="font-medium text-indigo-800">✨ Run Ingest Assist after upload</span>
           <span className="block text-xs text-indigo-700/80">
-            Parse the solicitation and auto-build the compliance matrix, volumes &amp; section molds, then
-            publish the opportunity card(s). You&apos;ll land in the curation workspace with it ready to review.
+            Parse the solicitation and auto-build the compliance matrix, volumes &amp; section molds for
+            review. Nothing is published to customers — you&apos;ll land in the curation workspace with it
+            ready to review, and release it with Push.
           </span>
         </span>
       </label>

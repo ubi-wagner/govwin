@@ -259,8 +259,8 @@ The test pyramid above is *what* to write; this is the ordered sequence every ch
 before it is called done. Each gate must pass before the next is meaningful:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. First gate, always.
-2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**828/828** at migration
-   head 137). Run on every change, not only schema changes.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1129/1129** at migration
+   head 185). Run on every change, not only schema changes.
 3. **Migration (schema changes only)** — apply the new migration through the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner tracks
    applied files in `_migration_history`, so re-running must be a clean no-op (idempotency proof).

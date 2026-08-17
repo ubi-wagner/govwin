@@ -63,7 +63,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     enterTenant(tenantId);
 
     // ── Input ─────────────────────────────────────────────────────────
-    let body: { targetStage?: unknown; notes?: unknown; force?: boolean } = {};
+    let body: { targetStage?: unknown; notes?: unknown; force?: boolean; acknowledgeBlockers?: boolean } = {};
     try {
       body = await request.json();
     } catch {
@@ -83,6 +83,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       notes,
       targetStage: typeof body.targetStage === 'string' ? body.targetStage : undefined,
       trigger: 'manual',
+      acknowledgeBlockers: !!body.acknowledgeBlockers,
     });
 
     if (!result.ok) {

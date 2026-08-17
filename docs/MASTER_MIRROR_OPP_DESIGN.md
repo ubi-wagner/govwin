@@ -135,13 +135,16 @@ The build surface. Built **globally on the master solicitation**, then **reused 
 > ~15-minute shadow-admin library plug-and-play (§6), no 72h. The master card list + history stay
 > canonical for everyone, including RFP Pipeline itself.
 
-**⚠ future — "proposal-ready" nudge.** When the master skeleton completes, we want every *mirror*
-card for that OPP to flip to "proposal-ready" ("OPP #6 is now ready for a proposal with these
-specifics") — a legit nudge that never reveals it was built for a specific buyer. **Not built:** the
-bridge fans lifecycle versions + `pin_update_available`, but nothing emits a *skeleton-ready* signal
-to the mirror cards (skeleton build is deliberately off the bridge, `107` header). Intended shape:
-on skeleton completion emit a bridge `updated` version carrying a `proposal_ready` card flag →
-existing fan-out delivers it → nudge surfaces like `pin_update_available`.
+**✅ BUILT — "proposal-ready" broadcast (the provisioning cockpit, PV-1..6, docs/PROVISIONING_WORKSPACE_DESIGN.md).**
+When the master skeleton completes, every *mirror* card for that OPP flips to "proposal-ready" — a legit
+nudge that never reveals it was built for a specific buyer. As-built: an rfp_admin's **Complete & Release**
+(`/admin/provisioning/[portalId]`) calls `completeBuildOut(solId)` → sets `curated_solicitations.build_complete`
+(mig 182) and RE-PUBLISHES every activated opp of it as a bridge **`updated`** version → the existing fan-out
+delivers it → `buildCardSnapshot` carries `provisionReady=true` on each `tenant_opportunity_cards.card` so the
+nudge surfaces like `pin_update_available`. The completion is bracketed `finder:opportunity.build_completed`
+(start/end, carrying `cardsRefreshed` = the true reach). This is OUTCOME 1 (broadcast to the shared master);
+OUTCOME 2 (provision the buyer's private portal + kick off their workflow) is layered on the same action —
+one auditable two-outcome release. Proven live: `frontend/scripts/drive-provisioning-cockpit.mts` (23/23).
 
 ---
 
@@ -221,6 +224,10 @@ them into the tenant to act — **no customer content ever crosses to the master
 **⚠ future — auto-skip for pre-built OPPs.** Today **every** purchase opens `curation_pending`; a
 pre-built OPP just gets a fast admin release rather than an automatic skip straight to `launched`.
 Intended: if the master skeleton already exists, open the portal past curation (or auto-release).
+**As-built fast-track (PV):** the provisioning cockpit (`/admin/provisioning/[portalId]`) renders a
+`build_complete` master as "Meets the bar · Marked complete" → the admin's **Complete & Release** is
+one click, no re-authoring. Full auto-release stays deliberately gated (the owner's segregation model
+keeps a human on the release), so this remains a *fast* path, not a *skip*.
 
 ---
 
@@ -350,9 +357,11 @@ identical, tightly bound) — molds already exist → straight to step 12, no 72
 1. **Buyer/outcome ledger** on the master OPP (buyers derivable from `purchases`; no ledger, no
    win/loss). §7.
 2. **sbir.gov outcome scrape** to backfill outcomes (6–12 mo). §7.
-3. **"Proposal-ready" nudge** fanned to mirror cards on skeleton completion. §2.
+3. ~~**"Proposal-ready" nudge** fanned to mirror cards on skeleton completion.~~ **✅ BUILT (PV) — the
+   provisioning cockpit's Complete & Release broadcasts it; §2.**
 4. **T&C shadow opt-out toggle** (grant is unconditional; only post-hoc revoke). §3.
-5. **Auto-skip curation** when the skeleton is pre-built. §5.
+5. **Auto-skip curation** when the skeleton is pre-built — the cockpit gives a *fast-track* (one-click
+   release on a `build_complete` master), full auto-skip stays deliberately gated. §5.
 6. **Full V0→V1 Workplan automation** (nudges/actions to shadow + company admins; customer-executed
    target). §6.
 7. **EconDev appointed-shadow role/invite UI** (`shadow_admin_grants.source='invite'` is the hook). §3.

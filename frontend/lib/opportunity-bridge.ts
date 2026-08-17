@@ -10,10 +10,11 @@
  * Design: docs/OPPORTUNITY_CARD_LIFECYCLE_AND_BRIDGE_DESIGN_2026-07-01.md.
  */
 
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coarseStatus, isSubmissionStage, type SubmissionStage, type BridgeEventType } from '@/lib/lifecycle';
-import { emitEventSingle, systemActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, systemActor } from '@/lib/events';
+import { scoreCardForTenant } from '@/lib/bucket-ranking';
 
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
@@ -44,6 +45,9 @@ export interface OppCard {
   expertNotes: string | null;
   lifecycleStatus: string | null;
   submissionStage: SubmissionStage;
+  /** The master OPP is fully built out (mig 182 curated_solicitations.build_complete) → provision-ready.
+   *  Drives the mirror card's "ready to build" badge; refreshed to all tenants on the completion re-publish. */
+  provisionReady: boolean;
   namespace: string | null;
   builtBy: string | null;
   builtByEmail: string | null;
@@ -72,7 +76,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.lifecycle_status, o.submission_stage,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
-             cs.namespace, cs.spotlight_summary,
+             cs.namespace, cs.spotlight_summary, cs.build_complete,
              sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
              (SELECT count(*)::int FROM solicitation_volumes sv
                 WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
@@ -121,6 +125,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       expertNotes: (o.expertNotes as string) ?? null,
       lifecycleStatus: (o.lifecycleStatus as string) ?? null,
       submissionStage: isSubmissionStage(o.submissionStage) ? o.submissionStage : 'open',
+      provisionReady: o.buildComplete === true,
       namespace: (o.namespace as string) ?? null,
       builtBy: str(o.builtBy),
       builtByEmail: (o.builtByEmail as string) ?? null,
@@ -186,8 +191,10 @@ export async function publishToBridge(
   }
 }
 
-/** Upsert one tenant's denormalized card from a bridge event (tenant-scoped via RLS GUC). */
-async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
+/** Upsert one tenant's denormalized card from a bridge event (tenant-scoped via RLS GUC).
+ *  `watched` (RANK-8) = this master opp is admin-pinned for updates, so a newer version landing on an
+ *  EXISTING mirror card fans an elevated update notification to this holder (pre-purchase reach). */
+async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false): Promise<boolean> {
   // Canonical stage from the card drives the coarse lifecycle_status the feed uses.
   // Fall back to the event type / coarse lifecycleStatus for LEGACY cards whose JSON
   // predates submission_stage — otherwise a re-fanned/backfilled closed or archived
@@ -207,7 +214,12 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
   // feed. The `WHERE EXCLUDED.bridge_version > current` makes a stale apply a no-op; RETURNING
   // tells us whether the card actually advanced, so we skip the cursor bump AND the rescore
   // emit for a no-op (the mirror already holds newer state).
-  const applied = await withTenant(tenantId, async (tx) => {
+  const { applied, existedBefore } = await withTenant(tenantId, async (tx) => {
+    // Was the card already in this tenant's mirror? Distinguishes a first-sight apply (a new/backfilled
+    // holder) from a genuine UPDATE — only the latter fans a watched-opp update notification (RANK-8).
+    const [prior] = await tx<Array<{ bridgeVersion: number }>>`
+      SELECT bridge_version FROM tenant_opportunity_cards
+      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${ev.opportunityId}::uuid`;
     const rows = await tx`
       INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage)
       VALUES (${tenantId}::uuid, ${ev.opportunityId}::uuid, ${jsonParam(ev.card)}, ${ev.version}, ${lifecycle}, ${stage})
@@ -223,9 +235,9 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
       WHERE EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
       RETURNING tenant_id
     `;
-    return rows.length > 0;
+    return { applied: rows.length > 0, existedBefore: !!prior };
   });
-  if (!applied) return;
+  if (!applied) return false;
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`
@@ -250,6 +262,35 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
   } catch (emitErr) {
     console.error('[bridge] card.applied emit failed (non-fatal)', tenantId, emitErr);
   }
+  // Synchronous scoring FALLBACK (RANK-6): rank the just-applied card against all active buckets HERE,
+  // so it ranks the instant it lands even if the pipeline OnCardApplied worker is down. Idempotent with
+  // that async path (same upsert), closing the one gap provisioning + bucket-create already cover inline.
+  // Best-effort — a scoring failure must never fail the fan-out (the async rescore still re-drives it).
+  try {
+    await scoreCardForTenant(tenantId, ev.opportunityId, Date.now());
+  } catch (scoreErr) {
+    console.error('[bridge] sync score fallback failed (non-fatal)', tenantId, scoreErr);
+  }
+  // Admin pin-for-updates (RANK-8): a WATCHED master opp getting a newer version on an EXISTING mirror
+  // card is an update the holder should hear about NOW — pre-purchase (today's amendment engine only
+  // reaches opps that already have a proposal). Elevated notification the customer bell + CC surface.
+  // Best-effort; first-sight applies (existedBefore=false) are skipped so a new holder isn't "updated".
+  if (watched && existedBefore) {
+    const title = (ev.card as unknown as { title?: unknown }).title;
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'opportunity.updated',
+        actor: systemActor('bridge'),
+        tenantId,
+        payload: { tenantId, opportunityId: ev.opportunityId, version: ev.version, title: typeof title === 'string' ? title : null },
+      });
+    } catch (e) {
+      console.error('[bridge] opportunity.updated emit failed (non-fatal)', tenantId, e);
+    }
+  }
+  // Return whether THIS holder got an update notification, so the fan-out can bracket + count them (RANK-8).
+  return watched && existedBefore;
 }
 
 /** Fan a published card version out to every subscribed tenant (all-opps replication). */
@@ -261,14 +302,44 @@ export async function fanOutBridgeEvent(ev: BridgeEvent): Promise<number> {
     console.error('[bridge] fan-out tenant list failed', e);
     return 0;
   }
+  // Admin pin-for-updates (RANK-8): is this master opp watched? If so, each holder that already had the
+  // card gets an elevated update notification. opportunities is the platform catalog (RLS-off) → sqlBypass;
+  // one lookup for the whole fan-out. Best-effort — a miss just means no elevated notification this round.
+  let watched = false;
+  try {
+    const [w] = await sqlBypass<Array<{ updateWatch: boolean }>>`
+      SELECT update_watch FROM opportunities WHERE id = ${ev.opportunityId}::uuid`;
+    watched = w?.updateWatch === true;
+  } catch (e) {
+    console.error('[bridge] watch lookup failed (non-fatal)', ev.opportunityId, e);
+  }
+  // A WATCHED opp's holder fan-out is an automation PROCESS → bracket it start/end with the holder count
+  // (RANK-8). Unwatched routine pushes are not bracketed. The per-holder capture:opportunity.updated
+  // events are the fine-grained audit; this is the process-level one. Best-effort; paired start/end.
+  let notifStart = '';
+  if (watched) {
+    try {
+      notifStart = await emitEventStart({
+        namespace: 'finder', type: 'opportunity.update_fanned', actor: systemActor('bridge'),
+        tenantId: null, payload: { opportunityId: ev.opportunityId, version: ev.version },
+      });
+    } catch (e) { console.error('[bridge] update fan-out start emit failed (non-fatal)', e); }
+  }
   let applied = 0;
+  let holdersNotified = 0;
   for (const t of tenants) {
     try {
-      await applyToTenant(t.id, ev);
+      const notified = await applyToTenant(t.id, ev, watched);
       applied++;
+      if (notified) holdersNotified++;
     } catch (e) {
       console.error('[bridge] fan-out to tenant failed', t.id, e);
     }
+  }
+  if (watched && notifStart) {
+    try {
+      await emitEventEnd(notifStart, { result: { opportunityId: ev.opportunityId, holdersNotified, tenantsReached: applied } });
+    } catch (e) { console.error('[bridge] update fan-out end emit failed (non-fatal)', e); }
   }
   return applied;
 }

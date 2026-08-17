@@ -138,9 +138,9 @@ function ActorDisplay({
   const label = actorEmail ?? actorId ?? actorType ?? 'unknown';
 
   return (
-    <span className="text-xs text-gray-500">
-      <span className="mr-1">{icon}</span>
-      {label}
+    <span className="text-xs text-gray-500 min-w-0 inline-flex items-center max-w-full">
+      <span className="mr-1 shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
     </span>
   );
 }
@@ -446,8 +446,8 @@ export function ActivityStreamClient({
                       </div>
 
                       {/* Subline: namespace.type + actor */}
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-400 font-mono">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 min-w-0">
+                        <span className="text-xs text-gray-400 font-mono break-all">
                           {ev.namespace}.{ev.type}
                         </span>
                         <ActorDisplay

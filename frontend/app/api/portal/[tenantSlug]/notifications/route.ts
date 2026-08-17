@@ -43,7 +43,11 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    if (!hasRoleAtLeast(role, 'tenant_user')) {
+    // partner_user (B2/H1): a collaborator gets a bell too, but a SCOPED feed (below) — never the
+    // tenant-wide firehose. tenant_user+ keep the tenant-wide feed. Anything lower than partner_user
+    // (none today) is still refused.
+    const isPartner = role === 'partner_user';
+    if (!isPartner && !hasRoleAtLeast(role, 'tenant_user')) {
       return NextResponse.json(
         { error: 'Insufficient permissions', code: 'FORBIDDEN' },
         { status: 403 },
@@ -81,25 +85,53 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Business logic ───────────────────────────────────────────
     try {
-      const notifications = await sql<{
-        id: string;
-        type: string;
-        namespace: string;
-        phase: string;
-        payload: Record<string, unknown>;
-        createdAt: string;
-        actorType: string | null;
-      }[]>`
-        SELECT id, type, namespace, phase, payload, created_at, actor_type
-        FROM system_events
-        WHERE tenant_id = ${tenantId}::uuid
-          AND namespace IN ('proposal', 'capture', 'library', 'system')
-          AND phase IN ('single', 'end')
-          AND actor_id IS DISTINCT FROM ${sessionUser.id}
-        ORDER BY created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `;
+      // partner_user: resolve THIS user's active collaborations in the tenant so the feed can be scoped
+      // to only the proposals (+ granted sections) they're on. An empty scope ⇒ an empty feed (never the
+      // tenant-wide firehose). tenant_user+ skip this and keep the tenant-wide feed.
+      let scopeProposalIds: string[] = [];
+      let scopeSectionIds: string[] = [];
+      if (isPartner) {
+        const grants = await sql<{ proposalId: string; assignedSections: string[] | null }[]>`
+          SELECT pc.proposal_id AS "proposalId", pc.assigned_sections AS "assignedSections"
+          FROM proposal_collaborators pc
+          JOIN proposals p ON p.id = pc.proposal_id
+          WHERE pc.user_id = ${sessionUser.id}::uuid AND p.tenant_id = ${tenantId}::uuid
+            AND pc.accepted_at IS NOT NULL AND pc.revoked_at IS NULL`;
+        scopeProposalIds = grants.map((g) => g.proposalId);
+        scopeSectionIds = grants.flatMap((g) => g.assignedSections ?? []);
+        if (scopeProposalIds.length === 0) {
+          return NextResponse.json({ data: { notifications: [] } });
+        }
+      }
+
+      const notifications = isPartner
+        ? await sql<{
+            id: string; type: string; namespace: string; phase: string;
+            payload: Record<string, unknown>; createdAt: string; actorType: string | null;
+          }[]>`
+            SELECT id, type, namespace, phase, payload, created_at, actor_type
+            FROM system_events
+            WHERE tenant_id = ${tenantId}::uuid
+              AND namespace IN ('proposal', 'capture', 'library', 'system')
+              AND phase IN ('single', 'end')
+              AND actor_id IS DISTINCT FROM ${sessionUser.id}
+              -- collaborator scope: only their proposals, and (for section-tagged events) only granted sections
+              AND (payload->>'proposalId') = ANY(${scopeProposalIds})
+              AND ( (payload->>'sectionId') IS NULL OR (payload->>'sectionId') = ANY(${scopeSectionIds}) )
+            ORDER BY created_at DESC
+            LIMIT ${limit} OFFSET ${offset}`
+        : await sql<{
+            id: string; type: string; namespace: string; phase: string;
+            payload: Record<string, unknown>; createdAt: string; actorType: string | null;
+          }[]>`
+            SELECT id, type, namespace, phase, payload, created_at, actor_type
+            FROM system_events
+            WHERE tenant_id = ${tenantId}::uuid
+              AND namespace IN ('proposal', 'capture', 'library', 'system')
+              AND phase IN ('single', 'end')
+              AND actor_id IS DISTINCT FROM ${sessionUser.id}
+            ORDER BY created_at DESC
+            LIMIT ${limit} OFFSET ${offset}`;
 
       // Per-user read watermark — a notification is read iff created_at <= last_read_at.
       const [readState] = await sql<{ lastReadAt: string | Date | null }[]>`
@@ -186,7 +218,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (!role || !sessionUser.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-    if (!hasRoleAtLeast(role, 'tenant_user')) {
+    // partner_user may clear THEIR read watermark too (their feed is collaborator-scoped in GET).
+    if (role !== 'partner_user' && !hasRoleAtLeast(role, 'tenant_user')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
     const tenant = await getTenantBySlug(tenantSlug);

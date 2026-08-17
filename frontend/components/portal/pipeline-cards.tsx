@@ -37,9 +37,13 @@ function closeChip(dateStr: string | null): { label: string; cls: string } | nul
   if (d <= 14) return { label, cls: 'bg-amber-100 text-amber-700' };
   return { label, cls: 'bg-gray-100 text-gray-500' };
 }
-/** Concise AI fit level from the analyst's output.text (matches its summarize_result buckets); null when absent. */
+/** Concise AI fit level from the analyst's output text; null when absent. `invoke_agent` nests the
+ *  string at output.result.text (the queue stores the whole invoke result), so read that first and
+ *  fall back to a flat output.text — matching the analyst's summarize_result "…match" buckets. */
 function fitFromOutput(out: unknown): { label: string; cls: string; full: string } | null {
-  const text = out && typeof out === 'object' && typeof (out as { text?: unknown }).text === 'string' ? (out as { text: string }).text.trim() : '';
+  const o = out && typeof out === 'object' ? (out as { text?: unknown; result?: { text?: unknown } }) : null;
+  const raw = typeof o?.result?.text === 'string' ? o.result.text : typeof o?.text === 'string' ? o.text : '';
+  const text = raw.trim();
   if (!text) return null;
   if (/strong match/i.test(text)) return { label: 'Strong fit', cls: 'bg-emerald-100 text-emerald-700', full: text };
   if (/moderate match/i.test(text)) return { label: 'Moderate fit', cls: 'bg-blue-100 text-blue-700', full: text };
@@ -49,14 +53,23 @@ function fitFromOutput(out: unknown): { label: string; cls: string; full: string
 }
 
 type SortKey = 'pinned' | 'close' | 'agency' | 'title';
-const SORT_LABELS: Record<SortKey, string> = { pinned: 'Pinned first', close: 'Close date', agency: 'Agency', title: 'Title' };
+const SORT_LABELS: Record<SortKey, string> = { pinned: 'Best match', close: 'Close date', agency: 'Agency', title: 'Title' };
 
 const str = (c: Card, k: string) => (c.card && typeof c.card[k] === 'string' ? (c.card[k] as string) : null);
 
-/** Pinned cards always float to the top; then by the chosen key. */
-function sortCards(cards: Card[], sortBy: SortKey): Card[] {
+/** The card's score in one bucket (-1 when that bucket hasn't scored it → it sinks to the bottom). */
+const bucketScore = (c: Card, bucketId: string): number => c.rankings?.find((r) => r.bucketId === bucketId)?.score ?? -1;
+
+/**
+ * Pinned cards always float to the top; then by the chosen key. `bucket:<id>` re-ranks the ONE
+ * list by that lens' score — "rank per bucket serially by OPP, parallel across buckets" (the same
+ * card carries every bucket's score in `rankings`, so switching lens is a client re-sort, no refetch).
+ */
+function sortCards(cards: Card[], sortBy: string): Card[] {
+  const bucketId = sortBy.startsWith('bucket:') ? sortBy.slice(7) : null;
   return [...cards].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (bucketId) return bucketScore(b, bucketId) - bucketScore(a, bucketId);
     if (sortBy === 'close') {
       const da = str(a, 'closeDate'); const db = str(b, 'closeDate');
       if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
@@ -84,7 +97,8 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [includeClosed, setIncludeClosed] = useState(false);
   const [includePassed, setIncludePassed] = useState(false);
   const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
-  const [sortBy, setSortBy] = useState<SortKey>('pinned');
+  const [buckets, setBuckets] = useState<{ id: string; name: string }[]>([]);
+  const [sortBy, setSortBy] = useState<string>('pinned');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,7 +107,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       if (includeClosed) qs.set('includeClosed', 'true');
       if (includePassed) qs.set('includePassed', 'true');
       const res = await fetch(`/api/portal/${tenantSlug}/cards${qs.toString() ? `?${qs}` : ''}`);
-      if (res.ok) { setCards((await res.json()).data?.cards ?? []); setErr(null); }
+      if (res.ok) { const d = (await res.json()).data; setCards(d?.cards ?? []); setBuckets(d?.buckets ?? []); setErr(null); }
       else setErr('Could not load your opportunity cards.');
     } catch { setErr('Could not load your opportunity cards.'); } finally { setLoading(false); }
   }, [tenantSlug, includeClosed, includePassed]);
@@ -126,13 +140,15 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   }, [tenantSlug, load]);
 
   const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
+  const selectedBucketId = sortBy.startsWith('bucket:') ? sortBy.slice(7) : null;
+  const selectedBucketName = selectedBucketId ? buckets.find((b) => b.id === selectedBucketId)?.name : null;
 
   return (
     <div>
       {err && (
         <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{err}</div>
       )}
-      <div className="flex items-center gap-3 mb-4 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-4 text-sm">
         <label className="flex items-center gap-1.5 text-gray-600">
           <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} /> Include closed
         </label>
@@ -143,11 +159,16 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
         <span className="text-gray-400">· {cards.length} cards</span>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          onChange={(e) => setSortBy(e.target.value)}
           aria-label="Sort opportunities"
           className="ml-auto text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-600"
         >
           {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABELS[k]}</option>)}
+          {buckets.length > 0 && (
+            <optgroup label="Rank by bucket">
+              {buckets.map((b) => <option key={b.id} value={`bucket:${b.id}`}>Bucket: {b.name}</option>)}
+            </optgroup>
+          )}
         </select>
       </div>
 
@@ -169,6 +190,13 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
               )}
             </div>
             <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${str(c, 'programType')}` : ''}</p>
+            {selectedBucketId && (
+              <div className="mt-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white tabular-nums" title={`Score in the “${selectedBucketName}” bucket`}>
+                  {selectedBucketName}: {(() => { const s = bucketScore(c, selectedBucketId); return s < 0 ? '—' : Math.round(s); })()}
+                </span>
+              </div>
+            )}
             {(() => {
               const chip = closeChip(str(c, 'closeDate'));
               const fit = fitFromOutput(c.fitOutput);

@@ -119,6 +119,31 @@ const RESPONDERS = [
       return textMsg(req.model, JSON.stringify(arr)); // the route JSON.parses the text block directly
     },
   },
+  // section_drafter (frontend proposal.draft_section tool) — the tool sends a system prompt beginning
+  // "You are a senior government proposal writer" and JSON.parses the text block as a CanvasNode[] array
+  // ([{type, content}], no fences). Return a valid, substantive array so the draft actually LANDS in the
+  // canvas (prod's Railway key returns the live narrative here; this proves the tool → parse → save wiring).
+  {
+    name: 'section_drafter',
+    match: (req) => /senior government proposal writer/i.test(systemText(req)),
+    respond: (req) => {
+      const user = lastUserText(req);
+      const tm = user.match(/Draft the "([^"]{2,90})" section/i);
+      const title = (tm ? tm[1] : 'Section').replace(/\s+/g, ' ').trim();
+      const nodes = [
+        { type: 'heading', content: { level: 1, text: title } },
+        { type: 'text_block', content: { text: `${title} directly addresses the solicitation's stated objectives and evaluation criteria. This draft is grounded in the offeror's qualifications and prior performance, written in active voice with specific, measurable commitments.` } },
+        { type: 'heading', content: { level: 2, text: 'Approach' } },
+        { type: 'text_block', content: { text: 'The approach is phased and low-risk: each milestone carries a named owner, a concrete deliverable, and an acceptance gate. Existing capability and prior performance de-risk execution against the proposed schedule.' } },
+        { type: 'bulleted_list', content: { items: [
+          { text: 'Objective mapped directly to the published evaluation criteria', indent_level: 0 },
+          { text: 'Measurable milestone with an explicit acceptance gate', indent_level: 0 },
+          { text: 'Named owner and a dependency-aware, on-schedule plan', indent_level: 0 },
+        ] } },
+      ];
+      return textMsg(req.model, JSON.stringify(nodes)); // the tool JSON.parses this text block as CanvasNode[]
+    },
+  },
   // Generic tool-using agent: walk the WHOLE tool loop — read/query tools first, the OUTPUT tool
   // (emit_/save_/publish_/…) LAST so the agent's result actually lands — one tool per turn until every
   // tool has run, then finish with text. Id params get real uuids from the request context.

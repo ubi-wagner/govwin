@@ -70,10 +70,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     }
 
-    // Materialize the whole skeleton + publish the card(s).
+    // Materialize the whole skeleton for REVIEW. Review-gated (launch): a build does NOT publish to
+    // customers — publishing to spotlight cards happens only through the reviewed `solicitation.push`
+    // gate (summary + close_date + compliance). Default publish=false; a caller may still opt in.
     let result;
     try {
-      result = await materializeSkeleton(solId, parsed, { publish: body.publish ?? true, nowIso: new Date().toISOString() });
+      result = await materializeSkeleton(solId, parsed, { publish: body.publish ?? false, nowIso: new Date().toISOString() });
     } catch (e) {
       console.error('[ingest-assist] materialize failed', e);
       return NextResponse.json({ error: 'Failed to build the skeleton', code: 'DB_ERROR' }, { status: 500 });

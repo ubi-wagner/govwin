@@ -152,7 +152,7 @@ async def main() -> None:
     from health import run_health_server
     from lifecycle_scheduler import run_lifecycle_scheduler
 
-    # Instantiate the AgentFabric so all 10 archetypes are registered
+    # Instantiate the AgentFabric so all 36 archetypes are registered
     # and ready for invocation by the workflow processor (AI_INVOKE
     # steps) and the agent_task_queue consumer.
     fabric = None
@@ -166,10 +166,44 @@ async def main() -> None:
     except Exception as exc:
         log.error("AgentFabric initialisation failed (non-fatal): %s", exc)
 
+    # TW-8 AI-manager auto-advance poker — periodically pokes the frontend's agent-gate sweep so an
+    # AI-manager stage marked autoAdvance clears itself the moment its cohort review lands. The advance
+    # is frontend-owned (the pipeline never mutates a business table), so we call the HTTP endpoint rather
+    # than advancing here. Gated on AGENT_GATE_SWEEP_URL — inert (logs once) when unset.
+    async def run_agent_gate_sweep_poker(interval: int = 60) -> None:
+        import os
+        import httpx
+        url = os.environ.get("AGENT_GATE_SWEEP_URL")
+        if not url:
+            log.info("agent-gate auto-advance poker: AGENT_GATE_SWEEP_URL unset — inert")
+            return
+        secret = os.environ.get("CRON_SECRET", "")
+        headers = {"Authorization": f"Bearer {secret}"} if secret else {}
+        log.info("agent-gate auto-advance poker started (interval=%ds)", interval)
+        while not shutdown_event.is_set():
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    r = await client.post(url, headers=headers)
+                if r.status_code == 200:
+                    adv = (r.json().get("data") or {}).get("advanced", 0)
+                    if adv:
+                        log.info("agent-gate sweep: auto-advanced %d portal(s)", adv)
+                else:
+                    log.warning("agent-gate sweep poke HTTP %s", r.status_code)
+            except Exception as exc:  # never let the poker crash the worker
+                log.warning("agent-gate sweep poke failed (non-fatal): %s", exc)
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=interval)
+                break
+            except asyncio.TimeoutError:
+                pass
+        log.info("agent-gate auto-advance poker stopped")
+
     # Run the ingester consumer loop, workflow processor, health
     # server, lifecycle scheduler, and agent task queue consumer
     # concurrently. All manage their own resources and respect shutdown_event.
     await asyncio.gather(
+        run_agent_gate_sweep_poker(),
         run_consumer_loop(
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,

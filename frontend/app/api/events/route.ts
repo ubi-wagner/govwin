@@ -51,6 +51,13 @@ export async function GET(request: Request) {
     try {
       const isAdmin = hasRoleAtLeast(role, 'rfp_admin');
 
+      // Stage-scoped collaborators (partner_user, rank < tenant_user) don't get the
+      // raw tenant-wide event stream — mirror the canonical notification bell's
+      // tenant_user floor. Their notifications arrive scoped via /notifications.
+      if (!isAdmin && !hasRoleAtLeast(role, 'tenant_user')) {
+        return NextResponse.json({ data: { events: [] } });
+      }
+
       let events;
       if (isAdmin) {
         // Admin sees all events

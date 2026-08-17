@@ -53,7 +53,7 @@ class OnCardApplied(Workflow):
 
 
 class OnBucketsUpdated(Workflow):
-    description = "Rescore all of a tenant's open cards when they change their OPP list / buckets"
+    description = "Rescore a tenant's cards when they change their OPP list / buckets"
 
     trigger = EventTrigger(
         namespace="capture",
@@ -67,7 +67,10 @@ class OnBucketsUpdated(Workflow):
             name="rescore_all",
             step_type=StepType.ACTION,
             action="workflows.actions.rescore.rescore_tenant",
-            input_map={"tenant_id": "payload.tenantId"},
+            # bucketId is present for a single-bucket create/edit/rank (→ targeted rescore of just that
+            # lens, so editing one bucket no longer re-scores every other) and absent for the daily
+            # rescore (→ payload.bucketId resolves to None → full-tenant rescore). See rescore_tenant.
+            input_map={"tenant_id": "payload.tenantId", "bucket_id": "payload.bucketId"},
             timeout_minutes=10,
         ),
     ]

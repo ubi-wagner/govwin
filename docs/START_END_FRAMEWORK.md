@@ -1,6 +1,6 @@
 # START_END_FRAMEWORK.md — the embedded start→end spine (bridge · engine · agent-automation)
 
-**Status:** as-built, proven against the live tree at migration **129** (current head **178**; every `file:line` below was
+**Status:** as-built, proven against the live tree at migration **129** (current head **184**; every `file:line` below was
 read, not remembered). This is the canonical map of *how work starts and ends at three nested depths*,
 *every message that crosses the bridge in both directions*, and *every trigger→step→trigger chain* the
 declarative engine runs — written so a **compliance domain** can be layered on without re-deriving any of it.

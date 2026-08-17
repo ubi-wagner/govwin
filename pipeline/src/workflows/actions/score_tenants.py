@@ -9,10 +9,11 @@ WHAT:   Resolves WHICH tenants should receive the "new priority opportunity"
         digest for a just-pushed solicitation, by READING the canonical spine —
         it no longer computes or writes scores.
 
-        Scoring is owned by the frontend opportunity-bridge on push
-        (`lib/opportunity-bridge.ts::publishToBridge` → `lib/bucket-ranking.ts::
-        autoScoreCard`), which creates a `tenant_opportunity_cards` row per tenant
-        and writes per-bucket `tenant_bucket_scores` against the tenant's own
+        Scoring is event-driven, tenant-side: the bridge fan-out
+        (`lib/opportunity-bridge.ts`) writes a `tenant_opportunity_cards` row per
+        tenant and emits `capture:card.applied`, then `OnCardApplied` →
+        `rescore.py::rescore_tenant_card` writes per-bucket `tenant_bucket_scores`
+        against the tenant's own
         `tenant_spotlight_buckets` criteria — "auto-scored on arrival". By the time
         this workflow runs, those canonical scores already exist.
 

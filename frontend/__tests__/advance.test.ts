@@ -22,7 +22,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccessMock,
   emitEventStartMock, emitEventEndMock, isValidUUIDMock, requestAgentTaskMock, getNodeTextMock,
-  resolveGatePolicyMock } = vi.hoisted(() => {
+  resolveGatePolicyMock, computeReadinessMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
   const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock, json: (v) => v });
   return {
@@ -37,6 +37,7 @@ const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccess
     requestAgentTaskMock: vi.fn(),
     getNodeTextMock: vi.fn(),
     resolveGatePolicyMock: vi.fn(),
+    computeReadinessMock: vi.fn(),
   };
 });
 
@@ -61,6 +62,10 @@ vi.mock('@/lib/validation', () => ({
 }));
 
 vi.mock('@/lib/agent-client', () => ({ requestAgentTask: requestAgentTaskMock }));
+
+// The submission-readiness gate (C1) runs only on advance-to-final; mock it so the unit test
+// controls the verdict. Unset (default) → undefined → gate is skipped (existing tests unaffected).
+vi.mock('@/lib/proposal/submission-readiness', () => ({ computeSubmissionReadiness: computeReadinessMock }));
 
 // AI review on advance is now gated by resolveGatePolicy('proposal:proposal.advanced'),
 // not the retired tenant_automation_preferences read (mig 142). Mock the resolver directly.
@@ -577,6 +582,95 @@ describe('POST advance — success path', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.stage).toBe('review'); // next after 'draft'
+  });
+});
+
+describe('POST advance — submission-readiness gate (C1)', () => {
+  // A whole-proposal verdict with two hard blockers (the shape computeSubmissionReadiness returns).
+  const blockerReport = {
+    proposalId: PROPOSAL_ID, ready: false, blockerCount: 2, warningCount: 0,
+    summary: {
+      sections: { total: 3, locked: 1, drafted_unlocked: 1, empty: 1 },
+      deadline: { closeDate: null, daysRemaining: null, past: false, estimated: false },
+      requirements: { mandatory: 0, satisfied: 0, unmet: 0 },
+      documents: { required: 1, provided: 0, missing: 1 },
+      formatViolations: 0, overBudget: 0, volumes: [],
+    },
+    blockers: [
+      { category: 'empty_section', severity: 'blocker', message: '"S3" is empty — nothing drafted yet.', sectionId: 's3' },
+      { category: 'missing_document', severity: 'blocker', message: 'Required document not provided: SF424.' },
+    ],
+  };
+
+  beforeEach(() => {
+    authMock.mockReset(); sqlMock.mockReset(); sqlBeginMock.mockReset();
+    getTenantBySlugMock.mockReset(); verifyTenantAccessMock.mockReset();
+    emitEventStartMock.mockReset(); emitEventEndMock.mockReset();
+    isValidUUIDMock.mockReset(); computeReadinessMock.mockReset();
+    emitEventStartMock.mockResolvedValue('evt-start-id');
+    emitEventEndMock.mockResolvedValue(undefined);
+    authMock.mockResolvedValue(makeSession());
+    getTenantBySlugMock.mockResolvedValue(makeTenant());
+    verifyTenantAccessMock.mockResolvedValue(true);
+    isValidUUIDMock.mockReturnValue(true);
+  });
+
+  it('blocks the submission (422 NOT_READY) when advancing to final with hard blockers', async () => {
+    // review → final is the submit moment; readiness reports blockers, and the caller did NOT acknowledge.
+    sqlMock.mockResolvedValueOnce([makeProposal({ stage: 'review' })]); // proposal load
+    sqlMock.mockResolvedValueOnce([{ count: '3' }]);                    // section count
+    computeReadinessMock.mockResolvedValue(blockerReport);
+
+    const res = await POST(makeRequest({ targetStage: 'final' }), makeCtx());
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('NOT_READY');
+    expect(json.details.blockers).toHaveLength(2);
+    // The gate returns BEFORE the advance transaction — no start event, no stage change.
+    expect(emitEventStartMock).not.toHaveBeenCalled();
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+  });
+
+  it('submits anyway (200) with acknowledgeBlockers, recording the override on the advance event', async () => {
+    sqlMock.mockResolvedValueOnce([makeProposal({ stage: 'review' })]);
+    sqlMock.mockResolvedValueOnce([{ count: '1' }]);
+    computeReadinessMock.mockResolvedValue(blockerReport);
+    wireTx({ sections: [{ id: 's1', title: 'S1', version: 1, status: 'complete', content: null }] });
+    sqlMock.mockResolvedValue([]);
+
+    const res = await POST(makeRequest({ targetStage: 'final', acknowledgeBlockers: true }), makeCtx());
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.stage).toBe('submitted');
+    // The override is audited on the proposal.advanced event.
+    expect(emitEventEndMock).toHaveBeenCalledWith('evt-start-id', expect.objectContaining({
+      result: expect.objectContaining({
+        readinessOverride: expect.objectContaining({ blockerCount: 2 }),
+      }),
+    }));
+  });
+
+  it('admin force-advance bypasses the readiness gate entirely (never computes it)', async () => {
+    sqlMock.mockResolvedValueOnce([makeProposal({ stage: 'review' })]);
+    sqlMock.mockResolvedValueOnce([{ count: '1' }]);
+    // section is not locked, but force overrides both the lock gate AND the readiness gate.
+    wireTx({ sections: [{ id: 's1', title: 'S1', version: 1, status: 'in_progress', content: null }] });
+    sqlMock.mockResolvedValue([]);
+
+    const res = await POST(makeRequest({ targetStage: 'final', force: true }), makeCtx());
+    expect(res.status).toBe(200);
+    expect(computeReadinessMock).not.toHaveBeenCalled();
+  });
+
+  it('advancing to a non-final gate (review) does not invoke the readiness gate', async () => {
+    sqlMock.mockResolvedValueOnce([makeProposal({ stage: 'draft' })]); // draft → review
+    sqlMock.mockResolvedValueOnce([{ count: '2' }]);
+    wireTx();
+    sqlMock.mockResolvedValue([]);
+
+    const res = await POST(makeRequest({ targetStage: 'review' }), makeCtx());
+    expect(res.status).toBe(200);
+    expect(computeReadinessMock).not.toHaveBeenCalled();
   });
 });
 

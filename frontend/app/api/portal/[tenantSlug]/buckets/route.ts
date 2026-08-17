@@ -8,8 +8,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { rankBucket } from '@/lib/bucket-ranking';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { rankBucket, sanitizeBucketCriteria } from '@/lib/bucket-ranking';
+import { getMaxBucketsPerTenant } from '@/lib/automation/policy';
+import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -25,7 +26,7 @@ async function gate(tenantSlug: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id, email: u.email ?? null };
+  return { tenantId, userId: u.id, email: u.email ?? null, role };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -33,12 +34,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const g = await gate(tenantSlug, 'tenant_user');
     if ('error' in g) return g.error;
-    const buckets = await withTenant(g.tenantId, async (tx) =>
-      tx`SELECT id, name, description, criteria, is_active, created_at, updated_at
-         FROM tenant_spotlight_buckets WHERE tenant_id = ${g.tenantId}::uuid AND is_active
-         ORDER BY created_at DESC`,
-    );
-    return NextResponse.json({ data: { buckets } });
+    const [buckets, cap] = await Promise.all([
+      withTenant(g.tenantId, async (tx) =>
+        tx`SELECT id, name, description, criteria, is_active, created_at, updated_at
+           FROM tenant_spotlight_buckets WHERE tenant_id = ${g.tenantId}::uuid AND is_active
+           ORDER BY created_at DESC`,
+      ),
+      getMaxBucketsPerTenant(),
+    ]);
+    // cap: the platform max_buckets_per_tenant so the UI can show slots + disable Create at the limit.
+    return NextResponse.json({ data: { buckets, cap } });
   } catch (err) {
     console.error('[portal/buckets] GET error', err);
     return NextResponse.json({ error: 'Failed to load buckets', code: 'DB_ERROR' }, { status: 500 });
@@ -48,20 +53,35 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
     const { tenantSlug } = await params;
-    const g = await gate(tenantSlug, 'tenant_admin');
+    const g = await gate(tenantSlug, 'tenant_user');
     if ('error' in g) return g.error;
+    // Authoring is tenant_admin OR a delegated designee (mig 181 can_manage_buckets).
+    if (!(await canManageBuckets(g.userId, g.role, g.tenantId))) {
+      return NextResponse.json({ error: 'Bucket management not permitted', code: 'FORBIDDEN' }, { status: 403 });
+    }
     let body: { name?: string; description?: string; criteria?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     if (!body.name || typeof body.name !== 'string') {
       return NextResponse.json({ error: 'name is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    const criteria = (body.criteria && typeof body.criteria === 'object') ? body.criteria : {};
-    const [row] = await withTenant(g.tenantId, async (tx) =>
+    const criteria = sanitizeBucketCriteria(body.criteria);
+    // Cap enforcement (mig 181): the platform limits buckets/tenant (framework-hard). Guard the
+    // INSERT with an atomic count check — INSERT…SELECT…WHERE count < cap returns 0 rows when at
+    // the limit, so two concurrent creates can never both slip past (no TOCTOU race).
+    const cap = await getMaxBucketsPerTenant();
+    const rows = await withTenant(g.tenantId, async (tx) =>
       tx<Array<{ id: string }>>`
         INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, created_by)
-        VALUES (${g.tenantId}::uuid, ${body.name!}, ${body.description ?? null}, ${sql.json(criteria as Parameters<typeof sql.json>[0])}, ${g.userId}::uuid)
+        SELECT ${g.tenantId}::uuid, ${body.name!}, ${body.description ?? null},
+               ${sql.json(criteria as Parameters<typeof sql.json>[0])}, ${g.userId}::uuid
+        WHERE (SELECT count(*) FROM tenant_spotlight_buckets
+               WHERE tenant_id = ${g.tenantId}::uuid AND is_active) < ${cap}
         RETURNING id`,
     );
+    if (rows.length === 0) {
+      return NextResponse.json({ error: `You've reached the limit of ${cap} spotlight buckets. Delete one to add another.`, code: 'BUCKET_LIMIT' }, { status: 409 });
+    }
+    const row = rows[0];
     // A new bucket changes the tenant's OPP list → the pipeline OnBucketsUpdated
     // workflow deterministically rescores every open card against all active buckets
     // (tenant-side, event-driven). tenantId in the payload keys the rescore.

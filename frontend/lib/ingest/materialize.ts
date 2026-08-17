@@ -81,7 +81,13 @@ export async function materializeSkeleton(
   const topics = parsed.topics ?? [];
   if (topics.length === 0) {
     if (sol.opportunityId) {
-      await sql`UPDATE opportunities SET solicitation_id = ${solicitationId}::uuid, is_active = true, submission_stage = 'open' WHERE id = ${sol.opportunityId}::uuid`;
+      // Review-gated: a BUILD never flips the customer-visible gate. is_active/submission_stage
+      // advance to live ONLY when publish=true (the reviewed push path). A build (publish=false)
+      // leaves them staged; a re-ingest never downgrades an already-live opp (OR-preserve).
+      await sql`UPDATE opportunities SET solicitation_id = ${solicitationId}::uuid,
+                  is_active = (is_active OR ${publish}),
+                  submission_stage = CASE WHEN (is_active OR ${publish}) THEN 'open' ELSE submission_stage END
+                WHERE id = ${sol.opportunityId}::uuid`;
       if (publish) { const r = await publishAndFanOut(sol.opportunityId, 'published', null, opts.nowIso); cards += r?.tenantsApplied ? 1 : 0; }
     }
   } else {
@@ -93,12 +99,14 @@ export async function materializeSkeleton(
            open_date, close_date, pre_release_date, description, solicitation_id, is_active)
         VALUES ('ingest', ${t.code}, ${t.title}, ${t.agency ?? null}, ${t.office ?? null}, ${t.office ?? null},
                 ${sol.namespace ?? null}, ${t.programType ?? 'sbir_phase_1'}, ${t.code}, ${coercePhase(t.phaseType)},
-                ${sql.array(t.techFocusAreas ?? [])}, 'open', 'open',
+                ${sql.array(t.techFocusAreas ?? [])}, ${publish ? 'open' : 'pre_release'}, 'open',
                 ${t.openDate ?? null}, ${t.closeDate ?? null}, ${t.preReleaseDate ?? null},
-                ${t.description ?? t.summary ?? null}, ${solicitationId}::uuid, true)
+                ${t.description ?? t.summary ?? null}, ${solicitationId}::uuid, ${publish})
         ON CONFLICT (source, source_id) DO UPDATE SET
           title = EXCLUDED.title, description = EXCLUDED.description, tech_focus_areas = EXCLUDED.tech_focus_areas,
-          solicitation_id = EXCLUDED.solicitation_id, submission_stage = 'open', is_active = true, updated_at = now()
+          solicitation_id = EXCLUDED.solicitation_id,
+          submission_stage = CASE WHEN (opportunities.is_active OR ${publish}) THEN 'open' ELSE opportunities.submission_stage END,
+          is_active = (opportunities.is_active OR ${publish}), updated_at = now()
         RETURNING id`;
       if (publish) { const r = await publishAndFanOut(opp.id, 'published', null, opts.nowIso); cards += r?.tenantsApplied ? 1 : 0; }
     }

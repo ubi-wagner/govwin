@@ -6,7 +6,7 @@ scoring to the pipeline preserves behavior (the deterministic 'default of the ag
 """
 from __future__ import annotations
 
-from workflows.actions.rescore import score_card, _js_round
+from workflows.actions.rescore import score_card, _js_round, _keyword_hit
 
 
 # Fixed clock so timeline cases are deterministic.
@@ -31,6 +31,14 @@ def test_keyword_fraction():
     r = score_card({"title": "AI Radar"}, {"keywords": ["ai", "quantum"]}, NOW_MS)
     assert r["score"] == 50
     assert r["factors"] == {"keyword": 50}
+
+
+def test_keyword_precision_word_boundary_for_short_tokens():
+    # Lock-down: bare short tokens ('ai'/'ml') match only on a word boundary, not substring, so
+    # they no longer false-positive on 'email'/'html'. Longer tokens/phrases stay substring.
+    assert score_card({"title": "AI radar"}, {"keywords": ["ai"]}, NOW_MS)["score"] == 100
+    assert score_card({"title": "Email marketing"}, {"keywords": ["ai", "ml"]}, NOW_MS)["score"] == 0
+    assert score_card({"title": "concrete 3d printing"}, {"keywords": ["3d print"]}, NOW_MS)["score"] == 100
 
 
 def test_naics_and_agency_weighted_average():
@@ -65,6 +73,19 @@ def test_accessibility_gated_on_useAccessibility():
     on = score_card({"setAsideType": "8(a) set-aside"}, {"setAsides": ["8(a)"], "useAccessibility": True}, NOW_MS)
     assert on["score"] == 100
     assert on["factors"] == {"accessibility": 100}
+
+
+def test_unparseable_close_date_skips_timeline():
+    # RANK-7 parity: an invalid date skips the timeline signal (no phantom 0.1), same as the frontend.
+    r = score_card({"title": "quantum", "closeDate": "not-a-date"}, {"keywords": ["quantum"], "useTimeline": True}, NOW_MS)
+    assert r == {"score": 100, "factors": {"keyword": 100}}
+
+
+def test_short_keyword_with_whitespace_uses_substring():
+    # RANK-7 parity: a <=3-char token containing ANY whitespace (tab) takes the substring path,
+    # matching the frontend's `!/\s/.test(k)` (previously Python only special-cased a literal space).
+    assert _keyword_hit("xa\tby", "a\tb") is True
+    assert _keyword_hit("foo bar", "a\tb") is False
 
 
 def test_timeline_decay_bands():

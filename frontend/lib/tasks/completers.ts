@@ -123,16 +123,27 @@ export function taskHref(opts: {
   tenantSlug?: string | null;
   entityType: string | null;
   entityId: string | null;
+  params?: Record<string, unknown> | null;
 }): string | null {
-  const { tenantSlug, entityType, entityId } = opts;
+  const { tenantSlug, entityType, entityId, params } = opts;
   if (!entityType || !entityId) return null;
   switch (entityType) {
     case 'proposal': return tenantSlug ? `/portal/${tenantSlug}/proposals/${entityId}` : null;
+    // A section-scoped ToDo (SPINE-T1): deep-link straight to the section editor. entityId is the
+    // section id; the owning proposalId rides in params (a section URL nests under its proposal).
+    case 'section': {
+      const proposalId = params && typeof params === 'object' ? (params as { proposalId?: unknown }).proposalId : null;
+      return tenantSlug && typeof proposalId === 'string'
+        ? `/portal/${tenantSlug}/proposals/${proposalId}/sections/${entityId}` : null;
+    }
     case 'contract': return tenantSlug ? `/portal/${tenantSlug}/contracts/${entityId}` : null;
     case 'content_pages': return `/admin/site/content/${entityId}`; // resolver → Studio editor
     case 'source': return `/admin/sources/${entityId}`;
-    case 'opportunity':
-    case 'solicitation': return `/admin/rfp-curation`;
+    case 'opportunity': return `/admin/rfp-curation`; // an opp id is not a solId — land on the queue
+    case 'solicitation': return `/admin/rfp-curation/${entityId}`; // deep-link straight to the workspace
+    // A purchased portal: the TENANT's required workflow-setup page when we have their slug (TW-3),
+    // else the admin provisioning cockpit (the rfp_admin proposal_setup gate, PV-4).
+    case 'portal': return tenantSlug ? `/portal/${tenantSlug}/portals/${entityId}` : `/admin/provisioning/${entityId}`;
     default: return null;
   }
 }

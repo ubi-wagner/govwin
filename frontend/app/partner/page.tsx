@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { partnerOwnOrg, partnerScopeTenants } from '@/lib/partner/scope';
 import { tenantRollupStats, type TenantRollup } from '@/lib/partner/rollup';
+import { getPartnerStableTodos } from '@/lib/partner/todos';
 import { ensurePartnerOwnOrgProvisioned } from '@/lib/partner/own-org';
 import AddCompanyFlow from './add-company-flow';
 import PartnerGuide from './partner-guide';
@@ -80,8 +81,14 @@ export default async function PartnerConsole() {
     (a, b) => (rollup.get(b.id)?.openTodos ?? 0) - (rollup.get(a.id)?.openTodos ?? 0),
   );
   const stableTodos = stable.reduce((n, t) => n + (rollup.get(t.id)?.openTodos ?? 0), 0);
+  // #16: the actual open to-do ITEMS across the whole stable (+ own org) — not just the counts —
+  // so the manager sees WHAT needs doing and can descend straight to it. Best-effort (returns []).
+  const stableFeed = await getPartnerStableTodos(rollupIds);
   const ownTodos = ownStats?.openTodos ?? 0;
   const totalTodos = stableTodos + ownTodos;
+  // Stable-wide pipeline glance (the partner's "Opportunities" signal): live builds across the
+  // whole stable + own org, so the manager sees pipeline depth beside the to-do attention count.
+  const totalProposals = stable.reduce((n, t) => n + (rollup.get(t.id)?.proposals ?? 0), 0) + (ownStats?.proposals ?? 0);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
@@ -93,19 +100,55 @@ export default async function PartnerConsole() {
         Your organization and the companies you support. Open any company to work inside it as its
         manager, or add a new company to your stable.
       </p>
-      {/* Attention banner — the aggregate "notify up" across the whole stable. */}
-      <div className="mb-8">
+      {/* Attention banner — the aggregate "notify up" across the whole stable, with the pipeline
+          glance beside it. Opening a company descends into its Command Center (the same tabbed
+          console a tenant admin runs), where the manager acts. */}
+      <div className="mb-8 flex flex-wrap items-center gap-2">
         {totalTodos > 0 ? (
           <div className="inline-flex items-center gap-2 rounded-lg border border-award-300 bg-award-50 px-3 py-1.5 text-sm text-award-800">
             <span className="font-semibold">{totalTodos} open to-do{totalTodos === 1 ? '' : 's'}</span>
-            <span className="text-award-700">across your companies — open a company below to review &amp; complete.</span>
+            <span className="text-award-700">across your companies — open a company to review &amp; complete.</span>
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-sm text-navy-500">
             No open to-dos across your companies right now.
           </div>
         )}
+        <div className="inline-flex items-center gap-2 rounded-lg border border-navy-200 bg-white px-3 py-1.5 text-sm text-navy-600">
+          <span className="font-semibold text-navy-800">{totalProposals}</span>
+          <span>build{totalProposals === 1 ? '' : 's'} in flight across your stable</span>
+        </div>
       </div>
+
+      {/* ── Across your stable — the actual open to-do items (#16) ──────────
+             The counts above say WHERE; this says WHAT, and each row descends straight to it
+             (the manager completes inside the company — the notify-up / descend-to-complete bridge). */}
+      {stableFeed.length > 0 && (
+        <section className="mb-10 rounded-xl border border-cream-200 bg-white p-4 sm:p-5">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-navy-400 mb-2">To-dos across your stable</h2>
+          <ul className="divide-y divide-cream-100">
+            {stableFeed.slice(0, 12).map((t) => (
+              <li key={t.id}>
+                <a
+                  href={enterHref(t.companySlug, t.inPortalHref)}
+                  className="flex items-center justify-between gap-3 min-h-11 py-2 -mx-2 px-2 rounded-lg hover:bg-cream-50 transition-colors"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-navy-900 truncate">{t.title}</span>
+                    <span className="block text-xs text-navy-500 truncate">
+                      {t.companyName}{t.dueAt ? ` · due ${new Date(t.dueAt).toLocaleDateString()}` : ''}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-navy-600">Descend &rarr;</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          {stableFeed.length > 12 && (
+            <p className="mt-2 text-xs text-navy-400">+ {stableFeed.length - 12} more across your companies.</p>
+          )}
+        </section>
+      )}
 
       {/* ── Your organization ─────────────────────────────────────────── */}
       {ownOrg && (
@@ -117,7 +160,7 @@ export default async function PartnerConsole() {
               <p className="text-sm text-navy-500">Higher-order org — run your own buckets, pipeline &amp; grants here.</p>
             </div>
             {ownStats && (
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <Stat label="Buckets" value={ownStats.buckets} />
                 <Stat label="Pins" value={ownStats.pins} />
                 <Stat label="Proposals" value={ownStats.proposals} />
@@ -171,7 +214,7 @@ export default async function PartnerConsole() {
                   <p className="text-xs text-navy-500 mb-4 truncate">
                     {s?.adminPocEmail ? <>Admin: {s.adminPocName ? `${s.adminPocName} · ` : ''}{s.adminPocEmail}</> : 'No admin POC'}
                   </p>
-                  <div className="flex items-center gap-5 mb-4">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-4">
                     <Stat label="Buckets" value={s?.buckets ?? 0} />
                     <Stat label="Pins" value={s?.pins ?? 0} />
                     <Stat label="Proposals" value={s?.proposals ?? 0} />

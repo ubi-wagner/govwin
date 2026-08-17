@@ -1,11 +1,13 @@
 """
 proposal_manager — the Proposal Draft Manager's PLANNER (skeleton + matrix + atoms → a draft PLAN).
 
-GREENFIELDED (Proposal Draft Manager cohort, P1) onto the current spine, DORMANT: registered in the
-fabric and its AI_INVOKE action (tool.proposal.plan_draft) is mapped, but NO firing hook is wired yet
-(no OnFullDraftRequested workflow, no on_* edit) — it is woken later (P2) as the head of the
-orchestration workflow. handles_event returns False so the event-dispatch fallback never fires it
-either. Inert until wired.
+WOKEN (Proposal Draft Manager cohort, P1). Registered in the fabric with its AI_INVOKE action
+(tool.proposal.plan_draft) mapped, and it is the shared HEAD step of OnFullDraftRequested{ModeA,B,C}
+(on_full_draft_requested.py) AND OnReviewPhaseRequestedDraft (the Studio Draft loop) — so it fires
+whenever a full draft or a Studio Draft phase is requested (portal "Run full draft" or the /admin
+doorbell POST …/proposals/[p]/full-draft|studio). handles_event returns False BY DESIGN: it is a
+STEP-ONLY actor (no event-dispatch fallback), never fired by the fabric's archetype fallback. Proven
+live in-sandbox (agent.invoked, guardrail-gated, advisory — emits a plan, writes nothing).
 
 JOB — PLAN, do not produce. The manager reads the proposal SKELETON (proposal_sections outline), the
 COMPLIANCE MATRIX (proposal_compliance_matrix), the SOLICITATION context (opportunities /

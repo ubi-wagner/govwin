@@ -179,7 +179,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
     enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
-    let body: { notes?: unknown; force?: boolean; targetStage?: unknown } = {};
+    let body: { notes?: unknown; force?: boolean; targetStage?: unknown; acknowledgeBlockers?: boolean } = {};
     try {
       body = await request.json();
     } catch {
@@ -198,6 +198,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       notes,
       targetStage: typeof body.targetStage === 'string' ? body.targetStage : undefined,
       trigger: 'manual',
+      acknowledgeBlockers: !!body.acknowledgeBlockers,
     });
 
     if (!result.ok) {

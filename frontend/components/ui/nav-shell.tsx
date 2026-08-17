@@ -49,13 +49,17 @@ export function NavShell({
           <button
             onClick={() => setOpen(true)}
             aria-label="Open navigation"
-            className="p-1 -ml-1 text-xl leading-none hover:text-gray-300"
+            className="-ml-2 min-h-11 min-w-11 inline-flex items-center justify-center text-xl leading-none hover:text-gray-300"
           >
             ☰
           </button>
           {brand && <span className="text-sm font-semibold truncate">{brand}</span>}
         </div>
-        <main className={mainClassName ?? 'flex-1 min-w-0'}>{children}</main>
+        {/* overflow-x-clip is the systemic guard: the page body can never scroll sideways, while
+            inner overflow-x-auto scrollers (tables, tab bars) and position:sticky still work (clip
+            does not create a scroll container). Per-row wrapping handles the large overflows so this
+            only catches tiny decorative residuals. */}
+        <main className={mainClassName ?? 'flex-1 min-w-0 overflow-x-clip'}>{children}</main>
       </div>
     </div>
   );

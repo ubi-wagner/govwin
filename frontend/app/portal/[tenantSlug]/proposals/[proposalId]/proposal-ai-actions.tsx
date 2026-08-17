@@ -59,6 +59,10 @@ export function ProposalAiActions({
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [landLoading, setLandLoading] = useState(false);
   const [acceptLoading, setAcceptLoading] = useState(false);
+  // One-click "draft & stage" orchestration (#8): fire the full draft → poll to completion →
+  // auto-stage the revisions for review. Stops at staged review; Accept stays a separate click.
+  const [orchestrating, setOrchestrating] = useState(false);
+  const [orchestratePhase, setOrchestratePhase] = useState<'drafting' | 'staging' | null>(null);
   // Direct verbatim reuse of an uploaded past proposal into empty sections (W3.2).
   const [pastProposals, setPastProposals] = useState<{ id: string; name: string; sectionCount: number }[]>([]);
   const [reuseCocoonId, setReuseCocoonId] = useState('');
@@ -74,13 +78,6 @@ export function ProposalAiActions({
   const [brief, setBrief] = useState<any | null>(null);
   const [researchErr, setResearchErr] = useState<string | null>(null);
 
-  // Outcome state
-  const [outcomeLoading, setOutcomeLoading] = useState(false);
-  const [selectedOutcome, setSelectedOutcome] = useState<
-    'awarded' | 'rejected' | 'withdrawn' | null
-  >(null);
-  const [outcomeNotes, setOutcomeNotes] = useState('');
-  const [outcomeRecorded, setOutcomeRecorded] = useState(false);
 
   const isAdmin = userRole === 'admin';
 
@@ -88,11 +85,6 @@ export function ProposalAiActions({
   const canDraft = isAdmin && !isLocked;
 
   // Outcome: available for admin only when the proposal is in a stage the
-  // outcome route accepts as a precondition (submitted | final). It 409s on
-  // 'archived' (outcome already recorded) and 400s on any other stage, so
-  // those must not surface the panel.
-  const canRecordOutcome =
-    isAdmin && ['submitted', 'final'].includes(stage);
 
   // AI color-team review — enqueues a color_team_reviewer task per section with content; each
   // review posts back as an `ai_review` recommendation in the section's context-box thread.
@@ -173,6 +165,87 @@ export function ProposalAiActions({
       setFullDraftLoading(false);
     }
   }, [canDraft, fullDraftLoading, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId]);
+
+  // One-click "Draft & stage for review" (#8) — the last-mile orchestration. Fires the full draft
+  // (the same mode/voice/adversarial the manual controls use), polls the run to completion, then
+  // auto-chains the read-on-review landing so the drafts appear as PROPOSED revisions without a
+  // second manual step. Stops there — "Accept into document" stays a deliberate, separate click.
+  const handleDraftAndStage = useCallback(async () => {
+    if (!canDraft || orchestrating) return;
+    setOrchestrating(true);
+    setOrchestratePhase('drafting');
+    setFullDraftMsg(null);
+    try {
+      const useAdversarial = fullDraftMode === 'c' && adversarial;
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: fullDraftMode,
+          voice,
+          adversarial: useAdversarial,
+          ...(useAdversarial ? { adversarialPolicy } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        setFullDraftMsg({ type: 'error', text: err.error || 'Full draft request failed' });
+        setOrchestrating(false);
+        setOrchestratePhase(null);
+        return;
+      }
+
+      // Poll the run to completion (paused = HITL landing, or completed), then stage.
+      const started = Date.now();
+      const poll = async () => {
+        try {
+          const r = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`);
+          const j = await r.json().catch(() => ({}));
+          const d = j.data as { done?: boolean; failed?: boolean } | undefined;
+          if (d?.failed) {
+            setFullDraftMsg({ type: 'error', text: 'The draft run failed — see the workflow monitor. Nothing was staged.' });
+            setOrchestrating(false);
+            setOrchestratePhase(null);
+            return;
+          }
+          if (d?.done) {
+            // Auto-chain the read-on-review landing (the only consumer of agent output — human-triggered).
+            setOrchestratePhase('staging');
+            const lr = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/land-revisions`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+            });
+            const lj = await lr.json().catch(() => ({}));
+            const n = lj.data?.landed ?? 0;
+            setFullDraftMsg({
+              type: 'success',
+              text: n > 0
+                ? `Drafted & staged ${n} section${n > 1 ? 's' : ''} for review — Restore any from a section's history, then Accept into the document below when you're ready.`
+                : 'The draft run finished but staged no new revisions (already landed, or it produced none). Try "Stage AI revisions for review".',
+            });
+            router.refresh();
+            setOrchestrating(false);
+            setOrchestratePhase(null);
+            return;
+          }
+        } catch { /* transient — keep polling */ }
+        if (Date.now() - started > 240_000) {
+          setFullDraftMsg({
+            type: 'error',
+            text: 'Drafting is taking longer than expected — it keeps running in the background. Once it finishes, use "Stage AI revisions for review" to bring the drafts in.',
+          });
+          setOrchestrating(false);
+          setOrchestratePhase(null);
+          return;
+        }
+        setTimeout(poll, 5000);
+      };
+      setTimeout(poll, 5000);
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+      setOrchestrating(false);
+      setOrchestratePhase(null);
+    }
+  }, [canDraft, orchestrating, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId, router]);
 
   // Apply AI-proposed revisions — the read-on-review LANDING. The fabric never lands agent output
   // and the workflow engine forbids a pipeline consumer (docs/FULL_DRAFT_LANDING_DESIGN.md), so the
@@ -323,77 +396,8 @@ export function ProposalAiActions({
     }
   }, [researching, researchQ, tenantSlug, proposalId]);
 
-  const handleOutcome = useCallback(async () => {
-    if (!selectedOutcome || outcomeLoading) return;
-    setOutcomeLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/outcome`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            outcome: selectedOutcome,
-            notes: outcomeNotes.trim() || undefined,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Failed' }));
-        setMessage({
-          type: 'error',
-          text: err.error || 'Failed to record outcome',
-        });
-      } else {
-        const json = await res.json();
-        const atomsUpdated = json.data?.atomsUpdated ?? 0;
-        const contract = json.data?.contractStarted as { contractId: string; kickoffLaunched: boolean } | null;
-        setOutcomeRecorded(true);
-        setMessage({
-          type: 'success',
-          text:
-            `Outcome recorded as "${selectedOutcome}". ${atomsUpdated} library atom${atomsUpdated !== 1 ? 's' : ''} updated.` +
-            (contract
-              ? ` 🏆 Contract started${contract.kickoffLaunched ? ' — a kickoff task is in your queue.' : '.'}`
-              : ''),
-        });
-        router.refresh();
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setOutcomeLoading(false);
-    }
-  }, [selectedOutcome, outcomeLoading, outcomeNotes, tenantSlug, proposalId, router]);
-
   if (!isAdmin) return null;
 
-  const outcomeOptions: {
-    value: 'awarded' | 'rejected' | 'withdrawn';
-    label: string;
-    color: string;
-    activeColor: string;
-  }[] = [
-    {
-      value: 'awarded',
-      label: 'Won',
-      color: 'border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50',
-      activeColor: 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500',
-    },
-    {
-      value: 'rejected',
-      label: 'Lost',
-      color: 'border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50',
-      activeColor: 'border-red-500 bg-red-50 text-red-700 ring-1 ring-red-500',
-    },
-    {
-      value: 'withdrawn',
-      label: 'Withdrawn',
-      color: 'border-gray-200 text-gray-600 hover:border-amber-300 hover:bg-amber-50',
-      activeColor: 'border-amber-500 bg-amber-50 text-amber-700 ring-1 ring-amber-500',
-    },
-  ];
 
   return (
     <div className="space-y-5">
@@ -562,10 +566,36 @@ export function ProposalAiActions({
           </fieldset>
         )}
 
+        {/* One-click path (#8): draft the whole proposal → poll to completion → auto-stage the
+            revisions for review, in one click. Stops at staged review — Accept stays separate. */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={handleDraftAndStage}
+            disabled={!canDraft || orchestrating || fullDraftLoading || landLoading || acceptLoading}
+            title="Draft the whole proposal and stage the results as proposed revisions for your review — one click. Accepting into the document stays a separate step."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {orchestrating ? (
+              <span className="w-4 h-4 border-2 border-indigo-200 border-t-white rounded-full animate-spin" />
+            ) : (
+              <span>&#x2726;</span>
+            )}
+            {orchestrating
+              ? (orchestratePhase === 'staging' ? 'Staging for review…' : 'Drafting…')
+              : `Draft & stage for review (Mode ${fullDraftMode.toUpperCase()})`}
+          </button>
+          <p className="text-xs text-gray-400 mt-1">
+            One click: drafts every section, then stages the results as proposed revisions you can review.
+            Accepting into the document stays a separate, deliberate step.
+          </p>
+        </div>
+
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Or step through it manually:</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleFullDraft}
-            disabled={!canDraft || fullDraftLoading}
+            disabled={!canDraft || fullDraftLoading || orchestrating}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {fullDraftLoading ? (
@@ -581,7 +611,7 @@ export function ProposalAiActions({
           <button
             type="button"
             onClick={handleLandRevisions}
-            disabled={!canDraft || landLoading}
+            disabled={!canDraft || landLoading || orchestrating}
             title="Stage the latest full-draft run's AI revisions as proposed versions in each section's history (review-first)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -598,7 +628,7 @@ export function ProposalAiActions({
           <button
             type="button"
             onClick={handleAcceptAi}
-            disabled={!canDraft || acceptLoading}
+            disabled={!canDraft || acceptLoading || orchestrating}
             title="Accept the staged AI drafts into the document — writes each section's latest AI revision to live content (undoable via each section's history)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-emerald-200 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -712,89 +742,6 @@ export function ProposalAiActions({
         )}
       </div>
 
-      {/* ── Outcome Recording ──────────────────────────────────────── */}
-      {canRecordOutcome && !outcomeRecorded && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            Record Outcome
-          </h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Record the final outcome for this proposal. This updates library
-            atom scores to improve future drafts.
-          </p>
-
-          {/* Outcome buttons */}
-          <div className="flex gap-3 mb-4">
-            {outcomeOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setSelectedOutcome(opt.value)}
-                disabled={outcomeLoading}
-                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-all disabled:opacity-50 ${
-                  selectedOutcome === opt.value ? opt.activeColor : opt.color
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Notes textarea */}
-          {selectedOutcome && (
-            <div className="space-y-3">
-              <textarea
-                value={outcomeNotes}
-                onChange={(e) => setOutcomeNotes(e.target.value)}
-                placeholder="Optional notes (e.g., feedback from evaluators, reason for withdrawal)..."
-                maxLength={2000}
-                rows={3}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">
-                  {outcomeNotes.length}/2000
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedOutcome(null);
-                      setOutcomeNotes('');
-                    }}
-                    disabled={outcomeLoading}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleOutcome}
-                    disabled={outcomeLoading}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {outcomeLoading ? (
-                      <>
-                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      `Record as ${outcomeOptions.find((o) => o.value === selectedOutcome)?.label}`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Outcome already recorded confirmation */}
-      {outcomeRecorded && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-emerald-700">
-            Outcome recorded successfully. Library atom scores have been
-            updated.
-          </p>
-        </div>
-      )}
 
       {/* ── Status message ─────────────────────────────────────────── */}
       {message && (

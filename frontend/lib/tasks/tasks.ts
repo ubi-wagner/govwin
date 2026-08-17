@@ -236,11 +236,22 @@ export async function createTask(opts: {
   if (assigneeUserId) {
     let member: { id: string }[];
     try {
+      // Accept the assignee if they are an active member of this tenant by the CANONICAL membership
+      // model (user_memberships, RLS-off) — the same basis verifyTenantAccess uses — which covers
+      // cross-company COLLABORATORS (partner_user) whose home users.tenant_id is their OWN company.
+      // The legacy users.tenant_id match stays as belt-and-suspenders for normal tenant members.
+      // Without the membership branch a section ToDo could never be assigned to the partner_user
+      // actually granted edit on that section (SPINE-T1).
       member = await sql<{ id: string }[]>`
-        SELECT id FROM users
-        WHERE id = ${assigneeUserId}::uuid
-          AND is_active = true
-          AND tenant_id IS NOT DISTINCT FROM ${tenantId}::uuid
+        SELECT u.id FROM users u
+        WHERE u.id = ${assigneeUserId}::uuid AND u.is_active = true
+          AND (
+            u.tenant_id IS NOT DISTINCT FROM ${tenantId}::uuid
+            OR EXISTS (
+              SELECT 1 FROM user_memberships m
+              WHERE m.user_id = u.id AND m.tenant_id = ${tenantId}::uuid AND m.status = 'active'
+            )
+          )
       `;
     } catch (e) {
       console.error('[tasks] createTask assignee lookup failed:', e);

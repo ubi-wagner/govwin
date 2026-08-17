@@ -68,7 +68,10 @@ export default async function ActivityPage({
     redirect('/portal');
   }
 
-  if (!hasRoleAtLeast(role, 'tenant_user')) {
+  // Admin-only: the tenant activity firehose (every member's actions, invites, member-adds) is for
+  // tenant_admin+ — a tenant_user should not see it. rfp_admin/master_admin pass by rank; a descended
+  // partner-manager passes as the pinned tenant_admin. (Command Center Activity tab; COMMAND_CENTER_DESIGN.md §3.3.)
+  if (!hasRoleAtLeast(role, 'tenant_admin')) {
     redirect(`/portal/${tenantSlug}/proposals`);
   }
 

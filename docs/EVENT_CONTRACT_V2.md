@@ -1,5 +1,7 @@
 # EVENT_CONTRACT_V2.md — Complete Event System Reference
 
+> **⚠️ Historical snapshot — no longer authoritative.** This catalog is frozen at ~migration 106 (last updated 2026-07-15). The live event catalog is now the `EVENT_AUDIT_*` sweeps (latest `docs/EVENT_AUDIT_2026-08-14.md`) + `docs/EVENT_CONTRACT.md`. The body below is retained for historical reference.
+
 **Generated:** 2026-05-21
 **Source:** Actual codebase analysis of all emitEvent* calls, automation_rules seeds, and the CMS event_listener
 **Updated:** 2026-07-15 — added the purchase→curation/release + postings-lifecycle event types and the migration 106 automation rule (marked rows below). **Not superseded by EVENT_CONTRACT_V3.md:** V3 governs how work is composed/executed; this doc remains the authoritative as-built event **catalog** (what is emitted).

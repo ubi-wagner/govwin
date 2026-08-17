@@ -3,9 +3,12 @@ import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
 import { resolveGatePolicy } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
+import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
+import { createOutcomeNudge } from '@/lib/proposal/outcome-todo';
+import type { Role } from '@/lib/rbac';
 
 /**
  * Shared proposal stage-advance core.
@@ -47,6 +50,9 @@ export interface AdvanceParams {
   targetStage?: string;
   /** Tag the activity log / advance event as an automated advance. */
   trigger?: 'manual' | 'auto';
+  /** The whole-proposal readiness gate blocks submission (→final) on hard blockers; set true to
+   *  submit anyway (the UI "Submit anyway" confirm). The override is recorded on the advance event. */
+  acknowledgeBlockers?: boolean;
 }
 
 export interface AdvanceSuccess {
@@ -75,6 +81,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
     tenantId, tenantSlug, proposalId,
     actorId, actorEmail, actorRole,
     force = false, notes = null, trigger = 'manual',
+    acknowledgeBlockers = false,
   } = params;
 
   // ── Load current proposal ────────────────────────────────────────
@@ -161,6 +168,39 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   const shouldLock = targetStage === 'final';
   // When advancing to 'final' AND auto-locking, also advance to 'submitted'
   const finalStageValue = shouldLock ? 'submitted' : targetStage;
+
+  // ── Submission-readiness gate (the single "ready to submit" gate) ────────────
+  // Advancing to 'final' LOCKS + auto-advances to 'submitted' — it IS the submission moment. Roll up
+  // the whole-proposal readiness verdict (empty/unlocked sections, unmet mandatory requirements,
+  // missing required forms, over-budget volumes, a closed solicitation) and HARD-BLOCK on any blocker
+  // unless the caller explicitly acknowledges them (the UI's "Submit anyway" confirm). Warnings never
+  // block. An admin force-advance (force=true) bypasses this, exactly as it bypasses the lock/gate
+  // checks. FAIL-OPEN: a readiness-computation error must never strand a submission, so it logs and
+  // allows the advance — the gate guards against known-incomplete, not against its own failure.
+  let readinessOverride: { blockerCount: number; categories: string[] } | null = null;
+  if (shouldLock && !force) {
+    let readiness: Awaited<ReturnType<typeof computeSubmissionReadiness>> = null;
+    try {
+      readiness = await computeSubmissionReadiness(proposalId, tenantId);
+    } catch (e) {
+      console.error('[proposal-advance] readiness gate check failed (non-fatal, allowing advance):', e);
+    }
+    if (readiness && readiness.blockerCount > 0) {
+      const hardBlockers = readiness.blockers.filter((b) => b.severity === 'blocker');
+      if (!acknowledgeBlockers) {
+        return {
+          ok: false, status: 422, code: 'NOT_READY',
+          error: `Not ready to submit — ${readiness.blockerCount} blocker(s) must be resolved (or explicitly acknowledged to submit anyway).`,
+          details: { blockers: hardBlockers, summary: readiness.summary },
+        };
+      }
+      // Acknowledged → proceed, but AUDIT what was overridden (folded into the advance event below).
+      readinessOverride = {
+        blockerCount: readiness.blockerCount,
+        categories: [...new Set(hardBlockers.map((b) => b.category))],
+      };
+    }
+  }
 
   // ── Start event for stage advancement ────────────────────────────
   const startId = await emitEventStart({
@@ -390,6 +430,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       previousStage,
       targetStage,
       forced: force,
+      ...(readinessOverride ? { readinessOverride } : {}),
       forcedOpenSections,
       sectionsLocked: lockedSections,
       trigger,
@@ -399,6 +440,49 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       notes: notes ?? undefined,
     },
   });
+
+  // ── SPINE-T5: sync the portal WORKFLOW machine to the proposal BUILD machine ──────
+  // When a proposal reaches 'submitted' (its build is done), move its portal to 'closeout' so the two
+  // stage machines don't drift (a portal left in 'executing' behind a submitted proposal). One-way,
+  // status-only (no gate skip), best-effort — it never blocks the advance.
+  if (shouldLock) {
+    try {
+      const moved = await withTenant(tenantId, async (tx: any) => {
+        const r = await tx`
+          UPDATE proposal_portals SET status = 'closeout'
+          WHERE tenant_id = ${tenantId}::uuid AND proposal_id = ${proposalId}::uuid
+            AND status IN ('launched', 'executing')
+          RETURNING id`;
+        return r as Array<{ id: string }>;
+      });
+      if (moved.length > 0) {
+        await emitEventSingle({
+          namespace: 'capture', type: 'portal.stage_advanced',
+          actor: userActor(actorId), tenantId,
+          payload: { portalId: moved[0].id, proposalId, status: 'closeout', synced: 'proposal_submitted' },
+        });
+      }
+    } catch (e) {
+      console.error('[proposal-advance] portal closeout sync failed (non-fatal):', e);
+    }
+
+    // ── #13: post-submission outcome nudge ──────────────────────────
+    // A submitted proposal should eventually get a win/loss/withdrawn outcome recorded —
+    // that closes the library learning loop (winning atoms surface first) and, on a win,
+    // seeds the contract kickoff. Raise a `record_outcome` ToDo for the tenant_admin,
+    // deep-linked to the proposal, that auto-completes when the outcome route records a
+    // result. Idempotent + best-effort — never blocks the advance.
+    try {
+      await createOutcomeNudge(
+        { id: actorId, email: actorEmail, role: actorRole as Role, tenantId },
+        tenantId,
+        proposalId,
+        proposal.title,
+      );
+    } catch (e) {
+      console.error('[proposal-advance] outcome nudge failed (non-fatal):', e);
+    }
+  }
 
   // ── Activity log ────────────────────────────────────────────────
   try {

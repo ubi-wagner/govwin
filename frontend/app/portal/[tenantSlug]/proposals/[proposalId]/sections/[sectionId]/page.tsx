@@ -1,10 +1,13 @@
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
-import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
+import { isRole, isTenantWideMember, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
+import { listSectionAssignees, type SectionAssignee } from '@/lib/proposal/section-todo';
 import { resolveCanvasCapabilities, type CanvasPermission, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
+import { SectionAssignBar } from '@/components/proposal/section-assign-bar';
+import { SectionAssistBar } from '@/components/proposal/section-assist-bar';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
 import { coerceJsonb } from '@/lib/jsonb';
@@ -74,11 +77,12 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     sectionNumber: string | null;
     volumeName: string | null;
     pageAllocation: number | null;
+    assignedTo: string | null;
   }[] = [];
   try {
     sectionRows = await sql<typeof sectionRows>`
       SELECT id, title, content, status, is_locked, proposal_id, version,
-             section_number, volume_name, page_allocation
+             section_number, volume_name, page_allocation, assigned_to AS "assignedTo"
       FROM proposal_sections
       WHERE id = ${sectionId}::uuid
         AND proposal_id = ${proposalId}::uuid
@@ -109,6 +113,30 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     console.error('[portal/sections] compliance query error:', e);
   }
 
+  // ── Section assignment + its ToDo (SPINE-T1) ─────────────────────────
+  // The per-section owner strip: who owns this section (+ their edit ToDo). Admins/shadow can
+  // (re)assign from the tenant's editors + this proposal's collaborators; managers assign via the API.
+  const canAssign = hasRoleAtLeast(role, 'tenant_admin');
+  let assigneeName: string | null = null;
+  if (section.assignedTo) {
+    try {
+      const [au] = await sql<Array<{ name: string | null; email: string }>>`
+        SELECT name, email FROM users WHERE id = ${section.assignedTo}::uuid LIMIT 1`;
+      assigneeName = au ? (au.name || au.email) : null;
+    } catch { /* best-effort */ }
+  }
+  let sectionTodoStatus: 'open' | 'in_progress' | 'completed' | null = null;
+  try {
+    const [t] = await sql<Array<{ status: string }>>`
+      SELECT status FROM tasks
+      WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'section' AND entity_id = ${sectionId}::uuid
+        AND status IN ('open', 'in_progress', 'completed')
+      ORDER BY created_at DESC LIMIT 1`;
+    const s = t?.status;
+    sectionTodoStatus = s === 'open' || s === 'in_progress' || s === 'completed' ? s : null;
+  } catch { /* best-effort */ }
+  const sectionAssignees: SectionAssignee[] = canAssign ? await listSectionAssignees(tenantId, proposalId) : [];
+
   // ── Collaborator scoping ───────────────────────────────────────────
   // Home tenant staff (tenant_user+) have tenant-wide proposal access by design.
   // Anyone WITHOUT tenant-wide access (a partner_user, OR a cross-company
@@ -137,6 +165,18 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   const parsedContent = coerceJsonb<CanvasDocument | null>(section.content, null);
   if (parsedContent && typeof parsedContent === 'object' && 'version' in parsedContent) {
     canvasDoc = parsedContent;
+    // A legacy/partial stored doc can carry `version` yet lack `metadata`/`canvas` (the editor reads both).
+    // Backfill the missing blocks so no downstream component white-screens on an incomplete doc.
+    if (!canvasDoc.metadata) {
+      canvasDoc.metadata = {
+        title: section.title ?? 'Untitled Section', volume_id: '', required_item_id: '',
+        proposal_id: proposalId, solicitation_id: proposal.solicitationId ?? '',
+        created_at: new Date().toISOString(), last_modified_at: new Date().toISOString(),
+        last_modified_by: userId, version_number: 1, status: (section.status as CanvasDocument['metadata']['status']) ?? 'empty',
+      };
+    }
+    if (!canvasDoc.canvas) canvasDoc.canvas = CANVAS_PRESETS.letter_sbir_phase1;
+    if (!Array.isArray(canvasDoc.nodes)) canvasDoc.nodes = [];
   } else {
     canvasDoc = createEmptyCanvas({
       documentId: sectionId,
@@ -167,6 +207,27 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   const stage = locked ? 'locked' : capabilities.canEditContent ? 'draft' : 'review';
 
   return (
+    <>
+    <SectionAssignBar
+      tenantSlug={tenantSlug}
+      proposalId={proposalId}
+      sectionId={sectionId}
+      currentAssigneeId={section.assignedTo}
+      currentAssigneeName={assigneeName}
+      canAssign={canAssign}
+      assignees={sectionAssignees}
+      todoStatus={sectionTodoStatus}
+      locked={locked}
+    />
+    <SectionAssistBar
+      tenantSlug={tenantSlug}
+      proposalId={proposalId}
+      sectionId={sectionId}
+      sectionTitle={section.title ?? section.sectionNumber ?? 'Section'}
+      isEmpty={section.status === 'empty'}
+      canEdit={capabilities.canEditContent && !locked}
+      pageLimit={section.pageAllocation ?? null}
+    />
     <CanvasEditorPage
       canvasDocument={canvasDoc}
       sectionId={sectionId}
@@ -190,5 +251,6 @@ export default async function PortalSectionEditorPage({ params }: Props) {
         sectionId: c.sectionId,
       }))}
     />
+    </>
   );
 }

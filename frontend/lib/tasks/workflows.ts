@@ -80,6 +80,19 @@ export const TASK_WORKFLOWS: Record<string, TaskWorkflowDef> = {
     completer: 'review',
     producedBy: ['human', 'engine', 'agent'],
   },
+  // The per-section edit ToDo raised when a section is assigned (SPINE-T1). Deep-links to the section
+  // editor (taskHref 'section' case); auto-completes when the section is locked. First-class so it never
+  // falls to the broadcast default — its params.kind='review' already drives the completer.
+  edit_section: {
+    key: 'edit_section',
+    name: 'Edit section',
+    description: 'Draft & edit your assigned section on the canvas, then it locks.',
+    side: 'tenant',
+    steps: ['Open section', 'Draft & edit', 'Save', 'Accept & Lock'],
+    actionStep: 1,
+    completer: 'review',
+    producedBy: ['human', 'engine'],
+  },
   proposal_setup: {
     key: 'proposal_setup',
     name: 'Proposal setup',
@@ -106,6 +119,19 @@ export const TASK_WORKFLOWS: Record<string, TaskWorkflowDef> = {
     description: 'Acknowledge an award and start post-award execution.',
     side: 'tenant',
     steps: ['Award', 'Assign owner', 'Kickoff'],
+    actionStep: 2,
+    completer: 'review',
+    producedBy: ['engine', 'automation'],
+  },
+  // Raised when a proposal is submitted (#13); auto-completes when the outcome route
+  // records a win/loss/withdrawn. Deep-links to the proposal (taskHref 'proposal' case);
+  // params.kind='review' drives the completer.
+  record_outcome: {
+    key: 'record_outcome',
+    name: 'Record outcome',
+    description: "Record the submission's award / rejection / withdrawal to close the learning loop.",
+    side: 'tenant',
+    steps: ['Submitted', 'Await decision', 'Record outcome'],
     actionStep: 2,
     completer: 'review',
     producedBy: ['engine', 'automation'],

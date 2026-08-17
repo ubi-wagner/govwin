@@ -15,6 +15,7 @@ import { ProposalAdminPanel } from './proposal-admin-panel';
 import { ProposalContributorView } from './proposal-contributor-view';
 import { ProposalTimeline } from './proposal-timeline';
 import { StageControl } from './stage-control';
+import { OutcomeRecorder } from './outcome-recorder';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -100,6 +101,10 @@ interface ProposalWorkspaceProps {
   isLocked: boolean;
   // New props from portal page enhancements
   userRole: 'admin' | 'contributor' | 'external';
+  // Tenant-wide member (admin or home tenant_user) — NOT a scoped/external collaborator. Gates the
+  // proposal-wide Timeline (actor emails + full event payloads + stage history), which must never
+  // reach a section-scoped partner_user / cross-company collaborator. Defaults true (internal staff).
+  isTenantWide?: boolean;
   currentUserId: string;
   collaborators: Collaborator[];
   compliance: ComplianceData | null;
@@ -145,6 +150,7 @@ export function ProposalWorkspace({
   proposalStage,
   isLocked,
   userRole,
+  isTenantWide = true,
   currentUserId,
   collaborators,
   compliance,
@@ -164,8 +170,11 @@ export function ProposalWorkspace({
   const router = useRouter();
   const [sections, setSections] = useState(initialSections);
   const [showDrafter, setShowDrafter] = useState(hasEmptySections && userRole === 'admin');
+  // Fluid-canvas F-primary: the editable one-canvas ("Document") is the DEFAULT surface for a
+  // tenant-wide member (admin OR home tenant_user); the section list demotes to an optional tab.
+  // A scoped/external collaborator has no whole-proposal view — they land on their own sections.
   const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'my-sections' | 'document' | 'timeline'>(
-    userRole !== 'admin' ? 'my-sections' : 'workspace',
+    isTenantWide ? 'document' : 'my-sections',
   );
 
   const handleSectionDrafted = useCallback(
@@ -207,14 +216,21 @@ export function ProposalWorkspace({
         closeDate={closeDate}
       />
 
+      {/* Outcome recording — first-class + discoverable the moment a proposal is submitted (a win
+          starts the contract + kickoff). Self-hides unless admin + submitted/final. */}
+      <OutcomeRecorder tenantSlug={tenantSlug} proposalId={proposalId} stage={proposalStage} isAdmin={userRole === 'admin'} />
+
       {/* Workspace-level tab bar */}
-      <div className="flex gap-0 border-b border-gray-200">
+      <div className="flex gap-0 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
         {([
+          // The editable whole-proposal one-canvas is the PRIMARY surface for tenant-wide members
+          // (fluid-canvas F-primary); the section list + Manage subtabs demote to "All Sections".
+          ...(isTenantWide ? [{ key: 'document' as const, label: 'Document' }] : []),
           { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },
           { key: 'my-sections' as const, label: 'My Sections' },
-          // Whole-proposal fluid document view — the reader surface (tenant members).
-          ...(userRole === 'admin' ? [{ key: 'document' as const, label: 'Document' }] : []),
-          { key: 'timeline' as const, label: 'Timeline' },
+          // Proposal-wide activity/history — tenant-wide members only; a scoped/external collaborator
+          // must not see other actors' emails, event payloads, or stage history for ungranted work.
+          ...(isTenantWide ? [{ key: 'timeline' as const, label: 'Timeline' }] : []),
         ]).map((tab) => (
           <button
             key={tab.key}
@@ -230,8 +246,8 @@ export function ProposalWorkspace({
         ))}
       </div>
 
-      {/* ─── Timeline Tab ────────────────────────────────────────────── */}
-      {workspaceTab === 'timeline' && (
+      {/* ─── Timeline Tab (tenant-wide members only) ─────────────────── */}
+      {isTenantWide && workspaceTab === 'timeline' && (
         <div className="space-y-6">
           {/* Stage Completion History */}
           {stageCompletionHistory && stageCompletionHistory.length > 0 && (

@@ -6,6 +6,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import ProposalStudio from '@/components/portal/proposal-studio';
 import { AmendmentBanner } from '@/components/portal/amendment-banner';
+import { StrategyPanel } from '@/components/portal/strategy-panel';
 import { ArchivePortalButton } from '@/components/portal/archive-portal-button';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
@@ -147,17 +148,61 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   }
 
-  // Scoped-collaborator guard: a user WITHOUT tenant-wide access (a partner_user,
-  // OR a cross-company collaborator) who has no section grant on THIS proposal must
-  // not see the workspace shell (title, collaborator roster + emails, compliance,
-  // stage history). Home tenant staff (tenant_user+) retain tenant-wide access.
+  // Tenant-wide access, CAP-3-aware: a member is tenant-wide by ROLE
+  // (isTenantWideMember) — but a proposal-scoped tenant_user is NOT tenant-wide for a
+  // proposal outside their grant. resolveUserAccess returns NO_ACCESS (role 'external')
+  // for exactly that case, so folding `access.role !== 'external'` into the signal makes
+  // both the workspace guard and the section-visibility filter honor the scope. A genuine
+  // tenant-wide member always resolves to 'admin'/'contributor', so this only ever
+  // RESTRICTS a scoped-out member — never over-grants.
+  const tenantWideRole = isTenantWideMember(role, sessionUser.tenantId, tenantId);
+  const effectiveTenantWide = tenantWideRole && access.role !== 'external';
+  // A home member restricted OUT of THIS proposal by per-proposal scoping (vs. a
+  // cross-company collaborator who simply has no section grant yet).
+  const scopedOut = tenantWideRole && !effectiveTenantWide;
+
+  // Access guard: a user WITHOUT effective tenant-wide access (a partner_user, a
+  // cross-company collaborator with no grant, OR a scoped-out tenant_user) who has no
+  // section grant on THIS proposal must not see the workspace shell (title, collaborator
+  // roster + emails, compliance, stage history).
   if (
-    !isTenantWideMember(role, sessionUser.tenantId, tenantId) &&
+    !effectiveTenantWide &&
     access.editableSections.length === 0 &&
     access.commentableSections.length === 0 &&
     access.viewableSections.length === 0
   ) {
-    notFound();
+    // A friendly denial instead of a bare 404 dead-end (the proposal may still appear in a
+    // /proposals list, so a hard notFound() reads as broken). The workspace shell stays
+    // hidden; nothing sensitive leaks. Copy differs for a scoped-out member vs. an
+    // as-yet-ungranted collaborator.
+    return (
+      <div className="max-w-lg mx-auto mt-16 px-4 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white p-8">
+          <div className="text-3xl mb-3" aria-hidden>🔒</div>
+          {scopedOut ? (
+            <>
+              <h1 className="text-lg font-semibold text-gray-900">You don&rsquo;t have access to this proposal</h1>
+              <p className="mt-2 text-sm text-gray-600">
+                Your access is limited to specific proposals, and this one isn&rsquo;t among them. Ask your company
+                admin to grant you access if you need it.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-lg font-semibold text-gray-900">No sections shared with you yet</h1>
+              <p className="mt-2 text-sm text-gray-600">
+                You&rsquo;ve been added to <span className="font-medium">{proposal.title ?? 'this proposal'}</span>, but no
+                sections have been shared with you to view, comment on, or edit yet. Once the proposal admin grants you
+                a section, it will appear here.
+              </p>
+            </>
+          )}
+          <a href={`/portal/${tenantSlug}/proposals`} className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline">
+            &larr; Back to proposals
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // ── Load sections (with completion markers) ────────────────────────
@@ -464,8 +509,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   // the "All" tab). A collaborator sees ONLY what the company admin assigned. Home
   // staff / admins (tenant-wide) keep the full section set. (Identity: collaborators
   // work across companies; scope is enforced off the grant, never assumed.)
-  const tenantWide = isTenantWideMember(role, sessionUser.tenantId, tenantId);
-  const visibleSections = tenantWide
+  // CAP-3-aware (see effectiveTenantWide above): a scoped-out member is filtered to
+  // permission!=='none' sections (i.e. none), so no section metadata leaks even if the
+  // guard above is ever loosened.
+  const visibleSections = effectiveTenantWide
     ? sectionsWithPermission
     : sectionsWithPermission.filter((s) => s.permission !== 'none');
 
@@ -478,7 +525,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
             <h1 className="text-2xl font-bold text-gray-900 truncate">
               {proposal.title}
             </h1>
-            <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-gray-500">
               {proposal.topicNumber && <span>Topic {proposal.topicNumber}</span>}
               {proposal.agency && <span>{proposal.agency}</span>}
               {proposal.programType && (
@@ -551,6 +598,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         </div>
       )}
 
+      {/* ── Capture strategy & research (#1) — the OnProposalCreated advisory briefs, read-only.
+             Self-hides when the run produced none. For the build team (not external viewers). ── */}
+      {access.role !== 'external' && (
+        <StrategyPanel tenantSlug={tenantSlug} proposalId={proposalId} />
+      )}
+
       {/* ── Workspace Client Component ────────────────────────────────── */}
       <ProposalWorkspace
         proposalId={proposalId}
@@ -561,6 +614,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         proposalStage={proposal.stage}
         isLocked={proposal.isLocked}
         userRole={access.role}
+        isTenantWide={effectiveTenantWide}
         currentUserId={sessionUser.id}
         collaborators={collaboratorsWithAccess}
         compliance={compliance}
@@ -574,8 +628,11 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         canExport={access.canExport}
         canManageTeam={access.canManageTeam}
         closeDate={proposal.closeDate?.toISOString() ?? null}
-        proposalEvents={proposalEvents}
-        stageCompletionHistory={stageCompletionHistory.map((h) => ({
+        // Defense in depth: never even SEND proposal-wide activity/history to a scoped or external
+        // collaborator (the Timeline tab is also hidden for them client-side). Only tenant-wide
+        // members receive the actor-email/payload stream + stage history.
+        proposalEvents={effectiveTenantWide ? proposalEvents : []}
+        stageCompletionHistory={(effectiveTenantWide ? stageCompletionHistory : []).map((h) => ({
           stage: h.stage,
           completedByName: h.completedByName,
           completedAt: h.completedAt.toISOString(),

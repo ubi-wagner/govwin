@@ -26,16 +26,50 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1092 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1129 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
 the build UNLOCKED and instantiating the compliance matrix + molds from the master solicitation. The
+purchase's `proposal_setup` ToDo now deep-links to the **provisioning cockpit** (`/admin/provisioning/
+[portalId]`, PV-1..6, docs/PROVISIONING_WORKSPACE_DESIGN.md) — the rfp_admin surface that LANDS the 72h
+SLA: it shows the buyer + live SLA countdown + the master **build-out readiness bar** (compliance + ≥1
+volume + ≥1 required item; mig 182 `curated_solicitations.build_complete`), deep-links to the authoring
+workspace, and hosts a two-outcome **Complete & Release** — (1) `completeBuildOut` marks the master built
+out + BROADCASTS an `updated` fan-out to EVERY tenant's mirror card (`provisionReady=true`; the shared
+master — segregation), then (2) `provisionAndReleasePortal` provisions THIS buyer's private portal, flips
+`curation_pending→launched`, and kicks off their workflow (the private portal — continuity). One shared
+`provisionAndReleasePortal` helper backs both the cockpit and the tenant-side `?action=release` (no drift);
+the provision best-effort tail (review ToDos + reuse suggester) is `runInTenant`-scoped so a cross-tenant
+admin caller never trips RLS. On release the buyer gets a **required tenant Workflow Setup** (recommend-but-
+require, TW-1..6, docs/TENANT_WORKFLOW_SETUP_DESIGN.md): `provisionAndReleasePortal` marks
+`guardrail_config._setup=pending` + raises a required ToDo → the tenant-owned page `/portal/[slug]/portals/
+[portalId]` where a tenant_admin/delegated-manager reviews a **history-recommended** plan (their prior
+*accepted* USAF-Phase-I/D2P2 pattern; own-history only, copy-inward) and **Accept & Starts** it. It's the
+post-launch-editable spine the frozen guardrail model never had — absolute stage-gate dates, a per-stage
+**gate closer** (Human | AI-manager), per-ToDo owner (a real person *or* a role) + date + nudge, and one-click
+**rebaseline** (shift ±N days / set from the solicitation close) — all riding the open `guardrail_config` JSONB
+(**no migration**). Edits re-project onto the live `tasks` rows via `editPortalWorkflow` (matches by title;
+resets `nudges_sent` so the pipeline nudge sweep re-fires against the new due), with a per-task
+`PATCH …/tasks/[taskId]` for day-to-day reassign/reschedule — so advancement stays task-completion-driven and
+the sweeper stays row-driven (aligned 100% with the phase-machine; the AI-manager `auto`-advance is the TW-8
+fast-follow). The
 OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **178** — migs 163–167 per below;
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **185**; migs 183–185 add section-comment anchors + the per-command RLS backstop closing shared writes on `document_templates` then `tasks`/`process_instances` — mig 180 the bucket-score
+integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
+OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
+`build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket
+authoring → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
+admin pin-for-updates (holder fan-out, pre-purchase) → notify/nudge (the hot-closing-soon start-nudge) → provision;
+mig **179** the **Command Center** watermark (`command_seen_state` — the tenant · admin · partner "new since you
+looked" cockpits, docs/COMMAND_CENTER_DESIGN.md); mig **183** span/node-anchored comments — the rebuilt
+**section-editing spine** (section-scoped ToDos → editor routing · AI assist from the section bar · AI-manager
+auto-advance · partner_user-scoped bell); mig **184** **cross-tenant isolation hardening** — per-command RLS on
+the shared `document_templates` catalog, adversarially verified copy-inward (docs/COPY_INWARD_VERIFICATION.md);
+migs 163–167 per below;
 mig 175 completes the **scout-intake candidate queue**: scout findings — crawler leads + the HITL source-scout's
 extracted opportunities — land in one `scout_findings` review→release queue, deterministically classified
 **NEW vs UPDATE** (`lib/scout/classify.ts`) and released as a new intake (`stageIntake`) or an update
@@ -111,7 +145,7 @@ where the admin **comments + regenerates** (comments threaded as `guidance`) or 
 **runs all 3 automatically** via the doorbell (`advance_studio_phase` ACTION auto-chains). Advisory —
 it never advances a stage, locks, or submits. Observability
 is enforced end-to-end: every actor/automation/agent/manager action posts to `system_events` (+ domain audit
-logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-02.md; the `package?format=zip` blind spot is closed).
+logs) — swept + gap-fixed 2026-08-02 (docs/EVENT_AUDIT_2026-08-14.md; the `package?format=zip` blind spot is closed).
 The rest are greenfielded + registry-wired, pending their per-producer wiring (the **global automation-policy layer** #190 — recipients×timing×escalation — is BUILT + complete, docs/AUTOMATION_POLICY_BUILD_LOG.md; it ships inert until a tenant edits a policy). Wiring pattern: realign to the current
 spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
 (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`
@@ -205,7 +239,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1092 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1129 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
@@ -275,7 +309,7 @@ See CLAUDE_CLIFFNOTES.md for:
   (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
 - **RLS is LIVE (two-layer, enforced) — not "inert until a future flip".** The app connects as the
   `NOBYPASSRLS` `govtech_app` role and RLS scopes every request via the per-request `SET app.tenant_id`
-  context (mig 136_rls_cutover: 19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles;
+  context (mig 136_rls_cutover: 19 force-RLS tables + 35 policies at that cutover — since extended by migs 171 (`atom_embeddings`) · 173 (amendment/notification) · 184 (per-command `document_templates`); the `govtech_app`/`rfp_agent` roles;
   mig 137 validates the namespace CHECK). **The sandbox EMULATES PRODUCTION EXACTLY — serve as
   `govtech_app` with RLS on.** The owner/`sqlBypass` connection is only for bootstrap/migrations and
   the few legitimate cross-tenant reads (admin/CMS on RLS-forced tables, e.g. the agent-workforce

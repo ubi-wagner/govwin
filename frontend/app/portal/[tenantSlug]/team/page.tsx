@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { TeamInviteForm } from '@/components/portal/team-invite-form';
 import { TeamMemberActions } from '@/components/portal/team-member-actions';
 import { ManagerRequestActions } from '@/components/portal/manager-request-actions';
+import { ManagerRemoveAction } from '@/components/portal/manager-remove-action';
+import { MemberScopeControl } from '@/components/portal/member-scope-control';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +57,8 @@ export default async function TeamPage({ params }: Props) {
     email: string;
     role: string;
     isActive: boolean;
+    canManageBuckets: boolean;
+    scope: unknown;
     lastLoginAt: Date | null;
     createdAt: Date;
   }
@@ -65,7 +70,7 @@ export default async function TeamPage({ params }: Props) {
     // their access follows the membership (verifyTenantAccess is membership-based).
     members = await sql<TeamMember[]>`
       SELECT u.id, u.name, u.email, m.role, (m.status = 'active') AS is_active,
-             u.last_login_at, u.created_at
+             m.can_manage_buckets, m.scope, u.last_login_at, u.created_at
       FROM user_memberships m
       JOIN users u ON u.id = m.user_id
       WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')
@@ -110,13 +115,13 @@ export default async function TeamPage({ params }: Props) {
   }
 
   // ── Managers (partner_manager memberships) + pending manager-access requests ──────
-  interface Manager { id: string; name: string | null; email: string; createdAt: Date }
+  interface Manager { id: string; membershipId: string; name: string | null; email: string; createdAt: Date }
   interface MgrRequest { id: string; partnerOrg: string | null; partnerEmail: string | null; createdAt: Date }
   let managers: Manager[] = [];
   let mgrRequests: MgrRequest[] = [];
   try {
     managers = await sql<Manager[]>`
-      SELECT u.id, u.name, u.email, m.created_at
+      SELECT u.id, m.id AS membership_id, u.name, u.email, m.created_at
       FROM user_memberships m JOIN users u ON u.id = m.user_id
       WHERE m.tenant_id = ${tenantId} AND m.status = 'active' AND m.source = 'partner_manager'
       ORDER BY m.created_at ASC`;
@@ -131,6 +136,16 @@ export default async function TeamPage({ params }: Props) {
 
   const basePath = `/portal/${tenantSlug}`;
   const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
+
+  // Proposals available to scope a tenant_user against (CAP-3 — admin only).
+  let tenantProposals: { id: string; title: string }[] = [];
+  if (isAdmin) {
+    try {
+      tenantProposals = await sql<{ id: string; title: string }[]>`
+        SELECT id, title FROM proposals WHERE tenant_id = ${tenantId} AND archived_at IS NULL
+        ORDER BY created_at DESC LIMIT 100`;
+    } catch (e) { console.error('[portal/team] proposals load failed', e); }
+  }
   // Guards the role control: the last active admin can't be demoted.
   const activeAdmins = members.filter((m) => m.isActive && m.role === 'tenant_admin').length;
 
@@ -194,6 +209,10 @@ export default async function TeamPage({ params }: Props) {
               <tbody className="divide-y divide-gray-100">
                 {members.map((m) => {
                   const badge = ROLE_BADGES[m.role] ?? { label: m.role, color: 'bg-gray-100 text-gray-600' };
+                  const memScope = coerceJsonb<{ proposalScoped?: boolean; proposals?: unknown }>(m.scope, {});
+                  const memScoped = memScope.proposalScoped === true;
+                  const memScopedProposals = memScoped && Array.isArray(memScope.proposals)
+                    ? (memScope.proposals as unknown[]).filter((p): p is string => typeof p === 'string') : [];
                   return (
                     <tr key={m.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">
@@ -218,13 +237,27 @@ export default async function TeamPage({ params }: Props) {
                           : 'Never'}
                       </td>
                       {isAdmin && (
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right align-top">
+                          {/* Per-proposal access scope — internal tenant_user only (CAP-3). */}
+                          {m.role === 'tenant_user' && m.isActive && (
+                            <div className="mb-1 flex justify-end">
+                              <MemberScopeControl
+                                tenantSlug={tenantSlug}
+                                userId={m.id}
+                                memberLabel={m.name ?? m.email}
+                                allProposals={tenantProposals}
+                                initialScoped={memScoped}
+                                initialProposals={memScopedProposals}
+                              />
+                            </div>
+                          )}
                           {m.id !== sessionUser.id && (
                             <TeamMemberActions
                               tenantSlug={tenantSlug}
                               userId={m.id}
                               active={m.isActive}
                               role={m.role}
+                              canManageBuckets={m.canManageBuckets}
                               isLastAdmin={m.role === 'tenant_admin' && activeAdmins <= 1}
                             />
                           )}
@@ -251,6 +284,7 @@ export default async function TeamPage({ params }: Props) {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Email</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Manager since</th>
+                  {isAdmin && <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -261,6 +295,11 @@ export default async function TeamPage({ params }: Props) {
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {new Date(m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-right">
+                        <ManagerRemoveAction tenantSlug={tenantSlug} membershipId={m.membershipId} managerLabel={m.name ?? m.email} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -174,7 +174,7 @@ export default async function AutomationPage() {
       </div>
 
       {/* Stats bar — hover any card for the rules behind the number */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Rules" value={stats.total} preview={allRulesPreview} />
         <StatCard label="Active" value={<span className="text-green-600">{stats.active}</span>} preview={activeRulesPreview} />
         <StatCard label="Inactive" value={<span className="text-gray-400">{stats.inactive}</span>} preview={inactiveRulesPreview} />

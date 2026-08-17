@@ -17,16 +17,19 @@ export function TeamMemberActions({
   userId,
   active,
   role,
+  canManageBuckets = false,
   isLastAdmin = false,
 }: {
   tenantSlug: string;
   userId: string;
   active: boolean;
   role: string;
+  canManageBuckets?: boolean;
   isLastAdmin?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [grant, setGrant] = useState(canManageBuckets);
 
   async function toggle() {
     const deactivating = active;
@@ -75,8 +78,47 @@ export function TeamMemberActions({
     }
   }
 
+  async function toggleBucketGrant() {
+    const next = !grant;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/team/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canManageBuckets: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        toast.error(j.error || 'Could not update the grant');
+        setBusy(false);
+        return;
+      }
+      setGrant(next);
+      toast.success(next ? 'Bucket management granted' : 'Bucket management revoked');
+      router.refresh();
+      setBusy(false);
+    } catch {
+      toast.error('Network error');
+      setBusy(false);
+    }
+  }
+
   return (
     <span className="inline-flex items-center gap-2">
+      {/* Designee grant — delegate spotlight-bucket authoring to a Contributor (mig 181).
+          Redundant for Admins (they already author), so shown only for active tenant_users. */}
+      {active && role === 'tenant_user' && (
+        <button
+          onClick={toggleBucketGrant}
+          disabled={busy}
+          title={grant ? 'Bucket manager — click to revoke' : 'Delegate spotlight-bucket authoring to this member'}
+          className={`rounded px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+            grant ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          }`}
+        >
+          {grant ? 'Buckets ✓' : 'Buckets'}
+        </button>
+      )}
       {active && (
         <select
           value={role}

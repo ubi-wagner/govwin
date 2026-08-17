@@ -87,7 +87,9 @@ export function CanvasEditorPage({
   const [undoTrail, setUndoTrail] = useState<string[]>([]);
   const [redoTrail, setRedoTrail] = useState<string[]>([]);
   const [nodeCount, setNodeCount] = useState(canvasDocument.nodes?.length ?? 0);
-  const [docStatus, setDocStatus] = useState<string>(canvasDocument.metadata.status ?? 'empty');
+  // Defensive: a legacy/partial stored doc can carry `version` (so the page accepts it) yet lack
+  // `metadata` — optional-chain every metadata read so a missing block never white-screens the editor.
+  const [docStatus, setDocStatus] = useState<string>(canvasDocument.metadata?.status ?? 'empty');
   const [panelOpen, setPanelOpen] = useState(true);
   const [canvasFormat, setCanvasFormat] = useState<string>(canvasDocument.canvas?.format ?? 'letter');
   const [hasTable,   setHasTable]   = useState(() => (canvasDocument.nodes ?? []).some((n) => n.type === 'table'));
@@ -205,7 +207,7 @@ export function CanvasEditorPage({
     const url  = URL.createObjectURL(blob);
     Object.assign(document.createElement('a'), {
       href:     url,
-      download: `${doc.metadata.title || 'document'}.${format}`,
+      download: `${doc.metadata?.title || 'document'}.${format}`,
     }).click();
     URL.revokeObjectURL(url);
   }, [exportUrl]);
@@ -220,7 +222,7 @@ export function CanvasEditorPage({
         <SectionTopRibbon
           backUrl={backUrl}
           backLabel={backLabel}
-          sectionTitle={canvasDocument.metadata.title || 'Untitled Section'}
+          sectionTitle={canvasDocument.metadata?.title || 'Untitled Section'}
           sectionNumber={sectionNumber}
           volumeName={volumeName}
           version={versionRef.current}
@@ -257,7 +259,7 @@ export function CanvasEditorPage({
           <Link href={backUrl} className="text-sm text-blue-600 hover:text-blue-800">
             &larr; {backLabel}
           </Link>
-          <span className="text-sm text-gray-400">{canvasDocument.metadata.title}</span>
+          <span className="text-sm text-gray-400">{canvasDocument.metadata?.title}</span>
         </div>
       )}
 

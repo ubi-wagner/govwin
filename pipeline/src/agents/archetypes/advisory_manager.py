@@ -1,11 +1,12 @@
 """
 advisory_manager — the Advisory / Adversarial Overlay's PLANNER + RECONCILER.
 
-GREENFIELDED (Advisory Overlay cohort, P1.5) onto the current spine, DORMANT: registered in the
-fabric and its AI_INVOKE action (tool.advisory.reconcile) is mapped, but NO firing hook is wired yet
-except the reusable AdvisoryOverlay sub-workflow (P2), which nothing emits — so it is inert. It is
-woken by a gate/step that emits the overlay's trigger event. handles_event returns False so the
-event-dispatch fallback never fires it either.
+WOKEN (Advisory Overlay cohort, P1.5). Registered in the fabric with its AI_INVOKE action
+(tool.advisory.reconcile) mapped, and it is the reconcile step of the reusable AdvisoryOverlay(Auto)
+sub-workflow — fired when a gate emits proposal.advisory_overlay_requested (Mode C's
+request_advisory_overlay ACTION does exactly this when the adversarial gate is set). handles_event
+returns False BY DESIGN: it is a STEP-ONLY actor (no event-dispatch fallback). Proven live in-sandbox
+(scripts/drive_overlay_market.py + the full-draft Mode C drive; agent.invoked, guardrail-gated).
 
 JOB — PLAN the fan-out, RECONCILE the results, RECORD the learning. It is the thin control layer that
 sits ABOVE any advisor (continuity_manager / traceability_auditor / redaction_guard / color_team_reviewer

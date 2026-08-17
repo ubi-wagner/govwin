@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
@@ -116,6 +116,8 @@ export default async function PortalLayout({
   const basePath = `/portal/${tenantSlug}`;
   const isPartner = role === 'partner_user';
   const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
+  // A delegated designee (tenant_user + can_manage_buckets, mig 181) also reaches Opportunities + Buckets.
+  const canManageBucketsHere = isTenantAdmin || (await canManageBuckets(userId, role, tenantId));
 
   return (
     <NavShell
@@ -124,26 +126,35 @@ export default async function PortalLayout({
         <div className="flex-1 min-h-0">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-lg font-bold truncate">{companyName}</h2>
-            {!isPartner && <NotificationBell tenantSlug={tenantSlug} />}
+            {/* B2/H1: a partner_user gets a bell too — the feed is collaborator-scoped server-side. */}
+            <NotificationBell tenantSlug={tenantSlug} />
           </div>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
           {/* Flat, slim nav (Step 0 of the unified-canvas plan — de-compartmentalized; the
               cockpit/dashboard is the visual home, the rail is just navigation). A hairline
               separates the daily surfaces from the setup tail; no uppercase section headers. */}
           <nav className="flex flex-col gap-1 text-sm">
+            {/* Command Center — the tabbed "what needs me → act" console (Opportunities · To-dos ·
+                Workflows · Activity). The admin front door; a base member lands on the cockpit. */}
+            {isTenantAdmin && <PortalNavLink href={`${basePath}/command`}>Command Center</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>}
-            {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
-            {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
+            {canManageBucketsHere && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
+            {canManageBucketsHere && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
             {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
             {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
+            {/* A partner_user reaches THEIR own nooks at the top-level /vaults (list is self-scoped;
+                empty state if none) — without this a partner with both a nook AND proposal access had
+                no path to their vault. */}
+            {isPartner && <PortalNavLink href="/vaults">Collaboration vaults</PortalNavLink>}
             <PortalNavLink href={`${basePath}/todos`}>To-dos</PortalNavLink>
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/processes`}>Processes</PortalNavLink>
-                <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
+                {/* Activity firehose is admin-only (tenant_admin+) — matches the page guard. */}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>}
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
                 <PortalNavLink href={`${basePath}/templates`}>Templates</PortalNavLink>
@@ -174,7 +185,7 @@ export default async function PortalLayout({
         </div>
       )}
       {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
-      <div className="p-8">{children}</div>
+      <div className="p-4 sm:p-6 lg:p-8">{children}</div>
     </NavShell>
   );
 }

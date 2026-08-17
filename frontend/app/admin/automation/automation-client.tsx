@@ -84,7 +84,7 @@ export function AutomationClient({
       {rules.length === 0 ? (
         <p className="text-sm text-gray-400 py-8">No automation rules found.</p>
       ) : (
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">

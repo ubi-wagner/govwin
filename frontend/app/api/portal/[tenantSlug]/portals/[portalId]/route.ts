@@ -14,11 +14,10 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { acceptGuardrails, releaseFromCuration, revokeShadowAdmin, setPortalStatus, linkPortalProposal } from '@/lib/portal-launch';
+import { acceptGuardrails, revokeShadowAdmin, setPortalStatus, linkPortalProposal } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, advancePortalStage, type GuardrailConfig } from '@/lib/portal-workflow';
 import { provisionProposalForPortal } from '@/lib/provision-proposal';
-import { emitEventSingle } from '@/lib/events';
-import { randomUUID } from 'crypto';
+import { provisionAndReleasePortal } from '@/lib/provisioning/release-portal';
 
 // Statuses a tenant_admin may set via PATCH — POST-LAUNCH lifecycle only. The pre-launch ENTRY
 // states (curation_pending, guardrails_pending, launched) are owned by the purchase / release /
@@ -27,18 +26,6 @@ import { randomUUID } from 'crypto';
 // paid rfp_admin curation + 72h SLA (adversarial-sweep B4). setPortalStatus additionally CAS-guards
 // the SOURCE state, so even an allowed target can only move an already-live portal.
 const CUSTOMER_ADVANCE_STATUSES = ['executing', 'closeout', 'archived', 'abandoned'];
-
-/** Minimal single-operator guardrails used when an admin releases a purchased workspace
- *  (no collaborators/nudges — the customer just builds). Passes the guardrail limits. */
-const DEFAULT_RELEASE_GUARDRAILS = {
-  nudgeDays: [],
-  collaborators: [],
-  stages: [
-    { key: 'draft', label: 'Draft', todos: [] },
-    { key: 'review', label: 'Review', todos: [] },
-    { key: 'final', label: 'Final', todos: [] },
-  ],
-} as unknown as GuardrailConfig;
 
 /**
  * Provision the build + link it to the portal — the discovery-spine → build-spine hand-off.
@@ -158,43 +145,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ data: { launched: true, tasksCreated, proposalId: prov.proposalId } });
     }
     if (action === 'release') {
-      // RFP expert releases a PURCHASED workspace (curation_pending → launched) after
-      // finishing the skeleton curation: flip live, then provision the build UNLOCKED so
-      // the customer can pick atoms + draft. rfp_admin acts here via global tenant access.
-      // AUTHZ: release is the EXPERT curation gate — a buying tenant_admin must NOT be able
-      // to self-release (via raw API) and skip the 72h curation. Require rfp_admin+; the
-      // outer gate() only floors at tenant_admin for the customer-owned accept/revoke controls.
+      // RFP expert releases a PURCHASED workspace (curation_pending → launched) after finishing the
+      // skeleton curation: provision the build UNLOCKED + flip live + kick off the workflow, via the
+      // shared provisionAndReleasePortal (one source of truth with the admin cockpit's Complete &
+      // Release, PV-3). rfp_admin acts here via global tenant access.
+      // AUTHZ: release is the EXPERT curation gate — a buying tenant_admin must NOT be able to
+      // self-release (via raw API) and skip the 72h curation. Require rfp_admin+; the outer gate()
+      // only floors at tenant_admin for the customer-owned accept/revoke controls.
       if (!hasRoleAtLeast(g.role, 'rfp_admin')) {
         return NextResponse.json({ error: 'Only an RFP expert can release a workspace from curation', code: 'FORBIDDEN' }, { status: 403 });
       }
       let body: { guardrailConfig?: GuardrailConfig } = {};
       try { body = await request.json(); } catch { /* body optional — default guardrails */ }
-      const config = (body.guardrailConfig ?? DEFAULT_RELEASE_GUARDRAILS) as GuardrailConfig;
-      const limits = await getGuardrailLimits();
-      const v = validateGuardrailConfig(config, limits);
-      if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
-      // Provision + link the build BEFORE flipping curation_pending → launched, so a hand-off
-      // failure leaves the workspace awaiting-curation (retryable by re-release), never a wedged
-      // buildless launch (B2). The purchased card's opportunity_id is all provisioning needs.
-      const prov = await provisionAndLink(g, tenantSlug, portalId);
-      if ('error' in prov) {
-        return NextResponse.json({ error: `Could not provision the build (please retry): ${prov.error}`, code: 'PROVISION_FAILED' }, { status: 500 });
-      }
-      const { released } = await releaseFromCuration(g.tenantId, portalId, config, { releasedBy: g.userId });
-      if (!released) return NextResponse.json({ error: 'Portal is not awaiting curation (already released?)', code: 'CONFLICT' }, { status: 409 });
-      const tasksCreated = await instantiateTodosBestEffort(g, portalId, config);
-      try {
-        await emitEventSingle({
-          namespace: 'capture',
-          type: 'workspace.released',
-          actor: { type: 'user', id: g.userId, email: g.userEmail ?? undefined },
-          tenantId: g.tenantId,
-          payload: { correlationId: randomUUID(), portalId, proposalId: prov.proposalId },
-        });
-      } catch (evtErr) {
-        console.error('[portal/portals/:id] release event emit failed (non-fatal)', evtErr);
-      }
-      return NextResponse.json({ data: { released: true, proposalId: prov.proposalId, tasksCreated } });
+      const result = await provisionAndReleasePortal({
+        tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug, portalId,
+        actor: { id: g.userId, email: g.userEmail, role: g.role },
+        guardrailConfig: body.guardrailConfig,
+      });
+      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      return NextResponse.json({ data: { released: true, proposalId: result.proposalId, tasksCreated: result.tasksCreated } });
     }
     if (action === 'advance-stage') {
       let body: { force?: boolean } = {};

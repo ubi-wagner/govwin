@@ -123,8 +123,28 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (g.error) return g.error;
     const { actor, tenantId, targetUserId } = g;
 
-    let body: { role?: unknown };
+    let body: { role?: unknown; canManageBuckets?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+
+    // ── Designee grant (mig 181): delegate/revoke spotlight-bucket authoring for this member.
+    //    Independent of role; a tenant_admin already may author, so this matters for tenant_users.
+    if (typeof body.canManageBuckets === 'boolean') {
+      const grant = body.canManageBuckets;
+      const [row] = await sql<{ canManageBuckets: boolean }[]>`
+        UPDATE user_memberships SET can_manage_buckets = ${grant}
+        WHERE user_id = ${targetUserId} AND tenant_id = ${tenantId} AND source IN ('home', 'manual')
+        RETURNING can_manage_buckets`;
+      if (!row) return NextResponse.json({ error: 'Team member not found', code: 'NOT_FOUND' }, { status: 404 });
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'team_member.bucket_grant_changed',
+        actor: userActor(actor.id ?? '', actor.email ?? undefined),
+        tenantId,
+        payload: { userId: targetUserId, canManageBuckets: row.canManageBuckets },
+      });
+      return NextResponse.json({ data: { canManageBuckets: row.canManageBuckets } });
+    }
+
     const ALLOWED = ['tenant_admin', 'tenant_user'];
     const newRole = typeof body.role === 'string' ? body.role : '';
     if (!ALLOWED.includes(newRole)) {

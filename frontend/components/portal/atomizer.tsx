@@ -47,7 +47,7 @@ function splitListItems(node: CanvasNodeLite): CanvasNodeLite[] {
   return (c.items ?? []).map((item) => ({ type: node.type, content: { items: [item] } }));
 }
 
-export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
+export function Atomizer({ tenantSlug, onAtomized }: { tenantSlug: string; onAtomized?: () => void }) {
   const [raw, setRaw] = useState('');
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -57,6 +57,9 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [referenceId, setReferenceId] = useState<string | null>(null);
+  // Auto-atomize the whole doc (skip hand-selection) → atoms land in the library for review.
+  const [autoMode, setAutoMode] = useState(false);
+  const [didAtomize, setDidAtomize] = useState(false);
   // Session FROM-pedigree — stamped on every atom/group/section created this session.
   const [ctx, setCtx] = useState({ agency: '', program: '', phase: '', sol: '', topic: '' });
   // Table/list grain choice.
@@ -71,19 +74,30 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
     fetch(`/api/portal/${tenantSlug}/taxonomy`).then((r) => (r.ok ? r.json() : null)).then((j) => j && setTax(j.data)).catch(() => {});
   }, [tenantSlug]);
 
-  const upload = useCallback(async (file: File) => {
-    setBusy(true); setMsg(null);
+  const upload = useCallback(async (file: File, auto = false) => {
+    setBusy(true); setMsg(null); setDidAtomize(false);
     try {
       const fd = new FormData(); fd.append('file', file);
+      if (auto) { fd.append('mode', 'auto'); fd.append('context', JSON.stringify(ctx)); }
       const res = await fetch(`/api/portal/${tenantSlug}/atoms/upload`, { method: 'POST', body: fd });
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
-        const d = j.data as { referenceAtomId: string | null; blocks: Block[] };
-        setBlocks(d.blocks); setReferenceId(d.referenceAtomId); setSel(new Set());
-        setMsg(`Uploaded — ${d.blocks.length} objects. Select what to atomize, at the grain you want.`);
+        const d = j.data as { referenceAtomId?: string | null; blocks?: Block[]; atomized?: boolean; atoms?: number; skipped?: number };
+        if (d.atomized) {
+          // Auto path — atoms landed in the library; the librarian is cataloging. Nothing to hand-pick.
+          setBlocks([]); setReferenceId(null); setSel(new Set());
+          const n = d.atoms ?? 0;
+          setDidAtomize(n > 0);
+          setMsg(n === 0
+            ? 'No reusable content could be extracted from this document.'
+            : `Auto-atomized ${n} atom${n === 1 ? '' : 's'} into the library (draft — review in Library).${d.skipped ? ` ${d.skipped} short block${d.skipped === 1 ? '' : 's'} skipped.` : ''} The librarian is cataloging.`);
+        } else {
+          setBlocks(d.blocks ?? []); setReferenceId(d.referenceAtomId ?? null); setSel(new Set());
+          setMsg(`Uploaded — ${(d.blocks ?? []).length} objects. Select what to atomize, at the grain you want.`);
+        }
       } else setMsg(j.error || 'Upload failed');
     } catch { setMsg('Upload failed'); } finally { setBusy(false); }
-  }, [tenantSlug]);
+  }, [tenantSlug, ctx]);
 
   const shred = useCallback(() => {
     setBlocks(raw.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean).map((text, i): Block => ({
@@ -199,14 +213,26 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
         <div className="border border-gray-200 rounded-xl p-4 bg-white">
           <label className="block text-xs text-gray-500 mb-1">Upload a document, or paste content, to deconstruct</label>
           <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={3} className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-sm" placeholder="Paste a bio, a past-performance blurb, a whole team section…" />
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <button onClick={shred} disabled={!raw.trim() || busy} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:opacity-50">Deconstruct</button>
             <label className="text-sm text-blue-600 hover:underline cursor-pointer">or upload a file
               <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md" className="hidden" disabled={busy}
-                     onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+                     onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, autoMode); e.target.value = ''; }} />
             </label>
-            <span className="text-[11px] text-gray-400">figures, tables & lists are detected — nothing atomizes until you select</span>
+            <label className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none" title="Segment the whole document into the library in one step and hand it to the librarian to catalog — you review in Library instead of hand-selecting.">
+              <input type="checkbox" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} disabled={busy} />
+              ⚡ auto-atomize the whole doc
+            </label>
+            <span className="text-[11px] text-gray-400">{autoMode ? 'the whole document is atomized on upload — review in Library' : 'figures, tables & lists are detected — nothing atomizes until you select'}</span>
           </div>
+          {didAtomize && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span className="text-green-700">✓ Atoms landed for review.</span>
+              {onAtomized
+                ? <button onClick={onAtomized} className="text-blue-600 font-medium hover:underline">Review in Library →</button>
+                : <a href={`/portal/${tenantSlug}/library/review`} className="text-blue-600 font-medium hover:underline">Review in Library →</a>}
+            </div>
+          )}
         </div>
         {blocks.length > 0 && (
           <div className="border border-gray-200 rounded-xl bg-white divide-y divide-gray-100">

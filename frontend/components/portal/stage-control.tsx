@@ -48,6 +48,7 @@ export function StageControl({
   const [locking, setLocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blockedSections, setBlockedSections] = useState<{ title: string; volumeName: string | null }[] | null>(null);
+  const [readinessBlockers, setReadinessBlockers] = useState<{ category: string; message: string; sectionTitle?: string }[] | null>(null);
   const [requirements, setRequirements] = useState<GateRequirement[]>([]);
   const [showChecklist, setShowChecklist] = useState(false);
   const [markingMet, setMarkingMet] = useState<string | null>(null);
@@ -124,31 +125,41 @@ export function StageControl({
     ? Math.ceil((new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  const handleAdvance = useCallback(async (force = false) => {
+  const handleAdvance = useCallback(async (opts: { force?: boolean; acknowledgeBlockers?: boolean } = {}) => {
+    const { force = false, acknowledgeBlockers = false } = opts;
     if (!canAdvance || advancing) return;
     setAdvancing(true);
     setError(null);
-    if (!force) setBlockedSections(null);
+    // A fresh (un-forced, un-acknowledged) attempt clears the prior blocker panels.
+    if (!force && !acknowledgeBlockers) { setBlockedSections(null); setReadinessBlockers(null); }
 
     try {
+      const body: Record<string, unknown> = {};
+      if (force) body.force = true;
+      if (acknowledgeBlockers) body.acknowledgeBlockers = true;
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/advance`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(force ? { force: true } : {}),
+          body: JSON.stringify(body),
         },
       );
       const json = await res.json();
       if (!res.ok) {
-        // The gate tells us exactly what's blocking — surface the open sections.
+        // The gate tells us exactly what's blocking — surface the open sections…
         if (json.code === 'SECTIONS_NOT_LOCKED' && Array.isArray(json.details?.openSections)) {
           setBlockedSections(json.details.openSections);
+        }
+        // …or the submission-readiness blockers (the "ready to submit" gate).
+        if (json.code === 'NOT_READY' && Array.isArray(json.details?.blockers)) {
+          setReadinessBlockers(json.details.blockers);
         }
         setError(json.error || 'Failed to advance stage');
         return;
       }
       setBlockedSections(null);
+      setReadinessBlockers(null);
       router.refresh();
     } catch {
       setError('Network error');
@@ -205,9 +216,9 @@ export function StageControl({
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-y-3">
         {/* Stage progress dots */}
-        <div className="flex items-center gap-0">
+        <div className="flex items-center gap-0 overflow-x-auto">
           {gateConfig.map((gate, idx) => {
             const isDone = idx < currentIndex;
             const isCurrent = idx === currentIndex;
@@ -262,7 +273,7 @@ export function StageControl({
 
           {canAdvance && !isAtLastGate && !isLocked && (
             <button
-              onClick={() => handleAdvance(false)}
+              onClick={() => handleAdvance()}
               disabled={advancing}
               className="min-h-[44px] px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
@@ -294,15 +305,26 @@ export function StageControl({
 
       {/* Lock status info */}
       {(lockCount > 0 || isLocked || deadlineStr) && (
-        <div className="mt-3 flex items-center gap-4 text-xs">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {isLocked && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium">
               Locked (#{lockCount})
             </span>
           )}
           {canExport && (
-            <span className="text-emerald-600 font-medium">
-              Download available ({downloadCount} downloaded)
+            <span className="inline-flex flex-wrap items-center gap-1.5 text-emerald-700">
+              <span className="font-medium">Download:</span>
+              {(['docx', 'pdf', 'zip', 'json'] as const).map((f) => (
+                <a
+                  key={f}
+                  href={`/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=${f}`}
+                  className="inline-flex items-center rounded border border-emerald-300 px-1.5 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                  title={`Download the ${f.toUpperCase()} package`}
+                >
+                  {f.toUpperCase()}
+                </a>
+              ))}
+              {downloadCount > 0 && <span className="text-[11px] text-gray-400">({downloadCount} downloaded)</span>}
             </span>
           )}
           {deadlineStr && !isLocked && (
@@ -337,13 +359,38 @@ export function StageControl({
           </ul>
           {isAdmin && (
             <button
-              onClick={() => handleAdvance(true)}
+              onClick={() => handleAdvance({ force: true })}
               disabled={advancing}
               className="mt-2 px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 transition-colors"
             >
               {advancing ? 'Forcing…' : 'Force advance anyway →'}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Submission-readiness gate: the whole-proposal blockers that stand between this proposal and
+          submission, with an explicit "Submit anyway" acknowledgement (the confirm-gate override). */}
+      {readinessBlockers && readinessBlockers.length > 0 && (
+        <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+          <p className="text-xs font-semibold text-red-800">
+            Not ready to submit — {readinessBlockers.length} blocker{readinessBlockers.length > 1 ? 's' : ''} to resolve:
+          </p>
+          <ul className="mt-1 text-xs text-red-700 list-disc pl-5 space-y-0.5">
+            {readinessBlockers.map((b, i) => (
+              <li key={i}>{b.message}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] text-red-500">
+            Resolve these, or submit anyway to record the proposal as submitted with these gaps acknowledged.
+          </p>
+          <button
+            onClick={() => handleAdvance({ acknowledgeBlockers: true })}
+            disabled={advancing}
+            className="mt-2 px-3 py-1.5 text-xs font-semibold bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {advancing ? 'Submitting…' : 'Submit anyway →'}
+          </button>
         </div>
       )}
 

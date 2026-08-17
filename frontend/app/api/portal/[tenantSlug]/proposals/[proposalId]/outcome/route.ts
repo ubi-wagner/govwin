@@ -9,6 +9,7 @@ import { isValidUUID } from '@/lib/validation';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 import { resolveGatePolicy } from '@/lib/automation/policy';
 import { coerceOriginCard } from '@/lib/cards/card';
+import { completeOutcomeTodos } from '@/lib/proposal/outcome-todo';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -283,6 +284,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 500 },
       );
     }
+
+    // ── #13: close the record-outcome nudge ────────────────────────
+    // The outcome is now durably recorded — auto-complete the `record_outcome` ToDo
+    // that submission raised, so it drops out of the tenant's queue. Best-effort.
+    await completeOutcomeTodos(tenantId, proposalId, sessionUser.id, outcome);
 
     // ── End event ────────────────────────────────────────────────────
     await emitEventEnd(startId, {

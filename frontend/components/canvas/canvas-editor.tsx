@@ -785,7 +785,7 @@ function CanvasEditorInner({
           suggestedType: typeFromLibraryTags(n.library_tags),
           sectionType: typeFromLibraryTags(n.library_tags),
           tags: (n.library_tags ?? []).filter((t) => !t.startsWith('type:')),
-          status: acceptedNodeIds.has(n.id) || n.provenance.library_unit_id ? 'approved' : 'draft',
+          status: acceptedNodeIds.has(n.id) || n.provenance?.library_unit_id ? 'approved' : 'draft',
         })),
     [doc.nodes, acceptedNodeIds],
   );
@@ -850,7 +850,7 @@ function CanvasEditorInner({
               text: getNodeText(node),
               sectionType: typeFromLibraryTags(node.library_tags),
               tags: (node.library_tags ?? []).filter((t) => !t.startsWith('type:')),
-              parentUnitId: node.provenance.library_unit_id ?? null,
+              parentUnitId: node.provenance?.library_unit_id ?? null,
             }),
           },
         );
@@ -917,22 +917,32 @@ function CanvasEditorInner({
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
   }, [proposalId, handleReviseNode]);
 
-  /** Annotate a highlighted span — attach a note (comment) to THIS section, quoting the span. */
+  /** Annotate a highlighted span — attach a note (comment) ANCHORED to the specific block + quoted span
+   *  (SPINE-T7), not just floating at the section level. section_id still scopes the comment; the block
+   *  anchor {nodeId, quote} pins it to what the reviewer highlighted. */
   const selectionAnnotate = useCallback(async (sel: CanvasSelection) => {
     if (!tenantSlug || !proposalId || !sectionId) return;
     const note = typeof window !== 'undefined' ? window.prompt(`Add a note on “${selectionLabel(sel)}”:`) : null;
     if (!note || !note.trim()) return;
-    const snippet = sel.text.slice(0, 140) + (sel.text.length > 140 ? '…' : '');
+    const snippet = sel.text.slice(0, 200) + (sel.text.length > 200 ? '…' : '');
+    const anchorNodeId = sel.nodeIds?.[0] ?? null;
     setSelBusy(true);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: sectionId, text: `“${snippet}” — ${note.trim()}` }),
+        body: JSON.stringify({
+          nodeId: sectionId,
+          text: note.trim(),
+          ...(anchorNodeId ? { anchor: { nodeId: anchorNodeId, quote: snippet } } : {}),
+        }),
       });
       const j = await res.json().catch(() => ({}));
-      if (res.ok) toast.success('Note added to this section.');
-      else toast.error(j?.error ?? 'Could not add the note.');
+      if (res.ok) {
+        toast.success(anchorNodeId ? 'Note pinned to the selected text.' : 'Note added to this section.');
+        // Nudge an already-open comment thread (sidebar) to re-fetch so the pinned note appears at once.
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('canvas:comment-added', { detail: { sectionId } }));
+      } else toast.error(j?.error ?? 'Could not add the note.');
     } catch { toast.error('Could not add the note.'); }
     finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
   }, [tenantSlug, proposalId, sectionId]);
@@ -969,8 +979,8 @@ function CanvasEditorInner({
           </div>
         )}
         {/* Toolbar */}
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-white border-b px-4 py-2">
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-y-2 bg-white border-b px-4 py-2">
+          <div className="flex items-center gap-3 min-w-0">
             <h2 className="font-semibold text-sm text-gray-800 truncate max-w-xs">
               {doc.metadata.title}
             </h2>
@@ -984,7 +994,7 @@ function CanvasEditorInner({
             </span>
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {saveError && (
               <span className="text-xs text-red-600 mr-2">{saveError}</span>
             )}

@@ -16,6 +16,7 @@ import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
 import { AmendmentsPanel } from './amendments-panel';
+import { IngestPlanPanel } from './ingest-plan-panel';
 
 interface Solicitation {
   id: string;
@@ -206,25 +207,29 @@ export function CurationWorkspace({
     flags: { hasFullText: boolean; hasAiExtracted: boolean; complianceRowCount: number; hasOutline: boolean };
     missingStages: { stage: string; agent: string }[];
   } | null>(null);
+  // Bumped when Assess fires so the coordination-plan panel re-fetches (the manager's async plan
+  // lands shortly after). Delayed bumps below catch that landing without a manual refresh.
+  const [planKey, setPlanKey] = useState(0);
 
   // Ingest Assist — one action that runs the whole ingest SOP for this claimed
   // solicitation: parse its text → auto-build the compliance matrix + volumes +
-  // section molds → publish the opportunity card(s) (a suite for a multi-topic
-  // solicitation). The same materializer the Scouts feed.
+  // section molds → topic opportunities, FOR YOUR REVIEW (a suite for a multi-topic
+  // solicitation). Review-gated: it does NOT publish to customers — release happens
+  // through Push after you approve. The same materializer the Scouts feed.
   const handleIngestAssist = async () => {
     if (typeof window !== 'undefined' && !window.confirm(
-      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds, then publish the opportunity card(s). Existing volumes/compliance for this solicitation are replaced. Continue?'
+      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds for your review. Nothing is published to customers — you release it with Push after review. Existing volumes/compliance for this solicitation are replaced. Continue?'
     )) return;
     setAssistBusy(true);
     try {
       const res = await fetch(`/api/admin/rfp-curation/${sol.id}/ingest-assist`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
       const d = json.data ?? {};
       toast.success(
-        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) · ${d.cards} card(s) published`,
+        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) built for review — Push to release`,
       );
       router.refresh();
     } catch (e) {
@@ -245,6 +250,10 @@ export function CurationWorkspace({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Assessment failed');
       setAssessment(json.data?.snapshot ?? null);
+      // The manager's coordination plan lands async (pipeline worker) — re-fetch the plan panel a
+      // few times to catch it. The panel self-hides until a real structured plan exists.
+      setPlanKey((k) => k + 1);
+      [4000, 9000, 15000].forEach((ms) => setTimeout(() => setPlanKey((k) => k + 1), ms));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assessment failed');
     } finally {
@@ -526,6 +535,7 @@ export function CurationWorkspace({
           break;
         case 'dismiss': {
           const notes = prompt('Reason for dismissal:');
+          if (notes === null) return; // Cancel aborts — do NOT dismiss on a cancelled prompt
           await invoke('solicitation.dismiss', { solicitationId: sol.id, notes: notes || undefined });
           setSol((s) => ({ ...s, status: 'dismissed' }));
           break;
@@ -564,6 +574,15 @@ export function CurationWorkspace({
           setSol((s) => ({ ...s, status: 'pushed_to_pipeline' }));
           break;
       }
+      // Success feedback — every state transition confirms, so the culminating Push
+      // (and the rest) is never a silent badge flip. Errors surface via useTool.
+      const done: Record<string, string> = {
+        claim: 'Claimed', release: 'Released for AI analysis', dismiss: 'Dismissed',
+        start_curation: 'Curation started', request_review: 'Sent for review',
+        approve: 'Approved', reject_review: 'Sent back for revision',
+        push: 'Published to the pipeline — customer cards are live',
+      };
+      if (done[action]) toast.success(done[action]);
       router.refresh();
     } catch {
       // error shown via useTool
@@ -736,7 +755,7 @@ export function CurationWorkspace({
     <div className="max-w-6xl">
       {/* Atomization rail — classify/tag/accept the drawn annotations as section anchors */}
       <AnnotationAtomizeRail solId={sol.id} />
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-y-3 mb-6">
         <div>
           <button
             onClick={() => router.push('/admin/rfp-curation')}
@@ -750,11 +769,11 @@ export function CurationWorkspace({
             {sol.programType?.replace(/_/g, ' ') ?? 'Unknown Type'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleIngestAssist}
             disabled={assistBusy}
-            title="Parse this solicitation and auto-build the matrix, volumes, section molds, and publish the opportunity card(s)"
+            title="Parse this solicitation and auto-build the matrix, volumes, and section molds for your review (nothing is published to customers until you Push)"
             className="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {assistBusy ? 'Building…' : '✨ Ingest Assist'}
@@ -857,9 +876,13 @@ export function CurationWorkspace({
           ) : (
             <p className="mt-2 text-xs text-emerald-700">All ingest stages complete — ready for QA / release.</p>
           )}
-          <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan posts to the agent workforce.</p>
+          <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan appears below once it lands.</p>
         </div>
       )}
+
+      {/* rfp_ingest_manager coordination plan (#12) — the async LLM plan, read back + rendered.
+          Always mounted; self-hides until a real structured plan exists (and after Assess fires). */}
+      <IngestPlanPanel solId={sol.id} refreshKey={planKey} />
 
       {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
       <div className="mb-4">
@@ -867,7 +890,7 @@ export function CurationWorkspace({
       </div>
 
       {/* Quick-nav tabs */}
-      <nav className="flex items-center gap-1 mb-6 border-b pb-2">
+      <nav className="flex items-center gap-1 mb-6 border-b pb-2 overflow-x-auto whitespace-nowrap">
         {[
           { label: 'Documents', target: 'section-documents' },
           { label: 'Topics', target: 'section-topics' },
@@ -929,7 +952,7 @@ export function CurationWorkspace({
 
           {/* PDF Viewer (side-by-side source) — or text fallback */}
           {sourcePdf ? (
-            <div className="border rounded-lg overflow-hidden relative">
+            <div className="border rounded-lg overflow-x-auto relative">
               <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
                 <h2 className="text-sm font-semibold text-gray-700">
                   Source Document — {sourcePdf.originalFilename}
@@ -993,14 +1016,14 @@ export function CurationWorkspace({
 
           {/* Topics — the pursuable units under this solicitation */}
           <div id="section-topics" className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-y-2 mb-3">
               <div>
                 <h2 className="text-lg font-semibold">Topics</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Discrete pursuit units — what customers pin in Spotlight
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {topicsList.length > 0 && (
                   <button
                     onClick={() => setShowTopicCompliance(!showTopicCompliance)}

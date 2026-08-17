@@ -15,7 +15,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
 import { paginate } from '@/lib/export/paginate';
@@ -54,15 +55,15 @@ export async function GET(_request: Request, ctx: RouteContext) {
 
     // ── Artifact + its sections ────────────────────────────────────────
     let artifact: { id: string; artifactType: string | null; volumeName: string | null } | undefined;
-    let sections: { title: string | null; content: string | null }[] = [];
+    let sections: { id: string; title: string | null; content: string | null }[] = [];
     try {
       [artifact] = await sql<{ id: string; artifactType: string | null; volumeName: string | null }[]>`
         SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName" FROM proposal_artifacts
         WHERE id = ${artifactId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1
       `;
       if (artifact) {
-        sections = await sql<{ title: string | null; content: string | null }[]>`
-          SELECT title, content FROM proposal_sections
+        sections = await sql<{ id: string; title: string | null; content: string | null }[]>`
+          SELECT id, title, content FROM proposal_sections
           WHERE proposal_id = ${proposalId}::uuid AND artifact_id = ${artifactId}::uuid
           ORDER BY volume_number ASC NULLS LAST, sort_index ASC NULLS LAST, section_number ASC
         `;
@@ -73,6 +74,26 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
     if (!artifact) {
       return NextResponse.json({ error: 'Artifact not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Section-level scope (mirrors the per-section export route) ──────
+    //    verifyProposalAccess is tenant-wide-true for any accepted collaborator;
+    //    layout leaks the whole volume's section titles + page spans. A collaborator
+    //    scoped to a subset must not see the rest. Tenant-wide members get all
+    //    sections from resolveUserAccess; a scoped collaborator only their grant.
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      const access = await resolveUserAccess(su.id, proposalId, tenantId);
+      const granted = new Set<string>([
+        ...access.viewableSections,
+        ...access.commentableSections,
+        ...access.editableSections,
+      ]);
+      if (!sections.every((s) => granted.has(s.id))) {
+        return NextResponse.json(
+          { error: 'You do not have access to all sections of this artifact', code: 'FORBIDDEN' },
+          { status: 403 },
+        );
+      }
     }
 
     // ── Assemble (v2 flow) + measure ───────────────────────────────────

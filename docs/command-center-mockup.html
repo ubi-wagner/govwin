@@ -1,0 +1,165 @@
+<title>Command Center Spec</title>
+<meta name="description" content="Interactive spec — the tabbed Command Center across all three roles: RFP admin, EconDev partner-manager, tenant admin." />
+<style>
+  :root{
+    --ground:#0f172a;--ground2:#1e293b;--gray50:#f9fafb;--g900:#111827;--g700:#374151;--g500:#6b7280;--g400:#9ca3af;--g300:#d1d5db;--g200:#e5e7eb;--g100:#f3f4f6;
+    --amber300:#fcd34d;--amber500:#f59e0b;--amber700:#b45309;--amber900:#78350f;
+    --blue200:#bfdbfe;--blue500:#3b82f6;--blue600:#2563eb;--blue900:#1e3a8a;
+    --violet200:#ddd6fe;--violet500:#8b5cf6;--violet600:#7c3aed;--violet800:#5b21b6;
+    --indigo600:#4f46e5;--red500:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%,var(--ground2),var(--ground));color:var(--g900);
+    -webkit-font-smoothing:antialiased;min-height:100%;padding:22px 12px 40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .cap{color:#cbd5e1;font-size:13px;text-align:center;max-width:440px;line-height:1.5}.cap b{color:#fff}
+  .roleswitch{display:flex;gap:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:5px}
+  .rbtn{border:0;background:none;font:inherit;font-size:13px;font-weight:700;color:#cbd5e1;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  .rbtn[aria-selected="true"]{background:#fff;color:#0f172a}
+  .phone{width:100%;max-width:400px;background:#0b1220;border-radius:2.4rem;padding:10px;box-shadow:0 40px 80px -20px rgba(0,0,0,.7),0 0 0 2px #020617,inset 0 0 0 2px #1f2937}
+  .screen{background:var(--gray50);border-radius:1.85rem;overflow:hidden;position:relative;height:76vh;min-height:640px;max-height:880px;display:flex;flex-direction:column}
+  .statusbar{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600;flex:0 0 auto}
+  .bat{width:22px;height:11px;border:1px solid #111;border-radius:3px;position:relative;opacity:.85;display:inline-block;vertical-align:middle}
+  .bat::after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:#111;border-radius:1px}
+  .bat::before{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:70%;background:#111;border-radius:1px}
+  .appbar{flex:0 0 auto;background:#fff;border-bottom:1px solid var(--g200);display:flex;align-items:center;gap:12px;padding:9px 14px}
+  .burger{width:36px;height:36px;border-radius:9px;border:1px solid var(--g200);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--g700)}
+  .brand{font-weight:700;font-size:15px}.rolechip{font-size:10px;font-weight:700;color:var(--indigo600);background:#eef2ff;border-radius:6px;padding:2px 7px;margin-left:2px}
+  .bell{margin-left:auto;position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--g500)}
+  .bell .dot{position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--red500);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
+  .head{flex:0 0 auto;background:#fff;padding:12px 14px 0}h1{font-size:20px;font-weight:800;letter-spacing:-.01em}.sub{font-size:12.5px;color:var(--g500);margin-top:2px}.sub .n{color:var(--amber700);font-weight:800}
+  .tabs{flex:0 0 auto;background:#fff;border-bottom:1px solid var(--g200);display:flex;gap:2px;padding:10px 8px 0;overflow-x:auto}
+  .tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:8px 12px 10px;border:0;background:none;font:inherit;font-size:13px;font-weight:600;color:var(--g500);border-bottom:2.5px solid transparent;cursor:pointer;white-space:nowrap}
+  .tab[aria-selected="true"]{color:var(--g900);border-bottom-color:var(--indigo600)}
+  .tab .b{min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:800;color:#fff;display:inline-flex;align-items:center;justify-content:center;background:var(--g400)}
+  .tab[data-tone="action"] .b{background:var(--amber500)}.tab[data-tone="shadow"] .b{background:var(--violet600)}
+  .body{flex:1 1 auto;overflow-y:auto;padding:14px 14px 24px}.body::-webkit-scrollbar,.tabs::-webkit-scrollbar,.quick::-webkit-scrollbar{width:0;height:0}
+  .quick{display:flex;gap:8px;overflow-x:auto;padding:0 0 12px;margin-bottom:2px}
+  .chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:11px;border:1px solid var(--g200);background:#fff;font-size:12.5px;font-weight:600;color:var(--g700);white-space:nowrap}
+  .card{border-radius:13px;border:1px solid var(--g200);background:#fff;padding:13px;margin-bottom:11px}
+  .card.action{border-color:var(--amber300);background:rgba(255,251,235,.5)}.card.shadow{border-color:var(--violet200);background:rgba(245,243,255,.55)}.card.progress{border-color:var(--blue200);background:rgba(239,246,255,.45)}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:10px}.ctitle{font-size:13px;font-weight:700}
+  .card.action .ctitle{color:var(--amber900)}.card.shadow .ctitle{color:var(--violet800)}.card.progress .ctitle{color:var(--blue900)}
+  .pill{min-width:22px;height:22px;padding:0 7px;border-radius:11px;font-size:11.5px;font-weight:800;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+  .card.action .pill{background:var(--amber500)}.card.shadow .pill{background:var(--violet600)}.card.progress .pill{background:var(--blue500)}
+  .rows{margin-top:9px;display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:7px 3px;border-top:1px solid rgba(0,0,0,.05)}.row:first-child{border-top:0}
+  .t{min-width:0}.rt{font-size:13px;font-weight:600;color:var(--g900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rs{font-size:11px;color:var(--g500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .r{display:flex;align-items:center;gap:8px;flex:0 0 auto}.chev{color:var(--g300);font-size:17px}.desc{font-size:11px;font-weight:700;color:var(--violet600);white-space:nowrap}
+  .seeall{margin-top:8px;display:inline-block;font-size:12px;font-weight:600;color:var(--blue600)}
+  .note{font-size:11px;color:var(--g400);line-height:1.5;margin:2px}
+  .home{flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center}.home::after{content:"";width:120px;height:5px;border-radius:3px;background:#111;opacity:.22}
+  .legend{max-width:440px;color:#94a3b8;font-size:11.5px;line-height:1.6;text-align:center}.legend b{color:#e2e8f0}
+</style>
+
+<p class="cap">📱 <b>Command Center — full spec</b>. Switch role below, then tap the tabs. Same component; role decides the tabs, counts, action buttons, and where <b>Descend →</b> takes you.</p>
+
+<div class="roleswitch" id="rs">
+  <button class="rbtn" data-role="rfp" aria-selected="true">RFP Admin</button>
+  <button class="rbtn" data-role="partner" aria-selected="false">Partner-Manager</button>
+  <button class="rbtn" data-role="tenant" aria-selected="false">Tenant Admin</button>
+</div>
+
+<div class="phone"><div class="screen">
+  <div class="statusbar"><span>9:41</span><span>•••&nbsp;📶&nbsp;<span class="bat"></span></span></div>
+  <div class="appbar"><div class="burger">☰</div><div class="brand" id="brand"></div><span class="rolechip" id="rolechip"></span><div class="bell">🔔<span class="dot" id="bell"></span></div></div>
+  <div class="head"><h1>Command Center</h1><p class="sub" id="sub"></p></div>
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div class="body" id="bodyEl"></div>
+  <div class="home"></div>
+</div></div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+const R = {
+  rfp: { brand:'RFP Admin', chip:'shadow · all tenants', bell:18, sub:'Hi Eric — <span class="n">18</span> open across your lanes.',
+    legend:'<b>RFP admin</b> sees all four lanes across every tenant. <b>Descend &rarr;</b> drops you straight into a tenant (amber “shadow” banner, then “Return to platform ↑”).',
+    tabs:[
+      {key:'opp',label:'Opportunities',tone:'action',count:9,
+        actions:['📤 Upload RFP','➕ New intake','🔭 Scout','📋 Triage'],
+        cards:[{tone:'action',title:'Approved — ready to release',count:3,rows:[
+          ['Ohio TVSF Round 45 — Tech Validation Fund','TVSF-R45'],['DoW 2026 STTR — Direct to Phase II','N26D-CAM07'],['DoW 2026 SBIR — Additive Construction','N261-EXP01']]},
+          {tone:'action',title:'New RFPs to claim',count:6,seeall:6,rows:[
+          ['DOE SBIR/STTR Phase I Release 2','DE-FOA-0003241'],['NSF SBIR/STTR Phase I (2026)','NSF 26-517'],['Untitled solicitation','needs a title']]}],
+        note:'Also here when populated: Awaiting your approval, Amendments to confirm, New scout finds. Empty sections auto-hide.'},
+      {key:'admin',label:'Admin',tone:'action',count:4,
+        actions:['👤 Applications','🤝 Partner requests','✍️ Content Studio','🎁 Comp a portal'],
+        cards:[{tone:'action',title:'Content to review &amp; publish',count:4,rows:[
+          ['What Is an OTA? — Other Transaction Agreements','program guide · draft'],['What Is a CSO? — Commercial Solutions','program guide · draft'],['What Is a BAA? — Broad Agency Announcements','program guide · draft'],['Federal Grants &amp; NOFOs — First-Timer’s Guide','program guide · draft']]}],
+        note:'Platform actions only you can take — new-customer applications, partner registrations, content publishing, comping a portal.'},
+      {key:'tenant',label:'Tenant',tone:'shadow',count:3,
+        actions:['📨 Send a to-do','🏢 Jump to company'],
+        cards:[{tone:'shadow',title:'Tenant to-dos — descend to act',count:3,rows:[
+          ['Review the DoW STTR cost volume','Foundation 3DCP · due Aug 15','desc'],['Approve the university teaming agreement','Foundation 3DCP · due Aug 17','desc'],['Approve the vendor MSA','Foundation 3DCP · due Aug 14','desc']]}],
+        note:'Workflow to-dos assigned inside a tenant. Descend → drops you into that company to act, then back. Same lane powers the partner-manager.'},
+      {key:'system',label:'System',tone:'system',count:2,
+        actions:['🔀 Workflows','⚙️ Automation','📡 Events','❤️ Health'],
+        cards:[{tone:'progress',title:'System &amp; automation',count:2,rows:[
+          ['Automation notice — spotlight digest sent','14 tenants · today'],['Workflow needs attention — OnRfpUploaded','paused · retry available']]}],
+        note:'Infra + automation alerts. Failed-workflow → to-do is a small new hook so a stalled pipeline surfaces here.'},
+    ]},
+  partner:{ brand:'Partner Console', chip:'pin-up · your stable', bell:12, sub:'Entrepreneurs’ Center — 6 companies, <span class="n">12</span> open.',
+    legend:'<b>EconDev partner-manager</b> sees only their managed companies — two lanes. <b>Descend &rarr;</b> pins you in as that company’s admin (navy “Exit to partner console →”). No Admin/System tabs (below /admin).',
+    tabs:[
+      {key:'opp',label:'Opportunities',tone:'action',count:5,
+        actions:['🏢 My companies','🔍 Spotlight'],
+        cards:[{tone:'action',title:'Active across your stable',count:5,rows:[
+          ['Foundation 3DCP — TVSF R45 pinned','ready to build'],['Bright Materials — DOE SBIR pinned','needs a proposal'],['Aether Robotics — NSF SBIR in draft','65% complete']]}],
+        note:'Live opportunity cards &amp; proposals across all 6 companies you manage.'},
+      {key:'companies',label:'Companies',tone:'shadow',count:7,
+        actions:['📨 Send a to-do','➕ Add company','🏢 Jump to company'],
+        cards:[{tone:'shadow',title:'Company to-dos — descend to act',count:7,rows:[
+          ['Foundation 3DCP — review cost volume','due Aug 15','desc'],['Bright Materials — approve teaming','due Aug 17','desc'],['Aether Robotics — upload SF424','overdue','desc'],['Vertex Additive — acknowledge kickoff','due Aug 20','desc']]}],
+        note:'Every managed company’s open to-dos in one feed — the “notify-up” your /partner console already does, now tabbed. Descend to act inside the company.'},
+    ]},
+  tenant:{ brand:'Foundation 3DCP', chip:'my company', bell:9, sub:'Hi Kate — <span class="n">9</span> open across your lanes.',
+    legend:'<b>Tenant admin</b> sees their own company — four lanes, no descending (they’re already home). <b>Activity</b> is admin-only. Descended RFP-admins &amp; partner-managers see this same view.',
+    tabs:[
+      {key:'opp',label:'Opportunities',tone:'action',count:2,
+        actions:['🔍 Browse spotlight','➕ New proposal'],
+        cards:[{tone:'action',title:'Your spotlight &amp; proposals',count:2,rows:[
+          ['Ohio TVSF Round 45 — pinned for you','ready to build a portal'],['DoW STTR — Autonomous Concrete AM','proposal 80% · in review']]}],
+        note:'Your pinned opportunities and the proposals in flight.'},
+      {key:'todos',label:'To-dos',tone:'action',count:3,
+        actions:['📨 Send a to-do','👥 Invite teammate'],
+        cards:[{tone:'action',title:'Your team’s to-dos',count:3,rows:[
+          ['Review the DoW STTR cost volume','due Aug 15'],['Approve the university teaming agreement','due Aug 17'],['Approve the vendor MSA','due Aug 14']]}],
+        note:'Your own workflow to-dos — you act right here, no descending.'},
+      {key:'workflows',label:'Workflows',tone:'progress',count:4,
+        actions:['📝 Run full draft','🎬 Run Studio','📨 Create a to-do'],
+        cards:[{tone:'progress',title:'Active pipeline runs',count:4,rows:[
+          ['Proposal build — DoW STTR','running · Draft phase'],['Contract kickoff — TVSF R45','paused · your gate'],['Studio — Refine loop','paused · review gate'],['Project setup — NSF SBIR','running · provisioning']]}],
+        note:'Your live workflow instances (proposal builds, Studio loops, kickoffs). Paused = waiting on you; tap to advance. Reuses the existing Processes monitor.'},
+      {key:'activity',label:'Activity',tone:'progress',count:12,
+        actions:['🔎 Filter','📅 7 days'],
+        cards:[{tone:'progress',title:'Recent system activity',count:12,rows:[
+          ['Invited Jordan Vega to the DoW STTR proposal','collaborator · 2h ago'],['Kate added Priya Shah to the team','new member · today'],['DoW STTR advanced to Review','proposal · today'],['Cost volume uploaded','library · yesterday']]}],
+        note:'Admin-only feed — project invites, new members, and system events for your company. Reuses the Activity Stream (visibility tightened to admin).'},
+    ]},
+};
+
+let role='rfp', tab='opp';
+const el=id=>document.getElementById(id);
+function render(){
+  const r=R[role]; const t=r.tabs.find(x=>x.key===tab)||r.tabs[0]; tab=t.key;
+  el('brand').textContent=r.brand; el('rolechip').textContent=r.chip; el('bell').textContent=r.bell; el('sub').innerHTML=r.sub; el('legend').innerHTML=r.legend;
+  el('tabs').innerHTML=r.tabs.map(x=>`<button class="tab" data-tone="${x.tone}" data-k="${x.key}" aria-selected="${x.key===tab}">${x.label} <span class="b">${x.count}</span></button>`).join('');
+  let h=`<div class="quick">${t.actions.map(a=>`<span class="chip">${a}</span>`).join('')}</div>`;
+  for(const c of t.cards){
+    h+=`<div class="card ${c.tone}"><div class="chead"><span class="ctitle">${c.title}</span><span class="pill">${c.count}</span></div><div class="rows">`;
+    for(const row of c.rows){ const right=row[2]==='desc'?`<span class="desc">Descend →</span>`:`<span class="chev">›</span>`;
+      h+=`<div class="row"><span class="t"><span class="rt">${row[0]}</span><span class="rs">${row[1]}</span></span><span class="r">${right}</span></div>`; }
+    h+=`</div>${c.seeall?`<a class="seeall">See all ${c.seeall} →</a>`:''}</div>`;
+  }
+  h+=`<p class="note">${t.note}</p>`;
+  el('bodyEl').innerHTML=h; el('bodyEl').scrollTop=0;
+  el('tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.getAttribute('data-k');render();});
+}
+document.getElementById('rs').querySelectorAll('.rbtn').forEach(b=>b.onclick=()=>{
+  document.getElementById('rs').querySelectorAll('.rbtn').forEach(x=>x.setAttribute('aria-selected',String(x===b)));
+  role=b.getAttribute('data-role'); tab='opp'; render();
+});
+render();
+</script>

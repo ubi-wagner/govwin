@@ -125,9 +125,16 @@ The schema is defined across **69 migrations (000–067, plus the interleaved
 produces **72 live tables across 14 domains**. Full per-table detail:
 `docs/archive/baseline/inventory/DB_SCHEMA_CURRENT.md`.
 (Prior docs said "53 / 051" or "40 / 039" — both stale/wrong.)
-> **⚠ high-water is now `137`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
+> **⚠ high-water is now `184`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
 > dated deltas below: §1b (migs 088–092), §1c (migs 094–103), and **As-built delta — 2026-07-15**
-> (migs 105–108). The opportunity→purchase→proposal spine is specified in
+> (migs 105–108). **Delta migs 179–184 (NOT reflected in the table defs below — check here):**
+> `command_seen_state` (179, new table: `user_id`+`scope`+`tab`+`seen_at` watermark);
+> `opportunities.update_watch`/`_at`/`_by` (181); `curated_solicitations.build_complete`/`_at`/`_by` (182);
+> `proposal_comments.anchor jsonb {nodeId,quote}` (183 — comments node-anchored, not only section-anchored);
+> `tenant_opportunity_cards.start_nudges_sent`/`start_nudged_at` (181); `user_memberships.can_manage_buckets` +
+> `automation_framework.max_buckets_per_tenant` default 12→6 (181). **There is NO
+> `tenant_opportunity_cards.rank_score`** — overall rank is the LATERAL top of `tenant_bucket_scores.top_score`
+> (Mistake 16). The opportunity→purchase→proposal spine is specified in
 > `docs/MASTER_MIRROR_OPP_DESIGN.md` (master + one-way bridge + per-tenant mirror).
 These are the tables most frequently queried and the exact column names.
 **Do NOT guess column names. Look them up here.**
@@ -867,16 +874,18 @@ in the list (tagged `status: 'hidden'`) so admins can see the full structure.
 
 ### Mistake 16: Recomputing scores in the frontend
 ⚠️ **REPOINTED (mig 125 dropped `tenant_pipeline_items`).** The authoritative
-per-tenant score now lives on the card spine: `tenant_opportunity_cards.rank_score`
-(overall) + per-bucket `tenant_bucket_scores`, auto-scored on bridge arrival. The
-legacy Spotlights/Pipeline pages `redirect()` to `/cards`. The original guidance —
-"use the stored pipeline score, don't recompute in the frontend" — still holds; only
-the source column moved. See Mistake 38 for the full retirement.
+per-tenant score now lives in the per-bucket **`tenant_bucket_scores`** table (one row
+per bucket, `top_score` 0–100, auto-scored on bridge arrival); the overall rank is the
+LATERAL top of that table (`ORDER BY bs.top_score DESC`). **There is NO `rank_score`
+column on `tenant_opportunity_cards`** — do not read or write one (it exists nowhere in
+the schema). The legacy Spotlights/Pipeline pages `redirect()` to `/cards`. The original
+guidance — "use the stored score, don't recompute in the frontend" — still holds; only
+the source moved. See Mistake 38 for the full retirement.
 
 **Rule:** Do NOT recompute opportunity scores from scratch in the frontend.
-Read `tenant_opportunity_cards.rank_score` / `tenant_bucket_scores` (never the
-dropped `tenant_pipeline_items.total_score`). Only the pipeline scoring engine
-computes full scores.
+Read the stored `tenant_bucket_scores.top_score` (its LATERAL top is the overall rank —
+there is no `tenant_opportunity_cards.rank_score`, and never the dropped
+`tenant_pipeline_items.total_score`). Only the pipeline scoring engine computes full scores.
 
 ### Mistake 17: Hardcoded instance deadline kills HITL (RESOLVED as of baseline)
 This was a live bug: `manager.create_instance` had a hardcoded 1h deadline. As of the

@@ -62,6 +62,22 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
     else toast.error('Nothing was archived.');
   }, [tenantSlug, load]);
 
+  // Apply the librarian's proposed vol/kind/tags to one atom (as UNconfirmed tags — a human still
+  // confirms in the Library). Surfaces the previously parsed-and-dropped `retag` suggestion (#5).
+  const applyTags = useCallback(async (atomId: string) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/portal/${tenantSlug}/atoms/apply-librarian-tags`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ atomId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j.data?.applied ?? 0) > 0) { toast.success(`Applied ${j.data.applied} suggested tag${j.data.applied > 1 ? 's' : ''} (unconfirmed).`); load(); }
+      else if (r.ok) toast('No new tags to apply — they may already be on the atom.', 'info');
+      else toast.error(j.error || 'Could not apply tags.');
+    } catch { toast.error('Could not apply tags.'); }
+    setBusy(false);
+  }, [tenantSlug, load]);
+
   if (state === 'loading') return <div className="py-16 text-center text-sm text-gray-400 animate-pulse">Reviewing your library…</div>;
   if (state === 'error') return <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center text-sm text-rose-600">Could not review the library. Try reloading.</div>;
   if (!review) return null;
@@ -92,7 +108,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
       {/* Librarian — the pipeline agent's richer AI catalog, when a result has been persisted. */}
       {librarian && (
         <section className="border border-violet-200 bg-violet-50/40 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h3 className="text-sm font-semibold text-violet-900">✦ Librarian — AI catalog
               <span className="ml-2 text-[11px] font-normal text-violet-500">{librarian.assessments.length} assessed · advisory</span>
             </h3>
@@ -113,9 +129,20 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
                     {meta && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${meta.tone}`}>{meta.label}</span>}
                     <span className="text-sm text-gray-800 truncate flex-1">{a.title || '(untitled)'}</span>
                     <span className="text-[11px] text-gray-400 tabular-nums shrink-0">Q {pct(a.qualityScore)} · R {pct(a.relevanceScore)}{a.freshness ? ` · ${a.freshness}` : ''}</span>
-                    {a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0">archive</button>}
+                    {a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0 inline-flex items-center min-h-[36px] px-1.5 -my-1">archive</button>}
                   </div>
                   {a.reason && <p className="text-[11px] text-gray-500 mt-0.5">{a.reason}</p>}
+                  {/* The librarian's proposed taxonomy (#5) — apply as unconfirmed tags in one click. */}
+                  {(a.vol || a.kind || a.suggestedTags.length > 0) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {a.vol && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">vol:{a.vol}</span>}
+                      {a.kind && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">kind:{a.kind}</span>}
+                      {a.suggestedTags.map((t) => (
+                        <span key={`${t.dimension}:${t.value}`} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{t.dimension}:{t.value}</span>
+                      ))}
+                      <button onClick={() => applyTags(a.atomId)} disabled={busy} className="text-[11px] text-violet-600 hover:underline shrink-0 ml-0.5 inline-flex items-center min-h-[36px] px-1.5 -my-1">apply tags</button>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -135,7 +162,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
       {/* Duplicates */}
       {duplicateGroups.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h3 className="text-sm font-semibold text-gray-900">Duplicates <span className="text-gray-400 font-normal">· {duplicateGroups.length} group{duplicateGroups.length > 1 ? 's' : ''}</span></h3>
             <button
               onClick={() => archive(duplicateGroups.flatMap((g) => g.atoms.slice(1).map((a) => a.id)))}
@@ -146,7 +173,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
           <div className="space-y-2">
             {duplicateGroups.map((g) => (
               <div key={g.key} className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <span className="text-xs text-gray-500">{g.atoms.length} identical copies</span>
                   <button onClick={() => archive(g.atoms.slice(1).map((a) => a.id))} disabled={busy}
                     className="text-xs text-amber-700 hover:underline disabled:opacity-50">Keep the first, archive {g.atoms.length - 1}</button>
@@ -171,7 +198,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
         const meta = FLAG_META[kind];
         return (
           <section key={kind}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <h3 className="text-sm font-semibold text-gray-900">
                 <span className={`text-[11px] px-2 py-0.5 rounded-full border ${meta.tone} mr-2`}>{meta.label}</span>
                 <span className="text-gray-400 font-normal">{items.length}</span>

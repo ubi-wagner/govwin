@@ -102,7 +102,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: 
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean; recommendationType?: string; category?: string | null }) => ({
+          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean; recommendationType?: string; category?: string | null; anchor?: { nodeId?: string; quote?: string } | null }) => ({
             id: c.id,
             actor_id: c.userId,
             actor_name: c.userName ?? 'Unknown',
@@ -111,6 +111,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: 
             resolved: c.resolved ?? false,
             recommendation_type: c.recommendationType,
             category: c.category ?? null,
+            anchor: c.anchor ?? null,
           })));
         }
       }
@@ -124,6 +125,17 @@ function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: 
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
+
+  // Re-fetch when a note is pinned from the canvas selection (selectionAnnotate) for THIS section, so an
+  // already-open thread shows the new anchored comment without a manual reload.
+  useEffect(() => {
+    const onAdded = (e: Event) => {
+      const d = (e as CustomEvent).detail as { sectionId?: string } | undefined;
+      if (!d?.sectionId || d.sectionId === nodeId) fetchComments();
+    };
+    window.addEventListener('canvas:comment-added', onAdded);
+    return () => window.removeEventListener('canvas:comment-added', onAdded);
+  }, [fetchComments, nodeId]);
 
   const handleAddComment = useCallback(async (text: string) => {
     try {
@@ -439,9 +451,9 @@ export function CanvasSidebar({
   const fit = evaluateFit(doc.nodes, budget);
   const pageOk = fit.withinBudget;
 
-  const aiNodes = doc.nodes.filter((n) => n.provenance.source === 'ai_draft').length;
-  const libraryNodes = doc.nodes.filter((n) => n.provenance.source === 'library').length;
-  const manualNodes = doc.nodes.filter((n) => n.provenance.source === 'manual').length;
+  const aiNodes = doc.nodes.filter((n) => n.provenance?.source === 'ai_draft').length;
+  const libraryNodes = doc.nodes.filter((n) => n.provenance?.source === 'library').length;
+  const manualNodes = doc.nodes.filter((n) => n.provenance?.source === 'manual').length;
 
   // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
   // user keeps the read panels (status, node info, history, comments).
@@ -605,21 +617,21 @@ export function CanvasSidebar({
                 <div className="flex justify-between">
                   <span className="text-gray-600">Source</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${
-                    selectedNode.provenance.source === 'ai_draft' ? 'bg-yellow-100 text-yellow-700' :
-                    selectedNode.provenance.source === 'library' ? 'bg-indigo-100 text-indigo-700' :
+                    selectedNode.provenance?.source === 'ai_draft' ? 'bg-yellow-100 text-yellow-700' :
+                    selectedNode.provenance?.source === 'library' ? 'bg-indigo-100 text-indigo-700' :
                     'bg-gray-100 text-gray-600'
                   }`}>
-                    {selectedNode.provenance.source.replace(/_/g, ' ')}
+                    {selectedNode.provenance?.source.replace(/_/g, ' ')}
                   </span>
                 </div>
-                {selectedNode.provenance.library_unit_id && (
+                {selectedNode.provenance?.library_unit_id && (
                   <div className="text-xs text-gray-500">
-                    From library: {selectedNode.provenance.library_unit_id.slice(0, 8)}...
+                    From library: {selectedNode.provenance?.library_unit_id.slice(0, 8)}...
                   </div>
                 )}
-                {selectedNode.provenance.source_anchor?.excerpt && (
+                {selectedNode.provenance?.source_anchor?.excerpt && (
                   <div className="text-xs text-gray-400 italic mt-1">
-                    Source: &ldquo;{selectedNode.provenance.source_anchor.excerpt.slice(0, 80)}...&rdquo;
+                    Source: &ldquo;{selectedNode.provenance?.source_anchor.excerpt.slice(0, 80)}...&rdquo;
                   </div>
                 )}
               </div>
@@ -629,7 +641,7 @@ export function CanvasSidebar({
               <div className="flex flex-wrap gap-1">
                 <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
                 <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
-                {selectedNode.provenance.source === 'ai_draft' && (
+                {selectedNode.provenance?.source === 'ai_draft' && (
                   <>
                     <button onClick={() => onAcceptNode(selectedNode.id)} title="Keep this AI content" className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
                     {selectedNode.history.some((h) => h.previous_content != null) && (

@@ -138,6 +138,7 @@ export function DraftAllSections({
         // Draft the section
         const result = await invoke<{ nodes: CanvasNode[] }>('proposal.draft_section', {
           proposalId,
+          sectionId: sec.id,
           sectionTitle: sec.title,
           pageLimit: sec.pageLimit,
           requiredSubsections: sec.requiredSubsections,

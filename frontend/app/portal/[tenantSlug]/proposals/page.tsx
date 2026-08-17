@@ -5,6 +5,7 @@ import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { ArchivedProposals, type ArchivedItem } from '@/components/portal/archived-proposals';
 import { RETENTION_DAYS } from '@/lib/proposal-archive';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,20 @@ export default async function ProposalsListPage({ params }: Props) {
     sectionCount: number;
   }[] = [];
 
+  // CAP-3: a proposal-scoped tenant_user (membership.scope.proposalScoped) sees ONLY the proposals
+  // granted in scope.proposals. `null` = unscoped (tenant-wide, the default for admins + normal users).
+  let scopedProposalIds: string[] | null = null;
+  try {
+    const [mem] = await sql<{ role: string; scope: unknown }[]>`
+      SELECT role, scope FROM user_memberships
+      WHERE user_id = ${sessionUser.id}::uuid AND tenant_id = ${tenantId}::uuid AND status = 'active'
+        AND role IN ('tenant_admin', 'tenant_user') LIMIT 1`;
+    const so = coerceJsonb<{ proposalScoped?: boolean; proposals?: unknown }>(mem?.scope, {});
+    if (mem?.role === 'tenant_user' && so.proposalScoped === true) {
+      scopedProposalIds = Array.isArray(so.proposals) ? (so.proposals as unknown[]).filter((p): p is string => typeof p === 'string') : [];
+    }
+  } catch (e) { console.error('[portal/proposals] scope read failed:', e); }
+
   try {
     if (role === 'partner_user') {
       proposals = await sql<typeof proposals>`
@@ -79,6 +94,28 @@ export default async function ProposalsListPage({ params }: Props) {
         WHERE p.tenant_id = ${tenantId}::uuid
         ORDER BY p.created_at DESC
         LIMIT 50
+      `;
+    } else if (scopedProposalIds !== null) {
+      // CAP-3: a proposal-scoped tenant_user sees ONLY their granted proposals. Two complete
+      // queries (never a nested `sql` fragment) — under an active tenant RLS context the db-client
+      // Proxy wraps each query in a SET LOCAL transaction, and a nested fragment corrupts the $N
+      // placeholders (lib/db.ts §"FRAGMENT-composing"). An empty scope correctly matches nothing.
+      proposals = await sql<typeof proposals>`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.created_at,
+          p.archived_at,
+          o.close_date,
+          o.agency,
+          o.topic_number,
+          (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
+        FROM proposals p
+        JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.tenant_id = ${tenantId}
+          AND p.id = ANY(${scopedProposalIds}::uuid[])
+        ORDER BY p.created_at DESC
       `;
     } else {
       proposals = await sql<typeof proposals>`

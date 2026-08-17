@@ -59,6 +59,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'section.locked': (p) => `Section accepted & locked${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.unlocked': (p) => `Section reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.harvested': 'Accepted content saved to library',
+  'section.assigned': (p) => str(p.assigneeUserId) ? `Section assigned${str(p.sectionTitle) ? `: ${str(p.sectionTitle)}` : ''}` : `Section unassigned${str(p.sectionTitle) ? `: ${str(p.sectionTitle)}` : ''}`,
 
   // ── Collaboration ───────────────────────────────────────────────────
   'comment.created': 'Comment added',
@@ -78,6 +79,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'document.atomized': 'Document atomized into library',
   'document.reatomized': 'Document re-atomized',
   'atom.saved': 'Library atom saved',
+  'atom.retagged': 'Library atom retagged',
 
   // ── Capture / pipeline ──────────────────────────────────────────────
   'topic.pinned': 'Opportunity pinned',
@@ -85,11 +87,39 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'opportunity.pinned': 'Opportunity pinned',
   'opportunity.unpinned': 'Opportunity unpinned',
   'opportunity.closed': (p) => `Opportunity closed${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // Admin pin-for-updates (RANK-8): a watched opp changed → holders hear about it pre-purchase.
+  'opportunity.updated': (p) => `Opportunity updated${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // Provisioning (PV-2): the master OPP build-out was completed + broadcast to all mirror cards.
+  'opportunity.build_completed': (p) => {
+    const n = typeof p.cardsRefreshed === 'number' ? p.cardsRefreshed : null;
+    return `OPP build-out completed${n != null ? ` — ${n} tenant card${n === 1 ? '' : 's'} refreshed` : ''}`;
+  },
+  // Pre-purchase start nudge (RANK-9): a hot, closing-soon opp the customer hasn't started yet.
+  'opportunity.start_recommended': (p) => {
+    const t = str(p.title); const d = p.daysToClose;
+    const tail = typeof d === 'number' ? ` — closes in ${d}d` : '';
+    return `Recommended: start a proposal${t ? ` on ${t}` : ''}${tail}`;
+  },
+  // Command Center read-receipt: the user cleared the "new" items in a lane (mig 179).
+  'command.acknowledged': (p) => {
+    const names: Record<string, string> = { opp: 'Opportunities', todos: 'To-dos', workflows: 'Workflows', activity: 'Activity', admin: 'Admin', tenant: 'Tenant', system: 'System' };
+    const t = str(p.tab);
+    return `Reviewed the ${t && names[t] ? names[t] : 'Command Center'} lane`;
+  },
   'opportunity.reopened': (p) => `Opportunity reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'opportunity.archived': (p) => `Opportunity archived${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'opportunity.close_date_changed': (p) => `Opportunity close date changed${str(p.newCloseDate) ? ` to ${str(p.newCloseDate)}` : ''}`,
   'profile.updated': 'Company profile updated',
   'process.force_advanced': 'Process advanced',
+  // Tenant Workflow Setup (TW): the required one-time accept + later re-configuration of a portal's workflow.
+  'workflow.accepted': (p) => `Build workflow set up & started${typeof p.stages === 'number' ? ` (${p.stages} phase${p.stages === 1 ? '' : 's'})` : ''}`,
+  'workflow.reconfigured': 'Build workflow updated',
+  'task.reassigned': (p) => `To-do reassigned${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'task.rescheduled': (p) => `To-do rescheduled${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // TW-8: the AI-manager stage gate — the cohort is requested on stage entry, then completes.
+  'stage_review.requested': 'AI review started for the stage',
+  'stage_review.completed': (p) => `AI review complete${str(p.verdict) ? ` — ${str(p.verdict)}` : ''}`,
+  'stage_review.advanced': 'AI manager advanced the stage',
 
   // ── Gates / compliance setup ────────────────────────────────────────
   'gate_requirement.created': 'Gate requirement added',
@@ -168,7 +198,7 @@ export function eventHref(tenantSlug: string, ev: EventLike): string | null {
   const opportunityId = str(p.opportunityId) ?? str(p.opportunity_id) ?? str(p.topicId);
 
   if (proposalId) {
-    const sectionEvents = ['section.saved', 'section.exported', 'section.locked', 'section.unlocked', 'comment.created'];
+    const sectionEvents = ['section.saved', 'section.exported', 'section.locked', 'section.unlocked', 'comment.created', 'section.assigned'];
     if (sectionId && sectionEvents.includes(ev.type)) {
       return `${base}/proposals/${proposalId}/sections/${sectionId}`;
     }

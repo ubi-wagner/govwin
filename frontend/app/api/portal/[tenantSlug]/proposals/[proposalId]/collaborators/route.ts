@@ -214,6 +214,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       role?: unknown;
       assignedSections?: unknown;
       permission?: unknown;
+      stagePermissions?: unknown;
     };
     try {
       body = await request.json();
@@ -230,6 +231,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       ? body.assignedSections.filter((s): s is string => typeof s === 'string' && isValidUUID(s))
       : [];
     const permission = typeof body.permission === 'string' ? body.permission : 'view';
+    // SPINE-T5: PER-STAGE grants. The access resolver + collaborator_stage_access already support a
+    // distinct permission per gate (e.g. edit-in-draft, comment-in-final); the invite only ever wrote a
+    // uniform one. An optional { stage: 'view'|'comment'|'edit' } map now overrides per stage; the flat
+    // `permission` remains the default for any stage the map omits. Invalid entries are dropped.
+    const stagePermissions: Record<string, string> = {};
+    if (body.stagePermissions && typeof body.stagePermissions === 'object' && !Array.isArray(body.stagePermissions)) {
+      for (const [stage, p] of Object.entries(body.stagePermissions as Record<string, unknown>)) {
+        if (typeof p === 'string' && ['view', 'comment', 'edit'].includes(p)) stagePermissions[stage] = p;
+      }
+    }
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'Valid email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
@@ -370,15 +381,16 @@ export async function POST(request: Request, ctx: RouteContext) {
         collaborator = inserted;
       }
 
-      // Create stage access for current stage
+      // Create stage access — a per-stage permission when the invite supplied one, else the flat default.
       const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
       for (const stage of gates) {
+        const stagePerm = stagePermissions[stage] ?? permission;
         await tx`
           INSERT INTO collaborator_stage_access (
             collaborator_id, proposal_id, stage, permission, granted_by
           )
           VALUES (
-            ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+            ${collaborator.id}, ${proposalId}, ${stage}, ${stagePerm}, ${sessionUser.id}
           )
         `;
       }

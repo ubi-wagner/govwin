@@ -1,5 +1,15 @@
 # Section Spine — Templates ⟷ Meta ⟷ Atoms ⟷ Canvas ⟷ Collaboration
 
+> **✅ AS-BUILT (2026-08-16, migration 183): the section-editing spine SHIPPED.** The `⚠ future` status
+> below is superseded. Live: **section-scoped ToDos** (`entity_type='section'` `edit_section`, assignee
+> validated against the editable set, deep-linked to the editor, auto-completed on lock —
+> `lib/proposal/section-todo.ts`); **AI assist from the section bar** (compliance check + cited research,
+> `components/proposal/section-assist-bar.tsx`); the AI-manager's findings **surfaced at the gate**; the
+> AI-manager **auto-advance** invoker; **span/node-anchored comments** (mig 183 `proposal_comments.anchor`,
+> the comments route round-trips it); a **partner_user collaborator-scoped notification bell**; and canvas
+> robustness so a partial/legacy doc never white-screens the editor. Retrospective:
+> docs/LAUNCH_READINESS_2026-08.md. The design/gap analysis below is retained for its grounding.
+
 Full mapping + gap analysis of the section authoring loop, grounded in code (4 parallel
 reviews). The organizing idea: **the section is a spine the way the opportunity card is a
 spine** — one keyed record (`proposal_id, section_id`) that carries all its metadata from

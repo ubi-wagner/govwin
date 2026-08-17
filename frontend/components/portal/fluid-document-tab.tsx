@@ -9,7 +9,7 @@
  * so the heavy renderer only loads when the reader actually opens the tab.
  */
 import { useEffect, useState } from 'react';
-import type { AssembledProposal } from '@/lib/canvas/assemble-proposal';
+import type { AssembledProposal, FluidSectionMeta } from '@/lib/canvas/assemble-proposal';
 import { FluidDocumentView } from '@/components/canvas/fluid-document-view';
 
 interface Props {
@@ -19,8 +19,10 @@ interface Props {
   variables?: Record<string, string>;
 }
 
+type DocumentResponse = AssembledProposal & { sections?: FluidSectionMeta[]; canManage?: boolean };
+
 export function FluidDocumentTab({ tenantSlug, proposalId, variables }: Props) {
-  const [assembled, setAssembled] = useState<AssembledProposal | null>(null);
+  const [assembled, setAssembled] = useState<DocumentResponse | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'empty'>('loading');
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function FluidDocumentTab({ tenantSlug, proposalId, variables }: Props) {
         const j = await res.json().catch(() => ({}));
         if (!alive) return;
         if (!res.ok || !j?.data) { setState('error'); return; }
-        const data = j.data as AssembledProposal;
+        const data = j.data as DocumentResponse;
         if (!data.outline?.length) { setState('empty'); return; }
         setAssembled(data);
         setState('ready');
@@ -66,7 +68,14 @@ export function FluidDocumentTab({ tenantSlug, proposalId, variables }: Props) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-3 h-[calc(100vh-14rem)] min-h-[520px]">
-      <FluidDocumentView assembled={assembled} tenantSlug={tenantSlug} proposalId={proposalId} variables={variables} />
+      <FluidDocumentView
+        assembled={assembled}
+        sections={assembled.sections ?? []}
+        canManage={assembled.canManage ?? false}
+        tenantSlug={tenantSlug}
+        proposalId={proposalId}
+        variables={variables}
+      />
     </div>
   );
 }
