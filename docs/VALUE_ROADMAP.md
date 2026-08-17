@@ -131,7 +131,7 @@ re-verified, premises overturned where wrong). Net changes:
 4. **#17 workflow retry-all** — S — multi-select in `app/admin/workflows/workflow-monitor-client.tsx` looping the existing retry route
 5. **#14 compliance-aware section AI** — S — add `sectionId` to `proposal.draft_section`, load `proposal_compliance_matrix`, inject as a fenced block (one server change fixes all four callers)
 6. **#1 Strategy panel (read-only)** — S–M — `GET .../strategy` reads `OnProposalCreated` step_results → an admin tab in the workspace
-7. **#6 auto-atomize on upload** — M — mirror the atomize-package `librarian` producer into the upload route (review-queue landing already exists)
+7. ✅ **#6 auto-atomize on upload** — DONE — opt-in `mode=auto` on `atoms/upload` reuses `atomizeDocumentIntoLibrary` + fires the `librarian` `catalog` producer; a "⚡ auto-atomize the whole doc" toggle in the Atomizer lands atoms (draft, context-tagged) → Library ▸ Review. Live-proven: 4 primitives + reference + cocoon, librarian task completed, `library.package.atomized{source:upload_auto}` audited.
 8. **#12 ingest & stage + render the QA** — M — chain ingest-assist+shred-audit + a route to read `curation_qa`/`rfp_ingest_manager` step_results
 9. **#13 post-submission outcome nudge** — S–M — `createTask` at submission + a `record_outcome` completer that POSTs the outcome route
 10. **#16 partner cross-stable to-do feed** — S–M — scoped clone of `getTenantSurfacedTodos` + render in the console

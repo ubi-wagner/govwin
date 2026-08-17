@@ -32,7 +32,7 @@ export function AtomsWorkbench({ tenantSlug }: { tenantSlug: string }) {
       {tab === 'library' && <AtomLibrary tenantSlug={tenantSlug} />}
       {tab === 'review' && <LibraryReview tenantSlug={tenantSlug} />}
       {tab === 'package' && <PackageAtomizer tenantSlug={tenantSlug} onDone={() => { /* atoms landed; Library tab reloads on mount */ }} />}
-      {tab === 'atomize' && <Atomizer tenantSlug={tenantSlug} />}
+      {tab === 'atomize' && <Atomizer tenantSlug={tenantSlug} onAtomized={() => setTab('review')} />}
       {tab === 'capture' && <CaptureAtomizer tenantSlug={tenantSlug} />}
     </div>
   );

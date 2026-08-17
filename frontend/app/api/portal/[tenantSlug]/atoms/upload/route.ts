@@ -14,7 +14,9 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { readDocument } from '@/lib/import';
 import { textOfNodes } from '@/lib/atom-size';
-import { createAtom } from '@/lib/atoms';
+import { createAtom, type CreatorKind } from '@/lib/atoms';
+import { atomizeDocumentIntoLibrary, contextTags } from '@/lib/atomize-package';
+import { requestAgentTask } from '@/lib/agent-client';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 // The import readers use the legacy 18-value category vocab; map the obvious ones to a
@@ -47,9 +49,48 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if (!(file instanceof File)) return NextResponse.json({ error: 'file is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     if (file.size > 25 * 1024 * 1024) return NextResponse.json({ error: 'file too large (25MB max)', code: 'VALIDATION_ERROR' }, { status: 413 });
 
+    let buffer: Buffer;
+    try { buffer = Buffer.from(await file.arrayBuffer()); }
+    catch { return NextResponse.json({ error: 'Could not read the file', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+
+    const actorKind: CreatorKind = hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' ? 'admin' : 'collaborator';
+
+    // Auto-atomize fast path (#6): instead of hand-shredding, segment the whole document into the
+    // library in one step and hand it to the librarian to catalog — the human then REVIEWS (Library
+    // → Review) rather than selecting every block. Mirrors the atomize-package producer exactly
+    // (same `atomizeDocumentIntoLibrary` core + `requestAgentTask` librarian enqueue), so what lands
+    // is identical to a package intake. Opt-in — the default (manual) path below is byte-for-byte
+    // unchanged, preserving the precise box-and-tag flow.
+    if (form.get('mode') === 'auto') {
+      let ctx: Record<string, unknown> = {};
+      const rawCtx = form.get('context');
+      if (typeof rawCtx === 'string' && rawCtx.trim()) { try { ctx = JSON.parse(rawCtx) ?? {}; } catch { /* ignore malformed context */ } }
+      const ctxTags = contextTags(ctx);
+      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, ctxTags, actor: { id: u.id, kind: actorKind } });
+      if (r.error && r.atoms === 0) {
+        const status = r.error === 'could not parse' ? 422 : 200; // "no extractable content" is a valid (empty) result, not a failure
+        return status === 422
+          ? NextResponse.json({ error: 'Could not parse the document', code: 'PARSE_ERROR' }, { status: 422 })
+          : NextResponse.json({ data: { atomized: true, atoms: 0, skipped: r.skipped ?? 0, cocoonId: r.cocoonId, format: r.format, note: r.error } });
+      }
+      try {
+        await emitEventSingle({
+          namespace: 'library', type: 'package.atomized', actor: userActor(u.id!, u.email ?? undefined), tenantId,
+          payload: { filesProcessed: 1, totalAtoms: r.atoms, source: 'upload_auto' },
+        });
+      } catch (evtErr) { console.error('[atoms/upload] package.atomized emit failed (non-fatal)', evtErr); }
+      // Producer: hand the atomized cocoon to the librarian to catalog (confirm tags, score, dedup,
+      // flag freshness). Best-effort — never fail the upload on an enqueue error.
+      if (r.cocoonId && r.atoms > 0) {
+        try {
+          await requestAgentTask({ tenantId, agentRole: 'librarian', taskType: 'catalog', input: { cocoonId: r.cocoonId, packageName: file.name, atomCount: r.atoms } });
+        } catch (e) { console.error('[atoms/upload] librarian enqueue failed (non-fatal)', e); }
+      }
+      return NextResponse.json({ data: { atomized: true, atoms: r.atoms, skipped: r.skipped ?? 0, cocoonId: r.cocoonId, format: r.format, reference: r.reference ?? false } });
+    }
+
     let parsed;
     try {
-      const buffer = Buffer.from(await file.arrayBuffer());
       parsed = await readDocument(buffer, file.name);
     } catch (e) {
       console.error('[atoms/upload] parse failed', e);
@@ -68,7 +109,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         tags: [{ dimension: 'fmt', value: FMT_OF[parsed.sourceFormat] ?? 'doc', source: 'auto', confirmed: true }],
         // Provenance follows the actual uploader — a collaborator's upload is
         // 'collaborator', not 'admin'. createAtom stamps owner_user_id = uploader.
-      }, { id: u.id, kind: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' ? 'admin' : 'collaborator' });
+      }, { id: u.id, kind: actorKind });
       referenceAtomId = ref.atomId;
       try {
         await emitEventSingle({
