@@ -193,7 +193,7 @@ export default async function DashboardPage({
         as soon as they add you to a build, it shows up right here.
       </p>
       <p className="text-sm text-gray-500">
-        In the meantime, check your <a href={`${basePath}/processes`} className="text-blue-600 hover:underline">to-dos</a>.
+        In the meantime, check your <a href={`${basePath}/todos`} className="text-blue-600 hover:underline">to-dos</a>.
         If you were expecting access to a proposal, ask your admin to add you.
       </p>
     </div>

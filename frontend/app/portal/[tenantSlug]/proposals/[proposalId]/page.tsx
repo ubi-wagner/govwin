@@ -158,7 +158,25 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     access.commentableSections.length === 0 &&
     access.viewableSections.length === 0
   ) {
-    notFound();
+    // Accepted collaborator with no section grant YET — a friendly "nothing shared yet" state
+    // instead of a bare 404 dead-end (the proposal still appears in their /proposals list, so a
+    // hard notFound() read as broken). The workspace shell stays hidden; nothing sensitive leaks.
+    return (
+      <div className="max-w-lg mx-auto mt-16 px-4 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white p-8">
+          <div className="text-3xl mb-3" aria-hidden>🔒</div>
+          <h1 className="text-lg font-semibold text-gray-900">No sections shared with you yet</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            You&rsquo;ve been added to <span className="font-medium">{proposal.title ?? 'this proposal'}</span>, but no
+            sections have been shared with you to view, comment on, or edit yet. Once the proposal admin grants you
+            a section, it will appear here.
+          </p>
+          <a href={`/portal/${tenantSlug}/proposals`} className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline">
+            &larr; Back to proposals
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // ── Load sections (with completion markers) ────────────────────────

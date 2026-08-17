@@ -312,8 +312,19 @@ export function StageControl({
             </span>
           )}
           {canExport && (
-            <span className="text-emerald-600 font-medium">
-              Download available ({downloadCount} downloaded)
+            <span className="inline-flex flex-wrap items-center gap-1.5 text-emerald-700">
+              <span className="font-medium">Download:</span>
+              {(['docx', 'pdf', 'zip', 'json'] as const).map((f) => (
+                <a
+                  key={f}
+                  href={`/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=${f}`}
+                  className="inline-flex items-center rounded border border-emerald-300 px-1.5 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                  title={`Download the ${f.toUpperCase()} package`}
+                >
+                  {f.toUpperCase()}
+                </a>
+              ))}
+              {downloadCount > 0 && <span className="text-[11px] text-gray-400">({downloadCount} downloaded)</span>}
             </span>
           )}
           {deadlineStr && !isLocked && (
