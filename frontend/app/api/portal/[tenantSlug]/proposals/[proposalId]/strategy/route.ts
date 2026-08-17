@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
@@ -53,6 +54,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
     enterTenant(tenantId); // RLS choke point
+
+    // CAP-3: verifyTenantAccess admits any active tenant member (ignores membership.scope), so a
+    // proposal-scoped tenant_user could pull this proposal's capture/market/cost strategy. Gate on
+    // resolveUserAccess, the only scope-aware check.
+    if (!hasProposalVisibility(await resolveUserAccess(u.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
 
     // Latest OnProposalCreated instance for this proposal (camelCase proposalId key).
     let inst: { stepResults: unknown; startedAt: Date | string | null } | undefined;

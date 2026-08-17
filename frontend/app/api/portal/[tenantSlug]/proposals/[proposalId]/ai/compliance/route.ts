@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
@@ -227,6 +228,13 @@ export async function POST(request: Request, ctx: RouteContext) {
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // CAP-3: verifyTenantAccess ignores membership.scope; gate on resolveUserAccess so a proposal-scoped
+    // tenant_user can't run compliance over (and read verbatim excerpts of) an out-of-scope proposal.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      await emitEventEnd(startId, { error: { message: 'Forbidden', code: 'FORBIDDEN' } });
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const solicitationId = proposalRows[0].solicitationId;

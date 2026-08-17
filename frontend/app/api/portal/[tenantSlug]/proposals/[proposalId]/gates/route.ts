@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { coerceJsonb } from '@/lib/jsonb';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
@@ -100,6 +101,13 @@ export async function GET(request: Request, ctx: RouteContext) {
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // CAP-3: the manual member/collaborator check below reads user_memberships but NOT `scope`, so a
+    // proposal-scoped tenant_user passes it. resolveUserAccess is scope-aware and subsumes that check —
+    // gate on it so a scoped-out user can't read this proposal's stage-gate requirements.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Proposal-level access for non-admins ────────────────────────

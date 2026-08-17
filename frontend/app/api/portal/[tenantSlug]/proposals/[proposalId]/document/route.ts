@@ -24,7 +24,7 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
-import { resolveUserAccess } from '@/lib/proposal-access';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { assembleProposalDocument, type ProposalSectionInput } from '@/lib/canvas/assemble-proposal';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -110,7 +110,7 @@ export async function GET(
     const viewable = new Set(access.viewableSections);
     const editableSections = new Set(access.editableSections);
     const canManage = access.role === 'admin';
-    if (viewable.size === 0) {
+    if (!hasProposalVisibility(access)) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 

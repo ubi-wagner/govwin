@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
@@ -74,6 +75,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     enterTenant(tenantId);
+
+    // CAP-3: verifyTenantAccess ignores membership.scope; gate reads on the scope-aware resolver so a
+    // proposal-scoped tenant_user can't list an out-of-scope proposal's supporting docs (+ signed URLs).
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
 
     // ── Verify proposal belongs to tenant ────────────────────
     let proposal: { id: string } | undefined;

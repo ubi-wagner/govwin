@@ -4,6 +4,7 @@ import { getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,13 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
     enterTenant(tenantId);
+
+    // CAP-3: verifyProposalAccess admits any active tenant member (it never reads membership.scope),
+    // so a proposal-SCOPED tenant_user could pull this whole-proposal verdict + pricing. resolveUserAccess
+    // is the only gate that honors scope — deny when it grants no visibility.
+    if (!hasProposalVisibility(await resolveUserAccess(u.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
 
     let report;
     try {

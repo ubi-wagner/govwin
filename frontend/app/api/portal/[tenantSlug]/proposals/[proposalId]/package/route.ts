@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -241,6 +242,13 @@ export async function POST(request: Request, ctx: RouteContext) {
   }
 
   enterTenant(tenantId);
+
+  // CAP-3: verifyTenantAccess ignores membership.scope, so a proposal-scoped tenant_user could
+  // download an out-of-scope proposal in any format. Gate ALL formats on the scope-aware
+  // resolveUserAccess before touching artifact data.
+  if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+  }
 
   // ── ZIP export path (whole proposal, each volume in its NATIVE format) ──
   // A proposal mixes docx/pptx/xlsx volumes, so a single-format download is lossy;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl, deleteObject } from '@/lib/storage/s3-client';
@@ -69,6 +70,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
         { error: 'Forbidden', code: 'FORBIDDEN' },
         { status: 403 },
       );
+    }
+
+    enterTenant(tenantId);
+    // CAP-3: verifyTenantAccess ignores membership.scope; gate on the scope-aware resolver so a
+    // proposal-scoped tenant_user can't fetch a signed download URL for an out-of-scope proposal's doc.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Load doc ─────────────────────────────────────────────

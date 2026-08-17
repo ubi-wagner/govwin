@@ -42,6 +42,23 @@ const NO_ACCESS: UserAccess = {
   accessibleStages: [],
 };
 
+/**
+ * True when this resolved access grants ANY visibility into the proposal — the canonical read
+ * gate for per-proposal API routes. It closes the CAP-3 hole where a proposal-SCOPED tenant_user
+ * (or a non-collaborator) could read a proposal outside their grant: `verifyTenantAccess` passes
+ * for any active tenant member and never consults `user_memberships.scope`, so routes MUST also
+ * call `resolveUserAccess` and gate on this.
+ *
+ * Denies ONLY the NO_ACCESS shape: an 'external' resolution with zero granted sections (a scoped-out
+ * tenant_user or a non-collaborator). Tenant-wide staff (role 'admin'/'contributor') pass — even on a
+ * section-less proposal, so an admin viewing an empty proposal is never falsely 403'd — and a
+ * section-granted external collaborator passes on the strength of their grants.
+ */
+export function hasProposalVisibility(access: UserAccess): boolean {
+  if (access.role === 'admin' || access.role === 'contributor') return true;
+  return access.viewableSections.length + access.editableSections.length + access.commentableSections.length > 0;
+}
+
 export async function resolveUserAccess(
   userId: string,
   proposalId: string,

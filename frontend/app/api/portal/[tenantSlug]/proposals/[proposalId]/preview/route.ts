@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { resolveUserAccess, hasProposalVisibility } from '@/lib/proposal-access';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { coerceJsonb } from '@/lib/jsonb';
 import { renderCanvasPreviewHtml } from '@/lib/export/canvas-html';
@@ -77,6 +78,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     `;
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // CAP-3: verifyTenantAccess ignores membership.scope, so a proposal-scoped tenant_user could pull
+    // this proposal's whole assembled body as HTML. Gate on the scope-aware resolveUserAccess.
+    if (!hasProposalVisibility(await resolveUserAccess(sessionUser.id, proposalId, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const sections = await sql<{ sectionNumber: string; title: string; content: string | null }[]>`
