@@ -13,7 +13,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -51,6 +51,8 @@ export async function PUT(request: Request, ctx: RouteContext) {
     if (!(await verifyTenantAccess(su.id, role, tenantId))) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS: tenant_documents is RLS-forced — without the context this doc's
+    // own-tenant lookup returns 0 rows under govtech_app → the save 404s a document the tenant owns.
 
     let body: { content?: unknown; baseVersion?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }

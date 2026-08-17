@@ -19,3 +19,21 @@ export function cleanText(s: string): string {
   }
   return out;
 }
+
+/** Deep-clean every string inside an arbitrary jsonb-bound value (recurses arrays/objects). */
+export function deepCleanStrings(v: unknown): unknown {
+  return typeof v === 'string' ? cleanText(v)
+    : Array.isArray(v) ? v.map(deepCleanStrings)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deepCleanStrings(x)]))
+    : v;
+}
+
+/**
+ * Deep-clean every string inside a canvas node's `content` (the canvas_nodes jsonb path) so a
+ * structured atom (image/table/OCR) with DB-hostile bytes can't throw 22021 on insert. Shared by
+ * the auto atomize path AND the createAtom choke point so no write path is left unprotected.
+ */
+export function cleanNodes<T extends { content?: unknown }>(nodes: T[]): T[] {
+  // deepCleanStrings preserves the value's shape (only replaces string leaves), so the cast is safe.
+  return nodes.map((n) => ({ ...n, content: deepCleanStrings(n.content) }) as T);
+}

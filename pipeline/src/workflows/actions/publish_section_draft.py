@@ -71,7 +71,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     # be safe to fill (untouched or prior auto-draft). One row, one lock.
     row = await conn.fetchrow(
         """
-        SELECT id, status, version
+        SELECT id, status, version, content_source
         FROM proposal_sections
         WHERE id = $1::uuid AND proposal_id = $2::uuid
         FOR UPDATE
@@ -86,6 +86,15 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
         log.info("publish_section_draft: section %s is '%s' (human-owned) — leaving it alone",
                  section_id, row["status"])
         return {"published": False, "skipped": True, "reason": f"status_{row['status']}"}
+    # AUTHORITATIVE anti-clobber guard: a released-UNLOCKED build lets the customer edit an
+    # 'ai_drafted' section immediately; a plain content save leaves status='ai_drafted' but stamps
+    # content_source='human_edit'. Status alone would still admit it into the landable set and this
+    # action would overwrite the human's work (unrecoverably — the prior human content isn't archived
+    # here). Refuse the moment a human has touched it, regardless of status. (The save route also
+    # advances such a section to 'in_progress'; this is the belt to that suspenders.)
+    if row["content_source"] == "human_edit":
+        log.info("publish_section_draft: section %s carries a human edit (content_source=human_edit) — leaving it alone", section_id)
+        return {"published": False, "skipped": True, "reason": "human_edited"}
 
     # canvas_versions.content is jsonb NOT NULL. A str must be valid JSON text; a bare
     # plain-text string would fail the jsonb bind (invalid input syntax for type json).

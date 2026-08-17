@@ -13,7 +13,7 @@
  * context) so a section/atom is filterable exactly like its foundation. createAtom
  * records members for the three container grains (foundation/section/group).
  */
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
 import { ARTIFACT_FORMAT, flattenNodes, type ArtifactForm } from '@/lib/library/artifact-canvas';
@@ -209,7 +209,10 @@ export interface SystemFoundation { id: string; title: string | null; form: stri
 /** List the shared system-scaffold foundations (readable by any tenant — the "add to
  *  my library" catalog). Cross-tenant read of the house scaffold, so no tenant filter. */
 export async function listSystemFoundations(): Promise<SystemFoundation[]> {
-  return sql<SystemFoundation[]>`
+  // sqlBypass: the shared system-starter scaffold lives under a HOST tenant. Under prod RLS
+  // (govtech_app) a context-scoped `sql` read returns 0 rows — this cross-tenant read of the
+  // house catalog is legitimately a bypass read. (Writes still go through the tenant-scoped path.)
+  return sqlBypass<SystemFoundation[]>`
     SELECT la.id, la.title,
       (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'form')    AS form,
       (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'format')  AS format,
@@ -222,7 +225,7 @@ export async function listSystemFoundations(): Promise<SystemFoundation[]> {
 
 /** True iff the foundation is part of the shared system scaffold (guards copy-to-library). */
 export async function isSystemFoundation(foundationId: string): Promise<boolean> {
-  const [row] = await sql<Array<{ one: number }>>`
+  const [row] = await sqlBypass<Array<{ one: number }>>`
     SELECT 1 AS one FROM library_atoms la
     WHERE la.id = ${foundationId}::uuid AND la.grain = 'foundation'
       AND la.id IN (SELECT atom_id FROM atom_tags WHERE dimension = 'collection' AND value = ${SYSTEM_COLLECTION})
@@ -235,15 +238,17 @@ export async function isSystemFoundation(foundationId: string): Promise<boolean>
 interface SrcAtom { grain: string; title: string | null; content: string | null; canvasNodes: CanvasNode[] | null; tags: AtomTagInput[] }
 
 async function readAtom(id: string): Promise<SrcAtom> {
-  const [a] = await sql<Array<{ grain: string; title: string | null; content: string | null; canvasNodes: CanvasNode[] | null }>>`
+  // sqlBypass: reading the shared house scaffold cross-tenant (see listSystemFoundations).
+  const [a] = await sqlBypass<Array<{ grain: string; title: string | null; content: string | null; canvasNodes: CanvasNode[] | null }>>`
     SELECT grain, title, content, canvas_nodes AS "canvasNodes" FROM library_atoms WHERE id = ${id}::uuid`;
-  const rawTags = await sql<Array<{ dimension: string; value: string }>>`
+  if (!a) throw new Error(`readAtom: source atom ${id} not found (or not readable)`);
+  const rawTags = await sqlBypass<Array<{ dimension: string; value: string }>>`
     SELECT dimension, value FROM atom_tags WHERE atom_id = ${id}::uuid`;
   const tags: AtomTagInput[] = rawTags.map((t) => ({ dimension: t.dimension, value: t.value, source: 'admin', confirmed: true }));
   return { grain: a.grain, title: a.title, content: a.content, canvasNodes: a.canvasNodes, tags };
 }
 async function orderedMembers(containerId: string): Promise<string[]> {
-  const rows = await sql<Array<{ id: string }>>`
+  const rows = await sqlBypass<Array<{ id: string }>>`
     SELECT member_atom_id AS id FROM atom_members WHERE group_atom_id = ${containerId}::uuid ORDER BY ordinal`;
   return rows.map((r) => r.id);
 }
@@ -310,7 +315,10 @@ export async function copyStarterSetToTenant(
   opts?: { collection?: string },
 ): Promise<StarterSetResult> {
   const collection = opts?.collection ?? 'my_library';
-  const catalog = await sql<Array<{ id: string; slug: string | null }>>`
+  // sqlBypass: the catalog is the shared house scaffold (cross-tenant); the dedup read carries an
+  // explicit `la.tenant_id = targetTenantId` filter (a legitimate specific-tenant bypass read). The
+  // WRITES below go through copyFoundationToTenant → createAtom → withTenant(target), so isolation holds.
+  const catalog = await sqlBypass<Array<{ id: string; slug: string | null }>>`
     SELECT la.id, (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'doc') AS slug
     FROM library_atoms la
     WHERE la.grain = 'foundation'
@@ -321,7 +329,7 @@ export async function copyStarterSetToTenant(
   const slugs = catalog.map((c) => c.slug).filter((s): s is string => !!s);
   const present = new Set<string>(
     slugs.length
-      ? (await sql<Array<{ slug: string }>>`
+      ? (await sqlBypass<Array<{ slug: string }>>`
           SELECT DISTINCT t.value AS slug
           FROM atom_tags t
           JOIN library_atoms la ON la.id = t.atom_id AND la.grain = 'foundation' AND la.tenant_id = ${targetTenantId}::uuid AND la.vault_id IS NULL

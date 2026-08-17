@@ -112,7 +112,10 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         log.warning("draft_v0: dependency import failed — skipping: %s", exc)
         return {"drafted": 0, "skipped": True, "reason": f"import:{exc}"}
 
-    # Only the still-fillable sections (the landing primitive re-checks per section).
+    # Only the still-fillable sections (the landing primitive re-checks per section). Exclude any
+    # section a human has already touched (content_source='human_edit') even if its status is still
+    # 'ai_drafted' — a released-UNLOCKED build invites the customer to edit ai_drafted sections
+    # immediately, and this async drafter (incl. its manager retries) must never overwrite that work.
     rows = await conn.fetch(
         """
         SELECT s.id, s.title, s.status, s.section_type, s.page_allocation, s.artifact_id,
@@ -120,6 +123,7 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         FROM proposal_sections s
         LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
         WHERE s.proposal_id = $1 AND s.status IN ('empty', 'ai_drafted')
+          AND s.content_source IS DISTINCT FROM 'human_edit'
         ORDER BY s.section_number
         """,
         proposal_uuid,

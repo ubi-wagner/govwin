@@ -283,13 +283,16 @@ export async function PUT(request: Request, ctx: RouteContext) {
     // which throws → the snapshot is silently dropped (content-loss). Defaults to human_edit.
     const contentSource = source;
 
-    // Auto-advance an untouched 'empty' section to 'in_progress' the instant real content
-    // lands. The client rarely sends an explicit status on a plain content save, so without
-    // this a drafted-but-not-locked section stays status='empty' forever — and the submission
-    // readiness rollup (which treats status='empty' as "nothing drafted yet") under-counts the
-    // work. Only fires when the caller didn't set a status AND the incoming canvas carries text.
+    // Auto-advance an untouched section to 'in_progress' the instant a real HUMAN edit lands text.
+    // Covers 'empty' (never drafted) AND 'ai_drafted' (a provision/agent strawman the customer is now
+    // editing). The 'ai_drafted' case is a DATA-LOSS guard: the async draft_v0 strawman drafter lands
+    // into sections whose status ∈ ('empty','ai_drafted'), so a customer editing a released-UNLOCKED
+    // ai_drafted section (which otherwise stays 'ai_drafted' — the client sends no status) could be
+    // silently overwritten when draft_v0 runs/retries. Moving it to 'in_progress' on the human's first
+    // keystroke removes it from that landable set. Only genuine human edits (source='human_edit'), never
+    // an AI landing, and only when the canvas carries text. (Pipeline-side guards back this up.)
     let effectiveStatus: string | null = newStatus;
-    if (!effectiveStatus && section.status === 'empty') {
+    if (!effectiveStatus && (section.status === 'empty' || (section.status === 'ai_drafted' && source === 'human_edit'))) {
       let incomingText = '';
       try {
         const nodes = (body.content as { nodes?: CanvasNode[] } | null)?.nodes;

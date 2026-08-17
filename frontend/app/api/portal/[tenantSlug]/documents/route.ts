@@ -15,7 +15,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -53,6 +53,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!(await verifyTenantAccess(su.id, role, tenantId))) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS: own-template lookup + tenant_documents INSERT are RLS-forced — without
+    // the context the templateId lookup 404s and the INSERT throws an RLS-violation under govtech_app.
 
     let body: { templateId?: unknown; preset?: unknown; title?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }

@@ -15,6 +15,7 @@ import { withTenant } from '@/lib/rls';
 import { atomSize, type AtomSize } from '@/lib/atom-size';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import type { CanvasNode } from '@/lib/types/canvas-document';
+import { cleanText, cleanNodes } from '@/lib/clean-text';
 import { upsertAtomEmbedding, atomEmbedText } from '@/lib/atom-embed';
 import { embeddingsEnabled, activeEmbedModel, embedOne, toVectorLiteral, isUsableVector } from '@/lib/embeddings';
 
@@ -71,6 +72,15 @@ export async function createAtom(
   input: CreateAtomInput,
   actor: { id: string; kind?: CreatorKind },
 ): Promise<CreatedAtom> {
+  // Sanitize DB-hostile bytes (NUL / lone UTF-16 surrogates — emitted by real PDFs with Type-3 fonts
+  // and OCR) at the SINGLE write choke point, so every caller is protected: the auto atomize path
+  // already cleans, but the manual upload/atomize + POST /atoms paths did not — a raw insert of such
+  // bytes throws Postgres 22021 and the atom is silently lost.
+  input = {
+    ...input,
+    content: input.content ? cleanText(input.content) : input.content,
+    canvasNodes: input.canvasNodes ? cleanNodes(input.canvasNodes) : input.canvasNodes,
+  };
   const size = atomSize({ content: input.content, canvasNodes: input.canvasNodes });
   const creatorKind = input.creatorKind ?? actor.kind ?? 'admin';
 
