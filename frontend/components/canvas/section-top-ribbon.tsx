@@ -203,7 +203,7 @@ export function SectionTopRibbon({
       </div>
 
       {/* ── Row 2: action bar ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 gap-y-1 px-4 py-1.5">
 
         {/* Save state */}
         {saveError && (

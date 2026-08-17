@@ -208,7 +208,7 @@ export function ProposalWorkspace({
       />
 
       {/* Workspace-level tab bar */}
-      <div className="flex gap-0 border-b border-gray-200">
+      <div className="flex gap-0 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
         {([
           { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },
           { key: 'my-sections' as const, label: 'My Sections' },

@@ -755,7 +755,7 @@ export function CurationWorkspace({
     <div className="max-w-6xl">
       {/* Atomization rail — classify/tag/accept the drawn annotations as section anchors */}
       <AnnotationAtomizeRail solId={sol.id} />
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-y-3 mb-6">
         <div>
           <button
             onClick={() => router.push('/admin/rfp-curation')}
@@ -769,7 +769,7 @@ export function CurationWorkspace({
             {sol.programType?.replace(/_/g, ' ') ?? 'Unknown Type'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleIngestAssist}
             disabled={assistBusy}
@@ -890,7 +890,7 @@ export function CurationWorkspace({
       </div>
 
       {/* Quick-nav tabs */}
-      <nav className="flex items-center gap-1 mb-6 border-b pb-2">
+      <nav className="flex items-center gap-1 mb-6 border-b pb-2 overflow-x-auto whitespace-nowrap">
         {[
           { label: 'Documents', target: 'section-documents' },
           { label: 'Topics', target: 'section-topics' },
@@ -952,7 +952,7 @@ export function CurationWorkspace({
 
           {/* PDF Viewer (side-by-side source) — or text fallback */}
           {sourcePdf ? (
-            <div className="border rounded-lg overflow-hidden relative">
+            <div className="border rounded-lg overflow-x-auto relative">
               <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
                 <h2 className="text-sm font-semibold text-gray-700">
                   Source Document — {sourcePdf.originalFilename}
@@ -1016,14 +1016,14 @@ export function CurationWorkspace({
 
           {/* Topics — the pursuable units under this solicitation */}
           <div id="section-topics" className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-y-2 mb-3">
               <div>
                 <h2 className="text-lg font-semibold">Topics</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Discrete pursuit units — what customers pin in Spotlight
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {topicsList.length > 0 && (
                   <button
                     onClick={() => setShowTopicCompliance(!showTopicCompliance)}

@@ -160,7 +160,7 @@ export default async function PartnerConsole() {
               <p className="text-sm text-navy-500">Higher-order org — run your own buckets, pipeline &amp; grants here.</p>
             </div>
             {ownStats && (
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <Stat label="Buckets" value={ownStats.buckets} />
                 <Stat label="Pins" value={ownStats.pins} />
                 <Stat label="Proposals" value={ownStats.proposals} />
@@ -214,7 +214,7 @@ export default async function PartnerConsole() {
                   <p className="text-xs text-navy-500 mb-4 truncate">
                     {s?.adminPocEmail ? <>Admin: {s.adminPocName ? `${s.adminPocName} · ` : ''}{s.adminPocEmail}</> : 'No admin POC'}
                   </p>
-                  <div className="flex items-center gap-5 mb-4">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-4">
                     <Stat label="Buckets" value={s?.buckets ?? 0} />
                     <Stat label="Pins" value={s?.pins ?? 0} />
                     <Stat label="Proposals" value={s?.proposals ?? 0} />
