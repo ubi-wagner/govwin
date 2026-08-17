@@ -125,16 +125,19 @@ re-verified, premises overturned where wrong). Net changes:
   land+accept **must stay browser-triggered** (the engine forbids a pipeline consumer of agent output).
 
 ### Build-now queue (verified, no product decision, ordered by value ÷ effort)
+**ALL BUILD-NOW ITEMS SHIPPED (2026-08-17).** The full value ÷ effort queue is delivered; what remains
+is decision-gated (#15 · #5-mode) or Large-with-design (#10 · #11) — see below.
+
 1. ✅ **#3 AI-fit chip** — DONE (`744c348f`)
-2. **#9 Release / SLA board** — S — new `/admin/provisioning/page.tsx` list (cross-tenant `sqlBypass`) + reuse `SlaCountdown` + nav link
-3. **#4 ops_digest → System lane** — S — `getOpsDigest()` reads the digest `step_results` → a Command-Center System card (+ the "new" dot)
-4. **#17 workflow retry-all** — S — multi-select in `app/admin/workflows/workflow-monitor-client.tsx` looping the existing retry route
-5. **#14 compliance-aware section AI** — S — add `sectionId` to `proposal.draft_section`, load `proposal_compliance_matrix`, inject as a fenced block (one server change fixes all four callers)
-6. **#1 Strategy panel (read-only)** — S–M — `GET .../strategy` reads `OnProposalCreated` step_results → an admin tab in the workspace
+2. ✅ **#9 Release / SLA board** — DONE — `/admin/provisioning/page.tsx` lists purchased portals sorted by the 72h `curation_due_at` SLA (cross-tenant `sqlBypass`), reuses `SlaCountdown`, nav link "Releases & SLA"; one-click instant release for a built-out master (folds #7).
+3. ✅ **#4 ops_digest → System lane** — DONE — `getOpsDigest()` (`lib/admin/review-queue.ts`) reads the `OnOpsDigestRequested` `ai_ops_digest` step_results → the `OpsDigestCard` in the Command-Center System lane (+ the "new" watermark dot).
+4. ✅ **#17 workflow retry-all** — DONE — `retryAllFailed` in `workflow-monitor-client.tsx` loops the existing per-instance retry route over the failed-in-view set (one filtered "retry all", no new endpoint).
+5. ✅ **#14 compliance-aware section AI** — DONE — `sectionId` threaded into `proposal.draft_section`; loads `proposal_compliance_matrix` and injects a fenced `<compliance_requirements>` block (one server change fixes all four callers).
+6. ✅ **#1 Strategy panel (read-only)** — DONE — `GET .../strategy` reads `OnProposalCreated` step_results → the self-hiding `StrategyPanel` in the build workspace.
 7. ✅ **#6 auto-atomize on upload** — DONE — opt-in `mode=auto` on `atoms/upload` reuses `atomizeDocumentIntoLibrary` + fires the `librarian` `catalog` producer; a "⚡ auto-atomize the whole doc" toggle in the Atomizer lands atoms (draft, context-tagged) → Library ▸ Review. Live-proven: 4 primitives + reference + cocoon, librarian task completed, `library.package.atomized{source:upload_auto}` audited.
 8. ✅ **#12 ingest & stage + render the QA** — DONE — the ingest-assist + shred-audit actions already existed; the Mode-A gap was the unrendered `rfp_ingest_manager` plan. `GET .../assessment` reads the latest OnIngestAssessmentRequested `step_results['ai_ingest_manager']` (parsed via `lib/ingest/assessment.ts`) → an `IngestPlanPanel` in the curation workspace renders stage · readiness · agent plan · blockers · next actions, self-hiding until a real plan lands (re-fetches after Assess). `digStepText` shared out to `lib/agent-output.ts`.
-9. **#13 post-submission outcome nudge** — S–M — `createTask` at submission + a `record_outcome` completer that POSTs the outcome route
-10. **#16 partner cross-stable to-do feed** — S–M — scoped clone of `getTenantSurfacedTodos` + render in the console
+9. ✅ **#13 post-submission outcome nudge** — DONE — `createOutcomeNudge` at section-lock (idempotent, tenant_admin, 30/60/90-day) + a `record_outcome` completer that POSTs the outcome route.
+10. ✅ **#16 partner cross-stable to-do feed** — DONE — `getPartnerStableTodos` (scoped `sqlBypass` over the manager's stable) → the "To-dos across your stable" feed in the partner console, each row deep-linking via the descend URL.
 
 ### Decision-gated (need a product call before building)
 - **#15** expose discovery to `tenant_user`? The cards API already permits it; only the page/nav block it — an access-policy choice, ready either way.
