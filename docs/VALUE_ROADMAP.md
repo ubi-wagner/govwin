@@ -132,7 +132,7 @@ re-verified, premises overturned where wrong). Net changes:
 5. **#14 compliance-aware section AI** — S — add `sectionId` to `proposal.draft_section`, load `proposal_compliance_matrix`, inject as a fenced block (one server change fixes all four callers)
 6. **#1 Strategy panel (read-only)** — S–M — `GET .../strategy` reads `OnProposalCreated` step_results → an admin tab in the workspace
 7. ✅ **#6 auto-atomize on upload** — DONE — opt-in `mode=auto` on `atoms/upload` reuses `atomizeDocumentIntoLibrary` + fires the `librarian` `catalog` producer; a "⚡ auto-atomize the whole doc" toggle in the Atomizer lands atoms (draft, context-tagged) → Library ▸ Review. Live-proven: 4 primitives + reference + cocoon, librarian task completed, `library.package.atomized{source:upload_auto}` audited.
-8. **#12 ingest & stage + render the QA** — M — chain ingest-assist+shred-audit + a route to read `curation_qa`/`rfp_ingest_manager` step_results
+8. ✅ **#12 ingest & stage + render the QA** — DONE — the ingest-assist + shred-audit actions already existed; the Mode-A gap was the unrendered `rfp_ingest_manager` plan. `GET .../assessment` reads the latest OnIngestAssessmentRequested `step_results['ai_ingest_manager']` (parsed via `lib/ingest/assessment.ts`) → an `IngestPlanPanel` in the curation workspace renders stage · readiness · agent plan · blockers · next actions, self-hiding until a real plan lands (re-fetches after Assess). `digStepText` shared out to `lib/agent-output.ts`.
 9. **#13 post-submission outcome nudge** — S–M — `createTask` at submission + a `record_outcome` completer that POSTs the outcome route
 10. **#16 partner cross-stable to-do feed** — S–M — scoped clone of `getTenantSurfacedTodos` + render in the console
 

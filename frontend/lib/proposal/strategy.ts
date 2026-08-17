@@ -7,11 +7,12 @@
  * instance's `step_results` but never reached a UI. This module extracts that text so a
  * read-only Strategy panel can render it. Pure + framework-free (unit-tested; no DB).
  *
- * Agent output nests VARIABLY across the fabric's paths — a queue result is
- * `output.result.text`, an AI_INVOKE step nests at `result.result.text`, and some land as a
- * bare `{text}` or a plain string. `digStepText` tries them all so the reader can't silently
- * miss the content (the same defensive posture as the card-fit chip fix).
+ * Agent output nests VARIABLY across the fabric's paths — the shared `digStepText`
+ * (lib/agent-output.ts) tries every carrier so the reader can't silently miss the content. It is
+ * re-exported here for the callers/tests that already import it from this module.
  */
+import { digStepText } from '@/lib/agent-output';
+export { digStepText };
 
 /** The four advisory steps OnProposalCreated fans, in display order. */
 export const STRATEGY_STEPS = [
@@ -34,27 +35,6 @@ export interface ProposalStrategy {
   generatedAt: string | null;
   /** Whether the OnProposalCreated run has produced anything renderable yet. */
   hasAny: boolean;
-}
-
-/** Pull the human-readable text out of one step's result, whatever shape the fabric used. */
-export function digStepText(stepResult: unknown): string | null {
-  const seen = new Set<unknown>();
-  const dig = (o: unknown, depth: number): string | null => {
-    if (o == null || depth > 6) return null;
-    if (typeof o === 'string') return o.trim() || null;
-    if (typeof o !== 'object' || seen.has(o)) return null;
-    seen.add(o);
-    const r = o as Record<string, unknown>;
-    // Prefer an explicit text field at this level.
-    if (typeof r.text === 'string' && r.text.trim()) return r.text.trim();
-    // Then descend the known nesting carriers (result / output), in order.
-    for (const k of ['result', 'output'] as const) {
-      const t = dig(r[k], depth + 1);
-      if (t) return t;
-    }
-    return null;
-  };
-  return dig(stepResult, 0);
 }
 
 /**

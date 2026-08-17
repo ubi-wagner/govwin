@@ -16,6 +16,7 @@ import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
 import { AmendmentsPanel } from './amendments-panel';
+import { IngestPlanPanel } from './ingest-plan-panel';
 
 interface Solicitation {
   id: string;
@@ -206,6 +207,9 @@ export function CurationWorkspace({
     flags: { hasFullText: boolean; hasAiExtracted: boolean; complianceRowCount: number; hasOutline: boolean };
     missingStages: { stage: string; agent: string }[];
   } | null>(null);
+  // Bumped when Assess fires so the coordination-plan panel re-fetches (the manager's async plan
+  // lands shortly after). Delayed bumps below catch that landing without a manual refresh.
+  const [planKey, setPlanKey] = useState(0);
 
   // Ingest Assist — one action that runs the whole ingest SOP for this claimed
   // solicitation: parse its text → auto-build the compliance matrix + volumes +
@@ -246,6 +250,10 @@ export function CurationWorkspace({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Assessment failed');
       setAssessment(json.data?.snapshot ?? null);
+      // The manager's coordination plan lands async (pipeline worker) — re-fetch the plan panel a
+      // few times to catch it. The panel self-hides until a real structured plan exists.
+      setPlanKey((k) => k + 1);
+      [4000, 9000, 15000].forEach((ms) => setTimeout(() => setPlanKey((k) => k + 1), ms));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assessment failed');
     } finally {
@@ -868,9 +876,13 @@ export function CurationWorkspace({
           ) : (
             <p className="mt-2 text-xs text-emerald-700">All ingest stages complete — ready for QA / release.</p>
           )}
-          <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan posts to the agent workforce.</p>
+          <p className="mt-1 text-[11px] text-gray-400">rfp_ingest_manager dispatched — its coordination plan appears below once it lands.</p>
         </div>
       )}
+
+      {/* rfp_ingest_manager coordination plan (#12) — the async LLM plan, read back + rendered.
+          Always mounted; self-hides until a real structured plan exists (and after Assess fires). */}
+      <IngestPlanPanel solId={sol.id} refreshKey={planKey} />
 
       {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
       <div className="mb-4">
