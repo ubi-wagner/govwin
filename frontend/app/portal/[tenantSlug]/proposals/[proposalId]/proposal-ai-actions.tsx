@@ -59,6 +59,10 @@ export function ProposalAiActions({
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [landLoading, setLandLoading] = useState(false);
   const [acceptLoading, setAcceptLoading] = useState(false);
+  // One-click "draft & stage" orchestration (#8): fire the full draft → poll to completion →
+  // auto-stage the revisions for review. Stops at staged review; Accept stays a separate click.
+  const [orchestrating, setOrchestrating] = useState(false);
+  const [orchestratePhase, setOrchestratePhase] = useState<'drafting' | 'staging' | null>(null);
   // Direct verbatim reuse of an uploaded past proposal into empty sections (W3.2).
   const [pastProposals, setPastProposals] = useState<{ id: string; name: string; sectionCount: number }[]>([]);
   const [reuseCocoonId, setReuseCocoonId] = useState('');
@@ -173,6 +177,87 @@ export function ProposalAiActions({
       setFullDraftLoading(false);
     }
   }, [canDraft, fullDraftLoading, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId]);
+
+  // One-click "Draft & stage for review" (#8) — the last-mile orchestration. Fires the full draft
+  // (the same mode/voice/adversarial the manual controls use), polls the run to completion, then
+  // auto-chains the read-on-review landing so the drafts appear as PROPOSED revisions without a
+  // second manual step. Stops there — "Accept into document" stays a deliberate, separate click.
+  const handleDraftAndStage = useCallback(async () => {
+    if (!canDraft || orchestrating) return;
+    setOrchestrating(true);
+    setOrchestratePhase('drafting');
+    setFullDraftMsg(null);
+    try {
+      const useAdversarial = fullDraftMode === 'c' && adversarial;
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: fullDraftMode,
+          voice,
+          adversarial: useAdversarial,
+          ...(useAdversarial ? { adversarialPolicy } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        setFullDraftMsg({ type: 'error', text: err.error || 'Full draft request failed' });
+        setOrchestrating(false);
+        setOrchestratePhase(null);
+        return;
+      }
+
+      // Poll the run to completion (paused = HITL landing, or completed), then stage.
+      const started = Date.now();
+      const poll = async () => {
+        try {
+          const r = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`);
+          const j = await r.json().catch(() => ({}));
+          const d = j.data as { done?: boolean; failed?: boolean } | undefined;
+          if (d?.failed) {
+            setFullDraftMsg({ type: 'error', text: 'The draft run failed — see the workflow monitor. Nothing was staged.' });
+            setOrchestrating(false);
+            setOrchestratePhase(null);
+            return;
+          }
+          if (d?.done) {
+            // Auto-chain the read-on-review landing (the only consumer of agent output — human-triggered).
+            setOrchestratePhase('staging');
+            const lr = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/land-revisions`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+            });
+            const lj = await lr.json().catch(() => ({}));
+            const n = lj.data?.landed ?? 0;
+            setFullDraftMsg({
+              type: 'success',
+              text: n > 0
+                ? `Drafted & staged ${n} section${n > 1 ? 's' : ''} for review — Restore any from a section's history, then Accept into the document below when you're ready.`
+                : 'The draft run finished but staged no new revisions (already landed, or it produced none). Try "Stage AI revisions for review".',
+            });
+            router.refresh();
+            setOrchestrating(false);
+            setOrchestratePhase(null);
+            return;
+          }
+        } catch { /* transient — keep polling */ }
+        if (Date.now() - started > 240_000) {
+          setFullDraftMsg({
+            type: 'error',
+            text: 'Drafting is taking longer than expected — it keeps running in the background. Once it finishes, use "Stage AI revisions for review" to bring the drafts in.',
+          });
+          setOrchestrating(false);
+          setOrchestratePhase(null);
+          return;
+        }
+        setTimeout(poll, 5000);
+      };
+      setTimeout(poll, 5000);
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+      setOrchestrating(false);
+      setOrchestratePhase(null);
+    }
+  }, [canDraft, orchestrating, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId, router]);
 
   // Apply AI-proposed revisions — the read-on-review LANDING. The fabric never lands agent output
   // and the workflow engine forbids a pipeline consumer (docs/FULL_DRAFT_LANDING_DESIGN.md), so the
@@ -562,10 +647,36 @@ export function ProposalAiActions({
           </fieldset>
         )}
 
+        {/* One-click path (#8): draft the whole proposal → poll to completion → auto-stage the
+            revisions for review, in one click. Stops at staged review — Accept stays separate. */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={handleDraftAndStage}
+            disabled={!canDraft || orchestrating || fullDraftLoading || landLoading || acceptLoading}
+            title="Draft the whole proposal and stage the results as proposed revisions for your review — one click. Accepting into the document stays a separate step."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {orchestrating ? (
+              <span className="w-4 h-4 border-2 border-indigo-200 border-t-white rounded-full animate-spin" />
+            ) : (
+              <span>&#x2726;</span>
+            )}
+            {orchestrating
+              ? (orchestratePhase === 'staging' ? 'Staging for review…' : 'Drafting…')
+              : `Draft & stage for review (Mode ${fullDraftMode.toUpperCase()})`}
+          </button>
+          <p className="text-xs text-gray-400 mt-1">
+            One click: drafts every section, then stages the results as proposed revisions you can review.
+            Accepting into the document stays a separate, deliberate step.
+          </p>
+        </div>
+
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Or step through it manually:</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleFullDraft}
-            disabled={!canDraft || fullDraftLoading}
+            disabled={!canDraft || fullDraftLoading || orchestrating}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {fullDraftLoading ? (
@@ -581,7 +692,7 @@ export function ProposalAiActions({
           <button
             type="button"
             onClick={handleLandRevisions}
-            disabled={!canDraft || landLoading}
+            disabled={!canDraft || landLoading || orchestrating}
             title="Stage the latest full-draft run's AI revisions as proposed versions in each section's history (review-first)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -598,7 +709,7 @@ export function ProposalAiActions({
           <button
             type="button"
             onClick={handleAcceptAi}
-            disabled={!canDraft || acceptLoading}
+            disabled={!canDraft || acceptLoading || orchestrating}
             title="Accept the staged AI drafts into the document — writes each section's latest AI revision to live content (undoable via each section's history)."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-emerald-200 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >

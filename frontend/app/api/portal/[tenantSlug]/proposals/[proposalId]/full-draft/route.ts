@@ -60,6 +60,72 @@ interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
+/**
+ * GET /api/portal/[tenantSlug]/proposals/[proposalId]/full-draft
+ *
+ * Poll target for the one-click "draft & stage" orchestration (#8). Reports the LATEST
+ * OnFullDraftRequested* workflow instance for this proposal so the client knows when the
+ * cohort has finished producing (and can then auto-chain land-revisions). `done` is true
+ * once the run is terminal-for-staging (paused = HITL landing, or completed); `failed` when
+ * the run errored/cancelled; otherwise it is still running. `state:'none'` = no run yet.
+ *
+ * Auth mirrors POST: tenant_admin+ WITH tenant access (shadow admins pass verifyTenantAccess).
+ */
+export async function GET(_request: Request, ctx: RouteContext) {
+  try {
+    const { tenantSlug, proposalId } = await ctx.params;
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    const u = session.user as { id?: string; role?: unknown };
+    const role: Role | null = isRole(u.role) ? u.role : null;
+    if (!role || !u.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    const tenantId = tenant.id as string;
+    if (!(await verifyTenantAccess(u.id, role, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    enterTenant(tenantId);
+
+    let latest: { status: string; startedAt: string | null } | undefined;
+    try {
+      [latest] = await sql<{ status: string; startedAt: string | null }[]>`
+        SELECT status, started_at AS "startedAt"
+        FROM process_instances
+        WHERE tenant_id = ${tenantId}::uuid
+          AND workflow_name LIKE 'OnFullDraftRequested%'
+          AND payload->>'proposal_id' = ${proposalId}
+        ORDER BY started_at DESC NULLS LAST
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[portal/proposals/full-draft] status query failed:', dbErr);
+      return NextResponse.json({ error: 'Status check failed', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    if (!latest) {
+      return NextResponse.json({ data: { state: 'none', status: null, done: false, failed: false } });
+    }
+    // Terminal-for-staging: the cohort's output is in step_results once the run pauses (HITL landing)
+    // or completes; failed/cancelled are terminal errors; anything else is still producing.
+    const done = latest.status === 'paused' || latest.status === 'completed';
+    const failed = latest.status === 'failed' || latest.status === 'cancelled';
+    return NextResponse.json({ data: { state: 'run', status: latest.status, startedAt: latest.startedAt, done, failed } });
+  } catch (err) {
+    console.error('[portal/proposals/full-draft] GET error:', err);
+    return NextResponse.json({ error: 'Status check failed', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, proposalId } = await ctx.params;
