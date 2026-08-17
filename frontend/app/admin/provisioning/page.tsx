@@ -90,8 +90,16 @@ export default async function ReleaseSlaBoardPage() {
       </p>
 
       {portals.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
-          No portals are awaiting release right now.
+        <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-green-50 text-2xl" aria-hidden>✓</div>
+          <p className="text-sm font-medium text-gray-900">The release queue is clear.</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+            When a customer buys a proposal portal it lands here awaiting expert release, sorted by its 72-hour
+            curation SLA. A portal whose master solicitation is already built out can be released in one click.
+          </p>
+          <Link href="/admin/purchases" className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            View purchases →
+          </Link>
         </div>
       ) : (
         <ul className="mt-6 space-y-3">
