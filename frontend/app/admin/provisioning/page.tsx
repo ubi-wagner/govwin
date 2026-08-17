@@ -12,7 +12,9 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { sqlBypass as sql } from '@/lib/db';
+import { getBuildReadiness } from '@/lib/provisioning/readiness';
 import { SlaCountdown } from './[portalId]/release-panel';
+import { InstantReleaseButton } from './instant-release-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ interface PendingPortal {
   tenantSlug: string;
   oppTitle: string;
   agency: string | null;
+  solId: string | null;
 }
 
 export default async function ReleaseSlaBoardPage() {
@@ -40,7 +43,12 @@ export default async function ReleaseSlaBoardPage() {
       SELECT pp.id, pp.label, pp.status,
              pp.curation_due_at AS "curationDueAt", pp.paid_at AS "paidAt",
              t.name AS "tenantName", t.slug AS "tenantSlug",
-             o.title AS "oppTitle", o.agency
+             o.title AS "oppTitle", o.agency,
+             -- The master solicitation behind this portal's opportunity (topic → solicitation_id,
+             -- umbrella → cs.opportunity_id), for the build-out readiness gate on the fast-path release.
+             (SELECT cs.id FROM curated_solicitations cs
+                JOIN opportunities o2 ON (o2.solicitation_id = cs.id OR cs.opportunity_id = o2.id)
+                WHERE o2.id = pp.opportunity_id LIMIT 1) AS "solId"
       FROM proposal_portals pp
       JOIN tenants t ON t.id = pp.tenant_id
       JOIN opportunities o ON o.id = pp.opportunity_id
@@ -51,8 +59,20 @@ export default async function ReleaseSlaBoardPage() {
     console.error('[admin/provisioning] board load failed', e);
   }
 
+  // Per-portal build-out readiness (the fast-path gate): a portal whose master OPP is already fully
+  // built out can be released in one click straight from this board — no cockpit trip. Bounded N (only
+  // portals awaiting release), best-effort (readiness returns EMPTY.ready=false on any failure).
+  const readyById = new Map<string, boolean>();
+  await Promise.all(
+    portals.map(async (p) => {
+      if (!p.solId) return;
+      try { readyById.set(p.id, (await getBuildReadiness(p.solId)).ready); } catch { /* not ready */ }
+    }),
+  );
+
   const now = Date.now();
   const overdueCount = portals.filter((p) => p.curationDueAt != null && new Date(p.curationDueAt).getTime() < now).length;
+  const readyCount = portals.filter((p) => readyById.get(p.id)).length;
 
   return (
     <div className="max-w-5xl">
@@ -64,6 +84,9 @@ export default async function ReleaseSlaBoardPage() {
         ) : (
           <span className="text-green-600 font-medium">None overdue.</span>
         )}
+        {readyCount > 0 && (
+          <span className="text-gray-500">{' '}· <span className="font-medium text-indigo-600">{readyCount} ready to release now.</span></span>
+        )}
       </p>
 
       {portals.length === 0 ? (
@@ -74,28 +97,33 @@ export default async function ReleaseSlaBoardPage() {
         <ul className="mt-6 space-y-3">
           {portals.map((p) => {
             const isOverdue = p.curationDueAt != null && new Date(p.curationDueAt).getTime() < now;
+            const isReady = readyById.get(p.id) === true;
             return (
               <li key={p.id}>
-                <Link
-                  href={`/admin/provisioning/${p.id}`}
-                  className={`block rounded-lg border bg-white p-4 transition-shadow hover:shadow-sm ${isOverdue ? 'border-red-300' : 'border-gray-200'}`}
-                >
+                <div className={`rounded-lg border bg-white p-4 transition-shadow hover:shadow-sm ${isOverdue ? 'border-red-300' : 'border-gray-200'}`}>
                   <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-gray-900">{p.oppTitle || p.label}</p>
+                    <Link href={`/admin/provisioning/${p.id}`} className="min-w-0 flex-1 group">
+                      <p className="truncate font-semibold text-gray-900 group-hover:text-indigo-700">{p.oppTitle || p.label}</p>
                       <p className="mt-0.5 truncate text-sm text-gray-500">
                         {[p.agency, p.tenantName].filter(Boolean).join(' · ') || 'Unknown buyer'}
                       </p>
-                    </div>
-                    <div className="shrink-0 text-right">
+                    </Link>
+                    <div className="shrink-0 flex flex-col items-end gap-2">
                       {p.curationDueAt ? (
                         <SlaCountdown dueAt={new Date(p.curationDueAt).toISOString()} />
                       ) : (
                         <span className="text-xs text-gray-400">No SLA set</span>
                       )}
+                      {isReady ? (
+                        <InstantReleaseButton portalId={p.id} label={p.oppTitle || p.label} />
+                      ) : (
+                        <Link href={`/admin/provisioning/${p.id}`} className="text-xs font-medium text-gray-500 hover:text-gray-700">
+                          Curate &amp; release →
+                        </Link>
+                      )}
                     </div>
                   </div>
-                </Link>
+                </div>
               </li>
             );
           })}
