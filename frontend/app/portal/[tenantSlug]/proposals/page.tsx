@@ -95,6 +95,28 @@ export default async function ProposalsListPage({ params }: Props) {
         ORDER BY p.created_at DESC
         LIMIT 50
       `;
+    } else if (scopedProposalIds !== null) {
+      // CAP-3: a proposal-scoped tenant_user sees ONLY their granted proposals. Two complete
+      // queries (never a nested `sql` fragment) — under an active tenant RLS context the db-client
+      // Proxy wraps each query in a SET LOCAL transaction, and a nested fragment corrupts the $N
+      // placeholders (lib/db.ts §"FRAGMENT-composing"). An empty scope correctly matches nothing.
+      proposals = await sql<typeof proposals>`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.created_at,
+          p.archived_at,
+          o.close_date,
+          o.agency,
+          o.topic_number,
+          (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
+        FROM proposals p
+        JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.tenant_id = ${tenantId}
+          AND p.id = ANY(${scopedProposalIds}::uuid[])
+        ORDER BY p.created_at DESC
+      `;
     } else {
       proposals = await sql<typeof proposals>`
         SELECT
@@ -110,7 +132,6 @@ export default async function ProposalsListPage({ params }: Props) {
         FROM proposals p
         JOIN opportunities o ON o.id = p.opportunity_id
         WHERE p.tenant_id = ${tenantId}
-          ${scopedProposalIds !== null ? sql`AND p.id = ANY(${scopedProposalIds}::uuid[])` : sql``}
         ORDER BY p.created_at DESC
       `;
     }
