@@ -216,9 +216,9 @@ export function StageControl({
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-y-3">
         {/* Stage progress dots */}
-        <div className="flex items-center gap-0">
+        <div className="flex items-center gap-0 overflow-x-auto">
           {gateConfig.map((gate, idx) => {
             const isDone = idx < currentIndex;
             const isCurrent = idx === currentIndex;
@@ -305,7 +305,7 @@ export function StageControl({
 
       {/* Lock status info */}
       {(lockCount > 0 || isLocked || deadlineStr) && (
-        <div className="mt-3 flex items-center gap-4 text-xs">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {isLocked && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium">
               Locked (#{lockCount})

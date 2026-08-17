@@ -979,8 +979,8 @@ function CanvasEditorInner({
           </div>
         )}
         {/* Toolbar */}
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-white border-b px-4 py-2">
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-y-2 bg-white border-b px-4 py-2">
+          <div className="flex items-center gap-3 min-w-0">
             <h2 className="font-semibold text-sm text-gray-800 truncate max-w-xs">
               {doc.metadata.title}
             </h2>
@@ -994,7 +994,7 @@ function CanvasEditorInner({
             </span>
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {saveError && (
               <span className="text-xs text-red-600 mr-2">{saveError}</span>
             )}

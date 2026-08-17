@@ -101,6 +101,10 @@ interface ProposalWorkspaceProps {
   isLocked: boolean;
   // New props from portal page enhancements
   userRole: 'admin' | 'contributor' | 'external';
+  // Tenant-wide member (admin or home tenant_user) — NOT a scoped/external collaborator. Gates the
+  // proposal-wide Timeline (actor emails + full event payloads + stage history), which must never
+  // reach a section-scoped partner_user / cross-company collaborator. Defaults true (internal staff).
+  isTenantWide?: boolean;
   currentUserId: string;
   collaborators: Collaborator[];
   compliance: ComplianceData | null;
@@ -146,6 +150,7 @@ export function ProposalWorkspace({
   proposalStage,
   isLocked,
   userRole,
+  isTenantWide = true,
   currentUserId,
   collaborators,
   compliance,
@@ -219,7 +224,9 @@ export function ProposalWorkspace({
           { key: 'my-sections' as const, label: 'My Sections' },
           // Whole-proposal fluid document view — the reader surface (tenant members).
           ...(userRole === 'admin' ? [{ key: 'document' as const, label: 'Document' }] : []),
-          { key: 'timeline' as const, label: 'Timeline' },
+          // Proposal-wide activity/history — tenant-wide members only; a scoped/external collaborator
+          // must not see other actors' emails, event payloads, or stage history for ungranted work.
+          ...(isTenantWide ? [{ key: 'timeline' as const, label: 'Timeline' }] : []),
         ]).map((tab) => (
           <button
             key={tab.key}
@@ -235,8 +242,8 @@ export function ProposalWorkspace({
         ))}
       </div>
 
-      {/* ─── Timeline Tab ────────────────────────────────────────────── */}
-      {workspaceTab === 'timeline' && (
+      {/* ─── Timeline Tab (tenant-wide members only) ─────────────────── */}
+      {isTenantWide && workspaceTab === 'timeline' && (
         <div className="space-y-6">
           {/* Stage Completion History */}
           {stageCompletionHistory && stageCompletionHistory.length > 0 && (

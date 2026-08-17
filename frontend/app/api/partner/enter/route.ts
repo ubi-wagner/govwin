@@ -58,6 +58,15 @@ export async function GET(req: NextRequest) {
       'processes', 'activity', 'portals', 'atoms', 'team', 'manage',
     ]);
     const next = req.nextUrl.searchParams.get('next')?.trim() ?? '';
+    // The console's stable-feed rows deep-link to a FULL in-portal task path
+    // (e.g. /portal/{slug}/proposals/{id}/sections/{sid}), not a bare suffix — honor it so a
+    // "Descend →" lands on the exact item, not the generic Command Center. Strict same-slug prefix,
+    // no scheme/host and no `..` traversal, so it can never be an open redirect. Anything else falls
+    // back to the bare-suffix whitelist (default `command`).
+    const inPortalPrefix = `/portal/${slug}/`;
+    if (next.startsWith(inPortalPrefix) && !next.includes('://') && !next.includes('..')) {
+      return NextResponse.redirect(url(next));
+    }
     const dest = NEXT_WHITELIST.has(next) ? next : 'command';
     return NextResponse.redirect(url(`/portal/${slug}/${dest}`));
   } catch (e) {

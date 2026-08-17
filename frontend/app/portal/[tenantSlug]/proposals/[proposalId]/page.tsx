@@ -614,6 +614,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         proposalStage={proposal.stage}
         isLocked={proposal.isLocked}
         userRole={access.role}
+        isTenantWide={effectiveTenantWide}
         currentUserId={sessionUser.id}
         collaborators={collaboratorsWithAccess}
         compliance={compliance}
@@ -627,8 +628,11 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         canExport={access.canExport}
         canManageTeam={access.canManageTeam}
         closeDate={proposal.closeDate?.toISOString() ?? null}
-        proposalEvents={proposalEvents}
-        stageCompletionHistory={stageCompletionHistory.map((h) => ({
+        // Defense in depth: never even SEND proposal-wide activity/history to a scoped or external
+        // collaborator (the Timeline tab is also hidden for them client-side). Only tenant-wide
+        // members receive the actor-email/payload stream + stage history.
+        proposalEvents={effectiveTenantWide ? proposalEvents : []}
+        stageCompletionHistory={(effectiveTenantWide ? stageCompletionHistory : []).map((h) => ({
           stage: h.stage,
           completedByName: h.completedByName,
           completedAt: h.completedAt.toISOString(),

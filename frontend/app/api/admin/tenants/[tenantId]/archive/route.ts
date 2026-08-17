@@ -12,7 +12,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+import { sql, enterBypass } from '@/lib/db';
 import { isValidUUID } from '@/lib/validation';
 import type { Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -30,6 +30,11 @@ async function requireAdmin() {
 type SetResult = 'not_found' | 'noop' | { id: string; name: string };
 
 async function setArchived(tenantId: string, archived: boolean): Promise<SetResult> {
+  // This is a legitimate cross-tenant admin op that writes the RLS-forced process_instances (and
+  // reads proposals) for ANY tenant. Without a context the cascade UPDATEs run as govtech_app with an
+  // unset app.tenant_id → RLS collapses them to zero rows (a silent no-op that leaves an archived
+  // company's workflows live). Route through the owner pool, same as the sibling amendments route.
+  enterBypass();
   // Existence + state check first, so a no-op 409s (not a silent 200 that resets the retention
   // watermark) and an unknown id 404s — compare-and-swap parity with the proposal/atom archive routes.
   const [existing] = await sql<{ id: string; name: string; archivedAt: Date | string | null }[]>`
