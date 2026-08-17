@@ -6,6 +6,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import ProposalStudio from '@/components/portal/proposal-studio';
 import { AmendmentBanner } from '@/components/portal/amendment-banner';
+import { StrategyPanel } from '@/components/portal/strategy-panel';
 import { ArchivePortalButton } from '@/components/portal/archive-portal-button';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
@@ -549,6 +550,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         <div className="mb-6">
           <ProposalStudio tenantSlug={tenantSlug} proposalId={proposalId} />
         </div>
+      )}
+
+      {/* ── Capture strategy & research (#1) — the OnProposalCreated advisory briefs, read-only.
+             Self-hides when the run produced none. For the build team (not external viewers). ── */}
+      {access.role !== 'external' && (
+        <StrategyPanel tenantSlug={tenantSlug} proposalId={proposalId} />
       )}
 
       {/* ── Workspace Client Component ────────────────────────────────── */}
