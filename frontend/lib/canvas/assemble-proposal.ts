@@ -50,6 +50,14 @@ export interface FluidSectionMeta {
   canvas: unknown | null;
   /** the section's OWN document metadata (title/status). */
   metadata: unknown | null;
+  /**
+   * The section's ORIGINAL stored CanvasDocument when it is v2 (carries an internal `sections[]`
+   * layer — layout / groups / section_type / source_atom_ids / atom_ref / pinned box). The fluid
+   * save reconstructs AGAINST this so a single-node edit can't flatten the section to v1 and
+   * silently strip the mold + compliance-matrix structure the exporters and readiness rollup
+   * depend on. null for v1 (flat-nodes) sections, which reconstruct losslessly without it.
+   */
+  sourceDoc?: CanvasDocument | null;
 }
 
 const anchorId = (sectionId: string) => `sec:${sectionId}`;
@@ -73,7 +81,41 @@ export function reconstructSectionDoc(
   sectionId: string,
   frame: CanvasDocument['canvas'],
   metadata: CanvasDocument['metadata'],
+  sourceDoc?: CanvasDocument | null,
 ): CanvasDocument {
+  // This section's edited leaf nodes, keyed by their in-section (un-prefixed) id.
+  const edited = new Map<string, CanvasNode>();
+  for (const n of assembledDoc.nodes) {
+    if (n.id.startsWith('sec:') || sectionOf[n.id]?.id !== sectionId) continue;
+    const oid = originalNodeId(n.id, sectionId);
+    edited.set(oid, { ...n, id: oid });
+  }
+
+  // v2 (section-layer) source: preserve the WHOLE structure — layout / groups / section_type /
+  // source_atom_ids / atom_ref / break_before / pinned box — and overwrite ONLY each leaf node's
+  // CONTENT from the edited flat view. Flattening to v1 here would silently strip the mold + the
+  // compliance-matrix mapping that the exporters and the readiness rollup depend on. An edited node
+  // absent from `edited` (shouldn't happen — assemble emits every leaf) keeps its original.
+  if (sourceDoc?.sections?.length) {
+    const sections = sourceDoc.sections.map((s) => ({
+      ...s,
+      groups: s.groups.map((g) => ({
+        ...g,
+        nodes: g.nodes.map((n) => edited.get(n.id) ?? n),
+      })),
+    }));
+    return {
+      ...sourceDoc,
+      version: sourceDoc.version ?? 2,
+      document_id: sourceDoc.document_id || `section-${sectionId}`,
+      canvas: frame,
+      metadata,
+      sections,
+      nodes: [],
+    };
+  }
+
+  // v1 flat path (lossless for nodes-only docs — the original F2 behaviour, unchanged).
   const nodes = assembledDoc.nodes
     .filter((n) => !n.id.startsWith('sec:') && sectionOf[n.id]?.id === sectionId)
     .map((n) => ({ ...n, id: originalNodeId(n.id, sectionId) }));
