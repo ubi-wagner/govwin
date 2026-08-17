@@ -18,6 +18,8 @@ interface Props {
   onAtomize?: (sel: CanvasSelection) => void;
   onRegenerate?: (sel: CanvasSelection) => void;
   onAnnotate?: (sel: CanvasSelection) => void;
+  onReuse?: (sel: CanvasSelection) => void;
+  onComplianceCheck?: (sel: CanvasSelection) => void;
   /** Suppress the toolbar (e.g. read-only, or a modal is open). */
   disabled?: boolean;
   /** Optional busy flag — shows a spinner label instead of the actions. */
@@ -27,7 +29,7 @@ interface Props {
 const elementOf = (node: Node | null): Element | null =>
   !node ? null : node.nodeType === Node.TEXT_NODE ? (node as Text).parentElement : (node as Element);
 
-export function SelectionToolbar({ doc, onAtomize, onRegenerate, onAnnotate, disabled, busy }: Props) {
+export function SelectionToolbar({ doc, onAtomize, onRegenerate, onAnnotate, onReuse, onComplianceCheck, disabled, busy }: Props) {
   const [sel, setSel] = useState<CanvasSelection | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -82,6 +84,12 @@ export function SelectionToolbar({ doc, onAtomize, onRegenerate, onAnnotate, dis
           )}
           {onAnnotate && (
             <button onClick={() => onAnnotate(sel)} className="px-2 py-1 rounded hover:bg-slate-700" title="Add a note to this selection">✎ Annotate</button>
+          )}
+          {onReuse && (
+            <button onClick={() => onReuse(sel)} className="px-2 py-1 rounded hover:bg-slate-700" title="Find a reusable library atom for this section">⇄ Reuse</button>
+          )}
+          {onComplianceCheck && (
+            <button onClick={() => onComplianceCheck(sel)} className="px-2 py-1 rounded hover:bg-slate-700" title="Check this section against the solicitation's compliance requirements">✓ Compliance</button>
           )}
         </>
       )}

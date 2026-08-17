@@ -27,7 +27,7 @@ import { SelectionToolbar } from './selection-toolbar';
 import { CanvasOverlayBar, overlayClass, useOverlays } from './canvas-overlays';
 import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
 import { originalNodeId, reconstructSectionDoc, type AssembledProposal, type FluidSectionMeta } from '@/lib/canvas/assemble-proposal';
-import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
+import { estimatePageCount, getNodeText, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { toast } from '@/lib/toast';
 
 interface Props {
@@ -52,9 +52,12 @@ const STATUS_DOT: Record<string, string> = {
   complete: 'bg-green-500', approved: 'bg-emerald-500',
 };
 
-export function FluidDocumentView({ assembled, sections, canManage = false, tenantSlug, proposalId, variables, canAct = true }: Props) {
+export function FluidDocumentView({ assembled, sections: sectionsProp, canManage = false, tenantSlug, proposalId, variables, canAct = true }: Props) {
   const { sectionOf, outline } = assembled;
   const [doc, setDoc] = useState<CanvasDocument>(assembled.doc);
+  // Per-section meta held in STATE so a lock/unlock (F2b) flips editability live without a reload.
+  const [sections, setSections] = useState<FluidSectionMeta[]>(sectionsProp);
+  const [lockBusy, setLockBusy] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(outline[0]?.sectionId ?? null);
   const [selBusy, setSelBusy] = useState(false);
@@ -68,7 +71,30 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Structure-as-overlay (Phase 1): togglable dotted Sections / Atoms / Provenance layers.
   const { active: overlays, toggle: toggleOverlay } = useOverlays();
+  // F3 — the two remaining overlay layers (Compliance coverage · Budget/pages), wired here off
+  // real data (the compliance matrix + estimatePageCount). Off by default, summonable chips.
+  const [showCompliance, setShowCompliance] = useState(false);
+  const [showBudget, setShowBudget] = useState(false);
+  const [compCoverage, setCompCoverage] = useState<{ met: number; total: number } | null>(null);
+  useEffect(() => {
+    if (!showCompliance || compCoverage) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/compliance`);
+        const j = await res.json().catch(() => ({}));
+        const items = (j?.data?.items ?? []) as { status?: string }[];
+        if (alive) setCompCoverage({ met: items.filter((i) => i.status === 'satisfied').length, total: items.length });
+      } catch { if (alive) setCompCoverage({ met: 0, total: 0 }); }
+    })();
+    return () => { alive = false; };
+  }, [showCompliance, compCoverage, tenantSlug, proposalId]);
 
+  const budget = useMemo(() => {
+    const est = estimatePageCount(doc);
+    const max = (doc.canvas as { max_pages?: number | null } | undefined)?.max_pages ?? null;
+    return { est, max };
+  }, [doc]);
   const sectionsById = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
   const anyEditable = useMemo(() => sections.some((s) => s.editable), [sections]);
   const statusOf = useMemo(() => new Map(sections.map((s) => [s.id, s.status])), [sections]);
@@ -76,10 +102,32 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
   // Re-seed if the parent hands us a fresh assemble (e.g. after an external refresh).
   useEffect(() => {
     setDoc(assembled.doc);
+    setSections(sectionsProp);
     setDirty(new Set());
-    versionRef.current = new Map(sections.map((s) => [s.id, s.version]));
+    versionRef.current = new Map(sectionsProp.map((s) => [s.id, s.version]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assembled]);
+
+  // F2b — lock (accept) / unlock a section straight from the canvas outline rail (admins only).
+  // A lock flips the section to read-only (editable=false) live; unlock reopens it for edit.
+  const toggleLock = useCallback(async (secId: string) => {
+    const sec = sections.find((s) => s.id === secId);
+    if (!sec || !canManage) return;
+    setLockBusy(secId);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${secId}/lock`, {
+        method: sec.isLocked ? 'DELETE' : 'POST',
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(j?.error ?? `Couldn’t ${sec.isLocked ? 'unlock' : 'lock'} the section.`); return; }
+      const nowLocked = !sec.isLocked;
+      // Locked → read-only; reopened → editable (the admin acting here is tenant-wide, so an
+      // unlocked current-stage section is theirs to edit; the save route re-enforces regardless).
+      setSections((prev) => prev.map((s) => s.id === secId ? { ...s, isLocked: nowLocked, editable: !nowLocked, status: nowLocked ? 'approved' : 'in_progress' } : s));
+      toast.success(nowLocked ? `“${sec.title ?? 'Section'}” locked.` : `“${sec.title ?? 'Section'}” reopened for edit.`);
+    } catch { toast.error('Network error changing the section lock.'); }
+    finally { setLockBusy(null); }
+  }, [sections, canManage, tenantSlug, proposalId]);
 
   const editableOf = useCallback((assembledNodeId: string): FluidSectionMeta | null => {
     if (assembledNodeId.startsWith('sec:')) return null; // synthetic boundary — never editable
@@ -228,26 +276,42 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
-  // ── Selection verbs (F0/F2) ─────────────────────────────────────────
+  // ── Selection verbs (F0/F2/F4) ──────────────────────────────────────
+  // F4 multi-target: a selection spanning N sections atomizes EACH section's own portion into its
+  // own atom (routed via sectionOf), not just the first section. Single-section spans behave as F0.
   const selectionAtomize = useCallback(
     async (sel: CanvasSelection) => {
-      const text = sel.text.trim();
-      if (text.length < 20) { toast.info('Select a bit more text to atomize (≥ 20 characters).'); return; }
-      const owner = sectionOf[sel.nodeIds[0]];
-      if (!owner) { toast.error('Could not resolve the section for this selection.'); return; }
+      if (sel.text.trim().length < 20) { toast.info('Select a bit more text to atomize (≥ 20 characters).'); return; }
+      // Group the span's nodes by owning section, preserving order; per-node text from the doc.
+      const textOf = new Map(doc.nodes.map((n) => [n.id, getNodeText(n as CanvasNode)]));
+      const groups: { secId: string; title: string; nodeIds: string[] }[] = [];
+      for (const nid of sel.nodeIds) {
+        if (nid.startsWith('sec:')) continue;
+        const owner = sectionOf[nid];
+        if (!owner) continue;
+        const g = groups.find((x) => x.secId === owner.id) ?? (groups.push({ secId: owner.id, title: owner.title, nodeIds: [] }), groups[groups.length - 1]);
+        g.nodeIds.push(nid);
+      }
+      if (!groups.length) { toast.error('Could not resolve the section(s) for this selection.'); return; }
       setSelBusy(true);
+      let ok = 0, skipped = 0;
       try {
-        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${owner.id}/atomize-node`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodeId: originalNodeId(sel.nodeIds[0], owner.id), heading: selectionLabel(sel) || owner.title, text, tags: [] }),
-        });
-        const j = await res.json().catch(() => ({}));
-        if (res.ok) toast.success(j?.data?.deduped ? `Matched an existing atom (from “${owner.title}”).` : `Saved as a library atom (from “${owner.title}”).`);
-        else toast.error(j?.error ?? 'Could not atomize the selection.');
+        for (const g of groups) {
+          const text = g.nodeIds.map((id) => textOf.get(id) ?? '').filter((t) => t.trim()).join('\n\n').trim();
+          if (text.length < 20) { skipped++; continue; }
+          const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${g.secId}/atomize-node`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nodeId: originalNodeId(g.nodeIds[0], g.secId), heading: g.title, text, tags: [] }),
+          });
+          if (res.ok) ok++; else skipped++;
+        }
+        if (ok && groups.length > 1) toast.success(`Atomized ${ok} section${ok === 1 ? '' : 's'} into ${ok} library atom${ok === 1 ? '' : 's'}.`);
+        else if (ok) toast.success('Saved as a library atom.');
+        if (!ok) toast.error('Could not atomize the selection.');
       } catch { toast.error('Could not atomize the selection.'); }
       finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
     },
-    [sectionOf, tenantSlug, proposalId],
+    [doc, sectionOf, tenantSlug, proposalId],
   );
 
   const selectionAnnotate = useCallback(
@@ -272,6 +336,46 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
     [sectionOf, tenantSlug, proposalId],
   );
 
+  // F2c — Compliance-check verb: advisory read of the compliance matrix for the span's OWNING
+  // section (read-only, never writes). Reports coverage for that section.
+  const selectionCompliance = useCallback(
+    async (sel: CanvasSelection) => {
+      const owner = sectionOf[sel.nodeIds[0]];
+      if (!owner) { toast.error('Could not resolve the section for this selection.'); return; }
+      setSelBusy(true);
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/compliance`);
+        const j = await res.json().catch(() => ({}));
+        const items = (j?.data?.items ?? []) as { status?: string; sectionId?: string | null }[];
+        const mine = items.filter((it) => it.sectionId === owner.id);
+        if (!mine.length) { toast.info(`No compliance requirements are mapped to “${owner.title}” yet.`); return; }
+        const met = mine.filter((it) => it.status === 'satisfied').length;
+        toast.info(`“${owner.title}”: ${met}/${mine.length} mapped requirement${mine.length === 1 ? '' : 's'} satisfied.`);
+      } catch { toast.error('Could not run the compliance check.'); }
+      finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+    },
+    [sectionOf, tenantSlug, proposalId],
+  );
+
+  // F2c — Reuse verb: surface reusable library atoms matching the highlighted text (advisory —
+  // the writable insert lives in the section editor's library picker; this points you at matches).
+  const selectionReuse = useCallback(
+    async (sel: CanvasSelection) => {
+      const q = sel.text.trim().slice(0, 80);
+      if (q.length < 8) { toast.info('Select a bit more text to search the library.'); return; }
+      setSelBusy(true);
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/library/atoms?q=${encodeURIComponent(q)}&limit=5`);
+        const j = await res.json().catch(() => ({}));
+        const atoms = (j?.data?.atoms ?? j?.data ?? []) as { title?: string }[];
+        if (!Array.isArray(atoms) || !atoms.length) { toast.info('No matching library atoms found for this text.'); return; }
+        toast.success(`${atoms.length} reusable atom${atoms.length === 1 ? '' : 's'} match — top: “${atoms[0]?.title ?? 'untitled'}”. Open the Library to insert.`);
+      } catch { toast.error('Could not search the library.'); }
+      finally { setSelBusy(false); window.getSelection()?.removeAllRanges(); }
+    },
+    [tenantSlug, proposalId],
+  );
+
   const dirtyCount = dirty.size;
   const saveLabel = saving ? 'Saving…' : dirtyCount > 0 ? `Save ${dirtyCount} section${dirtyCount === 1 ? '' : 's'}` : 'Saved';
 
@@ -279,7 +383,20 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
     <div className="flex flex-col gap-3 h-full min-h-0">
       {/* Slim action bar: overlays + editable save state (the Manage tab-row dissolves into this). */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 px-1">
-        <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} />
+        <div className="flex flex-wrap items-center gap-2">
+          <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} />
+          {/* F3 — Compliance + Budget layers (real data), summonable like the dotted layers. */}
+          <button type="button" onClick={() => setShowCompliance((v) => !v)} aria-pressed={showCompliance}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${showCompliance ? 'border-transparent bg-rose-500 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+            title="Compliance coverage across the proposal">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: showCompliance ? '#fff' : '#f43f5e', opacity: showCompliance ? 1 : 0.5 }} />Compliance
+          </button>
+          <button type="button" onClick={() => setShowBudget((v) => !v)} aria-pressed={showBudget}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${showBudget ? 'border-transparent bg-amber-500 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+            title="Page budget vs. the solicitation limit">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: showBudget ? '#fff' : '#f59e0b', opacity: showBudget ? 1 : 0.5 }} />Budget
+          </button>
+        </div>
         {anyEditable && (
           <div className="flex items-center gap-2">
             {dirtyCount > 0 && !saving && <span className="text-[11px] text-amber-600">{dirtyCount} unsaved</span>}
@@ -294,6 +411,24 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
           </div>
         )}
       </div>
+
+      {/* F3 layer read-outs (real data): compliance coverage + page budget. */}
+      {(showCompliance || showBudget) && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 shrink-0 px-1 text-xs">
+          {showCompliance && (
+            <span className="inline-flex items-center gap-1.5 text-rose-700">
+              <span className="font-medium">Compliance:</span>
+              {compCoverage === null ? 'checking…' : compCoverage.total === 0 ? 'no requirements mapped' : `${compCoverage.met}/${compCoverage.total} requirements satisfied`}
+            </span>
+          )}
+          {showBudget && (
+            <span className={`inline-flex items-center gap-1.5 ${budget.max != null && budget.est > budget.max ? 'text-red-600 font-medium' : 'text-amber-700'}`}>
+              <span className="font-medium">Budget:</span>
+              {`~${budget.est} page${budget.est === 1 ? '' : 's'}${budget.max != null ? ` of ${budget.max} allowed${budget.est > budget.max ? ' — over limit' : ''}` : ''}`}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Outline rail — now carries per-section status (the "All Sections" list, folded in). */}
@@ -311,18 +446,30 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
                   {newVolume && o.volumeName && (
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mt-3 mb-1 px-2 truncate">{o.volumeName}</div>
                   )}
-                  <button
-                    onClick={() => scrollTo(o.anchorNodeId, o.sectionId)}
-                    className={`w-full flex items-center gap-2 text-left text-sm rounded px-2 py-1 transition-colors border-l-2 ${
-                      active ? 'bg-blue-50 text-blue-700 font-medium border-blue-500' : 'text-gray-600 hover:bg-gray-50 border-transparent'
-                    }`}
-                    title={o.title}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${STATUS_DOT[st] ?? 'bg-gray-300'}`} />
-                    <span className="flex-1 min-w-0 truncate">{o.title}</span>
-                    {isDirty && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes" />}
-                    {locked && <span className="text-[10px] text-gray-400 shrink-0" title="Locked">🔒</span>}
-                  </button>
+                  <div className={`group flex items-center rounded border-l-2 ${active ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'}`}>
+                    <button
+                      onClick={() => scrollTo(o.anchorNodeId, o.sectionId)}
+                      className={`flex-1 min-w-0 flex items-center gap-2 text-left text-sm px-2 py-1 ${active ? 'text-blue-700 font-medium' : 'text-gray-600'}`}
+                      title={o.title}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${STATUS_DOT[st] ?? 'bg-gray-300'}`} />
+                      <span className="flex-1 min-w-0 truncate">{o.title}</span>
+                      {isDirty && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes" />}
+                    </button>
+                    {/* F2b: lock/unlock straight from the canvas (admins). Non-admins see a static state. */}
+                    {canManage ? (
+                      <button
+                        onClick={() => void toggleLock(o.sectionId)}
+                        disabled={lockBusy === o.sectionId}
+                        className="shrink-0 px-1.5 text-[11px] text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                        title={locked ? 'Reopen this section for editing' : 'Lock (accept) this section'}
+                      >
+                        {lockBusy === o.sectionId ? '…' : locked ? '🔒' : '🔓'}
+                      </button>
+                    ) : (
+                      locked && <span className="shrink-0 px-1.5 text-[10px] text-gray-400" title="Locked">🔒</span>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -339,7 +486,16 @@ export function FluidDocumentView({ assembled, sections, canManage = false, tena
             variables={variables}
             readOnly={!anyEditable}
           />
-          {canAct && <SelectionToolbar doc={doc} busy={selBusy} onAtomize={selectionAtomize} onAnnotate={selectionAnnotate} />}
+          {canAct && (
+            <SelectionToolbar
+              doc={doc}
+              busy={selBusy}
+              onAtomize={selectionAtomize}
+              onAnnotate={selectionAnnotate}
+              onReuse={selectionReuse}
+              onComplianceCheck={selectionCompliance}
+            />
+          )}
         </div>
       </div>
     </div>

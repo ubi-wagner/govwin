@@ -170,8 +170,11 @@ export function ProposalWorkspace({
   const router = useRouter();
   const [sections, setSections] = useState(initialSections);
   const [showDrafter, setShowDrafter] = useState(hasEmptySections && userRole === 'admin');
+  // Fluid-canvas F-primary: the editable one-canvas ("Document") is the DEFAULT surface for a
+  // tenant-wide member (admin OR home tenant_user); the section list demotes to an optional tab.
+  // A scoped/external collaborator has no whole-proposal view — they land on their own sections.
   const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'my-sections' | 'document' | 'timeline'>(
-    userRole !== 'admin' ? 'my-sections' : 'workspace',
+    isTenantWide ? 'document' : 'my-sections',
   );
 
   const handleSectionDrafted = useCallback(
@@ -220,10 +223,11 @@ export function ProposalWorkspace({
       {/* Workspace-level tab bar */}
       <div className="flex gap-0 border-b border-gray-200 overflow-x-auto whitespace-nowrap">
         {([
+          // The editable whole-proposal one-canvas is the PRIMARY surface for tenant-wide members
+          // (fluid-canvas F-primary); the section list + Manage subtabs demote to "All Sections".
+          ...(isTenantWide ? [{ key: 'document' as const, label: 'Document' }] : []),
           { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },
           { key: 'my-sections' as const, label: 'My Sections' },
-          // Whole-proposal fluid document view — the reader surface (tenant members).
-          ...(userRole === 'admin' ? [{ key: 'document' as const, label: 'Document' }] : []),
           // Proposal-wide activity/history — tenant-wide members only; a scoped/external collaborator
           // must not see other actors' emails, event payloads, or stage history for ungranted work.
           ...(isTenantWide ? [{ key: 'timeline' as const, label: 'Timeline' }] : []),
