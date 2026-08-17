@@ -109,14 +109,15 @@ export default async function ReleaseSlaBoardPage() {
             return (
               <li key={p.id}>
                 <div className={`rounded-lg border bg-white p-4 transition-shadow hover:shadow-sm ${isOverdue ? 'border-red-300' : 'border-gray-200'}`}>
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <Link href={`/admin/provisioning/${p.id}`} className="min-w-0 flex-1 group">
                       <p className="truncate font-semibold text-gray-900 group-hover:text-indigo-700">{p.oppTitle || p.label}</p>
                       <p className="mt-0.5 truncate text-sm text-gray-500">
                         {[p.agency, p.tenantName].filter(Boolean).join(' · ') || 'Unknown buyer'}
                       </p>
                     </Link>
-                    <div className="shrink-0 flex flex-col items-end gap-2">
+                    {/* Stacks under the title on mobile (left-aligned), sits in a right rail from sm up. */}
+                    <div className="flex flex-col items-start gap-2 sm:shrink-0 sm:items-end">
                       {p.curationDueAt ? (
                         <SlaCountdown dueAt={new Date(p.curationDueAt).toISOString()} />
                       ) : (
@@ -125,7 +126,7 @@ export default async function ReleaseSlaBoardPage() {
                       {isReady ? (
                         <InstantReleaseButton portalId={p.id} label={p.oppTitle || p.label} />
                       ) : (
-                        <Link href={`/admin/provisioning/${p.id}`} className="text-xs font-medium text-gray-500 hover:text-gray-700">
+                        <Link href={`/admin/provisioning/${p.id}`} className="inline-flex items-center min-h-11 text-sm font-medium text-gray-500 hover:text-gray-700">
                           Curate &amp; release →
                         </Link>
                       )}

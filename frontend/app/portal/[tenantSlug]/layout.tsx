@@ -181,7 +181,7 @@ export default async function PortalLayout({
         </div>
       )}
       {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
-      <div className="p-8">{children}</div>
+      <div className="p-4 sm:p-6 lg:p-8">{children}</div>
     </NavShell>
   );
 }

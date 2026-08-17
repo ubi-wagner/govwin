@@ -65,7 +65,7 @@ export function NavLink({ href, children, variant = 'portal', external = false }
       className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
         isActive
           ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          : 'text-slate-300 hover:bg-slate-50 hover:text-slate-900'
       }`}
     >
       {children}

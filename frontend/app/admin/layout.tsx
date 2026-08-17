@@ -12,7 +12,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AdminNavProvider>
     <NavShell
       brand="RFP Admin"
-      mainClassName="flex-1 min-w-0 p-4 sm:p-8 bg-gray-50 min-h-screen"
+      mainClassName="flex-1 min-w-0 overflow-x-clip p-4 sm:p-8 bg-gray-50 min-h-screen"
       rail={<>
         <AdminNavLink href="/admin/dashboard">
           <span className="text-lg font-bold">RFP Admin</span>
@@ -31,7 +31,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </AdminNavLink>
                   {item.children?.map((child) => (
                     <AdminNavLink key={child.href} href={child.href}>
-                      <span className="pl-4 text-[13px] text-gray-400 border-l border-gray-700 ml-1">{child.label}</span>
+                      {/* No text-color here — let AdminNavLink's active/inactive color win (an active
+                          child must render white on the blue pill, not a hardcoded gray). The smaller
+                          size + indent + rule already read it as a sub-item. */}
+                      <span className="pl-4 text-[13px] border-l border-gray-700 ml-1">{child.label}</span>
                     </AdminNavLink>
                   ))}
                 </Fragment>

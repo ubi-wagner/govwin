@@ -835,7 +835,7 @@ export function ProposalAiActions({
           </p>
 
           {/* Outcome buttons */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-wrap gap-3 mb-4">
             {outcomeOptions.map((opt) => (
               <button
                 key={opt.value}

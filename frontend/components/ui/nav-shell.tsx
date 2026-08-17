@@ -49,7 +49,7 @@ export function NavShell({
           <button
             onClick={() => setOpen(true)}
             aria-label="Open navigation"
-            className="p-1 -ml-1 text-xl leading-none hover:text-gray-300"
+            className="-ml-2 min-h-11 min-w-11 inline-flex items-center justify-center text-xl leading-none hover:text-gray-300"
           >
             ☰
           </button>

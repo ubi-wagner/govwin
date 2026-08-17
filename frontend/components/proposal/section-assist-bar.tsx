@@ -136,7 +136,7 @@ export function SectionAssistBar({
         <span className="ml-auto text-xs text-indigo-400">The researcher + drafter are advisory — you review what lands.</span>
       </div>
       {research && (
-        <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-indigo-200 bg-white p-2 text-xs text-gray-700">
+        <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded border border-indigo-200 bg-white p-2 text-xs text-gray-700">
           {research}
         </div>
       )}
