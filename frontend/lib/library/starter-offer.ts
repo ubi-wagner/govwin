@@ -12,6 +12,7 @@
  * callers MUST treat a throw as non-fatal (onboarding must never fail on this).
  */
 import { sql } from '@/lib/db';
+import { runInTenant } from '@/lib/tenant-context';
 import { createTask } from '@/lib/tasks/tasks';
 import { emitEventSingle, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
@@ -27,6 +28,14 @@ export async function offerStarterSet(opts: {
   actor: { id: string; email: string | null; role: Role; tenantId: string | null }; // who is provisioning
 }): Promise<StarterOfferResult> {
   const { tenantId, tenantSlug, adminUserId, actor } = opts;
+
+  // Self-sufficient RLS context (runInTenant, not enterTenant): this runs from ADMIN provisioning
+  // routes that hold no tenant context of their own. `tasks` is RLS-gated — with no context the
+  // idempotency SELECT sees only tenant_id IS NULL rows (so it never dedupes) and the createTask
+  // INSERT fails the `tenant_id = app.tenant_id OR tenant_id IS NULL` with_check, which the callers'
+  // best-effort try/catch swallowed → the new customer's starter-set ToDo was silently never raised.
+  // The frame is scoped: the /admin/tenants caller's bypass context is restored on exit.
+  return runInTenant(tenantId, async () => {
 
   // Idempotency: at most one open offer per tenant.
   const existing = await sql<Array<{ id: string }>>`
@@ -61,4 +70,5 @@ export async function offerStarterSet(opts: {
   });
 
   return { offered: true, alreadyOffered: false, taskId: r.data.taskId };
+  });
 }

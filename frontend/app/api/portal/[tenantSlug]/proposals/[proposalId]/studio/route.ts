@@ -55,7 +55,9 @@ async function resolve(ctx: RouteContext) {
   if (!hasAccess) {
     return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
   }
-  enterTenant(tenantId);
+  // The RLS context (enterTenant) is set by EACH HANDLER in its OWN frame, not here — an enterTenant
+  // inside this awaited helper is discarded before the handler's post-await queries run (AsyncLocalStorage
+  // under Next's per-request .run()) → 0 rows / 404 under the prod govtech_app role.
   return { user: { id: user.id, email: user.email ?? null, role }, tenantId, proposalId };
 }
 
@@ -64,6 +66,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     const r = await resolve(ctx);
     if ('error' in r) return r.error;
     const { tenantId, proposalId } = r;
+    enterTenant(tenantId); // RLS choke point — MUST be in the handler's own frame (see resolve()).
     let rows: { studioPhase: string | null; studioPhaseStatus: string | null; studioAuto: boolean }[];
     try {
       rows = await sql`
@@ -86,6 +89,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const r = await resolve(ctx);
     if ('error' in r) return r.error;
     const { user, tenantId, proposalId } = r;
+    enterTenant(tenantId); // RLS choke point (own frame) — covers the proposal read + advanceStudioPhase.
 
     let body: { action?: unknown; guidance?: unknown; auto?: unknown };
     try {

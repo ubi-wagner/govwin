@@ -20,9 +20,33 @@
  *   - pipeline/src/shredder/namespace.py for the Python parallel
  */
 
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import type { ToolContext } from './base';
 import { ToolExecutionError } from './errors';
+
+/**
+ * The house/platform org. Admin curation is platform work, not any customer's, but
+ * episodic_memories.tenant_id carries a NOT-NULL FK to tenants — so platform-scope memory has to be
+ * filed under a real tenant row. This is the same identity the workflow monitor labels
+ * "platform (rfp-pipeline)". Change this slug to relocate where platform curation memory lives.
+ */
+export const PLATFORM_TENANT_SLUG = 'rfp-pipeline';
+
+/** Cached platform tenant id — the slug→id lookup is stable for the process lifetime. */
+let _platformTenantId: string | null | undefined;
+
+async function resolvePlatformTenantId(): Promise<string | null> {
+  if (_platformTenantId !== undefined) return _platformTenantId;
+  try {
+    // sqlBypass: `tenants` is read here with no tenant context (platform scope, by definition).
+    const [row] = await sqlBypass<Array<{ id: string }>>`
+      SELECT id FROM tenants WHERE slug = ${PLATFORM_TENANT_SLUG} LIMIT 1`;
+    _platformTenantId = row?.id ?? null;
+  } catch {
+    _platformTenantId = null; // memory is best-effort; never let this throw into the business action
+  }
+  return _platformTenantId;
+}
 
 /**
  * Supported HITL actions. The action classifies WHY this memory was
@@ -129,13 +153,34 @@ export async function writeCurationMemory(
     actor_email: ctx.actor.email ?? null,
   };
 
+  // Resolve the owning tenant. Admin curation is PLATFORM scope (ctx.tenantId is null for the
+  // rfp_admin curation tools), and this row used to be written with the nil UUID — which
+  // episodic_memories.tenant_id's FK to tenants can never accept, so EVERY platform curation memory
+  // died on a foreign-key violation that the catch below swallowed. Proven: zero 'curator' rows have
+  // ever existed. Platform scope lives under the house org (the same identity the workflow monitor
+  // labels "platform (rfp-pipeline)"); change PLATFORM_TENANT_SLUG to relocate it.
+  const tenantId = ctx.tenantId ?? (await resolvePlatformTenantId());
+  if (!tenantId) {
+    ctx.log?.error?.({
+      msg: 'curation memory skipped: no platform tenant to file it under',
+      solicitationId: input.solicitationId,
+      platformTenantSlug: PLATFORM_TENANT_SLUG,
+    });
+    return;
+  }
+
   try {
-    await sql`
+    // sqlBypass (NOT the context-aware `sql`): episodic_memories is force-RLS with a
+    // `tenant_id = app.tenant_id` policy, and these curation tools run with NO tenant context (they
+    // are platform/admin tools). Under the prod govtech_app role the context-aware client threw an
+    // RLS violation that this catch swallowed. The tenant_id is supplied EXPLICITLY below, and the
+    // bypass is scoped to this single INSERT (no ambient-context mutation).
+    await sqlBypass`
       INSERT INTO episodic_memories
         (tenant_id, agent_role, embedding, content, memory_type,
          importance, metadata, source, namespace)
       VALUES
-        (${ctx.tenantId ?? '00000000-0000-0000-0000-000000000000'}::uuid,
+        (${tenantId}::uuid,
          'curator',
          ${zeroVector}::vector,
          ${content},

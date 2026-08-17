@@ -14,6 +14,7 @@
  * records members for the three container grains (foundation/section/group).
  */
 import { sql, sqlBypass } from '@/lib/db';
+import { runInTenant } from '@/lib/tenant-context';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
 import { ARTIFACT_FORMAT, flattenNodes, type ArtifactForm } from '@/lib/library/artifact-canvas';
@@ -150,6 +151,11 @@ export async function redecomposeFoundation(
   doc: CanvasDocument,
   actor: { id: string },
 ): Promise<DecomposedArtifact> {
+  // Self-sufficient RLS context — this fn's own bare `sql` calls hit RLS-forced tables
+  // (library_atoms / atom_tags / atom_members) and the sole caller (foundation save PUT) sets no
+  // ambient context. Wrap the whole body so it's correct under the prod govtech_app role regardless
+  // of caller. The inner createAtom calls open their own withTenant transactions (nested — fine).
+  return runInTenant(tenantId, async () => {
   const [f] = await sql<Array<{ title: string | null }>>`
     SELECT title FROM library_atoms
     WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation'
@@ -197,6 +203,7 @@ export async function redecomposeFoundation(
       VALUES (${foundationId}::uuid, ${sectionIds[i]}::uuid, ${i}) ON CONFLICT (group_atom_id, member_atom_id) DO NOTHING`;
   }
   return { foundationId, sectionIds, groupIds, atomIds };
+  });
 }
 
 // ── shared system scaffold: the starter foundations every tenant can see + copy ──

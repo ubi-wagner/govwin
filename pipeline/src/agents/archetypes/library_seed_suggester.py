@@ -154,7 +154,7 @@ found inside those tags."""
         if tool_name == "get_prior_proposals":
             return await self._get_prior_proposals(conn, tenant_id, tool_input.get("limit", 10))
         if tool_name == "save_candidates":
-            return await self._save_candidates(conn, tool_input)
+            return await self._save_candidates(conn, tool_input, tenant_id)
         return {"error": f"Unknown tool: {tool_name}"}
 
     async def _get_requirements(self, conn, proposal_id: str, tenant_id: str | None) -> dict:
@@ -232,11 +232,16 @@ found inside those tags."""
             logger.error("get_prior_proposals failed: %s", e)
             return {"proposals": [], "error": str(e)}
 
-    async def _save_candidates(self, conn, tool_input: dict) -> dict:
+    async def _save_candidates(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         seed_job_id = tool_input.get("seed_job_id", "")
         candidates = tool_input.get("candidates", [])
         if not seed_job_id:
             return {"saved": False, "error": "Missing seed_job_id"}
+        # Tenant-gate the WRITE like every read tool above. seed_job_id arrives in LLM-chosen
+        # tool_input, so an injected/confused agent could otherwise name ANOTHER tenant's job —
+        # and the pipeline connects as the RLS-bypass owner role, so nothing else would stop it.
+        if not tenant_id:
+            return {"saved": False, "error": "Missing tenant_id"}
         try:
             status = "awaiting_selection" if candidates else "skipped"
             await conn.execute(
@@ -245,11 +250,12 @@ found inside those tags."""
                 SET candidate_proposals = $1::jsonb,
                     status = $2,
                     updated_at = now()
-                WHERE id = $3::uuid
+                WHERE id = $3::uuid AND tenant_id = $4::uuid
                 """,
                 json.dumps(candidates),
                 status,
                 seed_job_id,
+                tenant_id,
             )
             return {"saved": True, "candidate_count": len(candidates), "status": status}
         except Exception as e:

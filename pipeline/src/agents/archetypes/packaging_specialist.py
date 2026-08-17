@@ -360,14 +360,20 @@ Then provide the package validation as JSON:
         if not proposal_id:
             return {"error": "proposal_id required"}
 
+        # Fail-closed ownership gate. Previously `if tenant_id:` SKIPPED the whole check when the
+        # caller passed no tenant (the AI_INVOKE path can), letting this tenant-bound agent read ANY
+        # tenant's proposal; and `if owner and ...` let a NULL owner through. The pipeline runs as the
+        # RLS-bypass owner role, so this is the only isolation layer. Both holes closed.
+        if not tenant_id:
+            return {"error": "Access denied", "code": "FORBIDDEN"}
+
         try:
-            if tenant_id:
-                owner = await conn.fetchval(
-                    "SELECT tenant_id FROM proposals WHERE id = $1",
-                    uuid.UUID(proposal_id),
-                )
-                if owner and str(owner) != tenant_id:
-                    return {"error": "Access denied", "code": "FORBIDDEN"}
+            owner = await conn.fetchval(
+                "SELECT tenant_id FROM proposals WHERE id = $1",
+                uuid.UUID(proposal_id),
+            )
+            if str(owner) != tenant_id:
+                return {"error": "Access denied", "code": "FORBIDDEN"}
 
             # Get proposal metadata
             proposal = await conn.fetchrow(
@@ -602,6 +608,13 @@ Then provide the package validation as JSON:
 
         if not query:
             return {"memories": [], "note": "No query provided"}
+
+        # Fail-closed: without a tenant context, never run an unfiltered cross-tenant
+        # query — return no rows rather than leaking other tenants' memories. (The pipeline
+        # connects as the RLS-BYPASS owner role, so this app-layer filter is the ONLY
+        # isolation layer here — a dropped filter is a real leak, not defense-in-depth.)
+        if not tenant_id:
+            return {"memories": [], "note": "No tenant context — memory search skipped (fail-closed)."}
 
         try:
             escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

@@ -385,10 +385,18 @@ class WorkflowManager:
             },
         )
 
-        # Load prior step results (for recovery)
+        # Load prior step results (for recovery) + the instance's OWN tenant. The tenant is the
+        # engine-level backstop for tenant-bound AI_INVOKE steps: without it, an AI step whose
+        # input_map forgets `tenant_id` invokes its agent platform-scoped — skipping the per-tenant
+        # rate-limit/budget checks and the tenant memory store (and, now that the tenant-bound
+        # archetypes fail CLOSED, degrading to a safe no-op). Defaulting from process_instances
+        # backstops that whole class instead of relying on every template mapping it by hand.
         row = await conn.fetchrow(
-            "SELECT step_results, step_status FROM process_instances WHERE id = $1",
+            "SELECT step_results, step_status, tenant_id FROM process_instances WHERE id = $1",
             uuid.UUID(instance_id),
+        )
+        instance_tenant_id: Optional[str] = (
+            str(row["tenant_id"]) if row and row["tenant_id"] else None
         )
         step_results: dict[str, Any] = {}
         step_status: dict[str, str] = {}
@@ -558,7 +566,8 @@ class WorkflowManager:
                 try:
                     step_result = await asyncio.wait_for(
                         self._execute_step(
-                            conn, step, trigger_payload, step_results
+                            conn, step, trigger_payload, step_results,
+                            tenant_id=instance_tenant_id,
                         ),
                         timeout=timeout_seconds,
                     )
@@ -1399,7 +1408,12 @@ class WorkflowManager:
         current_step = row["current_step"]
         if current_step:
             step_status[current_step] = "completed"
-            step_results[current_step] = resume_data or {"resumed": True}
+            # Wrap in {"result": ...} to match how ACTION/AI steps store their output — that is the
+            # shape resolve_input reads for a `step.<name>.result.<key>` input_map ref (it does
+            # step_results[name].get("result", {})[key]). Storing the raw dict made every
+            # `step.<todo>.result.approved` resolve to None, silently breaking the human-decision
+            # branch that complete_task's own docstring promises. Nothing reads the unwrapped shape.
+            step_results[current_step] = {"result": resume_data or {"resumed": True}}
 
         result = await conn.execute(
             """
@@ -1584,12 +1598,19 @@ class WorkflowManager:
         step: Any,
         trigger_payload: dict[str, Any],
         prior_results: dict[str, Any],
+        tenant_id: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Execute a single workflow step. Delegates to the step's action."""
+        """Execute a single workflow step. Delegates to the step's action.
+
+        `tenant_id` is the OWNING INSTANCE's tenant. It rides on the synthesized event dict so
+        _execute_ai_invoke's `context.setdefault("tenant_id", trigger_event.get("tenant_id"))`
+        has something to fall back on when a step's input_map doesn't map the tenant explicitly.
+        An explicit input_map mapping still WINS (setdefault only fills a missing key).
+        """
         from workflows.processor import resolve_inputs, _execute_step as processor_execute_step
 
         # Build a fake event dict so resolve_inputs works with existing logic
-        event_dict: dict[str, Any] = {"payload": trigger_payload}
+        event_dict: dict[str, Any] = {"payload": trigger_payload, "tenant_id": tenant_id}
         inputs = resolve_inputs(step.input_map, event_dict, prior_results)
 
         # Thread fabric so AI_INVOKE steps actually call Claude on the managed path

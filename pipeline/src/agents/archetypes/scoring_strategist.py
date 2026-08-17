@@ -210,17 +210,28 @@ Be precise and evidence-based. Every point of adjustment must be justified."""
             f"Algorithmic base score: {base_score}\n\n"
         )
 
-        user_content += f"""<opportunity>
-Title: {title}
-Agency: {agency}
-Office: {office}
-Program Type: {program_type}
-NAICS Codes: {', '.join(naics_codes) if isinstance(naics_codes, list) else str(naics_codes)}
-Set-Aside: {set_aside or 'None'}
+        # Injection fence. EVERY field below is untrusted (it comes from an ingested/scouted
+        # solicitation), so all of them go INSIDE the fence, and each has the closing marker
+        # neutralized first — otherwise a description containing the literal end-marker escapes
+        # the fence and the remainder of its text is read as instructions. Same escape idiom as
+        # section_drafter / color_team_reviewer / proposal_manager.
+        def _fenced(v: object, limit: int = 500) -> str:
+            return str(v or "")[:limit].replace(
+                "--- END USER CONTENT ---", "--- END USER CONTENT [escaped] ---"
+            )
 
+        naics_str = ", ".join(naics_codes) if isinstance(naics_codes, list) else str(naics_codes)
+        user_content += f"""<opportunity>
 --- BEGIN USER CONTENT ---
+Title: {_fenced(title)}
+Agency: {_fenced(agency)}
+Office: {_fenced(office)}
+Program Type: {_fenced(program_type)}
+NAICS Codes: {_fenced(naics_str)}
+Set-Aside: {_fenced(set_aside) or 'None'}
+
 Description:
-{description[:10000]}
+{_fenced(description, 10000)}
 --- END USER CONTENT ---
 </opportunity>
 

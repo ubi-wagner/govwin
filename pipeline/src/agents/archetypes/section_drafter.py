@@ -356,23 +356,24 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         if not proposal_id:
             return {"error": "proposal_id required"}
 
+        # Fail-closed: the `else` branch here USED to resolve the solicitation with no tenant check
+        # at all whenever the caller passed no tenant (the AI_INVOKE path can), letting this
+        # tenant-bound agent read any tenant's proposal→compliance. The pipeline runs as the
+        # RLS-bypass owner role, so this app-layer check is the only isolation layer. Hole closed.
+        if not tenant_id:
+            return {"error": "Access denied"}
+
         try:
             # Get the solicitation_id from the proposal with tenant check
-            if tenant_id:
-                row = await conn.fetchrow(
-                    "SELECT solicitation_id, tenant_id FROM proposals WHERE id = $1",
-                    uuid.UUID(proposal_id),
-                )
-                if not row:
-                    return {"error": "No solicitation linked to proposal"}
-                if str(row["tenant_id"]) != tenant_id:
-                    return {"error": "Access denied"}
-                sol_id = row["solicitation_id"]
-            else:
-                sol_id = await conn.fetchval(
-                    "SELECT solicitation_id FROM proposals WHERE id = $1",
-                    uuid.UUID(proposal_id),
-                )
+            row = await conn.fetchrow(
+                "SELECT solicitation_id, tenant_id FROM proposals WHERE id = $1",
+                uuid.UUID(proposal_id),
+            )
+            if not row:
+                return {"error": "No solicitation linked to proposal"}
+            if str(row["tenant_id"]) != tenant_id:
+                return {"error": "Access denied"}
+            sol_id = row["solicitation_id"]
             if not sol_id:
                 return {"error": "No solicitation linked to proposal"}
 
