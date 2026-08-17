@@ -5,6 +5,7 @@ import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { ArchivedProposals, type ArchivedItem } from '@/components/portal/archived-proposals';
 import { RETENTION_DAYS } from '@/lib/proposal-archive';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,20 @@ export default async function ProposalsListPage({ params }: Props) {
     sectionCount: number;
   }[] = [];
 
+  // CAP-3: a proposal-scoped tenant_user (membership.scope.proposalScoped) sees ONLY the proposals
+  // granted in scope.proposals. `null` = unscoped (tenant-wide, the default for admins + normal users).
+  let scopedProposalIds: string[] | null = null;
+  try {
+    const [mem] = await sql<{ role: string; scope: unknown }[]>`
+      SELECT role, scope FROM user_memberships
+      WHERE user_id = ${sessionUser.id}::uuid AND tenant_id = ${tenantId}::uuid AND status = 'active'
+        AND role IN ('tenant_admin', 'tenant_user') LIMIT 1`;
+    const so = coerceJsonb<{ proposalScoped?: boolean; proposals?: unknown }>(mem?.scope, {});
+    if (mem?.role === 'tenant_user' && so.proposalScoped === true) {
+      scopedProposalIds = Array.isArray(so.proposals) ? (so.proposals as unknown[]).filter((p): p is string => typeof p === 'string') : [];
+    }
+  } catch (e) { console.error('[portal/proposals] scope read failed:', e); }
+
   try {
     if (role === 'partner_user') {
       proposals = await sql<typeof proposals>`
@@ -95,6 +110,7 @@ export default async function ProposalsListPage({ params }: Props) {
         FROM proposals p
         JOIN opportunities o ON o.id = p.opportunity_id
         WHERE p.tenant_id = ${tenantId}
+          ${scopedProposalIds !== null ? sql`AND p.id = ANY(${scopedProposalIds}::uuid[])` : sql``}
         ORDER BY p.created_at DESC
       `;
     }
