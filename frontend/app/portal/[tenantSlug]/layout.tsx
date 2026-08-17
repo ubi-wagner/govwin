@@ -145,6 +145,10 @@ export default async function PortalLayout({
             {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
             {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
+            {/* A partner_user reaches THEIR own nooks at the top-level /vaults (list is self-scoped;
+                empty state if none) — without this a partner with both a nook AND proposal access had
+                no path to their vault. */}
+            {isPartner && <PortalNavLink href="/vaults">Collaboration vaults</PortalNavLink>}
             <PortalNavLink href={`${basePath}/todos`}>To-dos</PortalNavLink>
             {!isPartner && (
               <>
