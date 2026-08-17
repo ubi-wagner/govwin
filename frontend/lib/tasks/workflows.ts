@@ -123,6 +123,19 @@ export const TASK_WORKFLOWS: Record<string, TaskWorkflowDef> = {
     completer: 'review',
     producedBy: ['engine', 'automation'],
   },
+  // Raised when a proposal is submitted (#13); auto-completes when the outcome route
+  // records a win/loss/withdrawn. Deep-links to the proposal (taskHref 'proposal' case);
+  // params.kind='review' drives the completer.
+  record_outcome: {
+    key: 'record_outcome',
+    name: 'Record outcome',
+    description: "Record the submission's award / rejection / withdrawal to close the learning loop.",
+    side: 'tenant',
+    steps: ['Submitted', 'Await decision', 'Record outcome'],
+    actionStep: 2,
+    completer: 'review',
+    producedBy: ['engine', 'automation'],
+  },
   document_request: {
     key: 'document_request',
     name: 'Provide a document',

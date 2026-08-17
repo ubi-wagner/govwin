@@ -7,6 +7,8 @@ import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/
 import { requestAgentTask } from '@/lib/agent-client';
 import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
 import { computeSubmissionReadiness } from '@/lib/proposal/submission-readiness';
+import { createOutcomeNudge } from '@/lib/proposal/outcome-todo';
+import type { Role } from '@/lib/rbac';
 
 /**
  * Shared proposal stage-advance core.
@@ -462,6 +464,23 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       }
     } catch (e) {
       console.error('[proposal-advance] portal closeout sync failed (non-fatal):', e);
+    }
+
+    // ── #13: post-submission outcome nudge ──────────────────────────
+    // A submitted proposal should eventually get a win/loss/withdrawn outcome recorded —
+    // that closes the library learning loop (winning atoms surface first) and, on a win,
+    // seeds the contract kickoff. Raise a `record_outcome` ToDo for the tenant_admin,
+    // deep-linked to the proposal, that auto-completes when the outcome route records a
+    // result. Idempotent + best-effort — never blocks the advance.
+    try {
+      await createOutcomeNudge(
+        { id: actorId, email: actorEmail, role: actorRole as Role, tenantId },
+        tenantId,
+        proposalId,
+        proposal.title,
+      );
+    } catch (e) {
+      console.error('[proposal-advance] outcome nudge failed (non-fatal):', e);
     }
   }
 
