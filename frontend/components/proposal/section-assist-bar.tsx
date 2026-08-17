@@ -44,7 +44,7 @@ export function SectionAssistBar({
       } catch { /* draft without library context */ }
 
       const result = await invoke<{ nodes: CanvasNode[] }>('proposal.draft_section', {
-        proposalId, sectionTitle, pageLimit: pageLimit ?? undefined, libraryAtoms,
+        proposalId, sectionId, sectionTitle, pageLimit: pageLimit ?? undefined, libraryAtoms,
       });
       if (!result?.nodes?.length) { toast('The drafter returned nothing to land.', 'error'); return; }
 
