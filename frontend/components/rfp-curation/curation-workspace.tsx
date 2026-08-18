@@ -17,6 +17,7 @@ import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
 import { AmendmentsPanel } from './amendments-panel';
 import { IngestPlanPanel } from './ingest-plan-panel';
+import { IngestStudio } from './ingest-studio';
 
 interface Solicitation {
   id: string;
@@ -827,6 +828,10 @@ export function CurationWorkspace({
     <div className="max-w-6xl">
       {/* Atomization rail — classify/tag/accept the drawn annotations as section anchors */}
       <AnnotationAtomizeRail solId={sol.id} />
+      {/* The Ingest Studio gates sit ABOVE everything: the first thing an admin needs to know
+          about a compliance matrix is whether it is staged or landed, and how much of it was
+          actually read from the document. (docs/INGEST_STUDIO_DESIGN.md) */}
+      <IngestStudio solId={sol.id} />
       <div className="flex flex-wrap items-center justify-between gap-y-3 mb-6">
         <div>
           <button

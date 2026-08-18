@@ -727,13 +727,52 @@ async def _upsert_compliance(
     verified_by is deliberately NOT set here — the shredder is
     automated suggestion, not human verification. A curator confirms
     values later via the /admin/rfp-curation/[id] workspace.
+
+    TRUST-ORDERED + STAMPED (mig 187/188: hitl > verified > override > pattern_match > ai >
+    default). These values come off the Claude compliance-extraction prompt, so every column
+    this writer sets is stamped source='ai' in field_provenance — an unstamped value is
+    indistinguishable from a rule a human verified, which is the failure the whole provenance
+    spine exists to stop. And a column whose EXISTING provenance is stronger than 'ai' is
+    dropped from the update entirely: the shredder re-running must never overwrite a curator's
+    highlighted/verified value, or an admin's reviewed override, with a machine's re-read.
     """
     # Build the dynamic UPDATE set clause from column_updates plus
     # custom_variables. All params are parameterized so this is safe.
-    existing = await conn.fetchval(
-        "SELECT id FROM solicitation_compliance WHERE solicitation_id = $1",
+    existing_row = await conn.fetchrow(
+        "SELECT id, field_provenance FROM solicitation_compliance WHERE solicitation_id = $1",
         sol_id,
     )
+    existing = existing_row["id"] if existing_row else None
+
+    # Existing per-column provenance (may be a jsonb string on some drivers).
+    prior_prov: dict[str, Any] = {}
+    if existing_row and existing_row["field_provenance"] is not None:
+        raw_prov = existing_row["field_provenance"]
+        if isinstance(raw_prov, str):
+            try:
+                prior_prov = json.loads(raw_prov)
+            except (json.JSONDecodeError, TypeError):
+                prior_prov = {}
+        elif isinstance(raw_prov, dict):
+            prior_prov = raw_prov
+
+    _PROTECTED = {"hitl", "verified", "override"}
+    protected_cols = {
+        col for col, entry in prior_prov.items()
+        if isinstance(entry, dict) and entry.get("source") in _PROTECTED
+    }
+    dropped = protected_cols & set(column_updates.keys())
+    if dropped:
+        log.info(
+            "shredder: skipping %d compliance column(s) with stronger provenance than 'ai': %s",
+            len(dropped), ", ".join(sorted(dropped)),
+        )
+        column_updates = {k: v for k, v in column_updates.items() if k not in dropped}
+
+    # Merge the 'ai' stamps for the columns we ARE writing over whatever provenance exists.
+    merged_prov = dict(prior_prov)
+    for col in column_updates:
+        merged_prov[col] = {"source": "ai"}
 
     import re as _re
     _SAFE_COL = _re.compile(r'^[a-z_][a-z0-9_]*$')
@@ -750,14 +789,18 @@ async def _upsert_compliance(
     set_parts.append(f"custom_variables = ${len(values) + 2}::jsonb")
     values.append(json.dumps(custom_vars))
 
+    set_parts.append(f"field_provenance = ${len(values) + 2}::jsonb")
+    values.append(json.dumps(merged_prov))
+
     set_parts.append("updated_at = now()")
 
     if existing is None:
         # INSERT path
-        cols = ["solicitation_id"] + list(column_updates.keys()) + ["custom_variables"]
+        cols = ["solicitation_id"] + list(column_updates.keys()) + ["custom_variables", "field_provenance"]
         placeholders = [f"${i + 1}" for i in range(len(cols))]
-        insert_values = [sol_id] + list(column_updates.values()) + [json.dumps(custom_vars)]
-        # custom_variables needs ::jsonb cast; replace the last placeholder
+        insert_values = [sol_id] + list(column_updates.values()) + [json.dumps(custom_vars), json.dumps(merged_prov)]
+        # the two jsonb tails need ::jsonb casts
+        placeholders[-2] = f"${len(cols) - 1}::jsonb"
         placeholders[-1] = f"${len(cols)}::jsonb"
         await conn.execute(
             f"INSERT INTO solicitation_compliance ({', '.join(cols)}) "

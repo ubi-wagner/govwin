@@ -14,6 +14,8 @@
  * the AI parser — stay DB-free and unit-testable.
  */
 import { sql } from '@/lib/db';
+import type { JSONValue } from 'postgres';
+import { coerceJsonb } from '@/lib/jsonb';
 import { publishAndFanOut } from '@/lib/opportunity-bridge';
 import { DEFAULT_SBIR_CSO_SKELETON, type ParsedSolicitation } from './skeleton';
 
@@ -99,16 +101,59 @@ export async function materializeSkeleton(
     };
   }
 
+  // ── TRUST-ORDER ENFORCEMENT AT THE WRITE (mig 187: hitl > verified > override >
+  // pattern_match > ai > default; "a re-run stamping a weaker source over a curator's work must
+  // never happen"). The old DELETE+INSERT enforced nothing: it wiped `custom_variables` — where
+  // every hitl anchor a curator ever tagged lives — and overwrote verified named columns with
+  // whatever the fresh parse produced. So a curator who highlighted the page limit in the source
+  // and then clicked Ingest Assist again LOST their own work to a machine's re-read.
+  //
+  // Now the existing row is read first, and for each named column the STRONGER source survives:
+  // a hitl/verified/override value + its provenance entry are carried forward untouched; only
+  // columns whose existing provenance is pattern_match/ai/default/unknown take the new parse.
+  // custom_variables always carries forward — it is curator/annotation material this writer has
+  // no business replacing.
+  const PROTECTED = new Set(['hitl', 'verified', 'override']);
+  let existingProv: Record<string, { source?: string }> = {};
+  let existingVals: Record<string, unknown> = {};
+  let existingCustom: unknown = {};
+  try {
+    const [prior] = await sql<Array<Record<string, unknown>>>`
+      SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid LIMIT 1`;
+    if (prior) {
+      existingProv = coerceJsonb<Record<string, { source?: string }>>(prior.fieldProvenance, {});
+      existingCustom = coerceJsonb<Record<string, unknown>>(prior.customVariables, {});
+      existingVals = prior;   // camelCase keys, per the toCamel SOP
+    }
+  } catch { /* no prior row — nothing to protect */ }
+
+  const camel = (col: string) => col.replace(/_([a-z])/g, (_m, ch: string) => ch.toUpperCase());
+  /** The value to write for a named column: the protected existing value, else the new one. */
+  const keep = <T,>(col: string, incoming: T): T => {
+    if (PROTECTED.has(existingProv[col]?.source ?? '')) {
+      stamped[col] = existingProv[col] as (typeof stamped)[string];   // provenance survives too
+      return (existingVals[camel(col)] as T) ?? incoming;
+    }
+    return incoming;
+  };
+
   await sql`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
   await sql`INSERT INTO solicitation_compliance
     (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
      submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
-     field_provenance)
-    VALUES (${solicitationId}::uuid, ${c.pageLimitTechnical ?? null}, ${c.fontFamily ?? null}, ${c.fontSize ?? null},
-            ${c.minFontSize ?? null}, ${c.margins ?? null}, ${c.submissionFormat ?? null},
+     field_provenance, custom_variables)
+    VALUES (${solicitationId}::uuid,
+            ${keep('page_limit_technical', c.pageLimitTechnical ?? null)},
+            ${keep('font_family', c.fontFamily ?? null)},
+            ${keep('font_size', c.fontSize ?? null)},
+            ${keep('min_font_size', c.minFontSize ?? null)},
+            ${keep('margins', c.margins ?? null)},
+            ${keep('submission_format', c.submissionFormat ?? null)},
             ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
-            ${sql.json(c.requiredSections ?? [])}, ${sql.json(c.requiredDocuments ?? [])},
-            ${sql.json(stamped)})`;
+            ${sql.json(keep('required_sections', c.requiredSections ?? []) as JSONValue)},
+            ${sql.json(keep('required_documents', c.requiredDocuments ?? []) as JSONValue)},
+            ${sql.json(stamped)},
+            ${sql.json((existingCustom ?? {}) as JSONValue)})`;
 
   // ── Volumes + required items ──
   await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;

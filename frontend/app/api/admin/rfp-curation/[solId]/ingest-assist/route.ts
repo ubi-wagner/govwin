@@ -32,7 +32,7 @@ import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { parseSolicitation } from '@/lib/ingest/parse-solicitation';
 import { hasUsableSourceText, MIN_USABLE_TEXT_CHARS } from '@/lib/ingest/pattern-extract';
-import { materializeSkeleton } from '@/lib/ingest/materialize';
+import { landSkeleton, LandBlockedError, setIngestPhase, stageSkeleton } from '@/lib/ingest/stage-skeleton';
 import { type ParsedSolicitation } from '@/lib/ingest/skeleton';
 
 interface RouteContext { params: Promise<{ solId: string }> }
@@ -161,15 +161,49 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     }
 
-    // Materialize the whole skeleton for REVIEW. Review-gated (launch): a build does NOT publish to
-    // customers — publishing to spotlight cards happens only through the reviewed `solicitation.push`
-    // gate (summary + close_date + compliance). Default publish=false; a caller may still opt in.
-    let result;
+    // ── STAGE, then land only if the staged matrix is sound (Ingest Studio, mig 189) ──
+    //
+    // The matrix is proposed into solicitation_compliance_drafts first, always. Whether it then
+    // LANDS in the same click depends on the deterministic provenance audit:
+    //
+    //   clean  → land now. One click still produces a working matrix, and the values that were
+    //            not read from the document still arrive wearing their red "Default — unverified"
+    //            badge. Nothing has been hidden, and the downstream review_requested → approved →
+    //            push gate is still between this and any customer.
+    //   blocker→ STAY STAGED and say why. A blocker means we already know something is unfounded —
+    //            an unresolved deferral pointing at a document nobody attached, or a matrix where
+    //            nothing at all was read. Landing that silently is the exact failure this whole
+    //            subsystem exists to stop, so it waits for a person (or the Ingest Studio gates).
+    let draft;
     try {
-      result = await materializeSkeleton(solId, parsed, { publish: body.publish ?? false, nowIso: new Date().toISOString() });
+      draft = await stageSkeleton(solId, parsed, { phase: 'matrix', userId: su.id });
     } catch (e) {
-      console.error('[ingest-assist] materialize failed', e);
-      return NextResponse.json({ error: 'Failed to build the skeleton', code: 'DB_ERROR' }, { status: 500 });
+      console.error('[ingest-assist] stage failed', e);
+      return NextResponse.json({ error: 'Failed to stage the skeleton', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    const stagedAudit = draft.audit as { findings?: Array<{ severity: string; issue: string }> };
+    const blockers = (stagedAudit?.findings ?? []).filter((f) => f.severity === 'blocker');
+
+    let result: Awaited<ReturnType<typeof landSkeleton>> | null = null;
+    if (blockers.length === 0) {
+      try {
+        result = await landSkeleton(solId, {
+          userId: su.id, auto: true, publish: body.publish ?? false, nowIso: new Date().toISOString(),
+        });
+        await setIngestPhase(solId, 'landed');
+      } catch (e) {
+        if (e instanceof LandBlockedError) {
+          // Belt and braces: landSkeleton re-checks, so a race that introduced a blocker between
+          // staging and landing still parks rather than publishing.
+          console.error('[ingest-assist] land refused', e.message);
+        } else {
+          console.error('[ingest-assist] land failed', e);
+          return NextResponse.json({ error: 'Failed to land the skeleton', code: 'DB_ERROR' }, { status: 500 });
+        }
+      }
+    } else {
+      await setIngestPhase(solId, 'matrix');
     }
 
     try {
@@ -177,7 +211,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         namespace: 'finder', type: 'solicitation.ingest_assisted',
         actor: userActor(su.id, su.email ?? undefined), tenantId: null,
         payload: {
-          solicitationId: solId, source: parsed.source, ...result,
+          solicitationId: solId, source: parsed.source, ...(result ?? {}),
+          draftId: draft.id, landed: !!result, blockers: blockers.length,
           // Per-field provenance on the event too — "which of these values did we actually
           // READ?" must be answerable from the audit trail, not only from the current row.
           fieldSources: parsed.fieldSources ?? null,
@@ -188,7 +223,14 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (e) { console.error('[ingest-assist] event emit failed (non-fatal)', e); }
 
     return NextResponse.json({ data: {
-      source: parsed.source, ...result,
+      source: parsed.source,
+      // A staged-but-not-landed run reports zeroes for the landed counts, and says so explicitly
+      // rather than letting the caller read "0 volumes" as a failed build.
+      volumes: result?.volumes ?? 0, items: result?.items ?? 0,
+      topics: result?.topics ?? 0, cards: result?.cards ?? 0,
+      landed: !!result,
+      draftId: draft.id,
+      blockers: blockers.map((b) => b.issue),
       fieldSources: parsed.fieldSources ?? {},
       notes: parsed.notes ?? [],
     } });
