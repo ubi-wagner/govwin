@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, enterTenant, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -75,6 +76,7 @@ export async function POST(req: Request, { params }: Params) {
       WHERE id = ${seedJobId}::uuid
     `;
 
+    try { await emitEventSingle({ namespace: 'library', type: 'seed_decision.recorded', actor: userActor(sessionUser.id ?? '', undefined), tenantId, payload: { proposalId } }); } catch (e) { console.error('[seed_decision.recorded] audit emit failed (non-fatal)', e); }
     return NextResponse.json({ data: { saved: true } });
   } catch (e) {
     console.error('[seed-job/decide/POST]', e);

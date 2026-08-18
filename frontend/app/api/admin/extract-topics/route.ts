@@ -11,6 +11,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { auth } from '@/auth';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await extractTopicsForSolicitation(solicitationId);
+    try { await emitEventSingle({ namespace: 'finder', type: 'topics.extracted', actor: userActor((session.user as { id?: string }).id ?? '', undefined), tenantId: null, payload: { } }); } catch (e) { console.error('[topics.extracted] audit emit failed (non-fatal)', e); }
     return NextResponse.json({ data: result });
   } catch (err) {
     console.error('[extract-topics] extraction failed:', err);

@@ -137,41 +137,47 @@ export async function materializeSkeleton(
     return incoming;
   };
 
-  await sql`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
-  await sql`INSERT INTO solicitation_compliance
-    (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
-     submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
-     field_provenance, custom_variables)
-    VALUES (${solicitationId}::uuid,
-            ${keep('page_limit_technical', c.pageLimitTechnical ?? null)},
-            ${keep('font_family', c.fontFamily ?? null)},
-            ${keep('font_size', c.fontSize ?? null)},
-            ${keep('min_font_size', c.minFontSize ?? null)},
-            ${keep('margins', c.margins ?? null)},
-            ${keep('submission_format', c.submissionFormat ?? null)},
-            ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
-            ${sql.json(keep('required_sections', c.requiredSections ?? []) as JSONValue)},
-            ${sql.json(keep('required_documents', c.requiredDocuments ?? []) as JSONValue)},
-            ${sql.json(stamped)},
-            ${sql.json((existingCustom ?? {}) as JSONValue)})`;
-
-  // ── Volumes + required items ──
-  await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;
-  await sql`DELETE FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid`;
+  // AUDIT FIX (PATTERN_AUDIT HIGH-3): the matrix rewrite is DELETE→INSERT across two
+  // table families — ONE transaction, so a mid-land failure can never leave the
+  // solicitation with no compliance row / half-wiped volumes (the caller's catch resets
+  // the draft to 'staged' assuming nothing changed).
   let itemCount = 0;
   const volumes = parsed.volumes?.length ? parsed.volumes : DEFAULT_SBIR_CSO_SKELETON.volumes;
-  for (let v = 0; v < volumes.length; v++) {
-    const vol = volumes[v];
-    const [row] = await sql<{ id: string }[]>`
-      INSERT INTO solicitation_volumes (solicitation_id, volume_number, volume_name, volume_format, expert_notes)
-      VALUES (${solicitationId}::uuid, ${v + 1}, ${vol.name}, ${coerceVolFormat(vol.format)}, ${vol.notes ?? null}) RETURNING id`;
-    let n = 0;
-    for (const item of vol.items ?? []) {
-      n++; itemCount++;
-      await sql`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, expert_notes)
-                VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.notes ?? null})`;
+  await sql.begin(async (tx: any) => {
+    await tx`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
+    await tx`INSERT INTO solicitation_compliance
+      (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
+       submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
+       field_provenance, custom_variables)
+      VALUES (${solicitationId}::uuid,
+              ${keep('page_limit_technical', c.pageLimitTechnical ?? null)},
+              ${keep('font_family', c.fontFamily ?? null)},
+              ${keep('font_size', c.fontSize ?? null)},
+              ${keep('min_font_size', c.minFontSize ?? null)},
+              ${keep('margins', c.margins ?? null)},
+              ${keep('submission_format', c.submissionFormat ?? null)},
+              ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
+              ${tx.json(keep('required_sections', c.requiredSections ?? []) as JSONValue)},
+              ${tx.json(keep('required_documents', c.requiredDocuments ?? []) as JSONValue)},
+              ${tx.json(stamped)},
+              ${tx.json((existingCustom ?? {}) as JSONValue)})`;
+
+    // ── Volumes + required items ──
+    await tx`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;
+    await tx`DELETE FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid`;
+    for (let v = 0; v < volumes.length; v++) {
+      const vol = volumes[v];
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO solicitation_volumes (solicitation_id, volume_number, volume_name, volume_format, expert_notes)
+        VALUES (${solicitationId}::uuid, ${v + 1}, ${vol.name}, ${coerceVolFormat(vol.format)}, ${vol.notes ?? null}) RETURNING id`;
+      let n = 0;
+      for (const item of vol.items ?? []) {
+        n++; itemCount++;
+        await tx`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, expert_notes)
+                  VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.notes ?? null})`;
+      }
     }
-  }
+  });
 
   // ── Topics → opportunities → cards ──
   // No topics parsed ⇒ the solicitation's own umbrella opportunity is the single card.

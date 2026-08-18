@@ -83,6 +83,7 @@ export async function POST(
   request: Request,
   routeCtx: RouteContext,
 ) {
+  let startId: string | null = null;
   try {
     // ── Auth check ──────────────────────────────────────────────────
     const session = await auth();
@@ -147,7 +148,7 @@ export async function POST(
     };
 
     // ── Start event ─────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'compliance_value.saved',
       actor: { type: 'user', id: user.id! },
@@ -181,6 +182,11 @@ export async function POST(
 
     return NextResponse.json({ data: { ...(result as Record<string, unknown>), propagation } });
   } catch (error) {
+    // AUDIT FIX (PATTERN_AUDIT MED-8): a thrown tool error must not leave the
+    // compliance_value.saved bracket dangling (7 live orphans).
+    if (startId) {
+      try { await emitEventEnd(startId, { error: { message: error instanceof Error ? error.message : String(error), code: 'SAVE_FAILED' } }); } catch { /* never dangle */ }
+    }
     // Translate known AppError subclasses to proper HTTP responses
     if (error && typeof error === 'object' && 'httpStatus' in error) {
       const appErr = error as { httpStatus: number; message: string; code: string; details?: unknown };

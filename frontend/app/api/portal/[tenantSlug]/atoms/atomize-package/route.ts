@@ -9,7 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import { classifyDsipSidecar } from '@/lib/library/dsip-deconstruct';
@@ -94,7 +94,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const ordered = isDsipPackage
       ? [...files].sort((a, b) => Number(/full_proposal/i.test(b.name)) - Number(/full_proposal/i.test(a.name)))
       : files;
+    // Sidecars for an ALREADY-ingested proposal (no Full_Proposal in this batch): the
+    // uploader names the existing package cocoon and every file JOINS it volume-tagged.
     let packageCocoonId: string | null = null;
+    const attachTo = typeof ctx.attachToCocoonId === 'string' && /^[0-9a-f-]{36}$/i.test(ctx.attachToCocoonId) ? ctx.attachToCocoonId : null;
+    if (isDsipPackage && attachTo) {
+      const [own] = await sql<{ id: string }[]>`
+        SELECT id FROM document_cocoons WHERE id = ${attachTo}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      if (!own) return NextResponse.json({ error: 'attachToCocoonId is not one of your past proposals', code: 'NOT_FOUND' }, { status: 404 });
+      packageCocoonId = own.id;
+    }
 
     const docs = [];
     let totalAtoms = 0;

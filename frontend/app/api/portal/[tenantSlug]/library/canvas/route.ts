@@ -6,6 +6,7 @@
  * Body: { title, form, kind?, context? }. tenant_user+ with verified access.
  */
 import { NextResponse } from 'next/server';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { randomUUID } from 'crypto';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
@@ -57,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       { title, slug, form, kind, context, collection: 'user_created' },
       { id: g.userId },
     );
+    try { await emitEventSingle({ namespace: 'library', type: 'foundation.created', actor: userActor(g.userId, undefined), tenantId: g.tenantId, payload: { form } }); } catch (e) { console.error('[foundation.created] audit emit failed (non-fatal)', e); }
     return NextResponse.json({
       data: {
         foundationId: d.foundationId, form, format: ARTIFACT_FORMAT[form], kind, context,

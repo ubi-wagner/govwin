@@ -18,7 +18,7 @@ import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { runInTenant } from '@/lib/tenant-context';
 import { createTask } from '@/lib/tasks/tasks';
-import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, userActor, systemActor } from '@/lib/events';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
@@ -508,6 +508,15 @@ export async function closeAgentGate(
   // Auto is opt-in per stage — never auto-advance a stage the tenant didn't set to autoAdvance.
   if (opts.auto && stage.autoAdvance !== true) return { advanced: false, reason: 'auto_not_enabled' };
 
+  // AUDIT FIX (PATTERN_AUDIT HIGH-4): AUTO closes only a PASSED review — "the cohort ran"
+  // is not "the cohort found nothing". Any advisory note (or a non-clean verdict) leaves the
+  // gate for a human; the ASSISTED click (a human weighing the notes) is unchanged.
+  if (opts.auto) {
+    const notes = Number(review.noteCount ?? 0);
+    const verdictOk = review.verdict == null || ['reviewed', 'pass', 'clean'].includes(String(review.verdict));
+    if (notes > 0 || !verdictOk) return { advanced: false, reason: 'review_has_findings' };
+  }
+
   // Close the gate ToDo (its completion IS the gate close). RLS-scoped update (prod app role is
   // subject to tasks RLS). Record the AI verdict + closer so the ledger shows who/what closed it.
   await withTenant(tenantId, async (tx) => {
@@ -525,7 +534,9 @@ export async function closeAgentGate(
   if (result.advanced) {
     await emitEventSingle({
       namespace: 'capture', type: 'stage_review.advanced',
-      actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+      // EVENT_CONTRACT §5: the autonomous sweep is AUTOMATION — it audits as system, never
+      // as a synthetic user. The assisted click keeps its human actor.
+      actor: opts.auto ? systemActor('ai-manager-auto') : userActor(actor.id, actor.email ?? undefined), tenantId,
       payload: { portalId, stageKey: stage.key, auto: opts.auto === true, verdict: review.verdict ?? null, agentManagerKey: stage.agentManagerKey ?? null },
     });
   }

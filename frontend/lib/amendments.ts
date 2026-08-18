@@ -64,14 +64,15 @@ export async function logAmendment(
             ${p.documentId ?? null}::uuid)
     RETURNING id
   `;
-  const payload = { amendmentId: row.id, solicitationId: p.solicitationId, severity: p.severity, label: p.label };
-  const startId = await emitEventStart({
+  // AUDIT FIX (PATTERN_AUDIT MED-9): a single write is an audit SINGLE, not a decorative
+  // back-to-back bracket (EVENT_CONTRACT A1). Trigger consumers act on terminal phases, so
+  // single keeps them firing identically.
+  await emitEventSingle({
     namespace: 'finder',
     type: 'amendment.detected',
     actor: userActor(p.actorId, p.actorEmail ?? undefined),
-    payload,
+    payload: { amendmentId: row.id, solicitationId: p.solicitationId, severity: p.severity, label: p.label },
   });
-  await emitEventEnd(startId, { result: payload });
   return { id: row.id };
 }
 
@@ -82,6 +83,16 @@ export async function logAmendment(
 export async function confirmAmendment(
   p: Actor & { amendmentId: string; solicitationId: string },
 ): Promise<{ confirmed: boolean; flagged: number; tenants: number }> {
+  // AUDIT FIX (PATTERN_AUDIT MED-9): the bracket opens BEFORE the CAS — if the fan-out
+  // throws after the status committed, the ledger still shows the started confirmation
+  // (and the catch below closes it with the error) instead of a silent state change.
+  const startId = await emitEventStart({
+    namespace: 'finder',
+    type: 'amendment.confirmed',
+    actor: userActor(p.actorId, p.actorEmail ?? undefined),
+    payload: { amendmentId: p.amendmentId, solicitationId: p.solicitationId },
+  });
+  try {
   // Compare-and-swap: only a 'detected' amendment can be confirmed. A no-op (unknown id or
   // already confirmed/dismissed) returns confirmed:false so the caller can 409, distinct from a
   // genuine confirmation that simply had zero proposals to fan out (confirmed:true, flagged:0).
@@ -91,7 +102,10 @@ export async function confirmAmendment(
     WHERE id = ${p.amendmentId}::uuid AND solicitation_id = ${p.solicitationId}::uuid AND status = 'detected'
     RETURNING id
   `;
-  if (updated.length === 0) return { confirmed: false, flagged: 0, tenants: 0 };
+  if (updated.length === 0) {
+    await emitEventEnd(startId, { error: { message: 'not in detected state (no-op)', code: 'CONFLICT' } });
+    return { confirmed: false, flagged: 0, tenants: 0 };
+  }
 
   // Fan out to every ACTIVE proposal built from this solicitation (skip already-flagged + archived).
   const flagged = await sql<{ tenantId: string }[]>`
@@ -104,15 +118,8 @@ export async function confirmAmendment(
   `;
   const tenantIds = Array.from(new Set(flagged.map((r) => r.tenantId)));
 
-  // Admin audit (start/end around the fan-out).
-  const adminPayload = { amendmentId: p.amendmentId, solicitationId: p.solicitationId, flagged: flagged.length, tenants: tenantIds.length };
-  const startId = await emitEventStart({
-    namespace: 'finder',
-    type: 'amendment.confirmed',
-    actor: userActor(p.actorId, p.actorEmail ?? undefined),
-    payload: adminPayload,
-  });
-  await emitEventEnd(startId, { result: adminPayload });
+  // Close the confirmation bracket with the fan-out counts (what processors match).
+  await emitEventEnd(startId, { result: { amendmentId: p.amendmentId, solicitationId: p.solicitationId, flagged: flagged.length, tenants: tenantIds.length } });
 
   // One customer-facing event per affected tenant (surfaces in their notification bell).
   for (const tid of tenantIds) {
@@ -134,6 +141,12 @@ export async function confirmAmendment(
   await republishSolicitationCards({ solicitationId: p.solicitationId, actorId: p.actorId });
 
   return { confirmed: true, flagged: flagged.length, tenants: tenantIds.length };
+  } catch (err) {
+    // The status CAS may have committed — the error end records that the confirmation ran
+    // and where it failed, so the ledger never shows a silent state change.
+    try { await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'CONFIRM_FANOUT_FAILED' } }); } catch { /* never dangle */ }
+    throw err;
+  }
 }
 
 /**

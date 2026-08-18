@@ -52,11 +52,14 @@ from workflows.base import Workflow, Step, StepType, EventTrigger
 class OnSolicitationReviewRequested(Workflow):
     description = "Run an advisory pre-release QA pass when curation is submitted for review"
 
+    # AUDIT FIX (PATTERN_AUDIT HIGH-1): the live UI requests review via the TOOL, which
+    # emits finder:solicitation.review_requested as a SINGLE — the route's
+    # solicitation.triaged:end (toState=review_requested) path is the legacy twin and never
+    # fires from the workspace. Trigger on the tool's event so the QA pass actually runs.
     trigger = EventTrigger(
         namespace="finder",
-        type="solicitation.triaged",
-        phase="end",
-        condition=lambda p: p.get("toState") == "review_requested",
+        type="solicitation.review_requested",
+        phase="single",
     )
 
     steps = [

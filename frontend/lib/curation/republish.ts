@@ -104,10 +104,26 @@ export async function republishSolicitationCards(opts: {
       } catch (e) {
         console.error('[republish] republish failed (non-fatal)', o.id, e);
         out.skipped++;
+        // AUDIT FIX (PATTERN_AUDIT MED-10): a failed per-opp propagation is silent mirror
+        // divergence — put it on the ledger so the missed refresh is findable.
+        try {
+          await emitEventSingle({
+            namespace: 'finder', type: 'cards.republish_failed',
+            actor: systemActor('republish'), tenantId: null,
+            payload: { solicitationId: opts.solicitationId, opportunityId: o.id, error: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300) },
+          });
+        } catch { /* best-effort */ }
       }
     }
   } catch (e) {
     console.error('[republish] propagation failed (non-fatal)', opts.solicitationId, e);
+    try {
+      await emitEventSingle({
+        namespace: 'finder', type: 'cards.republish_failed',
+        actor: systemActor('republish'), tenantId: null,
+        payload: { solicitationId: opts.solicitationId, opportunityId: opts.opportunityId ?? null, error: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300) },
+      });
+    } catch { /* best-effort */ }
   }
   return out;
 }

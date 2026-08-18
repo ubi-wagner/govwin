@@ -31,6 +31,29 @@ that are built but dark.
   budget), `MAX_FILES` 12→20 (a real DSIP package is 14 files).
 - `ai/draft` NOT_FOUND exits close their start events (earlier this session).
 
+## Closure wave 1 (2026-08-18, same session — all verified green)
+
+CLOSED: HIGH-1 (QA workflow retargeted onto the tool's `solicitation.review_requested:single`
+— it can now actually fire) · HIGH-2 (shredder steps 5–8 wrapped: any throw closes the
+`rfp.shredding` bracket with an error end; both `compliance.extracted` dangling exits closed)
+· HIGH-3 (LAND matrix rewrite is ONE `sql.begin` transaction) · HIGH-4 (TW-8 AUTO gate now
+requires a PASSED review — zero advisory notes — and the sweep audits as `systemActor`, not a
+synthetic user; assisted mode unchanged) · HIGH-5 (audit-coverage moat excludes auth.ts's
+vacuous signal; the exposed business writers — library/canvas create, seed-job select/decide,
+extract-topics — now emit domain events; 7 read-side/advisory routes allowlisted with reasons)
+· MED-8 partial (compliance-route catch + both triage exits close their brackets) · MED-9
+(amendment confirm opens its bracket BEFORE the CAS and closes on every exit incl. fan-out
+failure; log/dismiss are honest singles) · MED-10 (`finder:cards.republish_failed` singles
+from both propagation fences) · MED-11 (processor fans out to ALL matching workflows —
+first-match-wins drop eliminated). Plus: sidecar attach-to-existing-cocoon
+(`context.attachToCocoonId`) for late-arriving DSIP package files.
+
+STILL OPEN (wave 2): MED-8 remainder (`ai/compliance` ~10 exits + `supporting-docs` exits
+need the fail() helper), MED-7 ingest_actions raw-emit pairing + trigger-liveness test +
+rule 'preview' badging, MED-6 shapes backfill (5 workflows) + drift tests, MED-12 triage
+ladder collapse, LOW 8/9/13–18 (incl. lock-harvest single, Studio-complete event, TW-8
+deploy env `AGENT_GATE_SWEEP_URL`, discovery digest, tenant launcher parity).
+
 ## Ranked backlog (all proven; smallest-fix noted in the audit transcripts)
 
 **HIGH**
