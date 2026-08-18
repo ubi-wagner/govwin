@@ -48,6 +48,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     }
     const packageName = (typeof form.get('packageName') === 'string' ? String(form.get('packageName')) : '').trim();
     const ctxTags = contextTags(ctx);
+    // 'past_proposal' declares a complete DSIP proposal download → the plan segments it into
+    // Volume 1..5 foundation documents under one cocoon (the shared past-proposal UUID).
+    const docType = typeof ctx.docType === 'string' ? ctx.docType : null;
     const actor = { id: u.id, kind: actorKind };
 
     // Dry-run preview: parse + segment and return EXACTLY what a real run would create,
@@ -59,9 +62,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       for (const file of files) {
         if (file.size > MAX_FILE_BYTES) { previewed.push({ file: file.name, format: '', planned: [], skipped: 0, error: 'file too large (25MB max)' }); continue; }
         const buffer = Buffer.from(await file.arrayBuffer());
-        const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags });
+        const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags, docType });
         totalPlanned += plan.planned.length;
-        previewed.push({ file: plan.file, format: plan.format, planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount })), skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable });
+        previewed.push({
+          file: plan.file, format: plan.format,
+          planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount, volumeNumber: p.volumeNumber })),
+          skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable,
+          dsip: plan.dsip ? { volumes: plan.dsip.volumes.map((v) => ({ volume: v.volumeNumber, name: v.volumeName, words: v.wordCount, blocks: v.blockCount })) } : undefined,
+        });
       }
       return NextResponse.json({ data: { preview: true, filesProcessed: previewed.length, totalPlanned, context: ctxTags.map((t) => `${t.dimension}:${t.value}`), docs: previewed } });
     }
@@ -71,9 +79,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     for (const file of files) {
       if (file.size > MAX_FILE_BYTES) { docs.push({ file: file.name, format: '', atoms: 0, cocoonId: null, error: 'file too large (25MB max)' }); continue; }
       const buffer = Buffer.from(await file.arrayBuffer());
-      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, packageName, ctxTags, actor });
+      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, packageName, ctxTags, actor, docType });
       totalAtoms += r.atoms;
       docs.push(r);
+    }
+
+    // Audit the deconstruct distinctly — a full past proposal entering the library as
+    // per-volume foundation docs is a different act than a plain package upload.
+    for (const r of docs) {
+      if (!r.volumes || !r.cocoonId) continue;
+      try {
+        await emitEventSingle({
+          namespace: 'library',
+          type: 'past_proposal.deconstructed',
+          actor: userActor(u.id, u.email ?? undefined),
+          tenantId,
+          payload: { cocoonId: r.cocoonId, file: r.file, volumes: r.volumes, atoms: r.atoms },
+        });
+      } catch (e) { console.error('[atomize-package] deconstruct event failed (non-fatal)', e); }
     }
 
     await emitEventSingle({
