@@ -48,5 +48,14 @@ export default defineConfig({
       name: 'hitl',
       testMatch: /hitl.*\.spec\.ts/,
     },
+    {
+      // Self-authenticating GUIDED DRIVES — specs that walk a full operator SOP end to end
+      // as a real actor and screenshot each step into public/guides/<topic>/ for the
+      // in-app guidebooks. No storageState / setup dependency: a drive signs in itself so
+      // the login screen is part of the captured walkthrough.
+      // Run: `npx playwright test --project=drive`.
+      name: 'drive',
+      testMatch: /.*-drive\.spec\.ts/,
+    },
   ],
 });
