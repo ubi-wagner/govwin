@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "seed:gen": "DATABASE_URL=postgresql://gen@localhost/gen tsx scripts/gen-page-seeds.ts",
-    "prebuild": "npm run seed:gen || echo '[prebuild] page-seeds snapshot skipped (using committed JSON)'",
+    "prebuild": "npm run sync:pdf-worker && (npm run seed:gen || echo '[prebuild] page-seeds snapshot skipped (using committed JSON)')",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,7 +15,8 @@
     "test:integration": "vitest run --passWithNoTests __tests__/integration/",
     "test:e2e": "playwright test",
     "architecture": "node scripts/architecture/extract.mjs && node scripts/architecture/generate.mjs",
-    "architecture:render": "node scripts/architecture/generate.mjs"
+    "architecture:render": "node scripts/architecture/generate.mjs",
+    "sync:pdf-worker": "node scripts/sync-pdf-worker.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
