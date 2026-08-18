@@ -3,9 +3,10 @@
  * DELETE /api/admin/opportunities/[oppId]/watch  → disarm it
  *
  * The admin "pin for updates" (RANK-8, mig 181 opportunities.update_watch). Arming a MASTER opp makes
- * a subsequent re-push (an amendment/change → newer bridge version) fan an elevated
- * capture:opportunity.update_available notification to EVERY tenant holding its mirror card — pre-purchase,
- * before any proposal exists (today's amendment engine only reaches opps that already have a proposal).
+ * a subsequent re-publish (any mid-window master edit or amendment confirm → newer bridge version,
+ * docs/MID_WINDOW_RULES.md) fan an elevated capture:opportunity.updated notification to EVERY tenant
+ * holding its mirror card — pre-purchase, before any proposal exists (amendments additionally REPLAY
+ * onto the proposal at provision).
  * rfp_admin+; opportunities is the platform catalog (no tenant_id, RLS-off) so writes use sqlBypass.
  */
 import { NextResponse } from 'next/server';

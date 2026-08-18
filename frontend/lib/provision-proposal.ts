@@ -66,6 +66,13 @@ export async function provisionProposalForPortal(opts: {
   const proposalTitle = label && label !== 'primary' ? `${baseTitle} [${label}]` : baseTitle;
 
   const resolved = await resolveTopicCompliance(opportunityId);
+  if (resolved.degraded) {
+    // A degraded resolve means the buyer would be provisioned a DEFAULT skeleton while the
+    // authored master sits unread — a silent divergence worse than a failed release. Refuse
+    // loudly; the release path surfaces the error and the admin retries.
+    console.error('[provision-proposal] compliance resolution DEGRADED for', opportunityId, '— refusing to provision a default skeleton');
+    return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
+  }
   const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {

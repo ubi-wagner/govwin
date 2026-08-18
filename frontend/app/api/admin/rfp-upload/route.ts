@@ -387,7 +387,6 @@ export async function POST(request: Request) {
   // fileBuffers were pre-computed above (hash + buffer + displayName).
   const documentIds: string[] = [];
   let firstPdfKey: string | null = null;
-  const docType = requestedDocType ?? 'source';
   for (const fb of fileBuffers) {
     const ext = extFromFilename(fb.file.name);
     const safeName = slugSafeName(fb.file.name);
@@ -446,17 +445,23 @@ export async function POST(request: Request) {
 
     try {
       // Document type, in priority order:
-      //   attach-to-existing → the request's documentType
+      //   attach-to-existing → the PER-FILE type, else the request's documentType, else
+      //                        'attachment' (NEVER 'source' — the original upload owns the
+      //                        source role, and a second "source" skews the full_text
+      //                        recombine ordering + the provenance story).
       //   new solicitation   → the PER-FILE type the admin chose on the form, else the first
       //                        PDF is the 'source' (umbrella) and the rest are 'attachment'.
       // The per-file choice matters: a solicitation states its rules across files, and a
       // supplementary PDF labelled 'instructions' is the one the umbrella BAA defers its page
       // limit TO. Labelling it correctly is what lets the provenance audit tell "the rule is
       // elsewhere and elsewhere is nowhere" from "the rule is elsewhere and here it is".
+      // (Caught live by the mid-window drive: an attach sending documentTypes ['amendment']
+      // was silently stored as 'source', so the amendment linked the wrong file.)
       const perFileType = fileTypes[fb.index];
+      const perFileValid = !!perFileType && (VALID_DOCUMENT_TYPES as readonly string[]).includes(perFileType);
       const effectiveType = existingSolId
-        ? docType
-        : (perFileType && (VALID_DOCUMENT_TYPES as readonly string[]).includes(perFileType))
+        ? (perFileValid ? perFileType : (requestedDocType ?? 'attachment'))
+        : perFileValid
           ? perFileType
           : (firstPdfKey === storageKey ? 'source' : 'attachment');
       const isPrimary = requestedIsPrimary && firstPdfKey === storageKey;

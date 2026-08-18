@@ -11,6 +11,10 @@ export interface ResolvedCompliance {
     volumeNumber: number;
     items: Array<Record<string, unknown>>;
   }>;
+  /** Set when resolution ERRORED and fell back to SYSTEM_DEFAULTS + no volumes. A provision
+   *  built off a degraded resolve is a default skeleton, not the authored master — callers
+   *  must surface it (the silent fallback used to be indistinguishable from an empty build). */
+  degraded?: boolean;
 }
 
 /**
@@ -86,7 +90,7 @@ export async function resolveTopicCompliance(topicId: string): Promise<ResolvedC
   return { compliance, volumes };
   } catch (err) {
     console.error('[compliance-resolver] resolveTopicCompliance failed:', err);
-    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [], degraded: true };
   }
 }
 

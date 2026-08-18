@@ -228,8 +228,11 @@ latest bridge head (wired at tenant-create, application-accept, and a manual bac
 | On the bridge? | **Yes** — the fan-out *is* Release 1 | **No** — deliberately off the bridge |
 
 They are decoupled: Release 2 can precede or follow purchase; a later buyer reuses the already-built skeleton
-(fast release, no 72h). ⚠ The “proposal-ready” nudge back to the mirror card is **not built**
-(`MASTER_MIRROR_OPP_DESIGN.md:131-137`).
+(fast release, no 72h). The “proposal-ready” nudge back to the mirror card is **BUILT** (mig 182
+`build_complete` + `completeBuildOut` → bridge `updated` re-publish, `provisionReady` on the card —
+the provisioning cockpit’s Complete & Release; MASTER_MIRROR_OPP_DESIGN §2). Mid-window master edits
+(summary · compliance · volumes · attachments · amendments · late topics) also re-publish now —
+canonical rules: **docs/MID_WINDOW_RULES.md**.
 
 ### 3c. BACKWARD (mirror → master) — the only up-signals
 Content never flows up. Two things do:
