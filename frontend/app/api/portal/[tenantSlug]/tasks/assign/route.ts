@@ -9,7 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { createTask } from '@/lib/tasks/tasks';
 
@@ -42,6 +42,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!(await verifyTenantAccess(u.id, role, tenantId))) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point — createTask INSERTs into the tenant-RLS'd tasks ledger
 
     // ── body ──
     let body: Record<string, unknown>;

@@ -23,8 +23,8 @@ import type { Role } from '@/lib/rbac';
 import { sqlBypass } from '@/lib/db';
 import { getBuildReadiness } from '@/lib/provisioning/readiness';
 import { completeBuildOut } from '@/lib/provisioning/complete';
-import { provisionAndReleasePortal } from '@/lib/provisioning/release-portal';
-import type { GuardrailConfig } from '@/lib/portal-workflow';
+import { provisionAndReleasePortal, DEFAULT_RELEASE_GUARDRAILS } from '@/lib/provisioning/release-portal';
+import { getGuardrailLimits, validateGuardrailConfig, type GuardrailConfig } from '@/lib/portal-workflow';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -80,15 +80,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ por
       return NextResponse.json({ error: 'Build-out is below the readiness bar', code: 'NOT_READY', data: { readiness } }, { status: 409 });
     }
 
-    // OUTCOME 1 — complete the master build-out + broadcast to every tenant's mirror card (idempotent).
-    let buildOut = null as null | Awaited<ReturnType<typeof completeBuildOut>>;
-    if (solId) {
-      buildOut = await completeBuildOut(solId, { id: user.id, email: user.email });
-    }
-
-    // Resolve the chosen overlay (guardrail template) to its config, scoped to the buyer tenant ∪ global.
-    // The config lives server-side — the cockpit sends only a template id. An explicit guardrailConfig
-    // in the body (programmatic callers) still wins; absent both, the helper defaults.
+    // Resolve the chosen overlay (guardrail template) to its config BEFORE any broadcast — a pure
+    // config mistake must 422 here, not after the irreversible all-tenant fan-out. Scoped to the
+    // buyer tenant ∪ global; the config lives server-side — the cockpit sends only a template id.
+    // An explicit guardrailConfig in the body (programmatic callers) still wins; absent both, the
+    // helper defaults.
     let overlayConfig = body.guardrailConfig as GuardrailConfig | undefined;
     if (!overlayConfig && typeof body.guardrailTemplateId === 'string' && UUID_RE.test(body.guardrailTemplateId)) {
       const [tpl] = await sqlBypass<Array<{ config: GuardrailConfig }>>`
@@ -96,7 +92,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ por
         WHERE id = ${body.guardrailTemplateId}::uuid
           AND (tenant_id IS NULL OR tenant_id = ${portal.tenantId}::uuid)
         LIMIT 1`;
-      if (tpl) overlayConfig = tpl.config;
+      if (!tpl) {
+        // Silently degrading an unknown/foreign template to the bare default is a config the
+        // admin never chose — refuse instead.
+        return NextResponse.json({ error: 'Guardrail template not found for this tenant', code: 'UNKNOWN_TEMPLATE' }, { status: 422 });
+      }
+      // Seeded defaults store the stage plan under config.defaults (the tenant guardrail editor
+      // unwraps the same way); a template without top-level stages is otherwise unreleasable.
+      const raw = tpl.config as GuardrailConfig & { defaults?: GuardrailConfig };
+      overlayConfig = (Array.isArray((raw as { stages?: unknown }).stages) ? raw : (raw.defaults ?? raw)) as GuardrailConfig;
+    }
+
+    // Pre-validate the shaped release config (same shape the helper builds: overlay ∪ default,
+    // _setup pending) so validation failures land BEFORE outcome 1's broadcast. The helper
+    // re-validates with the same functions — no drift.
+    {
+      const shaped = { ...(overlayConfig ?? DEFAULT_RELEASE_GUARDRAILS) } as GuardrailConfig;
+      shaped._setup = { status: 'pending' };
+      const limits = await getGuardrailLimits();
+      const pre = validateGuardrailConfig(shaped, limits);
+      if (!pre.ok) {
+        return NextResponse.json({ error: pre.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
+      }
+    }
+
+    // OUTCOME 1 — complete the master build-out + broadcast to every tenant's mirror card (idempotent).
+    let buildOut = null as null | Awaited<ReturnType<typeof completeBuildOut>>;
+    if (solId) {
+      buildOut = await completeBuildOut(solId, { id: user.id, email: user.email });
     }
 
     // OUTCOME 2 — provision + release the PURCHASER's private portal + kick off their workflow.

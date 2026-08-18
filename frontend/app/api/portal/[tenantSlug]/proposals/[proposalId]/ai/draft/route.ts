@@ -109,6 +109,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
 
       if (!proposal) {
+        await emitEventEnd(startId, { error: { message: 'proposal not found', code: 'NOT_FOUND' } });
         return NextResponse.json(
           { error: 'Proposal not found', code: 'NOT_FOUND' },
           { status: 404 },
@@ -124,6 +125,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           WHERE id = ${body.sectionId} AND proposal_id = ${proposalId}
         `;
         if (sections.length === 0) {
+          await emitEventEnd(startId, { error: { message: 'section not found', code: 'NOT_FOUND' } });
           return NextResponse.json(
             { error: 'Section not found', code: 'NOT_FOUND' },
             { status: 404 },

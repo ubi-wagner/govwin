@@ -161,7 +161,10 @@ describe('Smoke 2 — Proposal provisioning round-trip', () => {
 
   it('resolveTemplateKey() returns null for unknown combinations', () => {
     expect(resolveTemplateKey('unknown_program', 'word_doc')).toBeNull();
-    expect(resolveTemplateKey('sbir_phase_1', 'text')).toBeNull();
+    // 'text' is a NARRATIVE item type (how several shipped masters type their prose items) —
+    // it resolves the same technical mold as word_doc (adversarial sweep 2026-08-18).
+    expect(resolveTemplateKey('sbir_phase_1', 'text')).toBe('dod-sbir-phase1-technical');
+    expect(resolveTemplateKey('sbir_phase_1', 'pdf')).toBeNull();
     expect(resolveTemplateKey('baa', 'spreadsheet')).toBeNull();
   });
 

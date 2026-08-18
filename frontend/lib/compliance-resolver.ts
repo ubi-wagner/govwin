@@ -60,11 +60,22 @@ export async function resolveTopicCompliance(topicId: string): Promise<ResolvedC
     SELECT solicitation_id FROM opportunities WHERE id = ${topicId}
   `;
 
-  if (!topic?.solicitationId) {
-    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  let solicitationId = topic?.solicitationId ?? null;
+  if (topic && !solicitationId) {
+    // Umbrella arm: the live intake paths create the umbrella opportunity WITHOUT
+    // opportunities.solicitation_id (only topics get it stamped) — but the curated master
+    // points back via curated_solicitations.opportunity_id. Without this fallback an
+    // umbrella purchase resolves to a NON-degraded empty result and the buyer is
+    // provisioned a default skeleton while the fully-authored master sits unread.
+    const [cs] = await sql<{ id: string }[]>`
+      SELECT id FROM curated_solicitations WHERE opportunity_id = ${topicId} LIMIT 1
+    `;
+    solicitationId = cs?.id ?? null;
   }
 
-  const solicitationId = topic.solicitationId;
+  if (!solicitationId) {
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  }
 
   // ── 2. Fetch compliance rows (baseline + topic override) ────────────
   // Returns 0-2 rows: one with topic_id IS NULL (baseline), one with topic_id = topicId (override)

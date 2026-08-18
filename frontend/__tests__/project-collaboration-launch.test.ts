@@ -48,7 +48,7 @@ describe('launchProjectCollaboration', () => {
       assigneeRole: 'rfp_admin',
       entityType: 'proposal',
       entityRef: PROP_ID,
-      nudgeDays: [1, 3],   // default
+      nudgeDays: [2, 1],   // default — days-BEFORE-due; a 3 on a 72h gate nudges at t≈0
       dueMinutes: 4320,    // default 72h
       completeTemplate: 'proposal_unlocked',
     });

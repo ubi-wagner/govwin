@@ -10,7 +10,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -48,6 +48,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point — process_instances is tenant-RLS'd (mig 185)
 
     // Tenant-scoped: this tenant's own instance only (their spine).
     const instances = await sql<{

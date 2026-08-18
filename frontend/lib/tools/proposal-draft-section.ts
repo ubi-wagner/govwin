@@ -290,7 +290,7 @@ async function draftWithClaude(input: Input, actorId: string, actorName: string,
     return { nodes, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, model: response.model };
   };
 
-  const userMessage = buildUserMessage(input);
+  const userMessage = buildUserMessage(input, complianceReqs);
   const first = await gen(userMessage);
   let nodes = first.nodes;
   let inputTokens = first.inputTokens;

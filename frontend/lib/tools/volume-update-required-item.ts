@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { sql } from '@/lib/db';
-import { NotFoundError } from '@/lib/errors';
+import { NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { republishSolicitationCards } from '@/lib/curation/republish';
@@ -41,6 +41,25 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
+    // FK-before-write: refuse a dangling templateId cleanly (not a raw 23503 from the UPDATE),
+    // and refuse an EMPTY mold — it passes the readiness bar yet provisions nothing. Platform
+    // context means the RLS SELECT policy also hides tenant-owned molds here, so master items
+    // only ever link platform molds every buyer can load at release.
+    if (input.templateId) {
+      const tpl = await sql<{ id: string; contentNodes: number }[]>`
+        SELECT id,
+          (CASE WHEN jsonb_typeof(canvas_document->'nodes') = 'array'
+                THEN jsonb_array_length(canvas_document->'nodes') ELSE 0 END
+           + CASE WHEN jsonb_typeof(canvas_document->'sections') = 'array'
+                THEN jsonb_array_length(canvas_document->'sections') ELSE 0 END)::int AS content_nodes
+        FROM document_templates WHERE id = ${input.templateId}::uuid LIMIT 1`;
+      if (tpl.length === 0) {
+        throw new ValidationError(`templateId does not exist: ${input.templateId}`);
+      }
+      if (tpl[0].contentNodes === 0) {
+        throw new ValidationError('template has no canvas content — author the mold before linking it to an item');
+      }
+    }
     let rows: { id: string; volumeId: string }[];
     try {
       rows = await sql<{ id: string; volumeId: string }[]>`

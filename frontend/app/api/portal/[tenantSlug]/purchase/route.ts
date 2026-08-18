@@ -45,7 +45,7 @@ async function gate(tenantSlug: string, minRole: Role) {
 
 type PurchaseResult =
   | { ok: true; portalId: string; curationDueAt: string; comp: true }
-  | { ok: false; reason: 'invalid_code' | 'not_comp' | 'already_purchased' };
+  | { ok: false; reason: 'invalid_code' | 'not_comp' | 'already_purchased' | 'not_available' };
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -67,6 +67,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const label = (body.label ?? 'primary').slice(0, 80);
     const productType = 'proposal_phase1';
 
+    // #190: resolve the curation-gate cadence BEFORE the tx so the portal's SLA clock
+    // (curation_due_at — what the board/cockpit/ops_digest count down) and the gate ToDo's due
+    // derive from ONE source. The 72h window is framework-pinned (pinnedToCurationSla) but
+    // rfp_admin-tunable at /admin/automation-framework; hardcoding 72h here let the two drift.
+    // Fail-safe: the resolver returns these defaults on any error.
+    const pol = await resolveGatePolicy({
+      tenantId: g.tenantId,
+      scope: 'build',
+      triggerKey: 'proposal_setup',
+      gateDefaults: { assigneeRole: 'rfp_admin', nudgeDays: [2, 1], dueInMinutes: CURATION_SLA_HOURS * 60 },
+      pinnedToCurationSla: true,
+    });
+    const slaMinutes = pol.dueInMinutes && pol.dueInMinutes > 0 ? pol.dueInMinutes : CURATION_SLA_HOURS * 60;
+
     // Atomic: validate the code, open the curation-pending portal, record the paid
     // purchase, consume the code, and grant the T&C shadow-admin — one tenant tx (RLS).
     let result: PurchaseResult;
@@ -82,6 +96,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         if (!promo) return { ok: false, reason: 'invalid_code' };
         if (promo.kind !== 'comp') return { ok: false, reason: 'not_comp' };
 
+        // The purchase must target an opportunity actually RELEASED to this tenant — i.e. a
+        // mirror card exists. Without this, any leaked/guessed UUID of an un-triaged intake
+        // opp opens a portal + a 72h SLA clock for something no customer was ever shown.
+        const [card] = await tx<Array<{ id: string }>>`
+          SELECT id FROM tenant_opportunity_cards
+          WHERE tenant_id = ${g.tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+          LIMIT 1`;
+        if (!card) return { ok: false, reason: 'not_available' };
+
         // Open the portal in curation_pending with the 72h SLA clock. ON CONFLICT
         // (already a portal for this opp+label) → treat as already purchased.
         const portalRows = await tx<Array<{ id: string; curationDueAt: string }>>`
@@ -89,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
             (tenant_id, opportunity_id, label, status, paid_at, curation_due_at, created_by)
           VALUES (
             ${g.tenantId}::uuid, ${opportunityId}::uuid, ${label}, 'curation_pending',
-            now(), now() + (${CURATION_SLA_HOURS}::int) * interval '1 hour', ${g.userId}::uuid
+            now(), now() + (${slaMinutes}::int) * interval '1 minute', ${g.userId}::uuid
           )
           ON CONFLICT (tenant_id, opportunity_id, label) DO NOTHING
           RETURNING id, curation_due_at
@@ -124,6 +147,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       if (result.reason === 'already_purchased') {
         return NextResponse.json({ error: 'This opportunity already has a workspace', code: 'ALREADY_PURCHASED' }, { status: 409 });
       }
+      if (result.reason === 'not_available') {
+        return NextResponse.json({ error: 'This opportunity is not available to your workspace', code: 'OPP_NOT_AVAILABLE' }, { status: 422 });
+      }
       if (result.reason === 'not_comp') {
         return NextResponse.json({ error: 'That code requires card checkout, which is not enabled yet', code: 'CODE_NEEDS_STRIPE' }, { status: 400 });
       }
@@ -144,18 +170,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       console.error('[portal/purchase] event emit failed (non-fatal)', evtErr);
     }
     try {
-      // #190: resolve the gate cadence/assignee via the automation-policy layer.
-      // The 72h curation window is framework-HARD (pinnedToCurationSla) — a tenant
-      // cannot move the SLA. Fail-safe: on any error the resolver returns these defaults.
-      const pol = await resolveGatePolicy({
-        tenantId: g.tenantId,
-        scope: 'build',
-        triggerKey: 'proposal_setup',
-        gateDefaults: { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueInMinutes: CURATION_SLA_HOURS * 60 },
-        pinnedToCurationSla: true,
-      });
+      // The gate cadence/assignee resolved above (one source with the portal's SLA clock).
       if (pol.enabled) {
-        await launchProjectCollaboration({
+        const launch = await launchProjectCollaboration({
           actor: { id: g.userId, email: g.userEmail, tenantId: g.tenantId },
           actorType: 'user',
           tenantId: g.tenantId,
@@ -172,6 +189,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
           nudgeDays: pol.nudgeDays,
           dueMinutes: pol.dueInMinutes,
         });
+        // launchTemplate reports failure by RETURN (TEMPLATE_INACTIVE / EMIT_FAILED / …), not
+        // throw — without this line a failed 72h-gate launch is fully silent.
+        if (!launch?.ok) {
+          console.error('[portal/purchase] proposal_setup gate launch failed', (launch as { code?: string; error?: string })?.code, (launch as { error?: string })?.error);
+        }
       }
     } catch (setupErr) {
       console.error('[portal/purchase] curation-gate launch failed (non-fatal)', setupErr);

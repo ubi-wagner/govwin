@@ -70,15 +70,15 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Artifact + its sections ────────────────────────────────────────
     let artifact: { id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean; complianceSpec: ComplianceSpec | null } | undefined;
-    let sections: { id: string; title: string | null; content: string | null }[] = [];
+    let sections: { id: string; title: string | null; content: string | null; pageAllocation: number | null }[] = [];
     try {
       [artifact] = await sql<{ id: string; artifactType: string | null; volumeName: string | null; isLocked: boolean; complianceSpec: ComplianceSpec | null }[]>`
         SELECT id, artifact_type, volume_name, is_locked, compliance_spec FROM proposal_artifacts
         WHERE id = ${artifactId}::uuid AND proposal_id = ${proposalId}::uuid LIMIT 1
       `;
       if (artifact) {
-        sections = await sql<{ id: string; title: string | null; content: string | null }[]>`
-          SELECT id, title, content FROM proposal_sections
+        sections = await sql<{ id: string; title: string | null; content: string | null; pageAllocation: number | null }[]>`
+          SELECT id, title, content, page_allocation AS "pageAllocation" FROM proposal_sections
           WHERE proposal_id = ${proposalId}::uuid AND artifact_id = ${artifactId}::uuid
           ORDER BY volume_number ASC NULLS LAST, sort_index ASC NULLS LAST, section_number ASC
         `;

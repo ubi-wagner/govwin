@@ -83,16 +83,42 @@ export async function provisionAndReleasePortal(opts: {
     }
     // linkPortalProposal CAS-links only while proposal_id IS NULL. If it returns false a CONCURRENT
     // release (admin cockpit + tenant ?action=release, or a double-click) already provisioned + linked
-    // this portal — adopt the WINNER's proposal so we don't double-link / drive the wrong build. (Our
-    // just-provisioned proposal is left unlinked + inert; the release itself still CAS-guards below.)
-    const linked = await linkPortalProposal(tenantId, portalId, prov.proposalId);
+    // this portal — adopt the WINNER's proposal so we don't double-link / drive the wrong build.
+    // The loser build is NOT naturally inert (proposal.created fan-out already fired agents + review
+    // ToDos on it, and it lists with an identical title): ARCHIVE it + expire its open ToDos so the
+    // tenant never sees a phantom duplicate.
+    const archiveOrphanBuild = async (orphanId: string) => {
+      try {
+        await withTenant(tenantId, async (tx) => {
+          await tx`UPDATE proposals SET archived_at = now() WHERE id = ${orphanId}::uuid AND tenant_id = ${tenantId}::uuid`;
+          await tx`
+            UPDATE tasks SET status = 'expired', updated_at = now()
+            WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'proposal'
+              AND entity_id = ${orphanId}::uuid AND status IN ('open','in_progress')`;
+        });
+      } catch (e) { console.error('[provisionAndReleasePortal] orphan-build archive failed (non-fatal)', e); }
+    };
+    let linked = false;
+    try {
+      linked = await linkPortalProposal(tenantId, portalId, prov.proposalId);
+    } catch (e) {
+      console.error('[provisionAndReleasePortal] link failed', e);
+    }
     if (linked) {
       proposalId = prov.proposalId;
     } else {
       const [winner] = await withTenant(tenantId, async (tx) =>
         tx<Array<{ proposalId: string | null }>>`
           SELECT proposal_id AS "proposalId" FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`);
-      proposalId = winner?.proposalId ?? prov.proposalId;
+      if (winner?.proposalId) {
+        proposalId = winner.proposalId;
+        if (winner.proposalId !== prov.proposalId) await archiveOrphanBuild(prov.proposalId);
+      } else {
+        // Link threw with no winner on the portal: archive our orphan and fail the release —
+        // a retry provisions cleanly instead of stacking a second visible duplicate.
+        await archiveOrphanBuild(prov.proposalId);
+        return { ok: false, error: 'Could not link the provisioned build to the portal (please retry)', code: 'PROVISION_FAILED', status: 500 };
+      }
     }
   }
 

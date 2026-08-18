@@ -108,7 +108,9 @@ export async function launchProjectCollaboration(
     assigneeRole: opts.assigneeRole,
     entityType: opts.entityType,
     entityRef: opts.entityRef,
-    nudgeDays: opts.nudgeDays ?? [1, 3],
+    // Days-BEFORE-due: [2,1] (48h + 24h out). A value ≥ the full due window (e.g. 3 on a 72h
+    // gate) makes the first nudge threshold equal the creation instant — an immediate nudge.
+    nudgeDays: opts.nudgeDays ?? [2, 1],
     dueMinutes: opts.dueMinutes ?? 4320, // 72h
   };
   if (opts.proposalId) overlay.proposalId = opts.proposalId;

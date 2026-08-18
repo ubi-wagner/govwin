@@ -82,7 +82,7 @@ function moldNodes(content: string | null): { nodes: CanvasNode[]; canvas: Canva
  * mold's canvas rules win; malformed/empty mold content is skipped, not fatal.
  */
 export function assembleArtifactCanvas(
-  sections: Array<{ title: string | null; content: string | null }>,
+  sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null }>,
   artifactType: string | null | undefined,
   title: string,
 ): CanvasDocument {
@@ -102,7 +102,14 @@ export function assembleArtifactCanvas(
       outSections.push({
         id: crypto.randomUUID(),
         ...(ci === 0 && s.title ? { title: s.title } : {}),
-        layout: { mode: 'flow', ...(ci > 0 ? { break_before: true } : {}) },
+        // The item's own page cap (proposal_sections.page_allocation) rides the FIRST chunk as
+        // layout.page_budget so the floor's section_over_budget check is live at export — without
+        // it a 1-page cover sheet could eat 8 pages of a 15-page volume unflagged.
+        layout: {
+          mode: 'flow',
+          ...(ci > 0 ? { break_before: true } : {}),
+          ...(ci === 0 && s.pageAllocation != null && s.pageAllocation > 0 ? { page_budget: s.pageAllocation } : {}),
+        },
         groups,
       });
     });

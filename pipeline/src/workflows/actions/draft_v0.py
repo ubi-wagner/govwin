@@ -116,14 +116,19 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     # section a human has already touched (content_source='human_edit') even if its status is still
     # 'ai_drafted' — a released-UNLOCKED build invites the customer to edit ai_drafted sections
     # immediately, and this async drafter (incl. its manager retries) must never overwrite that work.
+    # content_source='template' = the section was provisioned from an admin-authored mold, the
+    # computed cost workbook, or a registry template — that canvas IS the intended V0 skeleton
+    # (slide geometry, priced tables). The strawman must not touch it (mirrored by the landing
+    # primitive's belt in publish_section_draft).
     rows = await conn.fetch(
         """
         SELECT s.id, s.title, s.status, s.section_type, s.page_allocation, s.artifact_id,
-               a.format_spec
+               s.content, a.format_spec
         FROM proposal_sections s
         LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
         WHERE s.proposal_id = $1 AND s.status IN ('empty', 'ai_drafted')
           AND s.content_source IS DISTINCT FROM 'human_edit'
+          AND s.content_source IS DISTINCT FROM 'template'
         ORDER BY s.section_number
         """,
         proposal_uuid,
@@ -201,7 +206,18 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
                 skipped += 1
                 continue
 
-            canvas = s["format_spec"] if (s["format_spec"] and isinstance(s["format_spec"], dict) and s["format_spec"]) else _DEFAULT_CANVAS
+            # Prefer the section's OWN canvas envelope when provisioning stamped one (e.g. an
+            # empty slide_16_9 skeleton for a blank slide item) — the drafter must inherit that
+            # geometry, not overwrite a deck with a letter document.
+            existing_canvas = None
+            try:
+                raw = s["content"]
+                body = json.loads(raw) if isinstance(raw, str) and raw.strip() else (raw if isinstance(raw, dict) else None)
+                if isinstance(body, dict) and isinstance(body.get("canvas"), dict) and body["canvas"].get("format"):
+                    existing_canvas = body["canvas"]
+            except (ValueError, TypeError):
+                existing_canvas = None
+            canvas = existing_canvas or (s["format_spec"] if (s["format_spec"] and isinstance(s["format_spec"], dict) and s["format_spec"]) else _DEFAULT_CANVAS)
             canvas_doc = build_canvas_document(
                 markdown,
                 document_id=section_id,

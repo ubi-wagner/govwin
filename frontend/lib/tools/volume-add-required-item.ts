@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { sql } from '@/lib/db';
-import { ConflictError, NotFoundError } from '@/lib/errors';
+import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { republishSolicitationCards } from '@/lib/curation/republish';
@@ -57,6 +57,28 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
       throw err;
     }
     if (vol.length === 0) throw new NotFoundError(`volume not found: ${input.volumeId}`);
+
+    // FK-before-write (CLAUDE.md §Data Layer): a dangling templateId must be a clean
+    // validation refusal, not a raw 23503 constraint throw from the INSERT. Also refuse an
+    // EMPTY mold ({} default body): it passes the cockpit readiness bar yet provisions
+    // nothing — author the canvas first, then link. (Run under platform context, the RLS
+    // SELECT policy also hides tenant-owned molds here, so a master item can only ever
+    // link a platform mold every buyer can load at release.)
+    if (input.templateId) {
+      const tpl = await sql<{ id: string; contentNodes: number }[]>`
+        SELECT id,
+          (CASE WHEN jsonb_typeof(canvas_document->'nodes') = 'array'
+                THEN jsonb_array_length(canvas_document->'nodes') ELSE 0 END
+           + CASE WHEN jsonb_typeof(canvas_document->'sections') = 'array'
+                THEN jsonb_array_length(canvas_document->'sections') ELSE 0 END)::int AS content_nodes
+        FROM document_templates WHERE id = ${input.templateId}::uuid LIMIT 1`;
+      if (tpl.length === 0) {
+        throw new ValidationError(`templateId does not exist: ${input.templateId}`);
+      }
+      if (tpl[0].contentNodes === 0) {
+        throw new ValidationError('template has no canvas content — author the mold before linking it to an item');
+      }
+    }
 
     let rows;
     try {

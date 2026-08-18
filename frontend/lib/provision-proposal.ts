@@ -61,6 +61,17 @@ export async function provisionProposalForPortal(opts: {
   }
   if (!topic) return { error: 'opportunity not found' };
   const t = topic;
+  if (!t.solicitationId) {
+    // Umbrella purchase: live intake creates the umbrella opportunity WITHOUT
+    // opportunities.solicitation_id — the curated master points back via
+    // curated_solicitations.opportunity_id. Resolve it so the proposal is stamped with
+    // its solicitation (amendment fan-out + replay key on proposals.solicitation_id).
+    try {
+      const [cs] = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE opportunity_id = ${opportunityId}::uuid LIMIT 1`;
+      if (cs) t.solicitationId = cs.id;
+    } catch (e) { console.error('[provision-proposal] umbrella solicitation lookup failed (non-fatal)', e); }
+  }
 
   const baseTitle = t.topicNumber ? `${t.topicNumber}: ${t.title}` : t.title;
   const proposalTitle = label && label !== 'primary' ? `${baseTitle} [${label}]` : baseTitle;
@@ -73,14 +84,15 @@ export async function provisionProposalForPortal(opts: {
     console.error('[provision-proposal] compliance resolution DEGRADED for', opportunityId, '— refusing to provision a default skeleton');
     return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
   }
-  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
+  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
     for (const item of vol.items) {
       gi++;
       requiredItems.push({
         itemNumber: gi, itemName: item.itemName as string, itemType: item.itemType as string,
-        pageLimit: (item.pageLimit as number) ?? null, volumeName: (vol.volumeName as string) ?? null,
+        pageLimit: (item.pageLimit as number) ?? null, slideLimit: (item.slideLimit as number) ?? null,
+        volumeName: (vol.volumeName as string) ?? null,
         volumeNumber: (vol.volumeNumber as number) ?? null, templateId: (item.templateId as string) ?? null,
         expertNotes: (item.expertNotes as string) ?? null,
       });
@@ -133,7 +145,10 @@ export async function provisionProposalForPortal(opts: {
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
           const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost'
-            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercial|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
+            // 'commercialization report|CCR' — NOT bare 'commercial': a "Commercialization Plan/
+            // Strategy" volume is a PROSE volume with a hard page limit; typing it 'form' would
+            // exempt it from the readiness page gate and the font floor.
+            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercialization\s+report|\bccr\b|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
             : 'narrative';
           const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
           const [art] = await tx<{ id: string }[]>`
@@ -192,37 +207,91 @@ export async function provisionProposalForPortal(opts: {
               (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
             VALUES (${p.id}, ${item.itemName}, ${item.volumeName ?? 'RFP'}, true, 'not_addressed', ${section.id})
           `;
+          const vkey = volKey(item.volumeNumber, item.volumeName);
+          const isCostVolume = artifactTypeByVolKey.get(vkey) === 'cost';
+          const isChosenCostItem = isCostVolume && costWorkbookItem.get(vkey) === item.itemNumber;
           let templateDoc: CanvasDocument | null = null;
           if (item.templateId) {
-            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
-            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) templateDoc = tpl.canvasDocument;
+            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null; templateType: string | null }[]>`
+              SELECT canvas_document, template_type FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
+            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
+              // The COMPUTED workbook must not be silently displaced on the data-bearing cost
+              // item by a non-cost mold (a slide deck linked by mistake would drop the priced
+              // roll-up for the whole volume). A cost-typed mold is an explicit admin override.
+              if (isChosenCostItem && !/cost|budget|spreadsheet|price/i.test(tpl.templateType ?? '')) {
+                console.error('[provision-proposal] linked mold on the cost data item is not cost-typed — using the computed workbook', { itemName: item.itemName, templateId: item.templateId, templateType: tpl.templateType });
+              } else {
+                templateDoc = tpl.canvasDocument;
+              }
+            } else {
+              // Linked but unusable (missing/RLS-invisible/empty body): fall through — but LOUDLY,
+              // this is an authored mold the buyer will not receive.
+              console.error('[provision-proposal] linked mold unusable (missing, invisible, or empty) — falling back', { itemName: item.itemName, templateId: item.templateId });
+            }
           }
           // Universal cost volume: the cost item (DoW / NSF / DOE / BAA / OTA — not just DoD SBIR) gets a
           // COMPUTED workbook, rendered in the common budget FORM the opportunity requires (DoD burden
           // waterfall · SF-424A federal grant · OTF state budget), taking precedence over the narrative
           // templates. Exactly the data-bearing item per cost volume (picked above); prose siblings stay empty.
-          if (!templateDoc) {
-            const vkey = volKey(item.volumeNumber, item.volumeName);
-            if (artifactTypeByVolKey.get(vkey) === 'cost' && costWorkbookItem.get(vkey) === item.itemNumber) {
-              const form = resolveCostForm({ agency: t.agency, program: programType, volumeName: item.volumeName });
-              templateDoc = buildCostVolume(form, {
-                title: item.itemName, agency: t.agency, program: workshareProgram,
-                companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
-                proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
-                ceiling: costCeiling, personnelMaxPct: personnelMax, costShareAllowed,
-              });
-            }
+          if (!templateDoc && isChosenCostItem) {
+            const form = resolveCostForm({
+              agency: t.agency, program: programType, volumeName: item.volumeName,
+              volumeFormat: ((resolved.compliance as Record<string, unknown>)?.costVolumeFormat as string) ?? null,
+            });
+            templateDoc = buildCostVolume(form, {
+              title: item.itemName, agency: t.agency, program: workshareProgram,
+              companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
+              proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
+              ceiling: costCeiling, personnelMaxPct: personnelMax, costShareAllowed,
+            });
           }
-          if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k); }
+          // Registry fallback — but never hand a SECOND, statically-seeded cost sheet to a
+          // non-chosen spreadsheet item in a cost volume (two inconsistent cost sheets in one xlsx).
+          if (!templateDoc && !(isCostVolume && !isChosenCostItem && item.itemType === 'spreadsheet')) {
+            const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k);
+          }
           if (templateDoc) {
+            // Older/API-created molds may lack a metadata object — stamping into undefined
+            // would throw inside the provision transaction and fail the whole release.
+            templateDoc.metadata = { ...(templateDoc.metadata ?? {}) } as CanvasDocument['metadata'];
             templateDoc.metadata.proposal_id = p.id;
             templateDoc.metadata.solicitation_id = t.solicitationId ?? '';
             templateDoc.metadata.created_at = new Date().toISOString();
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = actorId;
             templateDoc.document_id = section.id;
+            // The ITEM's own limits are provision truth — stamp them onto the canvas so the
+            // editor gauge and the export floor read the per-item cap, not the mold's default.
+            const canv = (templateDoc as unknown as { canvas?: { format?: string; max_pages?: number | null; max_slides?: number | null } }).canvas;
+            if (canv) {
+              const isSlideCanvas = /slide/i.test(canv.format ?? '');
+              if (item.pageLimit != null && !isSlideCanvas) canv.max_pages = item.pageLimit;
+              if (item.slideLimit != null && isSlideCanvas) canv.max_slides = item.slideLimit;
+            }
             const interpolated = interpolateTemplate(templateDoc, templateVariables);
-            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(interpolated)}, status = 'ai_drafted' WHERE id = ${section.id}`;
+            // content_source='template': marks the canvas as PROVISIONED (mold/workbook/registry)
+            // so the async V0 drafter treats it like human content and never clobbers it.
+            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(interpolated)}, status = 'ai_drafted', content_source = 'template' WHERE id = ${section.id}`;
+          } else if (item.itemType === 'slide_deck') {
+            // Blank slide item (no mold, no registry deck): provision an EMPTY slide-family
+            // envelope so the editor and the async drafter author it as a deck, not a letter
+            // doc. Status stays 'empty' — this is geometry, not content.
+            const nowIso = new Date().toISOString();
+            const envelope = {
+              document_id: section.id, nodes: [],
+              canvas: {
+                format: 'slide_16_9', width: 960, height: 540,
+                margins: { top: 36, right: 36, bottom: 36, left: 36 },
+                header: null, footer: null,
+                font_default: { family: 'Arial', size: 18 }, line_spacing: 1.1,
+                max_pages: null, max_slides: item.slideLimit ?? null,
+              },
+              metadata: {
+                title: item.itemName, proposal_id: p.id, solicitation_id: t.solicitationId ?? '',
+                created_at: nowIso, last_modified_at: nowIso, last_modified_by: actorId,
+              },
+            };
+            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(envelope)} WHERE id = ${section.id}`;
           }
           count++;
         }

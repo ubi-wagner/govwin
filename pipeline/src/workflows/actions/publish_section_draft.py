@@ -95,6 +95,14 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     if row["content_source"] == "human_edit":
         log.info("publish_section_draft: section %s carries a human edit (content_source=human_edit) — leaving it alone", section_id)
         return {"published": False, "skipped": True, "reason": "human_edited"}
+    # PROVISIONED MOLD guard: provisioning stamps content_source='template' on sections it fills
+    # with an admin-authored mold, the computed cost workbook, or a registry template — all
+    # status='ai_drafted', which the landable set would otherwise admit. Those canvases ARE the
+    # intended V0 (a slide deck skeleton, a priced workbook); overwriting one with a 1-node
+    # letter strawman destroys admin-authored structure seconds after release. Leave them alone.
+    if row["content_source"] == "template":
+        log.info("publish_section_draft: section %s is provisioned from a mold (content_source=template) — leaving it alone", section_id)
+        return {"published": False, "skipped": True, "reason": "template_provisioned"}
 
     # canvas_versions.content is jsonb NOT NULL. A str must be valid JSON text; a bare
     # plain-text string would fail the jsonb bind (invalid input syntax for type json).

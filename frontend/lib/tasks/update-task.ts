@@ -10,6 +10,7 @@
  * RLS-forced). Single-fact audit (capture:task.reassigned / task.rescheduled).
  */
 import { sql } from '@/lib/db';
+import { isRole } from '@/lib/rbac';
 import { runInTenant } from '@/lib/tenant-context';
 import { emitEventSingle, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
@@ -52,7 +53,13 @@ export async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResu
         if (!m) return { ok: false, error: 'the assignee is not an active member of this tenant', code: 'VALIDATION_ERROR', status: 422 };
         newUserId = input.assigneeUserId; newRole = null;
       } else {
-        newUserId = null; newRole = input.assigneeRole ?? 'tenant_user';
+        // A typo'd role would match no queue bucket and no nudge branch — the ToDo vanishes
+        // from every surface while still blocking the stage gate. Validate like createTask.
+        const candidate = input.assigneeRole ?? 'tenant_user';
+        if (!isRole(candidate)) {
+          return { ok: false, error: `invalid assignee role: ${candidate}`, code: 'VALIDATION_ERROR', status: 422 };
+        }
+        newUserId = null; newRole = candidate;
       }
       await sql`UPDATE tasks SET assignee_user_id = ${newUserId}, assignee_role = ${newRole}
                 WHERE tenant_id = ${tenantId}::uuid AND id = ${taskId}::uuid AND status IN ('open','in_progress')`;
@@ -61,6 +68,10 @@ export async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResu
 
     if (input.dueAt !== undefined || input.nudgeSchedule !== undefined) {
       if (input.dueAt !== undefined) {
+        // An unparseable string would throw in Postgres → a generic 500 instead of a 422.
+        if (input.dueAt !== null && Number.isNaN(new Date(input.dueAt).getTime())) {
+          return { ok: false, error: 'invalid dueAt (must be an ISO date or null)', code: 'VALIDATION_ERROR', status: 422 };
+        }
         await sql`UPDATE tasks SET due_at = ${input.dueAt}
                   WHERE tenant_id = ${tenantId}::uuid AND id = ${taskId}::uuid AND status IN ('open','in_progress')`;
       }

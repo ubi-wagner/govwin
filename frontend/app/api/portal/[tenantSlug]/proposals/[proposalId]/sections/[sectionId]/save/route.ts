@@ -146,11 +146,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; meta: unknown } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null }[]>`
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; meta: unknown }[]>`
         SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
-               ps.content_source AS "contentSource",
+               ps.content_source AS "contentSource", ps.meta,
                pa.compliance_spec
         FROM proposal_sections ps
         LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
@@ -227,6 +227,10 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
       // Archive even on first save (null content) to record the empty state
       const contentToArchive = currentContent ?? '{}';
+      // The archived content's AI provenance is the PREVIOUS save's (stashed in meta.lastEdit) —
+      // the incoming body's aiInstruction/aiModel describe the NEW content, which will be archived
+      // (with these values) by the NEXT save. Without the stash they were parsed and discarded.
+      const prevEdit = ((section.meta as { lastEdit?: { aiInstruction?: string | null; aiModel?: string | null; editSummary?: string | null } } | null)?.lastEdit) ?? {};
       // canvas_versions.content is jsonb: write the PARSED object via sql.json, NOT ${string}::jsonb
       // — the latter double-encodes to a jsonb STRING scalar, so the Version History preview renders
       // raw JSON instead of the node text (CLIFFNOTES §4b jsonb bug-class; the admin route is correct).
@@ -246,9 +250,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
             ${sessionUser.id}::uuid,
             ${archiveCharCount},
             ${archiveWordCount},
-            ${null},
-            ${null},
-            ${null}
+            ${prevEdit.aiInstruction ?? null},
+            ${prevEdit.aiModel ?? null},
+            ${prevEdit.editSummary ?? null}
           )
           ON CONFLICT (section_id, version_number) DO NOTHING
         `;
@@ -310,6 +314,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               status = ${effectiveStatus},
               version = ${nextVersion},
               content_source = ${contentSource},
+              meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{lastEdit}', ${sql.json({ aiInstruction, aiModel, editSummary })}::jsonb),
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -323,6 +328,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           SET content = ${contentJson},
               version = ${nextVersion},
               content_source = ${contentSource},
+              meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{lastEdit}', ${sql.json({ aiInstruction, aiModel, editSummary })}::jsonb),
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
