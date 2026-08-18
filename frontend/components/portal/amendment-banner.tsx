@@ -21,6 +21,8 @@ interface Flag {
   severity: 'critical' | 'major' | 'minor' | 'info';
   complianceDelta: DeltaItem[];
   detectedAt: string;
+  documentId: string | null;
+  documentFilename: string | null;
 }
 
 const sevTone: Record<string, string> = {
@@ -90,6 +92,21 @@ export function AmendmentBanner({
     [tenantSlug, proposalId],
   );
 
+  // The amendment's announcing document (flag-gated signed URL) — open in a new tab.
+  const openDocument = useCallback(async (amendmentId: string) => {
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/amendments/${amendmentId}/document`);
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.data?.url) {
+        setErr(j?.error || 'Could not open the amendment document');
+        return;
+      }
+      window.open(j.data.url as string, '_blank', 'noopener');
+    } catch {
+      setErr('Could not open the amendment document');
+    }
+  }, [tenantSlug, proposalId]);
+
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -121,6 +138,14 @@ export function AmendmentBanner({
                   <span className="text-sm font-medium text-gray-900">{f.label}</span>
                 </div>
                 <p className="text-xs text-gray-600 mt-1">{f.summary}</p>
+                {f.documentFilename && (
+                  <button
+                    onClick={() => { void openDocument(f.amendmentId); }}
+                    className="text-[11px] text-indigo-600 hover:underline mt-1 block"
+                  >
+                    📎 Open {f.documentFilename}
+                  </button>
+                )}
                 {f.complianceDelta.length > 0 && (
                   <button onClick={() => toggle(f.flagId)} className="text-[11px] text-indigo-600 hover:underline mt-1">
                     {expanded.has(f.flagId) ? 'Hide' : 'Show'} {f.complianceDelta.length} compliance change{f.complianceDelta.length > 1 ? 's' : ''}

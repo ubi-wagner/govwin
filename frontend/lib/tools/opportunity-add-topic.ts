@@ -19,6 +19,7 @@ import { sql } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { activateLateTopicIfReady, type LateTopicResult } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -43,6 +44,9 @@ interface Output {
   topicId: string;
   solicitationId: string;
   topicNumber: string;
+  /** Set when the parent solicitation was already pushed: whether this late topic
+   *  reached the bridge now, or why not (e.g. needs_close_date). */
+  lateRelease?: LateTopicResult;
 }
 
 export const opportunityAddTopicTool = defineTool<Input, Output>({
@@ -180,6 +184,14 @@ export const opportunityAddTopicTool = defineTool<Input, Output>({
       topicNumber,
     });
 
-    return { topicId, solicitationId, topicNumber };
+    // A topic added to an ALREADY-PUSHED solicitation would otherwise never reach a
+    // tenant (push cannot re-run; republish no-ops on a bridge-less opp). Release it
+    // now if it is date-complete; otherwise it stays off the bridge until a close
+    // date lands (mig-128 date guard) — surfaced via lateRelease for the UI.
+    const lateRelease = await activateLateTopicIfReady(topicId, {
+      id: actorId, email: ctx.actor.email ?? null,
+    });
+
+    return { topicId, solicitationId, topicNumber, lateRelease };
   },
 });

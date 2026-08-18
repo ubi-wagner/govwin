@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { randomUUID } from 'crypto';
 import type { Role } from '@/lib/rbac';
 
@@ -279,7 +280,13 @@ export async function PUT(request: Request, ctx: RouteContext) {
       // non-fatal, continue
     }
 
-    return NextResponse.json({ data: { topicId, saved: true } });
+    // A topic override changes THAT topic's card snapshot only — scope the republish
+    // to the topic opp (no-op if the topic was never released).
+    const propagation = await republishSolicitationCards({
+      solicitationId: solId, opportunityId: topicId, actorId: authResult.user.id ?? null,
+    });
+
+    return NextResponse.json({ data: { topicId, saved: true, propagation } });
   } catch (err) {
     console.error('[topic-compliance] PUT failed:', err);
     return NextResponse.json(
@@ -342,7 +349,12 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       // non-fatal, continue
     }
 
-    return NextResponse.json({ data: { topicId, cleared: true } });
+    // Reverting to baseline changes the topic card's resolved compliance — refresh it.
+    const propagation = await republishSolicitationCards({
+      solicitationId: solId, opportunityId: topicId, actorId: authResult.user.id ?? null,
+    });
+
+    return NextResponse.json({ data: { topicId, cleared: true, propagation } });
   } catch (err) {
     console.error('[topic-compliance] DELETE failed:', err);
     return NextResponse.json(

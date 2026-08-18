@@ -19,6 +19,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import type { Role } from '@/lib/rbac';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -368,8 +369,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       result: { applied: topicIds.length, topicIds },
     });
 
+    // Preset application rewrites each topic's compliance + volumes wholesale —
+    // refresh those topics' pushed mirror cards (no-op for unreleased topics).
+    let cardsRefreshed = 0;
+    for (const tid of topicIds) {
+      const p = await republishSolicitationCards({ solicitationId: solId, opportunityId: tid, actorId: user.id ?? null });
+      cardsRefreshed += p.cardsRefreshed;
+    }
+
     return NextResponse.json({
-      data: { applied: topicIds.length, topicIds },
+      data: { applied: topicIds.length, topicIds, propagation: { cardsRefreshed } },
     });
   } catch (err) {
     console.error('[apply-preset] apply failed:', err);

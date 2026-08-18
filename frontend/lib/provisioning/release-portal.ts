@@ -20,6 +20,7 @@ import { linkPortalProposal, releaseFromCuration } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, type GuardrailConfig } from '@/lib/portal-workflow';
 import { createTask } from '@/lib/tasks/tasks';
 import { emitEventSingle } from '@/lib/events';
+import { replayConfirmedAmendments } from '@/lib/amendments';
 import type { Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 
@@ -98,6 +99,30 @@ export async function provisionAndReleasePortal(opts: {
   // Build is ready + linked — NOW flip live (CAS on curation_pending). 409 if not awaiting curation.
   const { released } = await releaseFromCuration(tenantId, portalId, config, { releasedBy: actor.id });
   if (!released) return { ok: false, error: 'Portal is not awaiting curation (already released?)', code: 'CONFLICT', status: 409 };
+
+  // Mid-window amendment replay: an amendment confirmed BETWEEN purchase and this release
+  // fanned out to zero flags for this buyer — no proposals row existed yet, and nothing
+  // back-filled it. Flag every confirmed amendment onto the fresh proposal now so the
+  // portal opens with the banner + bell, exactly as if it had been provisioned first.
+  // Tenant-scoped (runInTenant) + best-effort: a replay failure never wedges the release.
+  if (proposalId) {
+    try {
+      const pid = proposalId;
+      const [pr] = await withTenant(tenantId, async (tx) =>
+        tx<Array<{ solicitationId: string | null }>>`
+          SELECT solicitation_id AS "solicitationId" FROM proposals
+          WHERE tenant_id = ${tenantId}::uuid AND id = ${pid}::uuid LIMIT 1`);
+      if (pr?.solicitationId) {
+        const solicitationId = pr.solicitationId;
+        await runInTenant(tenantId, () => replayConfirmedAmendments({
+          solicitationId, proposalId: pid, tenantId,
+          actorId: actor.id, actorEmail: actor.email ?? null,
+        }));
+      }
+    } catch (e) {
+      console.error('[provisionAndReleasePortal] amendment replay failed (non-fatal)', e);
+    }
+  }
 
   // Workflow ToDos are best-effort (re-creatable) — they never wedge an already-launched portal.
   let tasksCreated = 0;

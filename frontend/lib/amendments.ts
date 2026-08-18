@@ -13,6 +13,7 @@
  */
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import type { Role } from '@/lib/rbac';
 
 export type AmendmentSeverity = 'critical' | 'major' | 'minor' | 'info';
@@ -41,7 +42,9 @@ interface Actor {
   role: Role;
 }
 
-/** Admin logs a detected amendment (status='detected'). Advisory — no fan-out yet. */
+/** Admin logs a detected amendment (status='detected'). Advisory — no fan-out yet.
+ *  `documentId` (mig 190) links the announcing document so tenants can OPEN the
+ *  amendment they are told about, not just read a prose summary of it. */
 export async function logAmendment(
   p: Actor & {
     solicitationId: string;
@@ -50,13 +53,15 @@ export async function logAmendment(
     complianceDelta: ComplianceDeltaItem[];
     severity: AmendmentSeverity;
     source?: 'manual' | 'amendment_monitor';
+    documentId?: string | null;
   },
 ): Promise<{ id: string }> {
   const [row] = await sql<{ id: string }[]>`
     INSERT INTO solicitation_amendments
-      (solicitation_id, label, summary, compliance_delta, severity, source, status, detected_by)
+      (solicitation_id, label, summary, compliance_delta, severity, source, status, detected_by, document_id)
     VALUES (${p.solicitationId}::uuid, ${p.label}, ${p.summary},
-            ${sql.json(p.complianceDelta as unknown as Parameters<typeof sql.json>[0])}, ${p.severity}, ${p.source ?? 'manual'}, 'detected', ${p.actorId}::uuid)
+            ${sql.json(p.complianceDelta as unknown as Parameters<typeof sql.json>[0])}, ${p.severity}, ${p.source ?? 'manual'}, 'detected', ${p.actorId}::uuid,
+            ${p.documentId ?? null}::uuid)
     RETURNING id
   `;
   const payload = { amendmentId: row.id, solicitationId: p.solicitationId, severity: p.severity, label: p.label };
@@ -121,7 +126,57 @@ export async function confirmAmendment(
     });
   }
 
+  // Mirror-card reach: the proposal flags above only land for tenants who already HAVE a
+  // provisioned proposal — the pre-purchase/mid-window audience (pinned holders, pending
+  // buyers) hears about it through a bridge republish (pin_update_available + the watched-opp
+  // notification). Pre-release amendments for a not-yet-provisioned buyer are additionally
+  // REPLAYED at provision time (replayConfirmedAmendments, called by release-portal).
+  await republishSolicitationCards({ solicitationId: p.solicitationId, actorId: p.actorId });
+
   return { confirmed: true, flagged: flagged.length, tenants: tenantIds.length };
+}
+
+/**
+ * Provision-time replay (the mid-window hole, mig 190 cycle): amendments confirmed BETWEEN
+ * purchase and release fanned out to zero flags for that buyer — no proposals row existed
+ * yet. Called after a proposal is created so the fresh portal opens with every confirmed
+ * amendment flagged + a bell notification, exactly as if it had been provisioned first.
+ * Idempotent per (amendment, proposal); best-effort by contract (a replay failure must not
+ * fail the release — the banner reconciles on the next confirm).
+ */
+export async function replayConfirmedAmendments(p: {
+  solicitationId: string;
+  proposalId: string;
+  tenantId: string;
+  actorId: string;
+  actorEmail?: string | null;
+}): Promise<{ replayed: number }> {
+  try {
+    const flagged = await sql<{ amendmentId: string }[]>`
+      INSERT INTO proposal_amendment_flags (amendment_id, proposal_id, tenant_id)
+      SELECT a.id, ${p.proposalId}::uuid, ${p.tenantId}::uuid
+      FROM solicitation_amendments a
+      WHERE a.solicitation_id = ${p.solicitationId}::uuid AND a.status = 'confirmed'
+      ON CONFLICT (amendment_id, proposal_id) DO NOTHING
+      RETURNING amendment_id AS "amendmentId"
+    `;
+    if (flagged.length > 0) {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'amendment.flagged',
+        actor: userActor(p.actorId, p.actorEmail ?? undefined),
+        tenantId: p.tenantId,
+        payload: {
+          solicitationId: p.solicitationId, proposalId: p.proposalId,
+          proposalCount: 1, replayedAtProvision: true, amendmentCount: flagged.length,
+        },
+      });
+    }
+    return { replayed: flagged.length };
+  } catch (e) {
+    console.error('[amendments] provision replay failed (non-fatal)', p.proposalId, e);
+    return { replayed: 0 };
+  }
 }
 
 /** Admin dismisses a false-positive amendment (status='dismissed'). No fan-out. */

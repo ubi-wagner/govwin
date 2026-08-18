@@ -7,6 +7,7 @@ import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -94,6 +95,17 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
       actor: { type: 'user', id: ctx.actor.id, email: ctx.actor.email ?? undefined },
       payload: { correlationId: randomUUID(), itemId: input.itemId, volumeId: rows[0].volumeId },
     });
+
+    // Refresh pushed mirrors — item compliance (limits/molds/notes) is provision truth.
+    try {
+      const [vol] = await sql<{ solicitationId: string; topicId: string | null }[]>`
+        SELECT solicitation_id, topic_id FROM solicitation_volumes WHERE id = ${rows[0].volumeId}::uuid`;
+      if (vol) {
+        await republishSolicitationCards({
+          solicitationId: vol.solicitationId, opportunityId: vol.topicId, actorId: ctx.actor.id,
+        });
+      }
+    } catch (e) { console.error('[volume.update_required_item] republish lookup failed (non-fatal)', e); }
 
     return { itemId: input.itemId, updated: true as const };
   },

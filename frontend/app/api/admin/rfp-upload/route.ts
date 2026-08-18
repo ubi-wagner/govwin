@@ -38,6 +38,7 @@ import { auth } from '@/auth';
 import { sqlBypass as sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
@@ -610,6 +611,14 @@ export async function POST(request: Request) {
     },
   });
 
+  // Attach-to-existing on a PUSHED solicitation: bump the bridge so pinned mirror
+  // cards flip pin_update_available — the tenant's resync then re-copies the doc
+  // set, which is how a late attachment actually reaches a customer. No-op pre-push.
+  let propagation: Awaited<ReturnType<typeof republishSolicitationCards>> | undefined;
+  if (existingSolId) {
+    propagation = await republishSolicitationCards({ solicitationId: solId, actorId: userId ?? null });
+  }
+
   return NextResponse.json(
     {
       data: {
@@ -619,6 +628,7 @@ export async function POST(request: Request) {
         total_bytes: totalBytes,
         text_extracted: extractedText !== null,
         topics_found: topicsExtracted,
+        ...(propagation ? { propagation } : {}),
       },
     },
     { status: 201 },

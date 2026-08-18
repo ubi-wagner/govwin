@@ -60,9 +60,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       rows = await sql`
         SELECT f.id AS "flagId", f.acknowledged_at AS "acknowledgedAt",
                a.id AS "amendmentId", a.label, a.summary, a.severity,
-               a.compliance_delta AS "complianceDelta", a.detected_at AS "detectedAt"
+               a.compliance_delta AS "complianceDelta", a.detected_at AS "detectedAt",
+               a.document_id AS "documentId", d.original_filename AS "documentFilename"
         FROM proposal_amendment_flags f
         JOIN solicitation_amendments a ON a.id = f.amendment_id
+        LEFT JOIN solicitation_documents d ON d.id = a.document_id
         WHERE f.proposal_id = ${proposalId}::uuid AND f.tenant_id = ${tenantId}::uuid
         ORDER BY a.detected_at DESC
       `;

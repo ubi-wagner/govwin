@@ -161,7 +161,9 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
              sc.id AS comp_id,
              CASE
                WHEN sc.id IS NULL THEN NULL
-               ELSE sc.custom_variables->${variableName}
+               -- ::text disambiguates the parameter for the -> operator (jsonb->text vs
+               -- jsonb->int) — an untyped $n here is a 42P18 parse error on EVERY call.
+               ELSE sc.custom_variables->${variableName}::text
              END AS prior_json
       FROM curated_solicitations cs
       LEFT JOIN solicitation_compliance sc ON sc.solicitation_id = cs.id
@@ -213,7 +215,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
             (solicitation_id, custom_variables, verified_by, verified_at)
           VALUES
             (${solicitationId}::uuid,
-             jsonb_build_object(${variableName}, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
+             jsonb_build_object(${variableName}::text, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
              ${actorId}::uuid, now())
           RETURNING verified_at
         `;
@@ -222,7 +224,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
         const rows = await sql<{ verifiedAt: Date }[]>`
           UPDATE solicitation_compliance
           SET custom_variables = COALESCE(custom_variables, '{}'::jsonb)
-                                 || jsonb_build_object(${variableName}, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
+                                 || jsonb_build_object(${variableName}::text, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
               verified_by = ${actorId}::uuid,
               verified_at = now(),
               updated_at = now()

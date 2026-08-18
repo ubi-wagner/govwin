@@ -8,6 +8,7 @@ import { sql } from '@/lib/db';
 import { ConflictError, NotFoundError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -46,10 +47,10 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    let vol: { solicitationId: string }[];
+    let vol: { solicitationId: string; topicId: string | null }[];
     try {
-      vol = await sql<{ solicitationId: string }[]>`
-        SELECT solicitation_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
+      vol = await sql<{ solicitationId: string; topicId: string | null }[]>`
+        SELECT solicitation_id, topic_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
       `;
     } catch (err) {
       console.error('[volume.add_required_item] volume lookup failed:', err);
@@ -105,6 +106,12 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
         itemId: rows[0].id,
         itemName: input.itemName,
       },
+    });
+
+    // Required-item structure drives build readiness + the provisioned skeleton —
+    // refresh pushed mirrors so provisionReady truth doesn't silently diverge.
+    await republishSolicitationCards({
+      solicitationId: vol[0].solicitationId, opportunityId: vol[0].topicId, actorId: ctx.actor.id,
     });
 
     return { itemId: rows[0].id, volumeId: input.volumeId };

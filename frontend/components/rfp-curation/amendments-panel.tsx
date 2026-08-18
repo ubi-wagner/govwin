@@ -20,9 +20,12 @@ interface Amendment {
   status: 'detected' | 'confirmed' | 'dismissed';
   detectedAt: string;
   reviewedAt: string | null;
+  documentId: string | null;
+  documentFilename: string | null;
   flagged: number;
   acknowledged: number;
 }
+interface SolDoc { id: string; originalFilename: string; documentType: string }
 
 const sevTone: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
@@ -47,8 +50,26 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
   const [summary, setSummary] = useState('');
   const [severity, setSeverity] = useState<Amendment['severity']>('major');
   const [delta, setDelta] = useState<DeltaItem[]>([]);
+  // Optional announcing document (mig 190): attach the file via the Documents section
+  // (type "Amendment"), then link it here so tenants can OPEN what they're told about.
+  const [docId, setDocId] = useState('');
+  const [docs, setDocs] = useState<SolDoc[]>([]);
 
   const base = `/api/admin/rfp-curation/${solId}/amendments`;
+
+  // Lazy-load the solicitation's documents the first time the form opens.
+  useEffect(() => {
+    if (!showForm || docs.length > 0) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/rfp-curation/${solId}`);
+        if (!res.ok) return;
+        const j = await res.json().catch(() => null);
+        const list = (j?.data?.documents ?? []) as Array<{ id: string; originalFilename: string; documentType: string }>;
+        setDocs(list.map((d) => ({ id: d.id, originalFilename: d.originalFilename, documentType: d.documentType })));
+      } catch { /* select stays empty */ }
+    })();
+  }, [showForm, docs.length, solId]);
 
   const load = useCallback(async () => {
     try {
@@ -76,7 +97,11 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
       const res = await fetch(base, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: label.trim(), summary: summary.trim(), severity, complianceDelta: delta.filter((d) => d.requirement.trim()) }),
+        body: JSON.stringify({
+          label: label.trim(), summary: summary.trim(), severity,
+          complianceDelta: delta.filter((d) => d.requirement.trim()),
+          ...(docId ? { documentId: docId } : {}),
+        }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -87,6 +112,7 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
       setSummary('');
       setSeverity('major');
       setDelta([]);
+      setDocId('');
       setShowForm(false);
       setMsg({ type: 'success', text: 'Amendment logged. Confirm it to notify affected tenants.' });
       await load();
@@ -95,7 +121,7 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
     } finally {
       setBusy(false);
     }
-  }, [base, label, summary, severity, delta, load]);
+  }, [base, label, summary, severity, delta, docId, load]);
 
   const act = useCallback(
     async (id: string, action: 'confirm' | 'dismiss') => {
@@ -187,6 +213,20 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
             ))}
             <button onClick={addDeltaRow} className="text-[11px] text-indigo-600 hover:underline">+ add compliance change</button>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] text-gray-500 shrink-0">Announcing document</label>
+            <select
+              value={docId}
+              onChange={(e) => setDocId(e.target.value)}
+              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              title="Link the document that announced this change (upload it first via Source Documents, type 'Amendment') so tenants can open it from their banner"
+            >
+              <option value="">— none —</option>
+              {docs.map((d) => (
+                <option key={d.id} value={d.id}>{d.originalFilename} ({d.documentType})</option>
+              ))}
+            </select>
+          </div>
           <div className="flex justify-end">
             <button onClick={submit} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50">
               {busy ? 'Saving…' : 'Log amendment'}
@@ -212,6 +252,9 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-1">{a.summary}</p>
+                  {a.documentFilename && (
+                    <p className="text-[11px] text-gray-500 mt-0.5">📎 {a.documentFilename}</p>
+                  )}
                   {a.complianceDelta.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {a.complianceDelta.map((d, i) => (

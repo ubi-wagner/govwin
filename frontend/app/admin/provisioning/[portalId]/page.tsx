@@ -13,6 +13,7 @@ import { redirect, notFound } from 'next/navigation';
 import { sqlBypass as sql } from '@/lib/db';
 import { getBuildReadiness } from '@/lib/provisioning/readiness';
 import { ReleasePanel, SlaCountdown } from './release-panel';
+import { CurationNotesPanel } from '@/components/rfp-curation/curation-notes-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,6 +169,10 @@ export default async function ProvisioningCockpitPage({ params }: Props) {
               overlays={overlays}
             />
           )}
+
+          {/* The 72h-window conversation lives ON the record (mig 190) — same thread as the
+              curation workspace, so "waiting on instructions" notes follow the OPP, not an inbox. */}
+          {solId ? <CurationNotesPanel solId={solId} compact /> : null}
         </div>
       </div>
     </div>

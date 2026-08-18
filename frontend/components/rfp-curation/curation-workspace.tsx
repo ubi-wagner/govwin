@@ -16,6 +16,7 @@ import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
 import AnnotationAtomizeRail from './annotation-atomize-rail';
 import { AmendmentsPanel } from './amendments-panel';
+import { CurationNotesPanel } from './curation-notes-panel';
 import { IngestPlanPanel } from './ingest-plan-panel';
 import { IngestStudio } from './ingest-studio';
 
@@ -201,6 +202,28 @@ export function CurationWorkspace({
   const [assistBusy, setAssistBusy] = useState(false);
   const [assessBusy, setAssessBusy] = useState(false);
   const [shredBusy, setShredBusy] = useState(false);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+
+  // Explicit "push an update to tenants" for a LIVE (pushed) solicitation. Content edits
+  // auto-propagate; this is the manual lever — after a bulk session, or to force pinned
+  // holders' update nudge right now.
+  const handleBroadcast = async () => {
+    setBroadcastBusy(true);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${sol.id}/broadcast`, { method: 'POST' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(j?.error ?? 'Broadcast failed');
+        return;
+      }
+      const d = j?.data ?? {};
+      toast.success(`Update broadcast — ${d.republished ?? 0} card version(s), ${d.cardsRefreshed ?? 0} tenant card(s) refreshed`);
+    } catch {
+      toast.error('Broadcast failed');
+    } finally {
+      setBroadcastBusy(false);
+    }
+  };
   const [shredReport, setShredReport] = useState<ShredAuditReport | null>(null);
   const [assessment, setAssessment] = useState<{
     stage: string;
@@ -879,8 +902,25 @@ export function CurationWorkspace({
           }`}>
             {sol.status.replace(/_/g, ' ')}
           </span>
+          {sol.status === 'pushed_to_pipeline' && (
+            <button
+              onClick={() => { void handleBroadcast(); }}
+              disabled={broadcastBusy}
+              title="Re-publish this OPP's cards to every tenant now. Edits here already propagate automatically — use this after a bulk session, or to fire pinned holders' update nudge immediately."
+              className="px-3 py-1.5 text-sm font-medium rounded border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-50 disabled:opacity-50"
+            >
+              {broadcastBusy ? 'Broadcasting…' : '📡 Broadcast update'}
+            </button>
+          )}
         </div>
       </div>
+      {sol.status === 'pushed_to_pipeline' && (
+        <p className="-mt-4 mb-4 text-xs text-emerald-700">
+          Live to tenants — summary, compliance, volume and attachment changes propagate to
+          customer mirror cards automatically. Log an amendment for compliance-affecting changes
+          so buyers with live builds are formally notified.
+        </p>
+      )}
 
       {/* Shred-completeness readout (advisory — from Shred audit) */}
       {shredReport && (
@@ -964,6 +1004,11 @@ export function CurationWorkspace({
       {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
       <div className="mb-4">
         <AmendmentsPanel solId={sol.id} />
+      </div>
+
+      {/* Curation notes — the internal margin (mig 190): survives push, never customer-visible */}
+      <div className="mb-4">
+        <CurationNotesPanel solId={sol.id} compact />
       </div>
 
       {/* Quick-nav tabs */}

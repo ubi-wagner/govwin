@@ -25,6 +25,7 @@ import type { JSONValue } from 'postgres';
 import { coerceJsonb } from '@/lib/jsonb';
 import { auditProvenance, type ProvenanceAudit } from './provenance-audit';
 import { materializeSkeleton, type MaterializeResult } from './materialize';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import type { ParsedSolicitation } from './skeleton';
 
 /** Phases of the Ingest Studio state machine (curated_solicitations.ingest_phase, mig 189). */
@@ -229,6 +230,12 @@ export async function landSkeleton(
       publish: opts.publish ?? false,
       nowIso: opts.nowIso,
     });
+    // A land on a PUSHED solicitation rewrites the compliance the tenant mirrors
+    // summarize — refresh their cards (no-op pre-push; materialize's own `publish`
+    // path already fanned 'published' versions for the first-release case).
+    if (!opts.publish) {
+      await republishSolicitationCards({ solicitationId, actorId: opts.userId ?? null });
+    }
     return { ...result, draftId: draft.id };
   } catch (e) {
     // The claim without the write would be a draft that says "landed" over a matrix that never
