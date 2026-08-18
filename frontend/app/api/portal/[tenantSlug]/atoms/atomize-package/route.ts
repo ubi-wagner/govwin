@@ -12,11 +12,14 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
+import { classifyDsipSidecar } from '@/lib/library/dsip-deconstruct';
 import type { CreatorKind } from '@/lib/atoms';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
+  // Hoisted so the outer catch can close the process bracket (never a dangling start).
+  let startId: string | null = null;
   try {
     const { tenantSlug } = await params;
     const session = await auth();
@@ -77,18 +80,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     // Full start/end pattern (docs/EVENT_CONTRACT.md): the package atomization is a
     // multi-step PROCESS — bracket it; per-file deconstructs audit as intrastep singles;
     // the librarian hop rides agent_task_queue (terminal-phase consumers are unaffected).
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'library', type: 'package.atomized',
       actor: userActor(u.id, u.email ?? undefined), tenantId,
       payload: { files: files.length, packageName: packageName || null, docType: docType ?? null },
     });
 
+    // DSIP package ordering: the merged Full_Proposal goes FIRST so its cocoon becomes the
+    // shared past-proposal UUID; every filename-classified sidecar then JOINS that cocoon
+    // with its deterministic volume tag (SBC→V1, Budget/Addt_Cost→V3, CCR→V4, certs→V5,
+    // FWA→V6) instead of minting its own package.
+    const isDsipPackage = (docType ?? '').toLowerCase() === 'past_proposal';
+    const ordered = isDsipPackage
+      ? [...files].sort((a, b) => Number(/full_proposal/i.test(b.name)) - Number(/full_proposal/i.test(a.name)))
+      : files;
+    let packageCocoonId: string | null = null;
+
     const docs = [];
     let totalAtoms = 0;
-    for (const file of files) {
+    for (const file of ordered) {
       if (file.size > MAX_FILE_BYTES) { docs.push({ file: file.name, format: '', atoms: 0, cocoonId: null, error: 'file too large (25MB max)' }); continue; }
       const buffer = Buffer.from(await file.arrayBuffer());
-      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, packageName, ctxTags, actor, docType });
+      const volHint = isDsipPackage ? classifyDsipSidecar(file.name) : null;
+      const r = await atomizeDocumentIntoLibrary(tenantId, {
+        buffer, filename: file.name, packageName, ctxTags, actor, docType,
+        sharedCocoonId: isDsipPackage ? packageCocoonId : null,
+        volHint,
+      });
+      if (isDsipPackage && !packageCocoonId && r.cocoonId) packageCocoonId = r.cocoonId;
       totalAtoms += r.atoms;
       docs.push(r);
     }
@@ -143,6 +162,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     });
   } catch (err) {
     console.error('[atomize-package] error', err);
+    if (startId) {
+      try { await emitEventEnd(startId, { error: { message: 'package atomization failed', code: 'DB_ERROR' } }); } catch { /* never dangle */ }
+    }
     return NextResponse.json({ error: 'Package atomization failed', code: 'DB_ERROR' }, { status: 500 });
   }
 }

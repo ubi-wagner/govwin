@@ -8,7 +8,7 @@
  * DECLARED past proposal needs only 2; (5) offsets map blocks to their volume.
  */
 import { describe, expect, it } from 'vitest';
-import { detectDsipProposal, volumeOfOffset, detectDsipFromBlocks, volumeOfBlock } from '@/lib/library/dsip-deconstruct';
+import { detectDsipProposal, volumeOfOffset, detectDsipFromBlocks, volumeOfBlock, detectDsipFromPages, classifyDsipSidecar } from '@/lib/library/dsip-deconstruct';
 
 const FIVE_VOL = [
   'Aerivio Inc. — SBIR Phase I Proposal Package',
@@ -145,5 +145,69 @@ describe('detectDsipFromBlocks (the atomizer path)', () => {
     ];
     expect(detectDsipFromBlocks(two).isDsipProposal).toBe(false);
     expect(detectDsipFromBlocks(two, { declared: true }).isDsipProposal).toBe(true);
+  });
+});
+
+describe('detectDsipFromPages (real DSIP downloads) + sidecar classifier', () => {
+  const P = (n: number, m: number, text: string) => `-- ${n} of ${m} -- ${text}`;
+  const REAL = [
+    P(1, 10, 'Small Business Innovation Research (SBIR) Program - Proposal Cover Sheet Disclaimer Knowingly and willfully'),
+    P(2, 10, '121.702. 4. Verify that your firm has registered in the SBAS Company Registry at www.sbir.gov'),
+    P(3, 10, 'Approach (MOSA) sensor-agnostic cueing to deliver a graduated response across every fielded configuration today.'),
+    P(4, 10, 'VOL I - Contact Information Principal Investigator Name: Dr. A Alavi Phone: (330) 555-0000'),
+    P(5, 10, 'Proposal Number: N26BX-NP002-0450 Open Topic Number: DON26BX03-NP002 Immobileyes, Inc. Page 1 of 3 Guided'),
+    P(6, 10, 'Proposal Number: N26BX-NP002-0450 Open Topic Number: DON26BX03-NP002 Immobileyes, Inc. Page 2 of 3 STORM'),
+    P(7, 10, 'SBIR Phase I Proposal Proposal Number N26BX-NP002-0450 Topic Number DON26BX03-NP002 Proposal Title Adaptive'),
+    P(8, 10, 'Cost Volume Details Direct Labor Base Category Description Education Yrs Experience Hours Rate'),
+    P(9, 10, 'SBIR Company Commercialization Report Privileged and confidential and not subject to disclosure'),
+    P(10, 10, 'A. Alavi, Immobileyes Inc. Jul 21, 2026 Jul 21, 2027'),
+  ].join('\n');
+
+  it('segments the real anatomy: cover form → tech (Page 1 of N anchor) → cost form → CCR → remainder', () => {
+    const d = detectDsipFromPages(REAL);
+    expect(d.isDsipProposal).toBe(true);
+    const byVol = Object.fromEntries(d.segments.map((s: { volumeNumber: number }) => [s.volumeNumber, s]));
+    expect(byVol[1].pageStart).toBe(1); expect(byVol[1].pageEnd).toBe(4);
+    expect(byVol[2].pageStart).toBe(5); expect(byVol[2].pageEnd).toBe(6); expect(byVol[2].inferred).toBe(false);
+    expect(byVol[3].pageStart).toBe(7); expect(byVol[3].pageEnd).toBe(8);
+    expect(byVol[4].pageStart).toBe(9); expect(byVol[4].pageEnd).toBe(9);
+    expect(byVol[5].pageStart).toBe(10); expect(byVol[5].inferred).toBe(true);
+  });
+
+  it('slide-deck tech volume with NO page furniture: V2 boundary is INFERRED after the last form page', () => {
+    const CSO = [
+      P(1, 6, 'Small Business Innovation Research(SBIR) Program - Proposal Cover Sheet Disclaimer text here'),
+      P(2, 6, 'Recombinant DNA of the solicitation: 13. In accordance with Federal Acquisition Regulation 4.2105'),
+      P(3, 6, 'Introduction and Summary: Counter-UAS and Defeat of Drone Surveillance Company Name Immobileyes'),
+      P(4, 6, 'SBIR Phase I Proposal Proposal Number FX235-CSO1-0859 Topic Number AFX235-CSO1 Proposal Title Base-Wide'),
+      P(5, 6, 'SBIR Company Commercialization Report IMMOBILEYES INC DISCLAIMER: Information provided herein'),
+      P(6, 6, 'A. Alavi, Immobileyes Inc. Feb 22, 2023 Feb 22, 2024'),
+    ].join('\n');
+    const d = detectDsipFromPages(CSO);
+    expect(d.isDsipProposal).toBe(true);
+    const v2 = d.segments.find((s: { volumeNumber: number }) => s.volumeNumber === 2)!;
+    expect(v2.pageStart).toBe(3);
+    expect(v2.inferred).toBe(true);
+    expect(v2.markerExcerpt).toContain('inferred');
+  });
+
+  it('a non-DSIP paged PDF (no cost form / CCR anchors) detects nothing', () => {
+    const wp = [P(1, 3, 'Whitepaper on lasers'), P(2, 3, 'More prose here'), P(3, 3, 'Conclusions')].join('\n');
+    expect(detectDsipFromPages(wp).isDsipProposal).toBe(false);
+  });
+
+  it('classifies the full DSIP sidecar taxonomy', () => {
+    expect(classifyDsipSidecar('x-N26BXNP0020450_Full_Proposal.pdf')).toBeNull();
+    expect(classifyDsipSidecar('a-N26BXNP0020450_SBC_748198.pdf')?.volumeNumber).toBe(1);
+    expect(classifyDsipSidecar('b-N26BXNP0020450CoverSheet.pdf')?.volumeNumber).toBe(1);
+    expect(classifyDsipSidecar('c-N26BXNP0020450Budget.pdf')?.volKey).toBe('cost');
+    expect(classifyDsipSidecar('d-N26BXNP0020450_Addt_Cost_Info_1816592.pdf')?.volumeNumber).toBe(3);
+    expect(classifyDsipSidecar('e-N26BXNP0020450CCR.pdf')?.volKey).toBe('commercialization');
+    expect(classifyDsipSidecar('f-N26BXNP0020450_Fund_Agrmnt_Cert_1817601.pdf')?.volumeNumber).toBe(5);
+    expect(classifyDsipSidecar('g-N26BXNP0020450_Lifecycle_Cert_1817605.pdf')?.volumeNumber).toBe(5);
+    expect(classifyDsipSidecar('h-N26BXNP0020450_Other_1817608.pdf')?.volumeNumber).toBe(5);
+    expect(classifyDsipSidecar('i-N26BXNP0020450Foreign_Affiliations.pdf')?.volumeNumber).toBe(5);
+    expect(classifyDsipSidecar('j-N26BXNP0020450FWA.pdf')?.volumeNumber).toBe(6);
+    expect(classifyDsipSidecar('k-N26BXNP0020450Proposal.pdf')?.volumeNumber).toBe(2);
   });
 });

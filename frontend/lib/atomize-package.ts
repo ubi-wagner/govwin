@@ -16,9 +16,9 @@ import { withTenant } from '@/lib/rls';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 import { cleanText } from '@/lib/clean-text';
 import { randomUUID } from 'crypto';
-import { detectDsipFromBlocks, volumeOfBlock, detectDsipProposal, volumeOfOffset } from '@/lib/library/dsip-deconstruct';
+import { detectDsipFromBlocks, volumeOfBlock, detectDsipProposal, volumeOfOffset, detectDsipFromPages, volumeOfPage } from '@/lib/library/dsip-deconstruct';
 
-export const MAX_FILES = 12;
+export const MAX_FILES = 20; // a real DSIP package = Full_Proposal + ~13 sidecars
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_ATOMS_PER_DOC = 80;
 const MIN_ATOM_WORDS = 10; // below this a block is skipped (headings / noise)
@@ -82,7 +82,7 @@ export interface DocAtomizeResult { file: string; format: string; atoms: number;
 /** One primitive atom the plan proposes to mint (pre-write). */
 export interface PlannedAtom { blockIndex: number; title: string; wordCount: number; content: string; nodes: CanvasNode[]; tags: AtomTagInput[]; volumeNumber?: number }
 /** One DSIP volume the deconstruct plan proposes as a FOUNDATION document. */
-export interface PlannedVolume { volumeNumber: number; volumeName: string; volKey: string | null; markerExcerpt: string; text: string; wordCount: number; blockCount: number }
+export interface PlannedVolume { volumeNumber: number; volumeName: string; volKey: string | null; markerExcerpt: string; text: string; wordCount: number; blockCount: number; pageStart?: number; pageEnd?: number; inferred?: boolean }
 /** The dry-run plan for one document — exactly what atomize WOULD create, computed with NO DB write. */
 export interface DocPlan { file: string; format: string; fmt: string; fullText: string; allNodes: CanvasNode[]; parsedCount: number; planned: PlannedAtom[]; skipped: number; error?: string; unextractable?: UnextractableSignal; dsip?: { volumes: PlannedVolume[] } }
 
@@ -123,10 +123,17 @@ export async function planDocumentAtomization(
   // node) carries its volume separators as LINES, invisible to block mode.
   const declared = (docType ?? '').toLowerCase() === 'past_proposal';
   const tryDsip = declared || parsed.sourceFormat === 'pdf';
-  const dsipBlocks = tryDsip
+  // PAGE mode first: a REAL DSIP merge has no volume banners — its anatomy lives in the
+  // page heads (cover sheet p1 · cost-form head · CCR head · tech-doc furniture), which
+  // the reader's "-- N of M --" separators expose. Banner-based block/text modes remain
+  // as fallbacks for synthetic or re-typeset merges.
+  const dsipPages = tryDsip && parsed.sourceFormat === 'pdf'
+    ? detectDsipFromPages(fullText)
+    : { isDsipProposal: false as const, pages: [] as string[], segments: [], distinctVolumes: 0 };
+  const dsipBlocks = tryDsip && !dsipPages.isDsipProposal
     ? detectDsipFromBlocks(parsed.atoms.map((a, i) => ({ heading: a.headingText, text: blockTexts[i] })), { declared })
     : { isDsipProposal: false as const, segments: [], distinctVolumes: 0 };
-  const dsipText = tryDsip && !dsipBlocks.isDsipProposal
+  const dsipText = tryDsip && !dsipPages.isDsipProposal && !dsipBlocks.isDsipProposal
     ? detectDsipProposal(fullText, { declared })
     : { isDsipProposal: false as const, segments: [], distinctVolumes: 0 };
   // Block char offsets into fullText — maps text-mode segments back onto reader blocks.
@@ -154,7 +161,31 @@ export async function planDocumentAtomization(
 
   const planned: PlannedAtom[] = [];
   let skipped = 0; // substantive-looking blocks dropped for being under MIN_ATOM_WORDS — surfaced, not silent.
-  if (flatDeconstruct) {
+  if (dsipPages.isDsipProposal) {
+    // Page-grain primitives: one atom per PAGE, cited by its page number and tagged with
+    // its volume — deterministic units that spread the atom budget across ALL volumes
+    // (paragraph-guessing on extraction text let Volume 1 exhaust the cap).
+    for (let pg = 1; pg <= dsipPages.pages.length && planned.length < MAX_ATOMS_PER_DOC; pg++) {
+      const pageText = cleanText(dsipPages.pages[pg - 1] ?? '').trim();
+      const words = pageText ? pageText.split(/\s+/).length : 0;
+      if (!pageText || words < MIN_ATOM_WORDS) { if (pageText) skipped++; continue; }
+      const seg = volumeOfPage(dsipPages.segments, pg);
+      planned.push({
+        blockIndex: pg,
+        title: `p${pg} · ${pageText.slice(0, 54)}`.slice(0, 120),
+        wordCount: words,
+        content: pageText,
+        nodes: [paraNode(pageText)],
+        tags: [
+          { dimension: 'kind', value: 'narrative', source: 'auto', confirmed: false },
+          { dimension: 'fmt', value: fmt, source: 'auto', confirmed: false },
+          ...(seg?.volKey ? [{ dimension: 'vol', value: seg.volKey, source: 'auto' as const, confirmed: !seg.inferred }] : []),
+          ...ctxTags,
+        ],
+        ...(seg ? { volumeNumber: seg.volumeNumber } : {}),
+      });
+    }
+  } else if (flatDeconstruct) {
     let synthIndex = 0;
     for (const seg of dsipText.segments) {
       const volText = fullText.slice(seg.startOffset, seg.endOffset).trim();
@@ -210,7 +241,19 @@ export async function planDocumentAtomization(
   }
 
   const plan: DocPlan = { file: filename, format: parsed.sourceFormat, fmt, fullText, allNodes, parsedCount: parsed.atoms.length, planned, skipped, unextractable: parsed.unextractable };
-  if (dsipBlocks.isDsipProposal) {
+  if (dsipPages.isDsipProposal) {
+    plan.dsip = {
+      volumes: dsipPages.segments.map((s) => {
+        const text = dsipPages.pages.slice(s.pageStart - 1, s.pageEnd).join('\n\n').trim();
+        return {
+          volumeNumber: s.volumeNumber, volumeName: s.volumeName, volKey: s.volKey, markerExcerpt: s.markerExcerpt,
+          text, wordCount: text ? text.split(/\s+/).length : 0,
+          blockCount: planned.filter((p) => p.volumeNumber === s.volumeNumber).length,
+          pageStart: s.pageStart, pageEnd: s.pageEnd, inferred: s.inferred,
+        };
+      }),
+    };
+  } else if (dsipBlocks.isDsipProposal) {
     plan.dsip = {
       volumes: dsipBlocks.segments.map((s) => {
         const text = blockTexts.slice(s.blockStart, s.blockEnd).join('\n\n').trim();
@@ -243,9 +286,16 @@ export async function planDocumentAtomization(
  */
 export async function atomizeDocumentIntoLibrary(
   tenantId: string,
-  opts: { buffer: Buffer; filename: string; packageName?: string; ctxTags: AtomTagInput[]; actor: { id: string; kind: CreatorKind }; docType?: string | null },
+  opts: {
+    buffer: Buffer; filename: string; packageName?: string; ctxTags: AtomTagInput[];
+    actor: { id: string; kind: CreatorKind }; docType?: string | null;
+    /** Join an EXISTING package cocoon (DSIP sidecars ride the Full_Proposal's cocoon). */
+    sharedCocoonId?: string | null;
+    /** Deterministic volume assignment from DSIP's own filename taxonomy. */
+    volHint?: { volumeNumber: number; volKey: string; label: string } | null;
+  },
 ): Promise<DocAtomizeResult> {
-  const { buffer, filename, packageName, ctxTags, actor, docType } = opts;
+  const { buffer, filename, packageName, ctxTags, actor, docType, sharedCocoonId, volHint } = opts;
   // A collaborator (cross-company partner_user) OFFERS content up — it lands DRAFT for the company
   // to review before it's reuse-eligible, mirroring the capture path. Company staff uploads stay
   // approved. (selectForSection only pulls status='approved', so draft = not-yet-reusable.)
@@ -253,11 +303,17 @@ export async function atomizeDocumentIntoLibrary(
   const plan = await planDocumentAtomization({ buffer, filename, ctxTags, docType });
   if (plan.error) return { file: filename, format: plan.format, atoms: 0, skipped: plan.skipped, cocoonId: null, error: plan.error };
 
+  // Sidecar vol tag: DSIP's filename taxonomy is deterministic → confirmed.
+  const hintTags: AtomTagInput[] = volHint
+    ? [{ dimension: 'vol', value: volHint.volKey, source: 'auto', confirmed: true }]
+    : [];
+
   // 1) Foundational document cocoon. For a DSIP full-proposal deconstruct, THIS id is the
   //    shared past-proposal UUID: every volume foundation doc and every primitive links to
   //    it, and the structure records the volume map (the reverse of the pipeline build-up).
-  let cocoonId: string | null = null;
-  try {
+  //    A sidecar JOINS the package cocoon instead of minting its own.
+  let cocoonId: string | null = sharedCocoonId ?? null;
+  if (!cocoonId) try {
     const structure = plan.dsip
       ? {
           dsip: {
@@ -281,9 +337,9 @@ export async function atomizeDocumentIntoLibrary(
   try {
     const ref = await createAtom(tenantId, {
       grain: 'reference', title: filename, content: plan.fullText || null, canvasNodes: plan.allNodes.length ? plan.allNodes : null,
-      summary: `Uploaded ${plan.format} · ${plan.parsedCount} objects${packageName ? ` · ${packageName}` : ''}`,
+      summary: `${volHint ? `${volHint.label} (Volume ${volHint.volumeNumber} sidecar) · ` : ''}Uploaded ${plan.format} · ${plan.parsedCount} objects${packageName ? ` · ${packageName}` : ''}`,
       source: 'upload', status, cocoonId,
-      tags: [{ dimension: 'fmt', value: plan.fmt, source: 'auto', confirmed: true }, ...ctxTags],
+      tags: [{ dimension: 'fmt', value: plan.fmt, source: 'auto', confirmed: true }, ...hintTags, ...ctxTags],
     }, actor);
     referenceId = ref.atomId;
   } catch (e) { console.error('[atomize-package] reference atom failed (non-fatal)', e); }
@@ -299,7 +355,7 @@ export async function atomizeDocumentIntoLibrary(
           grain: 'foundation',
           title: `Volume ${v.volumeNumber} — ${v.volumeName}`,
           content: v.text || null,
-          summary: `DSIP past-proposal volume ${v.volumeNumber} · deconstructed from ${filename} · marker "${v.markerExcerpt}"${packageName ? ` · ${packageName}` : ''}`,
+          summary: `DSIP past-proposal volume ${v.volumeNumber}${v.pageStart ? ` · pp ${v.pageStart}–${v.pageEnd}` : ''}${v.inferred ? ' · boundary INFERRED — review' : ''} · deconstructed from ${filename} · marker "${v.markerExcerpt}"${packageName ? ` · ${packageName}` : ''}`,
           source: 'upload', status, cocoonId,
           sourceAnchor: referenceId ? [{ sourceAtomId: referenceId }] : undefined,
           tags: [
@@ -325,7 +381,7 @@ export async function atomizeDocumentIntoLibrary(
         content: p.content, canvasNodes: p.nodes.length ? p.nodes : null,
         summary: null, source: 'upload', status, cocoonId,
         sourceAnchor: anchorId ? [{ sourceAtomId: anchorId, blockIds: [`b${p.blockIndex}`] }] : undefined,
-        tags: p.tags,
+        tags: [...p.tags, ...hintTags.filter((h) => !p.tags.some((t) => t.dimension === h.dimension))],
       }, actor);
       made++;
     } catch (e) { console.error('[atomize-package] primitive create failed', filename, p.blockIndex, e); }
