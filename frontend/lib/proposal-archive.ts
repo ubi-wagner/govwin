@@ -133,3 +133,41 @@ export async function restoreProposal(
   await emitEventEnd(startId, { result: payload });
   return { restored: true };
 }
+
+/**
+ * HARD-delete one proposal and its full dependency fan-out — the ONLY sanctioned hard-delete
+ * path, reserved for (a) the future cold-storage retention sweep and (b) seed/dress-rehearsal
+ * teardown. The archive contract stands: product flows soft-archive, never call this. The FK
+ * graph lives HERE so callers stop hand-ordering DELETEs that break every time the
+ * provision fan-out grows (agent results/queue/log → ToDos → seed jobs → supporting docs →
+ * matrix → sections (canvas_versions cascade) → artifacts → proposal).
+ * Audit: proposal:proposal.hard_deleted single (reason carried in the payload).
+ */
+export async function hardDeleteProposalCascade(
+  proposalId: string,
+  opts: { reason: 'retention_sweep' | 'seed_rehearsal'; tenantId?: string | null; actorId?: string | null; actorEmail?: string | null },
+): Promise<{ deleted: boolean }> {
+  await sql`DELETE FROM agent_task_results WHERE task_id IN (SELECT id FROM agent_task_queue WHERE proposal_id = ${proposalId}::uuid)`;
+  await sql`DELETE FROM agent_task_queue WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM agent_task_log WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM tasks WHERE entity_type = 'proposal' AND entity_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM library_seed_jobs WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM proposal_supporting_docs WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM proposal_compliance_matrix WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid`;
+  await sql`DELETE FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid`;
+  const rows = await sql<{ id: string }[]>`DELETE FROM proposals WHERE id = ${proposalId}::uuid RETURNING id`;
+  const deleted = rows.length > 0;
+  if (deleted) {
+    try {
+      const { emitEventSingle } = await import('@/lib/events');
+      await emitEventSingle({
+        namespace: 'proposal', type: 'proposal.hard_deleted',
+        actor: userActor(opts.actorId ?? '00000000-0000-4000-8000-000000000000', opts.actorEmail ?? undefined),
+        tenantId: opts.tenantId ?? null,
+        payload: { proposalId, reason: opts.reason },
+      });
+    } catch (e) { console.error('[hardDeleteProposalCascade] audit emit failed (non-fatal)', e); }
+  }
+  return { deleted };
+}

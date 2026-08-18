@@ -13,7 +13,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import type { CreatorKind } from '@/lib/atoms';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -74,6 +74,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ data: { preview: true, filesProcessed: previewed.length, totalPlanned, context: ctxTags.map((t) => `${t.dimension}:${t.value}`), docs: previewed } });
     }
 
+    // Full start/end pattern (docs/EVENT_CONTRACT.md): the package atomization is a
+    // multi-step PROCESS — bracket it; per-file deconstructs audit as intrastep singles;
+    // the librarian hop rides agent_task_queue (terminal-phase consumers are unaffected).
+    const startId = await emitEventStart({
+      namespace: 'library', type: 'package.atomized',
+      actor: userActor(u.id, u.email ?? undefined), tenantId,
+      payload: { files: files.length, packageName: packageName || null, docType: docType ?? null },
+    });
+
     const docs = [];
     let totalAtoms = 0;
     for (const file of files) {
@@ -99,12 +108,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       } catch (e) { console.error('[atomize-package] deconstruct event failed (non-fatal)', e); }
     }
 
-    await emitEventSingle({
-      namespace: 'library',
-      type: 'package.atomized',
-      actor: userActor(u.id, u.email ?? undefined),
-      tenantId,
-      payload: { filesProcessed: docs.length, totalAtoms },
+    await emitEventEnd(startId, {
+      result: {
+        filesProcessed: docs.length, totalAtoms,
+        cocoonIds: docs.map((d) => d.cocoonId).filter(Boolean),
+        volumes: docs.reduce((n, d) => n + (d.volumes ?? 0), 0),
+      },
     });
 
     // Producer (#117): hand each atomized package to the librarian agent to catalog —
