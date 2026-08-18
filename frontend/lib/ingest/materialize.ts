@@ -48,14 +48,35 @@ export async function materializeSkeleton(
 
   // ── Compliance ──
   const c = parsed.compliance ?? {};
+  // Stamp WHERE EACH VALUE CAME FROM (mig 187). `parsed.source` is 'ai' when the parse read the
+  // solicitation text, 'default' when it fell back to DEFAULT_SBIR_CSO_SKELETON, 'override' when an
+  // admin supplied a reviewed parse. Without this the fallbacks land indistinguishable from
+  // extracted rules and a curator sees confident numbers with nothing behind them — proven live on
+  // the DoW 2026 SBIR BAA, where the matrix was byte-identical whether the shredder had extracted
+  // 0 characters or 165,268. Only the fields this write actually sets are stamped; a curator
+  // verifying one field later upgrades just that key to 'verified'.
+  const provSource = parsed.source ?? 'default';
+  const stamped: Record<string, { source: string }> = {};
+  const stamp = (col: string, v: unknown) => { if (v !== undefined && v !== null) stamped[col] = { source: provSource }; };
+  stamp('page_limit_technical', c.pageLimitTechnical);
+  stamp('font_family', c.fontFamily);
+  stamp('font_size', c.fontSize);
+  stamp('min_font_size', c.minFontSize);
+  stamp('margins', c.margins);
+  stamp('submission_format', c.submissionFormat);
+  stamp('required_sections', c.requiredSections?.length ? c.requiredSections : null);
+  stamp('required_documents', c.requiredDocuments?.length ? c.requiredDocuments : null);
+
   await sql`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
   await sql`INSERT INTO solicitation_compliance
     (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
-     submission_format, itar_required, images_tables_allowed, required_sections, required_documents)
+     submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
+     field_provenance)
     VALUES (${solicitationId}::uuid, ${c.pageLimitTechnical ?? null}, ${c.fontFamily ?? null}, ${c.fontSize ?? null},
             ${c.minFontSize ?? null}, ${c.margins ?? null}, ${c.submissionFormat ?? null},
             ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
-            ${sql.json(c.requiredSections ?? [])}, ${sql.json(c.requiredDocuments ?? [])})`;
+            ${sql.json(c.requiredSections ?? [])}, ${sql.json(c.requiredDocuments ?? [])},
+            ${sql.json(stamped)})`;
 
   // ── Volumes + required items ──
   await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;

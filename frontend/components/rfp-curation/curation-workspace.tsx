@@ -693,7 +693,7 @@ export function CurationWorkspace({
   // Merge AI-suggested (named columns) with human-verified (custom_variables)
   function getComplianceValue(camelKey: string): {
     value: unknown;
-    source: 'ai' | 'verified' | null;
+    source: 'ai' | 'verified' | 'hitl' | 'default' | null;
     sourceExcerpt: string | null;
     sourcePage: number | null;
     documentName: string | null;
@@ -710,9 +710,12 @@ export function CurationWorkspace({
     // Verified values (from admin actions) — include full anchor provenance
     if (custom?.[snakeKey]) {
       const anc = custom[snakeKey].anchor ?? null;
+      // A curator who HIGHLIGHTED the value in the source document leaves a SourceAnchor with
+      // method 'manual_selection' — that is the strongest provenance we have (human judgement AND
+      // a verifiable pointer back into the PDF), so it reads 'hitl' rather than plain 'verified'.
       return {
         value: custom[snakeKey].value,
-        source: 'verified',
+        source: anc?.method === 'manual_selection' || (anc?.page && anc?.excerpt) ? 'hitl' : 'verified',
         sourceExcerpt: custom[snakeKey].source_excerpt ?? anc?.excerpt ?? null,
         sourcePage: custom[snakeKey].page ?? anc?.page ?? null,
         documentName: anc?.document_name ?? null,
@@ -743,10 +746,21 @@ export function CurationWorkspace({
       };
     }
 
-    // Named column fallback
+    // Named column fallback. The raw column does NOT imply the value was read from this
+    // solicitation — Ingest Assist writes DEFAULT_SBIR_CSO_SKELETON here whenever the parse is
+    // unavailable or thin, and labelling that 'ai' told the curator a system fallback was an
+    // extracted rule. mig 187 stamps field_provenance per column, so trust that: only 'ai' /
+    // 'override' means it came off the document; 'default' (or an unstamped legacy row) is a
+    // fallback the curator must verify against the solicitation before anyone builds to it.
     const aiVal = compState?.[camelKey as keyof typeof compState];
     if (aiVal !== null && aiVal !== undefined) {
-      return { value: aiVal, source: 'ai', sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
+      const prov = (compState?.fieldProvenance as Record<string, { source?: string }> | null)?.[snakeKey]?.source;
+      const trusted = prov === 'ai' || prov === 'override' || prov === 'verified' || prov === 'hitl';
+      return {
+        value: aiVal,
+        source: trusted ? 'ai' : 'default',
+        sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null,
+      };
     }
     return { value: null, source: null, sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
   }
@@ -1267,10 +1281,21 @@ export function CurationWorkspace({
                       <div className="flex-1">
                         <span className="text-sm text-gray-700">{field.label}</span>
                         {source && (
-                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                            source === 'verified' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {source === 'verified' ? 'Verified' : 'AI'}
+                          <span
+                            className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                              source === 'hitl' ? 'bg-emerald-100 text-emerald-800 font-semibold'
+                                : source === 'verified' ? 'bg-green-100 text-green-700'
+                                : source === 'default' ? 'bg-red-100 text-red-700 font-semibold'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}
+                            title={
+                              source === 'hitl' ? 'HIGHLIGHTED IN THE SOURCE by a curator — anchored to a page + excerpt in the document. Strongest provenance.'
+                                : source === 'verified' ? 'A curator confirmed this against the solicitation (not anchored to a region).'
+                                : source === 'default' ? 'SYSTEM DEFAULT — not read from this solicitation. Verify against the document before anyone builds to it.'
+                                : 'Extracted from the solicitation text by the AI parse — confirm before release.'
+                            }
+                          >
+                            {source === 'hitl' ? 'Highlighted' : source === 'verified' ? 'Verified' : source === 'default' ? 'Default — unverified' : 'AI'}
                           </span>
                         )}
                       </div>
