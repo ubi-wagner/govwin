@@ -208,17 +208,37 @@ export async function landSkeleton(
     );
   }
 
-  const result = await materializeSkeleton(solicitationId, draft.parsed, {
-    publish: opts.publish ?? false,
-    nowIso: opts.nowIso,
-  });
-
-  await sql`
+  // CLAIM THE DRAFT FIRST — compare-and-swap on its status, BEFORE any business write. Two
+  // concurrent landers both read the same open draft above; without this they both ran the
+  // materializer and its interleaved DELETE+INSERTs 500'd one of them (caught live by the
+  // coverage drive's concurrent-lands case). The CAS serializes them on the draft row: exactly
+  // one request wins the claim and materializes; the loser gets the same clean refusal as
+  // landing with nothing staged.
+  const priorStatus = draft.status;
+  const claimed = await sql<Array<{ id: string }>>`
     UPDATE solicitation_compliance_drafts
     SET status = 'landed', landed_at = now(), landed_by = ${opts.userId ?? null}::uuid
-    WHERE id = ${draft.id}::uuid`;
+    WHERE id = ${draft.id}::uuid AND status IN ('staged', 'reviewed')
+    RETURNING id`;
+  if (claimed.length === 0) {
+    throw new LandBlockedError('No staged matrix to land — another request just landed it.', []);
+  }
 
-  return { ...result, draftId: draft.id };
+  try {
+    const result = await materializeSkeleton(solicitationId, draft.parsed, {
+      publish: opts.publish ?? false,
+      nowIso: opts.nowIso,
+    });
+    return { ...result, draftId: draft.id };
+  } catch (e) {
+    // The claim without the write would be a draft that says "landed" over a matrix that never
+    // changed — release it so the truth stays reachable and a retry is possible.
+    await sql`
+      UPDATE solicitation_compliance_drafts
+      SET status = ${priorStatus}, landed_at = NULL, landed_by = NULL
+      WHERE id = ${draft.id}::uuid`.catch(() => { /* the throw below is the primary signal */ });
+    throw e;
+  }
 }
 
 /** Read the phase without pulling the row's blobs. */
