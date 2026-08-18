@@ -126,6 +126,15 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── approve: the human gate. Nothing runs; the phase simply advances. ──
     if (action === 'approve') {
+      // The review gate has exactly two exits: LAND (promote the reviewed draft) or REGENERATE.
+      // "Approve" here would advance the phase to 'landed' while landing nothing — a state that
+      // claims a write that never happened. Refuse and name the real action.
+      if (phase === 'review') {
+        return NextResponse.json({
+          error: 'The review gate is exited by landing the matrix (or regenerating) — approve has nothing to approve past it.',
+          code: 'GATE_REQUIRES_LAND',
+        }, { status: 409 });
+      }
       const to = nextPhase(phase);
       const ok = await setIngestPhase(solId, to, phase);
       if (!ok) {
@@ -184,9 +193,14 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // Ask the agent cohort to review this draft. The pipeline picks the event up and runs the
     // adversarial fan-out; it is advisory and never lands anything, so we do not wait on it.
+    // MANUAL start/regenerate dispatches the MATRIX phase (the deterministic extract + stage
+    // just ran inline above; matrix_stager adds its advisory read). AUTO dispatches EXTRACT with
+    // auto=true so the full chain runs through the worker — extract → matrix → review, each hop
+    // made by advance_ingest_phase — and stops at the land gate. Starting auto mid-chain would
+    // leave the earlier phases' agents and the chain hops themselves permanently unexercised.
     await emitTrigger(admin, {
       solicitationId: solId, solicitation_id: solId, draftId: draft.id, draft_id: draft.id,
-      phase: action === 'auto' ? 'review' : 'matrix',
+      phase: action === 'auto' ? 'extract' : 'matrix',
       auto: action === 'auto',
       guidance: body.guidance ?? null,
       // Perspective-diverse lenses for the adversarial fan-out (docs/INGEST_STUDIO_DESIGN.md).
@@ -194,7 +208,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       resolution: 'majority',
     });
 
-    const to: IngestPhase = action === 'auto' ? 'review' : 'matrix';
+    const to: IngestPhase = action === 'auto' ? 'extract' : 'matrix';
     await setIngestPhase(solId, to);
     await emitPhaseEvent(solId, admin, action === 'regenerate' ? 'regenerated' : 'staged', {
       draftId: draft.id, auto: action === 'auto',

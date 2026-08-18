@@ -155,6 +155,19 @@ export async function POST(request: Request, ctx: RouteContext) {
     let parsed: ParsedSolicitation;
     if (hasOverride) {
       parsed = { ...body.parsed!, source: 'override' };
+      // An override supplies whole values with no per-field map; synthesize one so the stamps,
+      // the audit and the response all say 'override' per SET field instead of reporting {}.
+      const oc = parsed.compliance ?? {};
+      const fs: Record<string, 'override'> = {};
+      const mark = (col: string, v: unknown) => {
+        if (v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0)) fs[col] = 'override';
+      };
+      mark('page_limit_technical', oc.pageLimitTechnical); mark('font_family', oc.fontFamily);
+      mark('font_size', oc.fontSize); mark('min_font_size', oc.minFontSize);
+      mark('margins', oc.margins); mark('submission_format', oc.submissionFormat);
+      mark('required_sections', oc.requiredSections); mark('required_documents', oc.requiredDocuments);
+      if (parsed.volumes?.length) (fs as Record<string, string>).volumes = 'override';
+      parsed.fieldSources = fs;
     } else {
       parsed = await parseSolicitation(sol.fullText ?? '', {
         agency: sol.agency, namespace: sol.namespace, topicNumber: sol.topicNumber, title: sol.title,

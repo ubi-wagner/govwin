@@ -391,14 +391,20 @@ export async function POST(request: Request) {
     const ext = extFromFilename(fb.file.name);
     const safeName = slugSafeName(fb.file.name);
     let storageKey: string;
-    if (ext === 'pdf' && !firstPdfKey) {
+    // The 'source' slot (…/source.pdf) belongs to a NEW solicitation's primary document only.
+    // Attach-to-existing must never claim it — the original upload already owns that key, and
+    // taking it again is a unique-constraint 500 (proven by the coverage drive: attaching the
+    // Component instructions to an existing BAA collided on …/source.pdf). Attachment keys also
+    // carry a content-hash prefix so two different files sharing a filename cannot collide
+    // (same-CONTENT re-uploads are already rejected earlier by the content_hash dedup).
+    if (ext === 'pdf' && !firstPdfKey && !existingSolId) {
       storageKey = rfpPipelinePath({ opportunityId: oppRowId, kind: 'source', ext: 'pdf' });
       firstPdfKey = storageKey;
     } else {
       storageKey = rfpPipelinePath({
         opportunityId: oppRowId,
         kind: 'attachment',
-        name: safeName,
+        name: `${fb.hash.slice(0, 10)}-${safeName}`.slice(0, 63).replace(/-+$/, ''),
         ext,
       });
     }
@@ -509,7 +515,14 @@ export async function POST(request: Request) {
   // showed a permanently unresolvable deferral while the answer was sitting in the row next to it.
   //
   // documentIds is index-aligned with fileBuffers (one push per file, early return on conflict).
-  const shouldExtract = !existingSolId || requestedIsPrimary;
+  //
+  // ALWAYS extract — including attach-to-existing. The old gate (`!existingSolId ||
+  // requestedIsPrimary`) was single-document-era reasoning: it assumed a later attachment was
+  // supporting material. It is usually the OPPOSITE — the document an admin attaches later is
+  // the Component-specific instructions the umbrella defers its binding rules to, and skipping
+  // extraction left it a text-less row the compliance pipeline could never read. We hold the
+  // bytes right here; extracting now beats hoping a worker can fetch them back out of storage.
+  const shouldExtract = documentIds.length > 0;
   let extractedText: string | null = null;   // the UMBRELLA text — what topic extraction reads
   if (shouldExtract && documentIds.length > 0) {
     try {
@@ -541,6 +554,28 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       console.error('[rfp-upload] PDF text extraction failed (non-fatal):', err);
+    }
+
+    // Attach-to-existing: recombine curated_solicitations.full_text from EVERY document's
+    // extracted text, in the same order + separator the pipeline shredder uses, so the
+    // readiness gate and Ingest Assist see the newly-attached rules immediately. (For a NEW
+    // solicitation the OnRfpUploaded shred does this; an attach must not have to wait for it.)
+    if (existingSolId) {
+      try {
+        await sql`
+          UPDATE curated_solicitations SET full_text = (
+            SELECT string_agg(d.extracted_text, E'\n\n---DOCUMENT---\n\n'
+                     ORDER BY CASE d.document_type
+                       WHEN 'source' THEN 0 WHEN 'rfp' THEN 0 WHEN 'nofo' THEN 0
+                       WHEN 'instructions' THEN 1 WHEN 'amendment' THEN 1 WHEN 'qa' THEN 1
+                       WHEN 'topic' THEN 2 ELSE 3 END, d.created_at)
+            FROM solicitation_documents d
+            WHERE d.solicitation_id = ${solId}::uuid AND d.extracted_text IS NOT NULL
+          ), updated_at = now()
+          WHERE id = ${solId}::uuid`;
+      } catch (err) {
+        console.error('[rfp-upload] full_text recombine failed (non-fatal):', err);
+      }
     }
   }
 
