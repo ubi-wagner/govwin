@@ -131,6 +131,13 @@ export async function POST(request: Request) {
     );
   }
   const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
+  // Per-file types for a NEW solicitation, aligned by index to `files`. Unparseable or absent
+  // ⇒ [] and the first-PDF-is-source fallback applies. Values are validated per file below.
+  let fileTypes: string[] = [];
+  try {
+    const raw = formData.get('documentTypes');
+    if (raw) { const parsed: unknown = JSON.parse(String(raw)); if (Array.isArray(parsed)) fileTypes = parsed.map(String); }
+  } catch { /* malformed → fall back to the default typing */ }
   if (
     requestedDocType !== null &&
     !VALID_DOCUMENT_TYPES.includes(requestedDocType as (typeof VALID_DOCUMENT_TYPES)[number])
@@ -212,12 +219,12 @@ export async function POST(request: Request) {
   // solicitation so the admin can navigate there instead of creating a
   // duplicate. Admin can override by acknowledging the duplicate (future
   // UI — for now it's a hard reject with a link).
-  const fileBuffers: { file: File; buffer: Buffer; hash: string; displayName: string }[] = [];
+  const fileBuffers: { file: File; buffer: Buffer; hash: string; displayName: string; index: number }[] = [];
   for (const file of files) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const hash = createHash('sha256').update(buffer).digest('hex');
     const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
-    fileBuffers.push({ file, buffer, hash, displayName });
+    fileBuffers.push({ file, buffer, hash, displayName, index: fileBuffers.length });
   }
 
   // Check all hashes at once against the global document store
@@ -431,8 +438,20 @@ export async function POST(request: Request) {
     }
 
     try {
-      // For new solicitations without an explicit type, first PDF gets 'source'
-      const effectiveType = existingSolId ? docType : (firstPdfKey === storageKey ? 'source' : 'attachment');
+      // Document type, in priority order:
+      //   attach-to-existing → the request's documentType
+      //   new solicitation   → the PER-FILE type the admin chose on the form, else the first
+      //                        PDF is the 'source' (umbrella) and the rest are 'attachment'.
+      // The per-file choice matters: a solicitation states its rules across files, and a
+      // supplementary PDF labelled 'instructions' is the one the umbrella BAA defers its page
+      // limit TO. Labelling it correctly is what lets the provenance audit tell "the rule is
+      // elsewhere and elsewhere is nowhere" from "the rule is elsewhere and here it is".
+      const perFileType = fileTypes[fb.index];
+      const effectiveType = existingSolId
+        ? docType
+        : (perFileType && (VALID_DOCUMENT_TYPES as readonly string[]).includes(perFileType))
+          ? perFileType
+          : (firstPdfKey === storageKey ? 'source' : 'attachment');
       const isPrimary = requestedIsPrimary && firstPdfKey === storageKey;
       const docRows = await sql<{ id: string }[]>`
         INSERT INTO solicitation_documents
@@ -476,33 +495,49 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Extract text from the primary/first PDF immediately ───────────
-  // This removes the dependency on the pipeline shredder for text
-  // extraction. The extracted text is stored in solicitation_documents
-  // so topic extraction can run right away.
-  // For attach-to-existing, only extract if this upload is marked primary.
+  // ── Extract text from EVERY uploaded PDF immediately ──────────────
+  // We already hold the bytes, so extracting here removes the dependency on the pipeline
+  // shredder fetching them back out of storage — which is also the only path that works when
+  // the two services disagree about the storage driver.
+  //
+  // This used to extract only the FIRST pdf. That quietly capped every solicitation at one
+  // readable document, and the one it dropped is the one that matters most: a federal
+  // solicitation states its rules across files, and the DoW 2026 SBIR BAA defers its
+  // technical-volume page limit to the Component-specific instructions, which upload as a second
+  // PDF. Proven live — a 9-page instructions file stating "The Technical Volume is not to exceed
+  // 10 pages" sat in solicitation_documents with extracted_text NULL, so the compliance matrix
+  // showed a permanently unresolvable deferral while the answer was sitting in the row next to it.
+  //
+  // documentIds is index-aligned with fileBuffers (one push per file, early return on conflict).
   const shouldExtract = !existingSolId || requestedIsPrimary;
-  let extractedText: string | null = null;
-  const firstPdfFb = fileBuffers.find(
-    (fb) => extFromFilename(fb.file.name) === 'pdf',
-  );
-  if (shouldExtract && firstPdfFb && documentIds.length > 0) {
+  let extractedText: string | null = null;   // the UMBRELLA text — what topic extraction reads
+  if (shouldExtract && documentIds.length > 0) {
     try {
       const { loadPdfParse } = await import('@/lib/pdf-parse-quiet'); // pdf-parse loader with pdf.js Node setup warnings silenced
       const { PDFParse } = await loadPdfParse();
-      const parser = new PDFParse({ data: new Uint8Array(firstPdfFb.buffer) });
-      const textResult = await parser.getText();
-      const rawText = textResult.text?.slice(0, 500000) || '';
-      try { await parser.destroy(); } catch { /* ignore cleanup */ }
 
-      if (rawText.length > 100) {
-        extractedText = rawText;
-        // Update the document row with the extracted text
-        await sql`
-          UPDATE solicitation_documents
-          SET extracted_text = ${extractedText}
-          WHERE id = ${documentIds[0]}::uuid
-        `;
+      for (let i = 0; i < fileBuffers.length && i < documentIds.length; i++) {
+        const fb = fileBuffers[i];
+        if (extFromFilename(fb.file.name) !== 'pdf') continue;
+        try {
+          const parser = new PDFParse({ data: new Uint8Array(fb.buffer) });
+          const textResult = await parser.getText();
+          const rawText = textResult.text?.slice(0, 500000) || '';
+          try { await parser.destroy(); } catch { /* ignore cleanup */ }
+          if (rawText.length <= 100) continue;
+
+          await sql`
+            UPDATE solicitation_documents
+            SET extracted_text = ${rawText}, extracted_at = now(), updated_at = now()
+            WHERE id = ${documentIds[i]}::uuid
+          `;
+          // First readable PDF is the umbrella — topics are extracted from it, not from the
+          // Component instructions (which describe how to respond, not what to respond to).
+          if (extractedText === null) extractedText = rawText;
+        } catch (perFileErr) {
+          // One unreadable file (a scan, an encrypted PDF) must not cost us the others.
+          console.error(`[rfp-upload] PDF text extraction failed for ${fb.displayName} (non-fatal):`, perFileErr);
+        }
       }
     } catch (err) {
       console.error('[rfp-upload] PDF text extraction failed (non-fatal):', err);

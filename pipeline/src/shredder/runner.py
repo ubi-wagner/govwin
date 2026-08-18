@@ -197,17 +197,37 @@ async def shred_solicitation(
     office = sol_row["office"]
     program_type = sol_row["program_type"]
 
-    # solicitation_documents — query for source docs that have a storage_key.
-    # The table was created in migration 012; earlier data may not have docs.
+    # solicitation_documents — EVERY document that can carry a rule, not just the umbrella.
+    #
+    # This used to read `document_type IN ('source','topic')`, which silently excluded the one
+    # document class that most often holds the binding numbers. A federal solicitation routinely
+    # states its rules across files: the DoW 2026 SBIR BAA sets the format requirements but
+    # explicitly DEFERS the technical-volume page limit to the Component-specific instructions,
+    # which arrive as a separate PDF. The admin upload form types every non-primary file
+    # 'attachment' (rfp-upload/route.ts), so attaching those instructions could never help —
+    # they were never extracted, `full_text` never contained them, and the compliance matrix
+    # was left with a permanently unresolvable deferral. Proven live: a 9-page instructions PDF
+    # stating "The Technical Volume is not to exceed 10 pages" sat in the row with
+    # extracted_text NULL while the matrix showed no page limit at all.
+    #
+    # So: shred every type. 'template' is excluded because a blank form contributes formatting
+    # noise, not rules. Ordering puts the umbrella first, then the documents it defers to, then
+    # topics — which is also the order the page-marker segmentation reads most sensibly.
     try:
         doc_rows = await conn.fetch(
             """
             SELECT id, storage_key, original_filename, document_type
             FROM solicitation_documents
             WHERE solicitation_id = $1
-              AND document_type IN ('source', 'topic')
+              AND document_type <> 'template'
+              AND storage_key IS NOT NULL
             ORDER BY
-              CASE document_type WHEN 'source' THEN 0 ELSE 1 END,
+              CASE document_type
+                WHEN 'source' THEN 0 WHEN 'rfp' THEN 0 WHEN 'nofo' THEN 0
+                WHEN 'instructions' THEN 1 WHEN 'amendment' THEN 1 WHEN 'qa' THEN 1
+                WHEN 'topic' THEN 2
+                ELSE 3
+              END,
               created_at ASC
             """,
             sol_uuid,

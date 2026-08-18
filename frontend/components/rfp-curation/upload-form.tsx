@@ -83,6 +83,11 @@ export function UploadForm() {
   // Optional topic files uploaded alongside the umbrella (multi-topic BAAs) —
   // each becomes a topic opportunity in one flow after the umbrella is created.
   const [topicFiles, setTopicFiles] = useState<File[]>([]);
+  // Per-file document type. A solicitation states its rules across FILES: the umbrella BAA sets
+  // the format and defers the page limit to the Component-specific instructions, which arrive as
+  // their own PDF. Typing that file 'instructions' is what lets the ingest treat it as a rule
+  // source rather than a nameless attachment. Index-aligned with `files`.
+  const [fileTypes, setFileTypes] = useState<string[]>([]);
   const [topicDragOver, setTopicDragOver] = useState(false);
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
@@ -123,6 +128,7 @@ export function UploadForm() {
   const removeFile = useCallback(
     (idx: number) => {
       setFiles((prev) => prev.filter((_, i) => i !== idx));
+      setFileTypes((prev) => prev.filter((_, i) => i !== idx));
       setPrimaryIndex((prev) => {
         if (idx === prev) return 0;
         if (idx < prev) return prev - 1;
@@ -168,6 +174,7 @@ export function UploadForm() {
     data.set('postedDate', String(new FormData(form).get('postedDate') ?? ''));
     data.set('description', String(new FormData(form).get('description') ?? ''));
     data.set('primaryIndex', String(primaryIndex));
+    data.set('documentTypes', JSON.stringify(files.map((_, i) => fileTypes[i] || (i === primaryIndex ? 'source' : 'attachment'))));
     for (const f of files) data.append('files', f);
 
     try {
@@ -390,13 +397,34 @@ export function UploadForm() {
                       ({(f.size / 1024 / 1024).toFixed(2)} MB)
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    className="text-xs text-red-600 hover:text-red-800 shrink-0 ml-2"
-                  >
-                    Remove
-                  </button>
+                  <span className="flex items-center gap-2 shrink-0 ml-2">
+                    <select
+                      value={fileTypes[idx] || (idx === primaryIndex ? 'source' : 'attachment')}
+                      onChange={(e) => setFileTypes((prev) => {
+                        const next = [...prev];
+                        while (next.length < files.length) next.push('');
+                        next[idx] = e.target.value;
+                        return next;
+                      })}
+                      title="What kind of document is this? 'Component instructions' is the one an umbrella BAA defers its page limit to."
+                      className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
+                    >
+                      <option value="source">Solicitation (umbrella)</option>
+                      <option value="instructions">Component instructions</option>
+                      <option value="amendment">Amendment</option>
+                      <option value="qa">Q&amp;A</option>
+                      <option value="topic">Topic</option>
+                      <option value="supporting">Supporting</option>
+                      <option value="attachment">Attachment</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>

@@ -183,6 +183,26 @@ describe('extractByPattern — refuses to guess', () => {
     expect(r.deferrals).toEqual([]);
   });
 
+  it('prefers the cap stated ABOUT the Technical Volume over any other page cap', () => {
+    // The DoW T3CP Component instructions state three caps. Leftmost-match would pick whichever
+    // happened to come first; the anchored rule picks the one that is actually the TV limit.
+    const text = `${'filler. '.repeat(30)}
+Phase II proposals must include the following in Volume 5:
+• A summary of Phase I-equivalent work performed (not to exceed 3 pages), including results.
+Technical Volume (Volume 2)
+The Technical Volume is not to exceed 10 pages and must follow the formatting requirements.`;
+    const r = extractByPattern(text);
+    expect(r.compliance.pageLimitTechnical).toBe(10);
+    expect(r.evidence.page_limit_technical.rule).toBe('page_limit.technical_volume_not_exceed');
+  });
+
+  it('does not read prose as a volume title ("…to Volume 5. For additional details…")', () => {
+    const text = `${'filler. '.repeat(30)}
+Do not upload any previous versions of this form to Volume 5. For additional details, please refer to the guide.
+Volume 5. This sentence should not become a volume name either.`;
+    expect(extractByPattern(text).volumes).toEqual([]);
+  });
+
   it('segments page numbering across concatenated documents', () => {
     // full_text is every shredded document joined, so the numbering restarts per file.
     const two = `${BAA}\n-- 1 of 4 --\nTopic instructions.\n-- 2 of 4 --\nMore.\n-- 3 of 4 --\n`;
@@ -190,6 +210,48 @@ describe('extractByPattern — refuses to guess', () => {
     expect(r.notes.join(' ')).toMatch(/spans 2 documents/i);
     expect(r.evidence.margins.docSegment).toBe(1);
     expect(r.evidence.margins.docSegmentPages).toBe(50);
+  });
+});
+
+describe('cross-document reconciliation — the Component instructions resolve the BAA deferral', () => {
+  // The real shape of a DoW ingest: the umbrella BAA plus the Component-specific instructions
+  // it points at, concatenated into one full_text with page numbering restarting per document.
+  const COMPONENT = `
+-- 1 of 9 --
+T3CP Component-Specific Instructions
+Proposal Coversheet (Volume 1)
+Volume 1 is created as part of the DoW Proposal Submissions process.
+Technical Volume (Volume 2)
+The Technical Volume is not to exceed 10 pages and must follow the formatting requirements
+provided in the DoW SBIR Program BAA. T3CP will only evaluate the first ten (10) pages.
+-- 2 of 9 --
+Cost Volume (Volume 3)
+The Phase I Base amount must not exceed $250,000.00.
+-- 3 of 9 --
+`;
+
+  it('reads the page limit from the attached instructions and drops the now-stale deferral', () => {
+    const r = extractByPattern(`${BAA}\n${COMPONENT}`);
+    expect(r.compliance.pageLimitTechnical).toBe(10);
+    // The deferral explained an EMPTY cell. The cell is no longer empty, so it is gone —
+    // reporting both would tell the curator the limit is 10 AND that it is set elsewhere.
+    expect(r.deferrals).toEqual([]);
+    expect(r.notes.join(' ')).not.toMatch(/defers the technical-volume page limit/i);
+    // …and the citation points into the SECOND document, where the rule actually lives.
+    expect(r.evidence.page_limit_technical.docSegment).toBe(2);
+    expect(r.evidence.page_limit_technical.anchor.excerpt).toMatch(/not to exceed 10 pages/i);
+  });
+
+  it('still reports the deferral when the instructions are NOT attached', () => {
+    const r = extractByPattern(BAA);
+    expect(r.compliance.pageLimitTechnical).toBeUndefined();
+    expect(r.deferrals.map((d) => d.field)).toEqual(['page_limit_technical']);
+  });
+
+  it('keeps the BAA volume list — the instructions name volumes in a form we do not parse', () => {
+    const r = extractByPattern(`${BAA}\n${COMPONENT}`);
+    expect(r.volumes).toHaveLength(7);
+    expect(r.volumes[6].name).toMatch(/Disclosures of Foreign Affiliations/);
   });
 });
 

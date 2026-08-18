@@ -19,6 +19,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { auditProvenance, summarizeAudit } from '@/lib/ingest/provenance-audit';
+import { coerceJsonb } from '@/lib/jsonb';
 import type { Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -105,11 +107,46 @@ export async function POST(request: Request, routeCtx: RouteContext) {
     if (!hasAiExtracted) missingStages.push({ stage: 'extracting', agent: 'ingest_analyst' });
     if (!hasCompliance) missingStages.push({ stage: 'matrixing', agent: 'matrix_stager' });
     if (!hasOutline) missingStages.push({ stage: 'skeletoning', agent: 'skeleton_architect' });
+
+    // ── Provenance audit — the CROSS-DOCUMENT reconciliation ──
+    // Stage flags say a matrix EXISTS; they cannot say whether any of it was read. This does:
+    // per-field provenance, which values are still system defaults, and — the one an admin
+    // cannot see any other way — whether a rule the umbrella solicitation DEFERS elsewhere is
+    // actually reachable from what is on file. A DoW BAA that points at the Component-specific
+    // instructions for its page limit is release-blocked until those instructions are attached,
+    // and the matrix looks perfectly healthy the whole time. (docs/INGEST_PROVENANCE.md)
+    let audit: ReturnType<typeof auditProvenance> | null = null;
+    try {
+      const [comp] = await sql<Array<Record<string, unknown>>>`
+        SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid LIMIT 1`;
+      const docs = await sql<Array<{ documentType: string | null; fileName: string | null }>>`
+        SELECT document_type AS "documentType", original_filename AS "fileName"
+        FROM solicitation_documents WHERE solicitation_id = ${solId}::uuid`;
+      audit = auditProvenance({
+        fieldProvenance: coerceJsonb<Record<string, unknown>>(comp?.fieldProvenance, {}),
+        values: comp ?? {},
+        documents: docs,
+      });
+    } catch (auditErr) {
+      // Non-fatal: the stage snapshot is still useful without the audit.
+      console.error('[rfp-curation] assess-ingest provenance audit failed:', auditErr);
+    }
+
     const snapshot = {
       stage,
       status,
       flags: { hasFullText, hasAiExtracted, complianceRowCount: compCount, hasOutline },
       missingStages,
+      provenance: audit && {
+        read: audit.read, defaulted: audit.defaulted, deferred: audit.deferred,
+        unknown: audit.unknown, fieldsTotal: audit.fieldsTotal,
+        coverage: Number(audit.coverage.toFixed(2)),
+        unresolvedDeferrals: audit.unresolvedDeferrals.map((f) => ({
+          field: f.field, label: f.label, reason: f.reason, page: f.page,
+        })),
+        findings: audit.findings,
+        summary: summarizeAudit(audit),
+      },
     };
 
     // ── Emit the trigger (start/end). The workflow reads payload.solicitationId

@@ -246,6 +246,16 @@ const RULES: Rule[] = [
     value: (m) => inches(m[1]) },
 
   // ── technical-volume page limit (POSITIVE forms only — the deferral rules run separately) ──
+  // ANCHORED forms first. A solicitation states several page caps — the DoW T3CP Component
+  // instructions cap the Technical Volume at 10 AND a Volume 5 feasibility summary at 3 — and
+  // the generic patterns below match both. Whichever appears first in the text would win, which
+  // is luck, not reading. These rules require the cap to be stated ABOUT the Technical Volume.
+  { id: 'page_limit.technical_volume_not_exceed', field: 'page_limit_technical',
+    re: /\btechnical\s+volume\b[^.]{0,80}?\b(?:shall|must|may|will|is|are)\s+not\s+(?:to\s+)?exceed\s+(?:\w+\s+)?\(?(\d{1,3})\)?\s+pages\b/i,
+    value: (m) => int(m[1], 1, 100) },
+  { id: 'page_limit.technical_volume_limited', field: 'page_limit_technical',
+    re: /\btechnical\s+volume\b[^.]{0,80}?\b(?:limited\s+to|maximum\s+of|no\s+more\s+than)\s+(?:\w+\s+)?\(?(\d{1,3})\)?\s+pages\b/i,
+    value: (m) => int(m[1], 1, 100) },
   { id: 'page_limit.not_exceed', field: 'page_limit_technical',
     re: /\b(?:shall|must|may|will|is|are)\s+not\s+(?:to\s+)?exceed\s+(?:\w+\s+)?\(?(\d{1,3})\)?\s+pages\b/i,
     value: (m) => int(m[1], 1, 100) },
@@ -308,7 +318,11 @@ const DEFERRAL_RULES: Array<{ id: string; field: string; re: RegExp; reason: str
 
 // ── Line-oriented rules (lists keep their line structure; run them on the RAW text) ──
 
-const VOLUME_LINE_RE = /^[^\n]{0,12}?\bVolume\s+(\d{1,2})\s*[:.–-]\s*(.{3,110})$/i;
+// "a. \tVolume 1: Proposal Cover Sheet". The separator is deliberately NOT `.` — a period after
+// the number is a sentence end, not a title separator, and admitting it turns prose like
+// "…upload this form to Volume 5. For additional details…" into a volume named
+// "For additional details" (a real line in the DoW T3CP Component instructions).
+const VOLUME_LINE_RE = /^[^\n]{0,12}?\bVolume\s+(\d{1,2})\s*[:–-]\s*(.{3,110})$/i;
 
 /** "Volume 1: Proposal Cover Sheet" … a contiguous 1..N run is the document's volume list. */
 function extractVolumes(text: string, idx: PageIndex): { volumes: ParsedVolume[]; cited: Cited | null } {
@@ -454,10 +468,15 @@ export function extractByPattern(text: string): PatternExtraction {
   }
 
   // ── deferrals ──
+  // A deferral explains an EMPTY cell. If the same ingest already produced a cited value for
+  // that field, the cell is not empty and the deferral is stale — this is the ordinary case for
+  // a multi-document solicitation: the BAA says "the page limit is in the Component-specific
+  // instructions", and those instructions are attached and state 10. The value wins, and it
+  // carries a citation into the document that actually set it.
   const deferrals: PatternDeferral[] = [];
   const seenDeferral = new Set<string>();
   for (const d of DEFERRAL_RULES) {
-    if (seenDeferral.has(d.field)) continue;
+    if (seenDeferral.has(d.field) || evidence[d.field]) continue;
     const m = d.re.exec(norm);
     if (!m) continue;
     seenDeferral.add(d.field);
