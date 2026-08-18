@@ -87,16 +87,24 @@ async def advance_ingest_phase(
         except Exception as exc:
             logger.error("advance_ingest_phase: state update failed: %s", exc)
         try:
+            # START/END pair, like every other trigger emitter (EVENT_CONTRACT). The END is what
+            # the processor's trigger matches, so it carries the full payload; the START gives
+            # the hop a parent so the ledger can pair it — a bare END is an event nothing can
+            # correlate, and the coverage verifier rightly flags it as an orphan.
+            hop_payload = {
+                "solicitation_id": str(solicitation_id), "phase": nxt, "auto": True,
+                "draft_id": draft_id, "guidance": guidance,
+                "source": source or "ingest_auto",
+                "lens_0": "citation", "lens_1": "completeness", "lens_2": "consistency",
+                "resolution": "majority",
+            }
+            start_id = await emit_event(
+                conn, namespace="finder", type="ingest.phase_requested", phase="start",
+                tenant_id=None, payload=hop_payload,
+            )
             await emit_event(
                 conn, namespace="finder", type="ingest.phase_requested", phase="end",
-                tenant_id=None,
-                payload={
-                    "solicitation_id": str(solicitation_id), "phase": nxt, "auto": True,
-                    "draft_id": draft_id, "guidance": guidance,
-                    "source": source or "ingest_auto",
-                    "lens_0": "citation", "lens_1": "completeness", "lens_2": "consistency",
-                    "resolution": "majority",
-                },
+                tenant_id=None, parent_event_id=start_id, payload=hop_payload,
             )
         except Exception as exc:
             logger.error("advance_ingest_phase: next-phase emit failed: %s", exc)

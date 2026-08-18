@@ -48,13 +48,18 @@ async function main() {
   orphanStarts.length ? bad('orphan START events (began, never accounted for)', orphanStarts)
     : ok('every start has an end', -1);
 
+  // An END must be correlatable: either it has a START parent (the pair convention), or —
+  // for a machine chain hop — it demonstrably did its job by spawning a workflow instance.
+  // A bare END that fired nothing is the ledger-garbage case this exists to catch. (The
+  // pipeline chain hops now pair too; the instance clause keeps pre-pairing history honest.)
   const orphanEnds = await sql<Array<{ id: string; type: string }>>`
     SELECT e.id, e.type FROM system_events e
     WHERE e.namespace = 'finder' AND e.type = ANY(${INGEST_TYPES}) AND e.phase = 'end'
       AND (e.parent_event_id IS NULL OR NOT EXISTS (
-        SELECT 1 FROM system_events s WHERE s.id = e.parent_event_id AND s.phase IN ('start', 'end')))`;
-  orphanEnds.length ? bad('orphan END events (nothing to correlate to)', orphanEnds)
-    : ok('every end has a parent', -1);
+        SELECT 1 FROM system_events s WHERE s.id = e.parent_event_id AND s.phase IN ('start', 'end')))
+      AND NOT EXISTS (SELECT 1 FROM process_instances pi WHERE pi.trigger_event_id = e.id)`;
+  orphanEnds.length ? bad('orphan END events (no start parent AND fired nothing)', orphanEnds)
+    : ok('every end is correlatable (paired, or it spawned its workflow)', -1);
 
   console.log('── 2. every phase trigger actually fired a workflow ──');
   // Pipeline-side auto-chain hops emit bare 'end' triggers (the studio_actions precedent);
@@ -97,12 +102,18 @@ async function main() {
     : ok('landed drafts fully attributed', -1);
 
   console.log('── 4. provenance floor on landed matrices ──');
+  // Scoped to solicitations that went through the STUDIO (have a landed draft): those were
+  // written by the stamping writers, so an unstamped value there is a real regression. Legacy
+  // pre-Studio rows are excluded — their empty provenance already renders as unverified by the
+  // mig 187 contract, and their updated_at gets bumped by unrelated writers (the custom_variables
+  // upsert), which made a row-level recency filter flag columns nothing had touched.
   const unstamped = await sql<Array<{ solicitationId: string; col: string }>>`
     SELECT c.solicitation_id AS "solicitationId", cols.col
     FROM solicitation_compliance c,
     LATERAL (VALUES ('page_limit_technical'), ('font_family'), ('min_font_size'), ('margins'),
                     ('submission_format')) AS cols(col)
-    WHERE c.updated_at > now() - interval '1 day'
+    WHERE EXISTS (SELECT 1 FROM solicitation_compliance_drafts d
+                  WHERE d.solicitation_id = c.solicitation_id AND d.status = 'landed')
       AND (CASE cols.col
              WHEN 'page_limit_technical' THEN c.page_limit_technical IS NOT NULL
              WHEN 'font_family' THEN c.font_family IS NOT NULL

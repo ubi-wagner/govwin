@@ -45,6 +45,7 @@ def emitted(monkeypatch):
 
     async def fake_emit(conn, **kw):
         calls.append(kw)
+        return f"evt-{len(calls)}"
 
     mod = types.ModuleType("events")
     mod.emit_event = fake_emit
@@ -65,11 +66,15 @@ def test_auto_chain_extract_to_matrix_reemits_with_lenses(emitted):
         conn, solicitation_id=SOL, phase="extract", auto=True, draft_id="d1",
     ))
     assert out == {"advanced": True, "next": "matrix", "auto": True}
-    # completed audit + the next-phase trigger
+    # completed audit + the next-phase trigger as a START/END PAIR (full patterning: the END is
+    # what the processor matches; the START gives the ledger something to pair it to).
     types_emitted = [c["type"] for c in emitted]
-    assert types_emitted == ["ingest.phase_completed", "ingest.phase_requested"]
-    nxt = emitted[1]
-    assert nxt["phase"] == "end"                      # the trigger convention the processor matches
+    assert types_emitted == ["ingest.phase_completed", "ingest.phase_requested", "ingest.phase_requested"]
+    assert [c["phase"] for c in emitted] == ["single", "start", "end"]
+    nxt = emitted[2]
+    # the END is parented to the START it pairs with (the fake returns "evt-<n>"; the start
+    # was the second emission)
+    assert nxt["parent_event_id"] == "evt-2"
     assert nxt["payload"]["phase"] == "matrix"
     assert nxt["payload"]["auto"] is True
     # the colour-team armament survives every hop
@@ -85,7 +90,7 @@ def test_auto_chain_matrix_to_review(emitted):
         FakeConn(), solicitation_id=SOL, phase="matrix", auto=True,
     ))
     assert out["next"] == "review"
-    assert emitted[1]["payload"]["phase"] == "review"
+    assert emitted[2]["payload"]["phase"] == "review"
 
 
 @pytest.mark.parametrize("auto", [True, False])
@@ -107,7 +112,7 @@ def test_molds_auto_completes(emitted):
         FakeConn(), solicitation_id=SOL, phase="molds", auto=True,
     ))
     assert out["next"] == "complete"
-    assert emitted[1]["payload"]["phase"] == "complete"
+    assert emitted[2]["payload"]["phase"] == "complete"
 
 
 def test_manual_holds_the_gate_without_reemitting(emitted):
