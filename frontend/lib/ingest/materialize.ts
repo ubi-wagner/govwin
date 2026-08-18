@@ -48,16 +48,34 @@ export async function materializeSkeleton(
 
   // ── Compliance ──
   const c = parsed.compliance ?? {};
-  // Stamp WHERE EACH VALUE CAME FROM (mig 187). `parsed.source` is 'ai' when the parse read the
-  // solicitation text, 'default' when it fell back to DEFAULT_SBIR_CSO_SKELETON, 'override' when an
-  // admin supplied a reviewed parse. Without this the fallbacks land indistinguishable from
-  // extracted rules and a curator sees confident numbers with nothing behind them — proven live on
-  // the DoW 2026 SBIR BAA, where the matrix was byte-identical whether the shredder had extracted
-  // 0 characters or 165,268. Only the fields this write actually sets are stamped; a curator
-  // verifying one field later upgrades just that key to 'verified'.
+  // Stamp WHERE EACH VALUE CAME FROM (mig 187). Without this the fallbacks land
+  // indistinguishable from extracted rules and a curator sees confident numbers with nothing
+  // behind them — proven live on the DoW 2026 SBIR BAA, where the matrix was byte-identical
+  // whether the shredder had extracted 0 characters or 165,268.
+  //
+  // PER FIELD, not per row: a single parse blends layers (pattern-proven margins + an AI page
+  // limit + a defaulted typeface), so `parsed.source` alone would label the whole row with its
+  // strongest contributor. `parsed.fieldSources` carries the real per-column answer; `source`
+  // is only the fallback for a parse that predates it (an admin 'override', say). Pattern-read
+  // fields also carry their CITATION, so the row can show the curator the sentence it came
+  // from. Only fields this write actually sets are stamped; a curator verifying one field later
+  // upgrades just that key to 'verified'.
   const provSource = parsed.source ?? 'default';
-  const stamped: Record<string, { source: string }> = {};
-  const stamp = (col: string, v: unknown) => { if (v !== undefined && v !== null) stamped[col] = { source: provSource }; };
+  const perField = parsed.fieldSources ?? {};
+  const evidence = parsed.fieldEvidence ?? {};
+  const stamped: Record<string, {
+    source: string; rule?: string; page?: number | null; excerpt?: string;
+    charOffset?: number | null; docSegment?: number | null;
+    deferred?: boolean; reason?: string;
+  }> = {};
+  const stamp = (col: string, v: unknown) => {
+    if (v === undefined || v === null) return;
+    const source = perField[col] ?? provSource;
+    const ev = source === 'pattern_match' ? evidence[col] : undefined;
+    stamped[col] = ev
+      ? { source, rule: ev.rule, page: ev.page ?? null, excerpt: ev.excerpt, charOffset: ev.charOffset ?? null, docSegment: ev.docSegment ?? null }
+      : { source };
+  };
   stamp('page_limit_technical', c.pageLimitTechnical);
   stamp('font_family', c.fontFamily);
   stamp('font_size', c.fontSize);
@@ -66,6 +84,20 @@ export async function materializeSkeleton(
   stamp('submission_format', c.submissionFormat);
   stamp('required_sections', c.requiredSections?.length ? c.requiredSections : null);
   stamp('required_documents', c.requiredDocuments?.length ? c.requiredDocuments : null);
+
+  // DEFERRALS are stamped even though the column stays NULL — they are the reason it is null.
+  // "The BAA defers the page limit to the Component-specific instructions" is the single most
+  // useful thing a curator can know about that empty cell: it says the blank is CORRECT and a
+  // number would be wrong. Without persisting it the finding lived only in a toast, so the next
+  // person to open the workspace saw an unexplained gap and would reasonably fill it in.
+  for (const [col, d] of Object.entries(parsed.deferrals ?? {})) {
+    if (stamped[col]) continue;   // a real value was found after all — that outranks the deferral
+    stamped[col] = {
+      source: 'pattern_match', deferred: true, reason: d.reason,
+      rule: d.rule, page: d.page ?? null, excerpt: d.excerpt,
+      charOffset: d.charOffset ?? null, docSegment: d.docSegment ?? null,
+    };
+  }
 
   await sql`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
   await sql`INSERT INTO solicitation_compliance

@@ -23,11 +23,66 @@ export interface ParsedTopic {
   summary?: string | null; description?: string | null; techFocusAreas?: string[];
   openDate?: string | null; closeDate?: string | null; preReleaseDate?: string | null;
 }
+/**
+ * Where a compliance value came from. Trust order, strongest → weakest (migration 187):
+ *
+ *   hitl          a human highlighted it in the source (carries a SourceAnchor)
+ *   verified      a curator confirmed/corrected it against the document
+ *   override      supplied wholesale by an admin-reviewed parse
+ *   pattern_match read deterministically off this solicitation's text, WITH a citable excerpt
+ *   ai            extracted from this solicitation's text by the model, unanchored
+ *   default       a SYSTEM FALLBACK — not read from this solicitation at all
+ *
+ * `pattern_match` outranks `ai` because it is cited, not merely asserted: the value comes
+ * with the sentence it was lifted from and a character offset a curator can check.
+ */
+export type ProvenanceSource = 'hitl' | 'verified' | 'override' | 'pattern_match' | 'ai' | 'default';
+
 export interface ParsedSolicitation {
   compliance: ParsedCompliance;
   volumes: ParsedVolume[];
   topics: ParsedTopic[]; // empty ⇒ the solicitation's own umbrella opportunity is the single card
-  source?: 'ai' | 'default' | 'override';
+  /** The DOMINANT source. Per-field truth lives in `fieldSources` — read that when it exists. */
+  source?: ProvenanceSource;
+  /**
+   * Per-field provenance, keyed by solicitation_compliance COLUMN name (snake_case:
+   * page_limit_technical, min_font_size, …), plus the pseudo-key `volumes`. A parse that
+   * blends layers (pattern-proven margins + AI-guessed page limit + defaulted typeface) MUST
+   * fill this — `source` alone would label the whole row with the strongest contributor and
+   * present guesses as reads. Absent ⇒ every written field is `source`.
+   */
+  fieldSources?: Record<string, ProvenanceSource>;
+  /** Citation per field for the sources that carry one (today: pattern_match). */
+  fieldEvidence?: Record<string, ParsedFieldEvidence>;
+  /**
+   * Fields the document explicitly sets ELSEWHERE — e.g. the DoW BAA stating that the
+   * technical-volume page limit lives in the Component-specific instructions. This is the
+   * strongest possible statement about such a field, and the opposite of a gap: it means an
+   * empty cell is CORRECT and a filled one would be wrong. Keyed by compliance column.
+   */
+  deferrals?: Record<string, ParsedFieldDeferral>;
+  /** Findings with no column of their own — deadline time, media bans. */
+  notes?: string[];
+}
+
+/** A field this solicitation deliberately does not set, with the sentence that says so. */
+export interface ParsedFieldDeferral extends ParsedFieldEvidence {
+  /** Where the rule actually lives, in plain language for the curator. */
+  reason: string;
+}
+
+/** A citation back into the source document for one extracted field. */
+export interface ParsedFieldEvidence {
+  /** Stable rule id that produced the value. */
+  rule: string;
+  /** 1-based page within its document, when the text carried page markers. */
+  page?: number | null;
+  /** The sentence/fragment the value was lifted from. */
+  excerpt: string;
+  /** Character offset into `curated_solicitations.full_text`. */
+  charOffset?: number | null;
+  /** Which document of a multi-document ingest, when page numbering restarts. */
+  docSegment?: number | null;
 }
 
 /**

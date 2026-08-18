@@ -58,7 +58,20 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **185**; migs 183–185 add section-comment anchors + the per-command RLS backstop closing shared writes on `document_templates` then `tasks`/`process_instances` — mig 180 the bucket-score
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **188**; migs 186–188 the
+**ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
+*a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
+merges three layers PER FIELD — `pattern_match` (`lib/ingest/pattern-extract.ts`, a deterministic, DB-free,
+key-free extractor that lifts only unambiguously-stated rules and CITES each with rule + page + excerpt +
+char-offset + which document) → `ai` → `default` — stamping the winner into `solicitation_compliance.field_provenance`
+(mig 187; mig 188 documents the full contract) so the UI badges "Read from source" vs a red "Default — unverified".
+**Absence is a finding**: a DEFERRAL ("the page limit lives in the Component-specific instructions") CLEARS the
+default and renders as "Set elsewhere" with the citation — never a fabricated number. Assist also REFUSES an
+unshredded solicitation (409 `SOURCE_TEXT_NOT_READY`; `GET` the same route for readiness — the upload form polls
+it instead of racing the async shred), with an explicit `allowDefaultSkeleton` opt-in. Trust order:
+hitl > verified > override > pattern_match > ai > default. Mig 186 gave `episodic_memories` PLATFORM scope
+(`tenant_id IS NULL`) so curation memory actually persists; migs 183–185 add section-comment anchors + the
+per-command RLS backstop closing shared writes on `document_templates` then `tasks`/`process_instances` — mig 180 the bucket-score
 integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
 OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
 `build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket

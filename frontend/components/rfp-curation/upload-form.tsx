@@ -28,7 +28,31 @@ const OFFICES = [
   'DARPA/I2O', 'DARPA/DSO', 'DARPA/MTO', 'DARPA/STO',
 ];
 
-type Status = 'idle' | 'uploading' | 'assisting' | 'topics' | 'success' | 'error';
+type Status = 'idle' | 'uploading' | 'shredding' | 'assisting' | 'topics' | 'success' | 'error';
+
+/** How long to wait for the async shred before handing off to the workspace button. */
+const SHRED_POLL_MS = 2_000;
+const SHRED_POLL_TRIES = 20; // ~40s — a 50-page PDF shreds well inside this
+
+/**
+ * Poll until the solicitation has usable source text. Returns false on timeout or on a
+ * terminal state (no document / shredder_failed) — the caller then SKIPS Assist rather than
+ * running it against nothing.
+ */
+async function waitForShred(solId: string): Promise<boolean> {
+  for (let i = 0; i < SHRED_POLL_TRIES; i++) {
+    try {
+      const r = await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, { cache: 'no-store' });
+      if (r.ok) {
+        const d = (await r.json())?.data as { ready?: boolean; state?: string } | undefined;
+        if (d?.ready) return true;
+        if (d?.state === 'shred_failed' || d?.state === 'no_document') return false;
+      }
+    } catch { /* transient — keep polling */ }
+    await new Promise((res) => setTimeout(res, SHRED_POLL_MS));
+  }
+  return false;
+}
 
 const PROGRAM_TYPES = [
   { value: 'sbir_phase_1', label: 'SBIR Phase I' },
@@ -166,14 +190,25 @@ export function UploadForm() {
       // after upload. Review-gated: it does NOT publish to customers — the upload lands in
       // your curation queue, and you release it with Push after review. Same materializer the
       // Scouts feed. Best-effort: on failure, the workspace still has the manual button.
+      //
+      // WAIT FOR THE SHRED FIRST. The upload only EMITS `finder:rfp.uploaded`; OnRfpUploaded
+      // extracts the text asynchronously, so at this instant `full_text` is almost always still
+      // empty. Firing Assist here used to build the whole matrix off the default skeleton and
+      // present it as if the document had been read. Poll the readiness endpoint, then run.
+      // If the shred is still going when we give up, we simply skip — the workspace button
+      // stays, and it now reports the real state instead of fabricating one.
       const solId = json.data.solicitation_id as string;
       if (runAssist && solId) {
-        setStatus('assisting');
-        try {
-          await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
-          });
-        } catch { /* non-fatal */ }
+        setStatus('shredding');
+        const ready = await waitForShred(solId);
+        if (ready) {
+          setStatus('assisting');
+          try {
+            await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
+            });
+          } catch { /* non-fatal */ }
+        }
       }
       // Topic files → topic opportunities (single-flow: 1 umbrella + N topic
       // files → N topic OPPs). Best-effort: on failure the workspace drop-zone
@@ -445,10 +480,11 @@ export function UploadForm() {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={status === 'uploading' || status === 'assisting' || status === 'topics' || files.length === 0}
+          disabled={status === 'uploading' || status === 'shredding' || status === 'assisting' || status === 'topics' || files.length === 0}
           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
         >
           {status === 'uploading' ? 'Uploading…'
+            : status === 'shredding' ? 'Extracting document text…'
             : status === 'assisting' ? 'Building matrix & skeleton…'
             : status === 'topics' ? 'Creating topic opportunities…'
             : topicFiles.length > 0 ? `Upload + ${topicFiles.length} topic${topicFiles.length > 1 ? 's' : ''}`

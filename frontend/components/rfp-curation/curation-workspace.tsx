@@ -216,21 +216,39 @@ export function CurationWorkspace({
   // section molds → topic opportunities, FOR YOUR REVIEW (a suite for a multi-topic
   // solicitation). Review-gated: it does NOT publish to customers — release happens
   // through Push after you approve. The same materializer the Scouts feed.
-  const handleIngestAssist = async () => {
-    if (typeof window !== 'undefined' && !window.confirm(
+  const handleIngestAssist = async (allowDefaultSkeleton = false) => {
+    if (!allowDefaultSkeleton && typeof window !== 'undefined' && !window.confirm(
       'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds for your review. Nothing is published to customers — you release it with Push after review. Existing volumes/compliance for this solicitation are replaced. Continue?'
     )) return;
     setAssistBusy(true);
     try {
       const res = await fetch(`/api/admin/rfp-curation/${sol.id}/ingest-assist`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publish: false, allowDefaultSkeleton }),
       });
       const json = await res.json().catch(() => ({}));
+      // The shred gate. Rather than fail flat, offer the ONE thing an admin might legitimately
+      // want here — the blank starting skeleton — but make them ask for it, and say plainly
+      // that nothing in it was read from this document.
+      if (res.status === 409 && json.code === 'SOURCE_TEXT_NOT_READY') {
+        const canForce = json.detail?.canForceDefaultSkeleton && json.detail?.documents > 0;
+        if (canForce && typeof window !== 'undefined' && window.confirm(
+          `${json.error}\n\nBuild the DEFAULT SBIR/CSO skeleton anyway? Every value will be marked "Default — unverified" because none of it was read from this solicitation.`
+        )) { setAssistBusy(false); return handleIngestAssist(true); }
+        toast.error(json.error);
+        return;
+      }
       if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
       const d = json.data ?? {};
+      // Report how much was actually READ, not just how much was written — a curator needs to
+      // know at a glance whether they are looking at extraction or fallback.
+      const srcs: string[] = Object.values(d.fieldSources ?? {});
+      const read = srcs.filter((s) => s === 'pattern_match' || s === 'ai').length;
       toast.success(
-        `Ingest Assist complete (${d.source}): ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) built for review — Push to release`,
+        `Ingest Assist complete: ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s) — ` +
+        `${read}/${srcs.length || 0} compliance fields read from the document (${d.source}). Push to release.`,
       );
+      for (const n of (d.notes ?? []) as string[]) toast.info(n);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Ingest Assist failed');
@@ -693,11 +711,13 @@ export function CurationWorkspace({
   // Merge AI-suggested (named columns) with human-verified (custom_variables)
   function getComplianceValue(camelKey: string): {
     value: unknown;
-    source: 'ai' | 'verified' | 'hitl' | 'default' | null;
+    source: 'ai' | 'pattern_match' | 'verified' | 'hitl' | 'default' | 'deferred' | null;
     sourceExcerpt: string | null;
     sourcePage: number | null;
     documentName: string | null;
     anchor: import('@/lib/types/source-anchor').SourceAnchor | null;
+    /** Set only for `deferred`: where the solicitation says the rule actually lives. */
+    deferralReason?: string | null;
   } {
     const snakeKey = snakeCase(camelKey);
     const custom = (compState?.customVariables as Record<string, {
@@ -749,17 +769,55 @@ export function CurationWorkspace({
     // Named column fallback. The raw column does NOT imply the value was read from this
     // solicitation — Ingest Assist writes DEFAULT_SBIR_CSO_SKELETON here whenever the parse is
     // unavailable or thin, and labelling that 'ai' told the curator a system fallback was an
-    // extracted rule. mig 187 stamps field_provenance per column, so trust that: only 'ai' /
-    // 'override' means it came off the document; 'default' (or an unstamped legacy row) is a
-    // fallback the curator must verify against the solicitation before anyone builds to it.
+    // extracted rule. mig 187 stamps field_provenance per column, so trust that: only
+    // pattern_match / ai / override means it came off the document; 'default' (or an unstamped
+    // legacy row) is a fallback to verify against the solicitation before anyone builds to it.
+    //
+    // A pattern_match entry also carries its CITATION (rule + page + excerpt + offset), so the
+    // row can show the curator the exact sentence the value was lifted from — same treatment a
+    // human highlight gets, because it is the same kind of claim: here is where it says so.
     const aiVal = compState?.[camelKey as keyof typeof compState];
     if (aiVal !== null && aiVal !== undefined) {
-      const prov = (compState?.fieldProvenance as Record<string, { source?: string }> | null)?.[snakeKey]?.source;
+      const entry = (compState?.fieldProvenance as Record<string, {
+        source?: string; rule?: string; page?: number | null; excerpt?: string; charOffset?: number | null;
+      }> | null)?.[snakeKey];
+      const prov = entry?.source;
+      if (prov === 'pattern_match') {
+        return {
+          value: aiVal,
+          source: 'pattern_match',
+          sourceExcerpt: entry?.excerpt ?? null,
+          sourcePage: entry?.page ?? null,
+          documentName: null,
+          anchor: entry?.excerpt ? {
+            page: entry.page ?? 1,
+            excerpt: entry.excerpt,
+            char_offset: entry.charOffset ?? undefined,
+            section_key: snakeKey,
+            method: 'pattern_match' as const,
+          } : null,
+        };
+      }
       const trusted = prov === 'ai' || prov === 'override' || prov === 'verified' || prov === 'hitl';
       return {
         value: aiVal,
         source: trusted ? 'ai' : 'default',
         sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null,
+      };
+    }
+
+    // Empty cell — but not necessarily an unanswered one. When the extractor found the
+    // solicitation saying the rule lives ELSEWHERE (this BAA defers the technical-volume page
+    // limit to the Component-specific instructions), the blank is the CORRECT answer and a
+    // number here would be wrong. Say so, or the next curator fills the gap with a guess.
+    const def = (compState?.fieldProvenance as Record<string, {
+      deferred?: boolean; reason?: string; page?: number | null; excerpt?: string;
+    }> | null)?.[snakeKey];
+    if (def?.deferred) {
+      return {
+        value: null, source: 'deferred',
+        sourceExcerpt: def.excerpt ?? null, sourcePage: def.page ?? null,
+        documentName: null, anchor: null, deferralReason: def.reason ?? null,
       };
     }
     return { value: null, source: null, sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
@@ -785,7 +843,7 @@ export function CurationWorkspace({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleIngestAssist}
+            onClick={() => { void handleIngestAssist(false); }}
             disabled={assistBusy}
             title="Parse this solicitation and auto-build the matrix, volumes, and section molds for your review (nothing is published to customers until you Push)"
             className="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
@@ -1274,7 +1332,7 @@ export function CurationWorkspace({
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
-                const { value, source, sourceExcerpt, sourcePage, documentName, anchor: varAnchor } = getComplianceValue(field.key);
+                const { value, source, sourceExcerpt, sourcePage, documentName, anchor: varAnchor, deferralReason } = getComplianceValue(field.key);
                 return (
                   <div key={field.key} className="py-2 border-b border-gray-100 last:border-0">
                     <div className="flex items-center justify-between">
@@ -1285,18 +1343,29 @@ export function CurationWorkspace({
                             className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
                               source === 'hitl' ? 'bg-emerald-100 text-emerald-800 font-semibold'
                                 : source === 'verified' ? 'bg-green-100 text-green-700'
+                                : source === 'pattern_match' ? 'bg-sky-100 text-sky-800 font-semibold'
+                                : source === 'deferred' ? 'bg-violet-100 text-violet-800 font-semibold'
                                 : source === 'default' ? 'bg-red-100 text-red-700 font-semibold'
                                 : 'bg-yellow-100 text-yellow-700'
                             }`}
                             title={
                               source === 'hitl' ? 'HIGHLIGHTED IN THE SOURCE by a curator — anchored to a page + excerpt in the document. Strongest provenance.'
                                 : source === 'verified' ? 'A curator confirmed this against the solicitation (not anchored to a region).'
+                                : source === 'pattern_match' ? `READ FROM THE DOCUMENT by the deterministic extractor, with the exact sentence cited${sourcePage ? ` (p.${sourcePage})` : ''}${sourceExcerpt ? `: “${sourceExcerpt}”` : ''}`
+                                : source === 'deferred' ? `${deferralReason ?? 'This solicitation sets no value here.'}${sourcePage ? ` (p.${sourcePage})` : ''}${sourceExcerpt ? `: “${sourceExcerpt}”` : ''}`
                                 : source === 'default' ? 'SYSTEM DEFAULT — not read from this solicitation. Verify against the document before anyone builds to it.'
                                 : 'Extracted from the solicitation text by the AI parse — confirm before release.'
                             }
                           >
-                            {source === 'hitl' ? 'Highlighted' : source === 'verified' ? 'Verified' : source === 'default' ? 'Default — unverified' : 'AI'}
+                            {source === 'hitl' ? 'Highlighted'
+                              : source === 'verified' ? 'Verified'
+                              : source === 'pattern_match' ? 'Read from source'
+                              : source === 'deferred' ? 'Set elsewhere'
+                              : source === 'default' ? 'Default — unverified' : 'AI'}
                           </span>
+                        )}
+                        {source === 'deferred' && deferralReason && (
+                          <p className="mt-0.5 text-xs text-violet-700">{deferralReason}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

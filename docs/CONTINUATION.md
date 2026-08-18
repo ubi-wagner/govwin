@@ -704,6 +704,13 @@ These are recurring bug-classes — treat them as a checklist, not one-offs:
 4. **Standalone serving (supersedes the old "next start" note):** `output:'standalone'` means
    `next start` is broken — serve `node .next/standalone/server.js`, re-stage `.next/static` +
    `public` on every rebuild, restart, verify matching BUILD_IDs. Rebuild ≠ live. (§2 has the recipe.)
+   ⚠️ **The stale-server trap:** the heartbeat only starts a server when :3000 is FREE, so a process
+   left over from before your rebuild keeps serving the OLD code — and the symptom is a live test
+   failing on the exact behaviour you just added, which reads like your code is wrong. After every
+   rebuild, kill by PID and confirm the new one is younger than the build:
+   `fuser -k 3000/tcp` then `ps -o pid,lstart -p $(fuser 3000/tcp)`. (`ss` is not installed here; use
+   `fuser`. And `pkill -f standalone/server.js` never matches — the heartbeat launches a bare
+   `node server.js` with cwd=standalone.)
 5. **JWT is the singular-session source of truth:** everything authz reads the active
    membership off the token; never infer tenant from `users.tenant_id`.
 6. **Section ordering = `sort_index`, never `section_number` string:** any new query that lists
