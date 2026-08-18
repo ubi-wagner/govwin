@@ -29,7 +29,15 @@ FE="$ROOT/frontend"
 STANDALONE="$FE/.next/standalone"
 HARNESS="$FE/scripts/test-harness"
 SCR="${SCR:-/tmp/govwin-sandbox}"
-DBURL='postgresql://govtech:changeme@localhost:5432/govtech_intel'
+# PROD-FAITHFUL BY DEFAULT (CLAUDE.md: "the sandbox EMULATES PRODUCTION EXACTLY — serve as
+# govtech_app with RLS on"). The app connects as the NOBYPASSRLS `govtech_app` role so RLS is
+# actually ENFORCED here, and sqlBypass gets the owner via DATABASE_URL_OWNER. Serving as the
+# superuser instead (the old behaviour) silently bypasses every policy, which hides the entire
+# missing-enterTenant bug class from tsc/vitest/live testing — a class that then only shows up in
+# production as 0 rows / 404 / RLS-violation. Set RLS_FAITHFUL=0 to fall back to the superuser.
+DBURL_OWNER='postgresql://govtech:changeme@localhost:5432/govtech_intel'
+DBURL_APP='postgresql://govtech_app:changeme@localhost:5432/govtech_intel'
+if [ "${RLS_FAITHFUL:-1}" = "1" ]; then DBURL="$DBURL_APP"; else DBURL="$DBURL_OWNER"; fi
 INTERVAL="${INTERVAL:-20}"
 EMULATE="${EMULATE:-0}"
 EMU_PORT="${EMU_PORT:-8787}"
@@ -42,7 +50,8 @@ ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }
 emu_env() { [ "$EMULATE" = "1" ] && echo "ANTHROPIC_BASE_URL=http://127.0.0.1:${EMU_PORT} ANTHROPIC_API_KEY=emulated-claude"; }
 start_server() {
   ( cd "$STANDALONE" && env \
-      DATABASE_URL="$DBURL" AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
+      DATABASE_URL="$DBURL" DATABASE_URL_OWNER="$DBURL_OWNER" \
+      AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
       NEXTAUTH_URL='http://localhost:3000' AUTH_URL='http://localhost:3000' \
       PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production \
       FOUNDING_COHORT_BYPASS=true ATOM_EMBED=local STORAGE_DRIVER=local \

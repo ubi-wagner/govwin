@@ -1,0 +1,409 @@
+<title>The RLS Blind Spot</title>
+<style>
+  :root {
+    --paper:#FCFCFD; --surface:#F1F3F6; --surface-2:#E8ECF1;
+    --ink:#14171C; --muted:#5C6470; --rule:#D9DEE5;
+    --accent:#2C6389;
+    --ok:#1F6E45; --ok-soft:#E2F0E8;
+    --bad:#A32E2E;
+    --open:#8A6212; --open-soft:#F8EEDA;
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#111419; --surface:#181C23; --surface-2:#20262F;
+      --ink:#E7EAEF; --muted:#98A2B0; --rule:#2A313B;
+      --accent:#7FB2D4;
+      --ok:#6FCB9B; --ok-soft:#16261E;
+      --bad:#E88C88;
+      --open:#DCB463; --open-soft:#282013;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#111419; --surface:#181C23; --surface-2:#20262F;
+    --ink:#E7EAEF; --muted:#98A2B0; --rule:#2A313B;
+    --accent:#7FB2D4;
+    --ok:#6FCB9B; --ok-soft:#16261E;
+    --bad:#E88C88;
+    --open:#DCB463; --open-soft:#282013;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:60rem; margin:0 auto; padding:3.5rem 1.5rem 6rem; }
+  .col { max-width:44rem; }
+
+  header.mast { border-bottom:2px solid var(--ink); padding-bottom:1.4rem; margin-bottom:2.6rem; }
+  .kicker {
+    font-family:var(--mono); font-size:.7rem; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 .9rem;
+  }
+  h1 {
+    font-family:var(--serif); font-weight:600; font-size:clamp(2.1rem,5.5vw,3.1rem);
+    line-height:1.08; letter-spacing:-.015em; margin:0 0 .7rem; text-wrap:balance;
+  }
+  .standfirst {
+    font-family:var(--serif); font-size:1.12rem; line-height:1.55; color:var(--muted);
+    margin:0; max-width:42rem;
+  }
+  .meta {
+    display:flex; flex-wrap:wrap; gap:.4rem 1.6rem; margin-top:1.3rem;
+    font-family:var(--mono); font-size:.73rem; color:var(--muted);
+  }
+  .meta b { color:var(--ink); font-weight:600; }
+
+  .verdict {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); gap:1px;
+    background:var(--rule); border:1px solid var(--rule); margin:2.4rem 0 3rem;
+  }
+  .verdict div { background:var(--paper); padding:1rem 1.1rem; }
+  .verdict .n {
+    font-family:var(--mono); font-size:1.75rem; font-weight:600; line-height:1;
+    font-variant-numeric:tabular-nums; display:block; margin-bottom:.35rem;
+  }
+  .verdict .l { font-size:.76rem; color:var(--muted); line-height:1.35; display:block; }
+  .n.ok{color:var(--ok);} .n.bad{color:var(--bad);} .n.open{color:var(--open);} .n.acc{color:var(--accent);}
+
+  h2 {
+    font-family:var(--serif); font-size:1.62rem; font-weight:600; letter-spacing:-.01em;
+    margin:3.4rem 0 .5rem; padding-top:1.2rem; border-top:1px solid var(--rule); text-wrap:balance;
+  }
+  h2:first-of-type { border-top:none; padding-top:0; }
+  h3 { font-size:1.02rem; font-weight:650; margin:2rem 0 .5rem; letter-spacing:-.005em; }
+  p { margin:0 0 1rem; }
+  .lede { font-size:1.04rem; color:var(--muted); margin-bottom:1.6rem; }
+
+  code { font-family:var(--mono); font-size:.855em; }
+  p code, li code, td code {
+    background:var(--surface); border:1px solid var(--rule);
+    padding:.06em .34em; border-radius:3px; white-space:nowrap;
+  }
+
+  .evidence {
+    background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    font-family:var(--mono); font-size:.78rem; line-height:1.65;
+    padding:.95rem 1.1rem; margin:1.2rem 0 1.5rem; overflow-x:auto; white-space:pre;
+  }
+  .evidence .c { color:var(--muted); }
+  .evidence .g { color:var(--ok); font-weight:600; }
+  .evidence .r { color:var(--bad); font-weight:600; }
+
+  .find {
+    border:1px solid var(--rule); background:var(--surface);
+    padding:1.05rem 1.2rem; margin:0 0 .85rem;
+  }
+  .find-h { display:flex; align-items:flex-start; gap:.7rem; margin-bottom:.4rem; flex-wrap:wrap; }
+  .chip {
+    font-family:var(--mono); font-size:.63rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:.2rem .48rem; border-radius:2px; font-weight:700; white-space:nowrap; flex-shrink:0;
+    margin-top:.16rem; background:var(--ok-soft); color:var(--ok); border:1px solid var(--ok);
+  }
+  .find-t { font-weight:650; font-size:.97rem; line-height:1.4; flex:1; min-width:14rem; }
+  .find p { margin:.45rem 0 0; font-size:.92rem; color:var(--muted); }
+  .find p:first-of-type { margin-top:.3rem; }
+  .find .site { font-family:var(--mono); font-size:.76rem; color:var(--accent); word-break:break-all; }
+
+  .tw { overflow-x:auto; margin:1.3rem 0 1.6rem; border:1px solid var(--rule); }
+  table { border-collapse:collapse; width:100%; font-size:.855rem; min-width:34rem; }
+  th, td { text-align:left; padding:.52rem .8rem; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th {
+    background:var(--surface-2); font-family:var(--mono); font-size:.68rem;
+    letter-spacing:.07em; text-transform:uppercase; font-weight:700; color:var(--muted);
+  }
+  tr:last-child td { border-bottom:none; }
+  td.mono { font-family:var(--mono); font-size:.78rem; }
+  .yes { color:var(--ok); font-weight:650; }
+
+  ul { margin:0 0 1.1rem; padding-left:1.25rem; }
+  li { margin-bottom:.42rem; }
+
+  .callout {
+    border:1px solid var(--open); background:var(--open-soft);
+    padding:1.05rem 1.2rem; margin:1.6rem 0;
+  }
+  .callout h3 { margin:0 0 .45rem; color:var(--open); font-size:.95rem; }
+  .callout p { margin:0 0 .6rem; font-size:.92rem; }
+  .callout p:last-child { margin-bottom:0; }
+
+  footer {
+    margin-top:4rem; padding-top:1.3rem; border-top:1px solid var(--rule);
+    font-family:var(--mono); font-size:.73rem; color:var(--muted);
+  }
+  @media (max-width:640px){ .wrap{padding:2.2rem 1.1rem 4rem;} }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">Exhaustive audit · govwin · branch claude/nice-hamilton-kBqtD</p>
+  <h1>The RLS Blind Spot</h1>
+  <p class="standfirst">Five auditors swept every route, all 36 agent archetypes, all 24 workflow
+  templates and the workflow engine. The headline is not any single bug — it is that the sandbox
+  was structurally incapable of seeing a whole class of them.</p>
+  <div class="meta">
+    <span><b>2026-08-17</b></span>
+    <span>commits <b>f8b81a64</b> · <b>1718df64</b></span>
+    <span>26 files</span>
+    <span>pushed</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div><span class="n bad">21</span><span class="l">proven defects fixed</span></div>
+  <div><span class="n acc">6</span><span class="l">roles driven live</span></div>
+  <div><span class="n ok">1181</span><span class="l">vitest passing</span></div>
+  <div><span class="n ok">1035</span><span class="l">pytest passing</span></div>
+  <div><span class="n open">3</span><span class="l">open decisions</span></div>
+</div>
+
+<div class="col">
+<h2>Why this class was invisible</h2>
+<p class="lede">The app connects as <code>govtech_app</code>, a <code>NOBYPASSRLS</code> role. The
+sandbox connected as <code>govtech</code> — a <em>superuser</em>, which bypasses every row-level
+security policy unconditionally, including <code>FORCE</code>.</p>
+
+<p>So a route that forgot to establish its tenant context worked perfectly in the sandbox, passed
+<code>tsc</code>, passed <code>vitest</code>, passed a live browser drive — and then returned zero rows
+in production. Not an error. Just nothing: an empty list, a 404, a silently-skipped write.</p>
+
+<p>Connecting as the real role makes the whole class immediate and obvious:</p>
+</div>
+
+<div class="evidence"><span class="c">$ psql -U govtech_app   # the role production actually uses</span>
+
+TABLE                            NO CONTEXT    WITH CONTEXT
+──────────────────────────────────────────────────────────
+proposal_portals                  <span class="r">0</span>             <span class="g">4</span>
+proposals                         <span class="r">0</span>             <span class="g">5</span>
+proposal_sections                 <span class="r">0</span>            <span class="g">65</span>
+library_atoms                     <span class="r">0</span>            <span class="g">33</span>
+atom_tags                         <span class="r">0</span>           <span class="g">134</span>
+agent_task_queue                  <span class="r">0</span>             <span class="g">2</span>
+
+<span class="c">Every RLS-gated table returns nothing without SET app.tenant_id.</span></div>
+
+<div class="col">
+<p>The sandbox has been switched to serve as <code>govtech_app</code> with
+<code>DATABASE_URL_OWNER</code> for <code>sqlBypass</code> — which is what <code>CLAUDE.md</code>
+already said it should do. <strong>A route that forgets its context now fails here, which is the
+entire point.</strong></p>
+
+<h3>The mechanic that caused most of them</h3>
+<p><code>enterTenant</code> uses <code>AsyncLocalStorage.enterWith()</code>. Called inside an
+<em>awaited helper</em>, it is discarded the moment control returns to the handler — Next.js wraps
+each request in its own <code>.run()</code>, so the handler's post-await continuation never sees it.
+The gate looked present in the code and was gone at runtime.</p>
+<p>Fix: <code>enterTenant</code> belongs in each <strong>handler's own frame</strong>. Shared library
+functions instead use <code>runInTenant</code>, which opens its own scope and is correct regardless of
+caller.</p>
+</div>
+
+<h2>What was fixed</h2>
+
+<h3>Tenant context — frontend</h3>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Three routes set their tenant context inside an awaited helper, where it was discarded</span></div>
+  <p class="site">proposals/[p]/amendments · proposals/[p]/studio · sections/[s]/assign</p>
+  <p>Moved into each handler's own frame, with the trap documented at every site.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Supporting-docs PATCH and DELETE had no tenant context at all</span></div>
+  <p>Every review status change and every file removal was a silent no-op under the production role.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">lock-scope resolved permissions before establishing context, so every admin was 403'd</span></div>
+  <p><code>resolveUserAccess</code> reads RLS-gated <code>proposals</code> and
+  <code>proposal_sections</code>; running it first meant it saw nothing and denied the caller.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Two shared library functions were correct only by accident of their caller</span></div>
+  <p><code>redecomposeFoundation</code> and <code>offerStarterSet</code> are invoked from admin paths
+  that hold no tenant context. Both now wrap themselves in <code>runInTenant</code>.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Admin force-advance and the platform queue-depth metric needed the owner connection</span></div>
+  <p>Force-advance is a genuinely cross-tenant operation; <code>queueDepth</code> is a platform-wide
+  gauge that was returning <code>0</code> to every admin regardless of real backlog.</p>
+</div>
+
+<h3>The curation memory that never once wrote a row</h3>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">The HITL learning loop has been silently discarding every curator decision since it was built</span></div>
+  <p>It wrote the nil UUID as <code>tenant_id</code>. <code>episodic_memories</code> has a foreign key
+  to <code>tenants</code>, which can never accept it — and the best-effort <code>catch</code> swallowed
+  the violation. Design decision D-Phase1-14 describes curator decisions as "a compounding product
+  asset"; the asset was empty.</p>
+</div>
+
+<div class="evidence"><span class="c">-- before the fix, across the product's entire history:</span>
+SELECT count(*) FROM episodic_memories WHERE agent_role='curator';
+ <span class="r">0</span>
+
+<span class="c">-- after: the write lands</span>
+ agent_role |        namespace        | content
+ curator    | DOD:unknown:SBIR:Phase1 | curator verified page_limit_technical=15 …</div>
+
+<h3>Agent tenant-binding — pipeline</h3>
+<div class="col">
+<p>The pipeline connects as the RLS-bypass owner, so for these agents the application-layer
+<code>WHERE tenant_id = …</code> is the <em>only</em> isolation layer. A dropped filter is a real leak,
+not defence-in-depth.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Five memory searches dropped the tenant filter entirely when no tenant was passed</span></div>
+  <p class="site">capture_strategist · outcome_analyst · packaging_specialist · partner_coordinator · proposal_architect</p>
+  <p><code>if tenant_id:</code> meant "filter when convenient" — with no tenant, the query returned
+  every tenant's memories. Now fail closed, matching the pattern <code>research_scout</code> already used.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Three ownership gates skipped the check outright, and let a NULL owner through</span></div>
+  <p class="site">packaging_specialist · partner_coordinator · section_drafter</p>
+  <p>Same <code>if tenant_id:</code> shape, but guarding a proposal-ownership check — so the agent
+  could read any tenant's sections or compliance data. Additionally
+  <code>if owner and str(owner) != tenant_id</code> passed whenever <code>owner</code> was NULL.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Two seed-job writes took a job id straight from LLM-chosen tool input, ungated</span></div>
+  <p>Every <em>read</em> tool beside them was tenant-gated; the two <em>writes</em> were not. An
+  injected or confused agent could name another tenant's job. Now gated identically.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">scoring_strategist interpolated untrusted solicitation text raw, and put metadata outside the fence</span></div>
+  <p>A description containing the literal closing marker escaped the injection fence; title, agency
+  and NAICS were never inside it. All fields fenced, marker escaped.</p>
+</div>
+
+<h3>Workflow engine</h3>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Every advance-to-review ran a tenant-bound agent unmetered against the platform</span></div>
+  <p><code>ai_compliance_review</code> omitted <code>tenant_id</code>, so <code>invoke_agent</code> took
+  the platform-scope branch — skipping the per-tenant rate limit <em>and</em> the monthly budget check,
+  on a repeatable customer action. Its sibling step maps it correctly.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Engine backstop: the AI context now defaults its tenant from the instance</span></div>
+  <p>So one forgotten <code>input_map</code> entry can't silently unbind the whole class again.</p>
+</div>
+<div class="find">
+  <div class="find-h"><span class="chip">fixed</span><span class="find-t">Human decisions from a TODO gate were stored in a shape nothing could read</span></div>
+  <p>Resume stored the raw dict; every documented <code>step.&lt;todo&gt;.result.&lt;key&gt;</code>
+  reference resolved to <code>None</code>. No shipping template hit it yet — the next approve/reject
+  gate would have.</p>
+</div>
+
+<h2>Live verification</h2>
+<p class="lede">Driven against the flipped sandbox, with RLS actually enforced.</p>
+
+<div class="tw">
+<table>
+  <thead><tr><th>Actor</th><th>Paths driven</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>tenant_admin · Foundation</td><td class="mono">portal · cards · atoms · proposal · amendments · studio · assign · readiness · supporting-docs · package export</td><td class="yes">10/10</td></tr>
+    <tr><td>tenant_user · Foundation</td><td class="mono">portal · cards · amendments; studio correctly 403</td><td class="yes">4/4</td></tr>
+    <tr><td>tenant_admin · Immobileyes</td><td class="mono">portal · cards · atoms</td><td class="yes">3/3</td></tr>
+    <tr><td>partner_admin</td><td class="mono">console · own portal · descend via partner/enter · managed cards + proposal + amendments</td><td class="yes">7/7</td></tr>
+    <tr><td>master_admin</td><td class="mono">workflows · agents · opportunities · site · scouts · tenants · api/admin/system</td><td class="yes">7/7</td></tr>
+    <tr><td>cross-tenant probes</td><td class="mono">both directions, portal + API</td><td class="yes">307 / 403</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The queue-depth fix was proven by moving the underlying data rather than by reading a zero:</p>
+
+<div class="evidence">insert one pending agent_task_queue row
+  DB pending = 1        API queueDepth = <span class="g">1</span>
+delete it
+  DB pending = 0        API queueDepth = <span class="g">0</span>
+
+<span class="c">Under RLS without the fix this is pinned at 0 in both states.</span></div>
+
+<div class="col">
+<h3>Two things that looked like bugs and were not</h3>
+<ul>
+  <li><strong>Partner descend.</strong> Hitting a managed company's portal directly redirects to
+  <code>/select-company</code>; the console links through <code>/api/partner/enter</code>, which
+  switches the active membership first. Correct by design — my test used the wrong path.</li>
+  <li><strong>Admin login failing.</strong> The <code>/api/auth</code> rate limit is 20 requests per 15
+  minutes per IP, and a multi-actor drive burns that fast. Every later login then returns
+  <code>RATE_LIMITED</code>, which reads exactly like a wrong password. The limiter is working; this is
+  now documented in <code>CONTINUATION.md</code>.</li>
+</ul>
+</div>
+
+<h2>Green backbone</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>Check</th><th>Result</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">tsc --noEmit</td><td class="yes">0 errors</td><td>—</td></tr>
+    <tr><td class="mono">vitest</td><td class="yes">1181 / 1181</td><td>up from 1177; three curation suites now assert the real INSERT rather than a call count</td></tr>
+    <tr><td class="mono">next build</td><td class="yes">clean</td><td>standalone server rebuilt and driven</td></tr>
+    <tr><td class="mono">pytest</td><td class="yes">1035 passed</td><td>8 failures remain — a sandbox PyO3/CPython import quirk the test file itself documents</td></tr>
+    <tr><td class="mono">pytest regression diff</td><td class="yes">identical</td><td>failure set byte-identical before and after the change</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Open — your call</h2>
+
+<div class="callout" style="border-color:var(--ok); background:var(--ok-soft);">
+  <h3 style="color:var(--ok);">1 · Where platform curation memory lives — RESOLVED (migration 186)</h3>
+  <p>I first filed it under the house <code>rfp-pipeline</code> tenant, because the column was
+  <code>NOT NULL REFERENCES tenants(id)</code> and mig 152 files the system_starter library that way.
+  Eric's counter settled it: <em>the role has to descend into tenant space to curate a tenant
+  proposal, so why would memory not be enforced the same way?</em></p>
+  <p>That is the right rule. Curation is platform work by construction — all four writers are
+  <code>tenantScoped: false</code> and act on the MASTER <code>curated_solicitations</code> before any
+  tenant mirror exists. Filing it under a tenant conflates platform knowledge with that one tenant's
+  own memory, and hands the whole curation history to anyone holding its context. My mig-152 precedent
+  was also weaker than I presented: the starter library is a <em>source shelf tenants copy forward
+  from</em>, which curation memory never is.</p>
+  <p><strong>Migration 186</strong> drops the NOT NULL so platform scope is <code>tenant_id = NULL</code>
+  — the same marker <code>tasks</code> and <code>process_instances</code> already use. The policy is
+  deliberately left as tenant-equality (no <code>OR tenant_id IS NULL</code> read branch), which is
+  stricter than the tasks precedent: platform memory is reachable only through an explicit bypass, and
+  never from tenant space. Proven live as <code>govtech_app</code>:</p>
+</div>
+
+<div class="evidence"><span class="c">1. platform write via sqlBypass                    </span><span class="g">INSERT 0 1</span>
+<span class="c">2. visible to a TENANT context?                    </span><span class="g">0  ← descent enforced</span>
+<span class="c">3. memory.search filter (tenant_id = $tenant)      </span><span class="g">0  ← excluded everywhere</span>
+<span class="c">4. compliance-suggest (bypass, namespace-scoped)   </span><span class="g">15 ← pre-fill still works</span></div>
+
+<div class="callout">
+  <h3>2 · A failed action step re-runs on HITL resume</h3>
+  <p>Recovery skips only steps marked <code>completed</code>, so a <code>failed</code> action ahead of
+  an independent human gate would re-execute its side effects on resume. No current template has that
+  shape, so I left it — it is a real trap for the next template that does.</p>
+</div>
+
+<div class="callout">
+  <h3>3 · I cannot certify zero bugs</h3>
+  <p>What I can say precisely: the RLS-context class is now swept and, more importantly, the sandbox
+  can no longer hide it. The agent archetypes and workflow templates were read end to end. Everything
+  claimed above was verified by moving real data and watching the result — not by reading code and
+  concluding.</p>
+</div>
+
+<div class="col">
+<h2>Next</h2>
+<p>Standing by for the real RFP and the Immobileyes prior proposals, to run the exact process
+end to end: ingest → company onboard → content ingestion into the library → search buckets →
+proposal pipeline against that solicitation → export. Both Immobileyes accounts are seeded and were
+driven live in this pass.</p>
+<p>Housekeeping: the container has restarted twice since this work was pushed, so the sandbox database
+and services need a rehydrate before that run. The code is safe on the branch — the box just needs
+bringing back up (<code>frontend/scripts/rehydrate-sandbox.sh</code>, then the heartbeat).</p>
+</div>
+
+<footer>
+  govwin · exhaustive audit · 2026-08-17 · verified as govtech_app with RLS enforced
+</footer>
+
+</div>

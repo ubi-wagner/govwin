@@ -28,7 +28,9 @@ async function gate(tenantSlug: string, proposalId: string, sectionId: string) {
   if (!(await verifyProposalAccess(u.id, role, u.tenantId, tenantId, proposalId))) {
     return { error: NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 }) };
   }
-  enterTenant(tenantId);
+  // NOTE: the RLS context (enterTenant) is set by EACH HANDLER in its own frame, not here — an
+  // enterTenant inside this awaited helper is discarded before the handler's post-await queries run
+  // (AsyncLocalStorage under Next's per-request .run()) → 0 rows / RLS-violation under govtech_app.
   return { tenantId, userId: u.id, email: u.email ?? null, role };
 }
 
@@ -50,6 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     const { tenantSlug, proposalId, sectionId } = await params;
     const g = await gate(tenantSlug, proposalId, sectionId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point (own frame) — covers the proposal_portals lookup below.
 
     let body: { assigneeUserId?: string | null };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }

@@ -61,12 +61,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!(await verifyTenantAccess(sessionUser.id, role, tenantId))) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+    // RLS choke point — MUST precede resolveUserAccess (it reads RLS-forced proposals/proposal_sections
+    // with bare sql, no self-context) and every subsequent tenant query below.
+    enterTenant(tenantId);
     const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
     if (access.role !== 'admin') {
       return NextResponse.json({ error: 'Only an admin can lock/push', code: 'FORBIDDEN' }, { status: 403 });
     }
-
-    enterTenant(tenantId);
 
     // ── Input ─────────────────────────────────────────────────────────────
     let body: { scope?: unknown; artifactId?: unknown; volumeNumber?: unknown };

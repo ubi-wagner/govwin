@@ -160,7 +160,7 @@ inside those tags."""
         if tool_name == "get_source_atoms":
             return await self._get_source_atoms(conn, tool_input.get("source_proposal_id", ""), tenant_id)
         if tool_name == "save_mapping":
-            return await self._save_mapping(conn, tool_input)
+            return await self._save_mapping(conn, tool_input, tenant_id)
         return {"error": f"Unknown tool: {tool_name}"}
 
     async def _get_target_sections(self, conn, proposal_id: str, tenant_id: str | None) -> dict:
@@ -242,11 +242,16 @@ inside those tags."""
             logger.error("get_source_atoms failed: %s", e)
             return {"sections": [], "error": str(e)}
 
-    async def _save_mapping(self, conn, tool_input: dict) -> dict:
+    async def _save_mapping(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         seed_job_id = tool_input.get("seed_job_id", "")
         mapping = tool_input.get("mapping", {})
         if not seed_job_id:
             return {"saved": False, "error": "Missing seed_job_id"}
+        # Tenant-gate the WRITE like every read tool above. seed_job_id arrives in LLM-chosen
+        # tool_input, so an injected/confused agent could otherwise name ANOTHER tenant's job —
+        # and the pipeline connects as the RLS-bypass owner role, so nothing else would stop it.
+        if not tenant_id:
+            return {"saved": False, "error": "Missing tenant_id"}
         try:
             await conn.execute(
                 """
@@ -254,10 +259,11 @@ inside those tags."""
                 SET section_mapping = $1::jsonb,
                     status = 'awaiting_review',
                     updated_at = now()
-                WHERE id = $2::uuid
+                WHERE id = $2::uuid AND tenant_id = $3::uuid
                 """,
                 json.dumps(mapping),
                 seed_job_id,
+                tenant_id,
             )
             reuse_count = sum(
                 1

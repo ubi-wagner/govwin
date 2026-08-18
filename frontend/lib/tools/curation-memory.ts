@@ -20,7 +20,7 @@
  *   - pipeline/src/shredder/namespace.py for the Python parallel
  */
 
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import type { ToolContext } from './base';
 import { ToolExecutionError } from './errors';
 
@@ -129,13 +129,33 @@ export async function writeCurationMemory(
     actor_email: ctx.actor.email ?? null,
   };
 
+  // Scope follows the DESCENT model: memory is owned by whatever space the work happened in.
+  // An rfp_admin has no ambient cross-tenant reach — to touch a tenant's proposal they descend into
+  // that tenant's RLS shadow account and are scoped to it. Curation is PLATFORM work (all four
+  // callers are `tenantScoped: false` and act on the MASTER curated_solicitations, before any tenant
+  // mirror exists), so ctx.tenantId is null and the row is owned by NO tenant: tenant_id = NULL.
+  //
+  // NULL is the same platform-scope marker `tasks` and `process_instances` already use. Migration 186
+  // dropped the NOT NULL that made this impossible — the old code wrote the nil UUID, the FK to
+  // `tenants` rejected it every time, and the catch below swallowed the error, so the HITL learning
+  // loop never persisted a single row. Filing it under the house tenant instead would work, but would
+  // expose the whole curation history to any agent holding that tenant's context via the
+  // tenant-scoped `memory.search` — exactly the conflation descent exists to prevent.
+  const tenantId = ctx.tenantId ?? null;
+
   try {
-    await sql`
+    // sqlBypass (NOT the context-aware `sql`): episodic_memories is force-RLS with a
+    // `tenant_id = app.tenant_id` policy. NULL is never equal to anything, so a platform-scope row is
+    // invisible AND un-writable through the context-aware client under govtech_app — by design.
+    // Platform memory is reachable only through an explicit bypass (an admin/platform code path) and
+    // never from tenant space; the tenant-equality filter in memory.search excludes it everywhere.
+    // The bypass is scoped to this single INSERT (no ambient-context mutation).
+    await sqlBypass`
       INSERT INTO episodic_memories
         (tenant_id, agent_role, embedding, content, memory_type,
          importance, metadata, source, namespace)
       VALUES
-        (${ctx.tenantId ?? '00000000-0000-0000-0000-000000000000'}::uuid,
+        (${tenantId}::uuid,
          'curator',
          ${zeroVector}::vector,
          ${content},

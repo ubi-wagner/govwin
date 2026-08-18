@@ -21,7 +21,7 @@
  * contract as lib/events.ts.
  */
 
-import { sql } from './db';
+import { sql, sqlBypass } from './db';
 import { createLogger } from './logger';
 
 const log = createLogger('capacity');
@@ -134,7 +134,12 @@ export async function recentToolStats(windowHours = 24): Promise<ToolStatRow[]> 
 
 export async function queueDepth(): Promise<number> {
   try {
-    const [row] = await sql<{ count: string }[]>`
+    // sqlBypass: this is a PLATFORM-WIDE metric (pending work across every tenant) and both callers
+    // are master_admin cross-tenant health surfaces. agent_task_queue carries a
+    // `tenant_id = app.tenant_id` RLS policy, so under the prod govtech_app role the context-aware
+    // client returned 0 for every admin — a silently-wrong gauge, not an error. Legitimate
+    // cross-tenant admin read (docs/RLS_CUTOVER.md), same class as the agent-workforce rollup.
+    const [row] = await sqlBypass<{ count: string }[]>`
       SELECT COUNT(*)::text AS count
       FROM agent_task_queue
       WHERE status = 'pending'

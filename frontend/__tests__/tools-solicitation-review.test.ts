@@ -18,9 +18,12 @@ const { sqlMock } = vi.hoisted(() => {
   mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
+// writeCurationMemory writes episodic_memories (force-RLS, platform/nil-tenant scope) through
+// sqlBypass, NOT the context-aware client — so it gets its own mock and its own assertions.
+const { sqlBypassMock } = vi.hoisted(() => ({ sqlBypassMock: Object.assign(vi.fn(), { json: (v: any) => v }) }));
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
-vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, sqlBypass: sqlBypassMock }));
 
 vi.mock('@/lib/events', async () => {
   const actual = await vi.importActual<typeof import('@/lib/events')>('@/lib/events');
@@ -78,6 +81,13 @@ const SOL_ID = '22222222-2222-4222-8222-222222222222';
 const CURATOR_ID = '33333333-3333-4333-8333-333333333333';
 const NAMESPACE = 'DOD:unknown:SBIR:Phase1';
 
+/** True once a curation memory actually landed: an episodic_memories INSERT on the bypass client. */
+function memoryInsertCount(): number {
+  return sqlBypassMock.mock.calls.filter(
+    (c: unknown[]) => String(c[0]).includes('episodic_memories'),
+  ).length;
+}
+
 beforeEach(() => {
   __resetForTest();
   register(solicitationRequestReviewTool);
@@ -85,6 +95,9 @@ beforeEach(() => {
   register(solicitationRejectReviewTool);
   register(solicitationPushTool);
   sqlMock.mockReset();
+  sqlBypassMock.mockReset();
+  // Default for BOTH sqlBypass uses: the platform-tenant lookup and the memory INSERT.
+  sqlBypassMock.mockResolvedValue([{ id: 'b4e60242-ece7-482a-b661-eb7adf34ffc4' }]);
   sqlMock.begin = vi.fn(async (fn: any) => fn(sqlMock));
   emitSingleMock.mockReset();
   emitSingleMock.mockResolvedValue(undefined);
@@ -148,8 +161,10 @@ describe('solicitation.approve', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.approved' }),
     );
-    // 4 sql calls: UPDATE + triage + memory + curation_revision
-    expect(sqlMock).toHaveBeenCalledTimes(4);
+    // 3 context-aware sql calls: UPDATE + triage + curation_revision.
+    expect(sqlMock).toHaveBeenCalledTimes(3);
+    // The memory INSERT goes through sqlBypass (platform/nil-tenant scope on a force-RLS table).
+    expect(memoryInsertCount()).toBe(1);
   });
 
   it('allows self-approve (single-admin operation), audit-flagged', async () => {
@@ -274,9 +289,11 @@ describe('solicitation.push', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.pushed' }),
     );
-    // 9 sql: SELECT preflight + date-guard COUNT + UPDATE sol + UPDATE opp + triage + revision
-    //        + COUNT topics + memory + SELECT activated-set (multi-topic fan-out publishes each opp)
-    expect(sqlMock).toHaveBeenCalledTimes(9);
+    // 8 context-aware sql: SELECT preflight + date-guard COUNT + UPDATE sol + UPDATE opp + triage
+    //   + revision + COUNT topics + SELECT activated-set (multi-topic fan-out publishes each opp)
+    expect(sqlMock).toHaveBeenCalledTimes(8);
+    // The memory INSERT goes through sqlBypass (platform/nil-tenant scope on a force-RLS table).
+    expect(memoryInsertCount()).toBe(1);
   });
 
   it('throws ValidationError when submission_format is missing', async () => {

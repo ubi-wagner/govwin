@@ -26,9 +26,12 @@ const { sqlMock } = vi.hoisted(() => {
   mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
+// writeCurationMemory writes episodic_memories (force-RLS, platform/nil-tenant scope) through
+// sqlBypass, NOT the context-aware client — so it gets its own mock and its own assertions.
+const { sqlBypassMock } = vi.hoisted(() => ({ sqlBypassMock: Object.assign(vi.fn(), { json: (v: any) => v }) }));
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
-vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, sqlBypass: sqlBypassMock }));
 
 vi.mock('@/lib/events', async () => {
   const actual = await vi.importActual<typeof import('@/lib/events')>('@/lib/events');
@@ -72,6 +75,13 @@ function ctx(actorId: string, email: string): ToolContext {
   };
 }
 
+/** True once a curation memory actually landed: an episodic_memories INSERT on the bypass client. */
+function memoryInsertCount(): number {
+  return sqlBypassMock.mock.calls.filter(
+    (c: unknown[]) => String(c[0]).includes('episodic_memories'),
+  ).length;
+}
+
 beforeEach(() => {
   __resetForTest();
   register(solicitationListTriageTool);
@@ -82,6 +92,9 @@ beforeEach(() => {
   register(solicitationPushTool);
   register(complianceSaveVariableValueTool);
   sqlMock.mockReset();
+  sqlBypassMock.mockReset();
+  // Default for BOTH sqlBypass uses: the platform-tenant lookup and the memory INSERT.
+  sqlBypassMock.mockResolvedValue([{ id: 'b4e60242-ece7-482a-b661-eb7adf34ffc4' }]);
   sqlMock.begin = vi.fn(async (fn: any) => fn(sqlMock));
   emitSingleMock.mockReset();
   emitSingleMock.mockResolvedValue(undefined);
@@ -136,14 +149,13 @@ describe('Phase 1 §E24 — full curation flow', () => {
     // we simulate the state having advanced when the curator returns.
 
     // ── Step 5: admin A saves a verified compliance value ──────
-    // THE HITL marquee write. Three sql calls:
+    // THE HITL marquee write. Two context-aware sql calls + one bypass call:
     //   (a) preflight — namespace + compId + priorJson
     //   (b) UPSERT solicitation_compliance.custom_variables
-    //   (c) writeCurationMemory INSERT into episodic_memories
+    //   (c) writeCurationMemory INSERT into episodic_memories → sqlBypass (force-RLS, nil-tenant)
     sqlMock
       .mockResolvedValueOnce([{ namespace: NAMESPACE, compId: null, priorJson: null }])
-      .mockResolvedValueOnce([{ verifiedAt: new Date() }])
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce([{ verifiedAt: new Date() }]);
 
     const save = await invoke('compliance.save_variable_value', {
       solicitationId: SOL_ID,
@@ -156,8 +168,11 @@ describe('Phase 1 §E24 — full curation flow', () => {
     expect(save.memoryWritten).toBe(true);
     expect(save.action).toBe('manual_entry');
 
-    // Count sql calls so far: triage(1) + claim(2) + release(3) + save(3) + revision(1) = 10
-    expect(sqlMock).toHaveBeenCalledTimes(10);
+    // Context-aware sql calls so far: triage(1) + claim(2) + release(3) + save(2) + revision(1) = 9.
+    // The curation-memory INSERT is NOT among them — it goes through sqlBypass (episodic_memories is
+    // force-RLS and admin curation writes the platform/nil-tenant scope no tenant context can admit).
+    expect(sqlMock).toHaveBeenCalledTimes(9);
+    expect(memoryInsertCount()).toBe(1);
 
     // ── Step 6: admin A requests review ─────────────────────────
     sqlMock
@@ -175,7 +190,6 @@ describe('Phase 1 §E24 — full curation flow', () => {
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: ADMIN_A_ID, namespace: NAMESPACE }])
       .mockResolvedValueOnce(undefined) // triage_actions
-      .mockResolvedValueOnce(undefined) // approve memory INSERT
       .mockResolvedValueOnce(undefined); // curation_revision
 
     const approve = await invoke('solicitation.approve', {
@@ -196,8 +210,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active
       .mockResolvedValueOnce(undefined)                   // triage_actions
       .mockResolvedValueOnce(undefined)                   // curation_revision
-      .mockResolvedValueOnce([{ count: '5' }])            // topic COUNT
-      .mockResolvedValueOnce(undefined);                  // push memory INSERT
+      .mockResolvedValueOnce([{ count: '5' }]);           // topic COUNT
 
     const push = await invoke('solicitation.push', {
       solicitationId: SOL_ID,
@@ -227,7 +240,6 @@ describe('Phase 1 §E24 — full curation flow', () => {
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: ADMIN_A_ID, namespace: NAMESPACE }]) // UPDATE succeeds
       .mockResolvedValueOnce(undefined) // triage_actions
-      .mockResolvedValueOnce(undefined) // approve memory INSERT
       .mockResolvedValueOnce(undefined); // curation_revision
 
     const approve = await invoke('solicitation.approve', { solicitationId: SOL_ID },

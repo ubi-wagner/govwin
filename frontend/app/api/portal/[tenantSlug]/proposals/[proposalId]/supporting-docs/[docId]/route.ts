@@ -229,6 +229,8 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
+    enterTenant(tenantId); // RLS choke point — covers the doc lookup + UPDATE on proposal_supporting_docs.
+
     // ── Parse body ───────────────────────────────────────────
     let body: { status?: unknown; notes?: unknown };
     try {
@@ -444,6 +446,8 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+
+    enterTenant(tenantId); // RLS choke point — covers the collaborator check, doc lookup, and revert UPDATE.
 
     // ── Proposal-level access check for non-admin users ───────
     if (!hasRoleAtLeast(role, 'tenant_admin')) {

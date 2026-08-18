@@ -174,7 +174,12 @@ class OnProposalAdvancedToReview(Workflow):
             name="ai_compliance_review",
             step_type=StepType.AI_INVOKE,
             action="tool.proposal.check_compliance",
-            input_map={"proposal_id": "payload.proposalId"},
+            # tenant_id is REQUIRED: compliance_reviewer is a TENANT-BOUND agent. Omitting it (as
+            # this step did) made invoke_agent take the platform-scope branch — skipping the
+            # per-tenant rate-limit AND monthly budget checks, the NOBYPASS agent pool + SET
+            # app.tenant_id, and the per-tenant memory store — on every advance-to-review. The
+            # `proposal.advanced:end` payload carries tenantId (see the ai_package_review sibling).
+            input_map={"proposal_id": "payload.proposalId", "tenant_id": "payload.tenantId"},
             timeout_minutes=10,
         ),
         Step(

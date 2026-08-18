@@ -14,6 +14,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { forceAdvanceProcess } from '@/lib/process/force-advance';
 
@@ -74,6 +75,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Force-advance via the shared core ─────────────────────────
+    // rfp_admin is a CROSS-TENANT operator: the target instance belongs to an arbitrary tenant
+    // (discovered only after the SELECT), so RLS must be bypassed to see + mutate it. The
+    // own-tenant guard is enforced in-app by canForceAdvanceInstance (this route is rfp_admin-only,
+    // so it always passes). forceAdvanceProcess uses bare `sql` on RLS-forced process_instances/
+    // tasks/transitions — set the bypass context in this handler's own frame before calling it.
+    enterBypass();
     const result = await forceAdvanceProcess({
       instanceId,
       actor: {
