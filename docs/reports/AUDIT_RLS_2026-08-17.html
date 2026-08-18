@@ -352,14 +352,29 @@ delete it
 
 <h2>Open — your call</h2>
 
-<div class="callout">
-  <h3>1 · Where should platform curation memory live?</h3>
-  <p>Curator decisions are platform work, but the column carries a NOT-NULL foreign key to
-  <code>tenants</code>, so they must be filed under a real tenant row. I chose the house org —
-  <code>PLATFORM_TENANT_SLUG = 'rfp-pipeline'</code>, the same identity the workflow monitor already
-  labels "platform". It needs no migration and is one line to redirect. Say the word if you want it
-  somewhere else.</p>
+<div class="callout" style="border-color:var(--ok); background:var(--ok-soft);">
+  <h3 style="color:var(--ok);">1 · Where platform curation memory lives — RESOLVED (migration 186)</h3>
+  <p>I first filed it under the house <code>rfp-pipeline</code> tenant, because the column was
+  <code>NOT NULL REFERENCES tenants(id)</code> and mig 152 files the system_starter library that way.
+  Eric's counter settled it: <em>the role has to descend into tenant space to curate a tenant
+  proposal, so why would memory not be enforced the same way?</em></p>
+  <p>That is the right rule. Curation is platform work by construction — all four writers are
+  <code>tenantScoped: false</code> and act on the MASTER <code>curated_solicitations</code> before any
+  tenant mirror exists. Filing it under a tenant conflates platform knowledge with that one tenant's
+  own memory, and hands the whole curation history to anyone holding its context. My mig-152 precedent
+  was also weaker than I presented: the starter library is a <em>source shelf tenants copy forward
+  from</em>, which curation memory never is.</p>
+  <p><strong>Migration 186</strong> drops the NOT NULL so platform scope is <code>tenant_id = NULL</code>
+  — the same marker <code>tasks</code> and <code>process_instances</code> already use. The policy is
+  deliberately left as tenant-equality (no <code>OR tenant_id IS NULL</code> read branch), which is
+  stricter than the tasks precedent: platform memory is reachable only through an explicit bypass, and
+  never from tenant space. Proven live as <code>govtech_app</code>:</p>
 </div>
+
+<div class="evidence"><span class="c">1. platform write via sqlBypass                    </span><span class="g">INSERT 0 1</span>
+<span class="c">2. visible to a TENANT context?                    </span><span class="g">0  ← descent enforced</span>
+<span class="c">3. memory.search filter (tenant_id = $tenant)      </span><span class="g">0  ← excluded everywhere</span>
+<span class="c">4. compliance-suggest (bypass, namespace-scoped)   </span><span class="g">15 ← pre-fill still works</span></div>
 
 <div class="callout">
   <h3>2 · A failed action step re-runs on HITL resume</h3>

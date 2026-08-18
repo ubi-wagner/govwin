@@ -315,6 +315,17 @@ See CLAUDE_CLIFFNOTES.md for:
   the few legitimate cross-tenant reads (admin/CMS on RLS-forced tables, e.g. the agent-workforce
   rollup, `matched_opportunities`, rfp-curation Customer Interest — these MUST use `sqlBypass`).
   Full posture: **docs/SECURITY_AND_SAFETY.md**; mechanics in docs/RLS_CUTOVER.md.
+- **PLATFORM SCOPE = `tenant_id IS NULL`, never a stand-in tenant.** Memory/state follows the same
+  DESCENT rule as authority: an rfp_admin has no ambient cross-tenant reach, so work done in TENANT
+  space is that tenant's, and work done in PLATFORM space (curation, triage — the `tenantScoped:false`
+  tools acting on MASTER records before any tenant mirror exists) is owned by NO tenant. `tasks`,
+  `process_instances` and `episodic_memories` (mig 186) all model it as NULL. Because the policies are
+  tenant-EQUALITY and NULL never equals anything, such a row is invisible AND un-writable through the
+  context-aware `sql` under `govtech_app` — reachable only via an explicit `sqlBypass` admin path, and
+  excluded from every tenant-scoped memory search. Do NOT file platform rows under the house
+  `rfp-pipeline` tenant: that works, but hands the whole platform history to anyone holding that
+  tenant's context. (The house tenant IS correct for copy-forward CONTENT — the system_starter
+  library, mig 152 — which is a source shelf tenants copy from, not platform state.)
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
