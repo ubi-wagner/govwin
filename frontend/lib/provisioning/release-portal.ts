@@ -104,7 +104,10 @@ export async function provisionAndReleasePortal(opts: {
   // fanned out to zero flags for this buyer — no proposals row existed yet, and nothing
   // back-filled it. Flag every confirmed amendment onto the fresh proposal now so the
   // portal opens with the banner + bell, exactly as if it had been provisioned first.
-  // Tenant-scoped (runInTenant) + best-effort: a replay failure never wedges the release.
+  // Tenant-scoped (runInTenant) + best-effort: a replay failure never wedges the release —
+  // and it is NOT the last line of defense: the tenant amendments GET reconciles missing
+  // flags on read (idempotent ON CONFLICT), so a transiently-failed replay self-heals the
+  // first time anyone opens the proposal.
   if (proposalId) {
     try {
       const pid = proposalId;

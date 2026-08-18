@@ -311,7 +311,7 @@ export async function ingestTopicFilesForSolicitation(params: {
     // each to the bridge now if date-complete (extracted topics usually lack a close
     // date, so most park at needs_close_date until the admin sets one; date guard).
     for (const c of result.created) {
-      const late = await activateLateTopicIfReady(c.opportunityId, { id: userId ?? 'unknown' });
+      const late = await activateLateTopicIfReady(c.opportunityId, { id: userId ?? null });
       if (late.released) result.lateReleased = (result.lateReleased ?? 0) + 1;
       else if (late.reason === 'needs_close_date') result.needsCloseDate = (result.needsCloseDate ?? 0) + 1;
     }

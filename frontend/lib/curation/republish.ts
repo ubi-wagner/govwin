@@ -21,16 +21,26 @@
  */
 import { sql } from '@/lib/db';
 import type { BridgeEventType } from '@/lib/lifecycle';
-import { publishAndFanOut, republishIfReleased } from '@/lib/opportunity-bridge';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { buildCardSnapshot, publishAndFanOut } from '@/lib/opportunity-bridge';
+import { emitEventSingle, systemActor, userActor } from '@/lib/events';
 
 export interface RepublishResult {
   /** Opportunities that got a new bridge version fanned out. */
   republished: number;
   /** Activated opps skipped because they were never released (no bridge head). */
   skipped: number;
+  /** Released opps whose snapshot matched the bridge head — nothing to deliver, no
+   *  version appended, no pin nudge armed (kills the no-op broadcast/version storm). */
+  unchanged: number;
   /** Total tenant-card applies across all republished opps. */
   cardsRefreshed: number;
+}
+
+/** Compare a would-be snapshot against the bridge head's card, ignoring the per-call
+ *  `frozenAt` stamp (which would otherwise make every comparison "different"). */
+function snapshotEquals(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const norm = (c: Record<string, unknown>) => JSON.stringify({ ...c, frozenAt: null });
+  try { return norm(a) === norm(b); } catch { return false; }
 }
 
 /**
@@ -44,7 +54,7 @@ export async function republishSolicitationCards(opts: {
   eventType?: BridgeEventType;
   opportunityId?: string | null;
 }): Promise<RepublishResult> {
-  const out: RepublishResult = { republished: 0, skipped: 0, cardsRefreshed: 0 };
+  const out: RepublishResult = { republished: 0, skipped: 0, unchanged: 0, cardsRefreshed: 0 };
   // The WHOLE body is fenced: this tail rides on business writes that already committed,
   // so no failure here (including a mocked/absent sql in unit tests) may surface as a
   // tool/route error — the mirror can always be re-driven (reconcile, broadcast button).
@@ -69,7 +79,22 @@ export async function republishSolicitationCards(opts: {
     }
     for (const o of opps) {
       try {
-        const res = await republishIfReleased(o.id, eventType, opts.actorId ?? null, nowIso);
+        // Head check + CHANGE check before any publish. A never-released opp is skipped
+        // (pre-push edits stay private). A released opp whose fresh snapshot equals the
+        // head is UNCHANGED: publishing anyway would append a junk version, re-arm every
+        // pinned holder's update badge, and rescore all tenants over nothing — the exact
+        // storm a double-clicked Broadcast (or an edit to a non-card field) would cause.
+        const [head] = await sql<Array<{ card: Record<string, unknown> }>>`
+          SELECT card FROM opportunity_bridge
+          WHERE opportunity_id = ${o.id}::uuid ORDER BY version DESC LIMIT 1`;
+        if (!head) { out.skipped++; continue; }
+        const snap = await buildCardSnapshot(o.id, nowIso);
+        if (!snap) { out.skipped++; continue; }
+        if (snapshotEquals(snap as unknown as Record<string, unknown>, head.card)) {
+          out.unchanged++;
+          continue;
+        }
+        const res = await publishAndFanOut(o.id, eventType, opts.actorId ?? null, nowIso);
         if (res) {
           out.republished++;
           out.cardsRefreshed += res.tenantsApplied;
@@ -89,7 +114,7 @@ export async function republishSolicitationCards(opts: {
 
 export interface LateTopicResult {
   released: boolean;
-  reason?: 'not_pushed' | 'already_released' | 'needs_close_date' | 'not_found' | 'error';
+  reason?: 'not_pushed' | 'already_released' | 'needs_close_date' | 'not_open' | 'not_found' | 'error';
   cardsRefreshed?: number;
 }
 
@@ -104,46 +129,63 @@ export interface LateTopicResult {
  */
 export async function activateLateTopicIfReady(
   opportunityId: string,
-  actor: { id: string; email?: string | null },
+  actor: { id: string | null; email?: string | null },
 ): Promise<LateTopicResult> {
   try {
     const [row] = await sql<Array<{
       closeDate: Date | null; solStatus: string | null; solicitationId: string | null;
-      bridgeHead: number | null;
+      bridgeHead: number | null; submissionStage: string | null;
     }>>`
-      SELECT o.close_date AS "closeDate",
+      SELECT o.close_date AS "closeDate", o.submission_stage AS "submissionStage",
              cs.status AS "solStatus", cs.id AS "solicitationId",
              (SELECT max(version) FROM opportunity_bridge b WHERE b.opportunity_id = o.id) AS "bridgeHead"
       FROM opportunities o
       LEFT JOIN curated_solicitations cs
         ON cs.id = o.solicitation_id OR cs.opportunity_id = o.id
       WHERE o.id = ${opportunityId}::uuid
+      -- Deterministic tiebreak (the buildCardSnapshot F6 rule): an opp can match BOTH arms
+      -- (a topic of solicitation B that is also the landing opp of solicitation A). Prefer
+      -- the topic's own parent — without an ORDER BY the planner picks, and picking A's
+      -- non-pushed row silently parks a date-complete late topic forever.
+      ORDER BY (cs.id = o.solicitation_id) DESC NULLS LAST, cs.id
       LIMIT 1
     `;
     if (!row) return { released: false, reason: 'not_found' };
     if (row.solStatus !== 'pushed_to_pipeline') return { released: false, reason: 'not_pushed' };
     if (row.bridgeHead != null) return { released: false, reason: 'already_released' };
+    // A CLOSED/ARCHIVED topic must never sneak back to 'open' through a late release —
+    // retraction is a lifecycle decision (canTransition + opportunity_lifecycle_actions),
+    // not something a close-date edit may undo. Only pre-open/open stages qualify.
+    if (row.submissionStage === 'closed' || row.submissionStage === 'archived') {
+      return { released: false, reason: 'not_open' };
+    }
     if (!row.closeDate) return { released: false, reason: 'needs_close_date' };
 
     // Same shape as solicitation.push W2 (solicitation-push.ts:203-213), one opp.
     // Idempotent for an already-active row; the bridge publish below is the real
     // release (publishToBridge's UNIQUE(version) makes a concurrent double harmless).
-    await sql`
+    // CAS on the stage as a belt: a concurrent close between the read and this write
+    // makes it a 0-row no-op and the publish is skipped.
+    const flipped = await sql<Array<{ id: string }>>`
       UPDATE opportunities
       SET is_active = true, updated_at = now(),
           submission_stage = 'open',
           open_date   = COALESCE(open_date, now()),
-          released_by = COALESCE(released_by, ${actor.id}::uuid),
+          released_by = COALESCE(released_by, ${actor.id ?? null}::uuid),
           released_at = COALESCE(released_at, now())
       WHERE id = ${opportunityId}::uuid
+        AND (submission_stage IS NULL OR submission_stage NOT IN ('closed', 'archived'))
+      RETURNING id
     `;
+    if (flipped.length === 0) return { released: false, reason: 'not_open' };
 
     // First bridge version for this topic → every tenant's mirror gets the card.
     const pub = await publishAndFanOut(opportunityId, 'published', actor.id, new Date().toISOString());
     try {
       await emitEventSingle({
         namespace: 'finder', type: 'topic.released',
-        actor: userActor(actor.id, actor.email ?? undefined), tenantId: null,
+        actor: actor.id ? userActor(actor.id, actor.email ?? undefined) : systemActor('late_topic_release'),
+        tenantId: null,
         payload: {
           opportunityId, solicitationId: row.solicitationId,
           lateRelease: true, cardsRefreshed: pub?.tenantsApplied ?? 0,

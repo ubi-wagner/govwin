@@ -119,7 +119,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Optional linked document (mig 190): must be one of THIS solicitation's documents —
-    // a foreign id is refused, not silently dropped.
+    // a foreign id is refused, not silently dropped. A present-but-non-string value is a
+    // 400, not a silent NULL (a dropped link is exactly the tenant-can't-open-it gap).
+    if (body.documentId !== undefined && body.documentId !== null && typeof body.documentId !== 'string') {
+      return NextResponse.json({ error: 'documentId must be a UUID string', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     let documentId: string | null = null;
     if (typeof body.documentId === 'string' && body.documentId) {
       if (!UUID_RE.test(body.documentId)) {

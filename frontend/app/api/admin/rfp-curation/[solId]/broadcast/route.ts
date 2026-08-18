@@ -12,6 +12,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -31,12 +32,22 @@ export async function POST(_req: Request, ctx: RouteContext) {
     if (!isValidUUID(solId)) {
       return NextResponse.json({ error: 'Invalid solicitation id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
+    // Existence check keeps the audit ledger honest: a broadcast event for a solicitation
+    // that does not exist is indistinguishable from a legit never-pushed no-op.
+    try {
+      const [exists] = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid LIMIT 1`;
+      if (!exists) return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+    } catch (e) {
+      console.error('[broadcast] existence check failed', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const propagation = await republishSolicitationCards({ solicitationId: solId, actorId: su.id });
 
     try {
       await emitEventSingle({
-        namespace: 'finder', type: 'solicitation.broadcast',
+        namespace: 'finder', type: 'solicitation.broadcasted',
         actor: userActor(su.id, su.email ?? undefined), tenantId: null,
         payload: { solicitationId: solId, ...propagation },
       });

@@ -181,6 +181,25 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
     }
     const summary = hasSummary ? (body.spotlightSummary as string).slice(0, 5000) : null;
     const expertNotes = hasExpertNotes ? (body.expertNotes as string).slice(0, 5000) : null;
+    // Pre-flight BEFORE any write: an umbrella can legally exist without a landing opp
+    // (mig 013), and the expert note lives ON the landing opp. Checking after the summary
+    // UPDATE committed a partial, unaudited write and mislabelled it 404.
+    if (hasExpertNotes) {
+      try {
+        const [pre] = await sql<{ opportunityId: string | null }[]>`
+          SELECT opportunity_id AS "opportunityId" FROM curated_solicitations WHERE id = ${solId}::uuid`;
+        if (!pre) return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+        if (!pre.opportunityId) {
+          return NextResponse.json({
+            error: 'This solicitation has no landing opportunity — the expert note lives on the opportunity card.',
+            code: 'NO_LANDING_OPPORTUNITY',
+          }, { status: 409 });
+        }
+      } catch (err) {
+        console.error('[rfp-curation] PATCH preflight failed:', err);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+    }
     try {
       if (hasSummary) {
         const rows = await sql<{ id: string }[]>`

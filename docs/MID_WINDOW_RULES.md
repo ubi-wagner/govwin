@@ -30,8 +30,8 @@ which automatically brings **rescore** (sync fallback + `capture:card.applied` �
 | B2 · Full-snapshot versions: every publish writes the WHOLE card JSONB at `max(version)+1` (race-safe retry loop) | `opportunity-bridge.ts` publishToBridge |
 | B3 · Forward-only apply: a mirror card only advances (`EXCLUDED.bridge_version > current`); stale applies are silent no-ops with no cursor bump and no rescore | applyToTenant |
 | B4 · Safe-refresh split: an apply touches ONLY master-derived columns (`card`, `bridge_version`, `lifecycle_status`, `submission_stage`, `updated_at`, conditional `pin_update_available`). Tenant-owned state — pins, pinned_docs, pursuit, archive, bucket scores, nudge watermarks — is never clobbered | applyToTenant `DO UPDATE SET` list |
-| B5 · **Every card-visible master edit republishes** (NEW): summary + expert note, compliance (baseline, topic override set/clear, preset), volumes + required items (all 5 tools), topic title/description, attach-to-existing, Ingest Studio LAND, amendment confirm, and the explicit Broadcast button — all call `republishSolicitationCards` (best-effort: a propagation failure never fails the admin's edit) | `lib/curation/republish.ts` + the wired call sites |
-| B6 · **Late-topic release** (NEW): a topic added after push has no bridge version, so republish can never reach it. `activateLateTopicIfReady` releases it — keyed on the BRIDGE (not `is_active`), mirroring push's W2 activation write — the moment it is date-complete. No close date → parked (`needs_close_date`), invisible to customers (the mig-128 date guard extends to late additions). Wired into add_topic, bulk_add_topics, topic-file drop, topic update, and the lifecycle close-date change | `lib/curation/republish.ts` |
+| B5 · **Every card-visible master edit republishes** (NEW): summary + expert note, compliance (baseline, topic override set/clear, preset), volumes + required items (all 5 tools), topic title/description, attach-to-existing, Ingest Studio LAND, amendment confirm, and the explicit Broadcast button — all call `republishSolicitationCards` (best-effort: a propagation failure never fails the admin's edit). **Change-gated:** a fresh snapshot equal to the bridge head (frozenAt ignored) publishes NOTHING — no junk version, no pin-nudge re-arm, no rescore storm (`unchanged` in the result). Snapshots are (re)built inside the version-retry loop, so a concurrent-publish loser can never land stale content at the head | `lib/curation/republish.ts` + `publishToBridge` |
+| B6 · **Late-topic release** (NEW): a topic added after push has no bridge version, so republish can never reach it. `activateLateTopicIfReady` releases it — keyed on the BRIDGE (not `is_active`), mirroring push's W2 activation write — the moment it is date-complete. No close date → parked (`needs_close_date`), invisible to customers (the mig-128 date guard extends to late additions). A CLOSED/ARCHIVED topic is REFUSED (`not_open`, guard + CAS): retraction is a lifecycle decision a close-date edit may never undo. Wired into add_topic, bulk_add_topics, topic-file drop, topic update, and the lifecycle close-date change | `lib/curation/republish.ts` |
 | B7 · Backflow stays navigational-only: nothing in the window carries tenant content up. The up-signals remain the purchase ToDo, notifications, and shadow-descent audit | docs/MASTER_MIRROR_OPP_DESIGN.md §4 |
 | B8 · The card stays THIN: volumes/items/molds never ride the snapshot — only `complianceSummary` scalars (+ `provisionReady`). Structure is delivered at provision, not on the card | buildCardSnapshot |
 
@@ -49,7 +49,7 @@ which automatically brings **rescore** (sync fallback + `capture:card.applied` �
 
 | Rule | Note |
 |---|---|
-| A1 · Trigger events pair START/END; the END carries the payload the processor matches. Audit events are `single`. (Held by every new emitter this cycle: `topic.released`, `solicitation.broadcast`, `curation_note.added`, `solicitation.expert_notes_updated` are audit-singles; no new triggers were introduced) | docs/EVENT_CONTRACT.md |
+| A1 · Trigger events pair START/END; the END carries the payload the processor matches. Audit events are `single`. (Held by every new emitter this cycle: `topic.released`, `solicitation.broadcasted`, `curation_note.added`, `solicitation.expert_notes_updated` are audit-singles; no new triggers were introduced) | docs/EVENT_CONTRACT.md |
 | A2 · Propagation tails are best-effort BY CONTRACT: they run after the business write committed, never throw (whole-body fenced), and are re-drivable (reconcile sweep, Broadcast button). The unit suite locks this (`__tests__/curation-republish.test.ts`) | lib/curation/republish.ts |
 | A3 · Automation may never publish what a human hasn't founded: the Ingest Studio land gate (auto-land refuses blockers) and the deliberately-human portal release are unchanged by this pass. The Broadcast button and auto-republish only re-deliver already-landed master state | INGEST_STUDIO_DESIGN §never-auto |
 
@@ -58,7 +58,7 @@ which automatically brings **rescore** (sync fallback + `capture:card.applied` �
 | Rule | Note |
 |---|---|
 | P1 · **Fresh-at-release, universally:** provisioning reads compliance (topic-resolved), volumes + required items, molds (`document_templates.canvas_document`), cost forms, and required docs LIVE at release time. Nothing is snapshotted at purchase — every mid-window revision lands in the released portal (proven: Vol 3 added mid-window appeared in the provisioned build) | provision-proposal.ts |
-| P2 · **Amendment replay** (NEW): `confirmAmendment` fans flags to existing proposals AND republishes the mirror (pre-purchase reach); `replayConfirmedAmendments` runs at provision so a buyer whose amendment landed mid-window opens their portal with the flag + bell already present. The window can no longer swallow an amendment | lib/amendments.ts + release-portal.ts |
+| P2 · **Amendment replay** (NEW): `confirmAmendment` fans flags to existing proposals AND republishes the mirror (pre-purchase reach); `replayConfirmedAmendments` runs at provision so a buyer whose amendment landed mid-window opens their portal with the flag + bell already present — and the tenant amendments GET **reconciles missing flags on read** (idempotent), so even a transiently-failed replay self-heals. The window can no longer swallow an amendment | lib/amendments.ts + release-portal.ts + the tenant amendments route |
 | P3 · **Amendments carry their document** (mig 190): `solicitation_amendments.document_id` → admin links the announcing file when logging; tenants open it via a flag-gated signed URL (`…/amendments/[a]/document` — the flag IS the grant; no generic read into the admin document store) | verified live: F7 |
 | P4 · Post-release (portal live), the channels narrow by design: amendments (formal, acknowledgeable) + card refresh (informational). Master compliance/volume/mold edits do NOT rewrite a live build — structural change reaches a released proposal only as an amendment a human acts on | recon C |
 | P5 · Molds: live-read at provision (mid-window edits free); the template-stable lane fans only on explicit Push (`update_available`) and is not solicitation-linked — per-OPP template curation is `volume_required_items.template_id`. `collaboration` is now a first-class `template_type` for collaboration-product molds | TEMPLATE_BRIDGE_DESIGN |
@@ -66,13 +66,17 @@ which automatically brings **rescore** (sync fallback + `capture:card.applied` �
 
 ## 5. Residual gaps (tracked, deliberate, or follow-on)
 
-1. **Readiness bar is baseline-blind**: `getBuildReadiness` counts `topic_id IS NULL` rows while the
-   provisioner prefers topic overrides — a topic-only build reads "below the bar" and needs
-   `confirm:true`. (FLEX-sweep item.)
-2. **`resolveTopicCompliance` degrades silently** to SYSTEM_DEFAULTS + a lone Technical Volume on
-   error — the release response should surface that. (FLEX-sweep item.)
+1. ~~Readiness bar baseline-blind~~ **FIXED (sweep)**: the bar is now scope-agnostic AND
+   accepts the curator's `custom_variables.submission_format`, matching the resolver + push gate.
+2. ~~`resolveTopicCompliance` silent degradation~~ **FIXED (sweep)**: an errored resolve returns
+   `degraded:true` and `provisionProposalForPortal` REFUSES to provision a default skeleton off it.
 3. **`pushed_to_pipeline` stays terminal** (no un-push). Deliberate: retraction of a
    customer-visible OPP is a lifecycle `close`/`archive`, not a status rewind.
+3b. **Fan-out cost ceiling (monitored):** a genuinely-changed solicitation-wide republish walks
+   every activated opp × every tenant sequentially (~73 queries/opp at 4 tenants; a 30-topic BAA
+   ≈ 2.2k queries per changed edit). The change-gate removes all no-op storms and bounds repeated
+   saves; truly-changed bulk edits on very large topic sets remain synchronous by design (the
+   admin's save IS the delivery). Revisit with batched applies if tenant count grows 10×.
 4. **`build_complete` never un-sets** — provisionReady can only go true. Acceptable while release
    is human-gated; revisit if auto-release ever lands.
 5. **`amendment_monitor` agent output has no writer** into `solicitation_amendments`

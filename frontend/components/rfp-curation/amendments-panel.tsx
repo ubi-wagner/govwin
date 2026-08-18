@@ -39,7 +39,7 @@ const statusTone: Record<string, string> = {
   dismissed: 'bg-gray-200 text-gray-500',
 };
 
-export function AmendmentsPanel({ solId }: { solId: string }) {
+export function AmendmentsPanel({ solId, documents = [] }: { solId: string; documents?: SolDoc[] }) {
   const [items, setItems] = useState<Amendment[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,24 +52,13 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
   const [delta, setDelta] = useState<DeltaItem[]>([]);
   // Optional announcing document (mig 190): attach the file via the Documents section
   // (type "Amendment"), then link it here so tenants can OPEN what they're told about.
+  // The list comes from the WORKSPACE's `documents` prop (fresh across router.refresh()) —
+  // a local one-shot fetch went permanently stale the moment a new file was attached,
+  // defeating exactly the upload-then-link flow this select prescribes.
   const [docId, setDocId] = useState('');
-  const [docs, setDocs] = useState<SolDoc[]>([]);
+  const docs = documents;
 
   const base = `/api/admin/rfp-curation/${solId}/amendments`;
-
-  // Lazy-load the solicitation's documents the first time the form opens.
-  useEffect(() => {
-    if (!showForm || docs.length > 0) return;
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/rfp-curation/${solId}`);
-        if (!res.ok) return;
-        const j = await res.json().catch(() => null);
-        const list = (j?.data?.documents ?? []) as Array<{ id: string; originalFilename: string; documentType: string }>;
-        setDocs(list.map((d) => ({ id: d.id, originalFilename: d.originalFilename, documentType: d.documentType })));
-      } catch { /* select stays empty */ }
-    })();
-  }, [showForm, docs.length, solId]);
 
   const load = useCallback(async () => {
     try {
@@ -81,6 +70,26 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
       /* non-fatal */
     }
   }, [base]);
+
+  // Open the announcing document. Popup-blocker-safe: claim the tab SYNCHRONOUSLY inside
+  // the click, then point it at the signed URL once fetched (window.open after an await is
+  // blocked by Safari + by any browser once transient activation expires).
+  const openDocument = (documentId: string) => {
+    const w = window.open('', '_blank');
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/rfp-document/${documentId}/signed-url`);
+        const j = await res.json().catch(() => ({}));
+        const url = j?.data?.url as string | undefined;
+        if (res.ok && url && w) { w.location.href = url; return; }
+        w?.close();
+        setMsg({ type: 'error', text: j?.error ?? 'Could not open the document' });
+      } catch {
+        w?.close();
+        setMsg({ type: 'error', text: 'Could not open the document' });
+      }
+    })();
+  };
 
   useEffect(() => {
     load();
@@ -213,19 +222,25 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
             ))}
             <button onClick={addDeltaRow} className="text-[11px] text-indigo-600 hover:underline">+ add compliance change</button>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-[11px] text-gray-500 shrink-0">Announcing document</label>
-            <select
-              value={docId}
-              onChange={(e) => setDocId(e.target.value)}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs"
-              title="Link the document that announced this change (upload it first via Source Documents, type 'Amendment') so tenants can open it from their banner"
-            >
-              <option value="">— none —</option>
-              {docs.map((d) => (
-                <option key={d.id} value={d.id}>{d.originalFilename} ({d.documentType})</option>
-              ))}
-            </select>
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-gray-500 shrink-0">Announcing document</label>
+              <select
+                value={docId}
+                onChange={(e) => setDocId(e.target.value)}
+                className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              >
+                <option value="">— none —</option>
+                {docs.map((d) => (
+                  <option key={d.id} value={d.id}>{d.originalFilename} ({d.documentType})</option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Upload the amendment file in{' '}
+              <a href="#section-documents" className="text-indigo-600 hover:underline">Source Documents</a>
+              {' '}(type &ldquo;Amendment&rdquo;), then pick it here — tenants open it from their banner.
+            </p>
           </div>
           <div className="flex justify-end">
             <button onClick={submit} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50">
@@ -252,8 +267,15 @@ export function AmendmentsPanel({ solId }: { solId: string }) {
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-1">{a.summary}</p>
-                  {a.documentFilename && (
-                    <p className="text-[11px] text-gray-500 mt-0.5">📎 {a.documentFilename}</p>
+                  {a.documentFilename && a.documentId && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); openDocument(a.documentId!); }}
+                      className="text-[11px] text-indigo-600 hover:underline mt-0.5 block"
+                      title="Open the announcing document (verify you linked the right file)"
+                    >
+                      📎 {a.documentFilename}
+                    </button>
                   )}
                   {a.complianceDelta.length > 0 && (
                     <ul className="mt-1 space-y-0.5">

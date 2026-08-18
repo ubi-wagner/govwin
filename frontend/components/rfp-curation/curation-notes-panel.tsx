@@ -15,20 +15,29 @@ import { toast } from '@/lib/toast';
 
 interface Note { id: string; authorEmail: string | null; body: string; createdAt: string }
 
-export function CurationNotesPanel({ solId, compact = false }: { solId: string; compact?: boolean }) {
+export function CurationNotesPanel({
+  solId, compact = false, autoExpandIfNotes = false,
+}: { solId: string; compact?: boolean; autoExpandIfNotes?: boolean }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(!compact);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/rfp-curation/${solId}/notes`);
-      if (!res.ok) return;
+      if (!res.ok) { setLoadFailed(true); return; }
       const j = await res.json().catch(() => null);
-      if (j?.data?.notes) setNotes(j.data.notes);
-    } catch { /* panel is best-effort */ }
-  }, [solId]);
+      if (j?.data?.notes) {
+        setNotes(j.data.notes);
+        setLoadFailed(false);
+        // The cockpit's 72h-window conversation must not hide behind a collapsed header —
+        // a releasing admin should SEE "waiting on Component instructions" without a click.
+        if (autoExpandIfNotes && (j.data.notes as Note[]).length > 0) setOpen(true);
+      }
+    } catch { setLoadFailed(true); }
+  }, [solId, autoExpandIfNotes]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -62,6 +71,7 @@ export function CurationNotesPanel({ solId, compact = false }: { solId: string; 
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between px-4 py-2.5 text-left"
       >
         <span className="text-sm font-semibold text-gray-900">
@@ -95,13 +105,18 @@ export function CurationNotesPanel({ solId, compact = false }: { solId: string; 
               {busy ? 'Adding…' : 'Add note'}
             </button>
           </div>
-          {notes.length === 0 ? (
+          {loadFailed ? (
+            <p className="mt-2 text-xs text-rose-600">
+              Couldn&apos;t load notes.{' '}
+              <button type="button" onClick={() => { void load(); }} className="underline">Retry</button>
+            </p>
+          ) : notes.length === 0 ? (
             <p className="mt-2 text-xs text-gray-400">No notes yet.</p>
           ) : (
             <ul className="mt-3 space-y-2 max-h-64 overflow-y-auto">
               {notes.map((n) => (
                 <li key={n.id} className="text-sm border-l-2 border-gray-200 pl-3">
-                  <p className="text-gray-800 whitespace-pre-wrap">{n.body}</p>
+                  <p className="text-gray-800 whitespace-pre-wrap break-words">{n.body}</p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     {n.authorEmail ?? 'admin'} · {new Date(n.createdAt).toLocaleString()}
                   </p>

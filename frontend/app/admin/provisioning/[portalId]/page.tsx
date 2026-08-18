@@ -171,8 +171,10 @@ export default async function ProvisioningCockpitPage({ params }: Props) {
           )}
 
           {/* The 72h-window conversation lives ON the record (mig 190) — same thread as the
-              curation workspace, so "waiting on instructions" notes follow the OPP, not an inbox. */}
-          {solId ? <CurationNotesPanel solId={solId} compact /> : null}
+              curation workspace, so "waiting on instructions" notes follow the OPP, not an
+              inbox. Auto-expands when notes exist: a releasing admin must SEE "waiting on
+              Component instructions" without a click. */}
+          {solId ? <CurationNotesPanel solId={solId} compact autoExpandIfNotes /> : null}
         </div>
       </div>
     </div>

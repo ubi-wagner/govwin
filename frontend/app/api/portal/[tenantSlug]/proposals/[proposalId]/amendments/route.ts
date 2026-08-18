@@ -55,6 +55,24 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if ('error' in r) return r.error;
     const { tenantId, proposalId } = r;
     enterTenant(tenantId); // RLS choke point — MUST be in the handler's own frame (see resolve()).
+    // Self-healing reconcile (the reconcileTenant pattern): a confirmed amendment can miss
+    // this proposal if the provision-time replay transiently failed — and confirmAmendment
+    // only ever fans the amendment BEING confirmed, so nothing else would back-fill it.
+    // Idempotent (ON CONFLICT) + best-effort: a reconcile failure must not break the read.
+    try {
+      await sql`
+        INSERT INTO proposal_amendment_flags (amendment_id, proposal_id, tenant_id)
+        SELECT a.id, pr.id, pr.tenant_id
+        FROM proposals pr
+        JOIN solicitation_amendments a
+          ON a.solicitation_id = pr.solicitation_id AND a.status = 'confirmed'
+        WHERE pr.id = ${proposalId}::uuid AND pr.tenant_id = ${tenantId}::uuid
+          AND pr.stage <> 'archived'
+        ON CONFLICT (amendment_id, proposal_id) DO NOTHING
+      `;
+    } catch (e) {
+      console.error('[proposal-amendments] flag reconcile failed (non-fatal)', e);
+    }
     let rows;
     try {
       rows = await sql`

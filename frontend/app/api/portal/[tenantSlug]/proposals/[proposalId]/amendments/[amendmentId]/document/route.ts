@@ -24,10 +24,7 @@ interface RouteContext {
 
 export async function GET(_req: Request, ctx: RouteContext) {
   try {
-    const { tenantSlug, proposalId, amendmentId } = await ctx.params;
-    if (!isValidUUID(proposalId) || !isValidUUID(amendmentId)) {
-      return NextResponse.json({ error: 'Invalid ID', code: 'VALIDATION_ERROR' }, { status: 400 });
-    }
+    // Auth FIRST (the SOP order), then input validation.
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
@@ -36,6 +33,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
     const role: Role | null = isRole(user.role) ? user.role : null;
     if (!role || !user.id || !hasRoleAtLeast(role, 'tenant_user')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const { tenantSlug, proposalId, amendmentId } = await ctx.params;
+    if (!isValidUUID(proposalId) || !isValidUUID(amendmentId)) {
+      return NextResponse.json({ error: 'Invalid ID', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {

@@ -217,7 +217,13 @@ export function CurationWorkspace({
         return;
       }
       const d = j?.data ?? {};
-      toast.success(`Update broadcast — ${d.republished ?? 0} card version(s), ${d.cardsRefreshed ?? 0} tenant card(s) refreshed`);
+      toast.success(
+        (d.republished ?? 0) > 0
+          ? `Update broadcast — ${d.republished} card version(s), ${d.cardsRefreshed ?? 0} tenant card(s) refreshed`
+          : (d.unchanged ?? 0) > 0
+            ? 'Cards already match the master — nothing to broadcast'
+            : 'Nothing released yet — nothing to broadcast',
+      );
     } catch {
       toast.error('Broadcast failed');
     } finally {
@@ -902,24 +908,24 @@ export function CurationWorkspace({
           }`}>
             {sol.status.replace(/_/g, ' ')}
           </span>
-          {sol.status === 'pushed_to_pipeline' && (
-            <button
-              onClick={() => { void handleBroadcast(); }}
-              disabled={broadcastBusy}
-              title="Re-publish this OPP's cards to every tenant now. Edits here already propagate automatically — use this after a bulk session, or to fire pinned holders' update nudge immediately."
-              className="px-3 py-1.5 text-sm font-medium rounded border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-50 disabled:opacity-50"
-            >
-              {broadcastBusy ? 'Broadcasting…' : '📡 Broadcast update'}
-            </button>
-          )}
         </div>
       </div>
       {sol.status === 'pushed_to_pipeline' && (
-        <p className="-mt-4 mb-4 text-xs text-emerald-700">
-          Live to tenants — summary, compliance, volume and attachment changes propagate to
-          customer mirror cards automatically. Log an amendment for compliance-affecting changes
-          so buyers with live builds are formally notified.
-        </p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5">
+          <p className="text-xs text-emerald-800">
+            <span className="font-semibold">Live to tenants</span> — summary, compliance, volume and
+            attachment changes propagate to customer mirror cards automatically. Log an amendment for
+            compliance-affecting changes so buyers with live builds are formally notified.
+          </p>
+          <button
+            onClick={() => { void handleBroadcast(); }}
+            disabled={broadcastBusy}
+            title="Re-publish this OPP's cards to every tenant now — after a bulk session, or to fire pinned holders' update nudge immediately."
+            className="shrink-0 px-3 py-1.5 text-sm font-medium rounded border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-100 disabled:opacity-50"
+          >
+            {broadcastBusy ? 'Broadcasting…' : '📡 Broadcast update'}
+          </button>
+        </div>
       )}
 
       {/* Shred-completeness readout (advisory — from Shred audit) */}
@@ -1003,7 +1009,10 @@ export function CurationWorkspace({
 
       {/* Amendments — detect → confirm (fan out) → tenant acknowledge */}
       <div className="mb-4">
-        <AmendmentsPanel solId={sol.id} />
+        <AmendmentsPanel
+          solId={sol.id}
+          documents={documents.map((d) => ({ id: d.id, originalFilename: d.originalFilename, documentType: d.documentType }))}
+        />
       </div>
 
       {/* Curation notes — the internal margin (mig 190): survives push, never customer-visible */}
