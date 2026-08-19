@@ -110,7 +110,14 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   const matrixPages = artifactType === 'cost'
     ? firstNum(compliance.pageLimitCost, compliance.pageLimitTechnical)
     : firstNum(compliance.pageLimitTechnical);
-  const maxPages = isSlide ? null : (itemPages.length ? Math.max(...itemPages) : matrixPages);
+  // Whole-volume page cap. When the volume's required-items declare page budgets, the volume cap is
+  // their SUM (each item is a section of the volume, so the budgets add up) — NOT Math.max, which
+  // took the single largest section (e.g. a 3-page SOW) as the whole-volume cap and falsely
+  // throttled a 10-page Technical Volume to 3. Per-section budgets are still enforced individually by
+  // sectionPageSpan; this is the volume total. A single-item volume is unchanged (sum == that item).
+  // Falls back to the matrix volume limit (page_limit_technical) when no item declares a budget.
+  const summedItemPages = itemPages.reduce((a, b) => a + b, 0);
+  const maxPages = isSlide ? null : (itemPages.length ? summedItemPages : matrixPages);
   const maxSlides = isSlide
     ? (itemSlides.length ? Math.max(...itemSlides) : firstNum(compliance.slideLimit))
     : null;

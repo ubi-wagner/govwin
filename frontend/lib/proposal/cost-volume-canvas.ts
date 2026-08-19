@@ -138,7 +138,14 @@ export function buildCostVolumeCanvas(input: CostVolumeInputs): CanvasDocument {
     rows: [
       [txt('Fringe Benefits', CAT), pctCell(input.rates.fringePct), txt('Direct Labor'), txt('Health, FICA, PTO, 401k, workers comp')],
       [txt('Overhead (OH)', CAT), pctCell(input.rates.overheadPct), txt('Direct Labor + Fringe'), txt('Facilities, IT, admin support, insurance')],
-      [txt('General & Administrative (G&A)', CAT), pctCell(input.rates.gnaPct), txt('Total costs before G&A'), txt('Exec mgmt, accounting, legal, BD')],
+      [txt('General & Administrative (G&A)', CAT), pctCell(input.rates.gnaPct),
+        txt(input.rates.gnaAppliesToOverhead === false ? 'Total before G&A, excluding overhead' : 'Total costs before G&A'),
+        txt('Exec mgmt, accounting, legal, BD')],
+      // Machine-readable G&A-base toggle (parseStructuredCostInputs reads "G&A on Overhead"); 1=include
+      // overhead in the G&A base (default), 0=value-added base (DSIP "Apply G&A to Overhead? NO").
+      [txt('G&A on Overhead', CAT), numCell(input.rates.gnaAppliesToOverhead === false ? 0 : 1),
+        txt(input.rates.gnaAppliesToOverhead === false ? 'No — value-added base' : 'Yes — total cost input'),
+        txt('Whether overhead is inside the G&A base')],
       [txt('Fee / Profit', CAT), pctCell(input.rates.feePct), txt('Total estimated cost'), txt('Reasonable profit (FAR 15.404)')],
     ],
     column_widths: [180, 70, 160, 200], border_style: 'single',
@@ -369,7 +376,8 @@ export function parseStructuredCostInputs(
     const label = cellStr(row[0]).toLowerCase();
     const v = cellNum(row[1]);
     if (!Number.isFinite(v)) continue;
-    if (/fringe/.test(label)) rates.fringePct = v;
+    if (/g&a on overhead|g&a base/.test(label)) rates.gnaAppliesToOverhead = v !== 0;
+    else if (/fringe/.test(label)) rates.fringePct = v;
     else if (/overhead|\boh\b/.test(label)) rates.overheadPct = v;
     else if (/g&a|general/.test(label)) rates.gnaPct = v;
     else if (/fee|profit/.test(label)) rates.feePct = v;

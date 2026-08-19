@@ -877,7 +877,13 @@ async function packageComplianceFloor(proposalId: string): Promise<{ violations:
         ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
       if (secs.length === 0) continue;
       const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName || 'volume');
-      const v = validateCanvasAgainstSpec(doc, a.complianceSpec);
+      // Mirror submission-readiness's fontExempt rule so the two size gauges never disagree: a cost
+      // WORKBOOK or a webFORM is not narrative body text — federal cost tables + form fine print are
+      // conventionally below the prose minimum yet legible, and the RFP's "text ≥ N-pt" rule is a
+      // narrative/deck rule. Drop font_too_small for those artifact types; every other code stands.
+      const fontExempt = a.artifactType === 'cost' || a.artifactType === 'form';
+      const v = validateCanvasAgainstSpec(doc, a.complianceSpec)
+        .filter((x) => !(fontExempt && x.code === 'font_too_small'));
       if (v.length > 0) {
         out.violations += v.length;
         out.byArtifact[a.volumeName || a.id] = v.map((x) => x.code);
