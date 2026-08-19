@@ -79,8 +79,23 @@ class OnReviewPhaseRequestedDraft(Workflow):
             timeout_minutes=5,
         ),
         Step(
-            name="draft_sections", step_type=StepType.AI_INVOKE, action="tool.proposal.draft_all_sections",
-            depends_on="seed_suggest",
+            # THE per-section drafter. This used to be an AI_INVOKE on
+            # `tool.proposal.draft_all_sections`, which maps to the section_drafter ARCHETYPE — an
+            # agent built to draft ONE section from a payload carrying its title, page budget,
+            # required subsections and ranked library atoms. The step passed none of that: just
+            # proposal_id and tenant_id. So the "draft every section" step made a single nameless
+            # call, the archetype defaulted section_title to "Untitled Section", and the run
+            # completed having drafted nothing while the workflow reported success. Proven live on
+            # the T3CP build: 20 sections in, one "Untitled Section" blob out.
+            #
+            # `draft_v0` is the ACTION that actually does it — the one OnProposalCreated has always
+            # used. It loads every still-fillable section, assembles the RFP + compliance + library
+            # context per section, invokes the fabric once per section, and lands each draft through
+            # publish_section_draft's guards. Same actor, real context, one section at a time.
+            # No depends_on: seed_suggest is advisory (AI_INVOKE) and must never gate this hard
+            # step — draft_v0 retrieves its own library context per section, so a skipped or
+            # rate-limited seeder degrades the draft's starting material, never blocks it.
+            name="draft_sections", step_type=StepType.ACTION, action="workflows.actions.draft_v0.draft_v0",
             input_map={"proposal_id": "payload.proposal_id", "tenant_id": "payload.tenant_id",
                        "voice": _VOICE, "guidance": _GUIDANCE},
             timeout_minutes=15,

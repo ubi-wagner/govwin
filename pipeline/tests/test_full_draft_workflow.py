@@ -87,11 +87,18 @@ def test_mode_c_sequences_full_pipeline_cost_package_and_gate_cohort():
     steps = {s.name: s for s in OnFullDraftRequestedModeC.steps}
     # Per-section pipeline actions.
     assert steps["seed_suggest"].action == "tool.proposal.seed_suggest"
-    assert steps["draft_sections"].action == "tool.proposal.draft_all_sections"
+    # The per-section drafter is the draft_v0 ACTION. See test_review_phase_wiring for why the old
+    # AI_INVOKE on tool.proposal.draft_all_sections could not draft a proposal.
+    assert steps["draft_sections"].action == "workflows.actions.draft_v0.draft_v0"
     assert steps["reformat"].action == "tool.proposal.reformat_section"
     assert steps["restyle"].action == "tool.proposal.restyle"
-    # Chained in order.
-    assert steps["draft_sections"].depends_on == "seed_suggest"
+    # Chained in order. draft_sections carries NO depends_on: seed_suggest is an AI_INVOKE, and an
+    # advisory agent must never gate a hard step (test_workflow_no_deadend_emission enforces this).
+    # The engine runs steps in list order regardless — depends_on only adds a skip-cascade — so the
+    # seeding still happens first; it just cannot stop the draft when it is skipped or fails.
+    assert steps["draft_sections"].depends_on is None
+    assert OnFullDraftRequestedModeC.steps.index(steps["seed_suggest"]) < \
+        OnFullDraftRequestedModeC.steps.index(steps["draft_sections"])
     assert steps["reformat"].depends_on == "draft_sections"
     assert steps["restyle"].depends_on == "reformat"
     # Cost + package.
@@ -111,6 +118,28 @@ def test_mode_c_sequences_full_pipeline_cost_package_and_gate_cohort():
         assert steps[name].depends_on == "package"
 
 
+# The only two non-AI_INVOKE steps the full-draft modes are allowed to carry, and why each is
+# safe under "outputs are review-staged, no step advances a gate":
+#
+#   request_overlay  (P4-D) only EMITS the advisory-overlay request event. It writes no business
+#                    table at all — the overlay it asks for is itself advisory.
+#
+#   draft_sections   lands a v0 draft into sections that are still fillable, through
+#                    publish_section_draft's guards (which refuse to overwrite human prose or a
+#                    seeded mold that already carries prose). This is the same action provision
+#                    has always run from OnProposalCreated: writing a starting draft into an empty
+#                    section is not advancing a stage, locking, or submitting. It is an ACTION
+#                    rather than an AI_INVOKE because the drafting is PER SECTION — it assembles
+#                    each section's own title, page/character budget, required subsections and
+#                    ranked atoms before invoking the fabric. The AI_INVOKE it replaced passed
+#                    only proposal_id, so the archetype drafted one "Untitled Section" for the
+#                    whole proposal and the workflow reported success having drafted nothing.
+_ALLOWED_ACTIONS = {
+    "request_overlay": "workflows.actions.advisory_actions.request_advisory_overlay",
+    "draft_sections": "workflows.actions.draft_v0.draft_v0",
+}
+
+
 def test_every_mode_ends_in_hitl_review_and_never_auto_advances():
     """Outputs are review-staged: each mode ends in a HITL review TODO; NO step advances a gate."""
     for mode, cls in _MODES.items():
@@ -123,14 +152,16 @@ def test_every_mode_ends_in_hitl_review_and_never_auto_advances():
         for s in cls.steps:
             assert "advanced" not in (s.action or "")
             assert "advance" not in (s.action or "")
-            # Every non-HITL step is advisory: an AI_INVOKE agent, OR the request_overlay
-            # ACTION (P4-D) which only EMITS the advisory-overlay request event — it writes
-            # no business table and advances no gate (the overlay itself is advisory).
+            # Every non-HITL step is an AI_INVOKE agent, except for a closed allow-list of two
+            # ACTIONs. The allow-list is the point of this assertion: a NEW ACTION appearing in
+            # one of these modes fails here until someone states why it cannot advance a gate.
             if s.step_type != StepType.TODO:
-                if s.name == "request_overlay":
+                if s.name in _ALLOWED_ACTIONS:
                     assert s.step_type == StepType.ACTION
-                    assert s.action == "workflows.actions.advisory_actions.request_advisory_overlay"
-                    assert s.depends_on is None  # independent — never blocks the human gate
+                    assert s.action == _ALLOWED_ACTIONS[s.name]
+                    # Neither may be GATED by an advisory agent, and neither may gate the human
+                    # review TODO — they are independent of the AI_INVOKE steps around them.
+                    assert s.depends_on is None
                 else:
                     assert s.step_type == StepType.AI_INVOKE, f"mode {mode} step {s.name} not advisory"
 

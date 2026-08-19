@@ -71,7 +71,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     # be safe to fill (untouched or prior auto-draft). One row, one lock.
     row = await conn.fetchrow(
         """
-        SELECT id, status, version, content_source
+        SELECT id, status, version, content_source, content
         FROM proposal_sections
         WHERE id = $1::uuid AND proposal_id = $2::uuid
         FOR UPDATE
@@ -95,13 +95,17 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     if row["content_source"] == "human_edit":
         log.info("publish_section_draft: section %s carries a human edit (content_source=human_edit) — leaving it alone", section_id)
         return {"published": False, "skipped": True, "reason": "human_edited"}
-    # PROVISIONED MOLD guard: provisioning stamps content_source='template' on sections it fills
-    # with an admin-authored mold, the computed cost workbook, or a registry template — all
-    # status='ai_drafted', which the landable set would otherwise admit. Those canvases ARE the
-    # intended V0 (a slide deck skeleton, a priced workbook); overwriting one with a 1-node
-    # letter strawman destroys admin-authored structure seconds after release. Leave them alone.
-    if row["content_source"] == "template":
-        log.info("publish_section_draft: section %s is provisioned from a mold (content_source=template) — leaving it alone", section_id)
+    # PROVISIONED MOLD guard, judged by CONTENT rather than by the label. Provisioning stamps
+    # content_source='template' on sections it fills from an admin-authored mold, the computed cost
+    # workbook, or a registry template. When that canvas carries real content — a priced workbook, a
+    # filled deck — overwriting it with a strawman destroys admin-authored work seconds after
+    # release, so it stays untouchable. But a STRUCTURAL mold (the item heading, the rules callout,
+    # empty text blocks) is scaffolding, not a draft: refusing to write into it leaves the customer
+    # a proposal of headings with no prose and no error anywhere. Same rule as draft_v0's selection;
+    # the two must agree or a section is selected for drafting and then silently refused at landing.
+    from workflows.actions.draft_v0 import _has_prose  # noqa: PLC0415 (avoids a circular import at module load)
+    if row["content_source"] == "template" and _has_prose(row["content"]):
+        log.info("publish_section_draft: section %s is a FILLED mold (content_source=template) — leaving it alone", section_id)
         return {"published": False, "skipped": True, "reason": "template_provisioned"}
 
     # canvas_versions.content is jsonb NOT NULL. A str must be valid JSON text; a bare

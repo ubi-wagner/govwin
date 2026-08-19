@@ -52,13 +52,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     let body: { tags?: AtomTagInput[]; status?: string };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
-    let updated = 0;
+    let tagsUpdated = 0;
     if (Array.isArray(body.tags) && body.tags.length > 0) {
-      ({ updated } = await confirmTags(g.tenantId, atomId, body.tags, g.userId));
+      ({ updated: tagsUpdated } = await confirmTags(g.tenantId, atomId, body.tags, g.userId));
     }
+    // Report whether the STATUS write actually landed. This used to return the tag count under the
+    // bare name `updated`, so archiving an atom answered 200 with `updated: 0` — which reads as
+    // "nothing changed" even though the archive had succeeded. A caller cannot tell a no-op from a
+    // success, and the honest answer costs one row count.
+    let statusChanged = false;
     if (body.status && ['draft', 'approved', 'archived'].includes(body.status)) {
       await withTenant(g.tenantId, async (tx) => {
-        await tx`UPDATE library_atoms SET status = ${body.status} WHERE tenant_id = ${g.tenantId}::uuid AND id = ${atomId}::uuid AND vault_id IS NULL`;
+        const rows = await tx`UPDATE library_atoms SET status = ${body.status}
+          WHERE tenant_id = ${g.tenantId}::uuid AND id = ${atomId}::uuid AND vault_id IS NULL
+          RETURNING id`;
+        statusChanged = rows.length > 0;
       });
     }
     await emitEventSingle({
@@ -66,9 +74,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
       type: 'atom.curated',
       actor: userActor(g.userId, g.email ?? undefined),
       tenantId: g.tenantId,
-      payload: { atomId, tagsUpdated: updated, status: body.status ?? null },
+      payload: { atomId, tagsUpdated, status: body.status ?? null, statusChanged },
     });
-    return NextResponse.json({ data: { updated, status: body.status ?? null } });
+    return NextResponse.json({ data: { tagsUpdated, status: body.status ?? null, statusChanged } });
   } catch (err) {
     console.error('[portal/atoms/:id] PATCH error', err);
     return NextResponse.json({ error: 'Update failed', code: 'DB_ERROR' }, { status: 500 });

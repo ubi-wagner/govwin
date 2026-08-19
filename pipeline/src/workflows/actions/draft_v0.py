@@ -25,6 +25,7 @@ Wired as an ACTION step on OnProposalCreated (action string:
 from __future__ import annotations
 
 import logging
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -90,9 +91,72 @@ def _metadata(section: asyncpg.Record, proposal_id: str, solicitation_id: str | 
     }
 
 
+
+def _has_prose(content) -> bool:
+    """Does this canvas carry actual written prose, as opposed to empty structure?
+
+    A mold seeds headings, a rules callout and EMPTY text blocks — that is scaffolding, not a
+    draft, and the section still needs writing. A filled mold, a priced cost workbook or a human
+    draft carries words, and must never be clobbered. Headings and callouts are deliberately not
+    counted: they are the scaffolding itself.
+    """
+    if not content:
+        return False
+    doc = content
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(doc)
+        except (ValueError, TypeError):
+            return False
+    if not isinstance(doc, dict):
+        return False
+
+    nodes = doc.get("nodes")
+    if not isinstance(nodes, list):
+        nodes = [
+            n
+            for section in (doc.get("sections") or [])
+            for group in (section.get("groups") or [])
+            for n in (group.get("nodes") or [])
+        ]
+
+    words = 0
+    for n in nodes or []:
+        if not isinstance(n, dict):
+            continue
+        kind = n.get("type")
+        if kind in ("heading", "callout", "page_break", "divider"):
+            continue
+        c = n.get("content") or {}
+        texts = []
+        if isinstance(c, dict):
+            if isinstance(c.get("text"), str):
+                texts.append(c["text"])
+            for item in c.get("items") or []:
+                if isinstance(item, dict) and isinstance(item.get("text"), str):
+                    texts.append(item["text"])
+            for row in c.get("rows") or []:
+                for cell in row if isinstance(row, list) else []:
+                    if isinstance(cell, str):
+                        texts.append(cell)
+                    elif isinstance(cell, dict) and isinstance(cell.get("text"), str):
+                        texts.append(cell["text"])
+        words += sum(len(t.split()) for t in texts)
+        if words >= 25:      # a real paragraph; scaffolding never reaches this
+            return True
+    return False
+
+
 async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     proposal_id = inputs.get("proposal_id") or inputs.get("proposalId")
     tenant_id = inputs.get("tenant_id") or inputs.get("tenantId")
+    # Voice register, threaded from the full-draft / studio caller. The AI_INVOKE step these
+    # workflows used to run passed it to the archetype; keeping it here means switching them onto
+    # this action does not silently drop the author's chosen register (Mode B is literally a
+    # restyle pass, so losing it would make that mode a no-op).
+    voice = inputs.get("voice") or []
+    if isinstance(voice, str):
+        voice = [v.strip() for v in voice.split(",") if v.strip()]
 
     if not proposal_id:
         log.warning("draft_v0: missing proposal_id — skipping")
@@ -116,23 +180,32 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     # section a human has already touched (content_source='human_edit') even if its status is still
     # 'ai_drafted' — a released-UNLOCKED build invites the customer to edit ai_drafted sections
     # immediately, and this async drafter (incl. its manager retries) must never overwrite that work.
-    # content_source='template' = the section was provisioned from an admin-authored mold, the
-    # computed cost workbook, or a registry template — that canvas IS the intended V0 skeleton
-    # (slide geometry, priced tables). The strawman must not touch it (mirrored by the landing
-    # primitive's belt in publish_section_draft).
+    #
+    # A 'template' section — provisioned from an admin-authored mold, the computed cost workbook, or
+    # a registry template — is judged by what its canvas actually CONTAINS, not by the label. This
+    # used to be a blanket exclusion, written when a mold meant priced tables and slide geometry:
+    # real content the strawman must never clobber. Once the mold builder started seeding every
+    # authored section with a STRUCTURAL skeleton (the item heading, the rules callout, empty text
+    # blocks), that blanket exclusion silently switched drafting off for the entire proposal — every
+    # section looked "already drafted" and carried not one word of prose. Two features each correct
+    # on its own, wrong together, and the only symptom was a workflow reporting
+    # drafted:0 / no_empty_sections while the customer's build sat empty.
+    #
+    # So: fetch template sections too, and keep the ones with no prose. A skeleton gets drafted; a
+    # priced cost workbook or a filled mold is left alone.
     rows = await conn.fetch(
         """
         SELECT s.id, s.title, s.status, s.section_type, s.page_allocation, s.artifact_id,
-               s.content, a.format_spec
+               s.content, s.content_source, a.format_spec
         FROM proposal_sections s
         LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
         WHERE s.proposal_id = $1 AND s.status IN ('empty', 'ai_drafted')
           AND s.content_source IS DISTINCT FROM 'human_edit'
-          AND s.content_source IS DISTINCT FROM 'template'
         ORDER BY s.section_number
         """,
         proposal_uuid,
     )
+    rows = [r for r in rows if r["content_source"] != "template" or not _has_prose(r["content"])]
     if not rows:
         return {"drafted": 0, "skipped": False, "reason": "no_empty_sections"}
 
@@ -176,6 +249,7 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
                     "evaluation_criteria": rfp["evaluation_criteria"] or [],
                     "page_limit": s["page_allocation"],
                     "instruction": "Draft a substantive V0 strawman for this section grounded in the company's library atoms.",
+                    **({"voice": voice} if voice else {}),
                 },
             }
             result = await fabric.invoke_agent(conn, "section_drafter", context, tenant_id=tenant_id)

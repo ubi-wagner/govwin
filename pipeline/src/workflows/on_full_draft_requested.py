@@ -108,10 +108,28 @@ class OnFullDraftRequestedModeA(Workflow):
         ),
         # Merge the selected primitives into a rough draft (section_drafter). Threads voice.
         Step(
+            # THE per-section drafter. This used to be an AI_INVOKE on
+            # `tool.proposal.draft_all_sections`, which maps to the section_drafter ARCHETYPE — an
+            # agent built to draft ONE section from a payload carrying its title, page budget,
+            # required subsections and ranked library atoms. The step passed none of that: just
+            # proposal_id and tenant_id. So the "draft every section" step made a single nameless
+            # call, the archetype defaulted section_title to "Untitled Section", and the run
+            # completed having drafted nothing while the workflow reported success. Proven live on
+            # the T3CP build: 20 sections in, one "Untitled Section" blob out.
+            #
+            # `draft_v0` is the ACTION that actually does it — the one OnProposalCreated has always
+            # used. It loads every still-fillable section, assembles the RFP + compliance + library
+            # context per section, invokes the fabric once per section, and lands each draft through
+            # publish_section_draft's guards. Same actor, real context, one section at a time.
+            # NOT `depends_on="seed_suggest"`. seed_suggest is an AI_INVOKE, and an advisory agent
+            # must never gate a hard step: if the seeder is skipped, rate-limited or fails, the
+            # draft must still run. draft_v0 does its own library retrieval per section, so the
+            # seeder's staged atoms are an ACCELERANT, not a precondition. List order still puts
+            # the seeding first — the engine runs steps in order, and depends_on only adds a
+            # skip-cascade on top of that.
             name="draft_sections",
-            step_type=StepType.AI_INVOKE,
-            action="tool.proposal.draft_all_sections",
-            depends_on="seed_suggest",
+            step_type=StepType.ACTION,
+            action="workflows.actions.draft_v0.draft_v0",
             input_map={
                 "proposal_id": "payload.proposal_id",
                 "tenant_id": "payload.tenant_id",
@@ -213,10 +231,28 @@ class OnFullDraftRequestedModeC(Workflow):
             timeout_minutes=5,
         ),
         Step(
+            # THE per-section drafter. This used to be an AI_INVOKE on
+            # `tool.proposal.draft_all_sections`, which maps to the section_drafter ARCHETYPE — an
+            # agent built to draft ONE section from a payload carrying its title, page budget,
+            # required subsections and ranked library atoms. The step passed none of that: just
+            # proposal_id and tenant_id. So the "draft every section" step made a single nameless
+            # call, the archetype defaulted section_title to "Untitled Section", and the run
+            # completed having drafted nothing while the workflow reported success. Proven live on
+            # the T3CP build: 20 sections in, one "Untitled Section" blob out.
+            #
+            # `draft_v0` is the ACTION that actually does it — the one OnProposalCreated has always
+            # used. It loads every still-fillable section, assembles the RFP + compliance + library
+            # context per section, invokes the fabric once per section, and lands each draft through
+            # publish_section_draft's guards. Same actor, real context, one section at a time.
+            # NOT `depends_on="seed_suggest"`. seed_suggest is an AI_INVOKE, and an advisory agent
+            # must never gate a hard step: if the seeder is skipped, rate-limited or fails, the
+            # draft must still run. draft_v0 does its own library retrieval per section, so the
+            # seeder's staged atoms are an ACCELERANT, not a precondition. List order still puts
+            # the seeding first — the engine runs steps in order, and depends_on only adds a
+            # skip-cascade on top of that.
             name="draft_sections",
-            step_type=StepType.AI_INVOKE,
-            action="tool.proposal.draft_all_sections",
-            depends_on="seed_suggest",
+            step_type=StepType.ACTION,
+            action="workflows.actions.draft_v0.draft_v0",
             input_map={
                 "proposal_id": "payload.proposal_id",
                 "tenant_id": "payload.tenant_id",

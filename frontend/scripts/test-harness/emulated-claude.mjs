@@ -122,7 +122,14 @@ function sentences(text) {
     .map((x) => x.trim())
     .filter((x) => x.length >= 60 && x.length <= 420)
     .filter((x) => /[a-z]/.test(x) && (x.match(/[A-Za-z]/g)?.length ?? 0) / x.length > 0.6)
-    .filter((x) => !/^(page|proposal number|topic number|sbc:|disclaimer|form generated)/i.test(x));
+    .filter((x) => !/^(page|proposal number|topic number|sbc:|disclaimer|form generated)/i.test(x))
+    // Cover-sheet and certification boilerplate. The tenant's library holds whole prior proposals
+    // atomized as single documents rather than clean reusable atoms, so a retrieval for a technical
+    // section legitimately returns a full proposal — whose opening text is the firm's address, UEI,
+    // DUNS, CAGE and SBA certifications. A writer skips that; so does this. (The underlying fix is
+    // library GRAIN — atomizing those documents into sections — not a filter here.)
+    .filter((x) => !/\b(UEI|DUNS|CAGE|SBA SBC|13 C\.?F\.?R|OFFEROR CERTIFIES|Firm Certificate|Number of employees|www\.[a-z]|Mail Address|Website Address)\b/i.test(x))
+    .filter((x) => !/^\s*\d+\.\s/.test(x) || x.length > 140);
 }
 
 /** Parse the <library_atoms> block the product builds into { id, category, tags, text } records. */
@@ -166,6 +173,44 @@ function rankSentences(pool, focusTerms, limit) {
     .map((x) => x.s);
 }
 
+
+/**
+ * Pull the human-readable prose out of a tool result, rather than treating its JSON as text.
+ *
+ * A tool returns structure — {"results":[{"id":…,"title":…,"content":"…"}]} — and stringifying it
+ * makes the ranker treat `{"matched": false, "skeleton": []…` as a candidate sentence, which is how
+ * a section's opening paragraph became a wall of JSON. Walk the parsed object and keep only string
+ * values that read like prose; ignore ids, flags and short labels.
+ */
+function harvestProse(raw) {
+  let v = raw;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (t.startsWith('{') || t.startsWith('[')) {
+      try { v = JSON.parse(t); } catch { return [t]; }
+    } else {
+      return [t];
+    }
+  }
+  const out = [];
+  const walk = (node, depth) => {
+    if (depth > 6 || node == null) return;
+    if (typeof node === 'string') {
+      if (node.length >= 60 && /\s/.test(node) && !/^[0-9a-f-]{30,}$/i.test(node)) out.push(node);
+      return;
+    }
+    if (Array.isArray(node)) { node.forEach((x) => walk(x, depth + 1)); return; }
+    if (typeof node === 'object') {
+      for (const [k, x] of Object.entries(node)) {
+        if (/^(id|_id|uuid|type|status|note|matched)$/i.test(k)) continue;
+        walk(x, depth + 1);
+      }
+    }
+  };
+  walk(v, 0);
+  return out;
+}
+
 const wordsIn = (s) => (s.match(/\S+/g) || []).length;
 
 // ── RESPONDER REGISTRY — expand per-agent as flows are wired. First match wins. ─────────────────────
@@ -205,7 +250,10 @@ const RESPONDERS = [
   // and that is the correct signal about the product's retrieval rather than a flattering one.
   {
     name: 'section_drafter',
-    match: (req) => /senior government proposal writer/i.test(systemText(req)),
+    // The FRONTEND tool only. It demands a JSON CanvasNode[] array; the PIPELINE archetype with
+    // the same opening phrase wants markdown and runs a tool loop first, and is handled below.
+    match: (req) => /senior government proposal writer/i.test(systemText(req))
+      && /valid JSON array of CanvasNode/i.test(systemText(req)),
     respond: (req) => {
       const sys = systemText(req);
       const user = lastUserText(req);
@@ -303,6 +351,74 @@ const RESPONDERS = [
       }
 
       return textMsg(req.model, JSON.stringify(nodes));
+    },
+  },
+  // section_drafter — the PIPELINE archetype (agents/archetypes/section_drafter.py). Same opening
+  // phrase as the frontend tool, three material differences: it wants MARKDOWN ("## for
+  // subsections"), it is told to call search_starter_scaffold FIRST and then search_library, and
+  // draft_v0 feeds its text through build_canvas_document. Answering it the frontend way returned
+  // a JSON array that the markdown converter faithfully wrapped in ONE text block — every section
+  // of the proposal landed as a wall of JSON — and skipping its tool loop meant search_library
+  // never ran, so the draft honestly reported that no library content had been retrieved. Walk the
+  // tools first, then compose markdown from what they actually returned.
+  {
+    name: 'section_drafter_pipeline',
+    match: (req) => /senior government proposal writer/i.test(systemText(req)),
+    respond: (req) => {
+      const tools = req.tools || [];
+      const results = (req.messages || [])
+        .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+        .filter((b) => b?.type === 'tool_result');
+
+      // The section title must come from the WHOLE request, not the last user message: inside a
+      // tool loop the last user message is the tool_result block, so reading it gave every section
+      // the title "Section" and searched the library for a placeholder string.
+      const all = reqText(req);
+      const title = (all.match(/Draft the "([^"]{2,120})" section/i)?.[1] ?? 'Section').replace(/\s+/g, ' ').trim();
+
+      // Walk every tool once, in the order the archetype's own prompt names them — and call them
+      // with the REAL section title. genericToolInput fills a string param with a placeholder
+      // ("Emulated section_title — representative content…"), so search_library was querying for
+      // that placeholder and correctly finding nothing. A tool loop that searches for the wrong
+      // thing is worse than no tool loop: it looks like retrieval and returns noise.
+      if (results.length < tools.length) {
+        const order = ['search_starter_scaffold', 'search_library', 'get_compliance'];
+        const ranked = [...tools].sort((a, b) => {
+          const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+        });
+        const next = ranked[results.length];
+        if (next) {
+          const input = genericToolInput(next, req);
+          for (const k of Object.keys(input)) {
+            if (/^(section_title|query|search|text|topic|title)$/i.test(k)) input[k] = title;
+          }
+          return toolUseMsg(req.model, next.name, input);
+        }
+      }
+
+      const user = lastUserText(req);
+
+      // Everything the tools returned is the material to write from.
+      const harvested = results.flatMap((b) => harvestProse(b.content));
+      const pool = [...harvested.flatMap((t) => sentences(t)), ...sentences(user)];
+      const focus = terms(title);
+
+      const lines = [`# ${title}`, ''];
+      const lead = rankSentences(pool, focus, 6);
+      if (lead.length) {
+        lines.push(lead.slice(0, 4).join(' '), '');
+      } else {
+        lines.push(
+          `No approved library content was retrieved for "${title}". Add source material to the library, `
+          + 'or draft this section directly; nothing here has been generated from thin air.', '');
+      }
+      const used = new Set(lead);
+      const rest = rankSentences(pool.filter((x) => !used.has(x)), focus, 6);
+      if (rest.length) {
+        lines.push('## Approach', '', rest.slice(0, 3).join(' '), '');
+      }
+      return textMsg(req.model, lines.join('\n'));
     },
   },
   // Generic tool-using agent: walk the WHOLE tool loop — read/query tools first, the OUTPUT tool
