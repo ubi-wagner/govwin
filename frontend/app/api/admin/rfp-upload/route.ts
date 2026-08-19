@@ -240,7 +240,13 @@ export async function POST(request: Request) {
       FROM solicitation_documents sd
       LEFT JOIN curated_solicitations cs ON cs.id = sd.solicitation_id
       LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+      -- Dedupe is PER SOLICITATION (mig 192). The same file legitimately belongs to more than one
+      -- solicitation — every DoW SBIR topic attaches the SAME BAA preface, and an umbrella BAA and
+      -- its topic share the topic PDF. Only a re-upload into the SAME solicitation is a duplicate.
+      -- Attaching to an existing solicitation scopes to it; a NEW solicitation can never collide.
       WHERE sd.content_hash = ANY(${hashes}::text[])
+        AND ${existingSolId}::uuid IS NOT NULL
+        AND sd.solicitation_id = ${existingSolId}::uuid
     `;
   } catch (err) {
     console.error('[rfp-upload] duplicate check query failed', err);
@@ -254,7 +260,7 @@ export async function POST(request: Request) {
     const first = dupeRows[0];
     return NextResponse.json(
       {
-        error: `This file has already been uploaded to "${first.solTitle ?? 'an existing solicitation'}". Navigate to the existing solicitation or rename/modify the file if this is a different document.`,
+        error: `This file is already attached to "${first.solTitle ?? 'this solicitation'}". Attaching the same file to a DIFFERENT solicitation is allowed — only a repeat upload into the same one is refused.`,
         code: 'DUPLICATE_FILE',
         details: {
           existingSolicitationId: first.solicitationId,
@@ -479,7 +485,7 @@ export async function POST(request: Request) {
            ${fb.hash},
            ${userId ?? null}::uuid,
            ${isPrimary})
-        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
+        ON CONFLICT (solicitation_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
       if (docRows.length === 0) {
@@ -490,7 +496,7 @@ export async function POST(request: Request) {
         await emitEventEnd(eventId, { error: { message: 'duplicate content_hash', code: 'DUPLICATE_FILE' } });
         return NextResponse.json(
           {
-            error: 'This file has already been uploaded. Navigate to the existing solicitation or rename/modify the file if this is a different document.',
+            error: 'This file is already attached to this solicitation. Attaching it to a different solicitation is allowed — only a repeat upload into the same one is refused.',
             code: 'DUPLICATE_FILE',
           },
           { status: 409 },
