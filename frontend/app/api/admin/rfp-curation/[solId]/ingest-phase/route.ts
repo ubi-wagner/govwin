@@ -29,10 +29,11 @@ import {
   getIngestPhase, getOpenDraft, landSkeleton, LandBlockedError, nextPhase,
   setIngestPhase, stageSkeleton, type IngestPhase,
 } from '@/lib/ingest/stage-skeleton';
+import { buildMolds, getStagedOutline, moldsStatus, proposeOutline, stageOutline } from '@/lib/ingest/molds';
 
 interface RouteContext { params: Promise<{ solId: string }> }
 
-const ACTIONS = ['start', 'regenerate', 'approve', 'land', 'auto'] as const;
+const ACTIONS = ['start', 'regenerate', 'approve', 'land', 'auto', 'propose_molds', 'build_molds'] as const;
 type Action = (typeof ACTIONS)[number];
 
 async function requireAdmin() {
@@ -65,9 +66,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
     let phase: IngestPhase;
     let draft: Awaited<ReturnType<typeof getOpenDraft>>;
+    let molds: Awaited<ReturnType<typeof moldsStatus>> | null = null;
+    let outline: Awaited<ReturnType<typeof getStagedOutline>> = null;
     let chars = 0;
     try {
-      [phase, draft] = await Promise.all([getIngestPhase(solId), getOpenDraft(solId)]);
+      [phase, draft, molds, outline] = await Promise.all([
+        getIngestPhase(solId), getOpenDraft(solId), moldsStatus(solId), getStagedOutline(solId),
+      ]);
       const [row] = await sql<Array<{ chars: number }>>`
         SELECT coalesce(length(full_text), 0)::int AS chars
         FROM curated_solicitations WHERE id = ${solId}::uuid`;
@@ -84,6 +89,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
       sourceReady: chars >= MIN_USABLE_TEXT_CHARS,
       sourceChars: chars,
       draft,
+      // The molds gate's own truth. Without this the panel could only report that the phase's
+      // workflow instance finished — which it does whether or not a single mold exists.
+      molds,
+      outline,
     } });
   } catch (e) {
     console.error('[ingest-phase] error', e);
@@ -153,6 +162,61 @@ export async function POST(request: Request, ctx: RouteContext) {
         });
       }
       return NextResponse.json({ data: { phase: to, phaseLabel: PHASE_LABEL[to] } });
+    }
+
+    // ── propose_molds / build_molds: the molds gate's two halves ──────────────────────
+    //
+    // The phase workflow runs skeleton_architect, which is advisory and writes nothing. These are
+    // the read-on-review landing that used to be missing entirely: PROPOSE stages a skeleton for
+    // the admin to look at (the agent's own JSON when its run produced parseable JSON, otherwise
+    // derived from the LANDED matrix — labelled either way), and BUILD turns the reviewed
+    // skeleton into the molds a buyer actually receives. Both are frontend + human-triggered,
+    // because the workflow engine's invariants forbid a pipeline consumer of agent output.
+    if (action === 'propose_molds') {
+      try {
+        const proposed = await proposeOutline(solId);
+        if (!proposed) {
+          return NextResponse.json({
+            error: 'Nothing to propose — this solicitation has no landed volumes yet. Land the matrix first.',
+            code: 'NO_STRUCTURE',
+          }, { status: 409 });
+        }
+        const { outlineId } = await stageOutline(solId, proposed, admin.id);
+        await emitPhaseEvent(solId, admin, 'molds_proposed', {
+          outlineId, source: proposed.source,
+          sections: proposed.volumes.reduce((a, v) => a + v.sections.length, 0),
+        });
+        return NextResponse.json({ data: { outlineId, ...proposed, molds: await moldsStatus(solId) } });
+      } catch (e) {
+        console.error('[ingest-phase] propose_molds failed', e);
+        return NextResponse.json({ error: 'Failed to propose the skeleton', code: 'DB_ERROR' }, { status: 500 });
+      }
+    }
+
+    if (action === 'build_molds') {
+      try {
+        if (!(await getStagedOutline(solId))) {
+          return NextResponse.json({
+            error: 'No skeleton has been proposed yet — propose one and review it before building molds.',
+            code: 'NO_OUTLINE',
+          }, { status: 409 });
+        }
+        const result = await buildMolds(solId, admin.id);
+        await emitPhaseEvent(solId, admin, 'molds_built', {
+          built: result.built, linked: result.linked, skipped: result.skipped,
+        });
+        const status = await moldsStatus(solId);
+        // Only a solicitation whose authored items ALL carry a mold has finished this phase.
+        // Advancing on the workflow instance's completion alone is what let "Complete" mean
+        // "the advisory step ran", which is not the same thing as "the molds exist".
+        if (status.itemsToMold > 0 && status.itemsWithMold === status.itemsToMold) {
+          await setIngestPhase(solId, 'complete');
+        }
+        return NextResponse.json({ data: { ...result, molds: status, phase: await getIngestPhase(solId) } });
+      } catch (e) {
+        console.error('[ingest-phase] build_molds failed', e);
+        return NextResponse.json({ error: 'Failed to build the molds', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // ── land: promote the staged matrix. The only writer of solicitation_compliance. ──

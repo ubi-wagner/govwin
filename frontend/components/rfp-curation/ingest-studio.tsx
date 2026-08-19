@@ -29,9 +29,16 @@ interface Draft {
   audit: Audit; review: Record<string, unknown>; guidance: string | null;
   parsed?: { volumes?: Array<{ name: string }>; compliance?: Record<string, unknown> };
 }
+interface Molds {
+  itemsToMold: number; itemsWithMold: number;
+  outlineStagedAt: string | null; outlineSource: 'agent' | 'matrix' | null; sectionsProposed: number;
+}
+interface OutlineVol { volumeNumber: number; volume: string; dsipOnly: boolean; sections: Array<{ section: string; pageBudget: number | null; characterBudget: number | null }> }
 interface State {
   phase: Phase; phaseLabel: string; nextPhase: Phase;
   sourceReady: boolean; sourceChars: number; draft: Draft | null;
+  molds: Molds | null;
+  outline: { source: 'agent' | 'matrix'; volumes: OutlineVol[]; notes: string | null } | null;
 }
 
 /** The gates, in order. `molds` is the separate mold-manager phase — a different job. */
@@ -84,6 +91,11 @@ export function IngestStudio({ solId }: { solId: string }) {
       const d = json.data ?? {};
       if (action === 'land') {
         toast.success(`Landed: ${d.volumes} volumes · ${d.items} section molds · ${d.topics} topic(s)`);
+      } else if (action === 'propose_molds') {
+        const n = (d.volumes as OutlineVol[] | undefined)?.reduce((a, v) => a + v.sections.length, 0) ?? 0;
+        toast.success(`Skeleton proposed — ${n} section(s), ${d.source === 'agent' ? 'from skeleton_architect' : 'derived from the landed matrix'}`);
+      } else if (action === 'build_molds') {
+        toast.success(`${d.built} mold(s) built · ${d.molds?.itemsWithMold ?? 0} of ${d.molds?.itemsToMold ?? 0} items covered`);
       } else if (action === 'approve') {
         toast.success(`Advanced to ${d.phaseLabel}`);
       } else {
@@ -236,6 +248,87 @@ export function IngestStudio({ solId }: { solId: string }) {
               </button>
             </div>
           </div>
+
+          {/* ── The MOLDS gate ────────────────────────────────────────────────
+              This gate used to be a dead end: skeleton_architect ran advisorily and its proposal
+              went nowhere, so an admin arrived here with nothing to review and no button. The
+              counter is the point — a phase whose workflow instance finished is not the same
+              thing as a solicitation whose items have molds, and only one of those facts is
+              worth anything to the buyer who provisions off it. */}
+          {state.molds && state.molds.itemsToMold > 0 && rank(state.phase) >= rank('landed') && (
+            <div className="rounded border border-indigo-200 bg-white p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs">
+                  <span className="font-semibold text-indigo-900">Molds</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded font-medium ${
+                    state.molds.itemsWithMold === state.molds.itemsToMold
+                      ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {state.molds.itemsWithMold} of {state.molds.itemsToMold} items have a mold
+                  </span>
+                  {state.molds.outlineSource && (
+                    <span className="ml-2 text-gray-500">
+                      skeleton proposed {state.molds.outlineSource === 'agent'
+                        ? 'by skeleton_architect'
+                        : 'from the landed matrix'} · {state.molds.sectionsProposed} section(s)
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => void act('propose_molds')}
+                    disabled={!!busy}
+                    title="Stage a master response skeleton for review. Writes no molds."
+                    className="px-3 py-1.5 text-xs font-medium rounded bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    {busy === 'propose_molds' ? 'Proposing…' : state.outline ? '↻ Re-propose skeleton' : '◇ Propose skeleton'}
+                  </button>
+                  <button
+                    onClick={() => void act('build_molds')}
+                    disabled={!!busy || !state.outline}
+                    title={state.outline ? 'Build a mold for every authored item from the reviewed skeleton' : 'Propose a skeleton first'}
+                    className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {busy === 'build_molds' ? 'Building…' : '⇢ Build the molds'}
+                  </button>
+                </div>
+              </div>
+
+              {state.outline && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-indigo-700">
+                    Review the proposed skeleton
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {state.outline.notes && <p className="text-gray-600 italic">{state.outline.notes}</p>}
+                    {state.outline.volumes.map((v) => (
+                      <div key={v.volumeNumber}>
+                        <p className="font-medium text-gray-800">
+                          Volume {v.volumeNumber} — {v.volume}
+                          {v.dsipOnly && (
+                            <span className="ml-2 font-normal text-gray-500">
+                              completed in DSIP · nothing authored here
+                            </span>
+                          )}
+                        </p>
+                        <ul className="ml-4 mt-0.5 space-y-0.5">
+                          {v.sections.map((sec, i) => (
+                            <li key={i} className="text-gray-700">
+                              • {sec.section}
+                              {sec.pageBudget != null && <span className="text-gray-500"> — {sec.pageBudget}pp</span>}
+                              {sec.characterBudget != null && (
+                                <span className="text-gray-500"> — {sec.characterBudget.toLocaleString()} characters</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
 
           {/* ── Warnings, collapsed under the controls ── */}
           {warnings.length > 0 && (
