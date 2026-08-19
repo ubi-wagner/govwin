@@ -425,26 +425,25 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
             AND a.archived_at IS NULL
             AND a.status = 'approved'
             AND a.grain <> 'reference'
-            -- …and nothing DESCENDED from a reference document either.
+            -- NOT a fence on reference DESCENDANTS. That was tried, and it was wrong.
             --
-            -- The grain test above excluded the uploaded container and nothing else: atomizing a
-            -- reference PDF produces 'primitive' children that carry its text and lose the label,
-            -- so the fence kept out the folder and let out everything in it. Proven on the
-            -- Immobileyes library — the DSIP fraud-waste-and-abuse tutorial and the cover-sheet
-            -- disclaimer, uploaded as reference, were the top-ranked material for technical
-            -- sections and were being copied verbatim into the drafted volume. Reference material
-            -- is for the system to READ, never to reuse as the customer's own writing.
+            -- The reasoning was that atomizing a reference PDF produces children carrying its text,
+            -- so the children should inherit the exclusion. But reference grain means "the whole
+            -- uploaded document, kept as SOURCE for atomization" — its children ARE the reusable
+            -- pieces, and the tenant's own past proposals are the most valuable material in the
+            -- library. Measured: the fence excluded every "Volume 2 — Technical Volume" the customer
+            -- had uploaded, and would exclude every figure harvested out of one.
             --
-            -- Provenance, not keywords: source_anchor records the atom this one was cut from.
-            -- Non-array anchors and malformed ids are treated as "no parent" rather than throwing.
-            AND NOT EXISTS (
-              SELECT 1
-              FROM jsonb_array_elements(
-                     CASE WHEN jsonb_typeof(a.source_anchor) = 'array' THEN a.source_anchor ELSE '[]'::jsonb END
-                   ) sa
-              JOIN library_atoms p ON p.id = (sa->>'sourceAtomId')::uuid
-              WHERE sa->>'sourceAtomId' ~ '^[0-9a-fA-F-]{36}$' AND p.grain = 'reference'
-            )
+            -- The agency boilerplate that motivated it (a DSIP fraud-waste-and-abuse tutorial filed
+            -- as a proposal attachment) is handled by the lexical axis instead — which is what
+            -- should have been measured first. For "Identification and Significance of the Problem
+            -- or Opportunity" the offeror's own section scores 4.39 and the FWA text 1.06: it ranks
+            -- low because it IS low-relevance, which is the honest mechanism.
+            --
+            -- The residual — agency form text sitting in a tenant's library at all — is LIBRARY
+            -- HYGIENE, not ranking. The principled fix is to recognise it as the agency's writing
+            -- rather than the offeror's (that text appears verbatim in the shared solicitation
+            -- corpus), not a keyword list. Logged as the follow-up.
             AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
             AND (${!requireTag} OR EXISTS (
               SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (

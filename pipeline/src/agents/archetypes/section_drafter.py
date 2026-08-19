@@ -428,21 +428,11 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                       AND a.archived_at IS NULL
                       AND a.vault_id IS NULL
                       AND a.grain <> 'reference'
-                      -- …and nothing DESCENDED from a reference document either. The grain test
-                      -- above excludes the uploaded container; atomizing it produces 'primitive'
-                      -- children that carry its text and lose the label. Proven on the Immobileyes
-                      -- library: the DSIP fraud-waste-and-abuse tutorial and the cover-sheet
-                      -- disclaimer, uploaded as reference, were top-ranked material for technical
-                      -- sections and were being copied verbatim into the drafted volume. Reference
-                      -- material is for the system to READ, never to reuse as the customer's own
-                      -- writing. Mirrors the canonical selector (frontend lib/atoms.ts).
-                      AND NOT EXISTS (
-                            SELECT 1
-                            FROM jsonb_array_elements(
-                                   CASE WHEN jsonb_typeof(a.source_anchor) = 'array'
-                                        THEN a.source_anchor ELSE '[]'::jsonb END) sa
-                            JOIN library_atoms p ON p.id = (sa->>'sourceAtomId')::uuid
-                            WHERE sa->>'sourceAtomId' ~ '^[0-9a-fA-F-]{36}$' AND p.grain = 'reference')
+                      -- Deliberately NOT fenced on reference DESCENDANTS: `reference` grain means
+                      -- the whole uploaded document kept as SOURCE, so its children are the reusable
+                      -- pieces — including the tenant's own past proposal volumes and every figure
+                      -- harvested out of one. Relevance ranking below handles the agency boilerplate
+                      -- that gets uploaded alongside. Mirrors frontend lib/atoms.ts.
                       -- Not the starter scaffold. `search_starter_scaffold` walks
                       -- section → group → primitive and hands the model every one of those atoms
                       -- as `skeleton[].guidance`, and the drafter is told to call it FIRST. They
