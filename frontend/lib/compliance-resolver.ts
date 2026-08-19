@@ -9,6 +9,8 @@ export interface ResolvedCompliance {
   volumes: Array<{
     volumeName: string;
     volumeNumber: number;
+    /** Completed in DSIP (webform / agency-generated report) — not authored in this workspace. */
+    dsipOnly?: boolean;
     items: Array<Record<string, unknown>>;
   }>;
   /** Set when resolution ERRORED and fell back to SYSTEM_DEFAULTS + no volumes. A provision
@@ -236,8 +238,9 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name
+        SELECT id, volume_number, volume_name, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id = ${topicId}
@@ -247,8 +250,9 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name
+        SELECT id, volume_number, volume_name, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id IS NULL
@@ -301,9 +305,14 @@ async function resolveVolumes(
     itemsByVolume.set(item.volumeId, existing);
   }
 
-  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string }) => ({
+  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string; metadata?: Record<string, unknown> | null }) => ({
     volumeName: vol.volumeName,
     volumeNumber: vol.volumeNumber,
+    // A DSIP-ONLY volume is completed inside the agency's own submission portal (a DSIP webform or
+    // a report pulled from SBIR.gov) — the company never authors a document for it here. Carrying
+    // the flag lets provision list it as a submission checklist item instead of standing up an
+    // authoring artifact nobody can fill, which would then block readiness forever.
+    dsipOnly: (vol.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
     items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null }) => ({
       itemNumber: item.itemNumber,
       itemName: item.itemName,

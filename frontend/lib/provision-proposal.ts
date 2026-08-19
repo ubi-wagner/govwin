@@ -87,6 +87,9 @@ export async function provisionProposalForPortal(opts: {
   const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
+    // DSIP-only volumes contribute no authored items — they are completed in the agency portal and
+    // tracked as compliance-matrix checklist entries, not built here.
+    if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
     for (const item of vol.items) {
       gi++;
       requiredItems.push({
@@ -141,6 +144,13 @@ export async function provisionProposalForPortal(opts: {
         for (const vol of resolved.volumes) {
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
+          // DSIP-ONLY volumes are completed in the agency's submission portal — a DSIP webform
+          // (Cover Sheet, Foreign Affiliations) or an agency-generated report (the CCR pulled from
+          // SBIR.gov), or training taken inside DSIP (FWA). The company authors NO document here, so
+          // standing up an artifact + empty sections for one creates work that can never be done and
+          // a readiness blocker that can never clear. The requirement still reaches the customer as a
+          // compliance-matrix checklist item — it is tracked, just not authored.
+          if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
           // Map the volume to its artifact_type (CHECK: narrative|cost|form|matrix|other). Cost/budget
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
@@ -303,6 +313,10 @@ export async function provisionProposalForPortal(opts: {
         for (const vol of resolved.volumes) {
           const items = (vol.items as Array<Record<string, unknown>>) ?? [];
           if (items.length > 0) continue;
+          // …but NOT for a DSIP-only volume. It has no artifact (skipped above), so a placeholder
+          // here would be an orphan section that can never be authored or locked — the exact
+          // permanent readiness blocker this whole flag exists to prevent.
+          if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
           const artifactId = artifactByVolKey.get(volKey(volNum, volName)) ?? null;
