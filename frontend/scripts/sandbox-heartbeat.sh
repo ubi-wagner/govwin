@@ -65,6 +65,31 @@ start_pg() {
 }
 start_emu() { ( LOG="$EMU_LOG" PORT="$EMU_PORT" node "$HARNESS/emulated-claude.mjs" >> "$SCR/emu.out" 2>&1 & ); }
 
+# Is anything listening on $1? `ss` is NOT installed in this container, so the original
+# `ss -ltn | grep :3000` guard ALWAYS failed — the "never double-starts" promise in the header was
+# not kept. During a slow Next boot (several seconds) every cycle saw a non-200 /login, found no
+# listener, and spawned ANOTHER server; they then fought over :3000. fuser is present; ss stays as
+# a fallback for hosts that have it instead.
+port_busy() {
+  fuser -n tcp "$1" >/dev/null 2>&1 && return 0
+  command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":$1" && return 0
+  return 1
+}
+
+# The pipeline worker — the component that actually RUNS the workflows. It was not supervised
+# here, so it could die and every heartbeat still read healthy: db ok, srv ok, emu ok, and no
+# automation running at all. That is the worst shape a monitor can have.
+#
+# Runs as the OWNER connection, not govtech_app: it is the cross-tenant engine, so one connection
+# cannot carry one tenant's RLS context (docs/RLS_CUTOVER.md — "pipeline = owner"). Started as
+# govtech_app, every workflow dies writing process_instances.
+start_worker() {
+  ( cd "$ROOT/pipeline" && env \
+      DATABASE_URL="$DBURL_OWNER" PYTHONPATH=src \
+      $(emu_env) \
+      setsid python3 src/main.py >> "$SCR/worker.log" 2>&1 & )
+}
+
 cycle=0
 echo "$(ts) sandbox-heartbeat started (pid $$, interval ${INTERVAL}s, emulate=${EMULATE}, scr=$SCR)" >> "$LOG"
 while true; do
@@ -89,11 +114,16 @@ while true; do
   # ── frontend server ──
   CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3000/login 2>/dev/null)
   if [ "$CODE" = "200" ]; then SRV=ok
-  elif ss -ltn 2>/dev/null | grep -q ':3000'; then SRV="booting(${CODE})"
+  elif port_busy 3000; then SRV="booting(${CODE})"
   elif [ -f "$STANDALONE/server.js" ]; then start_server; SRV="DOWN(${CODE})->restarting"
   else SRV="DOWN(no-build:needs-rehydrate)"; fi
 
-  LINE="$(ts) cycle=$cycle srv=$SRV emu=$EMU db=$DB pad=$PAD"
+  # ── pipeline worker (:8080 health server) — the workflow engine ──
+  if port_busy 8080; then WRK=ok
+  elif [ -f "$ROOT/pipeline/src/main.py" ]; then start_worker; WRK="DOWN->restarting"
+  else WRK="DOWN(no-src)"; fi
+
+  LINE="$(ts) cycle=$cycle srv=$SRV wrk=$WRK emu=$EMU db=$DB pad=$PAD"
   echo "$LINE" >> "$LOG"; echo "$LINE" > "$STATUS"
   if [ "$((cycle % 60))" -eq 0 ]; then tail -n 3000 "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG" 2>/dev/null; fi
   sleep "$INTERVAL"
