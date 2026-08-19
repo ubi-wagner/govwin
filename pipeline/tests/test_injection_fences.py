@@ -100,5 +100,42 @@ def test_fencing_did_not_drop_the_content():
         page_limit=5,
     )
     for expected in ("Commercialization", "Market size credibility", "Transition plan",
-                     "Target customers", "Revenue model", "5 pages"):
+                     "Target customers", "Revenue model", "allowed 5 page(s)"):
         assert expected in blob, expected
+
+
+# ── 4. the length instruction tells the drafter to FILL its allowance ─────────────────────────
+def test_page_limit_reads_as_an_allowance_to_use_not_a_ceiling_to_avoid():
+    """The instruction used to be "Page limit: N pages. Be concise and substantive" — which tells
+    the model to write LESS against a budget it should be filling. Measured on a live build, a
+    generated volume came in at 3,371 characters where the hand-built reference for the same
+    solicitation ran 36,701. A page limit is an allowance; a volume that uses 7 of its 10 allowed
+    pages has silently forfeited three pages of argument."""
+    blob = _drafter_blob(section_title="Technical Approach", page_limit=10)
+    assert "Be concise" not in blob
+    assert "allowed 10 page(s)" in blob
+    assert "allowance, not a target to stay under" in blob
+    # a concrete character target, because "10 pages" is not an amount anyone can aim at
+    assert "32,300 characters" in blob
+
+
+def test_a_character_cap_aims_JUST_UNDER_it_because_the_form_refuses_the_overflow():
+    blob = _drafter_blob(section_title="Project Summary", character_limit=3000)
+    assert "hard cap 3,000 characters" in blob
+    assert "2,850" in blob and "2,980" in blob      # the 95%..cap-20 target band
+    assert "never exceed it" in blob
+
+
+def test_the_drafter_is_asked_for_the_full_markdown_vocabulary():
+    """The converter now carries tables, emphasis, blockquotes and rules through to the canvas and
+    on into docx/pdf/pptx/xlsx — but only if the DRAFT contains them."""
+    blob = _drafter_blob(section_title="Work Plan", page_limit=3)
+    for token in ("**bold**", "*italic*", "markdown table", "numbered lists"):
+        assert token in blob, token
+    # and it is told not to decorate for its own sake
+    assert "must earn its place" in blob
+
+
+def test_no_length_instruction_when_no_budget_is_known():
+    blob = _drafter_blob(section_title="Untitled")
+    assert "LENGTH:" not in blob

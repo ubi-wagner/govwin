@@ -148,8 +148,17 @@ function parseAtoms(user) {
   return out;
 }
 
-/** Rank candidate sentences by overlap with the section's own vocabulary; keep the best, deduped. */
-function rankSentences(pool, focusTerms, limit) {
+/**
+ * Rank candidate sentences by overlap with the section's own vocabulary; keep the best, deduped.
+ *
+ * `floor` is the minimum score to keep. The default 0.4 is a RELEVANCE gate — useful when you want
+ * only the strongly on-topic material — but it is brutal in aggregate: a perfectly good 13-word
+ * sentence that happens not to repeat the section title scores ~0.33 and is discarded. With a real
+ * library that threw away most of what retrieval returned, which is why drafted sections came in
+ * at a few hundred characters against a multi-page allowance. Pass floor 0 when you need LENGTH:
+ * the sort still puts the most relevant first, you simply stop throwing away the tail.
+ */
+function rankSentences(pool, focusTerms, limit, floor = 0.4) {
   const focus = new Set(focusTerms);
   const seen = new Set();
   return pool
@@ -161,7 +170,7 @@ function rankSentences(pool, focusTerms, limit) {
         + (s.match(/\b[A-Z][A-Za-z]*(?:™|®)/g)?.length ?? 0);
       return { s, score: hits * 2 + concrete * 3 + Math.min(t.length, 40) / 40 };
     })
-    .filter((x) => x.score > 0.4)
+    .filter((x) => x.score > floor)
     .sort((a, b) => b.score - a.score)
     .filter((x) => {
       const key = x.s.slice(0, 70).toLowerCase();
@@ -504,19 +513,86 @@ const RESPONDERS = [
       const pool = [...harvested.flatMap((t) => sentences(t)), ...sentences(user)];
       const focus = terms(title);
 
+      // ── Honour the prompt's LENGTH + FORMAT contract ────────────────────────────────────
+      // The archetype now states a character TARGET ("aim for roughly N characters") because a
+      // page limit is an allowance to fill, not a ceiling to stay under, and asks for markdown's
+      // full vocabulary. This emulator stands in for Claude, so it has to respond to both — a
+      // stand-in that ignores half the prompt tests half the pipeline.
+      //
+      // It still NEVER fabricates. Length comes from using MORE of what the tools actually
+      // returned (the old code ranked the pool and then threw away everything past the seventh
+      // sentence), and the table below is built from requirement text the prompt itself carries.
+      // When the library genuinely has nothing, it says so and stays short — under-filling is
+      // the honest outcome there, and the readiness warning will say so.
+      const target = Number((all.match(/aim for roughly ([\d,]+) characters/i)?.[1] ?? '0').replace(/,/g, ''))
+        || Number((all.match(/Aim for ([\d,]+)[–-]/i)?.[1] ?? '0').replace(/,/g, ''))
+        || 1200;
+
+      // Emphasise the section's own focus terms — first occurrence per paragraph, mirroring the
+      // narrow rule in lib/proposal/document-furniture.ts::emphasise.
+      // What a proposal writer actually bolds is the CLAIM an evaluator scans for — a measured
+      // result, a contract number, a TRL. So: a focus term if the paragraph carries one, else the
+      // first concrete figure in it. Never invented, never more than one run per paragraph
+      // (emphasising everything is what makes a page look shouted rather than structured).
+      const CONCRETE = /\b(?:\d[\d,.]*\s?(?:%|percent|metres?|meters?|km|nm|kW|W|months?|days?|weeks?)|TRL\s?\d|[A-Z]\d{5}-\d{2}-[A-Z]-\d{4}|\$[\d,]+)/;
+      const bolded = (para) => {
+        if (!para || para.includes('**')) return para;
+        for (const t of focus.slice(0, 3)) {
+          const re = new RegExp(`(?<![\\w*])(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?![\\w*])`, 'i');
+          if (re.test(para)) return para.replace(re, '**$1**');
+        }
+        const m = para.match(CONCRETE);
+        return m ? para.replace(m[0], `**${m[0]}**`) : para;
+      };
+
       const lines = [`# ${title}`, ''];
-      const lead = rankSentences(pool, focus, 6);
-      if (lead.length) {
-        lines.push(lead.slice(0, 4).join(' '), '');
-      } else {
+      // floor 0 — relevance still ORDERS the material, but nothing usable is discarded:
+      // the section has pages to fill and this is all real, retrieved content.
+      const ranked = rankSentences(pool, focus, 400, 0);
+      if (ranked.length === 0) {
         lines.push(
           `No approved library content was retrieved for "${title}". Add source material to the library, `
           + 'or draft this section directly; nothing here has been generated from thin air.', '');
+        return textMsg(req.model, lines.join('\n'));
       }
-      const used = new Set(lead);
-      const rest = rankSentences(pool.filter((x) => !used.has(x)), focus, 6);
-      if (rest.length) {
-        lines.push('## Approach', '', rest.slice(0, 3).join(' '), '');
+
+      // Lead paragraph, then subsections of ~4 sentences until the target is reached or the
+      // retrieved material runs out — whichever comes first.
+      const SUBHEADS = ['Approach', 'Technical Objectives', 'Work Plan', 'Risk and Mitigation',
+        'Relevant Experience', 'Anticipated Results', 'Transition and Commercialization'];
+      let i = 0;
+      const take = (n) => ranked.slice(i, (i += n));
+      lines.push(bolded(take(4).join(' ')), '');
+
+      let sub = 0;
+      while (i < ranked.length && lines.join('\n').length < target && sub < SUBHEADS.length) {
+        const para = take(4);
+        if (para.length === 0) break;
+        lines.push(`## ${SUBHEADS[sub]}`, '', bolded(para.join(' ')), '');
+        // A short bulleted list every other subsection — markdown the converter now carries
+        // through as a real bulleted_list node.
+        const bullets = take(3);
+        if (bullets.length && sub % 2 === 1) {
+          lines.push(...bullets.map((b) => `- ${b}`), '');
+        }
+        sub += 1;
+      }
+
+      // A requirements table, built ONLY from requirement text the prompt itself carries (the
+      // fenced evaluation-criteria / required-subsections blocks). No requirements in the prompt
+      // ⇒ no table, rather than an invented one.
+      const fenced = all.split('--- BEGIN USER CONTENT ---').slice(1)
+        .map((seg) => seg.split('--- END USER CONTENT ---')[0])
+        .join('\n');
+      const reqs = fenced.split('\n')
+        .map((l) => l.replace(/^\s*-\s*/, '').trim())
+        .filter((l) => l.length > 12 && l.length < 200);
+      if (reqs.length >= 2) {
+        lines.push('## Compliance Cross-Reference', '',
+          '| Requirement | Addressed in |',
+          '| --- | --- |',
+          ...reqs.slice(0, 8).map((r, n) => `| ${r.replace(/\|/g, '\\|')} | §${n + 1} above |`),
+          '');
       }
       return textMsg(req.model, lines.join('\n'));
     },

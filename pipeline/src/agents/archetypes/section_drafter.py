@@ -153,6 +153,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         evaluation_criteria = payload.get("evaluation_criteria", [])
         required_subsections = payload.get("required_subsections", [])
         page_limit = payload.get("page_limit")
+        character_limit = payload.get("character_limit")
         instruction = payload.get("instruction", "")
 
         # Neutralize a forged closing marker so any untrusted field below can be fenced without
@@ -226,8 +227,48 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                 user_content += f"- {_safe(sub)}\n"
             user_content += "--- END USER CONTENT ---\n\n"
 
+        # FILL THE ENVELOPE. The old instruction here read "Page limit: N pages. Be concise and
+        # substantive" — which tells the model to write LESS against a budget it should be filling.
+        # An agency page limit is an allowance, not a target to stay under: a technical volume that
+        # uses 7 of its 10 allowed pages has silently forfeited three pages of argument, and an
+        # evaluator reads that as a half-made proposal. Measured on a live build, a generated
+        # volume came in at 3,371 characters where the hand-built reference for the same
+        # solicitation ran 36,701.
+        #
+        # So state the TARGET, not the ceiling, and give it in characters as well as pages —
+        # "2 pages" is not an amount of writing anyone can aim at, and models systematically
+        # under-shoot a page count. ~3,400 characters per single-spaced letter page with 1in
+        # margins at 10-11pt is the working figure (the reference volume: 36,701 over 10 pages).
         if page_limit:
-            user_content += f"Page limit: {page_limit} pages. Be concise and substantive.\n\n"
+            target_chars = int(page_limit) * 3400
+            user_content += (
+                f"LENGTH: this section is allowed {page_limit} page(s) and should USE that "
+                f"allowance — aim for roughly {int(target_chars * 0.95):,} characters "
+                f"(~{page_limit} full pages). The limit is an allowance, not a target to stay "
+                "under; do not stop early. Depth, specifics, numbers and named detail — never "
+                "padding or repetition — are what fill it.\n\n"
+            )
+        if character_limit:
+            # A character-capped item (cover-sheet abstract, project summary) is the opposite
+            # risk: the agency form REFUSES over the cap, so aim just under it.
+            user_content += (
+                f"LENGTH: hard cap {character_limit:,} characters — the agency form truncates or "
+                f"refuses anything longer. Aim for {int(character_limit * 0.95):,}–"
+                f"{character_limit - 20:,}: use nearly all of it, and never exceed it.\n\n"
+            )
+
+        # Ask for the document apparatus explicitly. The converter now carries tables, emphasis,
+        # blockquotes and rules through to the canvas (pipeline/src/document/markdown_to_canvas.py),
+        # and every one of those survives into docx/pdf/pptx/xlsx — but only if the draft contains
+        # them. A drafter that writes nothing but paragraphs produces a wall of undifferentiated
+        # type no matter how good the rendering is.
+        user_content += (
+            "FORMAT: write markdown, and use its full vocabulary where it genuinely helps the "
+            "reader — `##` subheadings, **bold** for the claims an evaluator scans for, *italic* "
+            "for defined terms, bulleted and numbered lists, and a markdown table wherever the "
+            "content is genuinely tabular (milestones, deliverables, specifications, comparisons). "
+            "Do not decorate: every emphasis and every table must earn its place.\n\n"
+        )
 
         user_content += "First, use search_library to find relevant company capabilities, then draft the section."
 

@@ -195,7 +195,8 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     # priced cost workbook or a filled mold is left alone.
     rows = await conn.fetch(
         """
-        SELECT s.id, s.title, s.status, s.section_type, s.page_allocation, s.artifact_id,
+        SELECT s.id, s.title, s.status, s.section_type, s.page_allocation,
+               s.character_allocation, s.artifact_id,
                s.content, s.content_source, a.format_spec
         FROM proposal_sections s
         LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
@@ -248,6 +249,11 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
                     "rfp_excerpt": rfp["rfp_excerpt"],
                     "evaluation_criteria": rfp["evaluation_criteria"] or [],
                     "page_limit": s["page_allocation"],
+                    # The item's CHARACTER cap, where the agency measures in characters rather
+                    # than pages (cover-sheet abstract, project summary). Without it the drafter
+                    # had no idea it was writing into a fixed-size form field that REFUSES the
+                    # overflow, so it aimed at nothing and the human trimmed by hand afterwards.
+                    "character_limit": s["character_allocation"],
                     "instruction": "Draft a substantive V0 strawman for this section grounded in the company's library atoms.",
                     **({"voice": voice} if voice else {}),
                 },
