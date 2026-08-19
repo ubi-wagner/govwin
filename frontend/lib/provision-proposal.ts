@@ -180,7 +180,10 @@ export async function provisionProposalForPortal(opts: {
             // exempt it from the readiness page gate and the font floor.
             : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercialization\s+report|\bccr\b|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
             : 'narrative';
-          const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
+          // The solicitation's own identifiers travel onto every artifact's frozen spec, so the
+          // compliance floor can tell THIS topic number from a past proposal's. Without them the
+          // check stays off and behaviour is unchanged.
+          const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance, ownIdentifiers: [t.topicNumber, t.solicitationNumber] });
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
             VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
@@ -352,7 +355,7 @@ export async function provisionProposalForPortal(opts: {
           count++;
         }
       } else {
-        const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance });
+        const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance, ownIdentifiers: [t.topicNumber, t.solicitationNumber] });
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
           VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})

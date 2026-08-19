@@ -56,6 +56,13 @@ export interface ArtifactSpecInput {
   items: Array<Record<string, unknown>>;
   /** Merged compliance matrix (camelCase keys, from resolveTopicCompliance). */
   compliance: Record<string, unknown>;
+  /**
+   * THIS solicitation's own identifiers — topic number, solicitation number. Frozen onto the
+   * artifact so the compliance floor can tell "our topic number" from a past proposal's, which is
+   * what a draft grounded on the company's library will otherwise carry across. Omit to leave the
+   * check off (a build with no identifiers recorded behaves exactly as before).
+   */
+  ownIdentifiers?: Array<string | null | undefined>;
 }
 
 export interface FrozenSpecs {
@@ -92,6 +99,14 @@ function toSectionList(v: unknown): string[] {
  */
 export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   const { artifactType, items, compliance } = input;
+  // Deduplicated, trimmed, case-insensitive — the same number can arrive as both the topic and the
+  // solicitation number, and an empty string must never become an "own identifier" that silently
+  // matches everything.
+  const ownIdentifiers = [...new Set(
+    (input.ownIdentifiers ?? [])
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean),
+  )];
 
   // Pick the canvas format from the volume's item types / artifact type.
   const types = items.map((i) => String(i.itemType ?? ''));
@@ -182,6 +197,7 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
     required_sections: requiredSections,
     header_required: headerRequired,
     footer_required: footerRequired,
+    ...(ownIdentifiers.length ? { own_identifiers: ownIdentifiers } : {}),
   };
 
   return { formatSpec, complianceSpec };

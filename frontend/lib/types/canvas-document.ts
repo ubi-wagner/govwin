@@ -76,6 +76,21 @@ export interface ComplianceSpec {
    * volume). Per-section caps ride `SectionLayout.character_budget`.
    */
   max_characters?: number | null;
+  /**
+   * This proposal's OWN solicitation identifiers — its topic number, solicitation number, and
+   * (once assigned) proposal number. Any labelled identifier in the document that is not one of
+   * these is a different agency's, and the document is citing the wrong solicitation.
+   *
+   * The check exists because the leak is structural, not careless. A company's library is built
+   * from its past proposals, and a past proposal's cover sheet and cost form legitimately carry
+   * that solicitation's numbers — that IS the content of those pages, so it cannot be stripped at
+   * ingest. Drafting grounds on those pages and carries the numbers across. Observed on the T3CP
+   * build: a cost section for OSW26BZ04-DP013 opened "STTR Phase II Proposal Proposal Number
+   * F2-17528 Topic Number AFX23D-TCSO1".
+   *
+   * Empty/absent = unchecked, so a build with no identifiers recorded behaves exactly as before.
+   */
+  own_identifiers?: string[];
 }
 
 /** Standard presets derived from common RFP requirements. */
@@ -952,11 +967,36 @@ export interface ComplianceViolation {
     | 'section_over_budget'
     | 'image_not_allowed'
     | 'missing_header'
-    | 'missing_footer';
+    | 'missing_footer'
+    | 'foreign_solicitation';
   message: string;
   limit?: number | null;
   actual?: number;
+  /** foreign_solicitation: the identifiers found that belong to another solicitation. */
+  found?: string[];
 }
+
+/**
+ * Labelled solicitation identifiers in a block of text — "Topic Number: AFX23D-TCSO1",
+ * "Proposal Number F2-17528", "Topic: X23.5_CSO", "Solicitation No. N254-P01".
+ *
+ * Deliberately keyed on the LABEL rather than the shape of the token. Agency identifiers have no
+ * common format (OSW26BZ04-DP013, X23.5_CSO, F2-17528, N26BX-NP002-0450), so shape-matching either
+ * misses them or swallows part numbers and model numbers out of the company's own technical prose.
+ * They leak WITH their label attached, because they leak out of cover sheets and running headers.
+ */
+export function findLabelledIdentifiers(text: string): string[] {
+  // The lookahead requires a DIGIT inside the token. That is not just a filter — it makes the
+  // engine reject a label word as the identifier and keep looking, which is what a real cover
+  // sheet needs: in "STTR Phase II Proposal Proposal Number F2-17528", a filter applied after the
+  // match would have already consumed the first "Proposal" as both label and token, and F2-17528
+  // would never be reached.
+  const re = /\b(?:topic|proposal|solicitation|contract|award)\s*(?:number|no\.?|#)?\s*[:.\-]?\s*([A-Z0-9](?=[A-Z0-9._\-/]*\d)[A-Z0-9._\-/]{3,29})\b/gi;
+  return [...text.matchAll(re)].map((m) => m[1]);
+}
+
+/** Compare identifiers ignoring case, spacing and separators — "F 2 - 1 7 5 2 8" is "F2-17528". */
+const idKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 /**
  * validateCanvasAgainstSpec — the deterministic compliance floor (E4): check a
@@ -1093,6 +1133,36 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   }
   if (spec.footer_required && !doc.canvas?.footer) {
     out.push({ code: 'missing_footer', message: 'A page footer is required but not configured.' });
+  }
+
+  // The document must cite ITS OWN solicitation and no other. See ComplianceSpec.own_identifiers
+  // for why this leak is structural: a past proposal's cover sheet and cost form legitimately
+  // carry that solicitation's numbers, so they survive ingest as content and drafting grounds on
+  // them. An identifier from the wrong solicitation is not a style problem — a reviewer reading it
+  // is reading a proposal that appears to be for a different program.
+  // Normalize FIRST, then drop blanks: a whitespace-only entry keys to "" and would otherwise sit
+  // in the allow-list as an identifier that matches nothing while still switching the check on.
+  const own = (spec.own_identifiers ?? []).map(idKey).filter(Boolean);
+  if (own.length) {
+    const foreign = new Set<string>();
+    for (const n of docNodes(doc)) {
+      const text = getNodeText(n);
+      if (!text) continue;
+      for (const id of findLabelledIdentifiers(text)) {
+        if (!own.includes(idKey(id))) foreign.add(id.trim());
+      }
+    }
+    if (foreign.size) {
+      const list = [...foreign];
+      out.push({
+        code: 'foreign_solicitation',
+        message: list.length === 1
+          ? `Cites an identifier from another solicitation: "${list[0]}". This proposal is ${spec.own_identifiers![0]}.`
+          : `Cites ${list.length} identifiers from other solicitations: ${list.map((s) => `"${s}"`).join(', ')}. This proposal is ${spec.own_identifiers![0]}.`,
+        actual: list.length,
+        found: list,
+      });
+    }
   }
 
   return out;
