@@ -90,6 +90,38 @@ from workflows.base import StepType, Workflow
 logger = logging.getLogger("pipeline.workflows.manager")
 
 
+def _effective_step_status(
+    name: str,
+    step_status: dict[str, str],
+    step_results: dict[str, Any],
+) -> str:
+    """What a step ACTUALLY did — which is not always what `step_status` says (B17).
+
+    The engine records a step as 'completed' whenever its executor returned anything at all. A
+    SAFE-SKIP returns `{"result": None, "skipped": True, "reason": …}` — a perfectly good return
+    value — so an AI_INVOKE that never called an agent (no fabric, no key, unmapped archetype) is
+    written down as **completed**. Every safe-skip in `processor.py` has this shape.
+
+    That conflation is the deep half of B17, and it defeats the shallow half on its own: a verdict
+    derived from `step_status == 'completed'` would have called a cohort that never ran 'reviewed'
+    — the same lie, now with evidence-shaped packaging. Found by driving the real engine
+    (`scripts/drive_b17_evidence.py`); the unit tests could not see it, because they hand the
+    action a step map instead of making the engine produce one.
+
+    `step_status` itself is deliberately NOT changed: `depends_on` treats 'skipped' as a reason to
+    skip dependents, so rewriting it there would silently cascade skips through workflows that
+    currently run (e.g. `reconcile` behind a safe-skipped `refute_0`). That is a real question and
+    it is logged as its own defect — it is not something to smuggle into this fix.
+    """
+    status = step_status.get(name, "pending")
+    if status != "completed":
+        return status
+    result = step_results.get(name)
+    if isinstance(result, dict) and result.get("skipped") is True:
+        return "skipped"
+    return status
+
+
 class WorkflowManager:
     """Persistent workflow orchestration with crash recovery."""
 
@@ -417,6 +449,14 @@ class WorkflowManager:
         final_status = "completed"
         step_name = None  # track for error reporting
 
+        # Which steps ARE the agent cohort (B17). Named once, up front, off the workflow's own
+        # declaration — so a record ACTION can ask "did the cohort run?" without naming any step
+        # by hand and without depending on one. A step absent from step_status has not been
+        # reached yet; 'pending' says exactly that.
+        ai_step_names = [
+            s.name for s in steps if getattr(s, "step_type", None) == StepType.AI_INVOKE
+        ]
+
         try:
           for i, step in enumerate(steps):
             step_name = step.name
@@ -568,6 +608,14 @@ class WorkflowManager:
                         self._execute_step(
                             conn, step, trigger_payload, step_results,
                             tenant_id=instance_tenant_id,
+                            # Snapshot at dispatch time. Steps run in declaration order, so a
+                            # record ACTION declared after its cohort sees their terminal status;
+                            # one declared before them correctly sees 'pending' and reports
+                            # 'not_reviewed' rather than inventing a pass.
+                            ai_step_status={
+                                n: _effective_step_status(n, step_status, step_results)
+                                for n in ai_step_names
+                            },
                         ),
                         timeout=timeout_seconds,
                     )
@@ -1599,6 +1647,7 @@ class WorkflowManager:
         trigger_payload: dict[str, Any],
         prior_results: dict[str, Any],
         tenant_id: Optional[str] = None,
+        ai_step_status: Optional[dict[str, str]] = None,
     ) -> dict[str, Any]:
         """Execute a single workflow step. Delegates to the step's action.
 
@@ -1606,6 +1655,11 @@ class WorkflowManager:
         _execute_ai_invoke's `context.setdefault("tenant_id", trigger_event.get("tenant_id"))`
         has something to fall back on when a step's input_map doesn't map the tenant explicitly.
         An explicit input_map mapping still WINS (setdefault only fills a missing key).
+
+        `ai_step_status` is this instance's AI_INVOKE steps and what they DID — the engine's own
+        answer to "did the cohort run" (B17). It reaches an ACTION only if that action declares
+        `_ai_step_status`, and it never carries agent output. See
+        `workflows.actions.cohort_evidence`.
         """
         from workflows.processor import resolve_inputs, _execute_step as processor_execute_step
 
@@ -1616,7 +1670,8 @@ class WorkflowManager:
         # Thread fabric so AI_INVOKE steps actually call Claude on the managed path
         # (when fabric + ANTHROPIC_API_KEY are configured); else it skips as before.
         return await processor_execute_step(
-            conn, step, inputs, trigger_event=event_dict, fabric=self._fabric
+            conn, step, inputs, trigger_event=event_dict, fabric=self._fabric,
+            ai_step_status=ai_step_status,
         )
 
     async def _run_on_timeout(

@@ -188,16 +188,47 @@ def resolve_inputs(
 # ─── Step executors ────────────────────────────────────────────────
 
 
+def _declares_step_status(func: Any) -> bool:
+    """True when `func` names `_ai_step_status` as an EXPLICIT parameter.
+
+    Explicit only — a `**_ignored` catch-all does not count, and nearly every action in
+    this package has one. Injecting into a catch-all would mean the signal silently
+    vanishes wherever someone forgot to read it, which is the same shape of quiet
+    failure B17 was: something that looks wired and is not.
+    """
+    try:
+        import inspect  # noqa: PLC0415 — cheap, and only on the ACTION path
+
+        params = inspect.signature(func).parameters
+        p = params.get("_ai_step_status")
+        return p is not None and p.kind in (
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+    except (TypeError, ValueError):  # builtins / C functions have no signature
+        return False
+
+
 async def _execute_action(
     conn: asyncpg.Connection,
     action: str,
     inputs: dict[str, Any],
+    ai_step_status: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Resolve a dotted function path and call it.
 
     For V1, the action string is a Python module path like
     'pipeline.shredder.shred'. We import the module and call the
     last component as a function, passing conn + inputs.
+
+    `ai_step_status` is the ENGINE's own record of what each AI_INVOKE step in this
+    instance did (pending/running/completed/failed/skipped) — see
+    `workflows.actions.cohort_evidence`. It is injected as `_ai_step_status` ONLY into
+    actions that declare that parameter, so every existing action is unaffected and the
+    dependency is visible in the signature rather than hidden in a blanket kwarg.
+
+    It carries no agent OUTPUT, only whether the agent ran, so an action reading it is
+    still not a consumer of agent results — the input-map-ancestor invariant stands.
     """
     parts = action.rsplit(".", 1)
     if len(parts) != 2:
@@ -213,7 +244,12 @@ async def _execute_action(
     if func is None:
         raise AttributeError(f"Module '{module_path}' has no function '{func_name}'")
 
-    result = func(conn, **inputs)
+    call_kwargs = dict(inputs)
+    if _declares_step_status(func):
+        # A copy: an action must not be able to mutate the engine's own state.
+        call_kwargs["_ai_step_status"] = dict(ai_step_status or {})
+
+    result = func(conn, **call_kwargs)
     if asyncio.iscoroutine(result) or asyncio.isfuture(result):
         result = await result
     return {"result": result}
@@ -450,10 +486,11 @@ async def _execute_step(
     inputs: dict[str, Any],
     trigger_event: dict[str, Any] | None = None,
     fabric: Any = None,
+    ai_step_status: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Dispatch a single workflow step by its type."""
     if step.step_type == StepType.ACTION:
-        return await _execute_action(conn, step.action, inputs)
+        return await _execute_action(conn, step.action, inputs, ai_step_status=ai_step_status)
 
     if step.step_type == StepType.AI_INVOKE:
         return await _execute_ai_invoke(

@@ -118,6 +118,7 @@ async def record_ingest_review(
     conn,
     solicitation_id=None,
     resolution=None,
+    _ai_step_status=None,
     **_ignored,
 ):
     """Attach the adversarial cohort's reconciled verdict to the open staged draft.
@@ -125,6 +126,14 @@ async def record_ingest_review(
     ADVISORY: it marks the draft `reviewed` so the panel can show that a colour team has been
     through it — it does NOT land the matrix and does NOT authorize a land. A reviewed draft with
     surviving challenges is exactly the case a human is supposed to look at.
+
+    B17 — it marks the draft reviewed ONLY IF THE COLOUR TEAM ACTUALLY RAN. This step is
+    deliberately independent of the cohort (no `depends_on`, so a dead agent can never strand the
+    ingest), which used to mean it stamped 'reviewed' even when every reviewer safe-skipped for
+    want of a key. `_ai_step_status` is the engine's own record of what those steps did (see
+    `cohort_evidence`); with no evidence the draft KEEPS its status and the attempt is written
+    into `review` instead. A draft nobody reviewed stays staged, which is the truth, and the
+    panel's "a colour team has been through it" keeps meaning what it says.
     """
     if not solicitation_id:
         return {"recorded": False, "reason": "bad_input"}
@@ -133,22 +142,40 @@ async def record_ingest_review(
     except (ValueError, TypeError):
         return {"recorded": False, "reason": "bad_solicitation_id"}
 
-    verdict = {"resolution": resolution or "majority", "recorded_by": "advisory_manager"}
+    from workflows.actions.cohort_evidence import cohort_verdict  # noqa: PLC0415
+
+    review_verdict, ran, evidence = cohort_verdict(_ai_step_status)
+    verdict = {
+        "resolution": resolution or "majority",
+        "recorded_by": "advisory_manager",
+        "verdict": review_verdict,
+        "cohort_ran": ran,
+        "evidence": evidence,
+    }
     try:
         row = await conn.fetchrow(
             """UPDATE solicitation_compliance_drafts
-               SET review = $2, status = 'reviewed', reviewed_at = now()
+               SET review = $2,
+                   status      = CASE WHEN $3::bool THEN 'reviewed' ELSE status      END,
+                   reviewed_at = CASE WHEN $3::bool THEN now()      ELSE reviewed_at END
                WHERE id = (
                  SELECT id FROM solicitation_compliance_drafts
                  WHERE solicitation_id = $1 AND status IN ('staged', 'reviewed')
                  ORDER BY created_at DESC LIMIT 1
                )
-               RETURNING id""",
-            sid, json.dumps(verdict),
+               RETURNING id, status""",
+            sid, json.dumps(verdict), ran,
         )
         if not row:
             return {"recorded": False, "reason": "no_open_draft"}
-        return {"recorded": True, "draft_id": str(row["id"])}
+        return {
+            "recorded": True,
+            "draft_id": str(row["id"]),
+            "status": row["status"],
+            "verdict": review_verdict,
+            "cohort_ran": ran,
+            "evidence": evidence,
+        }
     except Exception as exc:
         logger.error("record_ingest_review failed: %s", exc)
         return {"recorded": False, "reason": str(exc)}

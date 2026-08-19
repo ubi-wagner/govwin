@@ -11,6 +11,7 @@ These lock the two properties the whole gated design hangs on:
      must structurally be unable to reach it.
 """
 import asyncio
+import json
 import sys
 import types
 import uuid
@@ -144,19 +145,69 @@ def test_bad_input_is_a_safe_noop(emitted, bad):
     assert out["advanced"] is False
 
 
-def test_record_review_marks_the_open_draft(emitted):
-    conn = FakeConn(draft_row={"id": uuid.uuid4()})
+def test_record_review_marks_the_open_draft_when_the_colour_team_RAN(emitted):
+    """The happy path — and it now requires evidence (B17).
+
+    `_ai_step_status` is the engine's own record of what this instance's AI_INVOKE steps did. One
+    completed reviewer is evidence, and only then is the draft marked reviewed.
+    """
+    conn = FakeConn(draft_row={"id": uuid.uuid4(), "status": "reviewed"})
+    out = _run(ingest_actions.record_ingest_review(
+        conn, solicitation_id=SOL, resolution="majority",
+        _ai_step_status={"refute_0": "completed", "refute_1": "skipped", "reconcile": "completed"},
+    ))
+    assert out["recorded"] is True
+    assert out["cohort_ran"] is True
+    assert out["verdict"] == "reviewed"
+    q, args = conn.executed[-1]
+    assert "status = CASE WHEN $3::bool THEN 'reviewed' ELSE status END" in q
+    assert "status IN ('staged', 'reviewed')" in q     # never resurrects a superseded/landed draft
+    assert args[2] is True                             # the flip is parameterised on the evidence
+    verdict = json.loads(args[1])
+    assert verdict["cohort_ran"] is True
+    assert "refute_0" in verdict["evidence"]
+
+
+def test_record_review_does_NOT_mark_reviewed_when_the_cohort_SAFE_SKIPPED(emitted):
+    """B17 — the bug this action shipped with.
+
+    Every reviewer safe-skips (no key / rate-limited / fabric absent). The record step is
+    independent by design, so it still runs — and it used to stamp `status='reviewed'` anyway,
+    making a draft nobody read indistinguishable from one a colour team cleared. Now the status is
+    left alone and the attempt is recorded honestly.
+    """
+    conn = FakeConn(draft_row={"id": uuid.uuid4(), "status": "staged"})
+    out = _run(ingest_actions.record_ingest_review(
+        conn, solicitation_id=SOL, resolution="majority",
+        _ai_step_status={"refute_0": "skipped", "refute_1": "skipped", "reconcile": "skipped"},
+    ))
+    assert out["recorded"] is True          # the attempt IS recorded — silence is not an error
+    assert out["cohort_ran"] is False
+    assert out["verdict"] == "not_reviewed"
+    assert out["status"] == "staged"        # ← the draft did NOT become 'reviewed'
+    _, args = conn.executed[-1]
+    assert args[2] is False
+    assert json.loads(args[1])["cohort_ran"] is False
+
+
+def test_record_review_reports_unverified_when_the_engine_says_nothing(emitted):
+    """Called with no step record at all (a direct call, or an engine that did not supply one).
+
+    'unverified' is deliberately not 'not_reviewed': one says the cohort did not run, the other
+    says nobody can tell. Either way the draft is not marked reviewed.
+    """
+    conn = FakeConn(draft_row={"id": uuid.uuid4(), "status": "staged"})
     out = _run(ingest_actions.record_ingest_review(
         conn, solicitation_id=SOL, resolution="majority",
     ))
-    assert out["recorded"] is True
-    q, args = conn.executed[-1]
-    assert "SET review = $2, status = 'reviewed'" in q
-    assert "status IN ('staged', 'reviewed')" in q     # never resurrects a superseded/landed draft
+    assert out["verdict"] == "unverified"
+    assert out["cohort_ran"] is False
+    assert out["status"] == "staged"
 
 
 def test_record_review_without_an_open_draft_reports_not_writes(emitted):
     out = _run(ingest_actions.record_ingest_review(
         FakeConn(draft_row=None), solicitation_id=SOL, resolution="majority",
+        _ai_step_status={"reconcile": "completed"},
     ))
     assert out == {"recorded": False, "reason": "no_open_draft"}
