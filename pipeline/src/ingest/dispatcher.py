@@ -562,7 +562,10 @@ async def run_consumer_loop(
 
         last_tick = 0.0
         while not shutdown_event.is_set():
-            now = asyncio.get_event_loop().time()
+            # get_RUNNING_loop, not get_event_loop: we are inside a coroutine, so the running
+            # loop is the one we want, and the deprecated spelling raises on 3.12 whenever no
+            # loop happens to be set for the thread.
+            now = asyncio.get_running_loop().time()
 
             # Tick schedules periodically
             if now - last_tick >= tick_interval:

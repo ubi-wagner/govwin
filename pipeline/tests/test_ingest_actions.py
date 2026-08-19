@@ -57,7 +57,16 @@ SOL = str(uuid.uuid4())
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    """Run one coroutine to completion on a fresh loop.
+
+    NOT `asyncio.get_event_loop().run_until_complete(...)`. On Python 3.10/3.11 that call
+    auto-created a loop when none was set (with a DeprecationWarning); on 3.12 it raises
+    `RuntimeError: There is no current event loop in thread 'MainThread'`. The suite passed
+    locally on 3.11 and failed every case in this file on CI's 3.12 — a version split, not a
+    behaviour change in the code under test. `asyncio.run` is the supported spelling and owns
+    the loop lifecycle, so each test also gets a clean one.
+    """
+    return asyncio.run(coro)
 
 
 def test_auto_chain_extract_to_matrix_reemits_with_lenses(emitted):

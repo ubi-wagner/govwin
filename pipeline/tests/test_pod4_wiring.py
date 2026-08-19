@@ -47,10 +47,22 @@ def test_ops_digest_reads_aggregates():
 
 def test_pre_release_qa_gate_workflow():
     t = OnSolicitationReviewRequested.trigger
-    assert t.namespace == "finder" and t.type == "solicitation.triaged" and t.phase == "end"
-    # condition matches ONLY the request_review transition
-    assert t.condition({"toState": "review_requested"}) is True
-    assert t.condition({"toState": "approved"}) is False
+    # Triggers on the TOOL's event, not the triage route's.
+    #
+    # Two producers exist for "curation was submitted for review": the workspace calls the
+    # request-review TOOL (frontend/lib/tools/solicitation-request-review.ts), which emits
+    # `finder:solicitation.review_requested` via emitEventSingle — hence phase 'single'; and the
+    # triage ROUTE emits `finder:solicitation.triaged` with toState='review_requested'. Only the
+    # first fires from the workspace, so PATTERN_AUDIT HIGH-1 re-pointed this workflow at it. The
+    # QA pass never ran while it listened to the legacy twin.
+    #
+    # This test asserted the legacy trigger long after that fix, so it failed on the CURRENT
+    # wiring — and its condition assertions called t.condition(...) on a trigger that no longer
+    # has one. Pinned to the tool's emit here so re-pointing it back at the twin fails loudly.
+    assert (t.namespace, t.type, t.phase) == ("finder", "solicitation.review_requested", "single")
+    # No condition: the event type IS the signal. A condition was only needed by the twin, whose
+    # type also covered approve/reject/return transitions and had to filter on toState.
+    assert t.condition is None
     steps = {s.name: s for s in OnSolicitationReviewRequested.steps}
     assert steps["ai_curation_qa"].step_type == StepType.AI_INVOKE
     assert steps["ai_curation_qa"].action == "tool.curation.qa"
