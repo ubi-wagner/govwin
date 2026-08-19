@@ -128,7 +128,7 @@ export function buildCostVolumeCanvas(input: CostVolumeInputs): CanvasDocument {
       + '(Direct Labor → Fringe → Overhead → Other Direct Costs / Subcontracts → G&A → Fee). '
       + 'Replace the example rows with your actual personnel, hours, rates, and costs — the summary '
       + 'recomputes from what you enter.',
-  }, { size: 9, style: 'italic' }));
+  }, { size: 10, style: 'italic' }));
 
   // 1. Rate schedule
   nodes.push(node('heading', { level: 2, text: 'Indirect Rate Schedule' }));
@@ -216,7 +216,7 @@ export function buildCostVolumeCanvas(input: CostVolumeInputs): CanvasDocument {
       text: over > 0
         ? `⚠ Total proposed price exceeds the solicitation ceiling of $${Math.round(meta.ceiling).toLocaleString('en-US')} by $${Math.round(over).toLocaleString('en-US')}.`
         : `Total proposed price is within the solicitation ceiling of $${Math.round(meta.ceiling).toLocaleString('en-US')} (headroom $${Math.round(-over).toLocaleString('en-US')}).`,
-    }, { size: 9, style: 'italic' }));
+    }, { size: 10, style: 'italic' }));
   }
 
   // 6. Work-share compliance (only when the program has a work-share floor)
