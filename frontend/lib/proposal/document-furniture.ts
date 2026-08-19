@@ -406,8 +406,15 @@ export function measureDocument(
   const pageFill = maxPages && maxPages > 0 ? pages / maxPages : null;
   const characterFill = maxCharacters && maxCharacters > 0 ? characters / maxCharacters : null;
 
+  const isNarrative = artifactType === 'narrative';
+  const isSpreadsheet = artifactType === 'cost' || doc.canvas?.format === 'spreadsheet';
+
   const warnings: string[] = [];
-  if (pageFill != null && pageFill < underfillAt) {
+  // Page fill only means something on something PAGINATED. A cost workbook is measured in rows and
+  // a webform in fields; both routinely carry a max_pages in their spec (it is the volume's cap in
+  // the announcement) and neither can "fill" it. Warning that a 3-page computed budget has left
+  // seven pages unused asks the customer to pad a spreadsheet.
+  if (!isSpreadsheet && pageFill != null && pageFill < underfillAt) {
     warnings.push(
       `Uses ${pages} of ${maxPages} allowed pages (${Math.round(pageFill * 100)}%). `
       + `An evaluator reads unused pages as an unfinished proposal — fill to ~${(maxPages ?? 0) - 0.1}.`,
@@ -425,8 +432,6 @@ export function measureDocument(
     && (nodes[i + 1]?.type === 'caption' || Boolean((n.content as { caption?: string })?.caption)
         || Boolean((n.content as ChartContent)?.title)));
   const figures = captionable.length;
-  const isNarrative = artifactType === 'narrative';
-  const isSpreadsheet = artifactType === 'cost' || doc.canvas?.format === 'spreadsheet';
   if (isNarrative && figures === 0) {
     warnings.push('No figures. A technical narrative with no figure is a wall of text.');
   }

@@ -144,6 +144,10 @@ function sentences(text) {
   return (text || '')
     .replace(/\r/g, ' ')
     .replace(/-{2,}\s*\d+\s+of\s+\d+\s*-{2,}/gi, ' ')   // "-- 3 of 41 --" page marks
+    // "p11 · " — the atomizer's page-of-origin prefix. It is provenance, not prose, and it printed
+    // on the rendered page ("p11 · Significance of Problem and Opportunity 5 Topic: X23.5"),
+    // which reads as an unproofed copy-paste rather than a written proposal.
+    .replace(/(^|\s)p\d{1,3}\s*[·•]\s*/g, '$1')
     .replace(/\s+/g, ' ')
     .split(/(?<=[.!?])\s+(?=[A-Z(])/)
     .map((x) => x.trim())
@@ -156,7 +160,13 @@ function sentences(text) {
     // DUNS, CAGE and SBA certifications. A writer skips that; so does this. (The underlying fix is
     // library GRAIN — atomizing those documents into sections — not a filter here.)
     .filter((x) => !/\b(UEI|DUNS|CAGE|SBA SBC|13 C\.?F\.?R|OFFEROR CERTIFIES|Firm Certificate|Number of employees|www\.[a-z]|Mail Address|Website Address)\b/i.test(x))
-    .filter((x) => !/^\s*\d+\.\s/.test(x) || x.length > 140);
+    .filter((x) => !/^\s*\d+\.\s/.test(x) || x.length > 140)
+    // A sentence carrying ANOTHER solicitation's identifiers. The library holds the company's past
+    // proposals, so retrieval legitimately returns text whose header line names the topic and
+    // proposal number it was written for — and copying that into the new volume puts a different
+    // agency's topic number on this submission. The compliance floor has a `foreign_solicitation`
+    // code for exactly this failure; a writer simply would not reuse the sentence.
+    .filter((x) => !/\b(?:Topic\s*(?:Number|#)|Proposal\s*(?:Number|#))\s*:?\s*[A-Z0-9]/i.test(x));
 }
 
 /** Parse the <library_atoms> block the product builds into { id, category, tags, text } records. */
