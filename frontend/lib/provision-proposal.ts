@@ -24,6 +24,7 @@ import { inferSectionType, type SectionStandard } from '@/lib/section-standards'
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveCostForm, buildCostVolume } from '@/lib/proposal/cost-forms';
 import { pickCostWorkbookItems } from '@/lib/proposal/cost-workbook-item';
+import { coerceJsonb } from '@/lib/jsonb';
 import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -371,15 +372,27 @@ export async function provisionProposalForPortal(opts: {
       // portal-built proposal — the #1 avoidable administrative DQ was silently unguarded.
       try {
         if (t.solicitationId) {
-          const [comp] = await tx<Array<{ requiredDocuments: unknown }>>`
-            SELECT required_documents AS "requiredDocuments" FROM solicitation_compliance
+          const [comp] = await tx<Array<{ requiredDocuments: unknown; fieldProvenance: unknown }>>`
+            SELECT required_documents AS "requiredDocuments", field_provenance AS "fieldProvenance"
+            FROM solicitation_compliance
             WHERE solicitation_id = ${t.solicitationId}::uuid LIMIT 1`;
           const reqDocs = comp?.requiredDocuments;
+          // Where the LIST came from. A value the product did not read from the solicitation must
+          // never look like one it did (docs/INGEST_PROVENANCE.md) — and a hard submission blocker
+          // is the strongest way of looking like one. The T3CP skeleton's default list carries
+          // "CMMC Reps & Certs", which that BAA does not require as an attachment at all: it is a
+          // DSIP representation. Provisioned as a blocker, it made the build unsubmittable for a
+          // document that does not exist. Carried through here, readiness downgrades a defaulted
+          // requirement to a warning — still on the checklist, no longer a wall.
+          const prov = coerceJsonb<Record<string, { source?: string }>>(comp?.fieldProvenance, {});
+          const listProvenance = prov?.required_documents?.source ?? null;
           if (Array.isArray(reqDocs)) {
             for (const doc of reqDocs) {
               const d = doc as { name?: string; label?: string; source?: string; reference?: string; required?: boolean } | string;
               const label = typeof d === 'string' ? d : (d.name || d.label || String(d));
-              const source = typeof d === 'object' && d !== null ? (d.source || d.reference || null) : null;
+              const perDoc = typeof d === 'object' && d !== null ? (d.source || d.reference || null) : null;
+              // Prefer the item's own citation; fall back to how the LIST was obtained.
+              const source = perDoc ?? (listProvenance ? `provenance:${listProvenance}` : null);
               const required = typeof d === 'object' && d !== null ? (d.required !== false) : true;
               await tx`
                 INSERT INTO proposal_supporting_docs

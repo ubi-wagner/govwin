@@ -166,8 +166,12 @@ export async function computeSubmissionReadiness(
   `;
   // Mandatory supporting documents/forms (SF424, reps & certs, required letters). Seeded at provision
   // from the solicitation's required_documents; the tenant uploads or an admin waives each.
-  const requiredDocs = await sql<{ requirementLabel: string | null; status: string }[]>`
-    SELECT requirement_label AS "requirementLabel", status
+  const requiredDocs = await sql<{ requirementLabel: string | null; status: string; requirementSource: string | null }[]>`
+    SELECT requirement_label AS "requirementLabel", status,
+           -- How the product came to believe this document is required. 'provenance:default' means
+           -- it was NOT read from this solicitation — it came from a program skeleton's default
+           -- list. See the blocker/warning split below.
+           requirement_source AS "requirementSource"
     FROM proposal_supporting_docs
     WHERE proposal_id = ${proposalId}::uuid AND is_required = true
   `;
@@ -398,10 +402,25 @@ export async function computeSubmissionReadiness(
   let docsProvided = 0;
   for (const d of requiredDocs) {
     if (d.status !== 'missing') { docsProvided++; continue; }
+    // A DEFAULTED requirement warns; a requirement READ from the solicitation blocks.
+    //
+    // "A value the product did not read from the solicitation must never look like one it did"
+    // (docs/INGEST_PROVENANCE.md), and a hard submission blocker is the strongest way of looking
+    // like one. The T3CP skeleton's default list carries "CMMC Reps & Certs", which that BAA does
+    // not require as an attachment at all — CMMC is a representation made in DSIP, so there is no
+    // document to upload. As a blocker it made a finished build unsubmittable for a file that does
+    // not exist, and the only escape was an admin waiving a requirement nobody could verify.
+    //
+    // It stays on the checklist either way. What changes is whether the product stakes a hard
+    // refusal on something it assumed.
+    const defaulted = d.requirementSource === 'provenance:default';
     blockers.push({
       category: 'missing_document',
-      severity: 'blocker',
-      message: `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
+      severity: defaulted ? 'warning' : 'blocker',
+      message: defaulted
+        ? `Document not provided: ${d.requirementLabel ?? 'Unnamed document'}. This requirement `
+          + 'came from the program default list, not from this solicitation — confirm whether it applies.'
+        : `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
     });
   }
 
