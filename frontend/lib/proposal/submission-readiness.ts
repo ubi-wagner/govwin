@@ -188,7 +188,9 @@ export async function computeSubmissionReadiness(
     metaByArtifact.set(a.id, { artifactType: a.artifactType, volumeName: a.volumeName });
   }
   // Sections collected per artifact (volume), in flow order, for the real rendered-page-count gate.
-  const volSections = new Map<string, Array<{ title: string | null; content: string | null }>>();
+  // pageAllocation rides along so the volume loop can check whether the per-section allowances
+  // even FIT the volume's own cap (assembleArtifactCanvas ignores it; only the sum tells you).
+  const volSections = new Map<string, Array<{ title: string | null; content: string | null; pageAllocation: number | null }>>();
 
   // ── Section state ──────────────────────────────────────────────────────────
   let locked = 0, emptyN = 0, draftedUnlocked = 0, formatViolations = 0, overBudget = 0;
@@ -230,7 +232,7 @@ export async function computeSubmissionReadiness(
     // (paginate over assembleArtifactCanvas), not a per-section node estimate.
     if (s.artifactId) {
       const list = volSections.get(s.artifactId) ?? [];
-      list.push({ title: s.title, content: s.content });
+      list.push({ title: s.title, content: s.content, pageAllocation: s.pageAllocation });
       volSections.set(s.artifactId, list);
     }
 
@@ -319,6 +321,28 @@ export async function computeSubmissionReadiness(
         message: `"${name}" is estimated at ${size} ${unit} against a ${max}-${noun} limit — trim ${size - max} ${noun}(s) before submission (same estimate the export compliance check uses).`,
       });
     }
+    // ── Do the section allowances even FIT the volume? ────────────────────────────────────
+    // Each `proposal_sections.page_allocation` comes from `volume_required_items.page_limit`,
+    // authored per ITEM. Nothing checks them against the VOLUME's own cap, so a volume whose
+    // announcement says "NTE 10 pages" can carry ten items each stamped 10 — 100 pages of
+    // allowance against a 10-page envelope. Every per-section check then passes while the assembled
+    // volume is 2.7× over, and the error is invisible until export. Observed exactly this on a live
+    // T3CP build: 10 sections × 10 pages, volume cap 10.
+    //
+    // A blocker, not a warning: unlike an under-filled volume (a judgement call), an over-subscribed
+    // page budget is arithmetic — it cannot be what the solicitation meant, and drafting to those
+    // allowances guarantees an over-length submission.
+    const allowanceSum = secs.reduce((t, x) => t + (x.pageAllocation ?? 0), 0);
+    if (!isSlide && max != null && allowanceSum > max) {
+      blockers.push({
+        category: 'page_overflow',
+        severity: 'blocker',
+        message: `"${name}": its ${secs.length} sections are allocated ${allowanceSum} pages between them, `
+          + `but the volume's limit is ${max}. The per-section allowances over-subscribe the volume — `
+          + 'drafting to them guarantees an over-length submission. Re-allocate the pages across the sections.',
+      });
+    }
+
     // ── Compliant, but finished? ──────────────────────────────────────────────────────────
     // The check above answers "is this volume ALLOWED"; this answers "is it FINISHED". They are
     // different questions, and only the first one existed: a 6-page volume under a 10-page cap

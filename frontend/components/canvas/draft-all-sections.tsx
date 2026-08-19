@@ -64,6 +64,9 @@ interface Section {
   nodeCount: number;
   pageLimit?: number;
   requiredSubsections?: string[];
+  /** The VOLUME's page cap, stamped on the section's canvas at provision — NOT the section's
+   *  own share (`pageLimit`). An AI-draft landing must preserve it. */
+  canvasMaxPages?: number | null;
   // Expert's curation note for this section (the "blank mold + prompt"). Passed to
   // the drafter as the grounding instruction so a section with no atoms can still
   // draft from the expert's prompt + the fallback all-proposal atoms.
@@ -117,7 +120,13 @@ export function DraftAllSections({
         try {
           const vol = sectionToVol(sec.title);
           const kinds = VOL_DEFAULT_KINDS[vol] ?? [];
-          const qs = new URLSearchParams({ vol, limit: '5', sectionId: sec.id });
+          // Scale retrieval to the section's ALLOWANCE. A flat 5 atoms was the same budget for a one-page
+        // abstract and a ten-page technical volume, so the long section ran out of material to write
+        // from and stopped at a fraction of its page envelope (measured: 60%% of a 10-page volume,
+        // with the ranker returning nothing further). ~4 atoms per allowed page, floored at 5 so
+        // short sections behave exactly as before and capped at 40 to bound the prompt.
+          const atomLimit = Math.min(40, Math.max(5, (sec.pageLimit ?? 1) * 4));
+          const qs = new URLSearchParams({ vol, limit: String(atomLimit), sectionId: sec.id });
           if (kinds.length) qs.set('kinds', kinds.join(','));
           if (context.length) qs.set('context', context.join(','));
           // the section title is the semantic query — ranks atoms by MEANING when embeddings are on
@@ -157,13 +166,15 @@ export function DraftAllSections({
           // sets status='ai_drafted', and emits section.saved. Draft-All only targets
           // genuinely-empty sections, so there is no prior canvas content to preserve.
           const now = new Date().toISOString();
+          // Preserve the VOLUME's page cap, which provisioning stamped onto this section's canvas
+          // and the sections list returns as `canvasMaxPages`. It is NOT the section's own share
+          // (page_allocation, carried separately as layout.page_budget at assembly), and it is not
+          // the preset's hard-coded 15 — rebuilding from the bare preset made the compliance floor
+          // measure against a limit the solicitation never gave.
           const doc = createEmptyCanvas({
             documentId: sec.id,
-            // Same as the single-section path: keep the section's PROVISIONED cap rather than the
-            // preset's hard-coded 15, or the compliance floor measures against a limit the
-            // solicitation never gave.
-            canvas: sec.pageLimit != null && sec.pageLimit > 0
-              ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: sec.pageLimit }
+            canvas: sec.canvasMaxPages != null && sec.canvasMaxPages > 0
+              ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: sec.canvasMaxPages }
               : CANVAS_PRESETS.letter_sbir_phase1,
             metadata: {
               title: sec.title,

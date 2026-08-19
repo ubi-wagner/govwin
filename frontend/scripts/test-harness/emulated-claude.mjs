@@ -453,6 +453,47 @@ const RESPONDERS = [
         push({ type: 'bulleted_list', content: { items } }, items.reduce((a, i) => a + wordsIn(i.text), 0));
       }
 
+      // ── FILL THE ALLOWANCE ────────────────────────────────────────────────────────────
+      // The product's own prompt says "Aim for about N words"; without this the responder stopped
+      // after the lead paragraph whenever a mold listed no required subsections — which is the
+      // usual case — and landed ~4 nodes against a ten-page allowance. Measured before this: a
+      // Technical Volume at 40% of its page envelope. Every sentence below is still the tenant's
+      // OWN retrieved material, just no longer discarded; when the library runs dry the section
+      // stays short and the readiness warning says so.
+      const CONTINUATION = ['Approach', 'Technical Detail', 'Implementation', 'Evidence',
+        'Risk and Mitigation', 'Expected Outcomes'];
+      const remaining = () => rankSentences(pool.filter((x) => !usedSentences.has(x)), focus, 400, 0);
+      let more = remaining();
+      let ci = 0;
+      while (used < targetWords * 0.95 && more.length && ci < CONTINUATION.length) {
+        const take = more.slice(0, 5);
+        take.forEach((x) => usedSentences.add(x));
+        push({ type: 'heading', content: { level: 2, text: CONTINUATION[ci] } }, 2);
+        const para = take.join(' ');
+        push({ type: 'text_block', content: { text: para } }, wordsIn(para));
+        // A short list every other block — the canvas renders and exports bulleted_list natively.
+        const bullets = more.slice(5, 8);
+        if (bullets.length && ci % 2 === 1) {
+          bullets.forEach((x) => usedSentences.add(x));
+          push({ type: 'bulleted_list', content: { items: bullets.map((b) => ({ text: b })) } },
+            bullets.reduce((a, x) => a + wordsIn(x), 0));
+        }
+        ci += 1;
+        more = remaining();
+      }
+
+      // Emphasis on the concrete claim in each paragraph — what a proposal writer actually bolds,
+      // and what the canvas models as text_block.inline_formats. Never invented: the run points at
+      // a figure or designator already in the sentence.
+      const CONCRETE = /\b(?:\d[\d,.]*\s?(?:%|percent|metres?|meters?|km|nm|kW|W|months?|days?|weeks?)|TRL\s?\d|[A-Z]\d{5}-\d{2}-[A-Z]-\d{4}|\$[\d,]+)/;
+      for (const n of nodes) {
+        if (n.type !== 'text_block' || n.content?.inline_formats) continue;
+        const t = n.content?.text ?? '';
+        const m = t.match(CONCRETE);
+        if (!m || m.index == null) continue;
+        n.content.inline_formats = [{ start: m.index, length: m[0].length, format: 'bold' }];
+      }
+
       // Trim to the budget from the end, never mid-node, so the draft always parses.
       while (used > maxWords && nodes.length > 2) {
         const dropped = nodes.pop();

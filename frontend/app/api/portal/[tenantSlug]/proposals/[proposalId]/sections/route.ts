@@ -81,6 +81,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       volumeNumber: number | null;
       isLocked: boolean;
       sectionType: string | null;
+      canvasMaxPages: number | null;
     }[];
     try {
       allSections = await sql<{
@@ -98,6 +99,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         volumeNumber: number | null;
         isLocked: boolean;
         sectionType: string | null;
+        canvasMaxPages: number | null;
       }[]>`
         SELECT
           id, section_number, title, status,
@@ -107,6 +109,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
           -- the master mold" versus "you wrote this" is the difference between a starting point
           -- and their own work.
           character_allocation, content_source,
+          -- The VOLUME's page cap, as stamped onto this section's canvas at provision. Distinct
+          -- from page_allocation, which is the SECTION's share of it — and a client that lands an
+          -- AI draft needs the volume cap, because rebuilding the document from a bare preset
+          -- replaces it with the preset's own number and the compliance floor then measures
+          -- against a limit the solicitation never gave. Extracted here rather than shipping the
+          -- whole canvas, which would be a large payload for one integer.
+          (content::jsonb -> 'canvas' ->> 'max_pages')::int AS canvas_max_pages,
           artifact_id, volume_name, volume_number, is_locked, section_type
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}
@@ -142,6 +151,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
         // read, so the author needs this one or they are writing blind against the agency's cap.
         pageAllocation: section.pageAllocation,
         characterAllocation: section.characterAllocation,
+        // The VOLUME's cap (see the query comment) — what an AI-draft landing must preserve.
+        canvasMaxPages: section.canvasMaxPages,
         // Where the starting content came from — 'template' means the master mold seeded it, which
         // is a materially different thing to show an author than their own draft.
         contentSource: section.contentSource,

@@ -47,7 +47,7 @@ const buyer = await login(b, 'admin@immobileyes.test', 'DemoPass123!');
 const sr = await buyer.get(`${BASE}/api/portal/${SLUG}/proposals/${PROP}/sections`);
 const sBody = await sr.json().catch(() => ({}));
 const sections: Array<{
-  id: string; title: string; status: string; pageAllocation: number | null;
+  id: string; title: string; status: string; pageAllocation: number | null; canvasMaxPages: number | null;
   contentSource: string | null; sortIndex: number | null;
 }> = sBody?.data?.sections ?? sBody?.data ?? [];
 ok('sections route returned the build', sr.status() === 200 && sections.length > 0,
@@ -56,8 +56,14 @@ if (!sections.length) { console.log(JSON.stringify(sBody).slice(0, 600)); await 
 
 // Only the molded sections — the ones the full-draft cohort skipped. Never touch a section a
 // human has edited, and never re-draft the computed cost workbook (it is priced data, not prose).
+// `--redraft` also re-runs sections already carrying an AI draft — used after a drafting-path fix
+// lands (the prompt now states a character target and asks for markdown's full vocabulary, and the
+// converter now carries emphasis/tables through). Still never touches a human edit, and never
+// re-drafts the computed cost workbook: that is priced data, not prose.
+const redraft = process.argv.includes('--redraft');
 const targets = sections.filter((s) =>
-  s.contentSource === 'template' && !/cost volume/i.test(s.title));
+  (s.contentSource === 'template' || (redraft && s.contentSource === 'ai_draft'))
+  && !/cost volume/i.test(s.title));
 console.log(`  ${targets.length} molded section(s) to draft (of ${sections.length})`);
 
 let drafted = 0;
@@ -66,7 +72,9 @@ for (const s of targets) {
     // 1 · rank this tenant's library atoms for the section (semantic query = the title)
     let libraryAtoms: Array<{ id: string; content: string; category: string }> = [];
     try {
-      const qs = new URLSearchParams({ limit: '5', sectionId: s.id, text: s.title });
+      // Mirror the component: retrieval scales with the section's page allowance.
+      const atomLimit = Math.min(40, Math.max(5, (s.pageAllocation ?? 1) * 4));
+      const qs = new URLSearchParams({ limit: String(atomLimit), sectionId: s.id, text: s.title });
       const r = await buyer.get(`${BASE}/api/portal/${SLUG}/atoms/select?${qs.toString()}`);
       if (r.status() === 200) {
         const ranked = ((await r.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;
@@ -94,12 +102,17 @@ for (const s of targets) {
 
     // 3 · land it through the section save route (archives a version, sets ai_drafted)
     const now = new Date().toISOString();
+    // Mirror the FIXED component: preserve the VOLUME's page cap (the sections list returns it as
+    // canvasMaxPages). It is not the section's own share, and not the preset's hard-coded 15.
     const doc = createEmptyCanvas({
-      documentId: s.id, canvas: CANVAS_PRESETS.letter_sbir_phase1,
+      documentId: s.id,
+      canvas: s.canvasMaxPages && s.canvasMaxPages > 0
+        ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: s.canvasMaxPages }
+        : CANVAS_PRESETS.letter_sbir_phase1,
       metadata: {
-        title: s.title, volume_id: '', required_item_id: '', proposal_id: PROP,
-        solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: '',
-        version_number: 1, status: 'ai_drafted',
+        title: s.title, volume_id: '', required_item_id: '', proposal_id: PROP, solicitation_id: '',
+        created_at: new Date().toISOString(), last_modified_at: new Date().toISOString(),
+        last_modified_by: '', version_number: 1, status: 'ai_drafted',
       },
     });
     doc.nodes = nodes;
