@@ -10,7 +10,7 @@
  * line that would have carried it rather than printing an empty band or throwing inside a download.
  */
 import { sql } from '@/lib/db';
-import type { VolumeFacts } from '@/lib/proposal/volume-finish';
+import type { LibraryFigure, VolumeFacts } from '@/lib/proposal/volume-finish';
 
 /**
  * Load the cover/header facts for one proposal.
@@ -50,9 +50,10 @@ export async function loadVolumeFacts(
     // record has none of its own — an uncurated or directly-loaded opportunity.
     const fromTitle = (r.proposalTitle ?? '').match(/^\s*([A-Z0-9][A-Z0-9.\-]{5,24})\s*[:—-]/)?.[1] ?? null;
 
-    const [milestones, computed] = await Promise.all([
+    const [milestones, computed, libraryFigures] = await Promise.all([
       loadMilestones(proposalId),
       loadComputedCostFacts(proposalId),
+      loadLibraryFigures(tenantId),
     ]);
 
     return {
@@ -60,6 +61,7 @@ export async function loadVolumeFacts(
       solicitationNumber: r.solicitationNumber ?? fromTitle,
       emphasise: emphasisTerms(r.companyName, r.solicitationTitle),
       milestones,
+      libraryFigures,
       ...computed,
     };
   } catch (e) {
@@ -177,4 +179,60 @@ function emphasisTerms(companyName: string | null, solicitationTitle: string | n
     if (out.length >= 6) break;
   }
   return out;
+}
+
+/**
+ * The offeror's own approved pictures.
+ *
+ * APPROVED only. A harvested figure lands `draft` behind a human review gate precisely because a
+ * picture lifted out of a past submission may carry another customer's markings, an
+ * export-controlled image or a competitor's logo — so the gate is the thing that makes automatic
+ * placement safe, and reading past it would defeat it.
+ *
+ * The searchable text is the atom's OCR + vision enrichment, which is what
+ * `finishVolumeCanvas::pickLibraryFigure` matches a section against. `alt_text` on the node is the
+ * caption the enricher wrote; `content` is the OCR.
+ */
+async function loadLibraryFigures(tenantId: string): Promise<LibraryFigure[]> {
+  try {
+    const rows = await sql<Array<{
+      atomId: string; storageKey: string | null; altText: string | null;
+      width: number | null; height: number | null; text: string | null;
+    }>>`
+      SELECT a.id                                AS "atomId",
+             n -> 'content' ->> 'storage_key'    AS "storageKey",
+             n -> 'content' ->> 'alt_text'       AS "altText",
+             (n -> 'content' ->> 'width')::int   AS "width",
+             (n -> 'content' ->> 'height')::int  AS "height",
+             -- NOT a.summary: that is the provenance line ("Figure harvested from X · timestamp"),
+             -- identical on every figure from one document, so including it makes every figure look
+             -- equally relevant to everything. a.content is the OCR + vision caption — what the
+             -- picture actually shows.
+             concat_ws(' ', a.title, a.content) AS "text"
+      FROM library_atoms a
+      CROSS JOIN LATERAL jsonb_array_elements(a.canvas_nodes) n
+      WHERE a.tenant_id = ${tenantId}::uuid
+        AND a.archived_at IS NULL
+        AND a.vault_id IS NULL
+        AND a.status = 'approved'
+        AND a.grain <> 'reference'
+        AND n ->> 'type' = 'image'
+        AND n -> 'content' ->> 'storage_key' IS NOT NULL
+      ORDER BY a.created_at DESC
+      LIMIT 60
+    `;
+    return rows
+      .filter((r) => r.storageKey)
+      .map((r) => ({
+        atomId: r.atomId,
+        storageKey: r.storageKey as string,
+        text: r.text ?? '',
+        caption: r.altText,
+        width: r.width,
+        height: r.height,
+      }));
+  } catch (e) {
+    console.error('[volume-facts] library figures load failed (non-fatal):', e);
+    return [];
+  }
 }

@@ -43,6 +43,7 @@ import {
   type TableContent,
   type TextBlockContent,
   coalesceGroups,
+  estimatePageCount,
   getNodeText,
 } from '@/lib/types/canvas-document';
 import {
@@ -79,8 +80,29 @@ export interface VolumeFacts {
    * offeror's estimates, which is what makes a schedule figure drawable without inventing a plan.
    */
   milestones?: ScheduleTask[] | null;
+  /**
+   * The offeror's OWN pictures — approved image atoms from their library, harvested out of the
+   * proposals they uploaded (`lib/pdf/figure-harvest.ts`).
+   *
+   * These outrank anything generated. A photograph of the company's optical bench says something a
+   * drawn diagram cannot, it is evidence rather than illustration, and it is the customer's own
+   * asset. A generated figure is what you fall back to when the library has nothing that fits.
+   */
+  libraryFigures?: LibraryFigure[] | null;
   /** Terms to emphasise in body copy — the offeror's own product/technology names. */
   emphasise?: string[];
+}
+
+/** One reusable picture from the tenant's library, with the text that describes it. */
+export interface LibraryFigure {
+  atomId: string;
+  /** Storage key or data URI — whatever the image node carries; the exporters resolve either. */
+  storageKey: string;
+  /** OCR + vision text, used both to caption it and to decide which section it belongs in. */
+  text: string;
+  caption?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,6 +310,132 @@ function isPaginatedProse(artifactType: string | null | undefined, canvas: Canva
 }
 
 /**
+ * The offeror's own picture for this section, if the library has one that belongs here.
+ *
+ * Matched on WORDS, not on tags. A harvested figure carries the OCR of whatever text is inside it
+ * plus a vision caption of what it depicts, and that text is the only honest evidence of what the
+ * picture is about — the tags on it describe the document it came out of, which is the same for
+ * every figure in that document and therefore separates nothing.
+ *
+ * The bar is deliberately high. A picture placed in a section it has nothing to do with is worse
+ * than no picture: it reads as padding, and an evaluator who spots one stops trusting the rest.
+ * Two shared content words is the floor, and a figure whose best section is a tie goes to the
+ * first — deterministic, so the same volume assembles the same way twice.
+ */
+function pickLibraryFigure(
+  heading: string,
+  nodes: CanvasNode[],
+  figures: LibraryFigure[],
+  used: Set<string>,
+): CanvasNode[] {
+  if (figures.length === 0) return [];
+  // Match against the section's HEADING AND ITS PROSE. A heading is four or five words and a
+  // picture's OCR is a scattering of fragments; requiring them to overlap on the heading alone
+  // placed none of six real figures. What the section is about is in its paragraphs.
+  const want = contentWords(`${heading} ${nodes.map(getNodeText).join(' ').slice(0, 4000)}`);
+  if (want.size === 0) return [];
+
+  let best: LibraryFigure | null = null;
+  let bestScore = 0;
+  for (const f of figures) {
+    if (used.has(f.atomId)) continue;
+    const have = contentWords(`${f.caption ?? ''} ${f.text}`);
+    let score = 0;
+    for (const w of want) if (have.has(w)) score += 1;
+    if (score > bestScore) { bestScore = score; best = f; }
+  }
+  // Three shared content words, now that both sides carry real text. Two was noise at this width;
+  // a picture placed in a section it has nothing to do with reads as padding, and an evaluator who
+  // spots one stops trusting the rest.
+  if (!best || bestScore < 3) return [];
+  used.add(best.atomId);
+
+  // The caption is the atom's own DESCRIPTION — never its filename.
+  //
+  // `alt_text` on a harvested figure is whatever the enricher wrote; when vision captioning is off
+  // it falls back to the atom title, which is the source document's name. That printed
+  // "Figure 1. Immobileyes_DON26BX03-NP002_Technical_Volume_PREVIEW.pdf — page 1" under a
+  // photograph, which is provenance leaking onto a submitted page — the same defect as the alt-text
+  // captions document-furniture already learned not to borrow. A filename is rejected here and the
+  // OCR's own first line stands instead; failing that, an honest generic that tells the author this
+  // is reused material to replace.
+  const caption = firstNonFilename([best.caption, firstSentence(best.text)])
+    || 'Figure carried forward from a prior submission — replace or re-caption.';
+
+  return [
+    furnitureNode('image', {
+      storage_key: best.storageKey,
+      alt_text: caption.slice(0, 220),
+      width: best.width ?? 468,
+      height: best.height ?? 300,
+    }, { alignment: 'center', space_before: 8, space_after: 4 }),
+    furnitureNode('caption', { prefix: 'Figure', number: 1, text: caption.slice(0, 220) }),
+  ];
+}
+
+/**
+ * The first candidate that is not a filename or a provenance line.
+ *
+ * A caption is what the picture SHOWS. "…_PREVIEW.pdf — page 1", "capture-8dc7bb71…png" and
+ * "Screen capture from X · 2026-08-19T…" are all records of where the bytes came from, and none of
+ * them belongs under a figure in a document going to an evaluator.
+ */
+function firstNonFilename(candidates: Array<string | null | undefined>): string {
+  for (const raw of candidates) {
+    const t = (raw ?? '').replace(/\s+/g, ' ').trim();
+    if (t.length < 8) continue;
+    if (/\.(pdf|docx?|pptx?|xlsx?|png|jpe?g|gif|webp)\b/i.test(t)) continue;   // a file name
+    if (/^(screen capture|figure harvested|capture-)/i.test(t)) continue;      // a provenance line
+    if (/\d{4}-\d{2}-\d{2}T\d{2}:/.test(t)) continue;                          // a timestamp
+    return t.slice(0, 220);
+  }
+  return '';
+}
+
+/** Content words of a string: lowercased, de-duplicated, without the vocabulary every proposal shares. */
+function contentWords(s: string): Set<string> {
+  const STOP = new Set(['and', 'the', 'for', 'with', 'from', 'that', 'this', 'are', 'was', 'will',
+    'proposal', 'section', 'volume', 'phase', 'sbir', 'sttr', 'government', 'offeror', 'figure',
+    'page', 'technical', 'approach', 'required', 'requirements']);
+  return new Set(
+    (s.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []).filter((w) => !STOP.has(w)),
+  );
+}
+
+/** First sentence of a blob of OCR/caption text, trimmed to caption length. */
+function firstSentence(s: string): string {
+  const t = (s ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const stop = t.search(/[.!?](\s|$)/);
+  return (stop > 12 ? t.slice(0, stop + 1) : t).slice(0, 200);
+}
+
+/**
+ * The generated figure a section's own content supports — the fallback when the library has
+ * nothing that belongs here. Every generator returns [] when its data is absent.
+ */
+function generatedFigure(intent: Intent, nodes: CanvasNode[], facts: VolumeFacts): CanvasNode[] {
+  if (intent === 'schedule') {
+    // The section's own months first — that is the offeror's plan. Falling back to the
+    // solicitation's curated deliverable dates second: those are the AGENCY's milestones, so
+    // drawing them commits the offeror to nothing they were not already required to meet.
+    const own = parseSchedule(nodes);
+    const { tasks, months } = own.tasks.length >= 2
+      ? own
+      : { tasks: facts.milestones ?? [], months: Math.max(0, ...(facts.milestones ?? []).map((m) => m.endMonth)) };
+    return scheduleFigure(tasks, months, 'Phase I schedule and milestones');
+  }
+  if (intent === 'approach') return architectureFigure(parseStages(nodes), 'Technical approach');
+  if (intent === 'results') return improvementFigure(parseMetrics(nodes));
+  if (intent === 'workshare' && facts.workShare) {
+    const w = facts.workShare;
+    return workShareFigure(w.primePct, w.floorPct, w.primeLabel, w.partnerLabel);
+  }
+  if (intent === 'cost' && facts.cost?.length) return costBuildupFigure(facts.cost);
+  return [];
+}
+
+/**
  * Finish an assembled volume: figures where the content supports one, then furniture over the whole.
  *
  * Returns a NEW document; the input is not mutated, so a caller can measure before and after.
@@ -304,96 +452,112 @@ export function finishVolumeCanvas(doc: CanvasDocument, facts: VolumeFacts = {})
   const imagesOk = paginated && canvas.images_allowed !== false;
 
   const usedIntents = new Set<Intent>();
+  const usedFigures = new Set<string>();
+  const placed: string[][] = [];
   const outSections: CanvasSection[] = sections.map((sec, si) => {
     const nodes = nodesOf(sec);
     if (!imagesOk || nodes.length === 0) return sec;
 
     const heading = (nodes.find((n) => n.type === 'heading')?.content as HeadingContent)?.text
       ?? sec.title ?? '';
-    const intent = intentOf(heading);
-    // One figure per intent per volume. Three gantts of the same schedule, one per section that
-    // happens to mention a month, reads as a document nobody proofread.
-    if (!intent || usedIntents.has(intent)) return sec;
+    // A section that already carries a picture keeps it — this finishes a volume, it does not
+    // redecorate one.
+    if (nodes.some((n) => n.type === 'image' || n.type === 'chart')) return sec;
 
-    let figure: CanvasNode[] = [];
-    if (intent === 'schedule') {
-      // The section's own months first — that is the offeror's plan. Falling back to the
-      // solicitation's curated deliverable dates second: those are the AGENCY's milestones, so
-      // drawing them commits the offeror to nothing they were not already required to meet, and it
-      // is the difference between a statement-of-work page with a schedule and one without.
-      const own = parseSchedule(nodes);
-      const { tasks, months } = own.tasks.length >= 2
-        ? own
-        : { tasks: facts.milestones ?? [], months: Math.max(0, ...(facts.milestones ?? []).map((m) => m.endMonth)) };
-      figure = scheduleFigure(tasks, months, 'Phase I schedule and milestones');
-    } else if (intent === 'approach') {
-      figure = architectureFigure(parseStages(nodes), 'Technical approach');
-    } else if (intent === 'results') {
-      figure = improvementFigure(parseMetrics(nodes));
-    } else if (intent === 'workshare' && facts.workShare) {
-      const w = facts.workShare;
-      figure = workShareFigure(w.primePct, w.floorPct, w.primeLabel, w.partnerLabel);
-    } else if (intent === 'cost' && facts.cost?.length) {
-      figure = costBuildupFigure(facts.cost);
+    // The offeror's OWN picture first, when the library holds one that belongs in this section.
+    // Considered for EVERY section: a photograph of the company's optical bench is evidence, and
+    // which section it belongs in is decided by what the picture is OF, not by whether the heading
+    // happens to match one of the generated-figure intents. Gating it on intent was measured to
+    // place none of six real harvested figures.
+    let figure = pickLibraryFigure(heading, nodes, facts.libraryFigures ?? [], usedFigures);
+    const fromLibrary = figure.length > 0;
+
+    // A generated figure only where the library had nothing, and only where the section's own
+    // content supports one — one per intent per volume, because three gantts of the same schedule
+    // reads as a document nobody proofread.
+    const intent = intentOf(heading);
+    if (figure.length === 0) {
+      if (!intent || usedIntents.has(intent)) return sec;
+      figure = generatedFigure(intent, nodes, facts);
+      if (figure.length === 0) return sec;
+      usedIntents.add(intent);
     }
-    if (figure.length === 0) return sec;
-    usedIntents.add(intent);
 
     // The figure goes AFTER the section's opening prose, not before it — a reader wants the claim
-    // and then its picture. Anchor: the end of the first text block following the heading, or the
-    // top of the section when it opens with a list or a table.
+    // and then its picture. Anchor: the end of the first substantial text block following the
+    // heading, or the top of the section when it opens with a list or a table.
     const firstProse = nodes.findIndex((n) => n.type === 'text_block' && getNodeText(n).length > 120);
     const at = firstProse >= 0 ? firstProse + 1 : Math.min(1, nodes.length);
     const merged = [...nodes.slice(0, at), ...figure, ...nodes.slice(at)];
+    // Remember what was added, in placement order, so it can be taken back out if the volume
+    // overruns its cap (see the fit pass below). Only LIBRARY figures are droppable: a generated
+    // figure is derived from the section's own content and is part of what the section says.
+    if (fromLibrary) placed.push(figure.map((n) => n.id));
     return { ...sec, groups: regroup(merged), layout: sec.layout ?? { mode: 'flow' } };
   });
 
   // The cover band opens the volume. It is page furniture, not a numbered figure (see
-  // document-furniture::numberFigures, which learned that the hard way).
-  if (imagesOk && facts.companyName && facts.volumeName) {
-    const banner = coverBanner(
-      facts.companyName,
-      facts.solicitationNumber ?? '',
-      facts.volumeName,
-    );
-    if (banner.length) {
-      outSections.unshift({
-        id: crypto.randomUUID(),
-        layout: { mode: 'flow' },
-        groups: regroup(banner),
-      });
-    }
-  }
+  // document-furniture::numberFigures, which learned that the hard way). Built BEFORE the fit pass
+  // because it costs a third of a page and the fit pass has to count it — measuring without it
+  // reported ten pages and shipped eleven.
+  const bannerSection: CanvasSection | null = (() => {
+    if (!imagesOk || !facts.companyName || !facts.volumeName) return null;
+    const banner = coverBanner(facts.companyName, facts.solicitationNumber ?? '', facts.volumeName);
+    return banner.length
+      ? { id: crypto.randomUUID(), layout: { mode: 'flow' as const }, groups: regroup(banner) }
+      : null;
+  })();
+  const withBanner = (secs: CanvasSection[]) => (bannerSection ? [bannerSection, ...secs] : secs);
 
-  // Furniture over the assembled whole: rules between top-level sections, correct figure/table
-  // numbering, and inline emphasis on the offeror's own terms. Applied per section so a node never
-  // migrates across a section boundary, with numbering carried by running the pass once over the
-  // flattened list and redistributing by original section length.
-  const flat = outSections.flatMap((s) => nodesOf(s));
-  const finishedFlat = applyFurniture(flat, {
-    rules: artifactType === 'narrative',
-    toc: false, // a TOC costs a page of a page-capped volume; the caller opts in, not this
-    bold: facts.emphasise ?? [],
-  });
+  // ── ASSEMBLE, THEN FIT THE ENVELOPE ─────────────────────────────────────────────────────────
+  // Assembly is a function of "which figures to leave out", so the fit pass can measure exactly
+  // what ships — cover band, section rules, numbered captions and all. Measuring the half-built
+  // document instead reported ten pages and shipped eleven, twice: furniture is not free, and a
+  // ruler that reads a different document from the one that gets exported is not a ruler.
+  const assemble = (drop: Set<string>): CanvasSection[] => {
+    const secs = withBanner(stripNodes(outSections, drop));
 
-  // applyFurniture inserts (captions, rules) but never reorders or drops, so walking both lists in
-  // step re-attaches every inserted node to the section its neighbour came from.
-  const rebuilt: CanvasSection[] = [];
-  let fi = 0;
-  for (const sec of outSections) {
-    const originals = nodesOf(sec);
-    const take: CanvasNode[] = [];
-    for (const orig of originals) {
-      // Anything applyFurniture inserted BEFORE this original belongs to this section.
-      while (fi < finishedFlat.length && finishedFlat[fi].id !== orig.id) take.push(finishedFlat[fi++]);
-      if (fi < finishedFlat.length) take.push(finishedFlat[fi++]);
+    // Rules between top-level sections, correct figure/table numbering, and inline emphasis on the
+    // offeror's own terms. Applied over the flattened list so numbering is continuous, then
+    // redistributed — applyFurniture inserts but never reorders or drops, so walking both lists in
+    // step re-attaches every inserted node to the section its neighbour came from.
+    const finishedFlat = applyFurniture(secs.flatMap(nodesOf), {
+      rules: artifactType === 'narrative',
+      toc: false, // a TOC costs a page of a page-capped volume; the caller opts in, not this
+      bold: facts.emphasise ?? [],
+    });
+
+    const out: CanvasSection[] = [];
+    let fi = 0;
+    for (const sec of secs) {
+      const take: CanvasNode[] = [];
+      for (const orig of nodesOf(sec)) {
+        while (fi < finishedFlat.length && finishedFlat[fi].id !== orig.id) take.push(finishedFlat[fi++]);
+        if (fi < finishedFlat.length) take.push(finishedFlat[fi++]);
+      }
+      out.push({ ...sec, groups: regroup(take) });
     }
-    rebuilt.push({ ...sec, groups: regroup(take) });
-  }
-  // Trailing insertions (a caption on the document's very last figure) land on the last section.
-  if (fi < finishedFlat.length && rebuilt.length) {
-    const last = rebuilt[rebuilt.length - 1];
-    rebuilt[rebuilt.length - 1] = { ...last, groups: regroup([...nodesOf(last), ...finishedFlat.slice(fi)]) };
+    // Trailing insertions (a caption on the document's very last figure) land on the last section.
+    if (fi < finishedFlat.length && out.length) {
+      const last = out[out.length - 1];
+      out[out.length - 1] = { ...last, groups: regroup([...nodesOf(last), ...finishedFlat.slice(fi)]) };
+    }
+    return out;
+  };
+
+  // Place first, measure the finished document, then take LIBRARY figures back out from the end
+  // until it fits. Last placed goes first: the sections are in reading order, so a figure late in
+  // the volume is the one an evaluator is least likely to miss. Generated figures are never
+  // dropped — they are derived from the section's own content, not added to it.
+  const drop = new Set<string>();
+  let rebuilt = assemble(drop);
+  if (paginated && canvas.max_pages && canvas.max_pages > 0) {
+    for (let i = placed.length - 1; i >= 0; i -= 1) {
+      const probe: CanvasDocument = { ...doc, canvas, sections: rebuilt, nodes: [] };
+      if (estimatePageCount(probe) <= canvas.max_pages) break;
+      placed[i].forEach((id) => drop.add(id));
+      rebuilt = assemble(drop);
+    }
   }
 
   return {
@@ -406,3 +570,12 @@ export function finishVolumeCanvas(doc: CanvasDocument, facts: VolumeFacts = {})
 
 /** Re-export so callers building a facts object do not need a second import. */
 export { furnitureNode };
+
+/** A copy of the section list with the given node ids removed. */
+function stripNodes(sections: CanvasSection[], drop: Set<string>): CanvasSection[] {
+  if (drop.size === 0) return sections;
+  return sections.map((s) => ({
+    ...s,
+    groups: coalesceGroups(s.groups.flatMap((g) => g.nodes).filter((n) => !drop.has(n.id))),
+  }));
+}

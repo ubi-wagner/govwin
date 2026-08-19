@@ -692,7 +692,31 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
     case 'image':
     case 'chart': {
       const styleH = (node.style as { height?: number } | undefined)?.height;
-      return (typeof styleH === 'number' && styleH > 0 ? styleH : fs * 15.5) + bodyLineH;
+      if (typeof styleH === 'number' && styleH > 0) return styleH + bodyLineH;
+
+      // The image's OWN declared size, when it has one. The exporters size an image by
+      // `content.width`/`content.height` in CSS pixels and constrain it to the text column
+      // (`max-width:100%`), so the height that lands on the page is the declared height scaled
+      // down by however much the width had to shrink.
+      //
+      // Estimating every image at a fixed 15.5 lines instead was a full page of error on a real
+      // volume: a 375×378 px harvested photograph occupies ~283pt, the flat estimate said ~155pt,
+      // and a Technical Volume the ruler cleared at 10 of 10 pages rendered as 11. A ruler that
+      // reads a different document from the one Chromium lays out is not a ruler — this is the
+      // same defect class as the three the ruler already documents.
+      const c = node.content as { width?: number; height?: number } | undefined;
+      const w = typeof c?.width === 'number' && c.width > 0 ? c.width : 0;
+      const h = typeof c?.height === 'number' && c.height > 0 ? c.height : 0;
+      if (w > 0 && h > 0) {
+        const PX_TO_PT = 0.75;                       // 96 CSS px per inch, 72 pt per inch
+        const scale = Math.min(1, usableW / (w * PX_TO_PT));
+        // + the <figure> element's own 12px top and bottom margins (canvas-html::imageHtml). Small
+        // per figure, and exactly the sort of omission that accumulates into the one-page error
+        // that turns a "10 of 10" claim into an eleven-page submission.
+        const FIGURE_MARGIN_PT = 18;
+        return h * PX_TO_PT * scale + FIGURE_MARGIN_PT + bodyLineH;
+      }
+      return fs * 15.5 + bodyLineH;
     }
     case 'table': {
       const t = node.content as TableContent;

@@ -384,6 +384,22 @@ const RESPONDERS = [
       ].join('\n'));
     },
   },
+  // visual page review (lib/review/visual-review.ts). The request carries PAGE IMAGES and asks what
+  // is visibly wrong with them.
+  //
+  // This stand-in CANNOT SEE. So it returns an empty finding array — the same answer a real
+  // reviewer gives for a clean page — rather than inventing defects, and the surrounding wiring
+  // (render → capture → request → parse → report) is exercised end to end, which is what the
+  // harness exists to prove. The page-COUNT half of that review is not gated on the model and is
+  // fully live here: it measures the rendered document.
+  //
+  // Saying so out loud matters. A harness that fabricates plausible findings would make the visual
+  // review look like it works in the sandbox and hide that the only real reviewer is the keyed one.
+  {
+    name: 'visual_page_review',
+    match: (req) => /You review rendered pages of a government proposal/i.test(systemText(req)),
+    respond: (req) => textMsg(req.model, '[]'),
+  },
   // section_drafter (frontend proposal.draft_section tool) — the tool sends a system prompt
   // beginning "You are a senior government proposal writer" and JSON.parses the text block as a
   // CanvasNode[] array ([{type, content}], no fences).

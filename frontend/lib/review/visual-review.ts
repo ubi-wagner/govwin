@@ -48,6 +48,7 @@ export interface VisualFinding {
 
 export interface VisualReviewResult {
   engine: VisualEngine;
+  /** Pages Chromium actually laid out — the TRUE count, not the estimate. */
   pagesReviewed: number;
   findings: VisualFinding[];
   /** Set when the review could not run. Never thrown — a review is advice, not a gate. */
@@ -98,6 +99,12 @@ export interface VisualReviewInput {
   variables?: Record<string, string>;
   /** Named in the prompt so the reviewer can spot a foreign company or solicitation. */
   context?: { companyName?: string | null; solicitationNumber?: string | null; volumeName?: string | null };
+  /**
+   * The agency's page cap for this volume. When given, the review reports the RENDERED page count
+   * against it as a blocker — the one measurement in this product that is ground truth rather than
+   * an estimate.
+   */
+  pageCap?: number | null;
   maxPages?: number;
 }
 
@@ -131,11 +138,32 @@ export async function reviewArtifactVisually(input: VisualReviewInput): Promise<
   if (pages.length === 0) {
     return { engine: 'none', pagesReviewed: 0, findings: [], skippedReason: 'no pages rendered' };
   }
+
+  // The page count is FREE here and it is the only one in the product that is not an estimate.
+  //
+  // `estimatePageCount` drives the editor gauge, the compliance floor and the readiness panel, and
+  // it is a character-width model: fast, interactive, and measured at ±1 page against Chromium on
+  // real volumes (a Technical Volume it cleared at "10 of 10" laid out as 11; a Supporting
+  // Documents it called 3 laid out as 2). An estimate is the right instrument for a gauge that
+  // updates as you type. It is the wrong instrument for the sentence "this volume is within its
+  // page limit", which is a claim about the file being submitted — and the file has already been
+  // rendered by the time this runs.
+  const overCap: VisualFinding[] = [];
+  if (input.pageCap && input.pageCap > 0 && pages.length > input.pageCap) {
+    overCap.push({
+      page: input.pageCap + 1,
+      severity: 'blocker',
+      finding: `The volume renders as ${pages.length} pages against a ${input.pageCap}-page limit. `
+        + `Measured on the rendered document, not estimated — pages ${input.pageCap + 1}–${pages.length} `
+        + 'would be discarded or the submission refused.',
+    });
+  }
+
   if (!ENABLED) {
     return {
       engine: 'none',
       pagesReviewed: pages.length,
-      findings: [],
+      findings: overCap,
       skippedReason: 'vision engine not configured (ANTHROPIC_API_KEY)',
     };
   }
@@ -169,13 +197,13 @@ export async function reviewArtifactVisually(input: VisualReviewInput): Promise<
     });
     const block = res.content.find((b) => b.type === 'text');
     const raw = block && block.type === 'text' ? block.text : '';
-    return { engine: 'vision', pagesReviewed: pages.length, findings: parseFindings(raw, pages.length) };
+    return { engine: 'vision', pagesReviewed: pages.length, findings: [...overCap, ...parseFindings(raw, pages.length)] };
   } catch (e) {
     console.error('[visual-review] review failed:', e instanceof Error ? e.message : e);
     return {
       engine: 'none',
       pagesReviewed: pages.length,
-      findings: [],
+      findings: overCap,
       skippedReason: e instanceof Error ? e.message : 'review failed',
     };
   }
