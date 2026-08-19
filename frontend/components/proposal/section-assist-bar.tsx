@@ -49,8 +49,19 @@ export function SectionAssistBar({
       if (!result?.nodes?.length) { toast('The drafter returned nothing to land.', 'error'); return; }
 
       const now = new Date().toISOString();
+      // Keep the section's PROVISIONED page cap. `letter_sbir_phase1` hard-codes max_pages: 15,
+      // but provision-proposal stamps the item's REAL limit onto the canvas (10 for an NTE-10-page
+      // Technical Volume). Rebuilding from the bare preset silently replaced 10 with 15, so after
+      // an AI draft the editor gauge and the export compliance floor both measured against a cap
+      // the solicitation never gave — a 14-page volume would pass every check and be refused by
+      // the agency. Proven live: all 10 Technical Volume sections read page_allocation=10 with
+      // canvas.max_pages=15. The pipeline drafter already gets this right
+      // (workflows/actions/draft_v0.py: "Prefer the section's OWN canvas envelope").
       const doc = createEmptyCanvas({
-        documentId: sectionId, canvas: CANVAS_PRESETS.letter_sbir_phase1,
+        documentId: sectionId,
+        canvas: pageLimit != null && pageLimit > 0
+          ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: pageLimit }
+          : CANVAS_PRESETS.letter_sbir_phase1,
         metadata: { title: sectionTitle, volume_id: '', required_item_id: '', proposal_id: proposalId, solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: '', version_number: 1, status: 'ai_drafted' },
       });
       doc.nodes = result.nodes;

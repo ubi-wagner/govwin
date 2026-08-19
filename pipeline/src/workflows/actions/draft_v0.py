@@ -92,13 +92,38 @@ def _metadata(section: asyncpg.Record, proposal_id: str, solicitation_id: str | 
 
 
 
+def _is_placeholder(text: str) -> bool:
+    """Is this block ENTIRELY a bracketed instruction, e.g. "[Describe the problem …]"?
+
+    Molds from the code registry (frontend/lib/provision-proposal.ts falls back to
+    `resolveTemplateKey` when no admin-authored mold is linked, which is the default state of a
+    freshly built-out master) seed their text blocks with long bracketed prompts telling the writer
+    what to put there. That is scaffolding in exactly the sense headings and callouts are — but it
+    is made of WORDS, so the word counter read it as a finished draft.
+
+    Whole-block only, deliberately: the drafter's own system prompt asks it to leave
+    "[PLACEHOLDER: description]" markers inside real paragraphs for claims needing verification, and
+    a paragraph carrying one of those IS a draft and must never be clobbered.
+    """
+    t = (text or "").strip()
+    return len(t) > 1 and t.startswith("[") and t.endswith("]")
+
+
 def _has_prose(content) -> bool:
     """Does this canvas carry actual written prose, as opposed to empty structure?
 
-    A mold seeds headings, a rules callout and EMPTY text blocks — that is scaffolding, not a
-    draft, and the section still needs writing. A filled mold, a priced cost workbook or a human
-    draft carries words, and must never be clobbered. Headings and callouts are deliberately not
-    counted: they are the scaffolding itself.
+    A mold seeds headings, a rules callout and EMPTY OR PLACEHOLDER text blocks — that is
+    scaffolding, not a draft, and the section still needs writing. A filled mold, a priced cost
+    workbook or a human draft carries words, and must never be clobbered. Headings, callouts and
+    whole-block bracketed placeholders are deliberately not counted: they are the scaffolding.
+
+    THE BUG THIS FIXES. The threshold below is 25 words, chosen when a mold's text blocks were
+    assumed EMPTY. The code-registry molds carry ~507 words per section of which ~500 sit inside
+    brackets — 20× the threshold — so `content_source='template'` + `_has_prose` excluded every
+    registry-molded section from drafting, and Mode C reported "sections: 2" on a 14-section
+    proposal. That is the exact failure the comment in `draft_v0` says was fixed ("every section
+    looked 'already drafted' and carried not one word of prose"); the registry-fallback path
+    reopened it, because those blocks are not empty — they are full of instructions.
     """
     if not content:
         return False
@@ -128,22 +153,58 @@ def _has_prose(content) -> bool:
         if kind in ("heading", "callout", "page_break", "divider"):
             continue
         c = n.get("content") or {}
+        if not isinstance(c, dict):
+            continue
+
+        # A TABLE is structure, not prose. Its cells are field LABELS on an unfilled form —
+        # "Proposal Number", "Topic Number", "Firm Name" — and counting those as writing is what
+        # made an untouched cover-sheet mold look like a finished draft. What distinguishes a
+        # FILLED form (or a priced cost workbook, which must never be clobbered) is not that it
+        # has words but that it has VALUES: any cell carrying a number means somebody filled it in.
+        if kind == "table":
+            if _table_has_values(c):
+                return True
+            continue
+
         texts = []
-        if isinstance(c, dict):
-            if isinstance(c.get("text"), str):
-                texts.append(c["text"])
-            for item in c.get("items") or []:
-                if isinstance(item, dict) and isinstance(item.get("text"), str):
-                    texts.append(item["text"])
-            for row in c.get("rows") or []:
-                for cell in row if isinstance(row, list) else []:
-                    if isinstance(cell, str):
-                        texts.append(cell)
-                    elif isinstance(cell, dict) and isinstance(cell.get("text"), str):
-                        texts.append(cell["text"])
+        if isinstance(c.get("text"), str) and not _is_placeholder(c["text"]):
+            texts.append(c["text"])
+        for item in c.get("items") or []:
+            if isinstance(item, dict) and isinstance(item.get("text"), str) and not _is_placeholder(item["text"]):
+                texts.append(item["text"])
         words += sum(len(t.split()) for t in texts)
         if words >= 25:      # a real paragraph; scaffolding never reaches this
             return True
+    return False
+
+
+def _table_has_values(content: dict) -> bool:
+    """Does this table carry entered VALUES, as opposed to an empty form's labels?
+
+    A cell counts as a value when it parses as a number (or carries an explicit numeric `value`,
+    which is how the cost workbook stores its computed cells). Row/column headers are excluded —
+    they are the form. One value is enough: a partially filled form is still somebody's work.
+    """
+    for row in content.get("rows") or []:
+        if not isinstance(row, list):
+            continue
+        for cell in row:
+            if isinstance(cell, dict):
+                if isinstance(cell.get("value"), (int, float)) and cell["value"] != 0:
+                    return True
+                text = cell.get("text")
+            elif isinstance(cell, str):
+                text = cell
+            else:
+                continue
+            if isinstance(text, str):
+                stripped = text.strip().replace(",", "").replace("$", "").replace("%", "")
+                if stripped and stripped not in ("0", "0.0", "-"):
+                    try:
+                        if float(stripped) != 0:
+                            return True
+                    except ValueError:
+                        pass
     return False
 
 

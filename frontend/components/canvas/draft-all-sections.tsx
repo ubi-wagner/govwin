@@ -159,7 +159,12 @@ export function DraftAllSections({
           const now = new Date().toISOString();
           const doc = createEmptyCanvas({
             documentId: sec.id,
-            canvas: CANVAS_PRESETS.letter_sbir_phase1,
+            // Same as the single-section path: keep the section's PROVISIONED cap rather than the
+            // preset's hard-coded 15, or the compliance floor measures against a limit the
+            // solicitation never gave.
+            canvas: sec.pageLimit != null && sec.pageLimit > 0
+              ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: sec.pageLimit }
+              : CANVAS_PRESETS.letter_sbir_phase1,
             metadata: {
               title: sec.title,
               volume_id: '',
