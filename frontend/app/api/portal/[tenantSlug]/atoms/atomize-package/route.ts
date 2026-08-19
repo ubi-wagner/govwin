@@ -127,7 +127,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const r = await atomizeDocumentIntoLibrary(tenantId, {
         buffer, filename: file.name, packageName, ctxTags, actor, docType,
         sharedCocoonId: isDsipPackage ? packageCocoonId : null,
-        volHint,
+        volHint, tenantSlug,
       });
       if (isDsipPackage && !packageCocoonId && r.cocoonId) packageCocoonId = r.cocoonId;
       totalAtoms += r.atoms;

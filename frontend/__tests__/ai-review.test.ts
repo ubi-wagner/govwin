@@ -103,13 +103,27 @@ describe('manual AI review — POST /api/portal/[t]/proposals/[p]/ai-review', ()
     expect(taskArg.input.section_text).toBe('section body text');
     expect(taskArg.input.requested_by).toBe(USER_ID);
 
-    expect(emitEventStartMock).toHaveBeenCalledTimes(1);
-    const emitArg = emitEventStartMock.mock.calls[0][0];
+    // ONE ai_review.requested. Asserted by TYPE rather than by call index: the same request also
+    // runs the visual pass (lib/proposal-visual-review.ts), which emits its own start/end pair, and
+    // an index-based assertion would break the moment a second reviewer joined — which is exactly
+    // what happened when one did.
+    const aiReviewStarts = emitEventStartMock.mock.calls
+      .map((c: unknown[]) => c[0] as { namespace: string; type: string; tenantId: string; payload: { source: string } })
+      .filter((a) => a.type === 'ai_review.requested');
+    expect(aiReviewStarts).toHaveLength(1);
+    const emitArg = aiReviewStarts[0];
     expect(emitArg.namespace).toBe('proposal');
-    expect(emitArg.type).toBe('ai_review.requested');
     expect(emitArg.type).not.toBe('review_requested');
     expect(emitArg.tenantId).toBe(TENANT_ID);
     expect(emitArg.payload.source).toBe('portal');
-    expect(emitEventEndMock).toHaveBeenCalledTimes(1);
+
+    // …and the VISUAL reviewer runs on the same trigger. The AI-review button is the one front door
+    // for both kinds of review: the per-section text reviewers above, and the pass that looks at
+    // the rendered pages. Every start is paired with an end.
+    const visualStarts = emitEventStartMock.mock.calls
+      .map((c: unknown[]) => c[0] as { type: string })
+      .filter((a) => a.type === 'visual_review.requested');
+    expect(visualStarts).toHaveLength(1);
+    expect(emitEventEndMock).toHaveBeenCalledTimes(emitEventStartMock.mock.calls.length);
   });
 });

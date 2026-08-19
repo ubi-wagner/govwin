@@ -23,9 +23,10 @@
  * sheet, so "each page or slide or sheet" is one code path, not three.
  *
  * WHERE IT RUNS. It is a REVIEWER, so it obeys the reviewer contract: advisory, never a writer.
- * It returns findings. Callers decide whether those become comments on a section, a blocking
- * gate, or a line in an ingest assessment. Wired into the color-team review path
- * (`lib/proposal-ai-review.ts`) and available to the ingest and packaging assessments.
+ * It returns findings and writes nothing itself. `lib/proposal-visual-review.ts` is the caller
+ * that lands them — invoked by `requestAiReview`, so the existing AI-review button runs this
+ * alongside the per-section text reviewers and the findings appear in the same section threads.
+ * Any other caller (an ingest or packaging assessment) can use it the same way.
  *
  * GATED, like every other AI capability here. No real `ANTHROPIC_API_KEY` ⇒ `engine: 'none'` and
  * an empty finding list, and the caller carries on. The CAPTURE half is not gated and is useful on

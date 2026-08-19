@@ -18,6 +18,7 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 import { extractCanvasText } from '@/lib/proposal-advance';
 import type { Role } from '@/lib/rbac';
+import { requestVisualReview, type VisualReviewOutcome } from '@/lib/proposal-visual-review';
 
 export type AiReviewSource = 'portal' | 'admin_doorbell';
 export type ReviewType = 'red_team' | 'pink_team' | 'gold_team';
@@ -41,6 +42,8 @@ export interface RequestAiReviewParams {
 
 export interface RequestAiReviewResult {
   enqueued: number;
+  /** The visual pass that ran alongside the per-section text reviewers. */
+  visual?: VisualReviewOutcome;
 }
 
 export async function requestAiReview(p: RequestAiReviewParams): Promise<RequestAiReviewResult> {
@@ -127,5 +130,38 @@ export async function requestAiReview(p: RequestAiReviewParams): Promise<Request
     console.error('[requestAiReview] activity log failed', logErr);
   }
 
-  return { enqueued };
+  // ── THE REVIEWER THAT LOOKS ───────────────────────────────────────────────────────────────
+  // Everything above queues text reviewers: one color_team_reviewer per section, each reading that
+  // section's extracted prose. They are good at the argument and blind to the page. A whole class
+  // of defect — a truncated diagram label, an unlabelled chart band, a caption that describes the
+  // wrong thing, a volume that renders one page over its cap — is invisible in the model and
+  // obvious in the render.
+  //
+  // So the same button also runs a visual pass over each VOLUME and posts what it sees into the
+  // same section threads, as the same `ai_review` recommendation type. One review, two kinds of
+  // reviewer.
+  //
+  // Not enqueued through agent_task_queue like its siblings: the pipeline cannot render a canvas
+  // (the exporters and Chromium live here), so this runs inline. Best-effort — a review that cannot
+  // run must never fail the request that asked for it, and the per-section reviewers are already
+  // queued by the time it starts.
+  //
+  // Skipped when the caller restricted the review to specific sections: that is the RETRY path,
+  // re-running only what failed, and the volumes were already looked at on the first pass.
+  let visual: VisualReviewOutcome | undefined;
+  if (!p.onlySectionIds?.length) {
+    try {
+      visual = await requestVisualReview({
+        proposalId: p.proposalId,
+        tenantId: p.tenantId,
+        actorId: p.actorId,
+        actorEmail: p.actorEmail,
+        source: p.source,
+      });
+    } catch (e) {
+      console.error('[requestAiReview] visual pass failed (non-fatal)', e);
+    }
+  }
+
+  return { enqueued, ...(visual ? { visual } : {}) };
 }

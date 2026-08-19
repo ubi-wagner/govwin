@@ -87,7 +87,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    const { enqueued } = await requestAiReview({
+    const { enqueued, visual } = await requestAiReview({
       proposalId,
       tenantId,
       actorId: user.id,
@@ -97,7 +97,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       onlySectionIds,
     });
 
-    return NextResponse.json({ data: { enqueued, retried: !!body.retryFailed } });
+    // `visual` reports the pass that LOOKED at the rendered volumes, alongside the per-section
+    // text reviewers `enqueued` counts. Surfaced so the caller can say what actually ran — a review
+    // that silently did half its job is the thing this whole pass exists to stop.
+    return NextResponse.json({ data: { enqueued, retried: !!body.retryFailed, ...(visual ? { visual } : {}) } });
   } catch (e) {
     console.error('[ai-review] POST error', e);
     return NextResponse.json({ error: 'AI review request failed', code: 'INTERNAL_ERROR' }, { status: 500 });

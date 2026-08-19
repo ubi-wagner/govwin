@@ -71,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const rawCtx = form.get('context');
       if (typeof rawCtx === 'string' && rawCtx.trim()) { try { ctx = JSON.parse(rawCtx) ?? {}; } catch { /* ignore malformed context */ } }
       const ctxTags = contextTags(ctx);
-      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, ctxTags, actor: { id: u.id, kind: actorKind } });
+      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, ctxTags, actor: { id: u.id, kind: actorKind }, tenantSlug });
       if (r.error && r.atoms === 0) {
         const status = r.error === 'could not parse' ? 422 : 200; // "no extractable content" is a valid (empty) result, not a failure
         return status === 422
@@ -91,7 +91,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
           await requestAgentTask({ tenantId, agentRole: 'librarian', taskType: 'catalog', input: { cocoonId: r.cocoonId, packageName: file.name, atomCount: r.atoms } });
         } catch (e) { console.error('[atoms/upload] librarian enqueue failed (non-fatal)', e); }
       }
-      return NextResponse.json({ data: { atomized: true, atoms: r.atoms, skipped: r.skipped ?? 0, cocoonId: r.cocoonId, format: r.format, reference: r.reference ?? false } });
+      return NextResponse.json({ data: { atomized: true, atoms: r.atoms, figures: r.figures ?? 0, skipped: r.skipped ?? 0, cocoonId: r.cocoonId, format: r.format, reference: r.reference ?? false } });
     }
 
     let parsed;
