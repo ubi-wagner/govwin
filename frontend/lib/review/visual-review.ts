@@ -215,8 +215,14 @@ export async function reviewArtifactVisually(input: VisualReviewInput): Promise<
  *
  * A reviewer that cannot be parsed reports nothing rather than something invented, and a page
  * number outside the document is dropped — a finding nobody can navigate to is worse than silence.
+ *
+ * EXPORTED FOR TEST, deliberately. In the sandbox the emulated model cannot see images and returns
+ * an empty array — correctly, since a harness that invented plausible defects would make this
+ * review look proven when only its page-count half is. That leaves this function as the one part
+ * of the vision path a test CAN pin without a key, so it is pinned against recorded replies
+ * (`__tests__/visual-review-parse.test.ts`) rather than left to the drive.
  */
-function parseFindings(raw: string, pageCount: number): VisualFinding[] {
+export function parseFindings(raw: string, pageCount: number): VisualFinding[] {
   const start = raw.indexOf('[');
   const end = raw.lastIndexOf(']');
   if (start < 0 || end <= start) return [];
