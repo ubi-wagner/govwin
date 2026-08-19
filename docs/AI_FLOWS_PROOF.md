@@ -78,3 +78,31 @@ Every AI path runs: the **entire event-triggered agent fabric** (full-draft, ai-
 assess-ingest, ai/research) drives end-to-end through the worker → emulator → tenant-scoped memory →
 land-or-review, with full `system_events` auditability; the rule-based routes return real results; the
 gated drop-ins are unit-tested and inert by design. Prod runs the identical wiring with the live key.
+
+---
+
+## Addendum 2026-08-19 — the visual reviewer (a new AI-gated path)
+
+`lib/review/visual-review.ts` was added after this register was written and belongs in it, because
+it is the one reviewer that reads a PICTURE rather than the model.
+
+**It has two halves and they are gated differently, which the register must say plainly.**
+
+- **The page-count half is NOT gated and is fully live here.** It renders the volume through the
+  product's own PDF exporter, captures the pages Chromium laid out, and reports a blocker when the
+  count exceeds the agency's cap. This is the only page number in the product that is not an
+  estimate, and it runs with no key. Proven on the live T3CP build: it caught a Technical Volume
+  downloading at 11 pages against a 10-page cap, which every model-side check had cleared.
+- **The vision half needs a real `ANTHROPIC_API_KEY`.** The emulator cannot see images and returns
+  `[]` — deliberately. A harness that invented plausible defects would make this review look proven
+  when nothing had looked at a page, and that is exactly the failure this reviewer exists to catch
+  elsewhere. So in this rig the wire is exercised end to end and the eyesight is not.
+
+**What IS proven without a key:** the render → capture → request → parse → land path, including the
+landing into `proposal_comments` (`recommendation_type='ai_review'`, `category='visual'`) via
+`lib/proposal-visual-review.ts`, invoked by `requestAiReview` on the existing AI-review button.
+Recorded model replies pin the parse/sort/cap behaviour against the malformed shapes models really
+produce (`__tests__/visual-review-parse.test.ts`, 15 cases).
+
+**What is not:** whether the model sees what a person would. One pass with a live key against the
+T3CP volumes closes it; until then this line stays here rather than in the Verdict above.
