@@ -24,7 +24,9 @@ const ACCEPT = ALLOWED.map((e) => `.${e}`).join(',');
 
 type PlanItem = { title: string; wordCount: number };
 type Unextractable = { count: number; kind: string; hint: string };
-type PreviewDoc = { file: string; planned: PlanItem[]; skipped: number; error?: string; unextractable?: Unextractable };
+type PreviewDoc = { file: string; planned: PlanItem[]; skipped: number; error?: string; unextractable?: Unextractable;
+  /** Running header/footer removed from every page before atomizing (see lib/library/page-furniture). */
+  strippedFurniture?: string[] };
 type Preview = { totalPlanned: number; docs: PreviewDoc[] } | null;
 type Result = { filesProcessed?: number; totalAtoms?: number } | null;
 
@@ -135,6 +137,24 @@ export function UploadAtomizeCard({ tenantSlug, canBrowseLibrary = true }: { ten
                     ))}
                     {d.planned.length > 6 && <li className="text-[11px] text-gray-400">+ {d.planned.length - 6} more</li>}
                   </ul>
+                )}
+                {/* Running header/footer removed from every page. Shown because it is the SOURCE
+                    document's furniture — on a past proposal that is the previous solicitation's
+                    topic and proposal numbers, which would otherwise be welded into every atom and
+                    resurface inside a new proposal's draft. Visible here so a mis-detection can be
+                    caught BEFORE the library is written. */}
+                {d.strippedFurniture && d.strippedFurniture.length > 0 && (
+                  <div className="mt-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] leading-snug text-gray-600">
+                    <span className="font-medium">Removed repeated page header/footer:</span>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {d.strippedFurniture.slice(0, 3).map((f, i) => (
+                        <li key={i} className="truncate font-mono text-gray-500">{f}</li>
+                      ))}
+                      {d.strippedFurniture.length > 3 && (
+                        <li className="text-gray-400">+ {d.strippedFurniture.length - 3} more</li>
+                      )}
+                    </ul>
+                  </div>
                 )}
                 {/* BOX-3: visual content the parser couldn't read as text → route to the box tool. */}
                 {d.unextractable && d.unextractable.count > 0 && (

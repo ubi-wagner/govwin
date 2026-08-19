@@ -17,6 +17,7 @@ import type { CanvasNode } from '@/lib/types/canvas-document';
 import { cleanText } from '@/lib/clean-text';
 import { randomUUID } from 'crypto';
 import { detectDsipFromBlocks, volumeOfBlock, detectDsipProposal, volumeOfOffset, detectDsipFromPages, volumeOfPage } from '@/lib/library/dsip-deconstruct';
+import { stripDocumentFurniture } from '@/lib/library/page-furniture';
 
 export const MAX_FILES = 20; // a real DSIP package = Full_Proposal + ~13 sidecars
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -84,7 +85,10 @@ export interface PlannedAtom { blockIndex: number; title: string; wordCount: num
 /** One DSIP volume the deconstruct plan proposes as a FOUNDATION document. */
 export interface PlannedVolume { volumeNumber: number; volumeName: string; volKey: string | null; markerExcerpt: string; text: string; wordCount: number; blockCount: number; pageStart?: number; pageEnd?: number; inferred?: boolean }
 /** The dry-run plan for one document — exactly what atomize WOULD create, computed with NO DB write. */
-export interface DocPlan { file: string; format: string; fmt: string; fullText: string; allNodes: CanvasNode[]; parsedCount: number; planned: PlannedAtom[]; skipped: number; error?: string; unextractable?: UnextractableSignal; dsip?: { volumes: PlannedVolume[] } }
+export interface DocPlan { file: string; format: string; fmt: string; fullText: string; allNodes: CanvasNode[]; parsedCount: number; planned: PlannedAtom[]; skipped: number; error?: string; unextractable?: UnextractableSignal; dsip?: { volumes: PlannedVolume[] };
+  /** Running header/footer lines removed from every page before atomizing — surfaced so the
+   *  curator sees what was dropped instead of text vanishing silently. */
+  strippedFurniture?: string[] }
 
 /**
  * Parse + segment one document into the primitives it WOULD atomize into — with NO DB
@@ -161,12 +165,24 @@ export async function planDocumentAtomization(
 
   const planned: PlannedAtom[] = [];
   let skipped = 0; // substantive-looking blocks dropped for being under MIN_ATOM_WORDS — surfaced, not silent.
+  let strippedFurniture: string[] = []; // running header/footer removed — reported, never silent.
   if (dsipPages.isDsipProposal) {
     // Page-grain primitives: one atom per PAGE, cited by its page number and tagged with
     // its volume — deterministic units that spread the atom budget across ALL volumes
     // (paragraph-guessing on extraction text let Volume 1 exhaust the cap).
-    for (let pg = 1; pg <= dsipPages.pages.length && planned.length < MAX_ATOMS_PER_DOC; pg++) {
-      const pageText = cleanText(dsipPages.pages[pg - 1] ?? '').trim();
+    //
+    // Strip the running header/footer FIRST. A page's extracted text includes whatever the word
+    // processor repeats on every page, and on a DSIP submission that is the SOURCE solicitation's
+    // identifiers ("Topic: X23.5_CSO   Proposal Number: FX235-CSO1-0859"). Kept, they are welded
+    // into every atom from the document, and a section grounded on those atoms cites a different
+    // agency's topic number in the new proposal — observed verbatim on the T3CP build. Detection
+    // is repetition-based, so it holds for footers we have never seen.
+    const furniturePass = stripDocumentFurniture(dsipPages.pages);
+    if (furniturePass.furniture.length) {
+      strippedFurniture = furniturePass.furniture;
+    }
+    for (let pg = 1; pg <= furniturePass.pages.length && planned.length < MAX_ATOMS_PER_DOC; pg++) {
+      const pageText = cleanText(furniturePass.pages[pg - 1] ?? '').trim();
       const words = pageText ? pageText.split(/\s+/).length : 0;
       if (!pageText || words < MIN_ATOM_WORDS) { if (pageText) skipped++; continue; }
       const seg = volumeOfPage(dsipPages.segments, pg);
@@ -240,7 +256,7 @@ export async function planDocumentAtomization(
     }
   }
 
-  const plan: DocPlan = { file: filename, format: parsed.sourceFormat, fmt, fullText, allNodes, parsedCount: parsed.atoms.length, planned, skipped, unextractable: parsed.unextractable };
+  const plan: DocPlan = { file: filename, format: parsed.sourceFormat, fmt, fullText, allNodes, parsedCount: parsed.atoms.length, planned, skipped, unextractable: parsed.unextractable, ...(strippedFurniture.length ? { strippedFurniture } : {}) };
   if (dsipPages.isDsipProposal) {
     plan.dsip = {
       volumes: dsipPages.segments.map((s) => {

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import uuid
 
 from .base import BaseArchetype
@@ -243,6 +244,10 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                 SELECT id, title
                 FROM library_atoms
                 WHERE tenant_id = $1 AND grain = 'section' AND status != 'archived'
+                  -- `status` and the soft-archive watermark are separate columns: archiving an
+                  -- atom sets archived_at and leaves status alone, so a status-only check kept
+                  -- archived scaffolds feeding the drafter (docs/ARCHIVABLE_CONTRACT.md).
+                  AND archived_at IS NULL
                   AND vault_id IS NULL
                   AND title ILIKE $2
                 ORDER BY updated_at DESC
@@ -264,6 +269,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                 JOIN library_atoms a ON a.id = gp.member_atom_id
                 WHERE sg.group_atom_id = $1
                   AND a.tenant_id = $2 AND a.status != 'archived'
+                  AND a.archived_at IS NULL
                   AND a.vault_id IS NULL
                 ORDER BY sg.ordinal, gp.ordinal
                 """,
@@ -284,64 +290,131 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
             return {"matched": False, "skeleton": [], "error": str(e)}
 
     async def _search_library(self, conn, tenant_id: str | None, tool_input: dict) -> dict:
-        """Search the content library for relevant units."""
+        """Search the content library for material to ground this section's draft.
+
+        Mirrors the canonical selector's scope rules (frontend `selectForSection`, lib/atoms.ts).
+        This query used to have none of them, and every one of the three gaps put the WRONG text
+        in front of the drafter:
+
+          · `grain <> 'reference'` — a reference atom is a whole uploaded document (a past proposal
+            at 13k words), kept as SOURCE for atomization, never as drafting material. Without this
+            the substring match below hits somewhere in the middle of a 60KB blob and the atom is
+            returned as if it were a passage about the section.
+          · `status = 'approved'` — the old `status != 'archived'` let DRAFT atoms through: content
+            the tenant has not vetted, including the zero-word placeholder rows an upload creates
+            before its shred lands.
+          · `archived_at IS NULL` — status and the soft-archive watermark are different columns.
+            Archiving an atom is supposed to drop it out of "the library + draft selection"
+            (docs/ARCHIVABLE_CONTRACT.md); checking only `status` meant it never left the drafter.
+
+        Ranked, not just filtered. `ORDER BY updated_at DESC` returned whichever atom was touched
+        most recently, which has nothing to do with the query — so relevance ordering is full-text
+        rank (OR over the query's terms, so a six-word section title still matches), then the same
+        outcome/usage tiebreakers the canonical selector uses.
+        """
         if not tenant_id:
             return {"results": [], "note": "No tenant context available"}
 
         query = tool_input.get("query", "")
         category = tool_input.get("category")
-        limit = tool_input.get("limit", 5)
+        try:
+            limit = max(1, min(20, int(tool_input.get("limit", 5))))
+        except (TypeError, ValueError):
+            limit = 5
+
+        # Build an OR tsquery from the query's own words. plainto_tsquery ANDs every term, so a
+        # real section title ("Identification and Significance of the Problem or Opportunity")
+        # would match nothing at all. Tokens are stripped to alphanumerics here, so nothing that
+        # could be read as tsquery syntax survives into to_tsquery.
+        terms = [t for t in re.split(r"[^A-Za-z0-9]+", query[:200]) if len(t) > 2][:12]
+        tsquery = " | ".join(terms)
+        if not tsquery:
+            return {"results": [], "note": f'No searchable terms in query "{query[:60]}"'}
 
         try:
-            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-            # Use text search on the canonical library_atoms table
-            if category:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, title AS heading_text, content,
-                           NULL AS category, '{}'::text[] AS tags
-                    FROM library_atoms
-                    WHERE tenant_id = $1
-                      AND status != 'archived'
-                      AND vault_id IS NULL
-                      AND EXISTS (SELECT 1 FROM atom_tags t
-                                  WHERE t.atom_id = library_atoms.id AND t.value = $2)
-                      AND content ILIKE $3
-                    ORDER BY updated_at DESC
-                    LIMIT $4
-                    """,
-                    uuid.UUID(tenant_id),
-                    category,
-                    f"%{escaped_query}%",
-                    limit,
+            rows = await conn.fetch(
+                """
+                WITH scoped AS (
+                    SELECT a.id, a.title, a.grain,
+                           a.outcome_score, a.usage_count, a.updated_at,
+                           -- A group atom carries no content of its own; it is an ordered list of
+                           -- member atoms. Reading a.content directly returns NULL for every one
+                           -- of them, so the best-titled matches in the library came back empty.
+                           -- Assemble from the members, exactly as the canonical selector does.
+                           coalesce(a.content, (
+                               SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
+                               FROM atom_members am
+                               JOIN library_atoms m ON m.id = am.member_atom_id
+                               WHERE am.group_atom_id = a.id
+                                 AND m.archived_at IS NULL
+                           )) AS content
+                    FROM library_atoms a
+                    WHERE a.tenant_id = $1
+                      AND a.status = 'approved'
+                      AND a.archived_at IS NULL
+                      AND a.vault_id IS NULL
+                      AND a.grain <> 'reference'
+                      -- Not the starter scaffold. `search_starter_scaffold` walks
+                      -- section → group → primitive and hands the model every one of those atoms
+                      -- as `skeleton[].guidance`, and the drafter is told to call it FIRST. They
+                      -- are writing PROMPTS ("The mission gap / opportunity and why it matters to
+                      -- the customer. Quantify the impact."), not the company's prose — so serving
+                      -- them here too spent this tool's few slots re-delivering what the model
+                      -- already had, and pushed the company's own 5KB section prose out of the
+                      -- results entirely. This tool owns grounding material; that one owns
+                      -- structure. Excludes the scaffold's nodes AND its leaves.
+                      AND NOT EXISTS (
+                            SELECT 1
+                            FROM atom_members sg
+                            JOIN library_atoms sec ON sec.id = sg.group_atom_id
+                                                  AND sec.grain = 'section'
+                                                  AND sec.tenant_id = a.tenant_id
+                            LEFT JOIN atom_members gp ON gp.group_atom_id = sg.member_atom_id
+                            WHERE a.id IN (sec.id, sg.member_atom_id, gp.member_atom_id))
+                      AND ($2::text IS NULL OR EXISTS (
+                            SELECT 1 FROM atom_tags t
+                            WHERE t.atom_id = a.id AND t.value = $2))
+                ),
+                ranked AS (
+                    SELECT s.*,
+                           to_tsvector('english',
+                               coalesce(s.title, '') || ' ' || coalesce(s.content, '')) AS tsv
+                    FROM scoped s
+                    -- An atom with no text is not drafting material, however well its title matches.
+                    WHERE s.content IS NOT NULL AND length(btrim(s.content)) > 0
                 )
-            else:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, title AS heading_text, content,
-                           NULL AS category, '{}'::text[] AS tags
-                    FROM library_atoms
-                    WHERE tenant_id = $1
-                      AND status != 'archived'
-                      AND vault_id IS NULL
-                      AND (content ILIKE $2 OR title ILIKE $2)
-                    ORDER BY updated_at DESC
-                    LIMIT $3
-                    """,
-                    uuid.UUID(tenant_id),
-                    f"%{escaped_query}%",
-                    limit,
-                )
+                SELECT id, title AS heading_text, content, grain,
+                       -- Normalized rank (1|32: divide by document length, then by rank+1).
+                       -- RAW ts_rank_cd rewards length — a 64KB whole-volume atom accumulates more
+                       -- term hits than the 5KB atom that IS this section, so the blob won every
+                       -- query. The grain weight then breaks the remaining tie the same way a
+                       -- proposal writer would: to draft ONE section, an atom at or below section
+                       -- scope is better material than a whole volume that merely contains it.
+                       ts_rank_cd(tsv, to_tsquery('english', $3), 1|32)
+                         * CASE grain WHEN 'foundation' THEN 0.6 WHEN 'section' THEN 0.9
+                                      ELSE 1.0 END AS rank,
+                       ARRAY(SELECT t.value FROM atom_tags t WHERE t.atom_id = ranked.id
+                             ORDER BY t.value LIMIT 12) AS tags
+                FROM ranked
+                WHERE tsv @@ to_tsquery('english', $3)
+                ORDER BY rank DESC, outcome_score DESC, usage_count DESC, updated_at DESC
+                LIMIT $4
+                """,
+                uuid.UUID(tenant_id),
+                category,
+                tsquery,
+                limit,
+            )
 
             return {
                 "results": [
                     {
                         "id": str(row["id"]),
                         "title": row["heading_text"],
-                        "content": row["content"][:2000] if row["content"] else "",
-                        "category": row["category"],
-                        "tags": row["tags"] if row["tags"] else [],
+                        "content": self._passage(row["content"], terms),
+                        "grain": row["grain"],
+                        "category": category,
+                        "tags": list(row["tags"] or []),
                     }
                     for row in rows
                 ]
@@ -349,6 +422,54 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         except Exception as e:
             logger.warning("search_library failed: %s", e)
             return {"results": [], "error": str(e)}
+
+    # The window a long atom is quoted through. An atom this size or smaller is passed whole.
+    _PASSAGE_CHARS = 2000
+
+    @classmethod
+    def _passage(cls, content: str | None, terms: list[str]) -> str:
+        """Return the part of `content` that the query actually matched.
+
+        The old code returned `content[:2000]`, which for anything longer than the window is the
+        document's OPENING — its cover sheet — regardless of where the match was. On a past
+        proposal that is the title block and agency metadata of a DIFFERENT solicitation, handed
+        to the drafter as though it were relevant prose. Observed verbatim in a T3CP draft: a
+        technical section opened with "STTR Phase II Proposal / Proposal Number: F2-17528".
+
+        So: score fixed-size windows by how many distinct query terms they contain and quote the
+        best one, snapped outward to whitespace so the excerpt starts and ends on whole words.
+        """
+        if not content:
+            return ""
+        if len(content) <= cls._PASSAGE_CHARS:
+            return content
+        if not terms:
+            return content[: cls._PASSAGE_CHARS]
+
+        lowered = content.lower()
+        needles = {t.lower() for t in terms}
+        step = cls._PASSAGE_CHARS // 4
+        best_start, best_hits = 0, -1
+        for start in range(0, len(content) - cls._PASSAGE_CHARS + step, step):
+            window = lowered[start : start + cls._PASSAGE_CHARS]
+            hits = sum(1 for n in needles if n in window)
+            if hits > best_hits:
+                best_start, best_hits = start, hits
+
+        end = min(len(content), best_start + cls._PASSAGE_CHARS)
+        # Snap to word boundaries so the quote does not begin or end mid-word.
+        if best_start > 0:
+            space = content.find(" ", best_start, best_start + 120)
+            if space != -1:
+                best_start = space + 1
+        if end < len(content):
+            space = content.rfind(" ", end - 120, end)
+            if space != -1:
+                end = space
+        excerpt = content[best_start:end].strip()
+        # Mark a quote that does not start at the document's own beginning, so neither the model
+        # nor a human reviewer reads a mid-document excerpt as the atom's opening.
+        return ("… " if best_start > 0 else "") + excerpt + ("…" if end < len(content) else "")
 
     async def _get_compliance(self, conn, tool_input: dict, tenant_id: str | None = None) -> dict:
         """Get compliance requirements for a proposal."""

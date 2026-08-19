@@ -71,6 +71,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
           file: plan.file, format: plan.format,
           planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount, volumeNumber: p.volumeNumber })),
           skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable,
+          // The running header/footer removed from every page before atomizing. Shown so the
+          // curator confirms what left the text, rather than lines disappearing invisibly — and
+          // so a mis-detection is visible BEFORE the library is written.
+          strippedFurniture: plan.strippedFurniture,
           dsip: plan.dsip ? { volumes: plan.dsip.volumes.map((v) => ({ volume: v.volumeNumber, name: v.volumeName, words: v.wordCount, blocks: v.blockCount })) } : undefined,
         });
       }
