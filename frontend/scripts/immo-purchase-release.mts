@@ -5,12 +5,15 @@
  *  (3) Immobileyes admin completes + Accept & Starts the required Workflow Setup (TW-3),
  *      stage gates dated against the extended close (2026-09-24).
  *
- *  cd frontend && node --import tsx scripts/immo-purchase-release.mts */
+ *  cd frontend && T3CP_OPP=<opportunityId> node --import tsx scripts/immo-purchase-release.mts */
 import { chromium, type Browser, type APIRequestContext } from 'playwright';
 
 const BASE = 'http://localhost:3000';
 // OSW26BZ04-DP013 — T3CP Patent Holiday SBIR Open Topic Call (close 2026-10-18).
-const OPP = 'c85d7d1a-391f-47d6-add7-08f8be183496';
+// The intake mints a fresh opportunity id per run, so this is env-overridable rather than a
+// constant that silently points at a solicitation from a previous life of the database. argv[2] is
+// already the re-entry portalId, hence the env var.
+const OPP = process.env.T3CP_OPP ?? 'bb64f56d-41a5-4cd0-8185-a5604d8574ae';
 const SLUG = 'immobileyes';
 
 let failures = 0;

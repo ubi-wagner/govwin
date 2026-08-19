@@ -515,13 +515,25 @@ export function canvasBaseCss(doc: CanvasDocument): string {
   const lineSpacing = doc.canvas?.line_spacing ?? 1.15;
   return `
     * { box-sizing: border-box; }
-    body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${lineSpacing}; color: ${font.color ?? '#111827'}; margin: 0; }
-    h1 { font-size: ${(font.size ?? 12) * 1.6}pt; margin: 16px 0 8px; }
-    h2 { font-size: ${(font.size ?? 12) * 1.3}pt; margin: 14px 0 6px; }
-    h3 { font-size: ${(font.size ?? 12) * 1.1}pt; margin: 12px 0 4px; }
-    p { margin: 6px 0; }
-    ul, ol { margin: 6px 0 6px 22px; }
-    li { margin: 3px 0; }
+    /* Never let the stated line spacing fall below readable leading. A solicitation that mandates
+       "single spaced" means 1.0 of the LEADING a typesetter would use, not 1.0 of the font size —
+       rendered at a literal 1.0 the body set solid and four-line paragraphs became a grey slab. */
+    body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${Math.max(lineSpacing, 1.28)}; color: ${font.color ?? '#111827'}; margin: 0; text-align: justify; hyphens: auto; }
+    /* Headings: a tighter scale than 1.6/1.3/1.1, with the space ABOVE far larger than below, so a
+       heading binds to the text it introduces instead of floating between two blocks. */
+    h1, h2, h3 { line-height: 1.22; text-align: left; page-break-after: avoid; break-after: avoid; }
+    h1 { font-size: ${((font.size ?? 12) * 1.34).toFixed(1)}pt; font-weight: 700; margin: 20pt 0 5pt; }
+    h2 { font-size: ${((font.size ?? 12) * 1.14).toFixed(1)}pt; font-weight: 700; margin: 14pt 0 4pt; }
+    h3 { font-size: ${((font.size ?? 12) * 1.02).toFixed(1)}pt; font-weight: 700; font-style: italic; margin: 11pt 0 3pt; }
+    /* A first paragraph sits tight under its heading; subsequent ones get real separation. */
+    p { margin: 0 0 7pt; orphans: 2; widows: 2; }
+    h1 + p, h2 + p, h3 + p { margin-top: 0; }
+    ul, ol { margin: 0 0 8pt 20pt; padding: 0; }
+    li { margin: 0 0 3pt; text-align: left; }
+    /* A figure and its caption are one object: no gap between them, real space around the pair. */
+    figure { page-break-inside: avoid; break-inside: avoid; }
+    figure + p[style*="italic"] { margin-top: 2pt; }
+    table { page-break-inside: avoid; break-inside: avoid; }
     a { color: #2563eb; }
     th { background: #1e293b; color: #fff; }
   `;

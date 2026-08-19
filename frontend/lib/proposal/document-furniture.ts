@@ -44,7 +44,6 @@ import {
   type CaptionContent,
   type ChartContent,
   type HeadingContent,
-  type TableContent,
   type TextBlockContent,
   type TocContent,
   countCharacters,
@@ -110,36 +109,51 @@ export function numberFigures(nodes: CanvasNode[]): CanvasNode[] {
     const prefix = CAPTIONABLE[n.type];
     if (!prefix) continue;
 
+    const next = nodes[i + 1];
+    const hasOwnCaption = Boolean(next && next.type === 'caption');
+    const text = hasOwnCaption ? '' : defaultCaptionText(n);
+
+    // An element that will NOT carry a caption does not consume a number. A cover banner is page
+    // furniture, and letting it take Figure 1 silently pushed every real figure up by one — the
+    // rendered page opened with "Figure 2. Patent-to-prototype pathway" and the document's own
+    // cross-references would have been wrong from the first one. Numbering follows captions, not
+    // node types.
+    if (!hasOwnCaption && !text) continue;
+
     counters[prefix] += 1;
     const num = counters[prefix];
-    const next = nodes[i + 1];
 
-    if (next && next.type === 'caption') {
+    if (hasOwnCaption) {
       // Existing caption → renumber in place, keep the author's words.
-      const c = next.content as CaptionContent;
-      out.push({ ...next, content: { ...c, prefix, number: num } });
+      const c = next!.content as CaptionContent;
+      out.push({ ...next!, content: { ...c, prefix, number: num } });
       i += 1; // consumed
       continue;
     }
-
-    const text = defaultCaptionText(n);
-    if (!text) continue; // nothing truthful to say about it — better silent than fabricated
     out.push(furnitureNode('caption', { prefix, number: num, text } satisfies CaptionContent));
   }
   return out;
 }
 
-/** A caption drawn from the element itself — its title, alt text or sheet name. Never invented. */
+/**
+ * A caption drawn from the element's own CAPTION field. Never invented, and never borrowed.
+ *
+ * Two sources were tried and both produced worse output than silence, seen on a rendered page:
+ *
+ *   alt_text  — accessibility text describing the picture for someone who cannot see it. A cover
+ *               BANNER carries alt text ("Immobileyes Inc. — Volume 2 — OSW26BZ04-DP013") and is
+ *               page furniture, not a numbered figure; borrowing it printed
+ *               "Figure 1. Immobileyes Inc. — Volume 2 — …" under the masthead, which then pushed
+ *               every real figure's number up by one.
+ *   sheet_name — a workbook tab name, one or two words. It rendered as "Table 1. Patent", which
+ *               tells a reader nothing they cannot see and reads as an unfinished placeholder.
+ *
+ * A chart's `title` IS a caption in everything but name — it is authored to describe the figure —
+ * so that one stays.
+ */
 function defaultCaptionText(n: CanvasNode): string {
   if (n.type === 'chart') return (n.content as ChartContent)?.title?.trim() ?? '';
-  if (n.type === 'image') {
-    const c = n.content as { caption?: string; alt_text?: string };
-    return (c?.caption || c?.alt_text || '').trim();
-  }
-  if (n.type === 'table') {
-    const c = n.content as TableContent;
-    return (c?.sheet_name || '').trim();
-  }
+  if (n.type === 'image') return ((n.content as { caption?: string })?.caption ?? '').trim();
   return '';
 }
 
@@ -404,7 +418,13 @@ export function measureDocument(
       `Uses ${characters} of ${maxCharacters} allowed characters (${Math.round(characterFill * 100)}%).`,
     );
   }
-  const figures = (nodeTypes.image ?? 0) + (nodeTypes.chart ?? 0);
+  // Count only figures that PRESENT as figures — an uncaptioned banner or rule image is page
+  // furniture and is neither numbered nor expected to have a caption (see numberFigures).
+  const captionable = nodes.filter((n, i) =>
+    (n.type === 'image' || n.type === 'chart')
+    && (nodes[i + 1]?.type === 'caption' || Boolean((n.content as { caption?: string })?.caption)
+        || Boolean((n.content as ChartContent)?.title)));
+  const figures = captionable.length;
   const isNarrative = artifactType === 'narrative';
   const isSpreadsheet = artifactType === 'cost' || doc.canvas?.format === 'spreadsheet';
   if (isNarrative && figures === 0) {

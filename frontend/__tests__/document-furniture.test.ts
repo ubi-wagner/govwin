@@ -21,6 +21,10 @@ import {
   trimToCharacterCap,
   workSplitChart,
 } from '@/lib/proposal/document-furniture';
+import {
+  architectureFigure, coverBanner, costBuildupFigure, improvementFigure,
+  scheduleFigure, workShareFigure,
+} from '@/lib/proposal/figures';
 import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 let seq = 0;
@@ -47,17 +51,38 @@ describe('numberFigures', () => {
   it('numbers each prefix independently and in document order', () => {
     const out = numberFigures([
       n('chart', { chart_type: 'bar', title: 'Cost', categories: [], series: [] }),
-      n('table', { headers: [], rows: [], sheet_name: 'Budget' }),
+      n('image', { storage_key: 'k', caption: 'Prototype', width: 1, height: 1 }),
       n('chart', { chart_type: 'pie', title: 'Split', categories: [], series: [] }),
-      n('image', { storage_key: 'k', alt_text: 'Prototype', width: 1, height: 1 }),
     ]);
     const caps = out.filter((x) => x.type === 'caption').map((x) => x.content as { prefix: string; number: number });
     expect(caps).toEqual([
       { prefix: 'Chart', number: 1, text: 'Cost' },
-      { prefix: 'Table', number: 1, text: 'Budget' },
-      { prefix: 'Chart', number: 2, text: 'Split' },
       { prefix: 'Figure', number: 1, text: 'Prototype' },
+      { prefix: 'Chart', number: 2, text: 'Split' },
     ].map((c) => expect.objectContaining(c)));
+  });
+
+  it('does NOT number an element that will carry no caption', () => {
+    // A cover banner is page furniture. Letting it take Figure 1 pushed every real figure up by
+    // one — the rendered page opened with "Figure 2. Patent-to-prototype pathway" — and the
+    // document's own cross-references would have been wrong from the first one.
+    const out = numberFigures([
+      n('image', { storage_key: 'banner', alt_text: 'Immobileyes Inc. — Volume 2', width: 468, height: 96 }),
+      n('chart', { chart_type: 'bar', title: 'Cost build-up', categories: [], series: [] }),
+    ]);
+    const caps = out.filter((x) => x.type === 'caption').map((x) => x.content as { prefix: string; number: number; text: string });
+    expect(caps).toEqual([{ prefix: 'Chart', number: 1, text: 'Cost build-up' }]);
+  });
+
+  it('never borrows alt text or a sheet name as a caption', () => {
+    // alt_text describes the picture for someone who cannot see it; a sheet_name is a workbook tab.
+    // Borrowed, they rendered as "Figure 1. Immobileyes Inc. — Volume 2 — …" under a masthead and
+    // "Table 1. Patent" under a table — both read as unfinished placeholders.
+    const out = numberFigures([
+      n('image', { storage_key: 'k', alt_text: 'a long accessibility description', width: 1, height: 1 }),
+      n('table', { headers: ['a'], rows: [['1']], sheet_name: 'Patent' }),
+    ]);
+    expect(out.filter((x) => x.type === 'caption')).toHaveLength(0);
   });
 
   it('RENUMBERS an existing caption in place and keeps the author words', () => {
@@ -203,7 +228,7 @@ describe('measureDocument', () => {
     ], { bold: ['Critical Minerals'] })));
     expect(m.charts).toBe(1);
     expect(m.tables).toBe(1);
-    expect(m.captions).toBe(2);      // one per chart + table
+    expect(m.captions).toBe(1);      // the chart; the table has no caption to source
     expect(m.emphasisedBlocks).toBe(1);
     expect(m.nodeTypes.divider).toBe(1); // rule before the second H1
     expect(m.distinctNodeTypes).toBeGreaterThanOrEqual(5);
@@ -320,5 +345,100 @@ describe('warnings are scoped to the artifact type', () => {
 
   it('defaults to the strictest reading when the type is unknown', () => {
     expect(measureDocument(doc(thin)).warnings.join(' ')).toMatch(/No figures/);
+  });
+});
+
+// ── figure library ───────────────────────────────────────────────────────────
+describe('figure generators', () => {
+  // These produce the pictures a technical volume is read by. Every one is drawn from values the
+  // caller passes in — nothing is invented — so the contract that matters is: real data in → a
+  // figure with a caption; missing or degenerate data in → NOTHING, because a diagram of nothing
+  // is worse than no diagram.
+  const stages = [{ name: 'Patent' }, { name: 'Adaptation' }, { name: 'Prototype' }];
+
+  it('emits an image + caption pair, as a data: URI the exporters can rasterize', () => {
+    const [img, cap] = architectureFigure(stages, 'Pathway');
+    expect(img.type).toBe('image');
+    expect(cap.type).toBe('caption');
+    const c = img.content as { storage_key: string; width: number; height: number; alt_text: string };
+    expect(c.storage_key.startsWith('data:image/svg+xml;base64,')).toBe(true);
+    expect(c.width).toBeGreaterThan(0);
+    expect(c.alt_text).toContain('Patent');
+    // decodes to well-formed SVG
+    const svg = Buffer.from(c.storage_key.split(',')[1], 'base64').toString('utf8');
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
+  });
+
+  it('refuses to draw a diagram of nothing', () => {
+    expect(architectureFigure([])).toEqual([]);
+    expect(architectureFigure([{ name: 'Only one' }])).toEqual([]);   // one box is not a flow
+    expect(scheduleFigure([], 10)).toEqual([]);
+    expect(scheduleFigure([{ name: 'x', startMonth: 5, endMonth: 2 }], 10)).toEqual([]); // inverted
+    expect(costBuildupFigure([{ label: 'only', amount: 100 }])).toEqual([]);
+    expect(costBuildupFigure([{ label: 'a', amount: 0 }, { label: 'b', amount: 0 }])).toEqual([]);
+    expect(workShareFigure(0, 67)).toEqual([]);
+    expect(improvementFigure([])).toEqual([]);
+  });
+
+  it('escapes label text so one ampersand cannot corrupt the document', () => {
+    const [img] = architectureFigure([{ name: 'R&D <phase>' }, { name: 'Build' }]);
+    const svg = Buffer.from((img.content as { storage_key: string }).storage_key.split(',')[1], 'base64').toString('utf8');
+    expect(svg).toContain('R&amp;D');
+    expect(svg).not.toMatch(/R&D/);
+  });
+
+  it('wraps a long stage label instead of truncating it mid-word', () => {
+    // Clipping produced "production un…" on a rendered page — a diagram whose own labels are cut
+    // off undermines the document it is meant to strengthen.
+    const [img] = architectureFigure([
+      { name: 'Transition', detail: 'production unit' }, { name: 'Build' }, { name: 'Test' },
+    ]);
+    const svg = Buffer.from((img.content as { storage_key: string }).storage_key.split(',')[1], 'base64').toString('utf8');
+    expect(svg).toContain('production');
+    expect(svg).toContain('unit');
+    expect(svg).not.toContain('…');
+  });
+
+  it('states the total and every element in the cost figure caption and alt text', () => {
+    const [img, cap] = costBuildupFigure([
+      { label: 'Direct labor', amount: 93500 },
+      { label: 'Overhead', amount: 56801 },
+    ]);
+    expect((img.content as { alt_text: string }).alt_text).toContain('$93,500');
+    expect((cap.content as { text: string }).text).toContain('$150,301');
+  });
+
+  it('marks work share against its floor in both directions', () => {
+    const pass = workShareFigure(89.4, 67);
+    const fail = workShareFigure(30, 40);
+    expect((pass[0].content as { alt_text: string }).alt_text).toContain('compliant');
+    expect((fail[0].content as { alt_text: string }).alt_text).toContain('BELOW FLOOR');
+  });
+
+  it('gives the cover banner no caption — it is page furniture, not a figure', () => {
+    const nodes = coverBanner('Immobileyes Inc.', 'OSW26BZ04-DP013', 'Volume 2');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('image');
+    expect((nodes[0].content as { caption?: string }).caption).toBeUndefined();
+  });
+
+  it('is deterministic — the same data renders the same bytes', () => {
+    const a = costBuildupFigure([{ label: 'x', amount: 10 }, { label: 'y', amount: 5 }]);
+    const b = costBuildupFigure([{ label: 'x', amount: 10 }, { label: 'y', amount: 5 }]);
+    expect((a[0].content as { storage_key: string }).storage_key)
+      .toBe((b[0].content as { storage_key: string }).storage_key);
+  });
+
+  it('marks every figure template-provenance and library-ineligible', () => {
+    for (const [node] of [
+      architectureFigure(stages), scheduleFigure([{ name: 'a', startMonth: 0, endMonth: 2 }], 4),
+      costBuildupFigure([{ label: 'a', amount: 2 }, { label: 'b', amount: 1 }]),
+      workShareFigure(50, 40), improvementFigure([{ name: 'm', current: 1, proposed: 2 }]),
+      coverBanner('Co', 'S-1', 'V1'),
+    ]) {
+      expect(node.provenance.source).toBe('template');
+      expect(node.library_eligible).toBe(false);
+    }
   });
 });

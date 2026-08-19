@@ -6,12 +6,14 @@
  *    →  lifecycle close_date_change  →  solicitation.request_review
  *    →  solicitation.approve  →  solicitation.push
  *
- *  cd frontend && node --import tsx scripts/t3cp-curate-push.mts */
+ *  cd frontend && node --import tsx scripts/t3cp-curate-push.mts <solicitationId> [opportunityId] */
 import { chromium, type Browser, type APIRequestContext } from 'playwright';
 
 const BASE = 'http://localhost:3000';
-const SOL = '4e340a58-90ce-47d8-92cd-2bb239119141';
-const OPP = 'c85d7d1a-391f-47d6-add7-08f8be183496';
+// Take the solicitation from argv like every sibling t3cp-* script — the intake mints fresh ids per
+// run, so a baked-in constant is stale the moment the master is re-ingested. The landing opportunity
+// is READ OFF the curation detail route below unless it is passed explicitly.
+const SOL = process.argv[2] ?? '4e340a58-90ce-47d8-92cd-2bb239119141';
 
 let failures = 0;
 const ok = (l: string, c: boolean, x = '') => {
@@ -46,7 +48,10 @@ async function tool<T = unknown>(name: string, input: unknown): Promise<{ status
 const cur = await admin.get(`${BASE}/api/admin/rfp-curation/${SOL}`);
 const curBody = await cur.json().catch(() => ({}));
 let status: string = curBody?.data?.solicitation?.status ?? '?';
-console.log(`  starting status=${status}`);
+const OPP: string | null = process.argv[3] ?? curBody?.data?.solicitation?.opportunityId ?? null;
+ok('landing opportunity resolved', !!OPP, `sol=${SOL} opp=${OPP}`);
+if (!OPP) { await b.close(); process.exit(1); }
+console.log(`  starting status=${status} · opp=${OPP}`);
 
 // ── 1 · claim (new → claimed) ──
 if (status === 'new') {
