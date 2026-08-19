@@ -1,0 +1,312 @@
+<title>Filling the Envelope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --paper:#FBFAF6; --surface:#FFFFFF; --surface-2:#F3F1EA;
+    --ink:#191C1B; --ink-2:#4B514E; --ink-3:#78807C;
+    --rule:#DCD8CD; --rule-2:#C6C1B4;
+    --accent:#1B5F60; --accent-2:#DCEBEA;
+    --fixed:#2C6A4C; --fixed-bg:#E2EFE7;
+    --open:#8E5410;  --open-bg:#F6EBDA;
+    --limit:#5B6360; --limit-bg:#EAEDEB;
+    --shadow:0 1px 2px rgba(25,28,27,.05), 0 8px 24px -16px rgba(25,28,27,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#141716; --surface:#1B1F1E; --surface-2:#232827;
+      --ink:#EDEEEB; --ink-2:#B4BBB7; --ink-3:#838C88;
+      --rule:#2E3433; --rule-2:#414846;
+      --accent:#6FC3BF; --accent-2:#1D3736;
+      --fixed:#79C79B; --fixed-bg:#1C3229;
+      --open:#DBA35C;  --open-bg:#33271A;
+      --limit:#9AA3A0; --limit-bg:#262B2A;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#141716; --surface:#1B1F1E; --surface-2:#232827;
+    --ink:#EDEEEB; --ink-2:#B4BBB7; --ink-3:#838C88;
+    --rule:#2E3433; --rule-2:#414846;
+    --accent:#6FC3BF; --accent-2:#1D3736;
+    --fixed:#79C79B; --fixed-bg:#1C3229;
+    --open:#DBA35C;  --open-bg:#33271A;
+    --limit:#9AA3A0; --limit-bg:#262B2A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:78rem; margin:0 auto; padding:0 1.5rem 6rem; }
+  .col  { max-width:44rem; }
+
+  header.mast { border-bottom:1px solid var(--rule); padding:3.5rem 0 2rem; display:flex; flex-direction:column; gap:1.25rem; }
+  .kicker { font-family:"IBM Plex Mono", monospace; font-size:.75rem; font-weight:500; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-family:"IBM Plex Serif", Georgia, serif; font-weight:600; font-size:clamp(2.1rem,5vw,3.1rem); line-height:1.1; letter-spacing:-.02em; margin:0; text-wrap:balance; max-width:20ch; }
+  .standfirst { font-size:1.075rem; color:var(--ink-2); max-width:60ch; margin:0; }
+  .meta { display:flex; flex-wrap:wrap; gap:.5rem 2rem; font-family:"IBM Plex Mono", monospace; font-size:.78rem; color:var(--ink-3); }
+  .meta b { color:var(--ink-2); font-weight:500; }
+
+  section { padding-top:3.25rem; }
+  h2 { font-family:"IBM Plex Serif", Georgia, serif; font-weight:600; font-size:1.55rem; line-height:1.25; letter-spacing:-.012em; margin:0 0 .35rem; text-wrap:balance; }
+  h3 { font-weight:600; font-size:1rem; margin:0 0 .3rem; letter-spacing:-.005em; }
+  .lede { color:var(--ink-2); margin:0 0 1.5rem; max-width:62ch; }
+  p { margin:0 0 1rem; } p:last-child { margin-bottom:0; }
+  code, .mono { font-family:"IBM Plex Mono", monospace; font-size:.875em; }
+  code { background:var(--surface-2); border:1px solid var(--rule); border-radius:3px; padding:.08em .34em; }
+  a { color:var(--accent); text-underline-offset:3px; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+
+  .board { display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden; grid-template-columns:repeat(auto-fit,minmax(11rem,1fr)); margin-top:1.75rem; }
+  .cell { background:var(--surface); padding:1.1rem 1.15rem; display:flex; flex-direction:column; gap:.3rem; }
+  .cell .lab { font-family:"IBM Plex Mono", monospace; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); }
+  .cell .val { font-family:"IBM Plex Serif", Georgia, serif; font-weight:600; font-size:1.6rem; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .cell .sub { font-size:.82rem; color:var(--ink-3); }
+  .from-to { display:flex; align-items:baseline; gap:.45rem; }
+  .from-to .was { font-family:"IBM Plex Mono", monospace; font-size:.95rem; color:var(--ink-3); text-decoration:line-through; text-decoration-color:var(--rule-2); font-variant-numeric:tabular-nums; }
+  .from-to .arw { color:var(--ink-3); font-size:.85rem; }
+
+  .tablewrap { overflow-x:auto; margin:1.5rem 0; border:1px solid var(--rule); border-radius:6px; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; font-size:.89rem; }
+  th, td { text-align:left; padding:.62rem .9rem; border-bottom:1px solid var(--rule); vertical-align:top; }
+  thead th { font-family:"IBM Plex Mono", monospace; font-weight:500; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); background:var(--surface-2); white-space:nowrap; }
+  tbody tr:last-child td { border-bottom:0; }
+  td.num, th.num { text-align:right; font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.name { font-weight:500; }
+  .ok { color:var(--fixed); font-weight:500; }
+
+  .bugs { display:flex; flex-direction:column; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden; margin-top:1.5rem; }
+  .bug { background:var(--surface); padding:1.25rem 1.3rem; display:grid; gap:.55rem; }
+  .bug-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:.6rem; }
+  .bid { font-family:"IBM Plex Mono", monospace; font-size:.74rem; font-weight:600; letter-spacing:.06em; color:var(--accent); background:var(--accent-2); border-radius:3px; padding:.15rem .42rem; }
+  .pill { font-family:"IBM Plex Mono", monospace; font-size:.66rem; font-weight:600; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.16rem .55rem; white-space:nowrap; }
+  .pill.fixed { color:var(--fixed); background:var(--fixed-bg); }
+  .pill.open  { color:var(--open);  background:var(--open-bg); }
+  .pill.limit { color:var(--limit); background:var(--limit-bg); }
+  .bug h3 { flex:1 1 22ch; }
+  .bug p { font-size:.93rem; color:var(--ink-2); margin:0; }
+  .bug p.proof { font-family:"IBM Plex Mono", monospace; font-size:.8rem; background:var(--surface-2); border-left:2px solid var(--rule-2); padding:.55rem .75rem; border-radius:0 3px 3px 0; white-space:pre-wrap; overflow-x:auto; }
+  .bug .why { color:var(--ink); }
+
+  .note { border:1px solid var(--rule); border-left:3px solid var(--accent); background:var(--surface); border-radius:0 6px 6px 0; padding:1.1rem 1.25rem; margin:1.5rem 0; box-shadow:var(--shadow); }
+  .note h3 { margin-bottom:.4rem; }
+  .note p { color:var(--ink-2); font-size:.94rem; }
+
+  footer { margin-top:4rem; padding-top:1.5rem; border-top:1px solid var(--rule); font-family:"IBM Plex Mono", monospace; font-size:.75rem; color:var(--ink-3); display:flex; flex-wrap:wrap; gap:.4rem 1.75rem; }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="kicker">Session report · OSW26BZ04-DP013</div>
+    <h1>Filling the Envelope</h1>
+    <p class="standfirst">
+      A full-project sweep, fifteen proven defects, and one government proposal driven from admin
+      intake to a locked, packaged submission — plus the gaps I could not honestly close.
+    </p>
+    <div class="meta">
+      <span><b>Branch</b> claude/nice-hamilton-kBqtD</span>
+      <span><b>Commits</b> 7</span>
+      <span><b>tsc</b> 0 errors</span>
+      <span><b>vitest</b> 1408 pass</span>
+      <span><b>pytest</b> 1140 pass</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>What the numbers did</h2>
+    <p class="lede col">
+      Every figure below was measured with the same rulers the product's own compliance gate and
+      editor gauge use — not a second opinion written for this report.
+    </p>
+    <div class="board">
+      <div class="cell"><span class="lab">Quality warnings</span><span class="val from-to"><span class="was">11</span><span class="arw">→</span>2</span><span class="sub">across all volumes</span></div>
+      <div class="cell"><span class="lab">Technical vol. characters</span><span class="val from-to"><span class="was">3,371</span><span class="arw">→</span>16,957</span><span class="sub">5.0× density</span></div>
+      <div class="cell"><span class="lab">Emphasised blocks</span><span class="val from-to"><span class="was">0</span><span class="arw">→</span>10</span><span class="sub">bold/italic runs reaching export</span></div>
+      <div class="cell"><span class="lab">Volumes with page furniture</span><span class="val from-to"><span class="was">1/3</span><span class="arw">→</span>3/3</span><span class="sub">running header + page numbers</span></div>
+      <div class="cell"><span class="lab">Compliance violations</span><span class="val">0</span><span class="sub">every volume, every format</span></div>
+      <div class="cell"><span class="lab">Foreign identifiers</span><span class="val">0</span><span class="sub">checked against the canvas</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The delivered package</h2>
+    <p class="lede col">
+      Fourteen sections locked, advanced draft&nbsp;→&nbsp;submitted, exported through the product's
+      own routes. The zip is per-volume-native: each volume in the format its content actually is.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Artefact</th><th class="num">DOCX</th><th class="num">PDF</th><th class="num">Pages</th><th class="num">Font faces</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td class="name">V2 Technical Volume</td><td class="num">12,174 B</td><td class="num">73,554 B</td><td class="num">5</td><td class="num">3</td><td class="ok">0 violations</td></tr>
+          <tr><td class="name">V3 Cost Volume</td><td class="num">12,800 B</td><td class="num">68,503 B</td><td class="num">2</td><td class="num">4</td><td class="ok">0 violations</td></tr>
+          <tr><td class="name">V5 Supporting Documents</td><td class="num">13,878 B</td><td class="num">53,728 B</td><td class="num">3</td><td class="num">3</td><td class="ok">0 violations</td></tr>
+          <tr><td class="name">Combined package</td><td class="num">17,805 B</td><td class="num">127,698 B</td><td class="num">7</td><td class="num">4</td><td class="ok">0 violations</td></tr>
+          <tr><td class="name">Submission zip</td><td class="num" colspan="2">39,753 B — docx · xlsx · docx</td><td class="num">—</td><td class="num">—</td><td class="ok">0 violations</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="col">
+      Three to four distinct font faces per PDF is the load-bearing number. It means the inline bold
+      and italic runs survived the whole chain — drafter, markdown converter, canvas, exporter —
+      instead of stopping at the model, which is where they used to stop.
+    </p>
+  </section>
+
+  <section>
+    <h2>The chain that was broken</h2>
+    <p class="lede col">
+      Five defects, each one upstream of the last. Fixing any single one alone would have changed
+      nothing visible.
+    </p>
+    <div class="bugs">
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B18</span><h3>Drafting threw away every table and every emphasis marker</h3><span class="pill fixed">Fixed</span></div>
+        <p class="proof">_strip_inline() — "Drop markdown emphasis markers for v1 (no inline_formats yet)"
+1,010 atom nodes across 224 atoms, of exactly four types:
+  text_block 845 · bulleted_list 144 · numbered_list 19 · heading 2</p>
+        <p class="why">The converter deleted <code>**bold**</code> and <code>*italic*</code> on the way through and handled no table, quote, rule or code fence. The editor and all four exporters could render every one of those perfectly — the content just never arrived carrying any.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B19</span><h3>Every generated volume shipped with no header and no page numbers</h3><span class="pill fixed">Fixed</span></div>
+        <p class="proof">Technical Volume          header NO · footer NO
+Cover / CCR / Supporting  header NO · footer NO
+Cost Volume               header yes · footer yes   ← the only one</p>
+        <p class="why">Molds spread a preset with <code>header: null</code>, and a mold's canvas wins at assembly — so the fallback that <em>does</em> carry furniture was unreachable for everything molded. The export routes were already passing <code>{company_name}</code> and turning <code>{n}</code>/<code>{N}</code> into live page fields. The whole mechanism worked and nothing was using it.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B21</span><h3>"Full draft" silently skipped every registry-molded section</h3><span class="pill fixed">Fixed</span></div>
+        <p class="proof">Mode C reported "sections: 2" on a 14-section proposal
+507 words per section — 500 of them inside [brackets]   (threshold: 25)</p>
+        <p class="why">The gate deciding "does this still need writing" answered <em>already written</em> about an untouched mold, because its word counter read bracketed instructions and form-field labels as prose. Now: a whole block that is one bracketed instruction is scaffolding, and a table's cells are a form's labels — what makes a form <em>filled</em> is values, not words.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B22</span><h3>AI drafting replaced the solicitation's page cap with a preset's</h3><span class="pill fixed">Fixed</span></div>
+        <p class="proof">select page_allocation, canvas.max_pages from proposal_sections …
+ 10 | 15      ← ten rows, all identical</p>
+        <p class="why">Compliance correctness, not cosmetics: the editor gauge and the export floor both then measured against a limit the solicitation never gave, so a 14-page volume passes every check in the product and is refused by the agency.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B23</span><h3>Ten items each carried the whole volume's page limit</h3><span class="pill fixed">Fixed</span></div>
+        <p class="proof">volume_required_items: 10 items × page_limit 10   (volume cap: 10)
+proposal_artifacts.compliance_spec.max_pages = 100</p>
+        <p class="why">The build-out repeated the volume's "NTE 10 pages" onto every item, and provisioning summed them — so the export gate would have passed a hundred-page volume. Drafting to those allowances produced 27 pages against a 10-page cap. Readiness now blocks when the per-section allowances over-subscribe the volume: unlike an under-filled volume, that is arithmetic, and it cannot be what the solicitation meant.</p>
+      </article>
+    </div>
+    <div class="note">
+      <h3>The distinction that took three wrong answers to find</h3>
+      <p>
+        Chasing B22 made the volume swing from 4/15 to 27/10 to 6/1 before it was clear that three
+        different numbers were being conflated: <strong>canvas.max_pages</strong> is the volume's
+        cap, <strong>page_allocation</strong> is a section's share of it, and the
+        <strong>preset</strong> is neither. My own first fix substituted the share for the cap —
+        wrong in the opposite direction to the bug. A one-page share is not a one-page document.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Also fixed</h2>
+    <p class="lede col">
+      Found by two audits whose every claim I re-proved against source or the live database before
+      acting. One agent-reported finding turned out to be correct behaviour and was dropped.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>ID</th><th>Defect</th><th>How it was proven</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">B8</td><td class="name">Two routes skipped the RLS context, so the librarian was never queued</td><td>Live as <code>govtech_app</code>: 0 rows vs 1; INSERT raised 42501, swallowed as <code>null</code></td></tr>
+          <tr><td class="mono">B9</td><td class="name">Archetype fallback dead for 32/36 agents; the 33rd fired twice per upload</td><td><code>system_events.type</code> carries no namespace prefix — queried live</td></tr>
+          <tr><td class="mono">B10</td><td class="name">Drafter fenced the RFP excerpt, left three siblings of the same provenance bare</td><td>Traced <code>evaluation_criteria</code> back to the same raw solicitation text</td></tr>
+          <tr><td class="mono">B11</td><td class="name">Web fences escapable by a forged closing marker</td><td>Executed the attack: 2 close markers in output, payload outside the fence</td></tr>
+          <tr><td class="mono">B12</td><td class="name">Recording a win produced a To-do whose only button 404'd</td><td><code>find app -ipath "*contract*" -type d</code> → empty</td></tr>
+          <tr><td class="mono">B13</td><td class="name">Admin rail offered rfp_admin a link that ejects them to the marketing site</td><td>master_admin-only in two places; middleware answers with <code>redirect('/')</code></td></tr>
+          <tr><td class="mono">B14</td><td class="name">Four controls rendered to roles the API refuses</td><td>Read both the component and its target route; one even took <code>role</code> and never used it</td></tr>
+          <tr><td class="mono">B15</td><td class="name">A failing topic extractor reported itself as "No topics found"</td><td>Error bodies are valid JSON, so they defeat a <code>.then(r =&gt; r.json())</code> chain silently</td></tr>
+          <tr><td class="mono">B16</td><td class="name">Notification links landed on retired stubs that drop their target id</td><td>Stub redirects to the list without the id</td></tr>
+          <tr><td class="mono">B20</td><td class="name">My own new warning fired where it could not apply</td><td>First live run told a Cover Sheet it needed figures</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What I did not close</h2>
+    <p class="lede col">
+      Things I could have made look finished and did not. Each is reported by the product itself
+      now, rather than being invisible.
+    </p>
+    <div class="bugs">
+      <article class="bug">
+        <div class="bug-head"><span class="bid">GAP 1</span><h3>The Technical Volume sits at 60% of its page envelope</h3><span class="pill limit">Honest limit</span></div>
+        <p class="why">The tenant's 224 atoms are whole prior proposals atomized as single documents, so retrieval genuinely runs dry — the ranker returns nothing further. Padding it would be exactly the hand-papering the brief forbids. The fix is library <em>grain</em>: atomizing those documents into sections. Readiness now says so out loud instead of the volume just being quietly short.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">GAP 2</span><h3>No figures anywhere in the narrative volumes</h3><span class="pill limit">Honest limit</span></div>
+        <p class="why">The PDF reader does not extract embedded images; images enter the library through the human box tool by design, which an unattended run cannot drive. What the system <em>can</em> produce it now does: the cost volume plots its own burden waterfall and work split as native chart nodes computed from the same numbers its tables print, so figure and table can never disagree.</p>
+      </article>
+      <article class="bug">
+        <div class="bug-head"><span class="bid">B17</span><h3>Two "reviewed" verdicts asserted without evidence the reviewer ran</h3><span class="pill open">Open — scoped</span></div>
+        <p class="why"><code>recorded_by: "advisory_manager"</code> is a hardcoded literal, and one of these verdicts auto-advances a portal stage. The record step must stay independent of the AI step or a dead agent dead-ends the workflow — so the fix needs a third signal carrying "did the cohort actually run". That is a change to the step contract, not a patch, and I would not smuggle it into a bug-fix commit.</p>
+      </article>
+    </div>
+    <div class="note">
+      <h3>One verification I had to withdraw</h3>
+      <p>
+        I first reported the PDFs clean of foreign solicitation numbers on the strength of a
+        <code>pdftotext</code> scan. <code>poppler-utils</code> is not installed here, so that
+        command returned empty — proving nothing. The check was redone against the canvas in the
+        database, which is authoritative: no foreign identifiers, own identifier
+        <code>OSW26BZ04-DP013</code> present.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Verification</h2>
+    <p class="lede col">
+      Two test failures during the session were my own changes surfacing correctly in tests that
+      pinned the old contract; both were updated to assert the new one.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Check</th><th class="num">Result</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="name">TypeScript</td><td class="num ok">0 errors</td><td>Exhaustive <code>Record</code> caught a missing UI label mid-change</td></tr>
+          <tr><td class="name">vitest</td><td class="num ok">1408 pass</td><td>+35 this session</td></tr>
+          <tr><td class="name">pytest</td><td class="num ok">1140 pass</td><td>+33 this session, 29 skipped</td></tr>
+          <tr><td class="name">next build</td><td class="num ok">exit 0</td><td>Four clean rebuilds, served from standalone</td></tr>
+          <tr><td class="name">Live drive</td><td class="num ok">14/14</td><td>Sections locked · advanced · exported through product routes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <h3>The container restarted after this run</h3>
+      <p>
+        All seven commits were pushed, so every fix survived and the working tree was restored from
+        origin. The sandbox <em>database</em> rolled back with the container, taking the built
+        proposal with it — the exported files had already been delivered. Schema is back at head 194
+        and the supervised stack is up; rebuilding the live data is a re-run of the same scripted
+        chain, not new work.
+      </p>
+    </div>
+    <p class="col">
+      Worth noting that worker supervision was itself one of this session's first fixes: the monitor
+      previously reported healthy while the component that runs the workflows was dead.
+    </p>
+  </section>
+
+  <footer>
+    <span>docs/BUG_LOG_2026-08-19.md — every finding, its proof, and its class</span>
+    <span>Proposal 082c1f9a · Immobileyes Inc.</span>
+  </footer>
+
+</div>
