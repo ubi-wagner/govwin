@@ -371,7 +371,9 @@ try {
   const secs = sections();
   let drafted = 0;
   for (const s of secs) {
-    const [row] = await sql<{ id: string; artifact_id: string; volume_name: string | null; volume_number: number | null; version: number }[]>`
+    // camelCase — transformed client (@/lib/db). The cost-section read at the bottom of this
+    // same file already declares `artifactId` and reads row.artifactId; this one was the outlier.
+    const [row] = await sql<{ id: string; artifactId: string; volumeName: string | null; volumeNumber: number | null; version: number }[]>`
       SELECT id, artifact_id, volume_name, volume_number, version FROM proposal_sections
       WHERE proposal_id = ${proposalId}::uuid AND title = ${s.key} LIMIT 1`;
     if (!row) { ok(`section row for "${s.key}"`, false); continue; }
