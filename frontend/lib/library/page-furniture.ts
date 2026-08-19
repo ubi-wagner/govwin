@@ -33,10 +33,44 @@
 const MIN_PAGES = 4;
 /** Furniture is short. A repeated long paragraph is boilerplate the company chose to repeat. */
 const MAX_FURNITURE_CHARS = 160;
-/** A line must appear on at least this SHARE of pages to count as running furniture. */
+/**
+ * A line must appear on at least this share of the pages IN ITS OWN RUN — the span from its first
+ * page to its last — not of the whole document.
+ *
+ * The denominator matters because a merged DSIP submission is several documents concatenated. Its
+ * technical volume carries one header, its cost volume another, its cover sheet none. Measured
+ * against the whole file, a header running through all 10 pages of a 32-page package's technical
+ * volume looks like it covers 31% and falls under any sane threshold — while within the volume it
+ * actually heads, it covers 100%. That is what let the DON26BX header survive: "Proposal Number:
+ * N26BX-NP002-0450 / Open Topic Number: DON26BX03-NP002" on 10 consecutive pages, missed, and
+ * carried into the new proposal's Statement of Work.
+ */
 const MIN_SHARE = 0.4;
-/** …and on at least this many pages, so a 4-page document needs 3, not 1.6. */
+/** …and on at least this many pages, so a short run needs several hits, not one. */
 const MIN_PAGES_SEEN = 3;
+/**
+ * How long a run has to be before density means "running header" rather than "a table".
+ *
+ * Density alone cannot tell them apart — measured on the filed F2-17528 proposal, the header
+ * "Topic Number: AFX23D-TCSO1 Proposal Number: F 2 - 1 7 5 2 8" and the cost form's line labels
+ * ("Subcontractor Costs", "Total Direct Material Costs (TDM) $35,000.00") BOTH appear on 100% of
+ * the pages in their run. What separates them is how far the run reaches: the header runs 17
+ * pages, the cost table 4. A running header heads a VOLUME; a repeated label belongs to one form
+ * that happens to span a few pages. Under this, an aggressive density rule deleted the cost
+ * volume's own figures.
+ *
+ * The trade is deliberately conservative: a header on a genuinely short document is missed rather
+ * than a table being destroyed. Whatever is removed is reported on the plan and shown in the
+ * upload preview, so a curator can see a mis-detection before the library is written.
+ */
+const MIN_RUN_PAGES = 8;
+/**
+ * A furniture line is identifying text, not a lone token. Without this, a word repeated down a
+ * table column ("Base", "Option" in a Phase I task schedule) reads as a perfect run and the table
+ * loses a column. Page numbers are exempt — they are handled by `isBarePageNumber`.
+ */
+const MIN_FURNITURE_CHARS = 12;
+const MIN_FURNITURE_WORDS = 2;
 
 /** Whitespace-collapsed, lowercased. Digits are KEPT — see `pageNumberKey`. */
 function normalize(line: string): string {
@@ -55,13 +89,32 @@ function normalize(line: string): string {
  */
 function pageNumberKey(line: string): string | null {
   const n = normalize(line);
-  const numbered = /\bpage\s+\d+\b/.test(n) || /\b\d+\s*(?:of|\/)\s*\d+\b/.test(n);
-  return numbered ? n.replace(/\d+/g, '#') : null;
+  const pattern = /\bpage\s+\d+(\s*(?:of|\/)\s*\d+)?\b|\b\d+\s*(?:of|\/)\s*\d+\b/;
+  if (!pattern.test(n)) return null;
+  // The line must BE page numbering, not merely contain it. A footer is the number plus a little
+  // ("Immobileyes Inc. — Page 3 of 15"); a sentence that happens to cite a page is content
+  // ("…the schedule continued on page 4 of the attachment…"). Matching on containment alone made
+  // every such sentence digit-collapsible, so a body line repeated across a run was confirmed as
+  // furniture and variant expansion then deleted each of its individual forms — silently removing
+  // real prose from every page.
+  const remainder = n.replace(pattern, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+  const wordsLeft = remainder ? remainder.split(/\s+/).length : 0;
+  return wordsLeft <= 3 ? n.replace(/\d+/g, '#') : null;
 }
 
 /** A line that is nothing but a page number (with optional "Page"/"of N" scaffolding). */
 function isBarePageNumber(line: string): boolean {
   return /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/)\s*\d{1,4})?$/i.test(line.trim());
+}
+
+/**
+ * Is this line substantial enough to be a running header, rather than a repeated table cell?
+ * A page-number line is exempt: `isBarePageNumber` removes those regardless of repetition.
+ */
+function isSubstantial(line: string): boolean {
+  if (isBarePageNumber(line)) return true;
+  const t = line.trim();
+  return t.length >= MIN_FURNITURE_CHARS && t.split(/\s+/).length >= MIN_FURNITURE_WORDS;
 }
 
 /** Every furniture key a line could match under (verbatim, and page-numbered form if any). */
@@ -82,23 +135,29 @@ export function detectRunningFurniture(pages: string[]): Set<string> {
   const real = pages.filter((p) => p && p.trim());
   if (real.length < MIN_PAGES) return new Set();
 
-  // Count DISTINCT pages per key — a line repeated twice on one page still counts once, so a page
-  // that happens to list a phrase twice cannot make it look like furniture.
-  const pagesSeen = new Map<string, number>();
-  for (const page of real) {
-    const seenHere = new Set<string>();
+  // Record WHICH pages each key appears on — a line repeated twice on one page still counts that
+  // page once, so a page that happens to list a phrase twice cannot make it look like furniture.
+  const pagesSeen = new Map<string, Set<number>>();
+  real.forEach((page, pi) => {
     for (const raw of page.split('\n')) {
       const line = raw.trim();
       if (!line || line.length > MAX_FURNITURE_CHARS) continue;
-      for (const k of keysOf(line)) seenHere.add(k);
+      if (!isSubstantial(line)) continue;
+      for (const k of keysOf(line)) {
+        if (!pagesSeen.has(k)) pagesSeen.set(k, new Set());
+        pagesSeen.get(k)!.add(pi);
+      }
     }
-    for (const key of seenHere) pagesSeen.set(key, (pagesSeen.get(key) ?? 0) + 1);
-  }
+  });
 
-  const threshold = Math.max(MIN_PAGES_SEEN, Math.ceil(real.length * MIN_SHARE));
   const furniture = new Set<string>();
-  for (const [key, count] of pagesSeen) {
-    if (count >= threshold && key) furniture.add(key);
+  for (const [key, pageSet] of pagesSeen) {
+    if (!key || pageSet.size < MIN_PAGES_SEEN) continue;
+    // Density within the line's OWN run, not across the whole document. See MIN_SHARE.
+    const seen = [...pageSet];
+    const span = Math.max(...seen) - Math.min(...seen) + 1;
+    if (span < MIN_RUN_PAGES) continue;
+    if (pageSet.size / span >= MIN_SHARE) furniture.add(key);
   }
 
   // Expand each confirmed line to its VARIANTS — same header, different number.
@@ -179,6 +238,9 @@ export function stripDocumentFurniture(pages: string[]): {
     for (const raw of (page ?? '').split('\n')) {
       const line = raw.trim();
       if (!line || line.length > MAX_FURNITURE_CHARS) continue;
+      // Bare page numbers are removed unconditionally, so listing each of "Page 1 of 15" …
+      // "Page 15 of 15" only buries the one or two lines a curator actually needs to check.
+      if (isBarePageNumber(line)) continue;
       for (const k of keysOf(line)) {
         if (wanted.has(k)) { samples.push(line); wanted.delete(k); }
       }
