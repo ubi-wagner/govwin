@@ -18,6 +18,7 @@ import type { CanvasDocument, CanvasNode, CanvasRules, TableCell, TableCellStyle
 import { docNodes } from '@/lib/types/canvas-document';
 import { coerceJsonb } from '@/lib/jsonb';
 import { parseNumericText } from '@/lib/numeric-cell';
+import { costWaterfallChart, workSplitChart } from '@/lib/proposal/document-furniture';
 import {
   computeBudget, odcTotal, roundCents,
   type LaborLine, type IndirectRates, type OtherDirectCost, type Subcontract, type Period,
@@ -219,6 +220,18 @@ export function buildCostVolumeCanvas(input: CostVolumeInputs): CanvasDocument {
     }, { size: 10, style: 'italic' }));
   }
 
+  // 5b. The same numbers as a FIGURE. Every value here is already computed above — the chart adds
+  // no claim, it just makes the shape of the cost readable at a glance, which is how a cost
+  // evaluator actually reads a build-up. `chart` nodes export natively to docx/pptx/xlsx/pdf, so
+  // this survives into every download rather than being an editor-only flourish. The caption is
+  // numbered by numberFigures at assembly.
+  const waterfall = costWaterfallChart({
+    labor: g.directLabor, fringe: g.fringe, overhead: g.overhead,
+    materials: odcTotal(g), subcontracts: g.subcontracts, ga: g.gna, fee: g.fee,
+  }, 'Cost build-up by element');
+  nodes.push(waterfall);
+  nodes.push(node('caption', { prefix: 'Chart', number: 1, text: 'Cost build-up by element (computed from the burden waterfall).' }));
+
   // 6. Work-share compliance (only when the program has a work-share floor)
   const prog = (meta.program ?? '').toLowerCase();
   if (prog === 'sbir' || prog === 'sttr') {
@@ -229,6 +242,15 @@ export function buildCostVolumeCanvas(input: CostVolumeInputs): CanvasDocument {
       rows: worksharRows(budget, prog),
       column_widths: [200, 90, 210, 70], border_style: 'single',
     }));
+    // The work-split as a figure — the eligibility question an SBIR/STTR evaluator checks first.
+    const ws = budget.workshare;
+    const sbcPct = ws.sbcWorkPct * 100;
+    nodes.push(workSplitChart(
+      [{ name: 'Small business concern', percent: sbcPct },
+       { name: 'Subcontract / partner', percent: Math.max(0, 100 - sbcPct) }],
+      'Work share of the research effort',
+    ));
+    nodes.push(node('caption', { prefix: 'Chart', number: 2, text: `Work share — ${sbcPct.toFixed(1)}% small-business concern against a ${prog === 'sttr' ? '40' : '67'}% floor.` }));
   }
 
   const doc: CanvasDocument = {

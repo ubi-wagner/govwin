@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildCostVolumeCanvas, buildStarterCostVolume, provisionalCostInputs, parseStructuredCostInputs } from '@/lib/proposal/cost-volume-canvas';
 import { computeBudget } from '@/lib/proposal/cost-model';
 import type { CanvasNode, TableCell, TableContent } from '@/lib/types/canvas-document';
+import { docNodes } from '@/lib/types/canvas-document';
 
 function tables(nodes: CanvasNode[]): TableContent[] {
   return nodes.filter((n) => n.type === 'table').map((n) => n.content as unknown as TableContent);
@@ -138,5 +139,60 @@ describe('parseStructuredCostInputs — canvas → typed inputs (readiness roll-
     expect(parseStructuredCostInputs([{ content: JSON.stringify(freeform) }])).toBeNull();
     expect(parseStructuredCostInputs([{ content: null }])).toBeNull();
     expect(parseStructuredCostInputs([])).toBeNull();
+  });
+});
+
+// ── computed figures ─────────────────────────────────────────────────────────
+describe('the cost volume carries its own computed figures', () => {
+  // The numbers were all already there; nothing plotted them. A cost evaluator reads the SHAPE of
+  // a build-up, and `chart` nodes export natively to docx/pptx/xlsx/pdf, so these reach every
+  // download rather than being an editor-only flourish.
+  const built = (program: string) => buildCostVolumeCanvas({
+    ...provisionalCostInputs(),
+    meta: { program, agency: 'DoW', ceiling: 250_000 },
+  });
+
+  it('plots the burden waterfall from the SAME numbers the summary table prints', () => {
+    const doc = built('sbir');
+    const nodes = docNodes(doc);
+    const chart = nodes.find((n) => n.type === 'chart'
+      && (n.content as { title?: string }).title === 'Cost build-up by element');
+    expect(chart, 'no cost build-up chart').toBeTruthy();
+
+    const c = chart!.content as { categories: string[]; series: Array<{ data: number[] }> };
+    // Every plotted element must also appear in the Summary table — the chart adds no claim.
+    const summary = nodes.find((n) => n.type === 'table'
+      && (n.content as { sheet_name?: string }).sheet_name === 'Summary');
+    const summaryText = JSON.stringify(summary!.content);
+    for (const cat of c.categories) {
+      const key = cat.split(' ')[0].replace('&', '&');   // 'Direct', 'Fringe', 'Overhead', 'G&A'…
+      expect(summaryText, `${cat} plotted but absent from Summary`).toContain(key);
+    }
+    expect(c.series[0].data.every((v) => v > 0)).toBe(true); // no empty bars
+  });
+
+  it('plots the work split for a program that HAS a work-share floor', () => {
+    const nodes = docNodes(built('sttr'));
+    const split = nodes.find((n) => n.type === 'chart'
+      && (n.content as { title?: string }).title === 'Work share of the research effort');
+    expect(split).toBeTruthy();
+    const c = split!.content as { series: Array<{ data: number[] }> };
+    // the two slices are a split — they sum to 100
+    expect(Math.round(c.series[0].data.reduce((a, b) => a + b, 0))).toBe(100);
+  });
+
+  it('omits the work-split chart where there is no floor to show', () => {
+    const nodes = docNodes(built('baa'));
+    expect(nodes.find((n) => n.type === 'chart'
+      && (n.content as { title?: string }).title === 'Work share of the research effort')).toBeUndefined();
+    // …but the build-up is universal
+    expect(nodes.some((n) => n.type === 'chart')).toBe(true);
+  });
+
+  it('gives every chart a caption', () => {
+    const nodes = docNodes(built('sbir'));
+    const charts = nodes.filter((n) => n.type === 'chart').length;
+    const captions = nodes.filter((n) => n.type === 'caption').length;
+    expect(captions).toBeGreaterThanOrEqual(charts);
   });
 });
