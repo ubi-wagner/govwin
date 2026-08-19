@@ -13,7 +13,14 @@
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// Page furniture (#152). A SoW is the document that gets attached to a contract and passed around
+// — it is the one in this set most likely to be printed, initialled and filed, so a page that has
+// been separated from the stack has to say what it is. `{n}`/`{N}` are the exporters' own tokens.
+const PRESET: CanvasRules = {
+  ...CANVAS_PRESETS.letter_standard,
+  header: { template: 'Statement of Work — {project_title}', height: 36, font: { family: 'Arial', size: 9 } },
+  footer: { template: '{company_name} | Page {n} of {N}', height: 36, font: { family: 'Arial', size: 9 } },
+};
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return { id, type: n.type ?? 'text_block', content: n.content ?? null, style: n.style ?? {}, provenance: { source: 'template' }, history: [], library_eligible: n.type !== 'page_break' && n.type !== 'spacer' };
 }

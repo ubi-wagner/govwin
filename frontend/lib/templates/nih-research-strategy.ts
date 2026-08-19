@@ -13,7 +13,15 @@
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
-const PRESET: CanvasRules = CANVAS_PRESETS.letter_standard;
+// Page furniture (#152). A Research Strategy runs to multiple pages and an NIH reviewer works
+// through a stack of them: the running header says which application this page belongs to, the
+// footer says where you are in it. `{n}`/`{N}` are the exporters' own page tokens — a hard-coded
+// number is furniture that lies, which is what B29 was.
+const PRESET: CanvasRules = {
+  ...CANVAS_PRESETS.letter_standard,
+  header: { template: 'Research Strategy — {company_name}', height: 36, font: { family: 'Arial', size: 9 } },
+  footer: { template: '{company_name} | Page {n} of {N}', height: 36, font: { family: 'Arial', size: 9 } },
+};
 function node(id: string, n: Partial<CanvasNode>): CanvasNode {
   return { id, type: n.type ?? 'text_block', content: n.content ?? null, style: n.style ?? {}, provenance: { source: 'template' }, history: [], library_eligible: n.type !== 'page_break' && n.type !== 'spacer' };
 }
