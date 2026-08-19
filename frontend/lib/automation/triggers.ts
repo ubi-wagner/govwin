@@ -18,6 +18,7 @@
  * Everything is best-effort: a failure here must NEVER affect the event emit.
  */
 import { sql } from '@/lib/db';
+import { runInTenant } from '@/lib/tenant-context';
 import { type AutomationEvent, EXECUTABLE, interpolate, conditionsMatch } from '@/lib/automation/match';
 
 export type { AutomationEvent } from '@/lib/automation/match';
@@ -139,11 +140,19 @@ async function executeTodoAction(
     ? (cfg.nudge_days as unknown[]).map(Number).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 3)
     : [];
 
-  await sql`
-    INSERT INTO tasks (tenant_id, assignee_role, task_type, title, description, status, due_at, nudge_schedule, params)
-    VALUES (${event.tenantId}::uuid, 'rfp_admin', ${taskType}, ${title}, ${description}, 'open',
-            ${dueAt}, ${sql.json(nudgeDays)}, ${sql.json(params as JsonArg)})
-  `;
+  // The tasks ledger is RLS-scoped per-command (mig 185): a tenant-stamped INSERT through the
+  // context-aware `sql` needs app.tenant_id SET — and event emitters (purchase route, Stripe
+  // webhook) run OUTSIDE any tenant frame. Without this wrap every tenant-scoped rule ToDo is
+  // silently RLS-rejected into automation_log as 'error'.
+  const insertTask = async () => {
+    await sql`
+      INSERT INTO tasks (tenant_id, assignee_role, task_type, title, description, status, due_at, nudge_schedule, params)
+      VALUES (${event.tenantId}::uuid, 'rfp_admin', ${taskType}, ${title}, ${description}, 'open',
+              ${dueAt}, ${sql.json(nudgeDays)}, ${sql.json(params as JsonArg)})
+    `;
+  };
+  if (event.tenantId) await runInTenant(event.tenantId, insertTask);
+  else await insertTask();
 }
 
 /** START-ROW: record the execution as 'running' and return its id to finalize later. */

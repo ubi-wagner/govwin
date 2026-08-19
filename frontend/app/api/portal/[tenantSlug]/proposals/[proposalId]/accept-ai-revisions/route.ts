@@ -103,6 +103,7 @@ export async function POST(
         JOIN proposal_sections ps ON ps.id = cv.section_id
         JOIN proposals p ON p.id = ps.proposal_id
         WHERE ps.proposal_id = ${proposalId}::uuid AND cv.source = 'ai_revision'
+          AND cv.snapshot_reason = 'full_draft'
         ORDER BY cv.section_id, cv.version_number DESC
       `;
     } catch (e) {

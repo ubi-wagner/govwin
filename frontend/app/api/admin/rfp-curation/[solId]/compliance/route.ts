@@ -17,6 +17,7 @@ import type { ToolContext } from '@/lib/tools';
 import { createLogger } from '@/lib/logger';
 import type { Role } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 
 const log = createLogger('rfp-curation');
 
@@ -82,6 +83,7 @@ export async function POST(
   request: Request,
   routeCtx: RouteContext,
 ) {
+  let startId: string | null = null;
   try {
     // ── Auth check ──────────────────────────────────────────────────
     const session = await auth();
@@ -146,7 +148,7 @@ export async function POST(
     };
 
     // ── Start event ─────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'compliance_value.saved',
       actor: { type: 'user', id: user.id! },
@@ -173,8 +175,18 @@ export async function POST(
       result: { solicitationId: solId, variableName: body.variableName as string },
     });
 
-    return NextResponse.json({ data: result });
+    // Card snapshots carry complianceSummary (page limits · submission_format · volume
+    // count), so a saved variable on a PUSHED solicitation must refresh the tenant
+    // mirrors — otherwise customers keep seeing the pre-edit matrix. No-op pre-push.
+    const propagation = await republishSolicitationCards({ solicitationId: solId, actorId: user.id ?? null });
+
+    return NextResponse.json({ data: { ...(result as Record<string, unknown>), propagation } });
   } catch (error) {
+    // AUDIT FIX (PATTERN_AUDIT MED-8): a thrown tool error must not leave the
+    // compliance_value.saved bracket dangling (7 live orphans).
+    if (startId) {
+      try { await emitEventEnd(startId, { error: { message: error instanceof Error ? error.message : String(error), code: 'SAVE_FAILED' } }); } catch { /* never dangle */ }
+    }
     // Translate known AppError subclasses to proper HTTP responses
     if (error && typeof error === 'object' && 'httpStatus' in error) {
       const appErr = error as { httpStatus: number; message: string; code: string; details?: unknown };

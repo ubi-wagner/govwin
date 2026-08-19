@@ -1,10 +1,20 @@
 /**
- * Manual AI (color-team) review — POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai-review
+ * Manual AI (color-team) review — /api/portal/[tenantSlug]/proposals/[proposalId]/ai-review
  *
- * The admin-triggered analog of the on-advance AI review. Enqueues a color_team_reviewer task per
- * section with content; the reviews land as `ai_review` comments in each section's context-box thread.
- * Advisory — it never edits, advances, locks, or submits. Funnels through requestAiReview so the
- * portal button and the (future) admin doorbell produce one auditable trail.
+ * POST                     enqueue a color_team_reviewer task per section with content
+ * POST {retryFailed:true}  re-queue ONLY the sections whose last review failed
+ * GET                      what actually happened to those reviews
+ *
+ * The reviews land as `ai_review` comments in each section's context-box thread. Advisory — never
+ * edits, advances, locks, or submits. Funnels through requestAiReview so the portal button and the
+ * admin doorbell produce one auditable trail.
+ *
+ * WHY GET EXISTS. POST returned `{ enqueued }` and that was the last thing the customer ever heard.
+ * A task that fails afterwards — most often the fabric's hourly rate limit, which on this database
+ * killed 36 of 68 queued reviews — surfaced nowhere at all. No comment, no error, no retry: from
+ * the customer's side identical to "the reviewer had nothing to say", which invites shipping an
+ * unreviewed section believing it passed. GET reports per-section state and the reason for every
+ * failure; retryFailed re-queues just those.
  *
  * Auth: tenant_admin or above with tenant access (rfp/master admins via their shadow membership).
  */
@@ -14,12 +24,13 @@ import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db'
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { requestAiReview } from '@/lib/proposal-ai-review';
+import { getColorTeamStatus, failedReviewSectionIds } from '@/lib/proposal-color-team';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
-export async function POST(_request: Request, ctx: RouteContext) {
+export async function POST(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, proposalId } = await ctx.params;
     if (!isValidUUID(proposalId)) {
@@ -60,6 +71,22 @@ export async function POST(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
+    let body: { retryFailed?: boolean } = {};
+    try { body = await request.json(); } catch { /* an empty body means "review everything" */ }
+
+    // Retry re-queues ONLY the failed sections. A blanket re-run would post a second, possibly
+    // contradictory review comment on every section that already succeeded, and would spend the
+    // same hourly budget that caused the failure — turning one retry into the next outage.
+    let onlySectionIds: string[] | undefined;
+    if (body.retryFailed) {
+      onlySectionIds = await failedReviewSectionIds(proposalId);
+      if (onlySectionIds.length === 0) {
+        return NextResponse.json({
+          error: 'No failed reviews to retry.', code: 'NOTHING_TO_RETRY',
+        }, { status: 409 });
+      }
+    }
+
     const { enqueued } = await requestAiReview({
       proposalId,
       tenantId,
@@ -67,11 +94,57 @@ export async function POST(_request: Request, ctx: RouteContext) {
       actorEmail: user.email ?? null,
       role,
       source: 'portal',
+      onlySectionIds,
     });
 
-    return NextResponse.json({ data: { enqueued } });
+    return NextResponse.json({ data: { enqueued, retried: !!body.retryFailed } });
   } catch (e) {
     console.error('[ai-review] POST error', e);
     return NextResponse.json({ error: 'AI review request failed', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}
+
+
+export async function GET(_request: Request, ctx: RouteContext) {
+  try {
+    const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    const user = session.user as { id?: string; email?: string; role?: unknown };
+    const role: Role | null = isRole(user.role) ? user.role : null;
+    if (!role || !user.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    const tenantId = tenant.id as string;
+    if (!(await verifyTenantAccess(user.id, role, tenantId))) {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    enterTenant(tenantId);
+
+    // Never trust the id alone — the proposal must belong to THIS tenant.
+    let exists: { id: string }[];
+    try {
+      exists = await sql`SELECT id FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+    } catch (e) {
+      console.error('[ai-review] GET proposal check failed', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (exists.length === 0) {
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: await getColorTeamStatus(proposalId) });
+  } catch (e) {
+    console.error('[ai-review] GET error', e);
+    return NextResponse.json({ error: 'Could not read the review status', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }

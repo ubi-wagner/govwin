@@ -28,6 +28,15 @@ const nextConfig = {
   // so Next's tracer misses them — force them into the standalone so OCR works on any deploy.
   outputFileTracingIncludes: {
     '/api/portal/[tenantSlug]/atoms/capture': ['./node_modules/tesseract.js-core/**/*', './ocr-data/**/*'],
+    // pdf.js resolves its WORKER (pdf.worker.mjs) by PATH at runtime, exactly like tesseract's wasm
+    // above — so Next's tracer copies pdf.mjs into .next/standalone but NOT the worker beside it.
+    // The standalone server is what deploys (`output: 'standalone'`), so without this EVERY PDF text
+    // extraction fails there with "Setting up fake worker failed: Cannot find module …/pdf.worker.mjs"
+    // while working fine in dev. Caught live: a DoW SBIR BAA upload shredded to 0 chars, and the
+    // compliance matrix then filled from SYSTEM_DEFAULTS as if the rules had been read.
+    // Keyed per PDF-reading route (pdf-parse nests its own pdfjs-dist copy).
+    '/api/admin/rfp-upload': ['./node_modules/pdf-parse/node_modules/pdfjs-dist/legacy/build/**/*'],
+    '/api/admin/upload-topic-files': ['./node_modules/pdf-parse/node_modules/pdfjs-dist/legacy/build/**/*'],
   },
   experimental: {
     serverActions: {

@@ -20,6 +20,7 @@ import { linkPortalProposal, releaseFromCuration } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, type GuardrailConfig } from '@/lib/portal-workflow';
 import { createTask } from '@/lib/tasks/tasks';
 import { emitEventSingle } from '@/lib/events';
+import { replayConfirmedAmendments } from '@/lib/amendments';
 import type { Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 
@@ -82,22 +83,75 @@ export async function provisionAndReleasePortal(opts: {
     }
     // linkPortalProposal CAS-links only while proposal_id IS NULL. If it returns false a CONCURRENT
     // release (admin cockpit + tenant ?action=release, or a double-click) already provisioned + linked
-    // this portal — adopt the WINNER's proposal so we don't double-link / drive the wrong build. (Our
-    // just-provisioned proposal is left unlinked + inert; the release itself still CAS-guards below.)
-    const linked = await linkPortalProposal(tenantId, portalId, prov.proposalId);
+    // this portal — adopt the WINNER's proposal so we don't double-link / drive the wrong build.
+    // The loser build is NOT naturally inert (proposal.created fan-out already fired agents + review
+    // ToDos on it, and it lists with an identical title): ARCHIVE it + expire its open ToDos so the
+    // tenant never sees a phantom duplicate.
+    const archiveOrphanBuild = async (orphanId: string) => {
+      try {
+        await withTenant(tenantId, async (tx) => {
+          await tx`UPDATE proposals SET archived_at = now() WHERE id = ${orphanId}::uuid AND tenant_id = ${tenantId}::uuid`;
+          await tx`
+            UPDATE tasks SET status = 'expired', updated_at = now()
+            WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'proposal'
+              AND entity_id = ${orphanId}::uuid AND status IN ('open','in_progress')`;
+        });
+      } catch (e) { console.error('[provisionAndReleasePortal] orphan-build archive failed (non-fatal)', e); }
+    };
+    let linked = false;
+    try {
+      linked = await linkPortalProposal(tenantId, portalId, prov.proposalId);
+    } catch (e) {
+      console.error('[provisionAndReleasePortal] link failed', e);
+    }
     if (linked) {
       proposalId = prov.proposalId;
     } else {
       const [winner] = await withTenant(tenantId, async (tx) =>
         tx<Array<{ proposalId: string | null }>>`
           SELECT proposal_id AS "proposalId" FROM proposal_portals WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`);
-      proposalId = winner?.proposalId ?? prov.proposalId;
+      if (winner?.proposalId) {
+        proposalId = winner.proposalId;
+        if (winner.proposalId !== prov.proposalId) await archiveOrphanBuild(prov.proposalId);
+      } else {
+        // Link threw with no winner on the portal: archive our orphan and fail the release —
+        // a retry provisions cleanly instead of stacking a second visible duplicate.
+        await archiveOrphanBuild(prov.proposalId);
+        return { ok: false, error: 'Could not link the provisioned build to the portal (please retry)', code: 'PROVISION_FAILED', status: 500 };
+      }
     }
   }
 
   // Build is ready + linked — NOW flip live (CAS on curation_pending). 409 if not awaiting curation.
   const { released } = await releaseFromCuration(tenantId, portalId, config, { releasedBy: actor.id });
   if (!released) return { ok: false, error: 'Portal is not awaiting curation (already released?)', code: 'CONFLICT', status: 409 };
+
+  // Mid-window amendment replay: an amendment confirmed BETWEEN purchase and this release
+  // fanned out to zero flags for this buyer — no proposals row existed yet, and nothing
+  // back-filled it. Flag every confirmed amendment onto the fresh proposal now so the
+  // portal opens with the banner + bell, exactly as if it had been provisioned first.
+  // Tenant-scoped (runInTenant) + best-effort: a replay failure never wedges the release —
+  // and it is NOT the last line of defense: the tenant amendments GET reconciles missing
+  // flags on read (idempotent ON CONFLICT), so a transiently-failed replay self-heals the
+  // first time anyone opens the proposal.
+  if (proposalId) {
+    try {
+      const pid = proposalId;
+      const [pr] = await withTenant(tenantId, async (tx) =>
+        tx<Array<{ solicitationId: string | null }>>`
+          SELECT solicitation_id AS "solicitationId" FROM proposals
+          WHERE tenant_id = ${tenantId}::uuid AND id = ${pid}::uuid LIMIT 1`);
+      if (pr?.solicitationId) {
+        const solicitationId = pr.solicitationId;
+        await runInTenant(tenantId, () => replayConfirmedAmendments({
+          solicitationId, proposalId: pid, tenantId,
+          actorId: actor.id, actorEmail: actor.email ?? null,
+        }));
+      }
+    } catch (e) {
+      console.error('[provisionAndReleasePortal] amendment replay failed (non-fatal)', e);
+    }
+  }
 
   // Workflow ToDos are best-effort (re-creatable) — they never wedge an already-launched portal.
   let tasksCreated = 0;

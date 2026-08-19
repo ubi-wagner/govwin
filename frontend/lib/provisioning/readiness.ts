@@ -4,9 +4,13 @@
  * Computes whether a master OPP (curated_solicitations) is "fully built out" — the advisory bar the
  * provisioning cockpit shows and the "Mark build-out complete" action gates on (owner decision:
  * advisory + confirm, so `ready=false` doesn't BLOCK release, it just requires an explicit confirm).
- * The bar = compliance authored (a baseline solicitation_compliance row with a submission_format) +
- * >=1 baseline volume + >=1 required item. `itemsWithTemplate` is a soft recommendation (the provision
- * cascade has a code-registry fallback, so a missing mold degrades gracefully — it never blocks).
+ * The bar = compliance authored (a solicitation_compliance row with a submission_format — named
+ * column OR the curator's custom_variables layer, matching the push gate) + >=1 volume + >=1
+ * required item. Scope-agnostic on purpose: the provisioner PREFERS topic overrides
+ * (compliance-resolver), so a fully topic-scoped build satisfies the bar exactly like a baseline
+ * one — counting only `topic_id IS NULL` made a topic-only build read "below the bar" and forced
+ * a spurious confirm. `itemsWithTemplate` is a soft recommendation (the provision cascade has a
+ * code-registry fallback, so a missing mold degrades gracefully — it never blocks).
  *
  * Master tables (solicitation_compliance / solicitation_volumes / volume_required_items / curated_
  * solicitations) are platform/admin-scoped and cross-tenant → read via sqlBypass. camelCase off toCamel.
@@ -40,10 +44,11 @@ export async function getBuildReadiness(solId: string): Promise<BuildReadiness> 
     }>>`
       SELECT
         EXISTS(SELECT 1 FROM solicitation_compliance sc
-               WHERE sc.solicitation_id = ${solId}::uuid AND sc.topic_id IS NULL
-                 AND sc.submission_format IS NOT NULL AND sc.submission_format <> '') AS has_compliance,
+               WHERE sc.solicitation_id = ${solId}::uuid
+                 AND ((sc.submission_format IS NOT NULL AND sc.submission_format <> '')
+                      OR COALESCE(sc.custom_variables->'submission_format'->>'value', '') <> '')) AS has_compliance,
         (SELECT count(*)::int FROM solicitation_volumes sv
-           WHERE sv.solicitation_id = ${solId}::uuid AND sv.topic_id IS NULL) AS volume_count,
+           WHERE sv.solicitation_id = ${solId}::uuid) AS volume_count,
         (SELECT count(*)::int FROM volume_required_items vri
            JOIN solicitation_volumes sv ON sv.id = vri.volume_id
            WHERE sv.solicitation_id = ${solId}::uuid) AS required_item_count,

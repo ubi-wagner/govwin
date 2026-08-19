@@ -21,6 +21,8 @@ import { sql } from '@/lib/db';
 import { publishAndFanOut } from '@/lib/opportunity-bridge';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { provisionProposalForPortal } from '@/lib/provision-proposal';
+import { createTenantWithAdmin } from '@/lib/tenants/create-tenant';
+import { hardDeleteProposalCascade } from '@/lib/proposal-archive';
 import { createRequire } from 'module';
 const require = createRequire('/home/user/govwin/frontend/');
 const bcrypt = require('bcryptjs');
@@ -73,17 +75,22 @@ let failures = 0;
 const ok = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗ FAIL'} ${l}${x ? ' — ' + x : ''}`); if (!c) failures++; };
 
 try {
-  // ── Immobileyes tenant + admin (demo login: admin@immobileyes.test / DemoPass123!) ──
-  const [tenant] = await sql<{ id: string; name: string; slug: string }[]>`
-    INSERT INTO tenants (name, slug, status) VALUES ('Immobileyes', 'immobileyes', 'active')
-    ON CONFLICT (slug) DO UPDATE SET status = 'active' RETURNING id, name, slug`;
-  const hash = await bcrypt.hash('DemoPass123!', 10);
+  // ── Immobileyes tenant + admin via the PRODUCT onboarding path (demo login:
+  //    admin@immobileyes.test / DemoPass123!) — membership + default buckets + card
+  //    backfill + starter/template library copy + the finder:tenant.created start/end
+  //    bracket all come from lib/tenants/create-tenant (idempotent adopt-or-create).
+  const [eric] = await sql<{ id: string; email: string }[]>`
+    SELECT id, email FROM users WHERE email = 'eric@rfppipeline.com' LIMIT 1`;
+  const seedActor = { id: eric?.id ?? '00000000-0000-4000-8000-000000000000', email: eric?.email ?? null, role: 'rfp_admin' as const };
+  const createdTenant = await createTenantWithAdmin(
+    { name: 'Immobileyes', fixedSlug: 'immobileyes', adminEmail: 'admin@immobileyes.test', adminName: 'Immo Admin', password: 'DemoPass123!' },
+    seedActor,
+  );
+  const tenant = { id: createdTenant.tenantId, name: 'Immobileyes', slug: createdTenant.slug };
   const [user] = await sql<{ id: string; email: string }[]>`
-    INSERT INTO users (email, name, role, tenant_id, password_hash, is_active, temp_password)
-    VALUES ('admin@immobileyes.test', 'Immo Admin', 'tenant_admin', ${tenant.id}::uuid, ${hash}, true, false)
-    ON CONFLICT (email) DO UPDATE SET role = 'tenant_admin', tenant_id = ${tenant.id}::uuid, password_hash = ${hash}, is_active = true, temp_password = false
-    RETURNING id, email`;
-  ok('Immobileyes tenant + admin ready', !!tenant && !!user, `${tenant.slug} / ${user.email}`);
+    SELECT id, email FROM users WHERE email = 'admin@immobileyes.test' LIMIT 1`;
+  ok('Immobileyes tenant + admin ready (product path)', !!tenant && !!user,
+     `${tenant.slug} / ${user.email} · membership+buckets+starter (${createdTenant.starterCopied} atoms copied)`);
 
   // ── Opportunity ──
   const [opp] = await sql<{ id: string }[]>`
@@ -167,10 +174,11 @@ try {
     const [{ arts }] = await sql<{ arts: number }[]>`SELECT count(*)::int arts FROM proposal_artifacts WHERE proposal_id = ${prov.proposalId}::uuid`;
     const [{ mx }] = await sql<{ mx: number }[]>`SELECT count(*)::int mx FROM proposal_compliance_matrix WHERE proposal_id = ${prov.proposalId}::uuid`;
     ok('6 volume artifacts + full matrix', arts === 6 && mx === totalItems, `${arts} artifacts, ${mx} matrix rows`);
-    await sql`DELETE FROM proposal_compliance_matrix WHERE proposal_id = ${prov.proposalId}::uuid`;
-    await sql`DELETE FROM proposal_sections WHERE proposal_id = ${prov.proposalId}::uuid`;
-    await sql`DELETE FROM proposal_artifacts WHERE proposal_id = ${prov.proposalId}::uuid`;
-    await sql`DELETE FROM proposals WHERE id = ${prov.proposalId}::uuid`;
+    // Teardown via the SYSTEM's hard-delete cascade (lib/proposal-archive) — the one
+    // sanctioned hard-delete path; seeds stop hand-ordering the FK graph.
+    await hardDeleteProposalCascade(prov.proposalId, {
+      reason: 'seed_rehearsal', tenantId: tenant.id, actorId: seedActor.id, actorEmail: seedActor.email,
+    });
     console.log('  ↳ rehearsal proposal cleaned up (OPP left fresh for the HITL run)');
   }
   console.log(`\nCUAS skeleton: ${VOLUMES.length} volumes, ${totalItems} required items (12 white-paper sections + cost base/option + cover sheet + CCR + 5 supporting docs + FWA).`);

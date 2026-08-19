@@ -179,6 +179,7 @@ export async function POST(
       `;
     } catch (dbErr) {
       console.error('[rfp-curation] POST triage update failed:', dbErr);
+      try { await emitEventEnd(startId, { error: { message: 'triage update failed', code: 'DB_ERROR' } }); } catch { /* never dangle */ }
       return NextResponse.json(
         { error: 'Internal error', code: 'DB_ERROR' },
         { status: 500 },
@@ -205,6 +206,9 @@ export async function POST(
       `;
     } catch (dbErr) {
       console.error('[rfp-curation] POST triage_actions insert failed:', dbErr);
+      // The status CAS already committed — close the bracket with the applied transition so
+      // the ledger reflects reality even though the audit row failed.
+      try { await emitEventEnd(startId, { error: { message: 'triage audit insert failed (transition applied)', code: 'DB_ERROR' } }); } catch { /* never dangle */ }
       return NextResponse.json(
         { error: 'Internal error', code: 'DB_ERROR' },
         { status: 500 },

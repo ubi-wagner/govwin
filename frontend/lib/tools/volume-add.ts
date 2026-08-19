@@ -13,6 +13,7 @@ import { sql } from '@/lib/db';
 import { ConflictError, NotFoundError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -88,6 +89,10 @@ export const volumeAddTool = defineTool<Input, Output>({
         volumeName: input.volumeName,
       },
     });
+
+    // Volume structure feeds the card's complianceSummary.volumeCount — a change on a
+    // pushed solicitation refreshes every tenant mirror (no-op pre-push, best-effort).
+    await republishSolicitationCards({ solicitationId: input.solicitationId, actorId: ctx.actor.id });
 
     return {
       volumeId: rows[0].id,

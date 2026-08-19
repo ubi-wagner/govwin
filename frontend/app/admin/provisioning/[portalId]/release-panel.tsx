@@ -111,7 +111,9 @@ export function SlaCountdown({ dueAt }: { dueAt: string }) {
   const dueLabel = new Date(dueAt).toLocaleString();
   if (now == null) {
     // SSR / first paint — show the deadline without the live delta (avoids hydration drift).
-    return <p className="text-sm text-gray-600">Due <span className="font-medium">{dueLabel}</span></p>;
+    // suppressHydrationWarning: toLocaleString renders in the SERVER's TZ in the initial HTML
+    // and the viewer's TZ on hydration — a guaranteed text mismatch whenever they differ.
+    return <p className="text-sm text-gray-600">Due <span className="font-medium" suppressHydrationWarning>{dueLabel}</span></p>;
   }
   const ms = due - now;
   const overdue = ms < 0;

@@ -5,9 +5,10 @@
 
 import { z } from 'zod';
 import { sql } from '@/lib/db';
-import { ConflictError, NotFoundError } from '@/lib/errors';
+import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -21,6 +22,16 @@ const InputSchema = z.object({
   required: z.boolean().default(true),
   pageLimit: z.number().int().min(1).max(10000).optional(),
   slideLimit: z.number().int().min(1).max(1000).optional(),
+  // Character cap, for an item the agency measures in characters rather than pages (an SBIR
+  // cover-sheet abstract, an NSF project summary). The agency's form field truncates at the cap.
+  characterLimit: z.number().int().min(1).max(100000).optional(),
+  // DSIP-ONLY: this item is completed inside the agency's submission portal — a webform, a
+  // report pulled from SBIR.gov, training taken there. The company never authors a document for
+  // it, so provision must track it as a checklist entry and NOT stand up an authoring artifact
+  // that can never be filled (which would block submission readiness forever). Set per ITEM
+  // because a volume can mix the two: the DoW Volume 1 is a DSIP cover-sheet webform PLUS two
+  // authored narrative documents.
+  dsipOnly: z.boolean().optional(),
   fontFamily: z.string().max(100).optional(),
   fontSize: z.string().max(20).optional(),
   margins: z.string().max(100).optional(),
@@ -46,10 +57,10 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    let vol: { solicitationId: string }[];
+    let vol: { solicitationId: string; topicId: string | null }[];
     try {
-      vol = await sql<{ solicitationId: string }[]>`
-        SELECT solicitation_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
+      vol = await sql<{ solicitationId: string; topicId: string | null }[]>`
+        SELECT solicitation_id, topic_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
       `;
     } catch (err) {
       console.error('[volume.add_required_item] volume lookup failed:', err);
@@ -57,14 +68,36 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
     }
     if (vol.length === 0) throw new NotFoundError(`volume not found: ${input.volumeId}`);
 
+    // FK-before-write (CLAUDE.md §Data Layer): a dangling templateId must be a clean
+    // validation refusal, not a raw 23503 constraint throw from the INSERT. Also refuse an
+    // EMPTY mold ({} default body): it passes the cockpit readiness bar yet provisions
+    // nothing — author the canvas first, then link. (Run under platform context, the RLS
+    // SELECT policy also hides tenant-owned molds here, so a master item can only ever
+    // link a platform mold every buyer can load at release.)
+    if (input.templateId) {
+      const tpl = await sql<{ id: string; contentNodes: number }[]>`
+        SELECT id,
+          (CASE WHEN jsonb_typeof(canvas_document->'nodes') = 'array'
+                THEN jsonb_array_length(canvas_document->'nodes') ELSE 0 END
+           + CASE WHEN jsonb_typeof(canvas_document->'sections') = 'array'
+                THEN jsonb_array_length(canvas_document->'sections') ELSE 0 END)::int AS content_nodes
+        FROM document_templates WHERE id = ${input.templateId}::uuid LIMIT 1`;
+      if (tpl.length === 0) {
+        throw new ValidationError(`templateId does not exist: ${input.templateId}`);
+      }
+      if (tpl[0].contentNodes === 0) {
+        throw new ValidationError('template has no canvas content — author the mold before linking it to an item');
+      }
+    }
+
     let rows;
     try {
       rows = await sql<{ id: string }[]>`
         INSERT INTO volume_required_items
           (volume_id, item_number, item_name, item_type, required,
-           page_limit, slide_limit, font_family, font_size, margins,
+           page_limit, slide_limit, character_limit, font_family, font_size, margins,
            line_spacing, header_format, footer_format, applies_to_phase,
-           template_id, expert_notes)
+           template_id, expert_notes, metadata)
         VALUES
           (${input.volumeId}::uuid,
            ${input.itemNumber},
@@ -73,6 +106,7 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
            ${input.required},
            ${input.pageLimit ?? null},
            ${input.slideLimit ?? null},
+           ${input.characterLimit ?? null},
            ${input.fontFamily ?? null},
            ${input.fontSize ?? null},
            ${input.margins ?? null},
@@ -81,7 +115,8 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
            ${input.footerFormat ?? null},
            ${input.appliesToPhase ?? null}::text[],
            ${input.templateId ?? null}::uuid,
-           ${input.expertNotes ?? null})
+           ${input.expertNotes ?? null},
+           ${sql.json(input.dsipOnly === true ? { dsipOnly: true } : {})})
         RETURNING id
       `;
     } catch (err) {
@@ -105,6 +140,12 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
         itemId: rows[0].id,
         itemName: input.itemName,
       },
+    });
+
+    // Required-item structure drives build readiness + the provisioned skeleton —
+    // refresh pushed mirrors so provisionReady truth doesn't silently diverge.
+    await republishSolicitationCards({
+      solicitationId: vol[0].solicitationId, opportunityId: vol[0].topicId, actorId: ctx.actor.id,
     });
 
     return { itemId: rows[0].id, volumeId: input.volumeId };

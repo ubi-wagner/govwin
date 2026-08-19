@@ -86,6 +86,30 @@ export async function PUT(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Content too large', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
     }
 
+    // The payload must actually BE a CanvasDocument. Checking only `typeof === 'object'` let any
+    // object through, and the nearest wrong one is easy to send by accident: the canvas RULES
+    // object (width/height/margins/font_default…), which the document route returns as
+    // `sections[].canvas`. Saving that replaces a drafted section with an empty shell — it has no
+    // nodes, so nothing is written and everything is lost. A client did exactly that here and
+    // wiped 20 drafted sections in one pass; the content was recoverable only because
+    // canvas_versions had archived it.
+    //
+    // An EMPTY `nodes: []` is still allowed — clearing a section deliberately is a real edit. What
+    // is refused is a payload with no `nodes` key at all, which is never a document.
+    const contentObj = body.content as Record<string, unknown>;
+    const hasNodes = Array.isArray(contentObj.nodes);
+    const hasSections = Array.isArray(contentObj.sections); // v2 documents carry sections[]
+    if (!hasNodes && !hasSections) {
+      return NextResponse.json(
+        {
+          error: 'content must be a CanvasDocument (missing "nodes"). '
+            + 'A canvas rules object is not a document.',
+          code: 'VALIDATION_ERROR',
+        },
+        { status: 400 },
+      );
+    }
+
     const newStatus = typeof body.status === 'string' &&
       (VALID_STATUSES as readonly string[]).includes(body.status)
       ? body.status
@@ -146,11 +170,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; characterAllocation: number | null; meta: unknown } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null }[]>`
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; characterAllocation: number | null; meta: unknown }[]>`
         SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
-               ps.content_source AS "contentSource",
+               ps.content_source AS "contentSource", ps.character_allocation, ps.meta,
                pa.compliance_spec
         FROM proposal_sections ps
         LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
@@ -227,6 +251,10 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
       // Archive even on first save (null content) to record the empty state
       const contentToArchive = currentContent ?? '{}';
+      // The archived content's AI provenance is the PREVIOUS save's (stashed in meta.lastEdit) —
+      // the incoming body's aiInstruction/aiModel describe the NEW content, which will be archived
+      // (with these values) by the NEXT save. Without the stash they were parsed and discarded.
+      const prevEdit = ((section.meta as { lastEdit?: { aiInstruction?: string | null; aiModel?: string | null; editSummary?: string | null } } | null)?.lastEdit) ?? {};
       // canvas_versions.content is jsonb: write the PARSED object via sql.json, NOT ${string}::jsonb
       // — the latter double-encodes to a jsonb STRING scalar, so the Version History preview renders
       // raw JSON instead of the node text (CLIFFNOTES §4b jsonb bug-class; the admin route is correct).
@@ -246,9 +274,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
             ${sessionUser.id}::uuid,
             ${archiveCharCount},
             ${archiveWordCount},
-            ${null},
-            ${null},
-            ${null}
+            ${prevEdit.aiInstruction ?? null},
+            ${prevEdit.aiModel ?? null},
+            ${prevEdit.editSummary ?? null}
           )
           ON CONFLICT (section_id, version_number) DO NOTHING
         `;
@@ -310,6 +338,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               status = ${effectiveStatus},
               version = ${nextVersion},
               content_source = ${contentSource},
+              meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{lastEdit}', ${sql.json({ aiInstruction, aiModel, editSummary })}::jsonb),
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -323,6 +352,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           SET content = ${contentJson},
               version = ${nextVersion},
               content_source = ${contentSource},
+              meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{lastEdit}', ${sql.json({ aiInstruction, aiModel, editSummary })}::jsonb),
               last_modified_by = ${sessionUser.id}::uuid,
               editing_by = NULL,
               editing_since = NULL,
@@ -391,14 +421,31 @@ export async function PUT(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/sections/save] activity log failed', logErr);
     }
 
-    // Compliance floor (E4) — section-local checks (font / images) on the saved
+    // Compliance floor (E4) — section-local checks (font / images / character cap) on the saved
     // canvas, surfaced as NON-BLOCKING warnings. Whole-doc limits (pages, header/
     // footer) are validated at the export gate, not per section-save.
+    //
+    // The CHARACTER cap is checked here against THIS section's own allocation, not the artifact
+    // spec's max_characters — that one is the sum across the volume's items, and measuring one
+    // section against the whole volume's budget would let a 3,000-character abstract run to 6,000
+    // unflagged. Unlike the page ruler this is an exact count, so it is worth reporting the moment
+    // the author saves: an over-cap narrative is silently truncated by the agency's form.
     let complianceWarnings: { code: string; message: string }[] = [];
-    if (section.complianceSpec) {
+    const sectionSpec: ComplianceSpec | null = section.complianceSpec
+      ? { ...section.complianceSpec, max_characters: section.characterAllocation ?? null }
+      : (section.characterAllocation != null
+        ? { max_pages: null, max_slides: null, max_characters: section.characterAllocation, min_font_size: null, images_allowed: true, required_sections: [], header_required: false, footer_required: false }
+        : null);
+    if (sectionSpec) {
       try {
-        complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, section.complianceSpec)
-          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed')
+        complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, sectionSpec)
+          // The per-SECTION subset: checks that are exact and local. The page-count rulers are
+          // excluded because they measure the whole volume, not this section.
+          // `foreign_solicitation` belongs here — it is exact, it is per-section, and it is the
+          // one violation whose cost is not a formatting nit: a section carrying another
+          // solicitation's topic number reads as a proposal for a different program.
+          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed'
+            || v.code === 'over_character_limit' || v.code === 'foreign_solicitation')
           .map((v) => ({ code: v.code, message: v.message }));
       } catch {
         // advisory only — never fail a save on the compliance check

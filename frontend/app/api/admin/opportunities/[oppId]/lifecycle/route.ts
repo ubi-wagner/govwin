@@ -9,6 +9,7 @@ import {
   isSubmissionStage, allowedTransitions, type SubmissionStage,
 } from '@/lib/lifecycle';
 import { republishIfReleased } from '@/lib/opportunity-bridge';
+import { activateLateTopicIfReady } from '@/lib/curation/republish';
 
 interface RouteContext {
   params: Promise<{ oppId: string }>;
@@ -115,8 +116,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       await emitFinder('opportunity.close_date_changed', oppId, opp.title, fromStage, fromStage, reason, {
         previousCloseDate: opp.closeDate?.toISOString?.() ?? null, newCloseDate,
       }, user);
-      await fanOut(oppId, 'updated', user.id);
-      return NextResponse.json({ data: { opportunityId: oppId, action, fromStage, toStage: fromStage, closeDate: newCloseDate } });
+      const fanned = await fanOut(oppId, 'updated', user.id);
+      // A late topic (added after push, parked on the mig-128 date guard) has NO bridge
+      // version, so the 'updated' republish above no-ops. The close date arriving is
+      // exactly its release condition — try the first publish now.
+      let lateRelease: Awaited<ReturnType<typeof activateLateTopicIfReady>> | undefined;
+      if (!fanned) {
+        lateRelease = await activateLateTopicIfReady(oppId, { id: user.id!, email: user.email ?? null });
+      }
+      return NextResponse.json({ data: {
+        opportunityId: oppId, action, fromStage, toStage: fromStage, closeDate: newCloseDate,
+        ...(lateRelease ? { lateRelease } : {}),
+      } });
     }
 
     // ── stage-changing actions (set_stage / close / archive / reopen) ──
@@ -210,10 +221,15 @@ async function emitFinder(
   }
 }
 
-async function fanOut(oppId: string, eventType: Parameters<typeof republishIfReleased>[1], actorId: string | undefined): Promise<void> {
+async function fanOut(
+  oppId: string, eventType: Parameters<typeof republishIfReleased>[1], actorId: string | undefined,
+): Promise<Awaited<ReturnType<typeof republishIfReleased>>> {
   try {
-    await republishIfReleased(oppId, eventType, actorId ?? null, new Date().toISOString());
+    // null = the opp was never released (no bridge head) — the caller can use that to
+    // try a late-topic first publish instead.
+    return await republishIfReleased(oppId, eventType, actorId ?? null, new Date().toISOString());
   } catch (e) {
     console.error('[admin/opportunities/lifecycle] bridge fan-out failed (non-fatal):', e);
+    return null;
   }
 }

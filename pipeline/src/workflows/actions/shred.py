@@ -327,6 +327,15 @@ async def extract_compliance(
         try:
             ai_extracted = json.loads(raw_extracted)
         except (json.JSONDecodeError, TypeError):
+            try:
+                await emit_event(
+                    conn, namespace="finder", type="compliance.extracted", phase="end",
+                    parent_event_id=start_event_id,
+                    payload={"solicitation_id": solicitation_id, "status": "skipped",
+                             "reason": "invalid_ai_extracted_json"},
+                )
+            except Exception:
+                pass
             return {"status": "skipped", "reason": "invalid_ai_extracted_json"}
     else:
         ai_extracted = raw_extracted
@@ -504,6 +513,15 @@ async def extract_compliance(
             log.error(
                 "extract_compliance: failed to upsert solicitation_compliance: %s", exc
             )
+            try:
+                await emit_event(
+                    conn, namespace="finder", type="compliance.extracted", phase="end",
+                    parent_event_id=start_event_id,
+                    payload={"solicitation_id": solicitation_id, "status": "completed",
+                             "extraction_method": "pattern_based", "db_error": str(exc)[:200]},
+                )
+            except Exception:
+                pass
             return {
                 "status": "completed",
                 "compliance_matches": len(compliance_vars),

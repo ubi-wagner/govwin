@@ -1024,7 +1024,13 @@ class AgentFabric:
             res = result.get("result") if isinstance(result, dict) else None
             text = ""
             if isinstance(res, dict):
-                text = (res.get("summary") or res.get("text") or "").strip()
+                # The FULL review, not the summary. `summary` is the memory label — five words,
+                # "Review: Acceptable — meets minimum requirements" — written for episodic recall.
+                # Preferring it here threw away the entire review: the disqualifier audit, the
+                # weaknesses, the risks and the priority recommendations all computed, then
+                # replaced by a word the builder cannot act on. The column holds 10,000
+                # characters; a real color-team review fits.
+                text = (res.get("text") or res.get("summary") or "").strip()
             if not text:
                 return
 

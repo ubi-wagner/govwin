@@ -69,7 +69,7 @@ describe('buildArtifactSpecs', () => {
     });
 
     expect(formatSpec.format).toBe('letter');
-    expect(formatSpec.max_pages).toBe(15); // item wins over matrix 20
+    expect(formatSpec.max_pages).toBe(15); // single item's budget (== its sum) wins over matrix 20
     expect(formatSpec.font_default.size).toBe(10);
     expect(formatSpec.margins).toEqual({ top: 72, right: 72, bottom: 72, left: 72 });
     expect(formatSpec.line_spacing).toBe(1.0);
@@ -80,6 +80,33 @@ describe('buildArtifactSpecs', () => {
     expect(complianceSpec.min_font_size).toBe(10);
     expect(complianceSpec.required_sections).toEqual(['Technical Approach', 'Work Plan']);
     expect(complianceSpec.header_required).toBe(true);
+  });
+
+  it('sums per-section page budgets into the whole-volume cap (not Math.max)', () => {
+    // A DSIP Technical Volume: multiple sections each carrying their own page budget. The volume
+    // cap is their SUM (2+1+3+1+1+1+1 = 10), NOT the largest single section (3) — the bug that
+    // throttled a 10-page Technical Volume to its 3-page SOW section.
+    const { formatSpec, complianceSpec } = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [
+        { itemType: 'word_doc', pageLimit: 2 }, { itemType: 'word_doc', pageLimit: 1 },
+        { itemType: 'word_doc', pageLimit: 3 }, { itemType: 'word_doc', pageLimit: 1 },
+        { itemType: 'word_doc', pageLimit: 1 }, { itemType: 'word_doc', pageLimit: 1 },
+        { itemType: 'word_doc', pageLimit: 1 }, { itemType: 'word_doc' /* no budget */ },
+      ],
+      compliance: { pageLimitTechnical: 10, minFontSize: 10 },
+    });
+    expect(formatSpec.max_pages).toBe(10);
+    expect(complianceSpec.max_pages).toBe(10);
+  });
+
+  it('falls back to the matrix volume limit when no item declares a page budget', () => {
+    const { formatSpec } = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [{ itemType: 'word_doc' }],
+      compliance: { pageLimitTechnical: 10 },
+    });
+    expect(formatSpec.max_pages).toBe(10);
   });
 
   it('uses the spreadsheet preset for a cost artifact', () => {

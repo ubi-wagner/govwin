@@ -9,14 +9,17 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
+import { classifyDsipSidecar } from '@/lib/library/dsip-deconstruct';
 import type { CreatorKind } from '@/lib/atoms';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
+  // Hoisted so the outer catch can close the process bracket (never a dangling start).
+  let startId: string | null = null;
   try {
     const { tenantSlug } = await params;
     const session = await auth();
@@ -48,6 +51,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     }
     const packageName = (typeof form.get('packageName') === 'string' ? String(form.get('packageName')) : '').trim();
     const ctxTags = contextTags(ctx);
+    // 'past_proposal' declares a complete DSIP proposal download → the plan segments it into
+    // Volume 1..5 foundation documents under one cocoon (the shared past-proposal UUID).
+    const docType = typeof ctx.docType === 'string' ? ctx.docType : null;
     const actor = { id: u.id, kind: actorKind };
 
     // Dry-run preview: parse + segment and return EXACTLY what a real run would create,
@@ -59,29 +65,87 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       for (const file of files) {
         if (file.size > MAX_FILE_BYTES) { previewed.push({ file: file.name, format: '', planned: [], skipped: 0, error: 'file too large (25MB max)' }); continue; }
         const buffer = Buffer.from(await file.arrayBuffer());
-        const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags });
+        const plan = await planDocumentAtomization({ buffer, filename: file.name, ctxTags, docType });
         totalPlanned += plan.planned.length;
-        previewed.push({ file: plan.file, format: plan.format, planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount })), skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable });
+        previewed.push({
+          file: plan.file, format: plan.format,
+          planned: plan.planned.map((p) => ({ title: p.title, wordCount: p.wordCount, volumeNumber: p.volumeNumber })),
+          skipped: plan.skipped, error: plan.error, unextractable: plan.unextractable,
+          // The running header/footer removed from every page before atomizing. Shown so the
+          // curator confirms what left the text, rather than lines disappearing invisibly — and
+          // so a mis-detection is visible BEFORE the library is written.
+          strippedFurniture: plan.strippedFurniture,
+          dsip: plan.dsip ? { volumes: plan.dsip.volumes.map((v) => ({ volume: v.volumeNumber, name: v.volumeName, words: v.wordCount, blocks: v.blockCount })) } : undefined,
+        });
       }
       return NextResponse.json({ data: { preview: true, filesProcessed: previewed.length, totalPlanned, context: ctxTags.map((t) => `${t.dimension}:${t.value}`), docs: previewed } });
     }
 
+    // Full start/end pattern (docs/EVENT_CONTRACT.md): the package atomization is a
+    // multi-step PROCESS — bracket it; per-file deconstructs audit as intrastep singles;
+    // the librarian hop rides agent_task_queue (terminal-phase consumers are unaffected).
+    startId = await emitEventStart({
+      namespace: 'library', type: 'package.atomized',
+      actor: userActor(u.id, u.email ?? undefined), tenantId,
+      payload: { files: files.length, packageName: packageName || null, docType: docType ?? null },
+    });
+
+    // DSIP package ordering: the merged Full_Proposal goes FIRST so its cocoon becomes the
+    // shared past-proposal UUID; every filename-classified sidecar then JOINS that cocoon
+    // with its deterministic volume tag (SBC→V1, Budget/Addt_Cost→V3, CCR→V4, certs→V5,
+    // FWA→V6) instead of minting its own package.
+    const isDsipPackage = (docType ?? '').toLowerCase() === 'past_proposal';
+    const ordered = isDsipPackage
+      ? [...files].sort((a, b) => Number(/full_proposal/i.test(b.name)) - Number(/full_proposal/i.test(a.name)))
+      : files;
+    // Sidecars for an ALREADY-ingested proposal (no Full_Proposal in this batch): the
+    // uploader names the existing package cocoon and every file JOINS it volume-tagged.
+    let packageCocoonId: string | null = null;
+    const attachTo = typeof ctx.attachToCocoonId === 'string' && /^[0-9a-f-]{36}$/i.test(ctx.attachToCocoonId) ? ctx.attachToCocoonId : null;
+    if (isDsipPackage && attachTo) {
+      const [own] = await sql<{ id: string }[]>`
+        SELECT id FROM document_cocoons WHERE id = ${attachTo}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      if (!own) return NextResponse.json({ error: 'attachToCocoonId is not one of your past proposals', code: 'NOT_FOUND' }, { status: 404 });
+      packageCocoonId = own.id;
+    }
+
     const docs = [];
     let totalAtoms = 0;
-    for (const file of files) {
+    for (const file of ordered) {
       if (file.size > MAX_FILE_BYTES) { docs.push({ file: file.name, format: '', atoms: 0, cocoonId: null, error: 'file too large (25MB max)' }); continue; }
       const buffer = Buffer.from(await file.arrayBuffer());
-      const r = await atomizeDocumentIntoLibrary(tenantId, { buffer, filename: file.name, packageName, ctxTags, actor });
+      const volHint = isDsipPackage ? classifyDsipSidecar(file.name) : null;
+      const r = await atomizeDocumentIntoLibrary(tenantId, {
+        buffer, filename: file.name, packageName, ctxTags, actor, docType,
+        sharedCocoonId: isDsipPackage ? packageCocoonId : null,
+        volHint,
+      });
+      if (isDsipPackage && !packageCocoonId && r.cocoonId) packageCocoonId = r.cocoonId;
       totalAtoms += r.atoms;
       docs.push(r);
     }
 
-    await emitEventSingle({
-      namespace: 'library',
-      type: 'package.atomized',
-      actor: userActor(u.id, u.email ?? undefined),
-      tenantId,
-      payload: { filesProcessed: docs.length, totalAtoms },
+    // Audit the deconstruct distinctly — a full past proposal entering the library as
+    // per-volume foundation docs is a different act than a plain package upload.
+    for (const r of docs) {
+      if (!r.volumes || !r.cocoonId) continue;
+      try {
+        await emitEventSingle({
+          namespace: 'library',
+          type: 'past_proposal.deconstructed',
+          actor: userActor(u.id, u.email ?? undefined),
+          tenantId,
+          payload: { cocoonId: r.cocoonId, file: r.file, volumes: r.volumes, atoms: r.atoms },
+        });
+      } catch (e) { console.error('[atomize-package] deconstruct event failed (non-fatal)', e); }
+    }
+
+    await emitEventEnd(startId, {
+      result: {
+        filesProcessed: docs.length, totalAtoms,
+        cocoonIds: docs.map((d) => d.cocoonId).filter(Boolean),
+        volumes: docs.reduce((n, d) => n + (d.volumes ?? 0), 0),
+      },
     });
 
     // Producer (#117): hand each atomized package to the librarian agent to catalog —
@@ -111,6 +175,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     });
   } catch (err) {
     console.error('[atomize-package] error', err);
+    if (startId) {
+      try { await emitEventEnd(startId, { error: { message: 'package atomization failed', code: 'DB_ERROR' } }); } catch { /* never dangle */ }
+    }
     return NextResponse.json({ error: 'Package atomization failed', code: 'DB_ERROR' }, { status: 500 });
   }
 }

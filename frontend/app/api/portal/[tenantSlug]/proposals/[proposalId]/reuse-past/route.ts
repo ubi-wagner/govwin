@@ -132,10 +132,20 @@ export async function POST(
       // Mark every reused node red-italic so the builder sees it is imported verbatim.
       nodes = nodes.map((n) => ({ ...n, style: { ...n.style, reuse_marker: true } }));
 
+      // Inherit the section's OWN canvas rules (provisioned mold/envelope geometry + the
+      // solicitation's font floor) — the fixed DoD preset (10pt/15p) minted false hard
+      // `format_floor` blockers on 11pt-floor programs and re-formatted slide items.
+      let baseCanvas = CANVAS_PRESETS.letter_sbir_phase1;
+      try {
+        const existing = s.content ? (JSON.parse(s.content) as { canvas?: { format?: string } }) : null;
+        if (existing?.canvas && typeof existing.canvas === 'object' && existing.canvas.format) {
+          baseCanvas = existing.canvas as typeof CANVAS_PRESETS.letter_sbir_phase1;
+        }
+      } catch { /* unparseable prior content — preset fallback */ }
       try {
         const doc = createEmptyCanvas({
           documentId: s.id,
-          canvas: CANVAS_PRESETS.letter_sbir_phase1,
+          canvas: baseCanvas,
           metadata: {
             title: s.title ?? 'Section', volume_id: '', required_item_id: '', proposal_id: proposalId,
             solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: u.id!,

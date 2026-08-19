@@ -163,16 +163,22 @@ export async function publishToBridge(
   postedBy: string | null,
   now: string,
 ): Promise<BridgeEvent | null> {
-  const card = await buildCardSnapshot(opportunityId, now);
-  if (!card) return null;
   // Race-safe version allocation. Two concurrent publishes for the SAME opportunity can both
   // read max(version)=N and compute N+1; the UNIQUE(opportunity_id,version) index lets exactly
   // one win. `ON CONFLICT DO NOTHING` turns the loser into a no-op (empty RETURNING) instead of
   // a duplicate-key throw — so we recompute the now-higher max and retry, rather than nulling
   // out (and never fanning out) a real lifecycle transition. Bounded so a pathological hot opp
   // can't spin forever.
+  //
+  // The snapshot is (re)built INSIDE the loop: a conflict means someone else just published,
+  // i.e. the master may have moved since we read it — retrying with the ORIGINAL snapshot
+  // would land pre-conflict content at the HIGHEST version, and the forward-only apply would
+  // then settle every tenant mirror on stale data (adversarially proven: two admins editing
+  // one pushed opp, the loser's retry erased the winner's edit from all customer cards).
   try {
     for (let attempt = 0; attempt < 6; attempt++) {
+      const card = await buildCardSnapshot(opportunityId, now);
+      if (!card) return null;
       const [row] = await sql<Array<{ id: string; version: number }>>`
         INSERT INTO opportunity_bridge (opportunity_id, version, event_type, card, posted_by)
         SELECT ${opportunityId}::uuid,

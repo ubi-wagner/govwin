@@ -102,6 +102,15 @@ export interface IndirectRates {
   overheadPct: number;
   gnaPct: number;
   feePct: number;
+  /**
+   * Whether overhead is inside the G&A base. Default (undefined/true) keeps the classic
+   * total-cost-input base (DL + fringe + overhead + ODC + subs). Some DCAA-approved rate
+   * structures — including the DoW DSIP cost form, which literally asks "Apply G&A Rate to
+   * Overhead Costs? YES/NO" — levy G&A on a value-added base that EXCLUDES overhead. Set
+   * false to reproduce that structure exactly; overhead still lands in total cost, it just
+   * isn't part of the G&A base.
+   */
+  gnaAppliesToOverhead?: boolean;
 }
 
 export interface Period {
@@ -234,9 +243,12 @@ function periodWaterfall(
   const fringe = dl * rates.fringePct;
   const overhead = (dl + fringe) * rates.overheadPct;
   const odc = materials + travel + equipment + odcOther;
-  // G&A base includes subcontracts (matches the frontend template's A+B+C+D+E+F+G).
+  // G&A base includes subcontracts (matches the frontend template's A+B+C+D+E+F+G). Overhead is
+  // in the base by default; a value-added rate structure (DSIP "Apply G&A to Overhead? NO") excludes
+  // it — the total cost still carries overhead, G&A just isn't levied on it.
   const totalBeforeGna = dl + fringe + overhead + odc + subs;
-  const gna = totalBeforeGna * rates.gnaPct;
+  const gnaBase = rates.gnaAppliesToOverhead === false ? totalBeforeGna - overhead : totalBeforeGna;
+  const gna = gnaBase * rates.gnaPct;
   const totalEstCost = totalBeforeGna + gna;
   const fee = totalEstCost * rates.feePct;
   const totalPrice = totalEstCost + fee;

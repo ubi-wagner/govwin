@@ -6,6 +6,39 @@ import { inferCategory, inferCategoryFromFilename } from './types';
 
 const SYSTEM_ACTOR = { id: 'system:import', name: 'Document Import' };
 
+/** Widest an imported figure is placed at (points) — the letter text column. */
+const IMAGE_MAX_WIDTH_PT = 432;
+
+/**
+ * Intrinsic pixel size of a `data:` image, read from the PNG IHDR / JPEG SOF header.
+ * Used only to preserve ASPECT RATIO when placing an imported figure; returns null for
+ * formats we don't decode (the caller then falls back to a full-width box).
+ */
+function intrinsicSize(dataUri: string): { width: number; height: number } | null {
+  try {
+    const comma = dataUri.indexOf(',');
+    if (comma < 0 || !/;base64/i.test(dataUri.slice(0, comma))) return null;
+    const buf = Buffer.from(dataUri.slice(comma + 1), 'base64');
+    // PNG: 8-byte signature, then IHDR length/type, then width/height as BE uint32.
+    if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    // JPEG: walk the segment chain to the first SOFn frame header (skip SOF4/8/12 markers).
+    if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+      let i = 2;
+      while (i + 9 < buf.length) {
+        if (buf[i] !== 0xff) { i++; continue; }
+        const marker = buf[i + 1];
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+        }
+        i += 2 + buf.readUInt16BE(i + 2);
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
 /**
  * Parse a .docx buffer into structured ImportedAtoms.
  *
@@ -136,6 +169,31 @@ function htmlToCanvasNodes(html: string): CanvasNode[] {
       } else if (tag === 'sub') {
         state.inlineStack.push('subscript');
         markFormatStart(state, 'subscript');
+      } else if (tag === 'img') {
+        // FIGURES ARE CONTENT. mammoth inlines every embedded image as a `data:` URI;
+        // without this branch the parser silently dropped ALL of them, so a figure-rich
+        // proposal imported as text-only and its figures never became atoms. Emit a real
+        // image node (the canvas + every exporter already accept a data: storage_key).
+        const src = attribs.src ?? '';
+        if (src.startsWith('data:image/')) {
+          flushPendingText(state);
+          flushList(state);
+          const intrinsic = intrinsicSize(src);
+          const width = Math.min(IMAGE_MAX_WIDTH_PT, intrinsic?.width ?? IMAGE_MAX_WIDTH_PT);
+          // Height must never be 0 — an undecodable format (EMF/WMF/WDP) would otherwise place a
+          // collapsed, invisible figure. Fall back to a 4:3 box the reviewer can resize.
+          const height = intrinsic
+            ? Math.max(1, Math.round(width * (intrinsic.height / intrinsic.width)))
+            : Math.round(width * 0.75);
+          state.nodes.push(createNode({
+            type: 'image',
+            content: { storage_key: src, alt_text: attribs.alt ?? '', width, height, caption: '' },
+            source: 'imported',
+            actorId: SYSTEM_ACTOR.id,
+            actorName: SYSTEM_ACTOR.name,
+            style: { alignment: 'center' },
+          }));
+        }
       } else if (tag === 'p') {
         // mammoth wraps everything in <p>. If we're inside a list or
         // table, let the parent handler deal with it.

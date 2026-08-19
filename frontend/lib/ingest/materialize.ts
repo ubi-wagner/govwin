@@ -14,6 +14,8 @@
  * the AI parser — stay DB-free and unit-testable.
  */
 import { sql } from '@/lib/db';
+import type { JSONValue } from 'postgres';
+import { coerceJsonb } from '@/lib/jsonb';
 import { publishAndFanOut } from '@/lib/opportunity-bridge';
 import { DEFAULT_SBIR_CSO_SKELETON, type ParsedSolicitation } from './skeleton';
 
@@ -48,32 +50,136 @@ export async function materializeSkeleton(
 
   // ── Compliance ──
   const c = parsed.compliance ?? {};
-  await sql`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
-  await sql`INSERT INTO solicitation_compliance
-    (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
-     submission_format, itar_required, images_tables_allowed, required_sections, required_documents)
-    VALUES (${solicitationId}::uuid, ${c.pageLimitTechnical ?? null}, ${c.fontFamily ?? null}, ${c.fontSize ?? null},
-            ${c.minFontSize ?? null}, ${c.margins ?? null}, ${c.submissionFormat ?? null},
-            ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
-            ${sql.json(c.requiredSections ?? [])}, ${sql.json(c.requiredDocuments ?? [])})`;
+  // Stamp WHERE EACH VALUE CAME FROM (mig 187). Without this the fallbacks land
+  // indistinguishable from extracted rules and a curator sees confident numbers with nothing
+  // behind them — proven live on the DoW 2026 SBIR BAA, where the matrix was byte-identical
+  // whether the shredder had extracted 0 characters or 165,268.
+  //
+  // PER FIELD, not per row: a single parse blends layers (pattern-proven margins + an AI page
+  // limit + a defaulted typeface), so `parsed.source` alone would label the whole row with its
+  // strongest contributor. `parsed.fieldSources` carries the real per-column answer; `source`
+  // is only the fallback for a parse that predates it (an admin 'override', say). Pattern-read
+  // fields also carry their CITATION, so the row can show the curator the sentence it came
+  // from. Only fields this write actually sets are stamped; a curator verifying one field later
+  // upgrades just that key to 'verified'.
+  const provSource = parsed.source ?? 'default';
+  const perField = parsed.fieldSources ?? {};
+  const evidence = parsed.fieldEvidence ?? {};
+  const stamped: Record<string, {
+    source: string; rule?: string; page?: number | null; excerpt?: string;
+    charOffset?: number | null; docSegment?: number | null;
+    deferred?: boolean; reason?: string;
+  }> = {};
+  const stamp = (col: string, v: unknown) => {
+    if (v === undefined || v === null) return;
+    const source = perField[col] ?? provSource;
+    const ev = source === 'pattern_match' ? evidence[col] : undefined;
+    stamped[col] = ev
+      ? { source, rule: ev.rule, page: ev.page ?? null, excerpt: ev.excerpt, charOffset: ev.charOffset ?? null, docSegment: ev.docSegment ?? null }
+      : { source };
+  };
+  stamp('page_limit_technical', c.pageLimitTechnical);
+  stamp('character_limit_narrative', c.characterLimitNarrative);
+  stamp('font_family', c.fontFamily);
+  stamp('font_size', c.fontSize);
+  stamp('min_font_size', c.minFontSize);
+  stamp('margins', c.margins);
+  stamp('submission_format', c.submissionFormat);
+  stamp('required_sections', c.requiredSections?.length ? c.requiredSections : null);
+  stamp('required_documents', c.requiredDocuments?.length ? c.requiredDocuments : null);
 
-  // ── Volumes + required items ──
-  await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;
-  await sql`DELETE FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid`;
+  // DEFERRALS are stamped even though the column stays NULL — they are the reason it is null.
+  // "The BAA defers the page limit to the Component-specific instructions" is the single most
+  // useful thing a curator can know about that empty cell: it says the blank is CORRECT and a
+  // number would be wrong. Without persisting it the finding lived only in a toast, so the next
+  // person to open the workspace saw an unexplained gap and would reasonably fill it in.
+  for (const [col, d] of Object.entries(parsed.deferrals ?? {})) {
+    if (stamped[col]) continue;   // a real value was found after all — that outranks the deferral
+    stamped[col] = {
+      source: 'pattern_match', deferred: true, reason: d.reason,
+      rule: d.rule, page: d.page ?? null, excerpt: d.excerpt,
+      charOffset: d.charOffset ?? null, docSegment: d.docSegment ?? null,
+    };
+  }
+
+  // ── TRUST-ORDER ENFORCEMENT AT THE WRITE (mig 187: hitl > verified > override >
+  // pattern_match > ai > default; "a re-run stamping a weaker source over a curator's work must
+  // never happen"). The old DELETE+INSERT enforced nothing: it wiped `custom_variables` — where
+  // every hitl anchor a curator ever tagged lives — and overwrote verified named columns with
+  // whatever the fresh parse produced. So a curator who highlighted the page limit in the source
+  // and then clicked Ingest Assist again LOST their own work to a machine's re-read.
+  //
+  // Now the existing row is read first, and for each named column the STRONGER source survives:
+  // a hitl/verified/override value + its provenance entry are carried forward untouched; only
+  // columns whose existing provenance is pattern_match/ai/default/unknown take the new parse.
+  // custom_variables always carries forward — it is curator/annotation material this writer has
+  // no business replacing.
+  const PROTECTED = new Set(['hitl', 'verified', 'override']);
+  let existingProv: Record<string, { source?: string }> = {};
+  let existingVals: Record<string, unknown> = {};
+  let existingCustom: unknown = {};
+  try {
+    const [prior] = await sql<Array<Record<string, unknown>>>`
+      SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid LIMIT 1`;
+    if (prior) {
+      existingProv = coerceJsonb<Record<string, { source?: string }>>(prior.fieldProvenance, {});
+      existingCustom = coerceJsonb<Record<string, unknown>>(prior.customVariables, {});
+      existingVals = prior;   // camelCase keys, per the toCamel SOP
+    }
+  } catch { /* no prior row — nothing to protect */ }
+
+  const camel = (col: string) => col.replace(/_([a-z])/g, (_m, ch: string) => ch.toUpperCase());
+  /** The value to write for a named column: the protected existing value, else the new one. */
+  const keep = <T,>(col: string, incoming: T): T => {
+    if (PROTECTED.has(existingProv[col]?.source ?? '')) {
+      stamped[col] = existingProv[col] as (typeof stamped)[string];   // provenance survives too
+      return (existingVals[camel(col)] as T) ?? incoming;
+    }
+    return incoming;
+  };
+
+  // AUDIT FIX (PATTERN_AUDIT HIGH-3): the matrix rewrite is DELETE→INSERT across two
+  // table families — ONE transaction, so a mid-land failure can never leave the
+  // solicitation with no compliance row / half-wiped volumes (the caller's catch resets
+  // the draft to 'staged' assuming nothing changed).
   let itemCount = 0;
   const volumes = parsed.volumes?.length ? parsed.volumes : DEFAULT_SBIR_CSO_SKELETON.volumes;
-  for (let v = 0; v < volumes.length; v++) {
-    const vol = volumes[v];
-    const [row] = await sql<{ id: string }[]>`
-      INSERT INTO solicitation_volumes (solicitation_id, volume_number, volume_name, volume_format, expert_notes)
-      VALUES (${solicitationId}::uuid, ${v + 1}, ${vol.name}, ${coerceVolFormat(vol.format)}, ${vol.notes ?? null}) RETURNING id`;
-    let n = 0;
-    for (const item of vol.items ?? []) {
-      n++; itemCount++;
-      await sql`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, expert_notes)
-                VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.notes ?? null})`;
+  await sql.begin(async (tx: any) => {
+    await tx`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
+    await tx`INSERT INTO solicitation_compliance
+      (solicitation_id, page_limit_technical, character_limit_narrative, font_family, font_size, min_font_size, margins,
+       submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
+       field_provenance, custom_variables)
+      VALUES (${solicitationId}::uuid,
+              ${keep('page_limit_technical', c.pageLimitTechnical ?? null)},
+              ${keep('character_limit_narrative', c.characterLimitNarrative ?? null)},
+              ${keep('font_family', c.fontFamily ?? null)},
+              ${keep('font_size', c.fontSize ?? null)},
+              ${keep('min_font_size', c.minFontSize ?? null)},
+              ${keep('margins', c.margins ?? null)},
+              ${keep('submission_format', c.submissionFormat ?? null)},
+              ${c.itarRequired ?? false}, ${c.imagesTablesAllowed ?? true},
+              ${tx.json(keep('required_sections', c.requiredSections ?? []) as JSONValue)},
+              ${tx.json(keep('required_documents', c.requiredDocuments ?? []) as JSONValue)},
+              ${tx.json(stamped)},
+              ${tx.json((existingCustom ?? {}) as JSONValue)})`;
+
+    // ── Volumes + required items ──
+    await tx`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid)`;
+    await tx`DELETE FROM solicitation_volumes WHERE solicitation_id = ${solicitationId}::uuid`;
+    for (let v = 0; v < volumes.length; v++) {
+      const vol = volumes[v];
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO solicitation_volumes (solicitation_id, volume_number, volume_name, volume_format, expert_notes)
+        VALUES (${solicitationId}::uuid, ${v + 1}, ${vol.name}, ${coerceVolFormat(vol.format)}, ${vol.notes ?? null}) RETURNING id`;
+      let n = 0;
+      for (const item of vol.items ?? []) {
+        n++; itemCount++;
+        await tx`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, character_limit, expert_notes)
+                  VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.characterLimit ?? null}, ${item.notes ?? null})`;
+      }
     }
-  }
+  });
 
   // ── Topics → opportunities → cards ──
   // No topics parsed ⇒ the solicitation's own umbrella opportunity is the single card.

@@ -17,6 +17,7 @@ import { sql } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { activateLateTopicIfReady } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const TopicSchema = z.object({
@@ -40,6 +41,9 @@ interface Output {
   inserted: { id: string; topicNumber: string }[];
   skipped: string[];
   totalRequested: number;
+  /** Pushed-solicitation late additions: how many reached the bridge now / await a close date. */
+  lateReleased?: number;
+  needsCloseDate?: number;
 }
 
 export const opportunityBulkAddTopicsTool = defineTool<Input, Output>({
@@ -193,6 +197,17 @@ export const opportunityBulkAddTopicsTool = defineTool<Input, Output>({
       skipped: skipped.length,
     });
 
-    return { inserted, skipped, totalRequested: topics.length };
+    // Late additions on a pushed solicitation: try to release each new topic to the
+    // bridge now. Bulk rows insert with close_date NULL, so most will report
+    // needs_close_date — correct per the date guard; they go live when dated.
+    let lateReleased = 0;
+    let needsCloseDate = 0;
+    for (const t of inserted) {
+      const late = await activateLateTopicIfReady(t.id, { id: actorId, email: ctx.actor.email ?? null });
+      if (late.released) lateReleased++;
+      else if (late.reason === 'needs_close_date') needsCloseDate++;
+    }
+
+    return { inserted, skipped, totalRequested: topics.length, lateReleased, needsCloseDate };
   },
 });

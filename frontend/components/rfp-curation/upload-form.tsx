@@ -28,7 +28,31 @@ const OFFICES = [
   'DARPA/I2O', 'DARPA/DSO', 'DARPA/MTO', 'DARPA/STO',
 ];
 
-type Status = 'idle' | 'uploading' | 'assisting' | 'topics' | 'success' | 'error';
+type Status = 'idle' | 'uploading' | 'shredding' | 'assisting' | 'topics' | 'success' | 'error';
+
+/** How long to wait for the async shred before handing off to the workspace button. */
+const SHRED_POLL_MS = 2_000;
+const SHRED_POLL_TRIES = 20; // ~40s — a 50-page PDF shreds well inside this
+
+/**
+ * Poll until the solicitation has usable source text. Returns false on timeout or on a
+ * terminal state (no document / shredder_failed) — the caller then SKIPS Assist rather than
+ * running it against nothing.
+ */
+async function waitForShred(solId: string): Promise<boolean> {
+  for (let i = 0; i < SHRED_POLL_TRIES; i++) {
+    try {
+      const r = await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, { cache: 'no-store' });
+      if (r.ok) {
+        const d = (await r.json())?.data as { ready?: boolean; state?: string } | undefined;
+        if (d?.ready) return true;
+        if (d?.state === 'shred_failed' || d?.state === 'no_document') return false;
+      }
+    } catch { /* transient — keep polling */ }
+    await new Promise((res) => setTimeout(res, SHRED_POLL_MS));
+  }
+  return false;
+}
 
 const PROGRAM_TYPES = [
   { value: 'sbir_phase_1', label: 'SBIR Phase I' },
@@ -59,6 +83,11 @@ export function UploadForm() {
   // Optional topic files uploaded alongside the umbrella (multi-topic BAAs) —
   // each becomes a topic opportunity in one flow after the umbrella is created.
   const [topicFiles, setTopicFiles] = useState<File[]>([]);
+  // Per-file document type. A solicitation states its rules across FILES: the umbrella BAA sets
+  // the format and defers the page limit to the Component-specific instructions, which arrive as
+  // their own PDF. Typing that file 'instructions' is what lets the ingest treat it as a rule
+  // source rather than a nameless attachment. Index-aligned with `files`.
+  const [fileTypes, setFileTypes] = useState<string[]>([]);
   const [topicDragOver, setTopicDragOver] = useState(false);
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
@@ -99,6 +128,7 @@ export function UploadForm() {
   const removeFile = useCallback(
     (idx: number) => {
       setFiles((prev) => prev.filter((_, i) => i !== idx));
+      setFileTypes((prev) => prev.filter((_, i) => i !== idx));
       setPrimaryIndex((prev) => {
         if (idx === prev) return 0;
         if (idx < prev) return prev - 1;
@@ -144,6 +174,7 @@ export function UploadForm() {
     data.set('postedDate', String(new FormData(form).get('postedDate') ?? ''));
     data.set('description', String(new FormData(form).get('description') ?? ''));
     data.set('primaryIndex', String(primaryIndex));
+    data.set('documentTypes', JSON.stringify(files.map((_, i) => fileTypes[i] || (i === primaryIndex ? 'source' : 'attachment'))));
     for (const f of files) data.append('files', f);
 
     try {
@@ -166,14 +197,25 @@ export function UploadForm() {
       // after upload. Review-gated: it does NOT publish to customers — the upload lands in
       // your curation queue, and you release it with Push after review. Same materializer the
       // Scouts feed. Best-effort: on failure, the workspace still has the manual button.
+      //
+      // WAIT FOR THE SHRED FIRST. The upload only EMITS `finder:rfp.uploaded`; OnRfpUploaded
+      // extracts the text asynchronously, so at this instant `full_text` is almost always still
+      // empty. Firing Assist here used to build the whole matrix off the default skeleton and
+      // present it as if the document had been read. Poll the readiness endpoint, then run.
+      // If the shred is still going when we give up, we simply skip — the workspace button
+      // stays, and it now reports the real state instead of fabricating one.
       const solId = json.data.solicitation_id as string;
       if (runAssist && solId) {
-        setStatus('assisting');
-        try {
-          await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
-          });
-        } catch { /* non-fatal */ }
+        setStatus('shredding');
+        const ready = await waitForShred(solId);
+        if (ready) {
+          setStatus('assisting');
+          try {
+            await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: false }),
+            });
+          } catch { /* non-fatal */ }
+        }
       }
       // Topic files → topic opportunities (single-flow: 1 umbrella + N topic
       // files → N topic OPPs). Best-effort: on failure the workspace drop-zone
@@ -355,13 +397,34 @@ export function UploadForm() {
                       ({(f.size / 1024 / 1024).toFixed(2)} MB)
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    className="text-xs text-red-600 hover:text-red-800 shrink-0 ml-2"
-                  >
-                    Remove
-                  </button>
+                  <span className="flex items-center gap-2 shrink-0 ml-2">
+                    <select
+                      value={fileTypes[idx] || (idx === primaryIndex ? 'source' : 'attachment')}
+                      onChange={(e) => setFileTypes((prev) => {
+                        const next = [...prev];
+                        while (next.length < files.length) next.push('');
+                        next[idx] = e.target.value;
+                        return next;
+                      })}
+                      title="What kind of document is this? 'Component instructions' is the one an umbrella BAA defers its page limit to."
+                      className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
+                    >
+                      <option value="source">Solicitation (umbrella)</option>
+                      <option value="instructions">Component instructions</option>
+                      <option value="amendment">Amendment</option>
+                      <option value="qa">Q&amp;A</option>
+                      <option value="topic">Topic</option>
+                      <option value="supporting">Supporting</option>
+                      <option value="attachment">Attachment</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -445,10 +508,11 @@ export function UploadForm() {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={status === 'uploading' || status === 'assisting' || status === 'topics' || files.length === 0}
+          disabled={status === 'uploading' || status === 'shredding' || status === 'assisting' || status === 'topics' || files.length === 0}
           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
         >
           {status === 'uploading' ? 'Uploading…'
+            : status === 'shredding' ? 'Extracting document text…'
             : status === 'assisting' ? 'Building matrix & skeleton…'
             : status === 'topics' ? 'Creating topic opportunities…'
             : topicFiles.length > 0 ? `Upload + ${topicFiles.length} topic${topicFiles.length > 1 ? 's' : ''}`

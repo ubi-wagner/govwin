@@ -47,7 +47,17 @@ def test_workflows_validate_register_and_branch():
 def test_each_phase_ends_in_the_advance_action_reusing_existing_actions():
     # Draft reuses plan/seed/draft; Refine reuses reformat/restyle/cost/package; Compliance the gate cohort.
     draft_actions = {s.action for s in OnReviewPhaseRequestedDraft.steps if s.step_type == StepType.AI_INVOKE}
-    assert {"tool.proposal.plan_draft", "tool.proposal.seed_suggest", "tool.proposal.draft_all_sections"} <= draft_actions
+    assert {"tool.proposal.plan_draft", "tool.proposal.seed_suggest"} <= draft_actions
+    # draft_sections is the draft_v0 ACTION, not an AI_INVOKE. It used to be an AI_INVOKE on
+    # `tool.proposal.draft_all_sections`, which dispatches to the section_drafter ARCHETYPE — an
+    # agent that drafts ONE section from a payload carrying its title, budget and ranked atoms. The
+    # step passed only proposal_id and tenant_id, so "draft every section" made a single nameless
+    # call and the run completed having drafted nothing. Proven live: 20 sections in, one "Untitled
+    # Section" blob out. draft_v0 is the action that iterates the sections and assembles the real
+    # per-section context; asserting the old wiring here would re-enshrine the bug.
+    draft_step = next(s for s in OnReviewPhaseRequestedDraft.steps if s.name == "draft_sections")
+    assert draft_step.step_type == StepType.ACTION
+    assert draft_step.action == "workflows.actions.draft_v0.draft_v0"
     comp_actions = {s.action for s in OnReviewPhaseRequestedCompliance.steps if s.step_type == StepType.AI_INVOKE}
     assert {"tool.proposal.check_compliance", "tool.proposal.check_continuity",
             "tool.proposal.audit_traceability", "tool.proposal.scan_redaction"} <= comp_actions

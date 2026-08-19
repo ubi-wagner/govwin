@@ -1,6 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+
+/** What actually happened to the color-team reviews (GET …/ai-review). */
+interface ReviewStatus {
+  total: number; completed: number; failed: number; pending: number;
+  openFindings: number; headline: string;
+  sections: Array<{ sectionId: string | null; sectionTitle: string; state: string; error: string | null; comments: number }>;
+}
 import { useRouter } from 'next/navigation';
 
 type Props = {
@@ -43,6 +50,7 @@ export function ProposalAiActions({
 }: Props) {
   const router = useRouter();
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus | null>(null);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -88,14 +96,30 @@ export function ProposalAiActions({
 
   // AI color-team review — enqueues a color_team_reviewer task per section with content; each
   // review posts back as an `ai_review` recommendation in the section's context-box thread.
-  const handleAiReview = useCallback(async () => {
+  /**
+   * Read what actually happened to the reviews. Queuing a review used to be the last word the
+   * customer got: a task that failed afterwards (most often the fabric's hourly rate limit)
+   * surfaced nowhere, so a section whose review never ran looked exactly like one the reviewer
+   * had nothing to say about.
+   */
+  const loadReviewStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai-review`, { cache: 'no-store' });
+      if (!res.ok) return;
+      setReviewStatus((await res.json()).data as ReviewStatus);
+    } catch { /* transient — keep the last known state */ }
+  }, [tenantSlug, proposalId]);
+
+  useEffect(() => { if (isAdmin) void loadReviewStatus(); }, [isAdmin, loadReviewStatus]);
+
+  const handleAiReview = useCallback(async (retryFailed = false) => {
     if (!isAdmin || reviewLoading) return;
     setReviewLoading(true);
     setMessage(null);
     try {
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/ai-review`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryFailed }) },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed' }));
@@ -111,12 +135,13 @@ export function ProposalAiActions({
               : `AI color-team review queued for ${count} section${count > 1 ? 's' : ''}. Recommendations will appear in each section's thread shortly.`,
         });
       }
+      await loadReviewStatus();
     } catch {
       setMessage({ type: 'error', text: 'Network error' });
     } finally {
       setReviewLoading(false);
     }
-  }, [isAdmin, reviewLoading, tenantSlug, proposalId]);
+  }, [isAdmin, reviewLoading, tenantSlug, proposalId, loadReviewStatus]);
 
   const toggleVoice = useCallback((token: string) => {
     setVoice((prev) =>
@@ -418,7 +443,7 @@ export function ProposalAiActions({
               'ai_review'). The same path the on-advance auto-review uses, triggered manually. */}
           <button
             type="button"
-            onClick={handleAiReview}
+            onClick={() => void handleAiReview(false)}
             disabled={!isAdmin || reviewLoading}
             title="Queue an AI color-team review — recommendations post into each section's thread."
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -431,6 +456,47 @@ export function ProposalAiActions({
             {reviewLoading ? 'Queuing review…' : 'AI Review'}
           </button>
         </div>
+
+        {/* What actually happened to the reviews. Queuing used to be the last word the customer
+            got — a review that failed afterwards surfaced nowhere, which reads exactly like a
+            review that found nothing. The failure count and its reason are the point. */}
+        {reviewStatus && reviewStatus.total > 0 && (
+          <div className="mt-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <p className={reviewStatus.failed > 0 ? 'text-amber-800' : 'text-gray-600'}>
+                {reviewStatus.headline}
+                {reviewStatus.openFindings > 0 && (
+                  <span className="text-gray-500">
+                    {' '}{reviewStatus.openFindings} open finding{reviewStatus.openFindings === 1 ? '' : 's'} in the section threads.
+                  </span>
+                )}
+              </p>
+              {reviewStatus.failed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void handleAiReview(true)}
+                  disabled={!isAdmin || reviewLoading}
+                  title="Re-queue only the sections whose review did not run"
+                  className="shrink-0 px-3 py-1.5 text-xs font-medium rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  Retry {reviewStatus.failed} failed
+                </button>
+              )}
+            </div>
+            {reviewStatus.failed > 0 && (
+              <details className="mt-1 text-xs">
+                <summary className="cursor-pointer text-amber-700">Which sections were not reviewed</summary>
+                <ul className="mt-1 space-y-0.5">
+                  {reviewStatus.sections.filter((s) => s.state === 'failed').map((s) => (
+                    <li key={s.sectionId ?? s.sectionTitle} className="text-amber-800">
+                      • {s.sectionTitle} — {s.error}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Run full draft (Proposal Draft Manager) ─────────────────── */}

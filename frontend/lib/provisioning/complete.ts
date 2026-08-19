@@ -31,6 +31,21 @@ export async function completeBuildOut(
 ): Promise<CompleteBuildOutResult> {
   const readiness = await getBuildReadiness(solId);
 
+  // Idempotency gate on the BROADCAST: once build_complete is set, re-running (a release retry
+  // after PROVISION_FAILED, or a second buyer's release of the same master) must not re-fan-out
+  // 'updated' to every tenant — each re-publish re-pings watched-opp holders and re-arms
+  // pin_update_available. Genuinely-changed master edits already republish via the change-gated
+  // mid-window propagation (MID_WINDOW_RULES B5), so nothing is lost by skipping here.
+  try {
+    const [prior] = await sqlBypass<Array<{ buildComplete: boolean | null }>>`
+      SELECT build_complete AS "buildComplete" FROM curated_solicitations WHERE id = ${solId}::uuid LIMIT 1`;
+    if (prior?.buildComplete === true) {
+      return { ok: true, readiness, opportunitiesRepublished: 0, cardsRefreshed: 0 };
+    }
+  } catch (e) {
+    console.error('[completeBuildOut] prior-flag read failed (non-fatal; proceeding)', e);
+  }
+
   // The deliberate "done" flag (idempotent). Best-effort: a schema-drifted deploy (mig 182 not yet
   // applied → column absent) must NOT 500 the whole two-outcome release before outcome 2 (provisioning
   // the buyer's private portal) — the two outcomes are independent, and getBuildReadiness already

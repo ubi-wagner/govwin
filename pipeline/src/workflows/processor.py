@@ -87,6 +87,7 @@ from workflows.base import (
     Workflow,
     discover_workflows,
     get_workflow_for_event,
+    get_all_workflows_for_event,
 )
 
 log = logging.getLogger("pipeline.workflows.processor")
@@ -735,7 +736,13 @@ async def run_workflow_processor(
                     # and match_waiting_instances — so it neither triggers a workflow
                     # nor resumes a paused instance. That guard was dead until the
                     # poll began SELECTing the `error` column (above); see test_error_gating.
-                    workflow_cls = get_workflow_for_event(event_dict)
+                    # AUDIT FIX (PATTERN_AUDIT MED-11): fan out to ALL matching workflows —
+                    # first-match-wins silently dropped later registrants on the 7 shared
+                    # trigger keys. The (workflow_name, trigger_event_id) dedup index keeps
+                    # per-workflow idempotency; the fabric fallback still fires only when NO
+                    # workflow claimed the event.
+                    matching_workflows = get_all_workflows_for_event(event_dict)
+                    workflow_cls = matching_workflows[0] if matching_workflows else None
                     if workflow_cls and manager is None:
                         # "No fire-and-forget ever": the managed engine is unavailable, so
                         # we REFUSE to execute — but the refusal itself is AUDITED (one event
@@ -760,34 +767,35 @@ async def run_workflow_processor(
                         except Exception as exc:
                             log.error("failed to emit workflow.execution_refused: %s", exc)
                     elif workflow_cls:
-                        try:
-                            await _run_workflow_managed(
-                                conn, manager, workflow_cls, event_dict
-                            )
-                        except Exception as exc:
-                            log.error(
-                                "workflow execution failed for event %s: %s",
-                                event_dict["id"],
-                                exc,
-                            )
+                        for wf_cls in matching_workflows:
                             try:
-                                await emit_event(
-                                    conn,
-                                    namespace="system",
-                                    type="workflow.failed",
-                                    payload={
-                                        "workflow": workflow_cls.__name__,
-                                        "triggerEventId": event_dict["id"],
-                                        "tenant_id": event_dict.get("tenant_id"),
-                                        "error": str(exc)[:500],
-                                    },
-                                    tenant_id=event_dict.get("tenant_id"),
+                                await _run_workflow_managed(
+                                    conn, manager, wf_cls, event_dict
                                 )
-                            except Exception as emit_exc:
+                            except Exception as exc:
                                 log.error(
-                                    "failed to emit workflow.failed event: %s",
-                                    emit_exc,
+                                    "workflow execution failed for event %s: %s",
+                                    event_dict["id"],
+                                    exc,
                                 )
+                                try:
+                                    await emit_event(
+                                        conn,
+                                        namespace="system",
+                                        type="workflow.failed",
+                                        payload={
+                                            "workflow": wf_cls.__name__,
+                                            "triggerEventId": event_dict["id"],
+                                            "tenant_id": event_dict.get("tenant_id"),
+                                            "error": str(exc)[:500],
+                                        },
+                                        tenant_id=event_dict.get("tenant_id"),
+                                    )
+                                except Exception as emit_exc:
+                                    log.error(
+                                        "failed to emit workflow.failed event: %s",
+                                        emit_exc,
+                                    )
                     elif (
                         fabric is not None
                         and event_dict.get("phase") != "start"

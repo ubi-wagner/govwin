@@ -32,6 +32,22 @@ const ALLOWLIST: Record<string, string> = {
   // pageview to system_events would be volume noise, not compliance signal.
   'app/api/analytics/pageview/route.ts':
     'anonymous public marketing telemetry — not an actor business action; lives in analytics tables',
+  // AUDIT FIX (PATTERN_AUDIT HIGH-5): exposed when the vacuous auth.ts signal was excluded.
+  // Each below is read-side/advisory — the BUSINESS landing that follows it audits.
+  'app/api/admin/documents/[documentId]/export/route.ts':
+    'export stream + download counter — read-side; document mutations audit on their own routes',
+  'app/api/admin/documents/upload-image/route.ts':
+    'media blob upload for the editor picker — the insert into a canvas/section audits downstream',
+  'app/api/portal/[tenantSlug]/uploads/image/route.ts':
+    'media blob upload for the editor picker — the insert into a canvas/section audits downstream',
+  'app/api/portal/[tenantSlug]/atoms/propose-regions/route.ts':
+    'advisory box proposals (nothing lands) — the human Atomize/Capture commit audits the landing',
+  'app/api/partner/tenants/precheck/route.ts':
+    'eligibility precheck — validation only; the actual request/creation routes audit',
+  'app/api/partner/tenants/route.ts':
+    'partner console list + request relay — the accept/creation flows (admin routes + create-tenant lib) audit the landing',
+  'app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts':
+    'foundation doc export stream — read-side; saves/publishes audit on their own routes',
 };
 
 const AUDIT_TABLES = new Set([
@@ -91,7 +107,10 @@ function scan(): { route: string; writePath: string[] }[] {
     const writers = files.filter((_f, i) => hasBusinessWrite(texts[i]));
     if (writers.length === 0) continue; // no business mutation on the 1-hop write path
 
-    const audited = texts.some((t) => AUDIT_SIGNAL.test(t));
+    // AUDIT FIX (PATTERN_AUDIT HIGH-5): auth.ts carries its own session-bookkeeping
+    // system_events INSERT, and EVERY authenticated route imports @/auth — counting it as
+    // the route's audit signal made this moat vacuous. Only non-auth files count.
+    const audited = texts.some((t, i) => !/(^|[\/])auth\.ts$/.test(files[i]) && AUDIT_SIGNAL.test(t));
     if (audited) continue;
     if (ALLOWLIST[rel]) continue;
 

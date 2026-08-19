@@ -26,6 +26,7 @@ import { computeBudget } from '@/lib/proposal/cost-model';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
+  countDocCharacters,
   estimateSlideCount,
   overflowingSlides,
   docNodes,
@@ -86,6 +87,7 @@ interface SectionRow {
   isLocked: boolean;
   artifactId: string | null;
   pageAllocation: number | null;
+  characterAllocation: number | null;
 }
 interface MatrixRow {
   requirementText: string | null;
@@ -146,7 +148,7 @@ export async function computeSubmissionReadiness(
 
   const sections = await sql<SectionRow[]>`
     SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId",
-           page_allocation AS "pageAllocation"
+           page_allocation AS "pageAllocation", character_allocation AS "characterAllocation"
     FROM proposal_sections
     WHERE proposal_id = ${proposalId}::uuid
     ORDER BY sort_index NULLS LAST, id
@@ -164,8 +166,12 @@ export async function computeSubmissionReadiness(
   `;
   // Mandatory supporting documents/forms (SF424, reps & certs, required letters). Seeded at provision
   // from the solicitation's required_documents; the tenant uploads or an admin waives each.
-  const requiredDocs = await sql<{ requirementLabel: string | null; status: string }[]>`
-    SELECT requirement_label AS "requirementLabel", status
+  const requiredDocs = await sql<{ requirementLabel: string | null; status: string; requirementSource: string | null }[]>`
+    SELECT requirement_label AS "requirementLabel", status,
+           -- How the product came to believe this document is required. 'provenance:default' means
+           -- it was NOT read from this solicitation — it came from a program skeleton's default
+           -- list. See the blocker/warning split below.
+           requirement_source AS "requirementSource"
     FROM proposal_supporting_docs
     WHERE proposal_id = ${proposalId}::uuid AND is_required = true
   `;
@@ -230,6 +236,27 @@ export async function computeSubmissionReadiness(
     // explicit node properties (smallest node font; presence of an image node), so a violation is
     // real, not an estimate — hence a blocker, not an advisory. (Page/slide caps are gated
     // separately below; header/footer + other softer codes stay out of the per-section pass.)
+    // ── Character cap — a HARD blocker, and checked before the artifact spec because it is a
+    // property of the SECTION, not the volume. A character-capped narrative (an SBIR cover-sheet
+    // abstract, an NSF project summary) is pasted into a fixed-size agency form field that
+    // truncates at the cap, so going over does not cost a deduction — it silently deletes the end
+    // of the argument between our export and their reviewer. Exact count, not an estimate, which
+    // is what makes it a blocker rather than a warning.
+    if (s.characterAllocation != null && s.characterAllocation > 0) {
+      const chars = countDocCharacters(doc);
+      if (chars > s.characterAllocation) {
+        formatViolations++;
+        blockers.push({
+          category: 'format_floor',
+          severity: 'blocker',
+          message: `"${s.title ?? 'Section'}": ${chars.toLocaleString()} characters exceeds the `
+            + `${s.characterAllocation.toLocaleString()}-character limit — the agency form truncates the overflow.`,
+          sectionId: s.id,
+          sectionTitle: s.title ?? undefined,
+        });
+      }
+    }
+
     const spec = s.artifactId ? specByArtifact.get(s.artifactId) : undefined;
     if (!spec) continue;
     // The narrative body-font floor governs PROSE. A cost WORKBOOK (xlsx) or a webFORM is not
@@ -375,10 +402,25 @@ export async function computeSubmissionReadiness(
   let docsProvided = 0;
   for (const d of requiredDocs) {
     if (d.status !== 'missing') { docsProvided++; continue; }
+    // A DEFAULTED requirement warns; a requirement READ from the solicitation blocks.
+    //
+    // "A value the product did not read from the solicitation must never look like one it did"
+    // (docs/INGEST_PROVENANCE.md), and a hard submission blocker is the strongest way of looking
+    // like one. The T3CP skeleton's default list carries "CMMC Reps & Certs", which that BAA does
+    // not require as an attachment at all — CMMC is a representation made in DSIP, so there is no
+    // document to upload. As a blocker it made a finished build unsubmittable for a file that does
+    // not exist, and the only escape was an admin waiving a requirement nobody could verify.
+    //
+    // It stays on the checklist either way. What changes is whether the product stakes a hard
+    // refusal on something it assumed.
+    const defaulted = d.requirementSource === 'provenance:default';
     blockers.push({
       category: 'missing_document',
-      severity: 'blocker',
-      message: `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
+      severity: defaulted ? 'warning' : 'blocker',
+      message: defaulted
+        ? `Document not provided: ${d.requirementLabel ?? 'Unnamed document'}. This requirement `
+          + 'came from the program default list, not from this solicitation — confirm whether it applies.'
+        : `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
     });
   }
 

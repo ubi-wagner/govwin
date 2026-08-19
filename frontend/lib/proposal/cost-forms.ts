@@ -42,14 +42,17 @@ export interface CostFormMeta extends CostVolumeMeta {
  * the burden waterfall (the most general burdened form).
  */
 export function resolveCostForm(o: { agency?: string | null; program?: string | null; volumeName?: string | null; volumeFormat?: string | null }): CostForm {
-  const a = (o.agency ?? '').toLowerCase();
-  const p = (o.program ?? '').toLowerCase();
-  const vf = (o.volumeFormat ?? '').toLowerCase();
+  // Normalize underscores to spaces so word-boundary tokens match the canonical program_type
+  // values (`\bnsf\b` is FALSE against "nsf_sbir_phase_1" — underscore is a word character).
+  const norm = (s: string) => s.toLowerCase().replace(/_/g, ' ');
+  const a = norm(o.agency ?? '');
+  const p = norm(o.program ?? '');
+  const vf = norm(o.volumeFormat ?? '');
   if (vf.includes('tvsf') || vf.includes('otf') || /\btvsf\b|third frontier|\botf\b|econdev/.test(p) || /third frontier|dmvec/.test(a)) return 'otf_state_budget';
   // Grant agencies. NOTE: no bare `\benergy\b` (DOE is already caught by \bdoe\b / "department of energy";
   // \benergy\b would wrongly grab DoD "Directed Energy" / "High Energy Laser" program offices), and the
   // program grant token is word-bounded (\bgrant\b — not bare "grant", which matches "migrant").
-  if (vf === 'sf424a' || vf.includes('424') || /\bnsf\b|national science|\bdoe\b|department of energy|grants?\.gov|\bnih\b|\busda\b|\bnasa\b/.test(a) || /\bnsf\b|\bdoe\b|\bgrant\b/.test(p)) return 'sf424a';
+  if (vf === 'sf424a' || vf.includes('424') || /\bnsf\b|national science|\bdoe\b|dep(?:artmen)?t\.? of energy|grants?\.gov|\bnih\b|\busda\b|\bnasa\b/.test(a) || /\bnsf\b|\bdoe\b|\bgrant\b/.test(p)) return 'sf424a';
   return 'burden_waterfall';
 }
 
@@ -237,7 +240,15 @@ export function buildCostVolume(
   inputs?: Partial<CostVolumeInputs>,
   otfLines?: OtfSpendLine[],
 ): CanvasDocument {
-  const base = { ...provisionalCostInputs(), ...(inputs ?? {}) } as CostVolumeInputs;
+  // Provisional starter ONLY when the caller passes nothing (provision-time worked example, which the
+  // tenant then edits). A caller that passes REAL inputs gets a clean slate for the COLLECTIONS it
+  // omits — merging the provisional example's labor/odcs/subs into a real cost volume silently injects
+  // a phantom "[University / Lab]" $15k research-subcontractor (and example labor/ODC rows) that inflate
+  // the total, appear in the rendered form, and skew the work-share. Rates is a scalar config, so the
+  // provisional rate schedule stays as the fallback when the caller omits it; the example ROWS never do.
+  const base = (inputs
+    ? { ...provisionalCostInputs(), labor: [], odcs: [], subs: [], ...inputs }
+    : provisionalCostInputs()) as CostVolumeInputs;
   switch (form) {
     case 'sf424a':
       return buildSf424aCanvas({ ...base, meta });

@@ -46,9 +46,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       rows = await sql`
         SELECT a.id, a.label, a.summary, a.compliance_delta AS "complianceDelta", a.severity, a.source,
                a.status, a.detected_at AS "detectedAt", a.reviewed_at AS "reviewedAt",
+               a.document_id AS "documentId", d.original_filename AS "documentFilename",
                (SELECT count(*)::int FROM proposal_amendment_flags f WHERE f.amendment_id = a.id) AS "flagged",
                (SELECT count(*)::int FROM proposal_amendment_flags f WHERE f.amendment_id = a.id AND f.acknowledged_at IS NOT NULL) AS "acknowledged"
         FROM solicitation_amendments a
+        LEFT JOIN solicitation_documents d ON d.id = a.document_id
         WHERE a.solicitation_id = ${solId}::uuid
         ORDER BY a.detected_at DESC
       `;
@@ -79,7 +81,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid solicitation ID', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    let body: { label?: unknown; summary?: unknown; severity?: unknown; complianceDelta?: unknown };
+    let body: { label?: unknown; summary?: unknown; severity?: unknown; complianceDelta?: unknown; documentId?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -116,6 +118,31 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
+    // Optional linked document (mig 190): must be one of THIS solicitation's documents —
+    // a foreign id is refused, not silently dropped. A present-but-non-string value is a
+    // 400, not a silent NULL (a dropped link is exactly the tenant-can't-open-it gap).
+    if (body.documentId !== undefined && body.documentId !== null && typeof body.documentId !== 'string') {
+      return NextResponse.json({ error: 'documentId must be a UUID string', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    let documentId: string | null = null;
+    if (typeof body.documentId === 'string' && body.documentId) {
+      if (!UUID_RE.test(body.documentId)) {
+        return NextResponse.json({ error: 'Invalid documentId', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
+      try {
+        const doc = await sql`
+          SELECT id FROM solicitation_documents
+          WHERE id = ${body.documentId}::uuid AND solicitation_id = ${solId}::uuid LIMIT 1`;
+        if (doc.length === 0) {
+          return NextResponse.json({ error: 'documentId is not a document of this solicitation', code: 'VALIDATION_ERROR' }, { status: 400 });
+        }
+        documentId = body.documentId;
+      } catch (e) {
+        console.error('[amendments] document check failed', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+    }
+
     let result: { id: string };
     try {
       result = await logAmendment({
@@ -124,6 +151,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         summary,
         complianceDelta,
         severity,
+        documentId,
         actorId: user.id,
         actorEmail: user.email ?? null,
         role: user.role as Role,

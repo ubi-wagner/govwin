@@ -18,7 +18,7 @@ import { sql, sqlBypass } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { runInTenant } from '@/lib/tenant-context';
 import { createTask } from '@/lib/tasks/tasks';
-import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, userActor, systemActor } from '@/lib/events';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
@@ -508,6 +508,15 @@ export async function closeAgentGate(
   // Auto is opt-in per stage — never auto-advance a stage the tenant didn't set to autoAdvance.
   if (opts.auto && stage.autoAdvance !== true) return { advanced: false, reason: 'auto_not_enabled' };
 
+  // AUDIT FIX (PATTERN_AUDIT HIGH-4): AUTO closes only a PASSED review — "the cohort ran"
+  // is not "the cohort found nothing". Any advisory note (or a non-clean verdict) leaves the
+  // gate for a human; the ASSISTED click (a human weighing the notes) is unchanged.
+  if (opts.auto) {
+    const notes = Number(review.noteCount ?? 0);
+    const verdictOk = review.verdict == null || ['reviewed', 'pass', 'clean'].includes(String(review.verdict));
+    if (notes > 0 || !verdictOk) return { advanced: false, reason: 'review_has_findings' };
+  }
+
   // Close the gate ToDo (its completion IS the gate close). RLS-scoped update (prod app role is
   // subject to tasks RLS). Record the AI verdict + closer so the ledger shows who/what closed it.
   await withTenant(tenantId, async (tx) => {
@@ -525,7 +534,9 @@ export async function closeAgentGate(
   if (result.advanced) {
     await emitEventSingle({
       namespace: 'capture', type: 'stage_review.advanced',
-      actor: userActor(actor.id, actor.email ?? undefined), tenantId,
+      // EVENT_CONTRACT §5: the autonomous sweep is AUTOMATION — it audits as system, never
+      // as a synthetic user. The assisted click keeps its human actor.
+      actor: opts.auto ? systemActor('ai-manager-auto') : userActor(actor.id, actor.email ?? undefined), tenantId,
       payload: { portalId, stageKey: stage.key, auto: opts.auto === true, verdict: review.verdict ?? null, agentManagerKey: stage.agentManagerKey ?? null },
     });
   }
@@ -647,21 +658,36 @@ export async function editPortalWorkflow(
       ? { status: 'accepted', acceptedAt: new Date().toISOString(), acceptedBy: actor.id }
       : (portal.guardrailConfig?._setup ?? newConfig._setup);
 
+    // CAS on the _setup state we READ: a plain save that raced a concurrent Accept must not
+    // write the stale 'pending' back (silently un-accepting the workflow). A miss 409s and the
+    // client re-reads.
+    const priorSetupStatus = (portal.guardrailConfig?._setup as { status?: string } | undefined)?.status ?? null;
     const [wrote] = await sql<Array<{ id: string }>>`
       UPDATE proposal_portals SET guardrail_config = ${jsonParam(config)}
       WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid AND status IN ('launched','executing')
+        AND guardrail_config->'_setup'->>'status' IS NOT DISTINCT FROM ${priorSetupStatus}
       RETURNING id`;
-    if (!wrote) return { ok: false, error: 'the workflow is not editable in this state', code: 'CONFLICT', status: 409 };
+    if (!wrote) return { ok: false, error: 'the workflow changed underneath this edit — reload and retry', code: 'CONFLICT', status: 409 };
 
     // Reconcile the CURRENT stage's tasks onto the new config.
     const stages = Array.isArray(config.stages) ? config.stages : [];
     const curStage = stages[portal.currentStageIndex];
     let reprojected = 0, created = 0, cancelled = 0;
     if (curStage) {
-      const existing = await sql<Array<{ id: string; title: string | null }>>`
-        SELECT id, title FROM tasks
+      const existing = await sql<Array<{ id: string; title: string | null; dueAt: string | Date | null; nudgeSchedule: unknown }>>`
+        SELECT id, title, due_at, nudge_schedule FROM tasks
         WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
           AND params->>'stage' = ${curStage.key} AND status IN ('open','in_progress')`;
+      // A COMPLETED stage ToDo must stay completed: without this, every save/rebaseline/Accept
+      // re-creates it as open (no open title-match exists) — re-blocking the gate and re-nudging
+      // the assignee for finished work.
+      const completedTitles = new Set(
+        (await sql<Array<{ title: string | null }>>`
+          SELECT title FROM tasks
+          WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'portal' AND entity_id = ${portalId}::uuid
+            AND params->>'stage' = ${curStage.key} AND status = 'completed'`
+        ).map((t) => t.title ?? ''),
+      );
       if (curStage.gateCloser === 'agent_manager') {
         // Agent-manager stage: keep exactly ONE gate ToDo (never empty). Cancel any human leftovers from a
         // prior config; create the gate if absent (createStageTodos makes the "AI review gate" ToDo).
@@ -684,11 +710,19 @@ export async function editPortalWorkflow(
           const match = existing.find((e) => !used.has(e.id) && e.title === title);
           if (match) {
             used.add(match.id);
+            // Reset the nudge watermark ONLY when the timing actually changed — a collaborator-list
+            // edit must not re-fire every already-past nudge threshold on the next sweep.
+            const toMs = (d: unknown) => (d ? new Date(d as string).getTime() : null);
+            const timingChanged = toMs(match.dueAt) !== toMs(dueAt)
+              || JSON.stringify(match.nudgeSchedule ?? []) !== JSON.stringify(sched);
             await sql`
               UPDATE tasks SET due_at = ${dueAt}, assignee_role = ${assigneeRole}, assignee_user_id = ${assigneeUserId},
-                nudge_schedule = ${jsonParam(sched)}, nudges_sent = '[]'::jsonb
+                nudge_schedule = ${jsonParam(sched)},
+                nudges_sent = CASE WHEN ${timingChanged} THEN '[]'::jsonb ELSE nudges_sent END
               WHERE tenant_id = ${tenantId}::uuid AND id = ${match.id}::uuid AND status IN ('open','in_progress')`;
             reprojected++;
+          } else if (completedTitles.has(title)) {
+            // Already done in this stage — leave it done.
           } else {
             const res = await createTask({
               actor, tenantId, assigneeRole, assigneeUserId, taskType: todo.type, title,

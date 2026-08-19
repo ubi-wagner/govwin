@@ -21,6 +21,8 @@ interface Flag {
   severity: 'critical' | 'major' | 'minor' | 'info';
   complianceDelta: DeltaItem[];
   detectedAt: string;
+  documentId: string | null;
+  documentFilename: string | null;
 }
 
 const sevTone: Record<string, string> = {
@@ -90,6 +92,33 @@ export function AmendmentBanner({
     [tenantSlug, proposalId],
   );
 
+  // The amendment's announcing document (flag-gated signed URL). Popup-blocker-safe:
+  // the tab is claimed SYNCHRONOUSLY in the click (window.open after an await is blocked
+  // by Safari, and by every browser once transient activation expires), then pointed at
+  // the signed URL when it arrives.
+  const [docBusy, setDocBusy] = useState<string | null>(null);
+  const openDocument = useCallback((amendmentId: string) => {
+    if (docBusy) return;
+    setErr(null);
+    setDocBusy(amendmentId);
+    const w = window.open('', '_blank');
+    void (async () => {
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/amendments/${amendmentId}/document`);
+        const j = await res.json().catch(() => ({}));
+        const url = j?.data?.url as string | undefined;
+        if (res.ok && url && w) { w.location.href = url; return; }
+        w?.close();
+        setErr(j?.error || 'Could not open the amendment document');
+      } catch {
+        w?.close();
+        setErr('Could not open the amendment document');
+      } finally {
+        setDocBusy(null);
+      }
+    })();
+  }, [tenantSlug, proposalId, docBusy]);
+
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -121,6 +150,15 @@ export function AmendmentBanner({
                   <span className="text-sm font-medium text-gray-900">{f.label}</span>
                 </div>
                 <p className="text-xs text-gray-600 mt-1">{f.summary}</p>
+                {f.documentFilename && (
+                  <button
+                    onClick={() => openDocument(f.amendmentId)}
+                    disabled={docBusy === f.amendmentId}
+                    className="text-[11px] text-indigo-600 hover:underline mt-1 block disabled:opacity-50"
+                  >
+                    📎 {docBusy === f.amendmentId ? 'Opening…' : `Open ${f.documentFilename}`}
+                  </button>
+                )}
                 {f.complianceDelta.length > 0 && (
                   <button onClick={() => toggle(f.flagId)} className="text-[11px] text-indigo-600 hover:underline mt-1">
                     {expanded.has(f.flagId) ? 'Hide' : 'Show'} {f.complianceDelta.length} compliance change{f.complianceDelta.length > 1 ? 's' : ''}

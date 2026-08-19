@@ -38,6 +38,7 @@ import { auth } from '@/auth';
 import { sqlBypass as sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
@@ -131,6 +132,13 @@ export async function POST(request: Request) {
     );
   }
   const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
+  // Per-file types for a NEW solicitation, aligned by index to `files`. Unparseable or absent
+  // ⇒ [] and the first-PDF-is-source fallback applies. Values are validated per file below.
+  let fileTypes: string[] = [];
+  try {
+    const raw = formData.get('documentTypes');
+    if (raw) { const parsed: unknown = JSON.parse(String(raw)); if (Array.isArray(parsed)) fileTypes = parsed.map(String); }
+  } catch { /* malformed → fall back to the default typing */ }
   if (
     requestedDocType !== null &&
     !VALID_DOCUMENT_TYPES.includes(requestedDocType as (typeof VALID_DOCUMENT_TYPES)[number])
@@ -212,12 +220,12 @@ export async function POST(request: Request) {
   // solicitation so the admin can navigate there instead of creating a
   // duplicate. Admin can override by acknowledging the duplicate (future
   // UI — for now it's a hard reject with a link).
-  const fileBuffers: { file: File; buffer: Buffer; hash: string; displayName: string }[] = [];
+  const fileBuffers: { file: File; buffer: Buffer; hash: string; displayName: string; index: number }[] = [];
   for (const file of files) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const hash = createHash('sha256').update(buffer).digest('hex');
     const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
-    fileBuffers.push({ file, buffer, hash, displayName });
+    fileBuffers.push({ file, buffer, hash, displayName, index: fileBuffers.length });
   }
 
   // Check all hashes at once against the global document store
@@ -232,7 +240,13 @@ export async function POST(request: Request) {
       FROM solicitation_documents sd
       LEFT JOIN curated_solicitations cs ON cs.id = sd.solicitation_id
       LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+      -- Dedupe is PER SOLICITATION (mig 192). The same file legitimately belongs to more than one
+      -- solicitation — every DoW SBIR topic attaches the SAME BAA preface, and an umbrella BAA and
+      -- its topic share the topic PDF. Only a re-upload into the SAME solicitation is a duplicate.
+      -- Attaching to an existing solicitation scopes to it; a NEW solicitation can never collide.
       WHERE sd.content_hash = ANY(${hashes}::text[])
+        AND ${existingSolId}::uuid IS NOT NULL
+        AND sd.solicitation_id = ${existingSolId}::uuid
     `;
   } catch (err) {
     console.error('[rfp-upload] duplicate check query failed', err);
@@ -246,7 +260,7 @@ export async function POST(request: Request) {
     const first = dupeRows[0];
     return NextResponse.json(
       {
-        error: `This file has already been uploaded to "${first.solTitle ?? 'an existing solicitation'}". Navigate to the existing solicitation or rename/modify the file if this is a different document.`,
+        error: `This file is already attached to "${first.solTitle ?? 'this solicitation'}". Attaching the same file to a DIFFERENT solicitation is allowed — only a repeat upload into the same one is refused.`,
         code: 'DUPLICATE_FILE',
         details: {
           existingSolicitationId: first.solicitationId,
@@ -379,19 +393,24 @@ export async function POST(request: Request) {
   // fileBuffers were pre-computed above (hash + buffer + displayName).
   const documentIds: string[] = [];
   let firstPdfKey: string | null = null;
-  const docType = requestedDocType ?? 'source';
   for (const fb of fileBuffers) {
     const ext = extFromFilename(fb.file.name);
     const safeName = slugSafeName(fb.file.name);
     let storageKey: string;
-    if (ext === 'pdf' && !firstPdfKey) {
+    // The 'source' slot (…/source.pdf) belongs to a NEW solicitation's primary document only.
+    // Attach-to-existing must never claim it — the original upload already owns that key, and
+    // taking it again is a unique-constraint 500 (proven by the coverage drive: attaching the
+    // Component instructions to an existing BAA collided on …/source.pdf). Attachment keys also
+    // carry a content-hash prefix so two different files sharing a filename cannot collide
+    // (same-CONTENT re-uploads are already rejected earlier by the content_hash dedup).
+    if (ext === 'pdf' && !firstPdfKey && !existingSolId) {
       storageKey = rfpPipelinePath({ opportunityId: oppRowId, kind: 'source', ext: 'pdf' });
       firstPdfKey = storageKey;
     } else {
       storageKey = rfpPipelinePath({
         opportunityId: oppRowId,
         kind: 'attachment',
-        name: safeName,
+        name: `${fb.hash.slice(0, 10)}-${safeName}`.slice(0, 63).replace(/-+$/, ''),
         ext,
       });
     }
@@ -431,8 +450,26 @@ export async function POST(request: Request) {
     }
 
     try {
-      // For new solicitations without an explicit type, first PDF gets 'source'
-      const effectiveType = existingSolId ? docType : (firstPdfKey === storageKey ? 'source' : 'attachment');
+      // Document type, in priority order:
+      //   attach-to-existing → the PER-FILE type, else the request's documentType, else
+      //                        'attachment' (NEVER 'source' — the original upload owns the
+      //                        source role, and a second "source" skews the full_text
+      //                        recombine ordering + the provenance story).
+      //   new solicitation   → the PER-FILE type the admin chose on the form, else the first
+      //                        PDF is the 'source' (umbrella) and the rest are 'attachment'.
+      // The per-file choice matters: a solicitation states its rules across files, and a
+      // supplementary PDF labelled 'instructions' is the one the umbrella BAA defers its page
+      // limit TO. Labelling it correctly is what lets the provenance audit tell "the rule is
+      // elsewhere and elsewhere is nowhere" from "the rule is elsewhere and here it is".
+      // (Caught live by the mid-window drive: an attach sending documentTypes ['amendment']
+      // was silently stored as 'source', so the amendment linked the wrong file.)
+      const perFileType = fileTypes[fb.index];
+      const perFileValid = !!perFileType && (VALID_DOCUMENT_TYPES as readonly string[]).includes(perFileType);
+      const effectiveType = existingSolId
+        ? (perFileValid ? perFileType : (requestedDocType ?? 'attachment'))
+        : perFileValid
+          ? perFileType
+          : (firstPdfKey === storageKey ? 'source' : 'attachment');
       const isPrimary = requestedIsPrimary && firstPdfKey === storageKey;
       const docRows = await sql<{ id: string }[]>`
         INSERT INTO solicitation_documents
@@ -448,7 +485,7 @@ export async function POST(request: Request) {
            ${fb.hash},
            ${userId ?? null}::uuid,
            ${isPrimary})
-        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
+        ON CONFLICT (solicitation_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
       if (docRows.length === 0) {
@@ -459,7 +496,7 @@ export async function POST(request: Request) {
         await emitEventEnd(eventId, { error: { message: 'duplicate content_hash', code: 'DUPLICATE_FILE' } });
         return NextResponse.json(
           {
-            error: 'This file has already been uploaded. Navigate to the existing solicitation or rename/modify the file if this is a different document.',
+            error: 'This file is already attached to this solicitation. Attaching it to a different solicitation is allowed — only a repeat upload into the same one is refused.',
             code: 'DUPLICATE_FILE',
           },
           { status: 409 },
@@ -476,36 +513,81 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Extract text from the primary/first PDF immediately ───────────
-  // This removes the dependency on the pipeline shredder for text
-  // extraction. The extracted text is stored in solicitation_documents
-  // so topic extraction can run right away.
-  // For attach-to-existing, only extract if this upload is marked primary.
-  const shouldExtract = !existingSolId || requestedIsPrimary;
-  let extractedText: string | null = null;
-  const firstPdfFb = fileBuffers.find(
-    (fb) => extFromFilename(fb.file.name) === 'pdf',
-  );
-  if (shouldExtract && firstPdfFb && documentIds.length > 0) {
+  // ── Extract text from EVERY uploaded PDF immediately ──────────────
+  // We already hold the bytes, so extracting here removes the dependency on the pipeline
+  // shredder fetching them back out of storage — which is also the only path that works when
+  // the two services disagree about the storage driver.
+  //
+  // This used to extract only the FIRST pdf. That quietly capped every solicitation at one
+  // readable document, and the one it dropped is the one that matters most: a federal
+  // solicitation states its rules across files, and the DoW 2026 SBIR BAA defers its
+  // technical-volume page limit to the Component-specific instructions, which upload as a second
+  // PDF. Proven live — a 9-page instructions file stating "The Technical Volume is not to exceed
+  // 10 pages" sat in solicitation_documents with extracted_text NULL, so the compliance matrix
+  // showed a permanently unresolvable deferral while the answer was sitting in the row next to it.
+  //
+  // documentIds is index-aligned with fileBuffers (one push per file, early return on conflict).
+  //
+  // ALWAYS extract — including attach-to-existing. The old gate (`!existingSolId ||
+  // requestedIsPrimary`) was single-document-era reasoning: it assumed a later attachment was
+  // supporting material. It is usually the OPPOSITE — the document an admin attaches later is
+  // the Component-specific instructions the umbrella defers its binding rules to, and skipping
+  // extraction left it a text-less row the compliance pipeline could never read. We hold the
+  // bytes right here; extracting now beats hoping a worker can fetch them back out of storage.
+  const shouldExtract = documentIds.length > 0;
+  let extractedText: string | null = null;   // the UMBRELLA text — what topic extraction reads
+  if (shouldExtract && documentIds.length > 0) {
     try {
       const { loadPdfParse } = await import('@/lib/pdf-parse-quiet'); // pdf-parse loader with pdf.js Node setup warnings silenced
       const { PDFParse } = await loadPdfParse();
-      const parser = new PDFParse({ data: new Uint8Array(firstPdfFb.buffer) });
-      const textResult = await parser.getText();
-      const rawText = textResult.text?.slice(0, 500000) || '';
-      try { await parser.destroy(); } catch { /* ignore cleanup */ }
 
-      if (rawText.length > 100) {
-        extractedText = rawText;
-        // Update the document row with the extracted text
-        await sql`
-          UPDATE solicitation_documents
-          SET extracted_text = ${extractedText}
-          WHERE id = ${documentIds[0]}::uuid
-        `;
+      for (let i = 0; i < fileBuffers.length && i < documentIds.length; i++) {
+        const fb = fileBuffers[i];
+        if (extFromFilename(fb.file.name) !== 'pdf') continue;
+        try {
+          const parser = new PDFParse({ data: new Uint8Array(fb.buffer) });
+          const textResult = await parser.getText();
+          const rawText = textResult.text?.slice(0, 500000) || '';
+          try { await parser.destroy(); } catch { /* ignore cleanup */ }
+          if (rawText.length <= 100) continue;
+
+          await sql`
+            UPDATE solicitation_documents
+            SET extracted_text = ${rawText}, extracted_at = now(), updated_at = now()
+            WHERE id = ${documentIds[i]}::uuid
+          `;
+          // First readable PDF is the umbrella — topics are extracted from it, not from the
+          // Component instructions (which describe how to respond, not what to respond to).
+          if (extractedText === null) extractedText = rawText;
+        } catch (perFileErr) {
+          // One unreadable file (a scan, an encrypted PDF) must not cost us the others.
+          console.error(`[rfp-upload] PDF text extraction failed for ${fb.displayName} (non-fatal):`, perFileErr);
+        }
       }
     } catch (err) {
       console.error('[rfp-upload] PDF text extraction failed (non-fatal):', err);
+    }
+
+    // Attach-to-existing: recombine curated_solicitations.full_text from EVERY document's
+    // extracted text, in the same order + separator the pipeline shredder uses, so the
+    // readiness gate and Ingest Assist see the newly-attached rules immediately. (For a NEW
+    // solicitation the OnRfpUploaded shred does this; an attach must not have to wait for it.)
+    if (existingSolId) {
+      try {
+        await sql`
+          UPDATE curated_solicitations SET full_text = (
+            SELECT string_agg(d.extracted_text, E'\n\n---DOCUMENT---\n\n'
+                     ORDER BY CASE d.document_type
+                       WHEN 'source' THEN 0 WHEN 'rfp' THEN 0 WHEN 'nofo' THEN 0
+                       WHEN 'instructions' THEN 1 WHEN 'amendment' THEN 1 WHEN 'qa' THEN 1
+                       WHEN 'topic' THEN 2 ELSE 3 END, d.created_at)
+            FROM solicitation_documents d
+            WHERE d.solicitation_id = ${solId}::uuid AND d.extracted_text IS NOT NULL
+          ), updated_at = now()
+          WHERE id = ${solId}::uuid`;
+      } catch (err) {
+        console.error('[rfp-upload] full_text recombine failed (non-fatal):', err);
+      }
     }
   }
 
@@ -540,6 +622,14 @@ export async function POST(request: Request) {
     },
   });
 
+  // Attach-to-existing on a PUSHED solicitation: bump the bridge so pinned mirror
+  // cards flip pin_update_available — the tenant's resync then re-copies the doc
+  // set, which is how a late attachment actually reaches a customer. No-op pre-push.
+  let propagation: Awaited<ReturnType<typeof republishSolicitationCards>> | undefined;
+  if (existingSolId) {
+    propagation = await republishSolicitationCards({ solicitationId: solId, actorId: userId ?? null });
+  }
+
   return NextResponse.json(
     {
       data: {
@@ -549,6 +639,7 @@ export async function POST(request: Request) {
         total_bytes: totalBytes,
         text_extracted: extractedText !== null,
         topics_found: topicsExtracted,
+        ...(propagation ? { propagation } : {}),
       },
     },
     { status: 201 },

@@ -8,7 +8,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, sql, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { listOpenTasksForActor, completeTask } from '@/lib/tasks/tasks';
 import { advancePortalStage } from '@/lib/portal-workflow';
@@ -52,6 +52,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const { tenantSlug } = await ctx.params;
     const r = await resolveActor(tenantSlug);
     if ('error' in r) return r.error;
+    // RLS choke point — the tasks ledger is tenant-RLS'd (mig 185); without context the
+    // context-aware sql passes through bare and the whole queue reads empty. Must live in
+    // the HANDLER frame (ALS set inside the awaited helper dies with the helper).
+    enterTenant(r.actor.tenantId);
     const tasks = await listOpenTasksForActor(r.actor);
     return NextResponse.json({ data: { tasks } });
   } catch (err) {
@@ -65,6 +69,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const { tenantSlug } = await ctx.params;
     const r = await resolveActor(tenantSlug);
     if ('error' in r) return r.error;
+    enterTenant(r.actor.tenantId); // RLS choke point (tasks ledger reads/writes below)
 
     let body: { taskId?: unknown; result?: unknown };
     try {

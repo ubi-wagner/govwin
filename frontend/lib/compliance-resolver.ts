@@ -9,8 +9,14 @@ export interface ResolvedCompliance {
   volumes: Array<{
     volumeName: string;
     volumeNumber: number;
+    /** Completed in DSIP (webform / agency-generated report) — not authored in this workspace. */
+    dsipOnly?: boolean;
     items: Array<Record<string, unknown>>;
   }>;
+  /** Set when resolution ERRORED and fell back to SYSTEM_DEFAULTS + no volumes. A provision
+   *  built off a degraded resolve is a default skeleton, not the authored master — callers
+   *  must surface it (the silent fallback used to be indistinguishable from an empty build). */
+  degraded?: boolean;
 }
 
 /**
@@ -56,11 +62,22 @@ export async function resolveTopicCompliance(topicId: string): Promise<ResolvedC
     SELECT solicitation_id FROM opportunities WHERE id = ${topicId}
   `;
 
-  if (!topic?.solicitationId) {
-    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  let solicitationId = topic?.solicitationId ?? null;
+  if (topic && !solicitationId) {
+    // Umbrella arm: the live intake paths create the umbrella opportunity WITHOUT
+    // opportunities.solicitation_id (only topics get it stamped) — but the curated master
+    // points back via curated_solicitations.opportunity_id. Without this fallback an
+    // umbrella purchase resolves to a NON-degraded empty result and the buyer is
+    // provisioned a default skeleton while the fully-authored master sits unread.
+    const [cs] = await sql<{ id: string }[]>`
+      SELECT id FROM curated_solicitations WHERE opportunity_id = ${topicId} LIMIT 1
+    `;
+    solicitationId = cs?.id ?? null;
   }
 
-  const solicitationId = topic.solicitationId;
+  if (!solicitationId) {
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  }
 
   // ── 2. Fetch compliance rows (baseline + topic override) ────────────
   // Returns 0-2 rows: one with topic_id IS NULL (baseline), one with topic_id = topicId (override)
@@ -86,7 +103,7 @@ export async function resolveTopicCompliance(topicId: string): Promise<ResolvedC
   return { compliance, volumes };
   } catch (err) {
     console.error('[compliance-resolver] resolveTopicCompliance failed:', err);
-    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [], degraded: true };
   }
 }
 
@@ -221,8 +238,9 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name
+        SELECT id, volume_number, volume_name, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id = ${topicId}
@@ -232,8 +250,9 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name
+        SELECT id, volume_number, volume_name, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id IS NULL
@@ -254,6 +273,7 @@ async function resolveVolumes(
     required: boolean;
     pageLimit: number | null;
     slideLimit: number | null;
+    characterLimit: number | null;
     fontFamily: string | null;
     fontSize: string | null;
     minFontSize: number | null;
@@ -266,12 +286,13 @@ async function resolveVolumes(
     customFields: unknown;
     templateId: string | null;
     expertNotes: string | null;
+    metadata: Record<string, unknown> | null;
   }[]>`
     SELECT volume_id, item_number, item_name, item_type, required,
-           page_limit, slide_limit, font_family, font_size, min_font_size, margins,
+           page_limit, slide_limit, character_limit, font_family, font_size, min_font_size, margins,
            line_spacing, header_format, footer_format,
            required_sections, format_rules, custom_fields,
-           template_id, expert_notes
+           template_id, expert_notes, metadata
     FROM volume_required_items
     WHERE volume_id = ANY(${volumeIds})
     ORDER BY item_number ASC
@@ -286,16 +307,27 @@ async function resolveVolumes(
     itemsByVolume.set(item.volumeId, existing);
   }
 
-  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string }) => ({
+  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string; metadata?: Record<string, unknown> | null }) => ({
     volumeName: vol.volumeName,
     volumeNumber: vol.volumeNumber,
-    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null }) => ({
+    // A DSIP-ONLY volume is completed inside the agency's own submission portal (a DSIP webform or
+    // a report pulled from SBIR.gov) — the company never authors a document for it here. Carrying
+    // the flag lets provision list it as a submission checklist item instead of standing up an
+    // authoring artifact nobody can fill, which would then block readiness forever.
+    dsipOnly: (vol.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
+    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null; metadata?: Record<string, unknown> | null }) => ({
       itemNumber: item.itemNumber,
       itemName: item.itemName,
       itemType: item.itemType,
       required: item.required,
       pageLimit: item.pageLimit,
       slideLimit: item.slideLimit,
+      characterLimit: item.characterLimit,
+      // Per-ITEM DSIP-only, the finer grain of the volume flag above: a volume can MIX the two.
+      // The DoW Volume 1 is a DSIP cover-sheet webform PLUS two authored narrative documents —
+      // flagging the whole volume would drop the narratives, flagging none would stand up an
+      // authoring artifact for a webform that can never be filled here.
+      dsipOnly: (item.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
       fontFamily: item.fontFamily,
       fontSize: item.fontSize,
       minFontSize: item.minFontSize,

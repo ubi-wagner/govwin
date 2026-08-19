@@ -599,9 +599,38 @@ authed request bounces back to `/login?from=…`. `localhost` resolves to `127.0
 on `127.0.0.1` + browsing `localhost` is correct and consistent.
 
 **GOTCHAS learned the hard way (save yourself the time):**
+- **The sandbox needs `STORAGE_DRIVER=local`.** Without it the compliance and package routes
+  return 500 on `[storage/s3-client] AWS_S3_BUCKET (or AWS_S3_BUCKET_NAME) is required in
+  production` — the storage client's own documented local driver, not a product defect. Add
+  `STORAGE_DRIVER=local LOCAL_STORAGE_DIR=<scratch>/storage` to the standalone server's env.
+- **`AUTH_TRUST_HOST=true` or every login 500s** with `UntrustedHost: Host must be trusted`
+  behind the standalone server. The symptom is a drive script getting 401 on every request while
+  `/login` itself answers 200.
+- **The Python worker runs as the OWNER, not `govtech_app`.** docs/RLS_CUTOVER.md is explicit
+  ("pipeline = owner"); it is the cross-tenant engine, so one connection cannot carry one tenant's
+  context. `rfp_agent` is the deploy-gated NOBYPASSRLS pool the AGENT FABRIC uses per invocation,
+  and `fabric.py` sets `app.tenant_id` on it. Start the worker with `govtech_app` and every
+  workflow dies on "new row violates row-level security policy for process_instances".
+- **Kill the worker by port too.** It binds :8080 for its health server; `pkill -f src/main.py`
+  can leave one alive holding the port, and the replacement exits on `Errno 98` — the same
+  stale-process trap as the frontend, with the same symptom of code changes appearing not to work.
+- **⚠️ KILL THE SERVER BY PORT, NOT BY NAME.** Next renames its process to `next-server (v…)`,
+  so `pkill -f "standalone/server.js"` and `pkill -f "node server.js"` match NOTHING — including
+  from inside `sandbox-heartbeat.sh`. The old process keeps serving its now-DELETED build from
+  open inodes, `/login` answers 200, the heartbeat reports `srv=ok`, and `.next/BUILD_ID` matches
+  `.next/standalone/.next/BUILD_ID` — every signal says "fresh" while every request runs the
+  previous build. It cost an hour this session chasing a route fix that was correct in the
+  source AND in the compiled bundle. Kill by port and VERIFY the generation changed:
+      fuser -k -9 -n tcp 3000
+      PID=$(fuser -n tcp 3000 | tr -d ' ')
+      readlink /proc/$PID/cwd     # must NOT end in "(deleted)"
+      ps -o lstart= -p $PID       # must be AFTER the build finished
+- **`next build` finishing is not `.next/standalone` existing.** The build writes `.next/BUILD_ID`
+  well before it emits `standalone/`, so `until [ -f .next/BUILD_ID ]` races and you restage into
+  a directory that is about to be replaced. Wait on `.next/standalone/server.js` instead.
 - **Restarting the standalone server:** stop the OLD one first or the new one hits
   `EADDRINUSE :3000`. If you started it with `run_in_background`, `TaskStop <task_id>`;
-  otherwise `fuser -k -9 3000/tcp; sleep 2`. Then restage static (above) + start fresh +
+  otherwise `fuser -k -9 -n tcp 3000; sleep 2`. Then restage static (above) + start fresh +
   poll `/login` for 200. The node child dying silently after a `setsid … &` launch is the
   usual reason a "restart" appears to hang — use `run_in_background:true`.
 - **Rebuild ≠ live:** the standalone server serves the files present at start. After ANY
@@ -704,6 +733,13 @@ These are recurring bug-classes — treat them as a checklist, not one-offs:
 4. **Standalone serving (supersedes the old "next start" note):** `output:'standalone'` means
    `next start` is broken — serve `node .next/standalone/server.js`, re-stage `.next/static` +
    `public` on every rebuild, restart, verify matching BUILD_IDs. Rebuild ≠ live. (§2 has the recipe.)
+   ⚠️ **The stale-server trap:** the heartbeat only starts a server when :3000 is FREE, so a process
+   left over from before your rebuild keeps serving the OLD code — and the symptom is a live test
+   failing on the exact behaviour you just added, which reads like your code is wrong. After every
+   rebuild, kill by PID and confirm the new one is younger than the build:
+   `fuser -k 3000/tcp` then `ps -o pid,lstart -p $(fuser 3000/tcp)`. (`ss` is not installed here; use
+   `fuser`. And `pkill -f standalone/server.js` never matches — the heartbeat launches a bare
+   `node server.js` with cwd=standalone.)
 5. **JWT is the singular-session source of truth:** everything authz reads the active
    membership off the token; never infer tenant from `users.tenant_id`.
 6. **Section ordering = `sort_index`, never `section_number` string:** any new query that lists

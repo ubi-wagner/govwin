@@ -253,8 +253,10 @@ export function resolveTemplateKey(
     key = 'dod-sbir-phase1-cost';
   } else if (itemType === 'slide_deck') {
     if (programType === 'cso') key = 'dod-cso-phase1-briefing';
-  } else if (itemType === 'word_doc') {
-    // Only the word_doc narrative gets a technical template — NOT pdf/form/text items.
+  } else if (itemType === 'word_doc' || itemType === 'text') {
+    // Narrative items (word_doc, and 'text' — how several shipped masters type their prose
+    // items) get a technical template — NOT pdf/form items. The name guard above already
+    // filters cover sheets/certs/CCR out of this branch.
     if (programType === 'sbir_phase_1') key = 'dod-sbir-phase1-technical';
     else if (programType === 'sbir_phase_2') key = 'dod-sbir-phase2-technical';
     else if (programType === 'sttr_phase_1') key = 'dod-sttr-phase1-technical';
@@ -279,7 +281,14 @@ export function interpolateTemplate(
   const json = JSON.stringify(doc);
   const interpolated = json.replace(
     /\{([a-z_]+)\}/g,
-    (match, key: string) => variables[key] ?? match,
+    (match, key: string) => {
+      const v = variables[key];
+      if (v == null) return match;
+      // The replacement lands INSIDE serialized JSON: a raw quote/backslash/newline in the
+      // value (a tenant name like `Tech"Node\LLC`) corrupts the parse — or injects structure.
+      // Encode as a JSON string and strip the wrapping quotes so any value splices safely.
+      return JSON.stringify(v).slice(1, -1);
+    },
   );
   return JSON.parse(interpolated);
 }

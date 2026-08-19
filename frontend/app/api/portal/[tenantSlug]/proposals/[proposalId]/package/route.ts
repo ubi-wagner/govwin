@@ -23,6 +23,7 @@ import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { exportToPdf } from '@/lib/export/pdf-exporter';
 import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 import JSZip from 'jszip';
 import {
   CANVAS_PRESETS,
@@ -286,8 +287,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       const failed: string[] = [];
       let fileCount = 0;
       for (const a of artifacts) {
-        const secs = await sql<{ title: string | null; content: string | null }[]>`
-          SELECT title, content FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
+        const secs = await sql<{ title: string | null; content: string | null; pageAllocation: number | null }[]>`
+          SELECT title, content, page_allocation AS "pageAllocation" FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
         if (secs.length === 0) continue;
         const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
         const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
@@ -331,11 +332,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       } catch (logErr) {
         console.error('[package/zip] activity log failed', logErr);
       }
-      await emitEventEnd(zipStartId, { result: { proposalId, format: 'zip', volumeCount: fileCount } });
+      const floor = await packageComplianceFloor(proposalId);
+      await emitEventEnd(zipStartId, { result: { proposalId, format: 'zip', volumeCount: fileCount, compliant: floor.violations === 0, complianceViolations: floor.byArtifact } });
 
       return new Response(new Uint8Array(zipBuf), {
         status: 200,
-        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${safeName}.zip"` },
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="${safeName}.zip"`,
+          'X-Compliance-Violations': String(floor.violations),
+        },
       });
     } catch (e) {
       console.error('[portal/proposals/package] zip failed:', e);
@@ -601,6 +607,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         0,
       );
 
+      // ── Advisory compliance floor (per artifact, same contract as artifact export) ──
+      const floor = await packageComplianceFloor(proposalId);
+
       // ── Emit end event ──────────────────────────────────────────
       await emitEventEnd(startEventId, {
         result: {
@@ -608,6 +617,8 @@ export async function POST(request: Request, ctx: RouteContext) {
           format,
           sectionCount: parsedSections.length,
           charCount: totalChars,
+          compliant: floor.violations === 0,
+          complianceViolations: floor.byArtifact,
         },
       });
 
@@ -621,6 +632,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'Content-Disposition': `attachment; filename="${safeFilename}.${isPdf ? 'pdf' : 'docx'}"`,
           'Content-Length': String(buffer.length),
+          'X-Compliance-Violations': String(floor.violations),
         },
       });
     }
@@ -845,6 +857,44 @@ export async function POST(request: Request, ctx: RouteContext) {
  * download links 405. `format` comes from the query string and the handler reads no
  * request body, so GET delegates to POST verbatim (same auth, same audit events).
  */
+/**
+ * Advisory compliance floor for the WHOLE-proposal package (M-5): validate each artifact's
+ * assembled canvas against its own frozen compliance_spec — the same floor + never-blocking
+ * contract as the per-artifact export route — and roll the violation count into the response
+ * header + end-event payload. Best-effort: a floor failure never blocks a locked download.
+ */
+async function packageComplianceFloor(proposalId: string): Promise<{ violations: number; byArtifact: Record<string, string[]> }> {
+  const out: { violations: number; byArtifact: Record<string, string[]> } = { violations: 0, byArtifact: {} };
+  try {
+    const arts = await sql<{ id: string; artifactType: string; volumeName: string | null; complianceSpec: ComplianceSpec | null }[]>`
+      SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", compliance_spec AS "complianceSpec"
+      FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid`;
+    for (const a of arts) {
+      if (!a.complianceSpec) continue;
+      const secs = await sql<{ title: string | null; content: string | null; pageAllocation: number | null }[]>`
+        SELECT title, content, page_allocation AS "pageAllocation" FROM proposal_sections
+        WHERE artifact_id = ${a.id}::uuid
+        ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
+      if (secs.length === 0) continue;
+      const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName || 'volume');
+      // Mirror submission-readiness's fontExempt rule so the two size gauges never disagree: a cost
+      // WORKBOOK or a webFORM is not narrative body text — federal cost tables + form fine print are
+      // conventionally below the prose minimum yet legible, and the RFP's "text ≥ N-pt" rule is a
+      // narrative/deck rule. Drop font_too_small for those artifact types; every other code stands.
+      const fontExempt = a.artifactType === 'cost' || a.artifactType === 'form';
+      const v = validateCanvasAgainstSpec(doc, a.complianceSpec)
+        .filter((x) => !(fontExempt && x.code === 'font_too_small'));
+      if (v.length > 0) {
+        out.violations += v.length;
+        out.byArtifact[a.volumeName || a.id] = v.map((x) => x.code);
+      }
+    }
+  } catch (e) {
+    console.error('[package] compliance floor failed (advisory, non-fatal)', e);
+  }
+  return out;
+}
+
 export async function GET(request: Request, ctx: RouteContext) {
   return POST(request, ctx);
 }

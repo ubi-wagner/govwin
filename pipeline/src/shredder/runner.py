@@ -197,17 +197,37 @@ async def shred_solicitation(
     office = sol_row["office"]
     program_type = sol_row["program_type"]
 
-    # solicitation_documents — query for source docs that have a storage_key.
-    # The table was created in migration 012; earlier data may not have docs.
+    # solicitation_documents — EVERY document that can carry a rule, not just the umbrella.
+    #
+    # This used to read `document_type IN ('source','topic')`, which silently excluded the one
+    # document class that most often holds the binding numbers. A federal solicitation routinely
+    # states its rules across files: the DoW 2026 SBIR BAA sets the format requirements but
+    # explicitly DEFERS the technical-volume page limit to the Component-specific instructions,
+    # which arrive as a separate PDF. The admin upload form types every non-primary file
+    # 'attachment' (rfp-upload/route.ts), so attaching those instructions could never help —
+    # they were never extracted, `full_text` never contained them, and the compliance matrix
+    # was left with a permanently unresolvable deferral. Proven live: a 9-page instructions PDF
+    # stating "The Technical Volume is not to exceed 10 pages" sat in the row with
+    # extracted_text NULL while the matrix showed no page limit at all.
+    #
+    # So: shred every type. 'template' is excluded because a blank form contributes formatting
+    # noise, not rules. Ordering puts the umbrella first, then the documents it defers to, then
+    # topics — which is also the order the page-marker segmentation reads most sensibly.
     try:
         doc_rows = await conn.fetch(
             """
             SELECT id, storage_key, original_filename, document_type
             FROM solicitation_documents
             WHERE solicitation_id = $1
-              AND document_type IN ('source', 'topic')
+              AND document_type <> 'template'
+              AND storage_key IS NOT NULL
             ORDER BY
-              CASE document_type WHEN 'source' THEN 0 ELSE 1 END,
+              CASE document_type
+                WHEN 'source' THEN 0 WHEN 'rfp' THEN 0 WHEN 'nofo' THEN 0
+                WHEN 'instructions' THEN 1 WHEN 'amendment' THEN 1 WHEN 'qa' THEN 1
+                WHEN 'topic' THEN 2
+                ELSE 3
+              END,
               created_at ASC
             """,
             sol_uuid,
@@ -407,186 +427,202 @@ async def shred_solicitation(
             details={"solicitation_id": solicitation_id, "estimated": est_input},
         )
 
-    # ── Step 5: Section extraction Claude call ──────────────────────────
-    section_prompt = _load_prompt("section_extraction")
-    system_section, user_template = _split_system_and_examples(section_prompt)
-    section_result, sec_in_tokens, sec_out_tokens = await _call_claude(
-        anthropic_client,
-        system_prompt=system_section,
-        user_message=f"{user_template}\n\nDOCUMENT:\n{combined_text}",
-    )
-    sections = section_result.get("sections", [])
-
-    # ── Step 6: Compliance extraction per section ───────────────────────
-    compliance_prompt = _load_prompt("compliance_extraction")
-    system_comp, comp_template = _split_system_and_examples(compliance_prompt)
-
-    # Master variable list from DB (injected into the user message)
-    variable_rows = await conn.fetch(
-        "SELECT name, label, category, data_type FROM compliance_variables ORDER BY name"
-    )
-    master_list = "\n".join(
-        f"- {v['name']} ({v['data_type']}) — {v['label']}"
-        for v in variable_rows
-    )
-
-    all_matches: list[dict[str, Any]] = []
-    comp_in_tokens = 0
-    comp_out_tokens = 0
-    for section in sections:
-        section_text = section.get("raw_text_excerpt") or ""
-        if not section_text:
-            continue
-        user_msg = (
-            f"{comp_template}\n\n"
-            f"MASTER VARIABLES:\n{master_list}\n\n"
-            f"SECTION: {section.get('title', '')}\n{section_text}"
-        )
-        try:
-            result, in_t, out_t = await _call_claude(
-                anthropic_client, system_prompt=system_comp, user_message=user_msg
-            )
-        except Exception as e:  # single-section failure doesn't kill the run
-            log.warning("compliance extraction failed for section %s: %s",
-                        section.get("key"), e)
-            continue
-        comp_in_tokens += in_t
-        comp_out_tokens += out_t
-        for m in result.get("matches", []):
-            m["_section"] = section.get("key")
-            all_matches.append(m)
-
-    # ── Step 7: Split matches, compute namespace, write to DB ───────────
-    column_updates, custom_vars, skipped = split_matches(all_matches)
-
-    namespace_key = compute_namespace_key(agency, office, program_type)
-
-    ai_extracted_blob = {
-        "prompt_version": 1,
-        "model": DEFAULT_MODEL,
-        "sections": sections,
-        "compliance_matches": all_matches,
-        "skipped_matches": skipped,
-        "extracted_at": started_at.isoformat(),
-    }
-
-    await _write_ai_extracted(conn, sol_uuid, ai_extracted_blob, namespace_key)
-    await _upsert_compliance(conn, sol_uuid, column_updates, custom_vars)
-    await _update_status(conn, sol_uuid, "ai_analyzed")
-
-    # ── Step 7b: Write section + metadata artifacts to S3 ──────────────
-    # Each atomized section → rfp-pipeline/{oppId}/shredded/{key}.md
-    # Full extraction metadata → rfp-pipeline/{oppId}/metadata.json
-    # These are the artifacts that customer agents will read from their
-    # isolated copies after portal purchase.
+    # AUDIT FIX (PATTERN_AUDIT HIGH-2): any throw below (Claude calls, DB reads, Step-7
+    # writes) previously propagated with the rfp.shredding bracket left OPEN — 36 live
+    # orphan starts. Close the bracket with an error end before re-raising.
     try:
-        from storage.s3_client import put_text as s3_put_text, put_json as s3_put_json
-        from storage.paths import rfp_pipeline_path
+        # ── Step 5: Section extraction Claude call ──────────────────────────
+        section_prompt = _load_prompt("section_extraction")
+        system_section, user_template = _split_system_and_examples(section_prompt)
+        section_result, sec_in_tokens, sec_out_tokens = await _call_claude(
+            anthropic_client,
+            system_prompt=system_section,
+            user_message=f"{user_template}\n\nDOCUMENT:\n{combined_text}",
+        )
+        sections = section_result.get("sections", [])
 
-        # Per-section markdown artifacts
+        # ── Step 6: Compliance extraction per section ───────────────────────
+        compliance_prompt = _load_prompt("compliance_extraction")
+        system_comp, comp_template = _split_system_and_examples(compliance_prompt)
+
+        # Master variable list from DB (injected into the user message)
+        variable_rows = await conn.fetch(
+            "SELECT name, label, category, data_type FROM compliance_variables ORDER BY name"
+        )
+        master_list = "\n".join(
+            f"- {v['name']} ({v['data_type']}) — {v['label']}"
+            for v in variable_rows
+        )
+
+        all_matches: list[dict[str, Any]] = []
+        comp_in_tokens = 0
+        comp_out_tokens = 0
         for section in sections:
-            sec_key = section.get("key", "").strip()
-            if not sec_key:
+            section_text = section.get("raw_text_excerpt") or ""
+            if not section_text:
                 continue
-            sec_text = section.get("raw_text_excerpt") or section.get("summary") or ""
-            sec_header = f"# {section.get('title', sec_key)}\n\n"
-            sec_header += f"**Section key:** {sec_key}\n"
-            if section.get("page_range"):
-                sec_header += f"**Pages:** {section['page_range']}\n"
-            if section.get("summary"):
-                sec_header += f"\n{section['summary']}\n"
-            sec_header += "\n---\n\n"
-
+            user_msg = (
+                f"{comp_template}\n\n"
+                f"MASTER VARIABLES:\n{master_list}\n\n"
+                f"SECTION: {section.get('title', '')}\n{section_text}"
+            )
             try:
-                section_path = rfp_pipeline_path(
-                    opportunity_id=opp_id_str,
-                    kind="shredded",
-                    name=sec_key,
+                result, in_t, out_t = await _call_claude(
+                    anthropic_client, system_prompt=system_comp, user_message=user_msg
                 )
-                s3_put_text(key=section_path, text=sec_header + sec_text)
-                artifact_keys.append(section_path)
-            except Exception as e:
-                log.warning("shredder: section %s S3 write failed: %s", sec_key, e)
+            except Exception as e:  # single-section failure doesn't kill the run
+                log.warning("compliance extraction failed for section %s: %s",
+                            section.get("key"), e)
+                continue
+            comp_in_tokens += in_t
+            comp_out_tokens += out_t
+            for m in result.get("matches", []):
+                m["_section"] = section.get("key")
+                all_matches.append(m)
 
-        # Metadata.json — full extraction record for auditability
-        metadata_blob = {
-            "solicitation_id": solicitation_id,
-            "opportunity_id": opp_id_str,
-            "namespace": namespace_key,
+        # ── Step 7: Split matches, compute namespace, write to DB ───────────
+        column_updates, custom_vars, skipped = split_matches(all_matches)
+
+        namespace_key = compute_namespace_key(agency, office, program_type)
+
+        ai_extracted_blob = {
             "prompt_version": 1,
             "model": DEFAULT_MODEL,
-            "extracted_at": started_at.isoformat(),
-            "sections_found": len(sections),
-            "section_keys": [s.get("key") for s in sections if s.get("key")],
-            "compliance_matches_found": len(all_matches),
-            "column_updates_applied": len(column_updates),
-            "custom_variables_stored": len(custom_vars),
+            "sections": sections,
+            "compliance_matches": all_matches,
             "skipped_matches": skipped,
-            "total_input_tokens": sec_in_tokens + comp_in_tokens,
-            "total_output_tokens": sec_out_tokens + comp_out_tokens,
-            "artifact_keys": artifact_keys,
+            "extracted_at": started_at.isoformat(),
         }
-        try:
-            meta_path = rfp_pipeline_path(
-                opportunity_id=opp_id_str, kind="metadata",
-            )
-            s3_put_json(key=meta_path, obj=metadata_blob)
-            artifact_keys.append(meta_path)
-        except Exception as e:
-            log.warning("shredder: metadata.json S3 write failed: %s", e)
 
-        # Emit artifact summary event
+        await _write_ai_extracted(conn, sol_uuid, ai_extracted_blob, namespace_key)
+        await _upsert_compliance(conn, sol_uuid, column_updates, custom_vars)
+        await _update_status(conn, sol_uuid, "ai_analyzed")
+
+        # ── Step 7b: Write section + metadata artifacts to S3 ──────────────
+        # Each atomized section → rfp-pipeline/{oppId}/shredded/{key}.md
+        # Full extraction metadata → rfp-pipeline/{oppId}/metadata.json
+        # These are the artifacts that customer agents will read from their
+        # isolated copies after portal purchase.
+        try:
+            from storage.s3_client import put_text as s3_put_text, put_json as s3_put_json
+            from storage.paths import rfp_pipeline_path
+
+            # Per-section markdown artifacts
+            for section in sections:
+                sec_key = section.get("key", "").strip()
+                if not sec_key:
+                    continue
+                sec_text = section.get("raw_text_excerpt") or section.get("summary") or ""
+                sec_header = f"# {section.get('title', sec_key)}\n\n"
+                sec_header += f"**Section key:** {sec_key}\n"
+                if section.get("page_range"):
+                    sec_header += f"**Pages:** {section['page_range']}\n"
+                if section.get("summary"):
+                    sec_header += f"\n{section['summary']}\n"
+                sec_header += "\n---\n\n"
+
+                try:
+                    section_path = rfp_pipeline_path(
+                        opportunity_id=opp_id_str,
+                        kind="shredded",
+                        name=sec_key,
+                    )
+                    s3_put_text(key=section_path, text=sec_header + sec_text)
+                    artifact_keys.append(section_path)
+                except Exception as e:
+                    log.warning("shredder: section %s S3 write failed: %s", sec_key, e)
+
+            # Metadata.json — full extraction record for auditability
+            metadata_blob = {
+                "solicitation_id": solicitation_id,
+                "opportunity_id": opp_id_str,
+                "namespace": namespace_key,
+                "prompt_version": 1,
+                "model": DEFAULT_MODEL,
+                "extracted_at": started_at.isoformat(),
+                "sections_found": len(sections),
+                "section_keys": [s.get("key") for s in sections if s.get("key")],
+                "compliance_matches_found": len(all_matches),
+                "column_updates_applied": len(column_updates),
+                "custom_variables_stored": len(custom_vars),
+                "skipped_matches": skipped,
+                "total_input_tokens": sec_in_tokens + comp_in_tokens,
+                "total_output_tokens": sec_out_tokens + comp_out_tokens,
+                "artifact_keys": artifact_keys,
+            }
+            try:
+                meta_path = rfp_pipeline_path(
+                    opportunity_id=opp_id_str, kind="metadata",
+                )
+                s3_put_json(key=meta_path, obj=metadata_blob)
+                artifact_keys.append(meta_path)
+            except Exception as e:
+                log.warning("shredder: metadata.json S3 write failed: %s", e)
+
+            # Emit artifact summary event
+            await _emit_event(
+                conn, "finder", "artifacts.written",
+                {
+                    "solicitation_id": solicitation_id,
+                    "artifact_count": len(artifact_keys),
+                    "artifact_keys": artifact_keys[:20],  # cap for payload size
+                },
+                parent_event_id=start_event_id,
+            )
+        except ImportError:
+            # Storage module not available in test — skip artifact writes
+            log.info("shredder: storage module unavailable, skipping S3 artifact writes")
+
+        # ── Step 8: Emit end event ──────────────────────────────────────────
+        total_in = sec_in_tokens + comp_in_tokens
+        total_out = sec_out_tokens + comp_out_tokens
         await _emit_event(
-            conn, "finder", "artifacts.written",
+            conn,
+            "finder",
+            "rfp.shredding.end",
             {
                 "solicitation_id": solicitation_id,
-                "artifact_count": len(artifact_keys),
-                "artifact_keys": artifact_keys[:20],  # cap for payload size
+                "status": "ai_analyzed",
+                "sections_extracted": len(sections),
+                "compliance_variables_extracted": len(all_matches),
+                "column_updates_applied": len(column_updates),
+                "custom_variables_stored": len(custom_vars),
+                "skipped": len(skipped),
+                "namespace": namespace_key,
+                "prompt_version": 1,
+                "model": DEFAULT_MODEL,
+                "total_input_tokens": total_in,
+                "total_output_tokens": total_out,
+                "duration_ms": _ms_since(started_at),
             },
+            phase="end",
             parent_event_id=start_event_id,
         )
-    except ImportError:
-        # Storage module not available in test — skip artifact writes
-        log.info("shredder: storage module unavailable, skipping S3 artifact writes")
 
-    # ── Step 8: Emit end event ──────────────────────────────────────────
-    total_in = sec_in_tokens + comp_in_tokens
-    total_out = sec_out_tokens + comp_out_tokens
-    await _emit_event(
-        conn,
-        "finder",
-        "rfp.shredding.end",
-        {
-            "solicitation_id": solicitation_id,
+        return {
             "status": "ai_analyzed",
-            "sections_extracted": len(sections),
-            "compliance_variables_extracted": len(all_matches),
-            "column_updates_applied": len(column_updates),
-            "custom_variables_stored": len(custom_vars),
-            "skipped": len(skipped),
+            "solicitation_id": solicitation_id,
             "namespace": namespace_key,
-            "prompt_version": 1,
-            "model": DEFAULT_MODEL,
+            "sections": len(sections),
+            "compliance_matches": len(all_matches),
+            "column_updates": len(column_updates),
+            "custom_variables": len(custom_vars),
+            "skipped": skipped,
             "total_input_tokens": total_in,
             "total_output_tokens": total_out,
-            "duration_ms": _ms_since(started_at),
-        },
-        phase="end",
-        parent_event_id=start_event_id,
-    )
-
-    return {
-        "status": "ai_analyzed",
-        "solicitation_id": solicitation_id,
-        "namespace": namespace_key,
-        "sections": len(sections),
-        "compliance_matches": len(all_matches),
-        "column_updates": len(column_updates),
-        "custom_variables": len(custom_vars),
-        "skipped": skipped,
-        "total_input_tokens": total_in,
-        "total_output_tokens": total_out,
-    }
+        }
+    except Exception as shred_err:
+        try:
+            await _emit_event(
+                conn, "finder", "rfp.shredding.end",
+                {"solicitation_id": solicitation_id, "status": "shredder_failed",
+                 "reason": "unhandled_error", "error": str(shred_err)[:500],
+                 "duration_ms": _ms_since(started_at)},
+                phase="end", parent_event_id=start_event_id,
+            )
+        except Exception:
+            log.warning("shredder: error-end emit failed while handling %s", shred_err)
+        raise
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -707,13 +743,52 @@ async def _upsert_compliance(
     verified_by is deliberately NOT set here — the shredder is
     automated suggestion, not human verification. A curator confirms
     values later via the /admin/rfp-curation/[id] workspace.
+
+    TRUST-ORDERED + STAMPED (mig 187/188: hitl > verified > override > pattern_match > ai >
+    default). These values come off the Claude compliance-extraction prompt, so every column
+    this writer sets is stamped source='ai' in field_provenance — an unstamped value is
+    indistinguishable from a rule a human verified, which is the failure the whole provenance
+    spine exists to stop. And a column whose EXISTING provenance is stronger than 'ai' is
+    dropped from the update entirely: the shredder re-running must never overwrite a curator's
+    highlighted/verified value, or an admin's reviewed override, with a machine's re-read.
     """
     # Build the dynamic UPDATE set clause from column_updates plus
     # custom_variables. All params are parameterized so this is safe.
-    existing = await conn.fetchval(
-        "SELECT id FROM solicitation_compliance WHERE solicitation_id = $1",
+    existing_row = await conn.fetchrow(
+        "SELECT id, field_provenance FROM solicitation_compliance WHERE solicitation_id = $1",
         sol_id,
     )
+    existing = existing_row["id"] if existing_row else None
+
+    # Existing per-column provenance (may be a jsonb string on some drivers).
+    prior_prov: dict[str, Any] = {}
+    if existing_row and existing_row["field_provenance"] is not None:
+        raw_prov = existing_row["field_provenance"]
+        if isinstance(raw_prov, str):
+            try:
+                prior_prov = json.loads(raw_prov)
+            except (json.JSONDecodeError, TypeError):
+                prior_prov = {}
+        elif isinstance(raw_prov, dict):
+            prior_prov = raw_prov
+
+    _PROTECTED = {"hitl", "verified", "override"}
+    protected_cols = {
+        col for col, entry in prior_prov.items()
+        if isinstance(entry, dict) and entry.get("source") in _PROTECTED
+    }
+    dropped = protected_cols & set(column_updates.keys())
+    if dropped:
+        log.info(
+            "shredder: skipping %d compliance column(s) with stronger provenance than 'ai': %s",
+            len(dropped), ", ".join(sorted(dropped)),
+        )
+        column_updates = {k: v for k, v in column_updates.items() if k not in dropped}
+
+    # Merge the 'ai' stamps for the columns we ARE writing over whatever provenance exists.
+    merged_prov = dict(prior_prov)
+    for col in column_updates:
+        merged_prov[col] = {"source": "ai"}
 
     import re as _re
     _SAFE_COL = _re.compile(r'^[a-z_][a-z0-9_]*$')
@@ -730,14 +805,18 @@ async def _upsert_compliance(
     set_parts.append(f"custom_variables = ${len(values) + 2}::jsonb")
     values.append(json.dumps(custom_vars))
 
+    set_parts.append(f"field_provenance = ${len(values) + 2}::jsonb")
+    values.append(json.dumps(merged_prov))
+
     set_parts.append("updated_at = now()")
 
     if existing is None:
         # INSERT path
-        cols = ["solicitation_id"] + list(column_updates.keys()) + ["custom_variables"]
+        cols = ["solicitation_id"] + list(column_updates.keys()) + ["custom_variables", "field_provenance"]
         placeholders = [f"${i + 1}" for i in range(len(cols))]
-        insert_values = [sol_id] + list(column_updates.values()) + [json.dumps(custom_vars)]
-        # custom_variables needs ::jsonb cast; replace the last placeholder
+        insert_values = [sol_id] + list(column_updates.values()) + [json.dumps(custom_vars), json.dumps(merged_prov)]
+        # the two jsonb tails need ::jsonb casts
+        placeholders[-2] = f"${len(cols) - 1}::jsonb"
         placeholders[-1] = f"${len(cols)}::jsonb"
         await conn.execute(
             f"INSERT INTO solicitation_compliance ({', '.join(cols)}) "

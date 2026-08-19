@@ -7,6 +7,7 @@ import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({ volumeId: z.string().uuid() });
@@ -21,12 +22,12 @@ export const volumeDeleteTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    let rows: { id: string; solicitationId: string; volumeNumber: number }[];
+    let rows: { id: string; solicitationId: string; volumeNumber: number; topicId: string | null }[];
     try {
-      rows = await sql<{ id: string; solicitationId: string; volumeNumber: number }[]>`
+      rows = await sql<{ id: string; solicitationId: string; volumeNumber: number; topicId: string | null }[]>`
         DELETE FROM solicitation_volumes
         WHERE id = ${input.volumeId}::uuid
-        RETURNING id, solicitation_id, volume_number
+        RETURNING id, solicitation_id, volume_number, topic_id
       `;
     } catch (err) {
       console.error('[volume.delete] delete failed:', err);
@@ -45,6 +46,11 @@ export const volumeDeleteTool = defineTool<Input, Output>({
         volumeId: input.volumeId,
         volumeNumber: rows[0].volumeNumber,
       },
+    });
+    // volumeCount rides the card snapshot — refresh pushed mirrors (topic-scoped
+    // volumes refresh just that topic's card; baseline refreshes the whole set).
+    await republishSolicitationCards({
+      solicitationId: rows[0].solicitationId, opportunityId: rows[0].topicId, actorId: ctx.actor.id,
     });
     return { deleted: true as const };
   },

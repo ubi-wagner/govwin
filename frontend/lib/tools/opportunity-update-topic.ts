@@ -25,6 +25,7 @@ import { sql } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { activateLateTopicIfReady, republishSolicitationCards } from '@/lib/curation/republish';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -196,6 +197,16 @@ export const opportunityUpdateTopicTool = defineTool<Input, Output>({
       opportunityId,
       changedFields,
     });
+
+    // Mid-window propagation: title/description are card fields AND bucket-scoring text.
+    // A never-released topic on a pushed solicitation is a LATE ADDITION — release it the
+    // moment it is date-complete; one already on the bridge just gets its card refreshed.
+    const late = await activateLateTopicIfReady(opportunityId, { id: actorId, email: ctx.actor.email ?? null });
+    if (!late.released && late.reason === 'already_released') {
+      await republishSolicitationCards({
+        solicitationId: r.solicitationId ?? '', opportunityId, actorId,
+      });
+    }
 
     const toIso = (v: unknown): string | null =>
       v == null ? null : v instanceof Date ? v.toISOString() : String(v);

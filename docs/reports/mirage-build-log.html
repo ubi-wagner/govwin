@@ -1,0 +1,194 @@
+<title>MIRAGE Build Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root{--paper:#FAFAF8;--surface:#FFF;--ink:#161A20;--muted:#5D6470;--rule:#E4E4DF;--stamp:#8E2F1E;--verdigris:#2C5F4F;--amber:#7A5A16;--code-bg:#F2F2EE}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#14171C;--surface:#1B1F26;--ink:#E8E7E2;--muted:#9AA1AC;--rule:#2B3038;--stamp:#E4806B;--verdigris:#7FBBA4;--amber:#D0A648;--code-bg:#212630}}
+  :root[data-theme="dark"]{--paper:#14171C;--surface:#1B1F26;--ink:#E8E7E2;--muted:#9AA1AC;--rule:#2B3038;--stamp:#E4806B;--verdigris:#7FBBA4;--amber:#D0A648;--code-bg:#212630}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Source Serif 4",Georgia,"Times New Roman",serif;font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:74rem;margin:0 auto;padding:clamp(2rem,5vw,4.5rem) clamp(1.1rem,4vw,3rem) 6rem}
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:1.4rem}
+  .eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 .9rem}
+  h1{font-family:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:clamp(2.1rem,6vw,3.4rem);line-height:1.02;letter-spacing:-.015em;margin:0;text-wrap:balance}
+  .standfirst{margin:1.1rem 0 0;max-width:62ch;color:var(--muted);font-size:1.06rem}
+  .scores{display:grid;gap:1px;background:var(--rule);grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));border:1px solid var(--rule);margin:2.4rem 0 3rem}
+  .score{background:var(--surface);padding:1rem 1.1rem}
+  .score dt{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 .45rem}
+  .score dd{margin:0;font-family:"IBM Plex Sans Condensed",Arial,sans-serif;font-weight:700;font-size:1.55rem;font-variant-numeric:tabular-nums;line-height:1.1}
+  .score dd small{display:block;font-family:"Source Serif 4",Georgia,serif;font-weight:400;font-size:.8rem;color:var(--muted);margin-top:.2rem}
+  .good{color:var(--verdigris)}
+  section{margin:3.4rem 0 0}
+  h2{font-family:"IBM Plex Sans Condensed",Arial,sans-serif;font-weight:600;font-size:1.55rem;letter-spacing:-.01em;margin:0 0 .3rem;padding-bottom:.5rem;border-bottom:1px solid var(--rule);text-wrap:balance}
+  .sec-note{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 1.5rem}
+  p{margin:0 0 1.05rem;max-width:68ch}
+  a{color:var(--stamp)}
+  .chain{list-style:none;margin:0;padding:0;display:grid;gap:0}
+  .chain li{display:grid;grid-template-columns:12.5rem 1fr;gap:1.2rem;padding:.72rem 0;border-bottom:1px dotted var(--rule);align-items:baseline}
+  .chain li:last-child{border-bottom:none}
+  .step{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .chain .outcome{font-variant-numeric:tabular-nums}
+  .chain strong{font-weight:600}
+  .find{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--stamp);padding:1.15rem 1.3rem;margin:0 0 1.1rem}
+  .find.gate{border-left-color:var(--verdigris)}
+  .find.note{border-left-color:var(--amber)}
+  .find h3{font-family:"IBM Plex Sans Condensed",Arial,sans-serif;font-size:1.08rem;font-weight:600;margin:0 0 .15rem;text-wrap:balance}
+  .kicker{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--stamp);margin:0 0 .55rem}
+  .find.gate .kicker{color:var(--verdigris)}
+  .find.note .kicker{color:var(--amber)}
+  .find p{margin:0 0 .7rem;font-size:.97rem}
+  .find p:last-child{margin-bottom:0}
+  blockquote{margin:.75rem 0;padding:.6rem .9rem;background:var(--code-bg);border-radius:2px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.79rem;line-height:1.55;color:var(--ink);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;background:var(--code-bg);padding:.08em .32em;border-radius:2px}
+  .scroll{overflow-x:auto;margin:0 0 1rem}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:34rem}
+  th,td{text-align:left;padding:.5rem .85rem .5rem 0;border-bottom:1px solid var(--rule);vertical-align:baseline}
+  th{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:500;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  td.sha{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.78rem;color:var(--muted);white-space:nowrap}
+  footer{margin-top:4rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--muted);letter-spacing:.04em}
+  @media (max-width:34rem){.chain li{grid-template-columns:1fr;gap:.15rem}}
+</style>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Overnight · branch claude/nice-hamilton-kBqtD · 20 commits</p>
+<h1>The night the proposal stopped citing the wrong solicitation</h1>
+<p class="standfirst">The T3CP build now runs the whole way through the product — comp purchase to downloadable package — and what comes out is the solicitation's own shape. Getting there meant fixing eleven defects, most of which looked like success from the outside.</p>
+</header>
+<dl class="scores">
+<div class="score"><dt>Sections drafted</dt><dd>20<small>none blank</small></dd></div>
+<div class="score"><dt>Volumes clean</dt><dd class="good">4 / 4<small>at the export gate</small></dd></div>
+<div class="score"><dt>Foreign identifiers</dt><dd class="good">0<small>was pervasive</small></dd></div>
+<div class="score"><dt>Cost volume</dt><dd>$236,930<small>computed, under $250K</small></dd></div>
+<div class="score"><dt>Work share</dt><dd class="good">89.4%<small>vs 67% SBIR floor</small></dd></div>
+<div class="score"><dt>Frontend suite</dt><dd>1,361<small>pipeline baseline held</small></dd></div>
+</dl>
+<section>
+<h2>What runs end to end now</h2>
+<p class="sec-note">Driven as the real actors, through the product's own routes</p>
+<ul class="chain">
+<li><span class="step">rfp_admin</span><span class="outcome">Master build-out completed, opportunity pushed onto the bridge — <strong>19 / 19</strong> moldable items carry a mold</span></li>
+<li><span class="step">tenant_admin</span><span class="outcome">Comp-code purchase opens <code>curation_pending</code>, never a live build</span></li>
+<li><span class="step">rfp_admin</span><span class="outcome">Release provisions the buyer's private portal — <strong>20</strong> sections in the solicitation's shape</span></li>
+<li><span class="step">workforce</span><span class="outcome">Every section drafted from the tenant's own library; the computed cost workbook left alone</span></li>
+<li><span class="step">color team</span><span class="outcome">20 reviews queued, drained, and landed <strong>in full</strong> on the page</span></li>
+<li><span class="step">tenant_admin</span><span class="outcome">20 / 20 sections locked · every compliance-matrix row satisfied</span></li>
+<li><span class="step">stage gate</span><span class="outcome">draft → submitted, workspace locked</span></li>
+<li><span class="step">export</span><span class="outcome">Four volumes as docx, <strong>0</strong> compliance violations each</span></li>
+<li><span class="step">package</span><span class="outcome">docx <strong>21,005</strong> bytes · zip <strong>50,555</strong> bytes, per-volume-native (V3 lands as .xlsx)</span></li>
+</ul>
+</section>
+<section>
+<h2>The defect that mattered most</h2>
+<p class="sec-note">Found by reading what the draft said, not whether the workflow succeeded</p>
+<p>A technical section for topic <code>OSW26BZ04-DP013</code> opened by citing <strong>a different agency's solicitation from two years earlier</strong>. Not a formatting nit — a reviewer reading that is reading a proposal that appears to be for another program. It had four independent causes, and each had to be fixed separately.</p>
+<div class="find">
+<p class="kicker">Cause 1 · retrieval</p>
+<h3>The drafter quoted the wrong 2,000 characters</h3>
+<p>Results came back as <code>content[:2000]</code> — the <em>opening</em> of whatever matched. On a 13,000-word past proposal that is its cover sheet: title block, agency, proposal number. The search also matched on substring anywhere in a document, ranked by <code>updated_at</code> rather than relevance, and carried none of the canonical selector's scope rules.</p>
+<p>Results now quote the window that actually matched, discounted for table-of-contents shape — a contents list names every section verbatim, so it out-scores the section's own prose on any title query while containing none of it.</p>
+</div>
+<div class="find">
+<p class="kicker">Cause 2 · ingest</p>
+<h3>Every atom carried the source document's running header</h3>
+<p>Page-grain atomization kept whatever the word processor repeats on every page. On a DSIP submission that is the solicitation's own identifiers, welded into every atom:</p>
+<blockquote>Topic: X23.5_CSO    Proposal Number: FX235-CSO1-0859</blockquote>
+<p>Detection is structural — a line repeating across a run of pages — so it holds for footers we have never seen. Three refinements came out of running it against the four filed Immobileyes proposals rather than fixtures: a run is measured against its own span, because a merged package is several documents each with its own header; a run must reach eight pages, because density alone cannot tell a header from a cost table that spans four; and page-number collapsing applies only to lines that <em>are</em> page numbering. That last one was live and destructive — any sentence citing a page was collapsible, and variant expansion then deleted real prose from every page.</p>
+</div>
+<div class="find">
+<p class="kicker">Cause 3 · provisioning</p>
+<h3>A mold displaced the computed cost workbook</h3>
+<p>The mold builder stamped a skeleton onto the cost volume's spreadsheet item. That mold is <code>cost_volume</code>-typed, and provisioning treats a cost-typed mold there as a deliberate admin override — so it never computed the workbook. The cost section arrived as a bare heading, the drafter filled it from the library, and the "cost volume" became prose lifted from a past proposal. It priced nothing.</p>
+<p>Two features each correct alone, wrong together — the same shape as the mold-seeding / anti-clobber pair fixed earlier in the night. The rule for which item receives the workbook now lives in one place that both sides read.</p>
+</div>
+<div class="find gate">
+<p class="kicker">Cause 4 · the part the library cannot fix</p>
+<h3>A cover sheet legitimately carries its own solicitation's numbers</h3>
+<p>That <em>is</em> the content of those pages — it cannot be stripped at ingest without deleting real data. So the control moved to the compliance floor: each artifact now carries its own topic and solicitation number, and any labelled identifier that is not one of them is reported as <code>foreign_solicitation</code> at section save and at the export gate.</p>
+<p>It fired on exactly two volumes. One was real. The other — a genuine prior Air Force contract in the past-performance narrative — was a false positive, so <code>contract</code> and <code>award</code> came out of the label set. A contract number is a record of work performed, not a claim about which solicitation this is.</p>
+</div>
+</section>
+<section>
+<h2>Everything else that was broken</h2>
+<p class="sec-note">Each looked like success until something read the output</p>
+<div class="find">
+<p class="kicker">Workflow</p>
+<h3>The full-draft workflows could not draft</h3>
+<p><code>draft_sections</code> was a single agent call passing only a proposal id to an archetype built to draft <em>one</em> section from its title, budget and ranked atoms. It defaulted the title to "Untitled Section" and made one contextless call for the whole proposal. Twenty sections in, one blob out, workflow reports success.</p>
+</div>
+<div class="find">
+<p class="kicker">Review</p>
+<h3>The color team's findings were thrown away at the last step</h3>
+<p>Reviews ran, comments appeared on every section, and what a builder read was <em>"Review: Acceptable — meets minimum requirements."</em> That is the one-line label written for episodic memory; it was being preferred over the review itself. The disqualifier audit, the weaknesses, the risks and the recommendations were all computed and discarded.</p>
+<p>The verdict was not the review's own either — the score was found by scanning the whole document for the first ladder word, best-first. A Marginal review whose weaknesses said "no good evidence of a transition path" was recorded as <strong>Good</strong>.</p>
+</div>
+<div class="find">
+<p class="kicker">Submission</p>
+<h3>A finished build was unsubmittable for a document that does not exist</h3>
+<p>Five hard blockers, one of them "CMMC Reps &amp; Certs" — a requirement from a program skeleton's hard-coded default list, not from this BAA. CMMC is a representation made inside DSIP; there is no file to upload. The only escape was an admin waiving a requirement nobody could verify.</p>
+<p>The provenance was already recorded and the column to carry it already existed; they were not connected. A defaulted requirement is now a warning that says where it came from; one read from the solicitation still blocks. Both stay on the checklist.</p>
+</div>
+<div class="find">
+<p class="kicker">Data loss</p>
+<h3>The save route accepted anything shaped like an object</h3>
+<p>A drive script sent the canvas <em>rules</em> object back as a document and replaced 20 drafted sections with an empty shell — 4,000 characters each down to a 277-byte husk, no error, HTTP 200. Nothing was lost: version history had archived every draft and all 20 came back through the product's own restore route. The trust hub did exactly what it exists for. The route now requires a document.</p>
+</div>
+<div class="find">
+<p class="kicker">Fixture</p>
+<h3>Three "fresh provision" runs were the same stale build</h3>
+<p>The reset script hit a foreign-key violation, aborted its transaction, skipped every later statement — and still exited 0 and printed success. The drive then took its already-purchased branch and quietly reused the old proposal, so the cost-workbook fix looked like it had not worked. Worth stating plainly: a lying fixture invalidates everything downstream of it.</p>
+</div>
+</section>
+<section>
+<h2>What I did not finish, and what is not what it looks like</h2>
+<p class="sec-note">Read this part</p>
+<div class="find note">
+<p class="kicker">Sandbox limit</p>
+<h3>The prose is stitched, not written</h3>
+<p>There is no live model key here, so the committed emulator stands in for Claude — by design, on the identical wiring prod uses. It composes each section from the customer's own library atoms and nothing else, which keeps the harness honest about retrieval: a thin library yields a thin draft. But it is sentence-stitching, not writing. The Technical Volume carries 19,298 characters of on-topic, correctly-sourced content that reads choppily. <strong>The pipeline is proven; the prose quality is not.</strong> That needs one run with a real key.</p>
+</div>
+<div class="find note">
+<p class="kicker">Known gap</p>
+<h3>A letter-spaced identifier slips the check</h3>
+<p>Some DSIP cover sheets render the number as <code>F 2 - 1 7 5 2 8</code>. The detector reads a contiguous token and misses that form. There is a test that asserts the miss, so it stays visible rather than being mistaken for coverage.</p>
+</div>
+<div class="find note">
+<p class="kicker">Known gap</p>
+<h3>The atomizer names atoms after page headers</h3>
+<p>Library atoms arrive titled <code>p11 · 2.1.1 Identification and Significance…</code> — page-derived, with numbering baked in. Retrieval works despite it, but those titles surface in the workspace and occasionally bleed into drafted text. Not fixed tonight.</p>
+</div>
+<div class="find note">
+<p class="kicker">Judgement call</p>
+<h3>The character cap is 3,000, not 3,500</h3>
+<p>Your note said 3,500. The BAA states 3,000, the DSIP form you screenshotted shows <code>0 / 3000 characters</code> on both fields, and the filed Technical Abstract measures <strong>3,002 characters</strong> with whitespace collapsed — written right up to the cap. I built to 3,000, read from source and cited. Flagging it because I went against what you wrote.</p>
+</div>
+</section>
+<section>
+<h2>Commits</h2>
+<p class="sec-note">68 files · +5,452 / −201 · all pushed</p>
+<div class="scroll">
+<table>
+<thead><tr><th>SHA</th><th>What it fixes</th></tr></thead>
+<tbody>
+<tr><td class="sha">f194af41</td><td>Character limits — the compliance floor could not represent a rule half our RFPs state</td></tr>
+<tr><td class="sha">78f0e3d9</td><td>DSIP-only is a per-item property too; V1 mixes a webform with authored narratives</td></tr>
+<tr><td class="sha">8876bd24</td><td>The molds gate was a dead end — the architect proposed into the void</td></tr>
+<tr><td class="sha">a7b7dd4c</td><td>A review that never ran looked exactly like one that found nothing</td></tr>
+<tr><td class="sha">47a80840</td><td>Emulated Claude drafts from the customer's library instead of canned text</td></tr>
+<tr><td class="sha">272debfb</td><td>Spine proven live: build-out → push → purchase → release</td></tr>
+<tr><td class="sha">c7f2b66c</td><td>Make the full-draft workflows actually draft</td></tr>
+<tr><td class="sha">b8de8875</td><td>Stop the library handing a new proposal another solicitation's identifiers</td></tr>
+<tr><td class="sha">42e40f8a</td><td>Volume foundations, footer variants, TOC-aware quote window</td></tr>
+<tr><td class="sha">2e940506</td><td>Separate a running header from a table that spans pages</td></tr>
+<tr><td class="sha">ada73532</td><td>Refuse to let a proposal cite another solicitation's identifiers</td></tr>
+<tr><td class="sha">7cf7452a</td><td>Guard the save route; narrow the foreign-identifier labels</td></tr>
+<tr><td class="sha">e4efe666</td><td>Stop the mold builder displacing the computed cost workbook</td></tr>
+<tr><td class="sha">1e5a79ec</td><td>Make the reset actually reset; stop the drive racing the drafter</td></tr>
+<tr><td class="sha">13bde23f</td><td>A requirement the product assumed must not block like one it read</td></tr>
+<tr><td class="sha">aafc23dd</td><td>Land the color team's actual review, not a five-word label for it</td></tr>
+<tr><td class="sha">b061c478</td><td>Record the four sandbox traps that cost time</td></tr>
+</tbody>
+</table>
+</div>
+<p>New migration <code>193_character_limits</code> (head 193). Verification on every commit: <code>tsc</code> 0 · <code>vitest</code> 1,361 · pipeline <code>pytest</code> 1,054 passing against an unchanged 43-failure baseline · <code>next build</code> clean · live Playwright drives against the real T3CP master.</p>
+</section>
+<footer>Immobileyes Inc. · OSW26BZ04-DP013 · T3CP Patent Holiday SBIR Open Topic Call · 2026-08-19</footer>
+</div>

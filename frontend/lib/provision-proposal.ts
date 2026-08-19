@@ -23,6 +23,8 @@ import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveCostForm, buildCostVolume } from '@/lib/proposal/cost-forms';
+import { pickCostWorkbookItems } from '@/lib/proposal/cost-workbook-item';
+import { coerceJsonb } from '@/lib/jsonb';
 import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -61,19 +63,61 @@ export async function provisionProposalForPortal(opts: {
   }
   if (!topic) return { error: 'opportunity not found' };
   const t = topic;
+  if (!t.solicitationId) {
+    // Umbrella purchase: live intake creates the umbrella opportunity WITHOUT
+    // opportunities.solicitation_id — the curated master points back via
+    // curated_solicitations.opportunity_id. Resolve it so the proposal is stamped with
+    // its solicitation (amendment fan-out + replay key on proposals.solicitation_id).
+    try {
+      const [cs] = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE opportunity_id = ${opportunityId}::uuid LIMIT 1`;
+      if (cs) t.solicitationId = cs.id;
+    } catch (e) { console.error('[provision-proposal] umbrella solicitation lookup failed (non-fatal)', e); }
+  }
 
   const baseTitle = t.topicNumber ? `${t.topicNumber}: ${t.title}` : t.title;
   const proposalTitle = label && label !== 'primary' ? `${baseTitle} [${label}]` : baseTitle;
 
   const resolved = await resolveTopicCompliance(opportunityId);
-  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
+  if (resolved.degraded) {
+    // A degraded resolve means the buyer would be provisioned a DEFAULT skeleton while the
+    // authored master sits unread — a silent divergence worse than a failed release. Refuse
+    // loudly; the release path surfaces the error and the admin retries.
+    console.error('[provision-proposal] compliance resolution DEGRADED for', opportunityId, '— refusing to provision a default skeleton');
+    return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
+  }
+  /**
+   * The AUTHORED set — the one rule every provision loop below applies, so they can never
+   * disagree about which volumes and items get an artifact, a section and a matrix row.
+   *
+   * DSIP-only work is completed inside the agency's submission portal (a webform, a report pulled
+   * from SBIR.gov, training taken there), so the company authors no document for it here. It is
+   * flagged at either grain: a whole VOLUME (the CCR, FWA training, Foreign Affiliations) or a
+   * single ITEM inside an otherwise authored volume (the DoW Volume 1 cover-sheet webform, which
+   * sits beside two authored narrative documents). A volume whose items are ALL DSIP-only is
+   * therefore not authored either — giving it an artifact with no sections would recreate the
+   * invisible no-op volume the placeholder rule below exists to prevent.
+   */
+  const isAuthoredItem = (item: Record<string, unknown>) => (item as { dsipOnly?: boolean }).dsipOnly !== true;
+  const authoredItems = (vol: Record<string, unknown>): Array<Record<string, unknown>> =>
+    ((vol.items as Array<Record<string, unknown>>) ?? []).filter(isAuthoredItem);
+  const isAuthoredVolume = (vol: Record<string, unknown>) =>
+    (vol as { dsipOnly?: boolean }).dsipOnly !== true
+    && !(((vol.items as unknown[]) ?? []).length > 0 && authoredItems(vol).length === 0);
+
+  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
-    for (const item of vol.items) {
+    // DSIP-only volumes contribute no authored items — they are completed in the agency portal and
+    // tracked as compliance-matrix checklist entries, not built here.
+    if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
+    for (const item of authoredItems(vol as unknown as Record<string, unknown>)) {
       gi++;
       requiredItems.push({
         itemNumber: gi, itemName: item.itemName as string, itemType: item.itemType as string,
-        pageLimit: (item.pageLimit as number) ?? null, volumeName: (vol.volumeName as string) ?? null,
+        pageLimit: (item.pageLimit as number) ?? null, slideLimit: (item.slideLimit as number) ?? null,
+        characterLimit: (item.characterLimit as number) ?? null,
+        volumeName: (vol.volumeName as string) ?? null,
         volumeNumber: (vol.volumeNumber as number) ?? null, templateId: (item.templateId as string) ?? null,
         expertNotes: (item.expertNotes as string) ?? null,
       });
@@ -122,13 +166,26 @@ export async function provisionProposalForPortal(opts: {
         for (const vol of resolved.volumes) {
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
+          // DSIP-ONLY volumes are completed in the agency's submission portal — a DSIP webform
+          // (Cover Sheet, Foreign Affiliations) or an agency-generated report (the CCR pulled from
+          // SBIR.gov), or training taken inside DSIP (FWA). The company authors NO document here, so
+          // standing up an artifact + empty sections for one creates work that can never be done and
+          // a readiness blocker that can never clear. The requirement still reaches the customer as a
+          // compliance-matrix checklist item — it is tracked, just not authored.
+          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
           // Map the volume to its artifact_type (CHECK: narrative|cost|form|matrix|other). Cost/budget
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
           const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost'
-            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercial|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
+            // 'commercialization report|CCR' — NOT bare 'commercial': a "Commercialization Plan/
+            // Strategy" volume is a PROSE volume with a hard page limit; typing it 'form' would
+            // exempt it from the readiness page gate and the font floor.
+            : /support|letter|\bform\b|cover\s*sheet|attach|appendix|certif|commercialization\s+report|\bccr\b|training|fraud|waste|abuse/i.test(volName ?? '') ? 'form'
             : 'narrative';
-          const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
+          // The solicitation's own identifiers travel onto every artifact's frozen spec, so the
+          // compliance floor can tell THIS topic number from a past proposal's. Without them the
+          // check stays off and behaviour is unchanged.
+          const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance, ownIdentifiers: [t.topicNumber, t.solicitationNumber] });
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
             VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
@@ -137,24 +194,13 @@ export async function provisionProposalForPortal(opts: {
           artifactByVolKey.set(volKey(volNum, volName), art.id);
           artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
         }
-        // Choose which item in each COST volume receives the computed workbook: prefer a data-bearing
-        // item (spreadsheet/cost type, or a name like spreadsheet/workbook/budget/pricing) over a prose
-        // sibling ("Basis of Estimate", "Cost Narrative"), so the workbook never lands on a prose item
-        // while the real data item is left empty. One workbook per cost volume.
-        const PROSE_ITEM = /narrative|justification|explanation|rationale|basis of estimate|\bboe\b|assumption/i;
-        const DATA_ITEM_TYPES = new Set(['spreadsheet', 'cost', 'cost_volume', 'budget']);
-        const DATA_ITEM_NAME = /spreadsheet|workbook|\btable\b|budget|pricing|cost\s*(?:volume|proposal|sheet)/i;
-        const isDataItem = (it: { itemType: string; itemName: string }) =>
-          DATA_ITEM_TYPES.has((it.itemType ?? '').toLowerCase()) || DATA_ITEM_NAME.test(it.itemName ?? '');
-        const costWorkbookItem = new Map<string, number>(); // volKey → chosen itemNumber
-        for (const it of requiredItems) {
-          const vkey = volKey(it.volumeNumber, it.volumeName);
-          if (artifactTypeByVolKey.get(vkey) !== 'cost' || PROSE_ITEM.test(it.itemName ?? '')) continue;
-          const cur = costWorkbookItem.get(vkey);
-          if (cur == null) { costWorkbookItem.set(vkey, it.itemNumber); continue; }
-          const curItem = requiredItems.find((r) => r.itemNumber === cur);
-          if (isDataItem(it) && !(curItem && isDataItem(curItem))) costWorkbookItem.set(vkey, it.itemNumber);
-        }
+        // Which item in each COST volume receives the computed workbook. The rule lives in
+        // lib/proposal/cost-workbook-item so the MOLD BUILDER can use the same one to decide what
+        // not to mold — when the two disagreed, a mold displaced the computed workbook entirely.
+        const costWorkbookItem = pickCostWorkbookItems(
+          requiredItems,
+          (vkey) => artifactTypeByVolKey.get(vkey) === 'cost',
+        );
         // OTF / state-grant budget caps (used by the otf_state_budget cost form), from the preset's
         // custom variables. Absent → the form's own defaults apply.
         const cvars = ((resolved.compliance as Record<string, unknown>)?.customVariables ?? {}) as Record<string, unknown>;
@@ -172,8 +218,8 @@ export async function provisionProposalForPortal(opts: {
         for (const item of requiredItems) {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           const [section] = await tx<{ id: string }[]>`
-            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, volume_name, volume_number, section_type, meta)
-            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemNumber}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
+            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, character_allocation, volume_name, volume_number, section_type, meta)
+            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemNumber}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.characterLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
             RETURNING id
           `;
           // Compliance matrix: one requirement row per required item, linked to the
@@ -185,37 +231,91 @@ export async function provisionProposalForPortal(opts: {
               (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
             VALUES (${p.id}, ${item.itemName}, ${item.volumeName ?? 'RFP'}, true, 'not_addressed', ${section.id})
           `;
+          const vkey = volKey(item.volumeNumber, item.volumeName);
+          const isCostVolume = artifactTypeByVolKey.get(vkey) === 'cost';
+          const isChosenCostItem = isCostVolume && costWorkbookItem.get(vkey) === item.itemNumber;
           let templateDoc: CanvasDocument | null = null;
           if (item.templateId) {
-            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
-            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) templateDoc = tpl.canvasDocument;
+            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null; templateType: string | null }[]>`
+              SELECT canvas_document, template_type FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1`;
+            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
+              // The COMPUTED workbook must not be silently displaced on the data-bearing cost
+              // item by a non-cost mold (a slide deck linked by mistake would drop the priced
+              // roll-up for the whole volume). A cost-typed mold is an explicit admin override.
+              if (isChosenCostItem && !/cost|budget|spreadsheet|price/i.test(tpl.templateType ?? '')) {
+                console.error('[provision-proposal] linked mold on the cost data item is not cost-typed — using the computed workbook', { itemName: item.itemName, templateId: item.templateId, templateType: tpl.templateType });
+              } else {
+                templateDoc = tpl.canvasDocument;
+              }
+            } else {
+              // Linked but unusable (missing/RLS-invisible/empty body): fall through — but LOUDLY,
+              // this is an authored mold the buyer will not receive.
+              console.error('[provision-proposal] linked mold unusable (missing, invisible, or empty) — falling back', { itemName: item.itemName, templateId: item.templateId });
+            }
           }
           // Universal cost volume: the cost item (DoW / NSF / DOE / BAA / OTA — not just DoD SBIR) gets a
           // COMPUTED workbook, rendered in the common budget FORM the opportunity requires (DoD burden
           // waterfall · SF-424A federal grant · OTF state budget), taking precedence over the narrative
           // templates. Exactly the data-bearing item per cost volume (picked above); prose siblings stay empty.
-          if (!templateDoc) {
-            const vkey = volKey(item.volumeNumber, item.volumeName);
-            if (artifactTypeByVolKey.get(vkey) === 'cost' && costWorkbookItem.get(vkey) === item.itemNumber) {
-              const form = resolveCostForm({ agency: t.agency, program: programType, volumeName: item.volumeName });
-              templateDoc = buildCostVolume(form, {
-                title: item.itemName, agency: t.agency, program: workshareProgram,
-                companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
-                proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
-                ceiling: costCeiling, personnelMaxPct: personnelMax, costShareAllowed,
-              });
-            }
+          if (!templateDoc && isChosenCostItem) {
+            const form = resolveCostForm({
+              agency: t.agency, program: programType, volumeName: item.volumeName,
+              volumeFormat: ((resolved.compliance as Record<string, unknown>)?.costVolumeFormat as string) ?? null,
+            });
+            templateDoc = buildCostVolume(form, {
+              title: item.itemName, agency: t.agency, program: workshareProgram,
+              companyName: tenantName, solicitationNumber: t.solicitationNumber, topicNumber: t.topicNumber,
+              proposalId: p.id, solicitationId: t.solicitationId ?? '', actorId,
+              ceiling: costCeiling, personnelMaxPct: personnelMax, costShareAllowed,
+            });
           }
-          if (!templateDoc) { const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k); }
+          // Registry fallback — but never hand a SECOND, statically-seeded cost sheet to a
+          // non-chosen spreadsheet item in a cost volume (two inconsistent cost sheets in one xlsx).
+          if (!templateDoc && !(isCostVolume && !isChosenCostItem && item.itemType === 'spreadsheet')) {
+            const k = resolveTemplateKey(programType, item.itemType, item.itemName); if (k) templateDoc = getTemplate(k);
+          }
           if (templateDoc) {
+            // Older/API-created molds may lack a metadata object — stamping into undefined
+            // would throw inside the provision transaction and fail the whole release.
+            templateDoc.metadata = { ...(templateDoc.metadata ?? {}) } as CanvasDocument['metadata'];
             templateDoc.metadata.proposal_id = p.id;
             templateDoc.metadata.solicitation_id = t.solicitationId ?? '';
             templateDoc.metadata.created_at = new Date().toISOString();
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = actorId;
             templateDoc.document_id = section.id;
+            // The ITEM's own limits are provision truth — stamp them onto the canvas so the
+            // editor gauge and the export floor read the per-item cap, not the mold's default.
+            const canv = (templateDoc as unknown as { canvas?: { format?: string; max_pages?: number | null; max_slides?: number | null } }).canvas;
+            if (canv) {
+              const isSlideCanvas = /slide/i.test(canv.format ?? '');
+              if (item.pageLimit != null && !isSlideCanvas) canv.max_pages = item.pageLimit;
+              if (item.slideLimit != null && isSlideCanvas) canv.max_slides = item.slideLimit;
+            }
             const interpolated = interpolateTemplate(templateDoc, templateVariables);
-            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(interpolated)}, status = 'ai_drafted' WHERE id = ${section.id}`;
+            // content_source='template': marks the canvas as PROVISIONED (mold/workbook/registry)
+            // so the async V0 drafter treats it like human content and never clobbers it.
+            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(interpolated)}, status = 'ai_drafted', content_source = 'template' WHERE id = ${section.id}`;
+          } else if (item.itemType === 'slide_deck') {
+            // Blank slide item (no mold, no registry deck): provision an EMPTY slide-family
+            // envelope so the editor and the async drafter author it as a deck, not a letter
+            // doc. Status stays 'empty' — this is geometry, not content.
+            const nowIso = new Date().toISOString();
+            const envelope = {
+              document_id: section.id, nodes: [],
+              canvas: {
+                format: 'slide_16_9', width: 960, height: 540,
+                margins: { top: 36, right: 36, bottom: 36, left: 36 },
+                header: null, footer: null,
+                font_default: { family: 'Arial', size: 18 }, line_spacing: 1.1,
+                max_pages: null, max_slides: item.slideLimit ?? null,
+              },
+              metadata: {
+                title: item.itemName, proposal_id: p.id, solicitation_id: t.solicitationId ?? '',
+                created_at: nowIso, last_modified_at: nowIso, last_modified_by: actorId,
+              },
+            };
+            await tx`UPDATE proposal_sections SET content = ${JSON.stringify(envelope)} WHERE id = ${section.id}`;
           }
           count++;
         }
@@ -225,8 +325,11 @@ export async function provisionProposalForPortal(opts: {
         // volume missing. Give every such volume a placeholder section + matrix row so it must be
         // authored + locked like any other.
         for (const vol of resolved.volumes) {
-          const items = (vol.items as Array<Record<string, unknown>>) ?? [];
-          if (items.length > 0) continue;
+          if (authoredItems(vol as unknown as Record<string, unknown>).length > 0) continue;
+          // …but NOT for a DSIP-only volume. It has no artifact (skipped above), so a placeholder
+          // here would be an orphan section that can never be authored or locked — the exact
+          // permanent readiness blocker this whole flag exists to prevent.
+          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
           const artifactId = artifactByVolKey.get(volKey(volNum, volName)) ?? null;
@@ -243,7 +346,7 @@ export async function provisionProposalForPortal(opts: {
           count++;
         }
       } else {
-        const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance });
+        const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance, ownIdentifiers: [t.topicNumber, t.solicitationNumber] });
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
           VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
@@ -269,15 +372,27 @@ export async function provisionProposalForPortal(opts: {
       // portal-built proposal — the #1 avoidable administrative DQ was silently unguarded.
       try {
         if (t.solicitationId) {
-          const [comp] = await tx<Array<{ requiredDocuments: unknown }>>`
-            SELECT required_documents AS "requiredDocuments" FROM solicitation_compliance
+          const [comp] = await tx<Array<{ requiredDocuments: unknown; fieldProvenance: unknown }>>`
+            SELECT required_documents AS "requiredDocuments", field_provenance AS "fieldProvenance"
+            FROM solicitation_compliance
             WHERE solicitation_id = ${t.solicitationId}::uuid LIMIT 1`;
           const reqDocs = comp?.requiredDocuments;
+          // Where the LIST came from. A value the product did not read from the solicitation must
+          // never look like one it did (docs/INGEST_PROVENANCE.md) — and a hard submission blocker
+          // is the strongest way of looking like one. The T3CP skeleton's default list carries
+          // "CMMC Reps & Certs", which that BAA does not require as an attachment at all: it is a
+          // DSIP representation. Provisioned as a blocker, it made the build unsubmittable for a
+          // document that does not exist. Carried through here, readiness downgrades a defaulted
+          // requirement to a warning — still on the checklist, no longer a wall.
+          const prov = coerceJsonb<Record<string, { source?: string }>>(comp?.fieldProvenance, {});
+          const listProvenance = prov?.required_documents?.source ?? null;
           if (Array.isArray(reqDocs)) {
             for (const doc of reqDocs) {
               const d = doc as { name?: string; label?: string; source?: string; reference?: string; required?: boolean } | string;
               const label = typeof d === 'string' ? d : (d.name || d.label || String(d));
-              const source = typeof d === 'object' && d !== null ? (d.source || d.reference || null) : null;
+              const perDoc = typeof d === 'object' && d !== null ? (d.source || d.reference || null) : null;
+              // Prefer the item's own citation; fall back to how the LIST was obtained.
+              const source = perDoc ?? (listProvenance ? `provenance:${listProvenance}` : null);
               const required = typeof d === 'object' && d !== null ? (d.required !== false) : true;
               await tx`
                 INSERT INTO proposal_supporting_docs

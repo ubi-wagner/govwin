@@ -12,7 +12,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { forceAdvanceProcess } from '@/lib/process/force-advance';
 
@@ -65,6 +65,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point — force-advance reads/writes the RLS'd ledgers
 
     if (!instanceId || !UUID_RE.test(instanceId)) {
       return NextResponse.json(

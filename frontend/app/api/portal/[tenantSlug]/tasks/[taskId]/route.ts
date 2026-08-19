@@ -8,7 +8,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
@@ -28,6 +28,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
     if (!(await verifyTenantAccess(u.id, role, tenantId))) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    enterTenant(tenantId); // RLS choke point — updateTask reads/writes the tenant-RLS'd tasks ledger
 
     // Resolve the task's portal so a delegated manager of THAT portal may edit it.
     const entity = await withTenant(tenantId, async (tx) => {

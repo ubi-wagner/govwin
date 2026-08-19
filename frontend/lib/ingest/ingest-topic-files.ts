@@ -23,6 +23,7 @@ import { createHash } from 'crypto';
 import { sql } from '@/lib/db';
 import { putObject } from '@/lib/storage/s3-client';
 import { emitEventSingle } from '@/lib/events';
+import { activateLateTopicIfReady } from '@/lib/curation/republish';
 import { randomUUID } from 'crypto';
 
 export interface TopicFileInput {
@@ -52,6 +53,9 @@ export interface TopicFileIngestResult {
   created: IngestedTopic[];
   skipped: Array<{ filename: string; reason: 'duplicate_file' | 'duplicate_topic' }>;
   failed: Array<{ filename: string; error: string }>;
+  /** Pushed-umbrella late additions: released to the bridge now / parked for a close date. */
+  lateReleased?: number;
+  needsCloseDate?: number;
 }
 
 export class SolicitationNotFoundError extends Error {
@@ -302,6 +306,14 @@ export async function ingestTopicFilesForSolicitation(params: {
       });
     } catch (evtErr) {
       console.error('[ingest-topic-files] event emission failed (non-fatal):', evtErr);
+    }
+    // Topic files dropped on an ALREADY-PUSHED umbrella are late additions — release
+    // each to the bridge now if date-complete (extracted topics usually lack a close
+    // date, so most park at needs_close_date until the admin sets one; date guard).
+    for (const c of result.created) {
+      const late = await activateLateTopicIfReady(c.opportunityId, { id: userId ?? null });
+      if (late.released) result.lateReleased = (result.lateReleased ?? 0) + 1;
+      else if (late.reason === 'needs_close_date') result.needsCloseDate = (result.needsCloseDate ?? 0) + 1;
     }
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, enterTenant, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -93,6 +94,7 @@ export async function POST(req: Request, { params }: Params) {
       proposalId,
     });
 
+    try { await emitEventSingle({ namespace: 'library', type: 'seed_job.selected', actor: userActor(sessionUser.id ?? '', undefined), tenantId, payload: { proposalId } }); } catch (e) { console.error('[seed_job.selected] audit emit failed (non-fatal)', e); }
     return NextResponse.json({ data: { status: 'mapping', sourceProposalTitle: srcProposal.title } });
   } catch (e) {
     console.error('[seed-job/select/POST]', e);

@@ -86,9 +86,10 @@ describe('amendment engine — audit contracts', () => {
     });
     const res = await logPost(req, { params: Promise.resolve({ solId: SOL_ID }) });
     expect(res.status).toBe(200);
-    const arg = emitEventStartMock.mock.calls[0][0];
-    expect(arg.namespace).toBe('finder');
-    expect(arg.type).toBe('amendment.detected');
+    // MED-9 audit fix: a single write is an audit SINGLE, not a decorative bracket.
+    const arg = emitEventSingleMock.mock.calls.find((c) => c[0].type === 'amendment.detected')?.[0];
+    expect(arg?.namespace).toBe('finder');
+    expect(arg?.type).toBe('amendment.detected');
     expect(arg.payload.severity).toBe('critical');
   });
 

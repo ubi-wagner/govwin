@@ -10,7 +10,7 @@ import { useCallback, useState } from 'react';
  * it's immediately reusable — and rank-matched — for the next proposal.
  */
 
-interface DocResult { file: string; format: string; atoms: number; skipped?: number; reference?: boolean; error?: string }
+interface DocResult { file: string; format: string; atoms: number; skipped?: number; reference?: boolean; error?: string; volumes?: number }
 interface PackageResult { packageName: string | null; filesProcessed: number; totalAtoms: number; context: string[]; docs: DocResult[] }
 
 const ACCEPT = '.pdf,.docx,.pptx,.xlsx,.txt,.md';
@@ -25,6 +25,7 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
   const [phase, setPhase] = useState('');
   const [sol, setSol] = useState('');
   const [topic, setTopic] = useState('');
+  const [pastProposal, setPastProposal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [result, setResult] = useState<PackageResult | null>(null);
@@ -52,6 +53,7 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
       if (phase) context.phase = phase;
       if (sol.trim()) context.sol = sol.trim();
       if (topic.trim()) context.topic = topic.trim();
+      if (pastProposal) context.docType = 'past_proposal';
       if (Object.keys(context).length) fd.append('context', JSON.stringify(context));
 
       const res = await fetch(`/api/portal/${tenantSlug}/atoms/atomize-package`, { method: 'POST', body: fd });
@@ -64,7 +66,7 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
         setErr(json.error || 'Package atomization failed');
       }
     } catch { setErr('Package atomization failed'); } finally { setBusy(false); }
-  }, [files, packageName, agency, program, phase, sol, topic, tenantSlug, onDone]);
+  }, [files, packageName, agency, program, phase, sol, topic, pastProposal, tenantSlug, onDone]);
 
   const inputCls = 'border border-gray-300 rounded px-2 py-1 text-sm';
 
@@ -104,6 +106,9 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
             <p className="font-semibold text-emerald-800">Atomized {result.filesProcessed} document{result.filesProcessed > 1 ? 's' : ''} → {result.totalAtoms} atoms added to your library.</p>
             {result.context.length > 0 && <p className="mt-1 text-xs text-emerald-700">Context stamped on every atom: {result.context.join(' · ')}</p>}
             <ul className="mt-2 space-y-0.5 text-xs text-emerald-800">
+              {result.docs.some((d) => (d.volumes ?? 0) > 0) && (
+                <p className="mt-1 text-xs text-indigo-700">Deconstructed into {result.docs.reduce((n, d) => n + (d.volumes ?? 0), 0)} proposal volume foundation document(s).</p>
+              )}
               {result.docs.map((d, i) => (
                 <li key={i}>• {d.file} — {d.error ? <span className="text-rose-600">{d.error}</span> : d.atoms === 0 && d.reference ? `registered as a foundational document (no sections long enough to atomize)` : <>{d.atoms} atoms ({d.format}){d.skipped ? <span className="text-emerald-600/70"> · skipped {d.skipped} short block{d.skipped > 1 ? 's' : ''}</span> : null}</>}</li>
               ))}
@@ -132,6 +137,13 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
           </div>
           <div className="flex items-center gap-2"><span className="text-[11px] text-gray-400 w-16">solicit.</span><input value={sol} onChange={(e) => setSol(e.target.value)} placeholder="e.g. AFWERX-CSO-2026-1" className={`${inputCls} flex-1`} /></div>
           <div className="flex items-center gap-2"><span className="text-[11px] text-gray-400 w-16">topic</span><input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. N251-042" className={`${inputCls} flex-1`} /></div>
+          <label className="flex items-start gap-2 text-xs text-gray-700 pt-1 cursor-pointer">
+            <input type="checkbox" checked={pastProposal} onChange={(e) => setPastProposal(e.target.checked)} className="mt-0.5" />
+            <span>
+              <span className="font-medium">Complete past proposal (DSIP download)</span>
+              <span className="block text-[11px] text-gray-500">Segments the single PDF into its Volume 1–5 foundation documents — all linked to one proposal — then atomizes each volume.</span>
+            </span>
+          </label>
 
           <button onClick={atomize} disabled={busy || files.length === 0}
                   className="w-full text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-2 disabled:opacity-50">
