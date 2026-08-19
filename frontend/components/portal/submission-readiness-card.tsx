@@ -20,6 +20,9 @@ const CATEGORY_LABEL: Record<BlockerCategory, string> = {
   page_overflow: 'Over page limit',
   work_split: 'Work-split',
   format_floor: 'Format',
+  // Compliant but unfinished — unused page envelope, no figures, no inline emphasis. Always a
+  // warning, never a blocker: whether an under-filled volume is deliberate is the builder's call.
+  underfilled: 'Unfinished',
 };
 
 const MAX_SHOWN = 8;

@@ -53,6 +53,16 @@ console.log('✓ logged in as eric@rfppipeline.com (rfp_admin)');
 const api = page.request;
 
 // ── 1 · Stage the intake (the product's canonical front door) ──
+// `stageIntake` mints a fresh opportunity id per call — it does NOT dedup on solicitation number,
+// so a blind re-run orphans a duplicate umbrella. Pass an already-staged solicitation id as argv[2]
+// to skip straight to the compliance pass (same convention as the sibling t3cp-* scripts).
+const RESUME = process.argv[2] ?? null;
+let oppId: string | null = null;
+let solId: string | null = RESUME;
+
+if (RESUME) {
+  console.log(`↻ resuming against already-staged solicitation ${RESUME} (intake skipped)`);
+} else {
 const intake = await api.post(`${BASE}/api/admin/intake`, {
   data: {
     title: 'OSW26BZ04-DP013: T3CP Patent Holiday SBIR Open Topic Call',
@@ -94,43 +104,69 @@ const intake = await api.post(`${BASE}/api/admin/intake`, {
   },
 });
 const ib = await intake.json().catch(() => ({}));
-const oppId: string | null = ib?.data?.opportunityId ?? null;
-const solId: string | null = ib?.data?.solicitationId ?? null;
+oppId = ib?.data?.opportunityId ?? null;
+solId = ib?.data?.solicitationId ?? null;
 ok('intake staged (opportunity + solicitation created)', intake.status() === 200 && !!oppId && !!solId,
   `HTTP ${intake.status()} ${JSON.stringify(ib).slice(0, 200)}`);
 if (!oppId || !solId) { await b.close(); process.exit(1); }
 console.log(`  opportunityId=${oppId}\n  solicitationId=${solId}`);
+}
 
 // ── 2 · Author the compliance matrix from the READ requirements ──
-const compliance = await api.post(`${BASE}/api/admin/rfp-curation/${solId}/compliance`, {
-  data: {
-    pageLimitTechnical: 10,
-    fontFamily: 'Times New Roman',
-    fontSize: '10',
-    margins: '1 inch (all sides)',
-    submissionFormat:
-      'DSIP electronic submission, seven volumes. Technical Volume (Vol 2) not to exceed 10 pages — T3CP evaluates only '
-      + 'the first ten pages; additional pages are not considered. Format per the DoW SBIR Program BAA "Format of Technical '
-      + 'Volume (Volume 2)". Cost Volume (Vol 3) uses the DSIP online cost volume; Phase I Base must not exceed $250,000.00.',
-    requiredDocuments: [
-      'Proposal Cover Sheet (Volume 1, DSIP)',
-      'Technical Volume (Volume 2) — NTE 10 pages',
-      'Cost Volume (Volume 3) — DSIP online cost volume, Phase I Base NTE $250,000',
-      'Company Commercialization Report (Volume 4, DSIP)',
-      'Supporting Documents (Volume 5) — incl. TABA Request Form if requested; D2P2 Phase I-equivalent summary NTE 3 pages',
-      'Fraud, Waste and Abuse Training (Volume 6)',
-      'Disclosures of Foreign Affiliations or Relationships to Foreign Countries (Volume 7 webform)',
-    ],
-    evaluationCriteria: [
-      'Evaluated per the DoW SBIR Program BAA criteria, with the T3CP additions below.',
-      'MUST identify the patent number(s) and the name of the associated DoW laboratory for the patent(s) on which the effort is based.',
-      'Identified patent(s) must be covered by a CEL issued to the offeror, or included in a CEL application submitted by the offeror, under the Patent Holiday Initiative.',
-      'Credible prototype and commercialization pathway — evolutionary-only improvements to the existing state of practice are excluded.',
-    ],
-  },
-});
-ok('compliance matrix authored (10-page V2, $250K base, 7 volumes)', compliance.status() === 200,
-  `HTTP ${compliance.status()} ${(await compliance.text()).slice(0, 200)}`);
+// The compliance route is ONE VARIABLE PER CALL (`compliance.save_variable_value`) — it has
+// required `variableName` since this script was written, so the old single bulk POST here
+// (pageLimitTechnical / fontFamily / requiredDocuments / …) was always a 422. Each value below is
+// posted on the real contract. Values quoted in the topic call / R4 announcement carry their
+// verbatim `sourceExcerpt`; the BAA formatting conventions (font · size · margins) are NOT quoted
+// in either T3CP document, so they are saved WITHOUT an excerpt — an unquoted value must never be
+// dressed up as one read from the source (docs/INGEST_PROVENANCE.md).
+const R4_DOC = 'OSWT3CP_SBIR_26BZ_R4_v2.pdf';
+const VOLUME_LIST =
+  'Proposal Coversheet (Volume 1) … Technical Volume (Volume 2) … Cost Volume (Volume 3) … Company '
+  + 'Commercialization Report (CCR) (Volume 4) … Supporting Documents (Volume 5) … Fraud, Waste and Abuse '
+  + 'Training (Volume 6) … Disclosures of Foreign Affiliations or Relationships to Foreign Countries (Volume 7)';
+
+/** [variableName, value, sourceExcerpt | null, notes] */
+const MATRIX: Array<[string, unknown, string | null, string]> = [
+  ['page_limit_technical', 10,
+    'The Technical Volume is not to exceed 10 pages and must follow the formatting requirements provided in the DoW SBIR '
+    + 'Program BAA titled "Format of Technical Volume (Volume 2)." T3CP will only evaluate the first ten (10) pages of the '
+    + 'Technical Volume. Additional pages will not be evaluated.',
+    `Read from ${R4_DOC}`],
+  ['submission_format',
+    'DSIP electronic submission, seven volumes. Technical Volume (Vol 2) not to exceed 10 pages — T3CP evaluates only '
+    + 'the first ten pages; additional pages are not considered. Format per the DoW SBIR Program BAA "Format of Technical '
+    + 'Volume (Volume 2)". Cost Volume (Vol 3) uses the DSIP online cost volume; Phase I Base must not exceed $250,000.00.',
+    VOLUME_LIST, `Read from ${R4_DOC}`],
+  ['required_documents', [
+    'Proposal Cover Sheet (Volume 1, DSIP)',
+    'Technical Volume (Volume 2) — NTE 10 pages',
+    'Cost Volume (Volume 3) — DSIP online cost volume, Phase I Base NTE $250,000',
+    'Company Commercialization Report (Volume 4, DSIP)',
+    'Supporting Documents (Volume 5) — incl. TABA Request Form if requested; D2P2 Phase I-equivalent summary NTE 3 pages',
+    'Fraud, Waste and Abuse Training (Volume 6)',
+    'Disclosures of Foreign Affiliations or Relationships to Foreign Countries (Volume 7 webform)',
+  ], VOLUME_LIST, `Read from ${R4_DOC}`],
+  ['evaluation_criteria', [
+    'Evaluated per the DoW SBIR Program BAA criteria, with the T3CP additions below.',
+    'MUST identify the patent number(s) and the name of the associated DoW laboratory for the patent(s) on which the effort is based.',
+    'Identified patent(s) must be covered by a CEL issued to the offeror, or included in a CEL application submitted by the offeror, under the Patent Holiday Initiative.',
+    'Credible prototype and commercialization pathway — evolutionary-only improvements to the existing state of practice are excluded.',
+  ],
+    'Proposals must identify the patent number(s) and the name of the associated DoW laboratory for the patent(s) on which '
+    + 'the proposed effort is based.', `Read from ${R4_DOC}`],
+  // Not quoted in the topic call or R4 — the DoW SBIR BAA Volume-2 format section governs. No excerpt.
+  ['font_family', 'Times New Roman', null, 'DoW SBIR Program BAA "Format of Technical Volume (Volume 2)" convention — NOT quoted in the T3CP topic call or R4 announcement.'],
+  ['font_size', '10', null, 'DoW SBIR Program BAA "Format of Technical Volume (Volume 2)" convention — NOT quoted in the T3CP topic call or R4 announcement.'],
+  ['margins', '1 inch (all sides)', null, 'DoW SBIR Program BAA "Format of Technical Volume (Volume 2)" convention — NOT quoted in the T3CP topic call or R4 announcement.'],
+];
+
+for (const [variableName, value, sourceExcerpt, notes] of MATRIX) {
+  const r = await api.post(`${BASE}/api/admin/rfp-curation/${solId}/compliance`, {
+    data: { variableName, value, ...(sourceExcerpt ? { sourceExcerpt } : {}), notes, action: 'manual_entry' },
+  });
+  ok(`compliance ${variableName}`, r.status() === 200, r.status() === 200 ? '' : `HTTP ${r.status()} ${(await r.text()).slice(0, 200)}`);
+}
 
 await b.close();
 console.log(failures === 0 ? `\nT3CP INGEST: ALL GREEN\n  opp=${oppId}\n  sol=${solId}` : `\nT3CP INGEST: ${failures} FAILURE(S)`);

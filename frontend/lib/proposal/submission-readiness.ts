@@ -23,6 +23,7 @@ import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
 import { computeSttrSplit } from '@/lib/proposal/sttr-split';
 import { parseStructuredCostInputs } from '@/lib/proposal/cost-volume-canvas';
 import { computeBudget } from '@/lib/proposal/cost-model';
+import { measureDocument } from '@/lib/proposal/document-furniture';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
@@ -42,7 +43,9 @@ export type BlockerCategory =
   | 'missing_document'
   | 'page_overflow'
   | 'work_split'
-  | 'format_floor';
+  | 'format_floor'
+  /** Compliant but obviously unfinished — an unused page envelope, no figures, no emphasis. */
+  | 'underfilled';
 
 export interface ReadinessBlocker {
   category: BlockerCategory;
@@ -110,6 +113,8 @@ const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   page_overflow: 5,
   work_split: 6,
   format_floor: 7,
+  // Last: never let a polish warning sit above a real submission blocker in the list.
+  underfilled: 8,
 };
 
 /**
@@ -313,6 +318,19 @@ export async function computeSubmissionReadiness(
         severity: 'blocker',
         message: `"${name}" is estimated at ${size} ${unit} against a ${max}-${noun} limit — trim ${size - max} ${noun}(s) before submission (same estimate the export compliance check uses).`,
       });
+    }
+    // ── Compliant, but finished? ──────────────────────────────────────────────────────────
+    // The check above answers "is this volume ALLOWED"; this answers "is it FINISHED". They are
+    // different questions, and only the first one existed: a 6-page volume under a 10-page cap
+    // passes every compliance gate and still reads to an evaluator as a half-made proposal.
+    // Measured against a hand-built reference volume for the same solicitation, the generated one
+    // used ~7 of 10 pages, half the character density, and ZERO figures. Warnings only — the
+    // builder decides whether an under-filled volume is deliberate; the system's job is to make
+    // sure they are never surprised by it at submission.
+    if (!isSlide) {
+      for (const w of measureDocument(doc).warnings) {
+        blockers.push({ category: 'underfilled', severity: 'warning', message: `"${name}": ${w}` });
+      }
     }
     if (isSlide) {
       const ov = overflowingSlides(doc);
