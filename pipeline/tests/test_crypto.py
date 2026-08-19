@@ -1,8 +1,23 @@
 """Unit tests for pipeline.src.crypto — AES-256-GCM encrypt/decrypt.
 
-No DB, no HTTP. The tests patch sys.path to ensure the working
-``cryptography`` package (49.x, installed at /tmp/crypto_pkg) takes
-priority over the broken system-level pyo3 build.
+No DB, no HTTP.
+
+A NOTE ON `cryptography` AND WHY THIS FILE NO LONGER EVICTS IT. These tests used to delete every
+`cryptography.*` entry from `sys.modules` before each case, so that a pip-installed build at
+`/tmp/crypto_pkg` would win over a system build that was broken at the time. Two things then went
+wrong at once: `/tmp` is ephemeral, so after a container restart that directory was gone; and the
+system build is a **PyO3** extension, which raises
+
+    ImportError: PyO3 modules compiled for CPython 3.8 or older
+                 may only be initialized once per interpreter process
+
+on the SECOND import in a process. The eviction guaranteed a second import, so all eight cases
+failed — not because encryption was broken, but because the workaround for an old problem had
+become the problem. The `_is_crypto_available()` skip guard could not catch it either: the first
+import (at collection) succeeds, and only the fixture's re-import blows up.
+
+So: import `cryptography` exactly once, like every other consumer does, and evict only the two
+pure-Python modules (`config`, `crypto`) that must be reloaded to pick up a patched env var.
 
 Tests:
   1. Round-trip: encrypt → decrypt returns original plaintext.
@@ -23,22 +38,17 @@ import sys
 import pytest
 
 # ---------------------------------------------------------------------------
-# Ensure the working cryptography build is on sys.path before any import of
-# the source module. The system-level cryptography (pyo3 Rust build) panics
-# because _cffi_backend is absent; pip-installed 49.x at /tmp/crypto_pkg works.
+# Prefer a locally pip-installed build IF one is present, but never require it:
+# the system package works, and the previous unconditional shim pointed at a
+# /tmp directory that does not survive a container restart.
 # ---------------------------------------------------------------------------
 _WORKING_CRYPTO_PATH = "/tmp/crypto_pkg"
-if _WORKING_CRYPTO_PATH not in sys.path:
+if os.path.isdir(_WORKING_CRYPTO_PATH) and _WORKING_CRYPTO_PATH not in sys.path:
     sys.path.insert(0, _WORKING_CRYPTO_PATH)
-
-# Evict any cached (broken) cryptography modules so our path wins.
-_CRYPTO_MODS = [k for k in list(sys.modules) if k.startswith("cryptography")]
-for _m in _CRYPTO_MODS:
-    del sys.modules[_m]
 
 
 def _is_crypto_available() -> bool:
-    """Return True if the working cryptography package can be imported."""
+    """Can we actually do AES-GCM here? Imported ONCE, and left imported."""
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: F401
         return True
@@ -64,24 +74,23 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(autouse=True)
 def _patch_env_and_reload(monkeypatch):
-    """Set API_KEY_ENCRYPTION_SECRET and reload the crypto module fresh."""
+    """Set API_KEY_ENCRYPTION_SECRET and reload the crypto module fresh.
+
+    `config` and `crypto` ONLY. `cryptography` is deliberately left alone — it is a native PyO3
+    extension that may be initialized once per process, and evicting it here is what turned this
+    file red (see the module docstring).
+    """
     monkeypatch.setenv("API_KEY_ENCRYPTION_SECRET", "test-secret-for-unit-tests-32bytes!")
-    # Evict cached copies so the fresh env is seen on first import.
-    for mod_name in list(sys.modules):
-        if mod_name in ("config", "crypto") or mod_name.startswith("cryptography"):
-            del sys.modules[mod_name]
+    for mod_name in ("config", "crypto"):
+        sys.modules.pop(mod_name, None)
     yield
-    # Teardown: evict again so other test modules start clean.
-    for mod_name in list(sys.modules):
-        if mod_name in ("config", "crypto") or mod_name.startswith("cryptography"):
-            del sys.modules[mod_name]
+    # Teardown: evict again so other test modules start from the real environment.
+    for mod_name in ("config", "crypto"):
+        sys.modules.pop(mod_name, None)
 
 
 def _load_crypto():
-    """Import the src/crypto module with the working cryptography on the path."""
-    # Guarantee our working path is first.
-    if _WORKING_CRYPTO_PATH not in sys.path:
-        sys.path.insert(0, _WORKING_CRYPTO_PATH)
+    """Import the src/crypto module fresh, so it re-reads the patched env."""
     import crypto  # resolves from pytest's pythonpath = src
     return crypto
 

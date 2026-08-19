@@ -10,6 +10,33 @@ from urllib.parse import urlparse
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
 
 
+def _resolve_pipeline_dsn() -> None:
+    """Run the DB-integration tests as the role the PIPELINE actually runs as.
+
+    The sandbox `env.sh` is shared by both services and sets `DATABASE_URL` to the FRONTEND's
+    role — `govtech_app`, which is NOBYPASSRLS and carries no `app.tenant_id` outside a request.
+    The deployed pipeline worker connects as the owner role instead, because the agent role
+    `rfp_agent` is still deploy-gated (docs/RLS_CUTOVER.md:6).
+
+    Run pipeline tests under the app role and eight of them fail for reasons that have nothing to
+    do with the code under test: writes to RLS-forced tables are refused outright
+    (`new row violates row-level security policy for table "tenant_spotlight_buckets"`), and the
+    workflow engine cannot even claim its own PLATFORM-scope instance (`tenant_id IS NULL` never
+    equals anything, so `execute_instance` returns "Instance not claimable" and the rest of the
+    assertions cascade). That is a suite testing the wrong deployment, not a bug it found.
+
+    So: when an owner DSN is available, pipeline tests use it. Narrow on purpose — nothing is
+    overridden unless `DATABASE_URL_OWNER` is actually set, so CI and any other environment keep
+    exactly the DSN they were given.
+    """
+    owner = os.environ.get("DATABASE_URL_OWNER")
+    if owner and os.environ.get("DATABASE_URL") != owner:
+        os.environ["DATABASE_URL"] = owner
+
+
+_resolve_pipeline_dsn()
+
+
 def _db_reachable(url: str, timeout: float = 1.0) -> bool:
     """True iff a TCP connection to the DATABASE_URL host:port succeeds.
 
