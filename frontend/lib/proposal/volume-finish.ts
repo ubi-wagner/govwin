@@ -265,7 +265,11 @@ function withPageFurniture(canvas: CanvasRules, facts: VolumeFacts): CanvasRules
     out.header = { template: `${ident}${facts.volumeName ? `  ·  ${facts.volumeName}` : ''}`, height: 28, font };
   }
   if (!out.footer) {
-    out.footer = { template: 'Page {page}', height: 28, font };
+    // `{n}` / `{N}` are the exporters' OWN tokens — the PDF exporter maps them onto Chromium's
+    // live pageNumber/totalPages spans (lib/export/pdf-exporter.ts). Writing `{page}` printed the
+    // literal string "Page {page}" across the foot of every page of the Supporting Documents
+    // volume, which is the sort of thing that only ever shows up by looking at the rendered page.
+    out.footer = { template: 'Page {n} of {N}', height: 28, font };
   }
   return out;
 }
