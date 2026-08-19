@@ -106,4 +106,30 @@ describe('buildCostVolume — dispatcher', () => {
     expect(heads(st).some((t) => t === 'Budget' || /Budget —/.test(t))).toBe(true);
     expect(rowValue(st.nodes, 'Total OTF Project Funds')).toBe(200000);
   });
+
+  it('does NOT leak provisional example rows when the caller passes real inputs', () => {
+    // Regression: buildCostVolume merged provisionalCostInputs() under the caller's inputs, so a
+    // caller passing real labor/odcs but omitting `subs` silently inherited the example
+    // "[University / Lab]" $15k research-subcontractor — inflating the total + work-share and putting
+    // a phantom subcontractor in the rendered form. A real-input caller now gets empty collections
+    // for what it omits.
+    const doc = buildCostVolume('burden_waterfall', { program: 'sbir', companyName: 'Acme' }, {
+      labor: [{ name: 'PI', category: 'Principal Investigator', hours: 100, unburdenedRate: 50 }],
+      rates: { fringePct: 0.3, overheadPct: 0.5, gnaPct: 0.2, feePct: 0.05 },
+      odcs: [{ kind: 'materials', label: 'Parts', amount: 1000 }],
+      // subs intentionally omitted → must be empty, NOT the provisional $15k example
+    });
+    const text = JSON.stringify(doc.nodes);
+    expect(text).not.toContain('University / Lab');
+    expect(text).not.toContain('15,000');
+    // The one PI labor row is present; the provisional [Senior Engineer]/[Research Scientist] are not.
+    expect(text).not.toContain('Senior Engineer');
+    expect(text).not.toContain('Research Scientist');
+  });
+
+  it('still renders the full provisional worked example when the caller passes no inputs (provision-time)', () => {
+    const doc = buildCostVolume('burden_waterfall', { program: 'sbir' });
+    const text = JSON.stringify(doc.nodes);
+    expect(text).toContain('University / Lab'); // the starter example survives when nothing is passed
+  });
 });

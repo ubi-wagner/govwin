@@ -46,8 +46,10 @@ const meta = {
   ceiling: 200000, proposalId: PROPOSAL,
 };
 
-const workbook = buildCostVolume('burden_waterfall', meta, { labor, rates, odcs, periods });
-const budget = computeBudget(labor, rates, { odcs, periods, ceiling: 200000, program: 'sbir' });
+// subs: [] is explicit — the GHOST proposal has NO subcontractors (Firm POW 100%). Even though
+// buildCostVolume now defaults omitted collections to empty, spell it out so the intent is on the page.
+const workbook = buildCostVolume('burden_waterfall', meta, { labor, rates, odcs, subs: [], periods });
+const budget = computeBudget(labor, rates, { odcs, subs: [], periods, ceiling: 200000, program: 'sbir' });
 const [base, opt] = budget.periods;
 console.log(`Base price $${base.totalPrice.toFixed(2)} (≤ $200,000) · Option $${opt.totalPrice.toFixed(2)} (≤ $115,000) · Total $${budget.grand.totalPrice.toFixed(2)} · SBC work ${(budget.workshare.sbcWorkPct * 100).toFixed(0)}%`);
 ok('Base ≤ $200,000 cap', base.totalPrice <= 200000, `$${base.totalPrice.toFixed(2)}`);

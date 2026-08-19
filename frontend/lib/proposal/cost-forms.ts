@@ -240,7 +240,15 @@ export function buildCostVolume(
   inputs?: Partial<CostVolumeInputs>,
   otfLines?: OtfSpendLine[],
 ): CanvasDocument {
-  const base = { ...provisionalCostInputs(), ...(inputs ?? {}) } as CostVolumeInputs;
+  // Provisional starter ONLY when the caller passes nothing (provision-time worked example, which the
+  // tenant then edits). A caller that passes REAL inputs gets a clean slate for the COLLECTIONS it
+  // omits — merging the provisional example's labor/odcs/subs into a real cost volume silently injects
+  // a phantom "[University / Lab]" $15k research-subcontractor (and example labor/ODC rows) that inflate
+  // the total, appear in the rendered form, and skew the work-share. Rates is a scalar config, so the
+  // provisional rate schedule stays as the fallback when the caller omits it; the example ROWS never do.
+  const base = (inputs
+    ? { ...provisionalCostInputs(), labor: [], odcs: [], subs: [], ...inputs }
+    : provisionalCostInputs()) as CostVolumeInputs;
   switch (form) {
     case 'sf424a':
       return buildSf424aCanvas({ ...base, meta });
