@@ -20,10 +20,27 @@ let ok = true; const A = (l, c, x = '') => { console.log(`${c ? '✓' : '✗'} $
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 const p = await (await browser.newContext({ viewport: { width: 1440, height: 2000 } })).newPage();
 try {
-  // Reset the guide to a clean draft (idempotent re-runs): archive any active, keep the draft.
-  await sql`UPDATE content_pages SET status='archived', archived_at=now() WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
+  // Reset the guide to a clean draft — and MAKE the draft if there is not one.
+  //
+  // The first version of this setup only archived the active row and assumed a draft was sitting
+  // there. It was not idempotent: the first run consumed the draft by publishing it, so the second
+  // run archived the (newly) active version, found nothing to publish, and reported the product
+  // broken — while actually taking a live guide off the public marketing site. A test that
+  // destroys its own precondition and then blames the code is worse than no test.
+  //
+  // So: promote the newest version back to a draft first, THEN archive whatever is live.
+  const [newest] = await sql`
+    SELECT id, status FROM content_pages
+    WHERE page_key=${SLUG} AND content_type='guide'
+    ORDER BY version_no DESC LIMIT 1`;
+  if (!newest) { A('a BAA guide version exists to publish', false, 'none in content_pages'); throw new Error('no seed content'); }
+  await sql`UPDATE content_pages SET status='draft', archived_at=NULL WHERE id=${newest.id}::uuid`;
+  await sql`UPDATE content_pages SET status='archived', archived_at=now()
+            WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
   const before = await sql`SELECT count(*)::int AS n FROM content_pages WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
+  const draftN = await sql`SELECT count(*)::int AS n FROM content_pages WHERE page_key=${SLUG} AND content_type='guide' AND status='draft'`;
   A('precondition: BAA guide is NOT live (0 active)', before[0].n === 0);
+  A('precondition: there IS a draft to publish', draftN[0].n > 0, `drafts=${draftN[0].n}`);
 
   await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#email', { timeout: 20000 });
@@ -46,7 +63,10 @@ try {
 
   // Verify it went live in the DB.
   const after = await sql`SELECT status, version_no FROM content_pages WHERE page_key=${SLUG} AND content_type='guide' AND status='active'`;
-  A('the guide is now LIVE (active version exists)', after.length > 0, after[0] ? `v${after[0].versionNo}` : 'none');
+  // snake_case on purpose: this script's postgres() has no toCamel transform, unlike lib/db.
+  // Reading `versionNo` here printed "vundefined" — the same class of silent miss the SOP warns
+  // about, harmless in a label and not harmless anywhere that branches on the value.
+  A('the guide is now LIVE (active version exists)', after.length > 0, after[0] ? `v${after[0].version_no}` : 'none');
 
   // Verify it renders on the PUBLIC marketing site (the resources/guides surface projects HTML).
   const pubUrl = `${BASE}/resources/${SLUG}`;
