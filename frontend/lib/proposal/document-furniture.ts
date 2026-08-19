@@ -363,7 +363,17 @@ export interface DocumentMeasurement {
  * `underfillAt` is the fraction below which a capped document is called out — 0.85 by default,
  * i.e. more than one page unused on a 10-page volume.
  */
-export function measureDocument(doc: CanvasDocument, underfillAt = 0.85): DocumentMeasurement {
+export function measureDocument(
+  doc: CanvasDocument,
+  underfillAt = 0.85,
+  /**
+   * The artifact's type. It changes which warnings are TRUE, not just which are interesting:
+   * "no figures" is a real finding on a technical narrative and meaningless on a cover sheet or a
+   * cost workbook, and a warning that fires where it cannot apply trains the reader to ignore the
+   * ones that do. Defaults to 'narrative' — the strictest reading — when unknown.
+   */
+  artifactType: string = 'narrative',
+): DocumentMeasurement {
   const nodes = docNodes(doc);
   const pages = estimatePageCount(doc);
   const characters = countCharacters(nodes);
@@ -395,15 +405,23 @@ export function measureDocument(doc: CanvasDocument, underfillAt = 0.85): Docume
     );
   }
   const figures = (nodeTypes.image ?? 0) + (nodeTypes.chart ?? 0);
-  if (figures === 0) warnings.push('No figures. A technical volume with no figure is a wall of text.');
+  const isNarrative = artifactType === 'narrative';
+  const isSpreadsheet = artifactType === 'cost' || doc.canvas?.format === 'spreadsheet';
+  if (isNarrative && figures === 0) {
+    warnings.push('No figures. A technical narrative with no figure is a wall of text.');
+  }
+  // A caption gap is worth reporting wherever figures exist, narrative or not.
   if ((nodeTypes.caption ?? 0) < figures) {
     warnings.push(`${figures} figure(s) but only ${nodeTypes.caption ?? 0} caption(s) — every figure needs one.`);
   }
-  if (emphasisedBlocks === 0 && (nodeTypes.text_block ?? 0) > 3) {
+  if (isNarrative && emphasisedBlocks === 0 && (nodeTypes.text_block ?? 0) > 3) {
     warnings.push('No inline emphasis anywhere — body copy is one undifferentiated face.');
   }
-  if (!doc.canvas?.header) warnings.push('No running header.');
-  if (!doc.canvas?.footer) warnings.push('No footer — page numbers are expected on a paginated volume.');
+  // Page furniture applies to anything PAGINATED. A spreadsheet has no page to put it on.
+  if (!isSpreadsheet) {
+    if (!doc.canvas?.header) warnings.push('No running header.');
+    if (!doc.canvas?.footer) warnings.push('No footer — page numbers are expected on a paginated volume.');
+  }
 
   return {
     pages,
@@ -437,12 +455,12 @@ export function measureDocument(doc: CanvasDocument, underfillAt = 0.85): Docume
  * caller (or a human) makes. What the system CAN do reliably is say precisely how much room is
  * left, which is the number nobody had.
  */
-export function headroom(doc: CanvasDocument): {
+export function headroom(doc: CanvasDocument, artifactType = 'narrative'): {
   pagesFree: number | null;
   charactersFree: number | null;
   atCapacity: boolean;
 } {
-  const m = measureDocument(doc);
+  const m = measureDocument(doc, 0.85, artifactType);
   const pagesFree = m.maxPages == null ? null : m.maxPages - m.pages;
   const charactersFree = m.maxCharacters == null ? null : m.maxCharacters - m.characters;
   const atCapacity =

@@ -284,3 +284,41 @@ describe('the pass is deterministic', () => {
       .toEqual(a.map((x) => [x.type, JSON.stringify(x.content)]));
   });
 });
+
+// ── artifact-type scoping ────────────────────────────────────────────────────
+describe('warnings are scoped to the artifact type', () => {
+  // A warning that fires where it cannot apply trains the reader to ignore the ones that do.
+  // "No figures" is a real finding on a technical narrative and meaningless on a cover sheet;
+  // page furniture is meaningless on a spreadsheet, which has no page to put it on.
+  const thin = [h1('A'), text('one'), text('two'), text('three'), text('four')];
+
+  it('flags a figure-less NARRATIVE', () => {
+    expect(measureDocument(doc(thin), 0.85, 'narrative').warnings.join(' ')).toMatch(/No figures/);
+  });
+
+  it('does NOT flag figures or emphasis on a form or a cost volume', () => {
+    for (const t of ['form', 'cost']) {
+      const w = measureDocument(doc(thin), 0.85, t).warnings.join(' ');
+      expect(w, t).not.toMatch(/No figures/);
+      expect(w, t).not.toMatch(/No inline emphasis/);
+    }
+  });
+
+  it('does not ask a spreadsheet for a running header', () => {
+    const w = measureDocument(doc(thin, { format: 'spreadsheet', header: null, footer: null }), 0.85, 'cost')
+      .warnings.join(' ');
+    expect(w).not.toMatch(/running header/);
+    expect(w).not.toMatch(/No footer/);
+  });
+
+  it('still reports a caption gap on ANY type that has figures', () => {
+    const withChart = [costWaterfallChart({ labor: 1, fringe: 1, overhead: 1, ga: 1 })];
+    // measured WITHOUT running numberFigures, so the caption is genuinely missing
+    expect(measureDocument(doc(withChart), 0.85, 'form').warnings.join(' '))
+      .toMatch(/1 figure\(s\) but only 0 caption\(s\)/);
+  });
+
+  it('defaults to the strictest reading when the type is unknown', () => {
+    expect(measureDocument(doc(thin)).warnings.join(' ')).toMatch(/No figures/);
+  });
+});

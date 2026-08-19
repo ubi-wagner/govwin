@@ -328,7 +328,7 @@ export async function computeSubmissionReadiness(
     // builder decides whether an under-filled volume is deliberate; the system's job is to make
     // sure they are never surprised by it at submission.
     if (!isSlide) {
-      for (const w of measureDocument(doc).warnings) {
+      for (const w of measureDocument(doc, 0.85, meta?.artifactType ?? 'narrative').warnings) {
         blockers.push({ category: 'underfilled', severity: 'warning', message: `"${name}": ${w}` });
       }
     }
