@@ -16,6 +16,12 @@ const InputSchema = z.object({
   required: z.boolean().optional(),
   pageLimit: z.number().int().min(0).max(10000).nullable().optional(),
   slideLimit: z.number().int().min(0).max(1000).nullable().optional(),
+  // Character cap for an item the agency measures in characters rather than pages (a cover-sheet
+  // abstract, a project summary) — its form field truncates at the cap. null clears it.
+  characterLimit: z.number().int().min(0).max(100000).nullable().optional(),
+  // DSIP-ONLY: completed in the agency's submission portal, so provision tracks it as a checklist
+  // entry and stands up no authoring artifact for it. See volume.add_required_item.
+  dsipOnly: z.boolean().optional(),
   fontFamily: z.string().max(100).nullable().optional(),
   fontSize: z.string().max(20).nullable().optional(),
   margins: z.string().max(100).nullable().optional(),
@@ -71,6 +77,11 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
                           THEN ${input.pageLimit ?? null} ELSE page_limit END,
         slide_limit = CASE WHEN ${input.slideLimit !== undefined}
                            THEN ${input.slideLimit ?? null} ELSE slide_limit END,
+        character_limit = CASE WHEN ${input.characterLimit !== undefined}
+                               THEN ${input.characterLimit ?? null} ELSE character_limit END,
+        metadata = CASE WHEN ${input.dsipOnly !== undefined}
+                        THEN jsonb_set(coalesce(metadata, '{}'::jsonb), '{dsipOnly}', ${input.dsipOnly === true}::text::jsonb)
+                        ELSE metadata END,
         font_family = CASE WHEN ${input.fontFamily !== undefined}
                            THEN ${input.fontFamily ?? null} ELSE font_family END,
         font_size = CASE WHEN ${input.fontSize !== undefined}

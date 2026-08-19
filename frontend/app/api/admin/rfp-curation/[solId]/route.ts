@@ -97,6 +97,10 @@ export async function GET(
         sql`
           SELECT v.id, v.volume_number, v.volume_name, v.volume_format,
                  v.description, v.special_requirements,
+                 -- dsipOnly: this volume is completed inside the agency's submission portal, so
+                 -- provision stands up no authoring artifact for it. The workspace has to SHOW it
+                 -- or a curator cannot tell a tracked-only volume from one nobody has built yet.
+                 coalesce((v.metadata->>'dsipOnly')::boolean, false) AS dsip_only,
                  json_agg(
                    json_build_object(
                      'id', ri.id,
@@ -105,7 +109,14 @@ export async function GET(
                      'itemType', ri.item_type,
                      'required', ri.required,
                      'pageLimit', ri.page_limit,
-                     'slideLimit', ri.slide_limit
+                     'slideLimit', ri.slide_limit,
+                     -- The character cap and the per-item DSIP-only flag are as load-bearing as
+                     -- the page limit — they decide whether an item is authored at all and what
+                     -- the compliance floor measures it against — so they belong in the read model.
+                     'characterLimit', ri.character_limit,
+                     'dsipOnly', coalesce((ri.metadata->>'dsipOnly')::boolean, false),
+                     'templateId', ri.template_id,
+                     'expertNotes', ri.expert_notes
                    ) ORDER BY ri.item_number ASC
                  ) FILTER (WHERE ri.id IS NOT NULL) AS required_items
           FROM solicitation_volumes v
