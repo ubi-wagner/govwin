@@ -286,12 +286,13 @@ async function resolveVolumes(
     customFields: unknown;
     templateId: string | null;
     expertNotes: string | null;
+    metadata: Record<string, unknown> | null;
   }[]>`
     SELECT volume_id, item_number, item_name, item_type, required,
            page_limit, slide_limit, character_limit, font_family, font_size, min_font_size, margins,
            line_spacing, header_format, footer_format,
            required_sections, format_rules, custom_fields,
-           template_id, expert_notes
+           template_id, expert_notes, metadata
     FROM volume_required_items
     WHERE volume_id = ANY(${volumeIds})
     ORDER BY item_number ASC
@@ -314,7 +315,7 @@ async function resolveVolumes(
     // the flag lets provision list it as a submission checklist item instead of standing up an
     // authoring artifact nobody can fill, which would then block readiness forever.
     dsipOnly: (vol.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
-    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null }) => ({
+    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null; metadata?: Record<string, unknown> | null }) => ({
       itemNumber: item.itemNumber,
       itemName: item.itemName,
       itemType: item.itemType,
@@ -322,6 +323,11 @@ async function resolveVolumes(
       pageLimit: item.pageLimit,
       slideLimit: item.slideLimit,
       characterLimit: item.characterLimit,
+      // Per-ITEM DSIP-only, the finer grain of the volume flag above: a volume can MIX the two.
+      // The DoW Volume 1 is a DSIP cover-sheet webform PLUS two authored narrative documents —
+      // flagging the whole volume would drop the narratives, flagging none would stand up an
+      // authoring artifact for a webform that can never be filled here.
+      dsipOnly: (item.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
       fontFamily: item.fontFamily,
       fontSize: item.fontSize,
       minFontSize: item.minFontSize,

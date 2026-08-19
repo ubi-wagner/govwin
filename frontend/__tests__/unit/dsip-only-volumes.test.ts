@@ -16,10 +16,14 @@ import { describe, it, expect } from 'vitest';
  * live provision drive).
  */
 
-type Vol = { volumeNumber: number; volumeName: string; dsipOnly?: boolean; items: unknown[] };
+type Item = { name?: string; dsipOnly?: boolean };
+type Vol = { volumeNumber: number; volumeName: string; dsipOnly?: boolean; items: Item[] };
 
-/** The rule provision applies in all three of its volume loops. */
-const isAuthored = (v: Vol) => v.dsipOnly !== true;
+/** The rule provision applies in all three of its volume loops (lib/provision-proposal.ts). */
+const isAuthoredItem = (i: Item) => i.dsipOnly !== true;
+const authoredItems = (v: Vol) => (v.items ?? []).filter(isAuthoredItem);
+const isAuthored = (v: Vol) =>
+  v.dsipOnly !== true && !((v.items ?? []).length > 0 && authoredItems(v).length === 0);
 
 // The real OSW26BZ04-DP013 seven-volume set.
 const T3CP: Vol[] = [
@@ -56,6 +60,36 @@ describe('DSIP-only volumes are tracked, not authored', () => {
   it('still authors a zero-item volume that is NOT DSIP-only (the placeholder rule survives)', () => {
     const orphanRequired: Vol = { volumeNumber: 8, volumeName: 'Appendix', items: [] };
     expect(orphanRequired.items.length === 0 && isAuthored(orphanRequired)).toBe(true);
+  });
+
+  it('authors the narrative items of a MIXED volume and skips the webform beside them', () => {
+    // The real DoW Volume 1: a DSIP cover-sheet webform (never authored here) sitting alongside
+    // two authored, character-capped narrative documents. Flagging the whole volume would drop
+    // the narratives; flagging nothing would stand up an authoring artifact for a webform.
+    const v1: Vol = {
+      volumeNumber: 1, volumeName: 'Proposal Cover Sheet',
+      items: [
+        { name: 'Proposal Cover Sheet (DSIP webform)', dsipOnly: true },
+        { name: 'Project Summary / Technical Abstract' },
+        { name: 'Anticipated Benefits and Potential Commercial Applications' },
+      ],
+    };
+    expect(isAuthored(v1)).toBe(true);
+    expect(authoredItems(v1).map((i) => i.name)).toEqual([
+      'Project Summary / Technical Abstract',
+      'Anticipated Benefits and Potential Commercial Applications',
+    ]);
+  });
+
+  it('does not author a volume whose items are ALL DSIP-only', () => {
+    // Otherwise it gets an artifact with no sections — and the zero-item placeholder rule does
+    // not fire (items.length > 0), so the volume is invisible to readiness and the zip: the exact
+    // "submission-ready with a whole volume missing" bug the placeholder rule was added to fix.
+    const allForms: Vol = {
+      volumeNumber: 6, volumeName: 'Fraud, Waste and Abuse Training',
+      items: [{ dsipOnly: true }, { dsipOnly: true }],
+    };
+    expect(isAuthored(allForms)).toBe(false);
   });
 
   it('treats an absent flag as authored — opt-in only, never inferred from the name', () => {

@@ -84,13 +84,32 @@ export async function provisionProposalForPortal(opts: {
     console.error('[provision-proposal] compliance resolution DEGRADED for', opportunityId, '— refusing to provision a default skeleton');
     return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
   }
+  /**
+   * The AUTHORED set — the one rule every provision loop below applies, so they can never
+   * disagree about which volumes and items get an artifact, a section and a matrix row.
+   *
+   * DSIP-only work is completed inside the agency's submission portal (a webform, a report pulled
+   * from SBIR.gov, training taken there), so the company authors no document for it here. It is
+   * flagged at either grain: a whole VOLUME (the CCR, FWA training, Foreign Affiliations) or a
+   * single ITEM inside an otherwise authored volume (the DoW Volume 1 cover-sheet webform, which
+   * sits beside two authored narrative documents). A volume whose items are ALL DSIP-only is
+   * therefore not authored either — giving it an artifact with no sections would recreate the
+   * invisible no-op volume the placeholder rule below exists to prevent.
+   */
+  const isAuthoredItem = (item: Record<string, unknown>) => (item as { dsipOnly?: boolean }).dsipOnly !== true;
+  const authoredItems = (vol: Record<string, unknown>): Array<Record<string, unknown>> =>
+    ((vol.items as Array<Record<string, unknown>>) ?? []).filter(isAuthoredItem);
+  const isAuthoredVolume = (vol: Record<string, unknown>) =>
+    (vol as { dsipOnly?: boolean }).dsipOnly !== true
+    && !(((vol.items as unknown[]) ?? []).length > 0 && authoredItems(vol).length === 0);
+
   const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
     // DSIP-only volumes contribute no authored items — they are completed in the agency portal and
     // tracked as compliance-matrix checklist entries, not built here.
-    if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
-    for (const item of vol.items) {
+    if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
+    for (const item of authoredItems(vol as unknown as Record<string, unknown>)) {
       gi++;
       requiredItems.push({
         itemNumber: gi, itemName: item.itemName as string, itemType: item.itemType as string,
@@ -151,7 +170,7 @@ export async function provisionProposalForPortal(opts: {
           // standing up an artifact + empty sections for one creates work that can never be done and
           // a readiness blocker that can never clear. The requirement still reaches the customer as a
           // compliance-matrix checklist item — it is tracked, just not authored.
-          if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
+          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
           // Map the volume to its artifact_type (CHECK: narrative|cost|form|matrix|other). Cost/budget
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
@@ -312,12 +331,11 @@ export async function provisionProposalForPortal(opts: {
         // volume missing. Give every such volume a placeholder section + matrix row so it must be
         // authored + locked like any other.
         for (const vol of resolved.volumes) {
-          const items = (vol.items as Array<Record<string, unknown>>) ?? [];
-          if (items.length > 0) continue;
+          if (authoredItems(vol as unknown as Record<string, unknown>).length > 0) continue;
           // …but NOT for a DSIP-only volume. It has no artifact (skipped above), so a placeholder
           // here would be an orphan section that can never be authored or locked — the exact
           // permanent readiness blocker this whole flag exists to prevent.
-          if ((vol as { dsipOnly?: boolean }).dsipOnly === true) continue;
+          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
           const artifactId = artifactByVolKey.get(volKey(volNum, volName)) ?? null;

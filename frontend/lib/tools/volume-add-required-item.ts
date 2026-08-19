@@ -22,6 +22,16 @@ const InputSchema = z.object({
   required: z.boolean().default(true),
   pageLimit: z.number().int().min(1).max(10000).optional(),
   slideLimit: z.number().int().min(1).max(1000).optional(),
+  // Character cap, for an item the agency measures in characters rather than pages (an SBIR
+  // cover-sheet abstract, an NSF project summary). The agency's form field truncates at the cap.
+  characterLimit: z.number().int().min(1).max(100000).optional(),
+  // DSIP-ONLY: this item is completed inside the agency's submission portal — a webform, a
+  // report pulled from SBIR.gov, training taken there. The company never authors a document for
+  // it, so provision must track it as a checklist entry and NOT stand up an authoring artifact
+  // that can never be filled (which would block submission readiness forever). Set per ITEM
+  // because a volume can mix the two: the DoW Volume 1 is a DSIP cover-sheet webform PLUS two
+  // authored narrative documents.
+  dsipOnly: z.boolean().optional(),
   fontFamily: z.string().max(100).optional(),
   fontSize: z.string().max(20).optional(),
   margins: z.string().max(100).optional(),
@@ -85,9 +95,9 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
       rows = await sql<{ id: string }[]>`
         INSERT INTO volume_required_items
           (volume_id, item_number, item_name, item_type, required,
-           page_limit, slide_limit, font_family, font_size, margins,
+           page_limit, slide_limit, character_limit, font_family, font_size, margins,
            line_spacing, header_format, footer_format, applies_to_phase,
-           template_id, expert_notes)
+           template_id, expert_notes, metadata)
         VALUES
           (${input.volumeId}::uuid,
            ${input.itemNumber},
@@ -96,6 +106,7 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
            ${input.required},
            ${input.pageLimit ?? null},
            ${input.slideLimit ?? null},
+           ${input.characterLimit ?? null},
            ${input.fontFamily ?? null},
            ${input.fontSize ?? null},
            ${input.margins ?? null},
@@ -104,7 +115,8 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
            ${input.footerFormat ?? null},
            ${input.appliesToPhase ?? null}::text[],
            ${input.templateId ?? null}::uuid,
-           ${input.expertNotes ?? null})
+           ${input.expertNotes ?? null},
+           ${sql.json(input.dsipOnly === true ? { dsipOnly: true } : {})})
         RETURNING id
       `;
     } catch (err) {
