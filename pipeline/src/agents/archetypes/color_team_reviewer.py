@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import uuid
 
 from .base import BaseArchetype
@@ -298,17 +299,33 @@ Then provide your review in this structure:
             logger.warning("get_compliance_matrix failed: %s", e)
             return {"error": str(e)}
 
+    #: The score the review DECLARES, read off its own "Overall Score" line.
+    _SCORE_LINE = re.compile(
+        r"overall\s+score\s*[:\-]?\s*\**\s*"
+        r"(outstanding|good|acceptable|marginal|unacceptable)",
+        re.I,
+    )
+    _VERDICT = {
+        "outstanding": "Review: Outstanding — proposal exceeds requirements",
+        "good": "Review: Good — proposal meets requirements with strengths",
+        "acceptable": "Review: Acceptable — meets minimum requirements",
+        "marginal": "Review: Marginal — significant weaknesses identified",
+        "unacceptable": "Review: Unacceptable — major deficiencies found",
+    }
+
     def summarize_result(self, result: dict) -> str:
-        """Summarize the review result for memory storage."""
-        text = result.get("text", "")
-        if "Outstanding" in text:
-            return "Review: Outstanding — proposal exceeds requirements"
-        elif "Good" in text:
-            return "Review: Good — proposal meets requirements with strengths"
-        elif "Acceptable" in text:
-            return "Review: Acceptable — meets minimum requirements"
-        elif "Marginal" in text:
-            return "Review: Marginal — significant weaknesses identified"
-        elif "Unacceptable" in text:
-            return "Review: Unacceptable — major deficiencies found"
+        """One-line verdict for MEMORY storage. The full review is what reaches the builder as a
+        section comment — see fabric._post_section_recommendation.
+
+        Read the score the review DECLARES rather than scanning the whole document for the first
+        ladder word in order. The old scan matched anywhere: a Marginal review that wrote "no good
+        evidence of transition" was recorded as "Good", and an Unacceptable one mentioning an
+        "outstanding action item" as "Outstanding" — the ladder ran best-first, so the worse the
+        review, the more prose it contained, and the more likely a stray word outranked its own
+        verdict.
+        """
+        text = result.get("text", "") or ""
+        m = self._SCORE_LINE.search(text)
+        if m:
+            return self._VERDICT[m.group(1).lower()]
         return f"Review completed: {text[:150]}"

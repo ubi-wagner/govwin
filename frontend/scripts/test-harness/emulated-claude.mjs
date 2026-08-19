@@ -238,6 +238,106 @@ const RESPONDERS = [
       return textMsg(req.model, JSON.stringify(arr)); // the route JSON.parses the text block directly
     },
   },
+  // color_team_reviewer (pipeline, via the advance/ai-review agent_task_queue) — an ADVERSARIAL
+  // review returned as prose in the structure the archetype asks for. It runs a tool loop first
+  // (get_eval_criteria, get_compliance_matrix), so the responder answers the tool call once and
+  // then writes the review.
+  //
+  // The findings are DERIVED FROM THE SECTION, not invented: the disqualifier audit is a real scan
+  // for the things the archetype names — bracketed template residue, unnamed key personnel,
+  // boilerplate with no specific number or name — because those are exactly what a page drafted
+  // from a thin library actually contains. A review that always said "looks good" would make the
+  // loop prove nothing about the build.
+  {
+    name: 'color_team_reviewer',
+    match: (req) => /color team review/i.test(systemText(req)),
+    respond: (req) => {
+      // Walk the archetype's own tools once before writing, in the order its prompt names them
+      // ("First, use get_eval_criteria and get_compliance_matrix…"). Same pattern as the pipeline
+      // drafter: count the tool_result blocks already in the conversation to know where we are.
+      const tools = req.tools || [];
+      const answered = (req.messages || [])
+        .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+        .filter((b) => b?.type === 'tool_result').length;
+      if (answered < tools.length) {
+        const order = ['get_eval_criteria', 'get_compliance_matrix'];
+        const ranked = [...tools].sort((a, b) => {
+          const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+        });
+        const next = ranked[answered];
+        if (next) return toolUseMsg(req.model, next.name, genericToolInput(next, req));
+      }
+
+      // `between` reads XML-ish <tag> pairs; the archetype fences the section with the canonical
+      // "--- BEGIN/END USER CONTENT ---" markers instead, so extract those directly. Falling back
+      // to the whole request was quoting the SYSTEM PROMPT back as the section's opening line.
+      const text = reqText(req);
+      const fenced = text.match(/---\s*BEGIN USER CONTENT\s*---([\s\S]*?)---\s*END USER CONTENT\s*---/);
+      const section = (fenced ? fenced[1] : '').trim();
+      // The archetype writes the title on its own line as `Section: <title>` (color_team_reviewer
+      // build_messages). Read that first; the quoted forms are fallbacks for other callers.
+      const title = (text.match(/^\s*Section:\s*(.+)$/mi)?.[1]
+        ?? text.match(/Review the "([^"]{2,120})" section/i)?.[1]
+        ?? 'this section').replace(/\s+/g, ' ').trim().slice(0, 90);
+      // No fenced section means the request is not a section review — say so rather than reviewing
+      // the prompt.
+      if (!section) return textMsg(req.model, 'No section content was provided to review.');
+
+      // (A) placeholder / template residue
+      const placeholders = [...new Set(
+        (section.match(/\[[^\]\n]{2,60}\]|\{[^}\n]{2,60}\}|\bTBD\b|\bTODO\b/gi) || []).map((m) => m.trim()),
+      )].slice(0, 6);
+      // (B) unnamed key personnel — a role word with no capitalised name anywhere near it
+      const ROLE = /\b(Principal Investigator|Senior Engineer|Research Scientist|Program Manager|Co-Investigator)\b/g;
+      const roleHits = section.match(ROLE) || [];
+      // Look for a PERSON name with the role titles removed first — "Senior Engineer" and
+      // "Research Scientist" both match a naive two-capitalised-words pattern, so leaving them in
+      // made every unnamed-personnel section look properly staffed.
+      const named = /\b[A-Z][a-z]+\s+(?:[A-Z]\.\s+)?[A-Z][a-z]+\b/.test(section.replace(ROLE, ''));
+      const unnamed = roleHits.length > 0 && !named ? [...new Set(roleHits)].slice(0, 4) : [];
+      // (C) specificity — a section with no number, no proper noun, is boilerplate
+      const hasNumbers = /\d/.test(section);
+      const proper = (section.match(/\b[A-Z]{2,}\b|\b[A-Z][a-z]+[A-Z]\w*/g) || []).length;
+
+      const disq = [];
+      if (placeholders.length) disq.push(`A. PLACEHOLDER — template residue still present: ${placeholders.map((p) => `"${p}"`).join(', ')}.`);
+      else disq.push('A. PLACEHOLDER — none found.');
+      if (unnamed.length) disq.push(`B. UNNAMED KEY PERSONNEL — ${unnamed.join(', ')} referenced by role with no named individual.`);
+      else disq.push('B. UNNAMED KEY PERSONNEL — none found.');
+      if (!hasNumbers || proper < 2) disq.push('C. FORMAT/SPECIFICITY — the text carries no quantified claim or named entity; it would read as boilerplate to an evaluator.');
+      else disq.push('C. FORMAT/SPECIFICITY — none found.');
+
+      const capped = placeholders.length || unnamed.length || !hasNumbers || proper < 2;
+      const score = capped ? 'Marginal' : (section.length > 2500 ? 'Good' : 'Acceptable');
+      const compliance = capped ? 'partially compliant' : 'compliant';
+
+      const words = section.split(/\s+/).filter(Boolean).length;
+      const firstSentence = (section.split(/(?<=[.!?])\s/)[0] || '').slice(0, 160);
+
+      return textMsg(req.model, [
+        `0. DISQUALIFIER AUDIT`,
+        ...disq.map((d) => `   ${d}`),
+        ``,
+        `1. Overall Score: ${score}`,
+        `2. Compliance Status: ${compliance} — the section is present and addresses its heading; ${words} words against the allotted budget.`,
+        `3. Strengths`,
+        `   • Opens on the requirement rather than on the company: "${firstSentence}"`,
+        hasNumbers ? `   • Carries quantified claims an evaluator can check.` : `   • (No quantified claim to cite.)`,
+        `4. Weaknesses`,
+        capped
+          ? `   • The disqualifier hits above must be cleared before this section is scored; each one is something an evaluator reads as an unfinished proposal.`
+          : `   • Tighten the transition into the evaluation criteria; the argument is present but the evaluator has to assemble it.`,
+        `   • ${title}: state the benefit to the government in the first two sentences, not the mechanism.`,
+        `5. Risks`,
+        capped ? `   • Placeholder or unnamed-personnel content is a scoring cap, and in a strict review a rejection without evaluation.`
+               : `   • Low: no disqualifying content detected in this section.`,
+        `6. Priority Recommendations`,
+        capped ? `   1. Replace every bracketed placeholder and name every key person.` : `   1. Lead each subsection with the government benefit.`,
+        `   2. Add one measurable commitment per claim.`,
+      ].join('\n'));
+    },
+  },
   // section_drafter (frontend proposal.draft_section tool) — the tool sends a system prompt
   // beginning "You are a senior government proposal writer" and JSON.parses the text block as a
   // CanvasNode[] array ([{type, content}], no fences).
