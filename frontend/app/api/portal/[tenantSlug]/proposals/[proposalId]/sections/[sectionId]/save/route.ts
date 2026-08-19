@@ -81,6 +81,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'content must be an object', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // 2c. Content size limit
+    if (JSON.stringify(body.content).length > 2_000_000) {
+      return NextResponse.json({ error: 'Content too large', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
+    }
+
     // The payload must actually BE a CanvasDocument. Checking only `typeof === 'object'` let any
     // object through, and the nearest wrong one is easy to send by accident: the canvas RULES
     // object (width/height/margins/font_default…), which the document route returns as
@@ -103,11 +108,6 @@ export async function PUT(request: Request, ctx: RouteContext) {
         },
         { status: 400 },
       );
-    }
-
-    // 2c. Content size limit
-    if (JSON.stringify(body.content).length > 2_000_000) {
-      return NextResponse.json({ error: 'Content too large', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
     }
 
     const newStatus = typeof body.status === 'string' &&
