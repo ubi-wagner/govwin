@@ -162,10 +162,28 @@ test('spine · build-out → push → comp purchase → release → the buyer ge
     expect(s!.characterAllocation, `${title} must carry its 3,000-character cap`).toBe(3000);
   }
 
-  // Every authored section was seeded from its master mold rather than left blank.
-  const seeded = sections.filter((s) => s.contentSource === 'template').length;
-  console.log(`[spine] ${seeded}/${sections.length} sections seeded from a master mold`);
-  expect(seeded, 'the molds must reach the buyer').toBeGreaterThan(0);
+  // No authored section arrives BLANK — each carries content the moment the buyer opens it.
+  //
+  // Asserted as "not blank" rather than "contentSource === 'template'" because with the pipeline
+  // worker running, provision's own OnProposalCreated drafts the build within seconds and flips
+  // content_source from 'template' to 'ai_draft'. That is correct product behaviour, and a drive
+  // that asserted the transient value was racing it — reporting 0/20 seeded on a build whose molds
+  // had in fact all been delivered and then drafted over.
+  const blank = sections.filter((s) => !s.contentSource || s.contentSource === 'empty');
+  console.log('[spine] content source:', JSON.stringify(
+    sections.reduce<Record<string, number>>((a, s) => {
+      const k = s.contentSource ?? 'none'; a[k] = (a[k] ?? 0) + 1; return a;
+    }, {})));
+  expect(blank.map((s) => s.title), 'no authored section may arrive blank').toEqual([]);
+
+  // …and the master really does carry a mold for every item it should, which is the durable fact
+  // the transient content_source was standing in for.
+  const gate = await admin.request.get(`/api/admin/rfp-curation/${SOL}/ingest-phase`);
+  expect(gate.ok()).toBeTruthy();
+  const molds = (await gate.json()).data?.molds as { itemsToMold: number; itemsWithMold: number };
+  console.log(`[spine] master molds: ${molds.itemsWithMold}/${molds.itemsToMold}`);
+  expect(molds.itemsWithMold, 'every moldable item on the master must carry a mold').toBe(molds.itemsToMold);
+  expect(molds.itemsToMold).toBeGreaterThan(0);
 
   await adminCtx.close();
   await buyerCtx.close();
