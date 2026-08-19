@@ -23,6 +23,7 @@ import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveCostForm, buildCostVolume } from '@/lib/proposal/cost-forms';
+import { pickCostWorkbookItems } from '@/lib/proposal/cost-workbook-item';
 import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -192,24 +193,13 @@ export async function provisionProposalForPortal(opts: {
           artifactByVolKey.set(volKey(volNum, volName), art.id);
           artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
         }
-        // Choose which item in each COST volume receives the computed workbook: prefer a data-bearing
-        // item (spreadsheet/cost type, or a name like spreadsheet/workbook/budget/pricing) over a prose
-        // sibling ("Basis of Estimate", "Cost Narrative"), so the workbook never lands on a prose item
-        // while the real data item is left empty. One workbook per cost volume.
-        const PROSE_ITEM = /narrative|justification|explanation|rationale|basis of estimate|\bboe\b|assumption/i;
-        const DATA_ITEM_TYPES = new Set(['spreadsheet', 'cost', 'cost_volume', 'budget']);
-        const DATA_ITEM_NAME = /spreadsheet|workbook|\btable\b|budget|pricing|cost\s*(?:volume|proposal|sheet)/i;
-        const isDataItem = (it: { itemType: string; itemName: string }) =>
-          DATA_ITEM_TYPES.has((it.itemType ?? '').toLowerCase()) || DATA_ITEM_NAME.test(it.itemName ?? '');
-        const costWorkbookItem = new Map<string, number>(); // volKey → chosen itemNumber
-        for (const it of requiredItems) {
-          const vkey = volKey(it.volumeNumber, it.volumeName);
-          if (artifactTypeByVolKey.get(vkey) !== 'cost' || PROSE_ITEM.test(it.itemName ?? '')) continue;
-          const cur = costWorkbookItem.get(vkey);
-          if (cur == null) { costWorkbookItem.set(vkey, it.itemNumber); continue; }
-          const curItem = requiredItems.find((r) => r.itemNumber === cur);
-          if (isDataItem(it) && !(curItem && isDataItem(curItem))) costWorkbookItem.set(vkey, it.itemNumber);
-        }
+        // Which item in each COST volume receives the computed workbook. The rule lives in
+        // lib/proposal/cost-workbook-item so the MOLD BUILDER can use the same one to decide what
+        // not to mold — when the two disagreed, a mold displaced the computed workbook entirely.
+        const costWorkbookItem = pickCostWorkbookItems(
+          requiredItems,
+          (vkey) => artifactTypeByVolKey.get(vkey) === 'cost',
+        );
         // OTF / state-grant budget caps (used by the otf_state_budget cost form), from the preset's
         // custom variables. Absent → the form's own defaults apply.
         const cvars = ((resolved.compliance as Record<string, unknown>)?.customVariables ?? {}) as Record<string, unknown>;

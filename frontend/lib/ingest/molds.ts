@@ -32,6 +32,7 @@ import { sql, sqlBypass } from '@/lib/db';
 import type { JSONValue } from 'postgres';
 import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
+import { pickCostWorkbookItems, volKeyOf } from '@/lib/proposal/cost-workbook-item';
 
 export type OutlineSource = 'agent' | 'matrix';
 
@@ -241,10 +242,43 @@ export interface MoldsStatus {
  * What the molds gate can honestly claim. `itemsWithMold === 0` is the state that used to render
  * as a finished phase; the panel now has the number to say otherwise.
  */
+/**
+ * The items that a mold is FOR: authored (not DSIP-only) and not the computed cost workbook.
+ *
+ * Both the gate (`moldsStatus`) and the builder read this. If the gate counted an item the builder
+ * skips, the molds phase could never reach complete; if the builder molded an item the gate did
+ * not count, a mold would appear from nowhere. The computed cost item is excluded because its
+ * content comes from the burden engine at provision — see lib/proposal/cost-workbook-item.
+ */
+function moldableItems(volumes: VolRow[], items: ItemRow[]): ItemRow[] {
+  const volById = new Map(volumes.map((v) => [v.id, v]));
+  const authored = items.filter((i) => {
+    const v = volById.get(i.volumeId);
+    return v && !v.dsipOnly && !i.dsipOnly;
+  });
+  const costVolKeys = new Set(
+    volumes.filter((v) => inferTemplateType(v.volumeName, '') === 'cost_volume')
+      .map((v) => volKeyOf(v.volumeNumber, v.volumeName)),
+  );
+  const computedCost = pickCostWorkbookItems(
+    authored.map((it) => {
+      const v = volById.get(it.volumeId);
+      return {
+        itemNumber: it.itemNumber, itemName: it.itemName, itemType: it.itemType,
+        volumeNumber: v?.volumeNumber ?? null, volumeName: v?.volumeName ?? null,
+      };
+    }),
+    (k) => costVolKeys.has(k),
+  );
+  return authored.filter((i) => {
+    const v = volById.get(i.volumeId)!;
+    return computedCost.get(volKeyOf(v.volumeNumber, v.volumeName)) !== i.itemNumber;
+  });
+}
+
 export async function moldsStatus(solId: string): Promise<MoldsStatus> {
   const { volumes, items } = await loadStructure(solId);
-  const authoredVols = new Set(volumes.filter((v) => !v.dsipOnly).map((v) => v.id));
-  const toMold = items.filter((i) => authoredVols.has(i.volumeId) && !i.dsipOnly);
+  const toMold = moldableItems(volumes, items);
   const staged = await getStagedOutline(solId);
   return {
     itemsToMold: toMold.length,
@@ -323,6 +357,12 @@ export interface BuildMoldsResult {
   built: number;
   skipped: number;
   linked: number;
+  /**
+   * Molds this builder previously made that it has now REMOVED from an item, because that item
+   * turned out not to be moldable (today: the cost item whose workbook the burden engine computes).
+   * Reported rather than silent — an admin who sees a mold disappear deserves to know it did.
+   */
+  unlinked?: number;
   molds: Array<{ itemId: string; itemName: string; templateId: string; nodes: number }>;
 }
 
@@ -366,9 +406,35 @@ export async function buildMolds(
 
   const out: BuildMoldsResult = { built: 0, skipped: 0, linked: 0, molds: [] };
 
+  // Exactly the set the gate counts — authored, and not the item whose cost workbook the burden
+  // engine computes at provision. Anything outside it is skipped, and the difference is reported.
+  const moldable = new Set(moldableItems(volumes, items).map((i) => i.id));
+
+  // RECONCILE, don't only add. A solicitation molded before the computed-cost item was excluded
+  // still carries that link, and provisioning reads a cost-typed mold as a deliberate override —
+  // so the workbook stays displaced forever unless the builder undoes its own mistake. Only molds
+  // THIS builder made are unlinked: they carry `metadata.itemId` naming the item they were built
+  // for. An admin's hand-authored override has no such marker and is left exactly as it is.
+  for (const item of items) {
+    if (moldable.has(item.id) || !item.templateId) continue;
+    const [own] = await sqlBypass<Array<{ id: string }>>`
+      SELECT id FROM document_templates
+      WHERE id = ${item.templateId}::uuid
+        AND is_system = true
+        AND tenant_id IS NULL
+        AND metadata->>'itemId' = ${item.id}
+      LIMIT 1`;
+    if (!own) continue; // not ours to undo
+    await sqlBypass`
+      UPDATE volume_required_items SET template_id = NULL, updated_at = now()
+      WHERE id = ${item.id}::uuid AND template_id = ${item.templateId}::uuid`;
+    out.unlinked = (out.unlinked ?? 0) + 1;
+  }
+
   for (const item of items) {
     const vol = volById.get(item.volumeId);
-    if (!vol || vol.dsipOnly || item.dsipOnly) { out.skipped++; continue; }
+    if (!moldable.has(item.id)) { out.skipped++; continue; }
+    if (!vol) { out.skipped++; continue; }
     if (item.templateId) { out.skipped++; continue; }
 
     const planned = sectionByName.get(item.itemName.toLowerCase());
