@@ -599,6 +599,21 @@ authed request bounces back to `/login?from=…`. `localhost` resolves to `127.0
 on `127.0.0.1` + browsing `localhost` is correct and consistent.
 
 **GOTCHAS learned the hard way (save yourself the time):**
+- **The sandbox needs `STORAGE_DRIVER=local`.** Without it the compliance and package routes
+  return 500 on `[storage/s3-client] AWS_S3_BUCKET (or AWS_S3_BUCKET_NAME) is required in
+  production` — the storage client's own documented local driver, not a product defect. Add
+  `STORAGE_DRIVER=local LOCAL_STORAGE_DIR=<scratch>/storage` to the standalone server's env.
+- **`AUTH_TRUST_HOST=true` or every login 500s** with `UntrustedHost: Host must be trusted`
+  behind the standalone server. The symptom is a drive script getting 401 on every request while
+  `/login` itself answers 200.
+- **The Python worker runs as the OWNER, not `govtech_app`.** docs/RLS_CUTOVER.md is explicit
+  ("pipeline = owner"); it is the cross-tenant engine, so one connection cannot carry one tenant's
+  context. `rfp_agent` is the deploy-gated NOBYPASSRLS pool the AGENT FABRIC uses per invocation,
+  and `fabric.py` sets `app.tenant_id` on it. Start the worker with `govtech_app` and every
+  workflow dies on "new row violates row-level security policy for process_instances".
+- **Kill the worker by port too.** It binds :8080 for its health server; `pkill -f src/main.py`
+  can leave one alive holding the port, and the replacement exits on `Errno 98` — the same
+  stale-process trap as the frontend, with the same symptom of code changes appearing not to work.
 - **⚠️ KILL THE SERVER BY PORT, NOT BY NAME.** Next renames its process to `next-server (v…)`,
   so `pkill -f "standalone/server.js"` and `pkill -f "node server.js"` match NOTHING — including
   from inside `sandbox-heartbeat.sh`. The old process keeps serving its now-DELETED build from
