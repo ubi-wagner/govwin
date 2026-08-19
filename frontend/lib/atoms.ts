@@ -18,6 +18,7 @@ import type { CanvasNode } from '@/lib/types/canvas-document';
 import { cleanText, cleanNodes } from '@/lib/clean-text';
 import { upsertAtomEmbedding, atomEmbedText } from '@/lib/atom-embed';
 import { embeddingsEnabled, activeEmbedModel, embedOne, toVectorLiteral, isUsableVector } from '@/lib/embeddings';
+import { isCorpusVerbatim } from '@/lib/library/corpus-verbatim';
 
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
 export { atomSize, type AtomSize };
@@ -202,6 +203,20 @@ export async function createAtom(
   try {
     await upsertAtomEmbedding(tenantId, result.atomId, atomEmbedText({ title: input.title, summary: input.summary, content: input.content }));
   } catch { /* non-fatal — the atom exists without a vector; selectForSection degrades to tags */ }
+
+  // Whose words are these? (LIB-HYGIENE) Atomizing a solicitation package fills the library with
+  // the AGENCY's instruction boilerplate, and retrieval would happily draft with it. Text that
+  // appears verbatim in the shared solicitation corpus was not written by this tenant, so it is
+  // marked non-retrievable — still in the library, still insertable by hand, just not something
+  // the drafter reaches for on its own. Same post-commit, best-effort shape as the embedding: a
+  // corpus check that cannot run must never fail an upload, and unknown means "keep it".
+  try {
+    if (await isCorpusVerbatim(input.content)) {
+      await withTenant(tenantId, async (tx) => {
+        await tx`UPDATE library_atoms SET corpus_verbatim = true WHERE id = ${result.atomId}::uuid`;
+      });
+    }
+  } catch { /* non-fatal — the atom stays retrievable, which is the pre-existing behaviour */ }
   return result;
 }
 
@@ -441,9 +456,14 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
             -- low because it IS low-relevance, which is the honest mechanism.
             --
             -- The residual — agency form text sitting in a tenant's library at all — is LIBRARY
-            -- HYGIENE, not ranking. The principled fix is to recognise it as the agency's writing
-            -- rather than the offeror's (that text appears verbatim in the shared solicitation
-            -- corpus), not a keyword list. Logged as the follow-up.
+            -- HYGIENE, not ranking, and this is that fix (mig 197). corpus_verbatim is stamped at
+            -- creation when the atom's text appears VERBATIM in the shared solicitation corpus:
+            -- the agency wrote it, not the offeror. It reads the TEXT, not the folder, so unlike
+            -- the reverted fence it cannot mis-classify a tenant's own writing wherever they filed
+            -- it. The atom stays in the library and stays insertable by hand — a builder may want a
+            -- required form's exact wording. It just stops being something the drafter picks up on
+            -- its own. (lib/library/corpus-verbatim.ts)
+            AND a.corpus_verbatim = false
             AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
             AND (${!requireTag} OR EXISTS (
               SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (

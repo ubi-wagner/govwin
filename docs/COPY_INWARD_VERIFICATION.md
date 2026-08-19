@@ -1,6 +1,14 @@
 # COPY_INWARD_VERIFICATION.md — cross-tenant isolation, verified (C7 / GUARDRAIL #118)
 
 **Date:** 2026-08-16 · **Status:** VERIFIED, with two fixes landed + one documented follow-up.
+**Re-verified:** 2026-08-19 at migration head **188** (the ingest-provenance migrations 186–188 have
+landed since the original pass). Every probe in `frontend/scripts/drive-copy-inward-isolation.sql`
+still holds as the NOBYPASSRLS `govtech_app` role: R1 deny-all with no context · R2 own-tenant read
+(13/34/10) · R3 a forged other-tenant id reads nothing · R4 RLS overrides an explicit
+`WHERE tenant_id = B` · W1 re-stamping an own row to B is BLOCKED `[42501]` · W2/W3 cross-tenant
+UPDATE and DELETE touch 0 rows · P1–P5 the shared `document_templates` catalog is readable, not
+writable, and a tenant cannot mint a fake global row. Re-run it after any migration that adds a
+`tenant_id` table — that script, not this document, is the thing that actually checks.
 **Invariant under test:** *Sharing is copy-inward only — no cross-tenant shared objects.* When
 content crosses from a shared/admin/other-tenant space into a tenant, it must be **copied** into a
 new row stamped with the destination `tenant_id` — never referenced across tenants, never read by id

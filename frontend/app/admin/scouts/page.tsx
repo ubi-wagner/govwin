@@ -12,6 +12,8 @@ import Link from 'next/link';
 // Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
 import { sqlBypass as sql } from '@/lib/db';
 import ScoutCandidateQueue from '@/components/scout/candidate-queue';
+import IntakeStageStrip from '@/components/admin/intake-stage-strip';
+import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,8 +112,12 @@ export default async function ScoutMonitorPage() {
     ['Changes (24h)', changes24h, 'border-purple-400 bg-purple-50'],
   ];
 
+  // The discovery river's backlog, shared by every stage (#176).
+  const stageCounts = await loadIntakeStageCounts();
+
   return (
     <div>
+      <IntakeStageStrip current="scouts" counts={stageCounts} />
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Scout Monitor</h1>

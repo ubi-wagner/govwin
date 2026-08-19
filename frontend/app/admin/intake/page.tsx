@@ -2,6 +2,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import type { Role } from '@/lib/rbac';
 import IntakeForm from '@/components/admin/intake-form';
+import IntakeStageStrip from '@/components/admin/intake-stage-strip';
+import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +14,12 @@ export default async function IntakePage() {
   const role = (session.user as { role?: Role }).role;
   if (role !== 'master_admin' && role !== 'rfp_admin') redirect('/admin/dashboard');
 
+  // The discovery river's backlog, shared by every stage (#176).
+  const stageCounts = await loadIntakeStageCounts();
+
   return (
     <div className="max-w-2xl">
+      <IntakeStageStrip current="intake" counts={stageCounts} />
       <h1 className="text-2xl font-bold mb-1">Stage Opportunity Intake</h1>
       <p className="text-gray-500 text-sm mb-6">
         Stage a found/uploaded notice into the review queue (status <code>new</code>, not yet live). Scout will call this
