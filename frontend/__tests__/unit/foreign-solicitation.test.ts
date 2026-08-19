@@ -51,6 +51,18 @@ describe('findLabelledIdentifiers', () => {
     expect(found).toContain('N254-P01');
   });
 
+  it('leaves a prior CONTRACT number alone — that is past performance, not a wrong solicitation', () => {
+    // Verbatim from the Immobileyes cover sheet. Including `contract`/`award` in the label set
+    // flagged this real Air Force contract as though the proposal were for the wrong program.
+    const text = 'Counter-UAS Disrupter for Air Force Rapid Tactical & Security Operations '
+      + 'Contract # - FA864923P0971 Start Date - May 5, 2023';
+    expect(findLabelledIdentifiers(text)).toEqual([]);
+  });
+
+  it('leaves an award number alone for the same reason', () => {
+    expect(findLabelledIdentifiers('Delivered under Award No. W911NF2110234 in FY22.')).toEqual([]);
+  });
+
   it('ignores a label followed by ordinary words', () => {
     // "Proposal Title", "Topic Areas" — a token with no digit is prose, not an identifier.
     expect(findLabelledIdentifiers('Proposal Title: Innovative Counter-UAS Topic Areas covered')).toEqual([]);

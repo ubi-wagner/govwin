@@ -991,7 +991,12 @@ export function findLabelledIdentifiers(text: string): string[] {
   // sheet needs: in "STTR Phase II Proposal Proposal Number F2-17528", a filter applied after the
   // match would have already consumed the first "Proposal" as both label and token, and F2-17528
   // would never be reached.
-  const re = /\b(?:topic|proposal|solicitation|contract|award)\s*(?:number|no\.?|#)?\s*[:.\-]?\s*([A-Z0-9](?=[A-Z0-9._\-/]*\d)[A-Z0-9._\-/]{3,29})\b/gi;
+  // Only labels that identify WHICH SOLICITATION this document answers. `contract` and `award`
+  // are deliberately excluded: a prior contract number is past performance — "under Contract
+  // FA864923P0971 we delivered the disrupter prototype" — which every cover sheet and capability
+  // narrative legitimately carries. Including them flagged a real Air Force contract in the
+  // company's own past-performance text as though the proposal were for the wrong program.
+  const re = /\b(?:topic|proposal|solicitation)\s*(?:number|no\.?|#)?\s*[:.\-]?\s*([A-Z0-9](?=[A-Z0-9._\-/]*\d)[A-Z0-9._\-/]{3,29})\b/gi;
   return [...text.matchAll(re)].map((m) => m[1]);
 }
 

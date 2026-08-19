@@ -81,6 +81,30 @@ export async function PUT(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'content must be an object', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // The payload must actually BE a CanvasDocument. Checking only `typeof === 'object'` let any
+    // object through, and the nearest wrong one is easy to send by accident: the canvas RULES
+    // object (width/height/margins/font_default…), which the document route returns as
+    // `sections[].canvas`. Saving that replaces a drafted section with an empty shell — it has no
+    // nodes, so nothing is written and everything is lost. A client did exactly that here and
+    // wiped 20 drafted sections in one pass; the content was recoverable only because
+    // canvas_versions had archived it.
+    //
+    // An EMPTY `nodes: []` is still allowed — clearing a section deliberately is a real edit. What
+    // is refused is a payload with no `nodes` key at all, which is never a document.
+    const contentObj = body.content as Record<string, unknown>;
+    const hasNodes = Array.isArray(contentObj.nodes);
+    const hasSections = Array.isArray(contentObj.sections); // v2 documents carry sections[]
+    if (!hasNodes && !hasSections) {
+      return NextResponse.json(
+        {
+          error: 'content must be a CanvasDocument (missing "nodes"). '
+            + 'A canvas rules object is not a document.',
+          code: 'VALIDATION_ERROR',
+        },
+        { status: 400 },
+      );
+    }
+
     // 2c. Content size limit
     if (JSON.stringify(body.content).length > 2_000_000) {
       return NextResponse.json({ error: 'Content too large', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
@@ -415,7 +439,13 @@ export async function PUT(request: Request, ctx: RouteContext) {
     if (sectionSpec) {
       try {
         complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, sectionSpec)
-          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed' || v.code === 'over_character_limit')
+          // The per-SECTION subset: checks that are exact and local. The page-count rulers are
+          // excluded because they measure the whole volume, not this section.
+          // `foreign_solicitation` belongs here — it is exact, it is per-section, and it is the
+          // one violation whose cost is not a formatting nit: a section carrying another
+          // solicitation's topic number reads as a proposal for a different program.
+          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed'
+            || v.code === 'over_character_limit' || v.code === 'foreign_solicitation')
           .map((v) => ({ code: v.code, message: v.message }));
       } catch {
         // advisory only — never fail a save on the compliance check
