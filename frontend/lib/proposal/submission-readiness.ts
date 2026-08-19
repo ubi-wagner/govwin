@@ -20,6 +20,7 @@
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
+import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { computeSttrSplit } from '@/lib/proposal/sttr-split';
 import { parseStructuredCostInputs } from '@/lib/proposal/cost-volume-canvas';
 import { computeBudget } from '@/lib/proposal/cost-model';
@@ -295,13 +296,20 @@ export async function computeSubmissionReadiness(
   // can never contradict each other. Over the limit is a BLOCKER: an over-limit Technical Volume is
   // rejected outright on DSIP.
   const volumeInfo: ReadinessReport['summary']['volumes'] = [];
+  const volumeFacts = await loadVolumeFacts(proposalId, tenantId);
   for (const [artifactId, secs] of volSections) {
     const spec = specByArtifact.get(artifactId);
     const meta = metaByArtifact.get(artifactId);
     if (secs.length === 0) continue;
     let doc: CanvasDocument;
-    try { doc = assembleArtifactCanvas(secs, meta?.artifactType ?? 'narrative', meta?.volumeName ?? 'Volume'); }
-    catch { continue; } // a measurement failure must never itself block
+    // FINISHED, as the download finishes it (lib/proposal/volume-finish.ts). The cover band and the
+    // figures are real pages; measuring the bare assembly would tell a customer they have room they
+    // do not have, and the export gate — which measures the finished document — would then disagree
+    // with the readiness panel that cleared them.
+    try {
+      doc = assembleArtifactCanvas(secs, meta?.artifactType ?? 'narrative', meta?.volumeName ?? 'Volume',
+        { ...volumeFacts, volumeName: meta?.volumeName ?? 'Volume' });
+    } catch { continue; } // a measurement failure must never itself block
     // A deck is measured in SLIDES, a prose volume in PAGES; cost spreadsheets / forms have no flow cap.
     const isSlide = doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3';
     if (!isSlide && meta?.artifactType !== 'narrative') continue;

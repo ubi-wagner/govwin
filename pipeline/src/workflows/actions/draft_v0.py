@@ -297,6 +297,8 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     drafted = 0
     skipped = 0
     held = 0
+    blocked = 0
+    blocked_reason = ""
     for s in rows:
         section_id = str(s["id"])
         try:
@@ -323,6 +325,25 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
             if result.get("status") != "completed":
                 log.info("draft_v0: section %s drafter status=%s — skipping", section_id, result.get("status"))
                 skipped += 1
+                # A guardrail REFUSAL is not a per-section problem — the tenant's hourly rate limit
+                # or monthly budget is spent, so every remaining section will be refused the same
+                # way. Stop, and remember why.
+                #
+                # This used to run the whole list anyway and report a clean "drafted 6, skipped 7"
+                # with the workflow status 'completed'. The customer saw half a proposal drafted,
+                # the other half untouched, and nothing anywhere said the AI budget had run out —
+                # which reads as the feature being broken rather than the cap being hit. Measured
+                # on a live drive: a 14-section proposal costs ~23 agent calls per full-draft run
+                # against a default cap of 50/hour, so the SECOND run in an hour lands here.
+                reason = str(result.get("error") or result.get("reason") or "")
+                if any(k in reason.lower() for k in ("rate limit", "budget", "ai is disabled", "cap")):
+                    blocked_reason = reason
+                    blocked = len(rows) - (drafted + skipped)
+                    log.error(
+                        "draft_v0: proposal %s — agent guardrail refused (%s); stopping with %d "
+                        "section(s) undrafted", proposal_id, reason, blocked,
+                    )
+                    break
                 continue
 
             markdown = (result.get("result") or {}).get("text") or ""
@@ -390,11 +411,22 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         await emit_event(
             conn, namespace="proposal", type="draft.completed", phase="end",
             parent_event_id=draft_start_id or None,
-            payload={"proposalId": str(proposal_id), "drafted": drafted, "skipped": skipped, "held": held},
+            payload={"proposalId": str(proposal_id), "drafted": drafted, "skipped": skipped,
+                     "held": held, "blocked": blocked,
+                     **({"blockedReason": blocked_reason} if blocked_reason else {})},
             tenant_id=tenant_id,
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("draft_v0: draft.completed:end emit failed (non-fatal): %s", exc)
 
-    log.info("draft_v0: proposal %s — drafted %d, skipped %d (held %d for review)", proposal_id, drafted, skipped, held)
-    return {"drafted": drafted, "skipped_sections": skipped, "held_for_review": held}
+    log.info("draft_v0: proposal %s — drafted %d, skipped %d (held %d for review, %d blocked)",
+             proposal_id, drafted, skipped, held, blocked)
+    return {
+        "drafted": drafted,
+        "skipped_sections": skipped,
+        "held_for_review": held,
+        # Surfaced so the workflow's outcome and the customer-facing notification can say "the AI
+        # budget ran out with N sections left" instead of silently delivering a partial draft.
+        "blocked_sections": blocked,
+        **({"blocked_reason": blocked_reason} if blocked_reason else {}),
+    }

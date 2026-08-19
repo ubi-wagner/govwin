@@ -13,6 +13,7 @@
  */
 import type { CanvasDocument, CanvasNode, CanvasRules, CanvasSection } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, coalesceGroups, sectionsToNodes } from '@/lib/types/canvas-document';
+import { finishVolumeCanvas, type VolumeFacts } from '@/lib/proposal/volume-finish';
 import { exportToDocx } from './docx-exporter';
 
 export type ExportFormat = 'docx' | 'pptx' | 'xlsx' | 'pdf';
@@ -85,6 +86,17 @@ export function assembleArtifactCanvas(
   sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null; characterAllocation?: number | null }>,
   artifactType: string | null | undefined,
   title: string,
+  /**
+   * Pass the volume's own facts to FINISH the assembled document — cover band, figures derived from
+   * its own content, running header/footer, figure numbering (`lib/proposal/volume-finish.ts`).
+   *
+   * Opt-in rather than automatic because assembly has two kinds of caller. Delivery paths (export,
+   * package, the on-screen document view) want the finished volume; extraction paths
+   * (`templates/extract`, past-proposal reuse) want the sections back exactly as the author wrote
+   * them — harvesting a generated cover band into a reusable template would put one tenant's
+   * identity into another's starting point.
+   */
+  finish?: VolumeFacts,
 ): CanvasDocument {
   const outSections: CanvasSection[] = [];
   let canvas: CanvasRules | null = null;
@@ -118,7 +130,7 @@ export function assembleArtifactCanvas(
       });
     });
   }
-  return {
+  const doc: CanvasDocument = {
     version: 2,
     document_id: crypto.randomUUID(),
     canvas: canvas ?? fallbackCanvas(artifactType),
@@ -129,6 +141,9 @@ export function assembleArtifactCanvas(
       created_at: '', last_modified_at: '', last_modified_by: '', version_number: 1, status: 'accepted',
     },
   };
+  return finish
+    ? finishVolumeCanvas(doc, { ...finish, artifactType: artifactType ?? 'narrative', volumeName: finish.volumeName ?? title })
+    : doc;
 }
 
 /** Render a CanvasDocument to the given format. Throws on exporter failure. */

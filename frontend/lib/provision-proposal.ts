@@ -156,6 +156,7 @@ export async function provisionProposalForPortal(opts: {
       let count = 0;
       const artifactByVolKey = new Map<string, string>();
       const artifactTypeByVolKey = new Map<string, string>();
+      const volumeCapByVolKey = new Map<string, number | null>();
       const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
       const programType = t.programType ?? '';
       // Normalize to the work-share program family: sbir_phase_1/2 → 'sbir', sttr* / d2p2 → 'sttr',
@@ -193,6 +194,9 @@ export async function provisionProposalForPortal(opts: {
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
           artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
+          // The VOLUME's page cap, kept so each section's canvas envelope can carry it (see the
+          // canvas.max_pages note in the section loop). Distinct from an item's page_allocation.
+          volumeCapByVolKey.set(volKey(volNum, volName), (complianceSpec as { max_pages?: number | null } | null)?.max_pages ?? null);
         }
         // Which item in each COST volume receives the computed workbook. The rule lives in
         // lib/proposal/cost-workbook-item so the MOLD BUILDER can use the same one to decide what
@@ -284,12 +288,23 @@ export async function provisionProposalForPortal(opts: {
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = actorId;
             templateDoc.document_id = section.id;
-            // The ITEM's own limits are provision truth — stamp them onto the canvas so the
-            // editor gauge and the export floor read the per-item cap, not the mold's default.
+            // `canvas.max_pages` is the VOLUME's cap, not this item's share of it.
+            //
+            // Sections of one volume assemble into ONE document (assembleArtifactCanvas), and the
+            // first section's canvas becomes that document's envelope — so stamping the item's own
+            // limit here declares the whole volume to be as long as its shortest item. With the
+            // Technical Volume's ten pages correctly split one page per item, the assembled volume
+            // reported "6 of 1 pages" and the export floor would have refused it. The item's share
+            // is carried separately and correctly, as `proposal_sections.page_allocation` →
+            // `layout.page_budget`, which is what the per-section over-budget check reads.
+            //
+            // Slide limits are per-DECK and a deck item is its own document, so those still take
+            // the item's number.
             const canv = (templateDoc as unknown as { canvas?: { format?: string; max_pages?: number | null; max_slides?: number | null } }).canvas;
             if (canv) {
               const isSlideCanvas = /slide/i.test(canv.format ?? '');
-              if (item.pageLimit != null && !isSlideCanvas) canv.max_pages = item.pageLimit;
+              const volumeCap = volumeCapByVolKey.get(vkey) ?? null;
+              if (!isSlideCanvas && volumeCap != null) canv.max_pages = volumeCap;
               if (item.slideLimit != null && isSlideCanvas) canv.max_slides = item.slideLimit;
             }
             const interpolated = interpolateTemplate(templateDoc, templateVariables);

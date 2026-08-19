@@ -19,6 +19,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
+import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -124,7 +125,11 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Assemble + resolve format + render ─────────────────────────────
     const title = artifact.volumeName || 'artifact';
-    const assembled = assembleArtifactCanvas(sections, artifact.artifactType, title);
+    // Finished, not merely assembled: cover band, the figures its own content supports, running
+    // header/footer and figure numbering (lib/proposal/volume-finish.ts). What downloads here is
+    // what the customer submits, so it is the finished document or nothing.
+    const facts = await loadVolumeFacts(proposalId, tenantId);
+    const assembled = assembleArtifactCanvas(sections, artifact.artifactType, title, { ...facts, volumeName: title });
 
     // Deterministic compliance floor (E4): record whether the exported artifact
     // satisfies the ComplianceSpec frozen at purchase. Advisory — surfaced via the

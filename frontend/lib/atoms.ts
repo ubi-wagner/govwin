@@ -278,7 +278,18 @@ export function viewerFromRole(userId: string, role: Role): Viewer {
   return { userId, isAdmin: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' };
 }
 
-// ── the scored selector: scope → context boost → SEMANTIC similarity (gated) → quality ──
+/**
+ * Words dropped from the lexical query. Not English stopwords — Postgres already strips those — but
+ * PROPOSAL stopwords: the vocabulary every section title and every atom in a federal proposal
+ * library shares, which therefore separates nothing and only dilutes the coverage score.
+ */
+const LEX_STOP = new Set([
+  'and', 'the', 'for', 'with', 'from', 'that', 'this',
+  'proposal', 'proposals', 'section', 'sections', 'volume', 'volumes',
+  'offeror', 'government', 'phase', 'sbir', 'sttr', 'required', 'requirement', 'requirements',
+]);
+
+// ── the scored selector: scope → context boost → LEXICAL rank → SEMANTIC similarity (gated) → quality ──
 export interface SectionQuery {
   vol?: string | null;
   kinds?: string[];
@@ -291,6 +302,7 @@ export interface RankedAtom {
   canvasNodes: CanvasNode[] | null; // the atom's real nodes (image/table/chart) so structured atoms insert faithfully
   wordCount: number; charCount: number; outcomeScore: number; usageCount: number;
   ctxMatches: number; vectorSim: number | null; score: number; // vectorSim: cosine to the query (null = no semantic axis)
+  lexRank: number; // Postgres full-text rank of the atom's own text against the query (0 = no match)
 }
 
 export async function selectForSection(tenantId: string, q: SectionQuery, viewer: Viewer): Promise<RankedAtom[]> {
@@ -302,19 +314,57 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   // Semantic axis (gated): embed the section's query text so an atom can rank by MEANING, not just
   // shared tags. Off / no key / embed-failed → qLit stays null and this is EXACTLY the pre-vector
   // selector (identical ordering), so the feature is a pure additive assist with zero regression.
+  // The words to retrieve BY. One derivation, shared by the lexical and the semantic axis, so the
+  // two can never be ranking against different questions.
+  const queryText = (q.text && q.text.trim())
+    || [String(vol ?? '').replace(/_/g, ' '), ...kinds, ...context].filter(Boolean).join(' ').trim();
+
   const model = embeddingsEnabled() ? activeEmbedModel() : null;
   let qLit: string | null = null;
-  if (model) {
-    const queryText = (q.text && q.text.trim())
-      || [String(vol ?? '').replace(/_/g, ' '), ...kinds, ...context].filter(Boolean).join(' ').trim();
-    if (queryText) {
-      const qv = await embedOne(queryText, 'query');
-      // a degenerate query vector (zero-magnitude → NaN cosine for every atom) drops the semantic
-      // axis entirely rather than NaN-ranking the whole library; falls back to pure tag ranking.
-      if (isUsableVector(qv)) qLit = toVectorLiteral(qv);
-    }
+  if (model && queryText) {
+    const qv = await embedOne(queryText, 'query');
+    // a degenerate query vector (zero-magnitude → NaN cosine for every atom) drops the semantic
+    // axis entirely rather than NaN-ranking the whole library; falls back to pure tag ranking.
+    if (isUsableVector(qv)) qLit = toVectorLiteral(qv);
   }
   const VEC_WEIGHT = 3; // a perfect cosine match ≈ 1.5 context tags — semantics assist, never override scope
+
+  // ── LEXICAL axis ──────────────────────────────────────────────────────────────────────────────
+  // Postgres full-text rank of the atom's own title+body against the section's words. Ungated: no
+  // API key, no extension, no backfill — it works on the day a tenant uploads their first document,
+  // which is the state most deployments are in.
+  //
+  // It exists because without it retrieval was TEXT-BLIND. Scope filter, context-tag count, vector
+  // (gated, usually off), outcome score, usage count — not one of those reads the section's words,
+  // and on a real library every candidate carries identical tags and untouched score/usage defaults.
+  // The ordering therefore collapsed to `created_at DESC`, and PROVED it: four different technical
+  // sections of the Immobileyes T3CP volume each retrieved the SAME six atoms — fraud-waste-and-abuse
+  // boilerplate that happened to be the newest rows — so every section of the drafted volume opened
+  // with the same sentence about the False Claims Act. That is what a reader sees as "the flow
+  // sucks", and no amount of drafting quality downstream can recover from being handed the wrong
+  // paragraphs.
+  //
+  // Weight 2 = one context tag. Scope still dominates (the tag filter runs first and ctxMatches is
+  // weighted the same), so this discriminates WITHIN the scoped set rather than overriding it —
+  // the same "assist, never override" contract the semantic axis has. Backed by the GIN index in
+  // migration 195.
+  // Calibration: ts_rank with normalisation 1|32 is bounded in (0,1) but lands in a narrow low band
+  // (measured on this library: 0.024–0.034 for a strong match, ~0.0001 for a marginal one). ×60
+  // makes a top lexical match worth about one context tag and a marginal one worth nothing —
+  // "assist, never override", the same contract the semantic axis has. Scaling is monotone, so it
+  // changes the lexical-vs-context trade-off, never the order within the lexical axis itself.
+  const LEX_WEIGHT = 60;
+  //
+  // The terms are joined with OR, not AND. websearch_to_tsquery ANDs by default, which requires an
+  // atom to contain EVERY word of the section title — measured, "Anticipated Performance
+  // Improvements, Commercial Value, and Transition Approach" matched nothing in a library that had
+  // plenty to say about each of those, and the section fell straight back to the boilerplate the
+  // lexical axis exists to displace. OR makes ts_rank_cd a COVERAGE score: an atom hitting five of
+  // the seven terms outranks one hitting two, which is the ranking a retrieval query wants.
+  const lexQuery = Array.from(new Set(
+    queryText.toLowerCase().replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 3 && !LEX_STOP.has(w)),
+  )).slice(0, 24).join(' or ');
 
   // `requireTag=true` scopes to the section's vol/kind atoms; `false` drops that
   // filter → ALL of the tenant's approved atoms (still context-ranked). We run the
@@ -323,10 +373,11 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   // atoms in place to try to generate" (the blank-mold-with-a-prompt path). Raw
   // ${boolean} — never `${cond?'t':'f'}::bool`, which binds text and evaluates false.
   const runQuery = (requireTag: boolean) =>
-    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; canvasNodes: CanvasNode[] | null; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number; vectorSim: number | null; blend: number }>>(tenantId, async (tx) =>
+    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; canvasNodes: CanvasNode[] | null; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number; vectorSim: number | null; lexRank: number; blend: number }>>(tenantId, async (tx) =>
       tx`
         SELECT s.*,
-               (coalesce(s."vectorSim", 0) * ${VEC_WEIGHT} + s."ctxMatches" * 2 + s."outcomeScore" + ln(1 + s."usageCount") * 0.1) AS "blend"
+               (coalesce(s."vectorSim", 0) * ${VEC_WEIGHT} + s."lexRank" * ${LEX_WEIGHT}
+                + s."ctxMatches" * 2 + s."outcomeScore" + ln(1 + s."usageCount") * 0.1) AS "blend"
         FROM (
           SELECT a.id, a.title, a.summary, a.grain,
                  a.word_count AS "wordCount", a.char_count AS "charCount",
@@ -338,6 +389,25 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
                  -- NULLIF(…, 'NaN') so a stored degenerate vector (defense-in-depth) yields NULL → coalesce→0,
                  -- never a NaN that sorts above every real blend. Postgres treats NaN = NaN, so NULLIF catches it.
                  ${qLit ? tx`NULLIF(1 - (ae.embedding <=> ${qLit}::vector), 'NaN'::float8)` : tx`NULL::float`} AS "vectorSim",
+                 -- Lexical rank, 0–1. websearch_to_tsquery (not plainto_) because it never throws on
+                 -- punctuation a section title routinely carries — slashes, parentheses, an em dash —
+                 -- where to_tsquery would 42601 and take the whole draft down. Empty query ⇒ 0 for
+                 -- every atom ⇒ the axis contributes nothing, which is the correct inert behaviour.
+                 --
+                 -- ts_rank, not ts_rank_cd, with normalisation 1|32:
+                 --   1  → divide by 1 + log(document length), so a 60 KB uploaded volume does not
+                 --        outrank the two-paragraph atom that is actually ABOUT the section merely
+                 --        by mentioning the words more often. Measured: with cover-density ranking
+                 --        the whole top of the list was the same three giant volume atoms for every
+                 --        section, which is the failure this axis exists to fix.
+                 --   32 → rank/(rank+1), which bounds the result in (0,1) so the blend weight below
+                 --        means the same thing on every library.
+                 ${lexQuery
+                   ? tx`ts_rank(
+                         setweight(to_tsvector('english', coalesce(a.title, '')), 'A')
+                         || setweight(to_tsvector('english', coalesce(a.content, '')), 'B'),
+                         websearch_to_tsquery('english', ${lexQuery}), 1|32)`
+                   : tx`0::float`} AS "lexRank",
                  -- a group carries no content of its own; assemble it from its ordered members
                  coalesce(a.content, (
                    SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
@@ -355,6 +425,26 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
             AND a.archived_at IS NULL
             AND a.status = 'approved'
             AND a.grain <> 'reference'
+            -- …and nothing DESCENDED from a reference document either.
+            --
+            -- The grain test above excluded the uploaded container and nothing else: atomizing a
+            -- reference PDF produces 'primitive' children that carry its text and lose the label,
+            -- so the fence kept out the folder and let out everything in it. Proven on the
+            -- Immobileyes library — the DSIP fraud-waste-and-abuse tutorial and the cover-sheet
+            -- disclaimer, uploaded as reference, were the top-ranked material for technical
+            -- sections and were being copied verbatim into the drafted volume. Reference material
+            -- is for the system to READ, never to reuse as the customer's own writing.
+            --
+            -- Provenance, not keywords: source_anchor records the atom this one was cut from.
+            -- Non-array anchors and malformed ids are treated as "no parent" rather than throwing.
+            AND NOT EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(
+                     CASE WHEN jsonb_typeof(a.source_anchor) = 'array' THEN a.source_anchor ELSE '[]'::jsonb END
+                   ) sa
+              JOIN library_atoms p ON p.id = (sa->>'sourceAtomId')::uuid
+              WHERE sa->>'sourceAtomId' ~ '^[0-9a-fA-F-]{36}$' AND p.grain = 'reference'
+            )
             AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
             AND (${!requireTag} OR EXISTS (
               SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
@@ -363,9 +453,11 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
               )
             ))
         ) s
-        -- with the semantic axis live, the blended score leads; the tag tiebreakers are the EXACT
-        -- pre-vector ordering, so with embeddings OFF the result is identical to the old selector.
-        ORDER BY ${qLit ? tx`"blend" DESC,` : tx``} s."ctxMatches" DESC, s."outcomeScore" DESC, s."usageCount" DESC, s."createdAt" DESC
+        -- The blended score always leads now. It used to lead only when the semantic axis was live,
+        -- which meant the common (embeddings-off) path fell through every equal tiebreaker to
+        -- created_at DESC and handed every section the same newest atoms. The tag tiebreakers stay
+        -- underneath, so two atoms the query cannot tell apart still order exactly as before.
+        ORDER BY "blend" DESC, s."ctxMatches" DESC, s."outcomeScore" DESC, s."usageCount" DESC, s."createdAt" DESC
         LIMIT ${limit}
       `,
     );
@@ -377,7 +469,8 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
     id: r.id, title: r.title, summary: r.summary, content: r.content, grain: r.grain,
     canvasNodes: r.canvasNodes, wordCount: r.wordCount, charCount: r.charCount,
     outcomeScore: r.outcomeScore, usageCount: r.usageCount, ctxMatches: r.ctxMatches,
-    vectorSim: r.vectorSim ?? null, score: Math.round((r.blend ?? 0) * 1000) / 1000,
+    vectorSim: r.vectorSim ?? null, lexRank: Math.round((r.lexRank ?? 0) * 1000) / 1000,
+    score: Math.round((r.blend ?? 0) * 1000) / 1000,
   }));
 }
 

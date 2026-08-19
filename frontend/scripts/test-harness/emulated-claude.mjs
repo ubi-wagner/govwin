@@ -94,6 +94,33 @@ function genericToolInput(tool, req) {
 
 const between = (s, tag) => { const m = (s || '').match(new RegExp(`<${tag}>\\s*([\\s\\S]*?)\\s*</${tag}>`)); return m ? m[1] : ''; };
 
+/**
+ * The section's own title, whichever way the caller phrased the ask.
+ *
+ * Two live shapes, and reading only one of them silently ruined every draft the harness produced:
+ *
+ *   1. `Draft the "Phase I Technical Objectives" section.`   — the FRONTEND tool's prompt
+ *   2. `Draft the proposal section named between the markers below…`  — the PIPELINE archetype,
+ *      after its prompt-injection hardening moved the (tenant-editable, untrusted) title inside
+ *      a `--- BEGIN USER CONTENT ---` fence.
+ *
+ * The regex only matched form 1. Against form 2 it fell through to the literal default, so every
+ * section of the volume searched the tenant's library for the word "Section", every search
+ * returned the same six atoms, and every section of the drafted Technical Volume opened with the
+ * same paragraph. The output looked like a retrieval failure and was a title-parsing failure —
+ * worth a named helper so the next prompt change breaks loudly instead of quietly.
+ */
+function sectionTitleFrom(all) {
+  const quoted = all.match(/Draft the "([^"]{2,120})" section/i)?.[1];
+  if (quoted) return quoted.replace(/\s+/g, ' ').trim();
+
+  const fenced = all.match(
+    /section named between the markers below[\s\S]{0,400}?--- BEGIN USER CONTENT ---\s*([\s\S]*?)\s*--- END USER CONTENT ---/i,
+  )?.[1];
+  const t = (fenced ?? '').replace(/\s+/g, ' ').trim();
+  return t && t.length <= 200 ? t : 'Section';
+}
+
 
 // ── Grounded composition helpers ───────────────────────────────────────────────────────────────
 //
@@ -366,7 +393,8 @@ const RESPONDERS = [
     respond: (req) => {
       const sys = systemText(req);
       const user = lastUserText(req);
-      const title = (user.match(/Draft the "([^"]{2,120})" section/i)?.[1] ?? 'Section').replace(/\s+/g, ' ').trim();
+      // Same two prompt shapes as the pipeline responder — see sectionTitleFrom.
+      const title = sectionTitleFrom(user) !== 'Section' ? sectionTitleFrom(user) : sectionTitleFrom(reqText(req));
 
       // The budget the product computed from the solicitation's page limit. Respect it — a draft
       // that busts the page limit is the failure the budget exists to prevent.
@@ -524,7 +552,7 @@ const RESPONDERS = [
       // tool loop the last user message is the tool_result block, so reading it gave every section
       // the title "Section" and searched the library for a placeholder string.
       const all = reqText(req);
-      const title = (all.match(/Draft the "([^"]{2,120})" section/i)?.[1] ?? 'Section').replace(/\s+/g, ' ').trim();
+      const title = sectionTitleFrom(all);
 
       // Walk every tool once, in the order the archetype's own prompt names them — and call them
       // with the REAL section title. genericToolInput fills a string param with a placeholder
@@ -547,11 +575,19 @@ const RESPONDERS = [
         }
       }
 
-      const user = lastUserText(req);
-
-      // Everything the tools returned is the material to write from.
+      // The MATERIAL is what the tools returned — the tenant's own library. The solicitation
+      // excerpt in the prompt is REFERENCE: it says what the section must address, and the
+      // archetype's own instructions call it untrusted data, never source copy.
+      //
+      // Pooling the two together is what produced the worst output this harness has ever
+      // generated. `rfp_excerpt` carries up to 20,000 characters of DSIP instruction text, so it
+      // outweighed the library by an order of magnitude and every section of the Technical Volume
+      // opened with the same sentence about the False Claims Act and the fraud-waste-and-abuse
+      // tutorial. A real model reads that excerpt and writes ABOUT the topic; quoting it back is
+      // an artifact of the stand-in, and a stand-in whose failure mode does not resemble the
+      // model's teaches the wrong lesson about the pipeline.
       const harvested = results.flatMap((b) => harvestProse(b.content));
-      const pool = [...harvested.flatMap((t) => sentences(t)), ...sentences(user)];
+      const pool = harvested.flatMap((t) => sentences(t));
       const focus = terms(title);
 
       // ── Honour the prompt's LENGTH + FORMAT contract ────────────────────────────────────
@@ -622,8 +658,14 @@ const RESPONDERS = [
       // A requirements table, built ONLY from requirement text the prompt itself carries (the
       // fenced evaluation-criteria / required-subsections blocks). No requirements in the prompt
       // ⇒ no table, rather than an invented one.
+      // The SHORT fenced blocks only. The archetype fences four things in the same markers: the
+      // section name, the evaluation criteria, the required subsections — and the whole raw
+      // solicitation excerpt, up to 20,000 characters. Taking them all fed the table arbitrary
+      // lines of agency boilerplate ("Distribution A - Approved for Public Release") as if they
+      // were requirements. Requirements come in short bullets; the excerpt does not.
       const fenced = all.split('--- BEGIN USER CONTENT ---').slice(1)
         .map((seg) => seg.split('--- END USER CONTENT ---')[0])
+        .filter((seg) => seg.length < 2500)
         .join('\n');
       const reqs = fenced.split('\n')
         .map((l) => l.replace(/^\s*-\s*/, '').trim())
