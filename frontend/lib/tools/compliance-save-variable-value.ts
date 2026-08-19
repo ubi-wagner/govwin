@@ -71,6 +71,76 @@ const KNOWN_TYPES: Record<string, 'int' | 'text' | 'bool' | 'numeric'> = {
   itar_required: 'bool',
 };
 
+/**
+ * Known variables that have a REAL typed column on solicitation_compliance. The value is mirrored
+ * there so the build actually sees it (see the mirror block below); custom_variables keeps the
+ * provenance either way. Fixed map — column names never come from caller input.
+ */
+const TYPED_COLUMNS: Record<string, string> = {
+  page_limit_technical: 'page_limit_technical',
+  page_limit_cost: 'page_limit_cost',
+  font_family: 'font_family',
+  font_size: 'font_size',
+  margins: 'margins',
+  line_spacing: 'line_spacing',
+  header_required: 'header_required',
+  header_format: 'header_format',
+  footer_required: 'footer_required',
+  footer_format: 'footer_format',
+  submission_format: 'submission_format',
+  images_tables_allowed: 'images_tables_allowed',
+  slides_allowed: 'slides_allowed',
+  slide_limit: 'slide_limit',
+  taba_allowed: 'taba_allowed',
+  indirect_rate_cap: 'indirect_rate_cap',
+  partner_max_pct: 'partner_max_pct',
+  cost_sharing_required: 'cost_sharing_required',
+  cost_volume_format: 'cost_volume_format',
+  pi_must_be_employee: 'pi_must_be_employee',
+  pi_university_allowed: 'pi_university_allowed',
+  clearance_required: 'clearance_required',
+  itar_required: 'itar_required',
+};
+
+/**
+ * Parse a number out of a value that may carry the solicitation's own wording ("10 pages",
+ * "$250,000"). Returns undefined when there is NO digit to read — prose like "not stated" or
+ * "see the Component instructions" must never coerce to 0, which would silently write a 0-page
+ * limit or a $0 ceiling and read as a rule the solicitation states. Absence is a finding.
+ */
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  const digits = String(value).replace(/[^0-9.-]/g, '');
+  if (!/[0-9]/.test(digits)) return undefined;
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Coerce a saved value to the column's type. Returns undefined when it cannot be represented,
+ *  so the mirror is skipped rather than writing something the column would misread. */
+function coerceForColumn(value: unknown, type: 'int' | 'text' | 'bool' | 'numeric' | undefined): unknown {
+  if (value === null) return null;
+  switch (type) {
+    case 'int': {
+      const n = toNumber(value);
+      return n === undefined ? undefined : Math.round(n);
+    }
+    case 'numeric':
+      return toNumber(value);
+    case 'bool': {
+      if (typeof value === 'boolean') return value;
+      const s = String(value).trim().toLowerCase();
+      if (['true', 'yes', 'y', '1'].includes(s)) return true;
+      if (['false', 'no', 'n', '0'].includes(s)) return false;
+      return undefined;
+    }
+    case 'text':
+      return typeof value === 'string' ? value : String(value);
+    default:
+      return undefined; // freeform variable — custom_variables only
+  }
+}
+
 const InputSchema = z.object({
   solicitationId: z.string().uuid(),
   variableName: z.string().min(1).max(128),
@@ -236,6 +306,30 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
     } catch (err) {
       console.error('[compliance.save_variable_value] upsert failed:', err);
       throw err;
+    }
+
+    // Mirror into the TYPED column when this variable has one. custom_variables carries the
+    // provenance (excerpt, anchor, who verified, when) but NOTHING downstream reads it: the artifact
+    // spec builder, the readiness roll-up, the cost forms and the opportunity card all read the typed
+    // `solicitation_compliance` columns. Without this mirror an admin could verify "TABA allowed" or
+    // "CMMC Level 1" against the source, see it saved, and still have every consumer see NULL — the
+    // verified value would be invisible to the build it exists to govern.
+    const column = TYPED_COLUMNS[variableName];
+    if (column) {
+      try {
+        const typed = coerceForColumn(value, KNOWN_TYPES[variableName]);
+        if (typed !== undefined) {
+          // Column identifiers come from the fixed TYPED_COLUMNS map above — never from input.
+          await sql.unsafe(
+            `UPDATE solicitation_compliance SET ${column} = $1, updated_at = now() WHERE solicitation_id = $2::uuid`,
+            [typed as never, solicitationId],
+          );
+        }
+      } catch (e) {
+        // Non-fatal: the value + its provenance are already stored in custom_variables. A type the
+        // column rejects is a curation problem to surface, not a reason to lose the verified entry.
+        console.error('[compliance.save_variable_value] typed-column mirror failed (non-fatal)', variableName, e);
+      }
     }
 
     // ── Curation revision tracking ──────────────────────────────────
