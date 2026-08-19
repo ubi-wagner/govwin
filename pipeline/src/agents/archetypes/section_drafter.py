@@ -426,6 +426,18 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
     # The window a long atom is quoted through. An atom this size or smaller is passed whole.
     _PASSAGE_CHARS = 2000
 
+    # A contents-list line: dot leaders ("Glossary ......... 2"), or a heading-ish line that ends
+    # in a bare page number ("2.1 Technical Summary   1"). Both are structural, not vocabulary.
+    _TOC_LINE = re.compile(r"(\.\s*){4,}\s*\d+\s*$|^\s*\d+(\.\d+)*\s+\S.{0,90}?\s+\d{1,3}\s*$")
+
+    @classmethod
+    def _toc_ratio(cls, window: str) -> float:
+        """Share of a window's non-empty lines that look like table-of-contents entries."""
+        lines = [ln for ln in window.split("\n") if ln.strip()]
+        if not lines:
+            return 0.0
+        return sum(1 for ln in lines if cls._TOC_LINE.search(ln)) / len(lines)
+
     @classmethod
     def _passage(cls, content: str | None, terms: list[str]) -> str:
         """Return the part of `content` that the query actually matched.
@@ -449,12 +461,18 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         lowered = content.lower()
         needles = {t.lower() for t in terms}
         step = cls._PASSAGE_CHARS // 4
-        best_start, best_hits = 0, -1
+        best_start, best_score = 0, -1.0
         for start in range(0, len(content) - cls._PASSAGE_CHARS + step, step):
-            window = lowered[start : start + cls._PASSAGE_CHARS]
-            hits = sum(1 for n in needles if n in window)
-            if hits > best_hits:
-                best_start, best_hits = start, hits
+            window = content[start : start + cls._PASSAGE_CHARS]
+            hits = sum(1 for n in needles if n in lowered[start : start + cls._PASSAGE_CHARS])
+            # A table of contents is a term MAGNET: it lists every section title verbatim, so it
+            # out-scores the section's own prose on any title query while containing none of it.
+            # The window first chosen for a whole Technical Volume was exactly that — the TOC,
+            # headed by the source proposal's number. Discounting by how much of the window looks
+            # like a contents list lets real prose win with fewer term hits.
+            score = hits * (1.0 - cls._toc_ratio(window))
+            if score > best_score:
+                best_start, best_score = start, score
 
         end = min(len(content), best_start + cls._PASSAGE_CHARS)
         # Snap to word boundaries so the quote does not begin or end mid-word.

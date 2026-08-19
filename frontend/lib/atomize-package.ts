@@ -165,22 +165,25 @@ export async function planDocumentAtomization(
 
   const planned: PlannedAtom[] = [];
   let skipped = 0; // substantive-looking blocks dropped for being under MIN_ATOM_WORDS — surfaced, not silent.
-  let strippedFurniture: string[] = []; // running header/footer removed — reported, never silent.
+
+  // Strip the running header/footer ONCE, before anything is built from these pages. A page's
+  // extracted text includes whatever the word processor repeats on every page, and on a DSIP
+  // submission that is the SOURCE solicitation's identifiers ("Topic: X23.5_CSO   Proposal
+  // Number: FX235-CSO1-0859"). Kept, they are welded into every atom cut from the document, and a
+  // section grounded on those atoms cites a different agency's topic number in the new proposal —
+  // observed verbatim on the T3CP build. Detection is repetition-based, so it holds for footers we
+  // have never seen. Hoisted above BOTH consumers — the page-grain primitives below and the volume
+  // FOUNDATION atoms further down — because a foundation is the whole volume's text: strip only
+  // the primitives and the same header survives inside every volume atom.
+  const furniturePass = dsipPages.isDsipProposal
+    ? stripDocumentFurniture(dsipPages.pages)
+    : { pages: dsipPages.pages, furniture: [] as string[], removedChars: 0 };
+  const strippedFurniture = furniturePass.furniture;
   if (dsipPages.isDsipProposal) {
     // Page-grain primitives: one atom per PAGE, cited by its page number and tagged with
     // its volume — deterministic units that spread the atom budget across ALL volumes
     // (paragraph-guessing on extraction text let Volume 1 exhaust the cap).
     //
-    // Strip the running header/footer FIRST. A page's extracted text includes whatever the word
-    // processor repeats on every page, and on a DSIP submission that is the SOURCE solicitation's
-    // identifiers ("Topic: X23.5_CSO   Proposal Number: FX235-CSO1-0859"). Kept, they are welded
-    // into every atom from the document, and a section grounded on those atoms cites a different
-    // agency's topic number in the new proposal — observed verbatim on the T3CP build. Detection
-    // is repetition-based, so it holds for footers we have never seen.
-    const furniturePass = stripDocumentFurniture(dsipPages.pages);
-    if (furniturePass.furniture.length) {
-      strippedFurniture = furniturePass.furniture;
-    }
     for (let pg = 1; pg <= furniturePass.pages.length && planned.length < MAX_ATOMS_PER_DOC; pg++) {
       const pageText = cleanText(furniturePass.pages[pg - 1] ?? '').trim();
       const words = pageText ? pageText.split(/\s+/).length : 0;
@@ -260,7 +263,9 @@ export async function planDocumentAtomization(
   if (dsipPages.isDsipProposal) {
     plan.dsip = {
       volumes: dsipPages.segments.map((s) => {
-        const text = dsipPages.pages.slice(s.pageStart - 1, s.pageEnd).join('\n\n').trim();
+        // Cleaned pages — a foundation is the whole volume, so building it from the raw pages
+        // would carry the running header the primitives just had removed.
+        const text = furniturePass.pages.slice(s.pageStart - 1, s.pageEnd).join('\n\n').trim();
         return {
           volumeNumber: s.volumeNumber, volumeName: s.volumeName, volKey: s.volKey, markerExcerpt: s.markerExcerpt,
           text, wordCount: text ? text.split(/\s+/).length : 0,
