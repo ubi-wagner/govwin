@@ -599,9 +599,23 @@ authed request bounces back to `/login?from=…`. `localhost` resolves to `127.0
 on `127.0.0.1` + browsing `localhost` is correct and consistent.
 
 **GOTCHAS learned the hard way (save yourself the time):**
+- **⚠️ KILL THE SERVER BY PORT, NOT BY NAME.** Next renames its process to `next-server (v…)`,
+  so `pkill -f "standalone/server.js"` and `pkill -f "node server.js"` match NOTHING — including
+  from inside `sandbox-heartbeat.sh`. The old process keeps serving its now-DELETED build from
+  open inodes, `/login` answers 200, the heartbeat reports `srv=ok`, and `.next/BUILD_ID` matches
+  `.next/standalone/.next/BUILD_ID` — every signal says "fresh" while every request runs the
+  previous build. It cost an hour this session chasing a route fix that was correct in the
+  source AND in the compiled bundle. Kill by port and VERIFY the generation changed:
+      fuser -k -9 -n tcp 3000
+      PID=$(fuser -n tcp 3000 | tr -d ' ')
+      readlink /proc/$PID/cwd     # must NOT end in "(deleted)"
+      ps -o lstart= -p $PID       # must be AFTER the build finished
+- **`next build` finishing is not `.next/standalone` existing.** The build writes `.next/BUILD_ID`
+  well before it emits `standalone/`, so `until [ -f .next/BUILD_ID ]` races and you restage into
+  a directory that is about to be replaced. Wait on `.next/standalone/server.js` instead.
 - **Restarting the standalone server:** stop the OLD one first or the new one hits
   `EADDRINUSE :3000`. If you started it with `run_in_background`, `TaskStop <task_id>`;
-  otherwise `fuser -k -9 3000/tcp; sleep 2`. Then restage static (above) + start fresh +
+  otherwise `fuser -k -9 -n tcp 3000; sleep 2`. Then restage static (above) + start fresh +
   poll `/login` for 200. The node child dying silently after a `setsid … &` launch is the
   usual reason a "restart" appears to hang — use `run_in_background:true`.
 - **Rebuild ≠ live:** the standalone server serves the files present at start. After ANY

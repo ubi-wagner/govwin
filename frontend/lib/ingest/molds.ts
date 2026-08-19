@@ -354,8 +354,14 @@ export async function buildMolds(
   const sectionByName = new Map<string, OutlineSection>();
   for (const v of outline.volumes) for (const s of v.sections) sectionByName.set(s.section.toLowerCase(), s);
 
+  // The mold's name prefix. curated_solicitations carries the SOLICITATION number; the TOPIC
+  // number lives on the linked opportunity, and it is the one a curator recognises
+  // ("OSW26BZ04-DP013 — Technical Volume"), so prefer it.
   const [sol] = await sqlBypass<Array<{ topicNumber: string | null; solicitationNumber: string | null }>>`
-    SELECT topic_number, solicitation_number FROM curated_solicitations WHERE id = ${solId}::uuid`;
+    SELECT o.topic_number AS "topicNumber", cs.solicitation_number AS "solicitationNumber"
+    FROM curated_solicitations cs
+    LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+    WHERE cs.id = ${solId}::uuid`;
   const prefix = sol?.topicNumber || sol?.solicitationNumber || 'Master';
 
   const out: BuildMoldsResult = { built: 0, skipped: 0, linked: 0, molds: [] };
@@ -376,9 +382,17 @@ export async function buildMolds(
       compliance,
     });
 
-    // Only the TECHNICAL volume carries the matrix's mandated section order; stamping those
-    // headings into a cost form or a one-page abstract would be noise, not structure.
-    const requiredSections = templateType === 'technical_volume' ? matrixSections : [];
+    // The matrix's mandated section order belongs in the mold ONLY when this item IS the whole
+    // technical volume — one document the offeror writes end to end. When curation has already
+    // split the volume into one item per mandated section (the T3CP shape: 12 items for the 12
+    // sections), stamping the full list into each of them gives the offeror twelve copies of the
+    // outline, one per section, and buries the section they actually opened. Each such item gets
+    // its own heading and nothing else.
+    const authoredSiblings = items.filter(
+      (i) => i.volumeId === item.volumeId && !i.dsipOnly,
+    ).length;
+    const isWholeVolume = authoredSiblings === 1;
+    const requiredSections = templateType === 'technical_volume' && isWholeVolume ? matrixSections : [];
 
     const canvas = buildMoldCanvas({
       itemName: item.itemName,

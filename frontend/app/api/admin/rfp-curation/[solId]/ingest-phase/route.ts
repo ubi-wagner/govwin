@@ -186,7 +186,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           outlineId, source: proposed.source,
           sections: proposed.volumes.reduce((a, v) => a + v.sections.length, 0),
         });
-        return NextResponse.json({ data: { outlineId, ...proposed, molds: await moldsStatus(solId) } });
+        return NextResponse.json({ data: { outlineId, ...proposed, status: await moldsStatus(solId) } });
       } catch (e) {
         console.error('[ingest-phase] propose_molds failed', e);
         return NextResponse.json({ error: 'Failed to propose the skeleton', code: 'DB_ERROR' }, { status: 500 });
@@ -212,7 +212,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         if (status.itemsToMold > 0 && status.itemsWithMold === status.itemsToMold) {
           await setIngestPhase(solId, 'complete');
         }
-        return NextResponse.json({ data: { ...result, molds: status, phase: await getIngestPhase(solId) } });
+        // `result.molds` is the per-item list that was built; the gate counter is a different
+        // shape, so it gets its own key — spreading both under `molds` silently dropped the list.
+        return NextResponse.json({ data: { ...result, status, phase: await getIngestPhase(solId) } });
       } catch (e) {
         console.error('[ingest-phase] build_molds failed', e);
         return NextResponse.json({ error: 'Failed to build the molds', code: 'DB_ERROR' }, { status: 500 });

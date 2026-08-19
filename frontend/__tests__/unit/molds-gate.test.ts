@@ -88,6 +88,24 @@ describe('the authored set — volume flag and item flag must agree', () => {
 describe('buildMoldCanvas — what a buyer actually opens', () => {
   const SPEC = { font_default: { family: 'Times New Roman', size: 10 }, min_font_size: 10 };
 
+  it('stamps the mandated list ONLY when the item is the whole volume', () => {
+    // Found live: T3CP's Volume 2 is curated as 12 items, one per mandated section. Stamping the
+    // full 12-section list into each of them produced 26-node molds — twelve copies of the
+    // outline, burying the one section the offeror actually opened. The list belongs in the mold
+    // only when the volume is authored as ONE document.
+    const isWholeVolume = (authoredSiblings: number) => authoredSiblings === 1;
+    expect(isWholeVolume(1)).toBe(true);   // single-item technical volume → stamp the outline
+    expect(isWholeVolume(12)).toBe(false); // already split per section → each gets its own heading
+
+    const split = buildMoldCanvas({
+      itemName: 'Phase I Statement of Work', volumeName: 'Technical Volume',
+      pageLimit: 3, characterLimit: null, requiredSections: [], formatSpec: SPEC,
+    });
+    const headings = docNodes(split).filter((n) => n.type === 'heading');
+    expect(headings).toHaveLength(1);
+    expect((headings[0].content as { text: string }).text).toBe('Phase I Statement of Work');
+  });
+
   it('lays out the mandated sections in the mandated order for a technical volume', () => {
     // Getting the required-section ORDER wrong is one of the most common technical-volume
     // compliance failures, and it is knowable at curation time — so the buyer should never have

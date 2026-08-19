@@ -26,6 +26,7 @@ import { computeBudget } from '@/lib/proposal/cost-model';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
+  countDocCharacters,
   estimateSlideCount,
   overflowingSlides,
   docNodes,
@@ -86,6 +87,7 @@ interface SectionRow {
   isLocked: boolean;
   artifactId: string | null;
   pageAllocation: number | null;
+  characterAllocation: number | null;
 }
 interface MatrixRow {
   requirementText: string | null;
@@ -146,7 +148,7 @@ export async function computeSubmissionReadiness(
 
   const sections = await sql<SectionRow[]>`
     SELECT id, title, content, status, is_locked AS "isLocked", artifact_id AS "artifactId",
-           page_allocation AS "pageAllocation"
+           page_allocation AS "pageAllocation", character_allocation AS "characterAllocation"
     FROM proposal_sections
     WHERE proposal_id = ${proposalId}::uuid
     ORDER BY sort_index NULLS LAST, id
@@ -230,6 +232,27 @@ export async function computeSubmissionReadiness(
     // explicit node properties (smallest node font; presence of an image node), so a violation is
     // real, not an estimate — hence a blocker, not an advisory. (Page/slide caps are gated
     // separately below; header/footer + other softer codes stay out of the per-section pass.)
+    // ── Character cap — a HARD blocker, and checked before the artifact spec because it is a
+    // property of the SECTION, not the volume. A character-capped narrative (an SBIR cover-sheet
+    // abstract, an NSF project summary) is pasted into a fixed-size agency form field that
+    // truncates at the cap, so going over does not cost a deduction — it silently deletes the end
+    // of the argument between our export and their reviewer. Exact count, not an estimate, which
+    // is what makes it a blocker rather than a warning.
+    if (s.characterAllocation != null && s.characterAllocation > 0) {
+      const chars = countDocCharacters(doc);
+      if (chars > s.characterAllocation) {
+        formatViolations++;
+        blockers.push({
+          category: 'format_floor',
+          severity: 'blocker',
+          message: `"${s.title ?? 'Section'}": ${chars.toLocaleString()} characters exceeds the `
+            + `${s.characterAllocation.toLocaleString()}-character limit — the agency form truncates the overflow.`,
+          sectionId: s.id,
+          sectionTitle: s.title ?? undefined,
+        });
+      }
+    }
+
     const spec = s.artifactId ? specByArtifact.get(s.artifactId) : undefined;
     if (!spec) continue;
     // The narrative body-font floor governs PROSE. A cost WORKBOOK (xlsx) or a webFORM is not

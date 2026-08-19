@@ -95,7 +95,7 @@ export function IngestStudio({ solId }: { solId: string }) {
         const n = (d.volumes as OutlineVol[] | undefined)?.reduce((a, v) => a + v.sections.length, 0) ?? 0;
         toast.success(`Skeleton proposed — ${n} section(s), ${d.source === 'agent' ? 'from skeleton_architect' : 'derived from the landed matrix'}`);
       } else if (action === 'build_molds') {
-        toast.success(`${d.built} mold(s) built · ${d.molds?.itemsWithMold ?? 0} of ${d.molds?.itemsToMold ?? 0} items covered`);
+        toast.success(`${d.built} mold(s) built · ${d.status?.itemsWithMold ?? 0} of ${d.status?.itemsToMold ?? 0} items covered`);
       } else if (action === 'approve') {
         toast.success(`Advanced to ${d.phaseLabel}`);
       } else {
