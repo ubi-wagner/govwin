@@ -1089,7 +1089,17 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   // Per-SECTION size budgets — a section that declares a page_budget must fit within it
   // (e.g. a "Technical Approach ≤ 5 pages" section inside a longer document). Measured with
   // the same height ruler, so a section limit is enforced as strictly as the whole-doc cap.
-  if (doc.sections?.length && doc.canvas) {
+  //
+  // …but ONLY when the document as a whole does not fit. A per-section budget is the OFFEROR's
+  // internal allocation of the agency's cap (ten required items sharing a ten-page Technical
+  // Volume get one page each); the agency caps the volume, not the item. Once the assembled volume
+  // is inside its cap, a section that ran to two pages while its neighbour ran to half a page is a
+  // plan that reality adjusted, not a compliance defect — and reporting it as one told a customer
+  // their compliant, submittable volume had a violation. Kept live when the volume IS over, which
+  // is when the number does its real job: saying WHICH section to cut.
+  const volumeFits = doc.canvas?.max_pages != null && doc.canvas.max_pages > 0
+    && estimatePageCount(doc) <= doc.canvas.max_pages;
+  if (doc.sections?.length && doc.canvas && !volumeFits) {
     for (const s of doc.sections) {
       const budget = s.layout?.page_budget;
       if (budget == null || budget <= 0) continue;
