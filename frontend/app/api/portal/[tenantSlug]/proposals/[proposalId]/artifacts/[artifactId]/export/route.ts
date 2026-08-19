@@ -18,7 +18,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
-import { resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
+import { resolveArtifactFormat, assembleFittedArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
 import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 
@@ -129,7 +129,16 @@ export async function GET(request: Request, ctx: RouteContext) {
     // header/footer and figure numbering (lib/proposal/volume-finish.ts). What downloads here is
     // what the customer submits, so it is the finished document or nothing.
     const facts = await loadVolumeFacts(proposalId, tenantId);
-    const assembled = assembleArtifactCanvas(sections, artifact.artifactType, title, { ...facts, volumeName: title });
+    const vars: Record<string, string> = {
+      company_name: (tenant as { name?: string }).name ?? 'Your Company',
+      topic_number: title,
+    };
+    // FITTED, not merely finished: the page count is verified by rendering the document rather than
+    // estimating it, because a page over the agency's limit is a rejected submission and the
+    // estimator is ±1 once figures are involved.
+    const assembled = await assembleFittedArtifactCanvas(
+      sections, artifact.artifactType, title, { ...facts, volumeName: title }, vars,
+    );
 
     // Deterministic compliance floor (E4): record whether the exported artifact
     // satisfies the ComplianceSpec frozen at purchase. Advisory — surfaced via the
@@ -140,10 +149,6 @@ export async function GET(request: Request, ctx: RouteContext) {
       : [];
     const requested = new URL(request.url).searchParams.get('format');
     const format = resolveArtifactFormat(artifact.artifactType, assembled.canvas?.format, requested);
-    const vars: Record<string, string> = {
-      company_name: (tenant as { name?: string }).name ?? 'Your Company',
-      topic_number: title,
-    };
 
     let buffer: Buffer;
     try {

@@ -817,6 +817,9 @@ export interface LayoutResult {
   vsMaxPages: { max: number | null; over: boolean };
 }
 
+/** Node types the exporters refuse to break across a page (canvas-html: page-break-inside: avoid). */
+const ATOMIC_NODES: ReadonlySet<CanvasNode['type']> = new Set<CanvasNode['type']>(['image', 'chart', 'table']);
+
 export function paginate(doc: CanvasDocument): LayoutResult {
   const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
   const usableH = m.usableH;
@@ -855,6 +858,17 @@ export function paginate(doc: CanvasDocument): LayoutResult {
         if (group.keep_together) { fitKeep(stackHeightPt(group.nodes ?? [], m)); continue; }
         for (const node of group.nodes ?? []) {
           if (node.type === 'page_break') { if (y > 0) newPage(); continue; }
+          // A figure or a table is ATOMIC. The exporters' own stylesheet says so —
+          // `figure, table { page-break-inside: avoid }` in canvas-html::canvasBaseCss — so when
+          // one does not fit in what is left of a page the renderer moves it whole to the next and
+          // leaves the gap. Letting it split here made the ruler read a document Chromium never
+          // produces: a Technical Volume with two photographs measured 9 pages and laid out as 10,
+          // because the estimator spent the white space the renderer left empty.
+          //
+          // This is the third time the same class of defect has surfaced (a flat height for every
+          // image; a footer token nothing substituted; captions borrowed from alt text) and the
+          // shape is always the same — a model of the page that quietly disagrees with the page.
+          if (ATOMIC_NODES.has(node.type)) { fitKeep(nodeStackHeightPt(node, m)); continue; }
           advance(nodeStackHeightPt(node, m));
         }
       }

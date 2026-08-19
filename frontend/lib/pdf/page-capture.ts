@@ -170,11 +170,25 @@ async function serveAssets(pdf: Buffer): Promise<{ server: Server; origin: strin
   return { server, origin: `http://127.0.0.1:${port}` };
 }
 
-/** Chromium, located the way the PDF exporter locates it. */
+/**
+ * Chromium, located by the SAME rule the PDF exporter uses.
+ *
+ * This used to read its own `CHROMIUM_PATH`, which nothing sets. In the sandbox that meant every
+ * capture worked from a shell (where the variable was exported by hand) and every capture failed
+ * inside the running server — silently, because the whole module is best-effort. The visible
+ * symptom was a Technical Volume that downloaded at eleven pages against a ten-page cap: the
+ * render-verified page fit had quietly measured nothing at all.
+ *
+ * `lib/export/chromium.ts` now owns the one rule — explicit override, Playwright-managed download,
+ * system package, Playwright's default — and both callers use it. Two ways of finding the same
+ * browser is one way too many, and importing it FROM the exporter would close a cycle (the export
+ * assembler imports both), which is the shape that resolves to `undefined` at call time.
+ */
 async function launchBrowser() {
   const { chromium } = await import('playwright');
-  const executablePath = process.env.CHROMIUM_PATH || undefined;
-  return chromium.launch({ ...(executablePath ? { executablePath } : {}), args: ['--no-sandbox'] });
+  const { resolveChromiumExecutable } = await import('@/lib/export/chromium');
+  const executablePath = await resolveChromiumExecutable();
+  return chromium.launch({ ...(executablePath ? { executablePath } : {}), args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 }
 
 interface RawPage {

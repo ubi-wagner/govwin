@@ -22,7 +22,7 @@ import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { exportToPdf } from '@/lib/export/pdf-exporter';
-import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import { assembleArtifactCanvas, assembleFittedArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
 import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { finishVolumeCanvas } from '@/lib/proposal/volume-finish';
 import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
@@ -295,7 +295,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         if (secs.length === 0) continue;
         // Finished per volume, exactly as the single-artifact download finishes it — the zip is
         // the same deliverable in per-volume-native form, so it must not be a plainer document.
-        const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName, { ...zipFacts, volumeName: a.volumeName });
+        const doc = await assembleFittedArtifactCanvas(secs, a.artifactType, a.volumeName, { ...zipFacts, volumeName: a.volumeName }, vars);
         const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
         try {
           const buf = await renderCanvas(fmt, doc, vars);

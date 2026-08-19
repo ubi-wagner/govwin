@@ -91,6 +91,15 @@ export interface VolumeFacts {
   libraryFigures?: LibraryFigure[] | null;
   /** Terms to emphasise in body copy — the offeror's own product/technology names. */
   emphasise?: string[];
+  /**
+   * Hard ceiling on how many LIBRARY figures may be admitted, on top of the page-fit rule.
+   *
+   * Exists so a caller that can measure the TRUTH — `fitFinishedVolume`, which renders the document
+   * and counts its actual pages — can walk this down until the rendered volume is inside its cap.
+   * The estimator is ±1 page and no amount of tuning makes a character-width model exact; the
+   * renderer is exact, and this is the dial it turns.
+   */
+  maxLibraryFigures?: number;
 }
 
 /** One reusable picture from the tenant's library, with the text that describes it. */
@@ -561,14 +570,24 @@ export function finishVolumeCanvas(doc: CanvasDocument, facts: VolumeFacts = {})
   let rebuilt = assemble(allLibraryIds);
   if (paginated && canvas.max_pages && canvas.max_pages > 0) {
     const admitted = new Set<string>();
+    let admittedCount = 0;
+    const ceiling = facts.maxLibraryFigures ?? Number.POSITIVE_INFINITY;
     for (const ids of placed) {
+      if (admittedCount >= ceiling) break;
       const trial = new Set(allLibraryIds);
       ids.forEach((id) => trial.delete(id));          // admit this figure…
       admitted.forEach((id) => trial.delete(id));     // …on top of the ones already admitted
       const candidate = assemble(trial);
       const probe: CanvasDocument = { ...doc, canvas, sections: candidate, nodes: [] };
-      if (estimatePageCount(probe) > canvas.max_pages) continue;   // does not fit — try the next
+      // Fits, by the same ruler the compliance floor and the editor gauge use. That ruler is only
+      // trustworthy here because it was corrected to treat a figure as ATOMIC (canvas-document
+      // ::paginate) — before that it spent the white space the renderer leaves when a picture will
+      // not fit on the rest of a page, and cleared volumes at "10 of 10" that laid out as 11.
+      // The visual reviewer still reports the TRUE rendered count, which is the number any
+      // compliance CLAIM should rest on.
+      if (estimatePageCount(probe) > canvas.max_pages) continue;   // no room — try the next
       ids.forEach((id) => admitted.add(id));
+      admittedCount += 1;
       rebuilt = candidate;
     }
   } else {

@@ -16,6 +16,7 @@
  */
 import { renderCanvasToHtml } from './canvas-html';
 import { inlineImageDataUris } from './image-raster';
+import { resolveChromiumExecutable } from './chromium';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 type RunningSpec = { template?: string } | null | undefined;
@@ -45,41 +46,13 @@ function runningHtml(spec: RunningSpec, vars: Record<string, string>, isFooter: 
  * pre-installed browser build may not match the bundled Playwright, honor an
  * explicit override, else auto-detect a `chromium-*` under PLAYWRIGHT_BROWSERS_PATH.
  */
-async function resolveExecutable(): Promise<string | undefined> {
-  const { existsSync } = await import('fs');
-  // 1) explicit override — prod Docker sets this to the apk-installed chromium.
-  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
-  if (explicit && existsSync(explicit)) return explicit;
-  // 2) a Playwright-managed download under PLAYWRIGHT_BROWSERS_PATH (sandbox).
-  const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (root) {
-    try {
-      const { readdirSync } = await import('fs');
-      for (const d of readdirSync(root)) {
-        if (d.startsWith('chromium-') && !d.includes('headless_shell')) {
-          const p = `${root}/${d}/chrome-linux/chrome`;
-          if (existsSync(p)) return p;
-        }
-      }
-    } catch {
-      /* fall through */
-    }
-  }
-  // 3) a system Chromium (alpine `apk add chromium`, debian, etc.) — robust to
-  //    the exact package path so a mis-set env var can't break PDF export.
-  for (const p of ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/lib/chromium/chromium']) {
-    if (existsSync(p)) return p;
-  }
-  // 4) let Playwright use its own default (a dev machine with a full install).
-  return undefined;
-}
 
 export async function exportToPdf(doc: CanvasDocument, variables: Record<string, string> = {}): Promise<Buffer> {
   // Inline uploaded-image S3 keys to data: URIs first — the sync HTML render can't fetch a storage
   // key, so without this a customer's logo / screenshots export as a broken <img> (the G3 bug).
   const html = renderCanvasToHtml(await inlineImageDataUris(doc), variables);
   const { chromium } = await import('playwright');
-  const executablePath = await resolveExecutable();
+  const executablePath = await resolveChromiumExecutable();
   const browser = await chromium.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     ...(executablePath ? { executablePath } : {}),
