@@ -36,7 +36,12 @@ interface PastProposal {
   templateName: string | null;
 }
 
-export function TemplifyPastProposals({ tenantSlug }: { tenantSlug: string }) {
+// canTemplify: POST …/templates/extract requires tenant_admin ("Only an admin can save a
+// template"), but this panel is mounted on the tenant_user-accessible /atoms page and the LIST it
+// renders (library/past-proposals) is floored at tenant_user — so the rows AND the button both
+// appeared for a base member, and only the button 403'd. The canvas editor already gates its
+// equivalent correctly (lib/canvas/capabilities.ts canManageStructure = isTenantAdmin).
+export function TemplifyPastProposals({ tenantSlug, canTemplify = false }: { tenantSlug: string; canTemplify?: boolean }) {
   const router = useRouter();
   const [items, setItems] = useState<PastProposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +132,7 @@ export function TemplifyPastProposals({ tenantSlug }: { tenantSlug: string }) {
                     >
                       {regenBusy === p.templateId ? 'Starting…' : 'New draft'}
                     </button>
-                  ) : (
+                  ) : canTemplify ? (
                     <button
                       onClick={() => setEditing(p.id)}
                       className="rounded border border-indigo-300 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
@@ -135,7 +140,7 @@ export function TemplifyPastProposals({ tenantSlug }: { tenantSlug: string }) {
                     >
                       Save as template
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 

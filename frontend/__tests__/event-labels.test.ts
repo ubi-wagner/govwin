@@ -49,9 +49,14 @@ describe('eventHref', () => {
     expect(eventHref(slug, { namespace: 'proposal', type: 'section.saved', payload: { proposalId: 'p1', sectionId: 's1' } })).toBe('/portal/acme/proposals/p1/sections/s1');
     expect(eventHref(slug, { namespace: 'proposal', type: 'section.locked', payload: { proposalId: 'p1', sectionId: 's1' } })).toBe('/portal/acme/proposals/p1/sections/s1');
   });
-  it('links library + opportunity + profile events to their surfaces', () => {
-    expect(eventHref(slug, { namespace: 'library', type: 'file.uploaded', payload: {} })).toBe('/portal/acme/library');
-    expect(eventHref(slug, { namespace: 'capture', type: 'topic.pinned', payload: { opportunityId: 'o1' } })).toBe('/portal/acme/spotlights/o1');
+  it('links library + opportunity + profile events to their LIVE surfaces, not retired stubs', () => {
+    // These used to point at /library and /spotlights/<id>. Both are retired redirect stubs, and
+    // the spotlight DETAIL stub redirects to /cards WITHOUT the id — so an opportunity
+    // notification landed on the generic list instead of the card it was about. Pinned to the
+    // live surfaces, id preserved (PipelineCards reads ?opp= and scrolls to that card).
+    expect(eventHref(slug, { namespace: 'library', type: 'file.uploaded', payload: {} })).toBe('/portal/acme/atoms');
+    expect(eventHref(slug, { namespace: 'capture', type: 'topic.pinned', payload: { opportunityId: 'o1' } })).toBe('/portal/acme/cards?opp=o1');
+    expect(eventHref(slug, { namespace: 'capture', type: 'topic.pinned', payload: {} })).toBe('/portal/acme/cards');
     expect(eventHref(slug, { namespace: 'capture', type: 'profile.updated', payload: {} })).toBe('/portal/acme/profile');
   });
   it('returns null when there is no natural source', () => {

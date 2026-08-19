@@ -35,6 +35,7 @@ export function LibraryBrowser({ tenantSlug }: { tenantSlug: string }) {
   const [qInput, setQInput] = useState('');
   const [res, setRes] = useState<ApiResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   // Debounce the search box into filters.q.
   useEffect(() => {
@@ -45,10 +46,22 @@ export function LibraryBrowser({ tenantSlug }: { tenantSlug: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // res.ok BEFORE reading the body: a 403/500 also returns parseable JSON, so without this a
+    // server failure rendered as a confident, silent EMPTY library ("0 atoms") — the user reads
+    // that as "I have nothing saved", not "this request failed".
     fetch(`/api/portal/${tenantSlug}/library/atoms?${buildLibraryQuery(filters)}`)
-      .then((r) => r.json())
-      .then((b) => { if (!cancelled) setRes(b.data ?? { atoms: [], total: 0, facets: {} }); })
-      .catch(() => { if (!cancelled) setRes({ atoms: [], total: 0, facets: {} }); })
+      .then(async (r) => {
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(b?.error ?? `library load failed (${r.status})`);
+        return b;
+      })
+      .then((b) => { if (!cancelled) { setErr(null); setRes(b.data ?? { atoms: [], total: 0, facets: {} }); } })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error('[library-browser] load failed', e);
+        setErr('Could not load your library. Refresh to try again.');
+        setRes({ atoms: [], total: 0, facets: {} });
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [tenantSlug, filters]);
@@ -107,6 +120,9 @@ export function LibraryBrowser({ tenantSlug }: { tenantSlug: string }) {
       {/* results */}
       <div className="mt-3">
         {loading && <p className="text-sm text-gray-400">Loading…</p>}
+        {err && !loading && (
+          <p role="alert" className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded px-3 py-2">{err}</p>
+        )}
         {!loading && res && res.atoms.length === 0 && (
           <p className="rounded border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">Nothing matches these filters.</p>
         )}

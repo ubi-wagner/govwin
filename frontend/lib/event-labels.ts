@@ -205,10 +205,13 @@ export function eventHref(tenantSlug: string, ev: EventLike): string | null {
     return `${base}/proposals/${proposalId}`;
   }
   if (ev.type.startsWith('topic.') || ev.type.startsWith('opportunity.')) {
-    return opportunityId ? `${base}/spotlights/${opportunityId}` : `${base}/spotlights`;
+    // /spotlights and /spotlights/[id] are RETIRED redirect stubs, and the detail stub redirects to
+    // /cards WITHOUT the id — so an opportunity notification landed on the generic list instead of
+    // the item it was about. Point at the live surface directly and keep the id.
+    return opportunityId ? `${base}/cards?opp=${opportunityId}` : `${base}/cards`;
   }
   if (ev.type === 'file.uploaded' || ev.type.startsWith('document.') || ev.type === 'atom.saved') {
-    return `${base}/library`;
+    return `${base}/atoms`; // /library is a retired stub that redirects here
   }
   if (ev.type === 'profile.updated') return `${base}/profile`;
   return null;

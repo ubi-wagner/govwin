@@ -1,13 +1,27 @@
 import { Fragment } from 'react';
+import { auth } from '@/auth';
 import { AdminNavLink } from '@/components/admin/admin-nav-link';
 import { AdminNavProvider } from '@/components/admin/admin-nav-context';
 import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
-import { ADMIN_NAV } from '@/components/admin/admin-nav-data';
+import { visibleAdminNav } from '@/components/admin/admin-nav-data';
+import { isRole, type Role } from '@/lib/rbac';
 import { NavShell } from '@/components/ui/nav-shell';
 
 export const metadata = { title: 'Admin' };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Filter the rail by what this actor may actually reach. ADMIN_NAV was rendered whole to every
+  // admin, so an rfp_admin saw "System Health" (/admin/system is master_admin-only in BOTH
+  // lib/rbac.ts and the page itself) and clicking it hit middleware's deny → redirect('/'), i.e.
+  // ejected out of the console onto the public marketing site with no message. A nav entry that
+  // throws you off the product is worse than no entry.
+  //
+  // The filter is DERIVED from requiredRoleForPath — the same table middleware enforces — rather
+  // than a second minRole field to keep in sync. One authority, no drift.
+  const session = await auth();
+  const su = session?.user as { role?: unknown } | undefined;
+  const role: Role | null = isRole(su?.role) ? su.role : null;
+  const nav = visibleAdminNav(role);
   return (
     <AdminNavProvider>
     <NavShell
@@ -21,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Rendered from ADMIN_NAV — the single source shared with the breadcrumb (admin-nav-data.ts).
             A grouped item (children) shows its primary link with the secondaries indented beneath it. */}
         <nav className="flex flex-col gap-1 text-sm flex-1 mt-4">
-          {ADMIN_NAV.map((section, si) => (
+          {nav.map((section, si) => (
             <Fragment key={section.title}>
               <span className={`text-xs text-gray-500 uppercase tracking-wider mb-1 ${si === 0 ? 'mt-2' : 'mt-4'}`}>{section.title}</span>
               {section.items.map((item) => (

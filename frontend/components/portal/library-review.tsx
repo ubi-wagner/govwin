@@ -26,7 +26,11 @@ const ACTION_META: Record<LibrarianAction, { label: string; tone: string }> = {
 };
 const pct = (n: number | null) => (n == null ? '—' : `${Math.round(n * 100)}%`);
 
-export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
+// canArchive: …/atoms/[atomId]/archive is the ONE tenant_admin gate in the atoms surface, while
+// this panel is mounted on a tenant_user-accessible page. Every "Archive N" control here 403'd for
+// a base member — and because the loop below counted only r.ok, the refusal surfaced as
+// "Nothing was archived", which reads as "there was nothing to do" rather than "you may not".
+export function LibraryReview({ tenantSlug, canArchive = false }: { tenantSlug: string; canArchive?: boolean }) {
   const [review, setReview] = useState<Review | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busy, setBusy] = useState(false);
@@ -48,6 +52,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
     if (!ids.length) return;
     setBusy(true);
     let ok = 0;
+    let denied = false;
     for (const id of ids) {
       try {
         // eslint-disable-next-line no-await-in-loop
@@ -55,10 +60,14 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'archive' }),
         });
         if (r.ok) ok++;
+        else if (r.status === 401 || r.status === 403) denied = true;
       } catch { /* keep going */ }
     }
     setBusy(false);
     if (ok) { toast.success(`Archived ${ok} atom${ok > 1 ? 's' : ''}.`); load(); }
+    // Distinguish "you may not" from "there was nothing to do" — counting only r.ok made a 403
+    // read as an empty result, which is the opposite of what happened.
+    else if (denied) toast.error('Only a company admin can archive library atoms.');
     else toast.error('Nothing was archived.');
   }, [tenantSlug, load]);
 
@@ -112,7 +121,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
             <h3 className="text-sm font-semibold text-violet-900">✦ Librarian — AI catalog
               <span className="ml-2 text-[11px] font-normal text-violet-500">{librarian.assessments.length} assessed · advisory</span>
             </h3>
-            {librarian.recommendedRejectIds.length > 0 && (
+            {canArchive && librarian.recommendedRejectIds.length > 0 && (
               <button onClick={() => archive(librarian.recommendedRejectIds)} disabled={busy}
                 className="text-xs px-3 py-1.5 rounded-md bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50">
                 Archive {librarian.recommendedRejectIds.length} recommended reject{librarian.recommendedRejectIds.length > 1 ? 's' : ''}
@@ -129,7 +138,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
                     {meta && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${meta.tone}`}>{meta.label}</span>}
                     <span className="text-sm text-gray-800 truncate flex-1">{a.title || '(untitled)'}</span>
                     <span className="text-[11px] text-gray-400 tabular-nums shrink-0">Q {pct(a.qualityScore)} · R {pct(a.relevanceScore)}{a.freshness ? ` · ${a.freshness}` : ''}</span>
-                    {a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0 inline-flex items-center min-h-[36px] px-1.5 -my-1">archive</button>}
+                    {canArchive && a.action === 'reject' && <button onClick={() => archive([a.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline shrink-0 inline-flex items-center min-h-[36px] px-1.5 -my-1">archive</button>}
                   </div>
                   {a.reason && <p className="text-[11px] text-gray-500 mt-0.5">{a.reason}</p>}
                   {/* The librarian's proposed taxonomy (#5) — apply as unconfirmed tags in one click. */}
@@ -164,19 +173,23 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
         <section>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h3 className="text-sm font-semibold text-gray-900">Duplicates <span className="text-gray-400 font-normal">· {duplicateGroups.length} group{duplicateGroups.length > 1 ? 's' : ''}</span></h3>
-            <button
-              onClick={() => archive(duplicateGroups.flatMap((g) => g.atoms.slice(1).map((a) => a.id)))}
-              disabled={busy}
-              className="text-xs px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-            >Archive all extras ({stats.duplicateAtoms})</button>
+            {canArchive && (
+              <button
+                onClick={() => archive(duplicateGroups.flatMap((g) => g.atoms.slice(1).map((a) => a.id)))}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+              >Archive all extras ({stats.duplicateAtoms})</button>
+            )}
           </div>
           <div className="space-y-2">
             {duplicateGroups.map((g) => (
               <div key={g.key} className="bg-white border border-gray-200 rounded-lg p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <span className="text-xs text-gray-500">{g.atoms.length} identical copies</span>
-                  <button onClick={() => archive(g.atoms.slice(1).map((a) => a.id))} disabled={busy}
-                    className="text-xs text-amber-700 hover:underline disabled:opacity-50">Keep the first, archive {g.atoms.length - 1}</button>
+                  {canArchive && (
+                    <button onClick={() => archive(g.atoms.slice(1).map((a) => a.id))} disabled={busy}
+                      className="text-xs text-amber-700 hover:underline disabled:opacity-50">Keep the first, archive {g.atoms.length - 1}</button>
+                  )}
                 </div>
                 <ol className="space-y-1">
                   {g.atoms.map((a, i) => (
@@ -203,7 +216,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
                 <span className={`text-[11px] px-2 py-0.5 rounded-full border ${meta.tone} mr-2`}>{meta.label}</span>
                 <span className="text-gray-400 font-normal">{items.length}</span>
               </h3>
-              {meta.archivable && (
+              {canArchive && meta.archivable && (
                 <button onClick={() => archive(items.map((f) => f.atomId))} disabled={busy}
                   className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50">Archive all {items.length}</button>
               )}
@@ -213,7 +226,7 @@ export function LibraryReview({ tenantSlug }: { tenantSlug: string }) {
                 <li key={f.atomId} className="flex items-center gap-2 px-3 py-2 text-sm">
                   <span className="truncate flex-1">{f.title || '(untitled)'}</span>
                   <span className="text-[11px] text-gray-400">{f.detail}</span>
-                  {meta.archivable && (
+                  {canArchive && meta.archivable && (
                     <button onClick={() => archive([f.atomId])} disabled={busy} className="text-[11px] text-rose-600 hover:underline disabled:opacity-50">archive</button>
                   )}
                 </li>

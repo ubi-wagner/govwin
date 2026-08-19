@@ -85,11 +85,38 @@ Your recommendations are ADVISORY: you never auto-approve, delete, or write busi
         return ["search_atoms", "match_section_skeleton", "search_memory", "get_tenant_profile"]
 
     def handles_event(self, event_type: str) -> bool:
-        # Handled both bare and namespaced, since dispatch paths differ.
+        # Handled both bare and namespaced, since dispatch paths differ. The BARE forms are the
+        # live ones — `system_events.type` carries no namespace prefix — which makes this the only
+        # archetype the processor's fallback can actually reach. See handles_dispatch below.
         return event_type in (
             "library.package.atomized", "package.atomized",
             "library.document.locked", "document.locked",
         )
+
+    def handles_dispatch(self, event: dict) -> bool:
+        """Decline a fallback dispatch that carries no cocoon to catalog.
+
+        Cataloging is per-PACKAGE: every prompt this archetype builds is "Catalog the atoms of
+        package (cocoon) {id}". The designed producer is the explicit `agent_task_queue` enqueue
+        the upload routes make (`requestAgentTask({agentRole:'librarian', input:{cocoonId}})`),
+        which carries that id.
+
+        The processor's archetype-fallback also reaches us, because the routes ALSO emit
+        `library:package.atomized` — and its payload is `{filesProcessed, totalAtoms, source}`,
+        with no cocoonId. That produced a SECOND invocation per upload whose prompt read
+        "Catalog the atoms of package (cocoon) ." — burning a tenant's agent budget on a request
+        that names nothing. `document.locked` (both the `library` volume-promotion emit and the
+        `proposal` volume-lock emit) carries no cocoonId either.
+
+        So: require the id. A payload that names a cocoon is a real catalog request and still
+        dispatches; one that does not is left to the queued task that has the id.
+        """
+        if not self.handles_event(event.get("type", "")):
+            return False
+        payload = event.get("payload") or {}
+        if not isinstance(payload, dict):
+            return False
+        return bool(payload.get("cocoonId") or payload.get("cocoon_id"))
 
     def get_tools(self) -> list[dict]:
         return [

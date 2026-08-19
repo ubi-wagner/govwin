@@ -7,6 +7,8 @@
 // lives here with its canonical label, and redundant surfaces are grouped as
 // `children` (a primary link with indented secondaries) instead of a flat wall.
 
+import { hasRoleAtLeast, requiredRoleForPath, type Role } from '@/lib/rbac';
+
 export type AdminNavItem = {
   href: string;
   label: string;
@@ -98,6 +100,34 @@ export const ADMIN_NAV: AdminNavSection[] = [
 const FLAT: AdminNavItem[] = ADMIN_NAV.flatMap((s) =>
   s.items.flatMap((i) => [i, ...(i.children ?? [])]),
 );
+
+/**
+ * ADMIN_NAV filtered to what `role` may actually REACH.
+ *
+ * The rail used to render whole to every admin, so an `rfp_admin` was shown "System Health"
+ * (`/admin/system` is master_admin-only in BOTH lib/rbac.ts and the page's own guard). Clicking it
+ * hit middleware's deny → `redirect('/')` — ejected out of the admin console onto the public
+ * marketing site, silently. A nav entry that throws you off the product is worse than no entry.
+ *
+ * The gate is DERIVED from `requiredRoleForPath`, the same table middleware enforces, so this can
+ * never drift from the real answer the way a second hand-maintained `minRole` field would. Adding
+ * a new master_admin-only admin route needs no change here.
+ *
+ * A parent whose children are all hidden still renders (it is reachable itself); a section whose
+ * items are ALL hidden is dropped so no empty heading appears.
+ */
+export function visibleAdminNav(role: Role | null): AdminNavSection[] {
+  const may = (href: string) => {
+    const need = requiredRoleForPath(href);
+    return need == null || (role != null && hasRoleAtLeast(role, need));
+  };
+  return ADMIN_NAV.map((s) => ({
+    ...s,
+    items: s.items
+      .filter((i) => may(i.href))
+      .map((i) => (i.children ? { ...i, children: i.children.filter((c) => may(c.href)) } : i)),
+  })).filter((s) => s.items.length > 0);
+}
 
 /** Human-readable label for an admin pathname, including detail routes. */
 export function adminPageLabel(pathname: string): string {

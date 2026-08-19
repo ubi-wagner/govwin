@@ -9,7 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant, sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, planDocumentAtomization, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import { classifyDsipSidecar } from '@/lib/library/dsip-deconstruct';
@@ -36,6 +36,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
     if (!(await verifyTenantAccess(u.id, role, tenantId))) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    // RLS choke point: pin tenant context in THIS handler's own frame. verifyTenantAccess enters
+    // the context in ITS frame, and context does not flow child→parent — so without this line the
+    // handler's own reads run with no `app.tenant_id`. Under the govtech_app (NOBYPASSRLS) role
+    // that is not a no-op: proven live, the `document_cocoons` bind below returned 0 rows for a
+    // cocoon the tenant genuinely owns → 404 "attachToCocoonId is not one of your past proposals"
+    // on every DSIP sidecar attach, and the `requestAgentTask` librarian enqueue further down
+    // raised 42501 (RLS policy violation) which its own try/catch swallowed as `null` — so the
+    // librarian was NEVER queued from this route.
+    enterTenant(tenantId);
     const actorKind: CreatorKind = hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' ? 'admin' : 'collaborator';
 
     let form: FormData;

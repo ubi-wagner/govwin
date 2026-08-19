@@ -208,7 +208,15 @@ export default async function DashboardPage({
             : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
         }`}>
           Your trial expires in {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}.
-          <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">Subscribe to keep your data.</a>
+          {/* /billing redirects anyone below tenant_admin straight back here, so for a base member
+              the link is a no-op click. The "Get started" checklist below is already fenced on
+              canAct for exactly this reason ("avoid a redirect-trap"); this banner sat outside it.
+              Same fence, and tell a base member who CAN act instead of dead-ending them. */}
+          {canAct ? (
+            <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">Subscribe to keep your data.</a>
+          ) : (
+            <span className="ml-2 font-semibold">Ask your company admin to subscribe.</span>
+          )}
         </div>
       )}
       <Cockpit

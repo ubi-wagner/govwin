@@ -292,7 +292,9 @@ class AgentFabric:
 
         try:
             for name, archetype in self._archetypes.items():
-                if archetype.handles_event(event_type):
+                # handles_dispatch, not handles_event: the type-only gate cannot tell a usable
+                # event from one that merely names the right subject. Defaults to handles_event.
+                if archetype.handles_dispatch(event):
                     result = await self.invoke_agent(
                         conn, name, event, tenant_id=tenant_id,
                     )

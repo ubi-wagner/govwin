@@ -1177,7 +1177,16 @@ export function CurationWorkspace({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ solicitationId: sol.id }),
                       });
-                      const json = await resp.json();
+                      const json = await resp.json().catch(() => ({}));
+                      // resp.ok FIRST. The route returns JSON bodies on 401/403/400/500 (e.g.
+                      // { error: 'Topic extraction failed', code: 'DB_ERROR' }) which parse
+                      // cleanly, leaving json.data undefined → extracted=[] → the extractor
+                      // FAILING was reported to the curator as an informational "No topics
+                      // found", i.e. the opposite of what actually happened.
+                      if (!resp.ok) {
+                        toast.error(json?.error ?? 'Topic extraction failed. Try again, or use Bulk Import.');
+                        return;
+                      }
                       const extracted = json.data?.topics ?? [];
                       if (extracted.length === 0) {
                         toast.info(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');

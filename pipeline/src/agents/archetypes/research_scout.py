@@ -43,8 +43,16 @@ FENCE_CLOSE = "--- END UNTRUSTED WEB CONTENT ---"
 
 
 def fence_web(text: str, limit: int = 6000) -> str:
-    """Wrap external web text so the model treats it as data, not instructions."""
-    return f"{FENCE_OPEN}\n{str(text)[:limit]}\n{FENCE_CLOSE}"
+    """Wrap external web text so the model treats it as data, not instructions.
+
+    Neutralize a forged CLOSING marker first. Without that step the fence is decorative against
+    the single most hostile source in the system: an attacker-controlled page that simply
+    CONTAINS the literal close marker ends the fence early, and everything it writes after that
+    line lands OUTSIDE the fence — in instruction position. Mirrors ContextAssembler._wrap and
+    the section_drafter excerpt fence.
+    """
+    safe = str(text)[:limit].replace(FENCE_CLOSE, FENCE_CLOSE.replace(" ---", " [escaped] ---"))
+    return f"{FENCE_OPEN}\n{safe}\n{FENCE_CLOSE}"
 
 
 class ResearchScoutArchetype(BaseArchetype):

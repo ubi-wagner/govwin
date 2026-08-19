@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { readDocument } from '@/lib/import';
 import { textOfNodes } from '@/lib/atom-size';
@@ -42,6 +42,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
     if (!(await verifyTenantAccess(u.id, role, tenantId))) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    // RLS choke point: pin tenant context in THIS handler's own frame (verifyTenantAccess enters
+    // it in ITS frame; context does not flow child→parent). Without it the `requestAgentTask`
+    // librarian enqueue below raised 42501 (RLS policy violation on agent_task_queue) and its own
+    // try/catch swallowed it as `null` — the librarian was never queued from an upload, silently.
+    enterTenant(tenantId);
 
     let form: FormData;
     try { form = await request.formData(); } catch { return NextResponse.json({ error: 'Expected multipart form-data', code: 'VALIDATION_ERROR' }, { status: 400 }); }
