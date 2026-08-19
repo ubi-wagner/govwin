@@ -545,19 +545,34 @@ export function finishVolumeCanvas(doc: CanvasDocument, facts: VolumeFacts = {})
     return out;
   };
 
-  // Place first, measure the finished document, then take LIBRARY figures back out from the end
-  // until it fits. Last placed goes first: the sections are in reading order, so a figure late in
-  // the volume is the one an evaluator is least likely to miss. Generated figures are never
-  // dropped — they are derived from the section's own content, not added to it.
-  const drop = new Set<string>();
-  let rebuilt = assemble(drop);
+  // Fit by ADDING, not by removing.
+  //
+  // The first version placed every candidate and then dropped from the end until the volume fit.
+  // Measured, that converged to zero: six harvested figures cost four pages against one page of
+  // headroom, and every intermediate step was still over, so it kept dropping and the volume
+  // shipped with no pictures at all. Removing one at a time cannot land on "as many as fit" when
+  // each step is coarse relative to the headroom.
+  //
+  // Adding does. Start from the volume with no library figures — its generated figures stay, they
+  // are derived from the section's own content — then admit candidates in READING ORDER, keeping
+  // each only while the finished document is still inside its cap. The result is the largest
+  // prefix that fits, and it keeps the figures nearest the front, where a volume wants them.
+  const allLibraryIds = new Set(placed.flat());
+  let rebuilt = assemble(allLibraryIds);
   if (paginated && canvas.max_pages && canvas.max_pages > 0) {
-    for (let i = placed.length - 1; i >= 0; i -= 1) {
-      const probe: CanvasDocument = { ...doc, canvas, sections: rebuilt, nodes: [] };
-      if (estimatePageCount(probe) <= canvas.max_pages) break;
-      placed[i].forEach((id) => drop.add(id));
-      rebuilt = assemble(drop);
+    const admitted = new Set<string>();
+    for (const ids of placed) {
+      const trial = new Set(allLibraryIds);
+      ids.forEach((id) => trial.delete(id));          // admit this figure…
+      admitted.forEach((id) => trial.delete(id));     // …on top of the ones already admitted
+      const candidate = assemble(trial);
+      const probe: CanvasDocument = { ...doc, canvas, sections: candidate, nodes: [] };
+      if (estimatePageCount(probe) > canvas.max_pages) continue;   // does not fit — try the next
+      ids.forEach((id) => admitted.add(id));
+      rebuilt = candidate;
     }
+  } else {
+    rebuilt = assemble(new Set());   // uncapped: every figure the library matched
   }
 
   return {

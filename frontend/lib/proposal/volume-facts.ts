@@ -50,11 +50,20 @@ export async function loadVolumeFacts(
     // record has none of its own — an uncurated or directly-loaded opportunity.
     const fromTitle = (r.proposalTitle ?? '').match(/^\s*([A-Z0-9][A-Z0-9.\-]{5,24})\s*[:—-]/)?.[1] ?? null;
 
-    const [milestones, computed, libraryFigures] = await Promise.all([
-      loadMilestones(proposalId),
-      loadComputedCostFacts(proposalId),
-      loadLibraryFigures(tenantId),
-    ]);
+    // SEQUENTIAL, not Promise.all.
+    //
+    // These run through the RLS-scoped `sql` proxy, which carries the request's tenant context and
+    // its connection. Firing them concurrently put three statements on that one connection at once,
+    // and on the server every one of them came back empty while the query ABOVE — the same client,
+    // run before the fan-out — returned fine. The symptom was a Technical Volume that downloaded
+    // with its cover band and running header (from the first query) and no figures, no milestones
+    // and no cost facts at all (from the three).
+    //
+    // Three small indexed reads do not need the concurrency, and a shared, context-carrying
+    // connection is exactly the wrong place to reach for it.
+    const milestones = await loadMilestones(proposalId);
+    const computed = await loadComputedCostFacts(proposalId);
+    const libraryFigures = await loadLibraryFigures(tenantId);
 
     return {
       companyName: r.companyName,
