@@ -72,6 +72,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
       title: string;
       status: string;
       pageAllocation: number | null;
+      characterAllocation: number | null;
+      contentSource: string | null;
       version: number;
       assignedTo: string | null;
       artifactId: string | null;
@@ -87,6 +89,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
         title: string;
         status: string;
         pageAllocation: number | null;
+        characterAllocation: number | null;
+        contentSource: string | null;
         version: number;
         assignedTo: string | null;
         artifactId: string | null;
@@ -98,6 +102,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
         SELECT
           id, section_number, title, status,
           page_allocation, version, assigned_to,
+          -- The section's own size budget and where its starting content came from. The author
+          -- needs BOTH: a character-capped narrative has no page gauge to read, and "seeded from
+          -- the master mold" versus "you wrote this" is the difference between a starting point
+          -- and their own work.
+          character_allocation, content_source,
           artifact_id, volume_name, volume_number, is_locked, section_type
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}
@@ -128,6 +137,14 @@ export async function GET(_request: Request, ctx: RouteContext) {
         title: section.title,
         status: section.status,
         pageLimit: section.pageAllocation,
+        // Both size budgets, under the names the rest of the app uses. `pageLimit` is the older
+        // alias kept for its existing consumers; a character-capped section has no page gauge to
+        // read, so the author needs this one or they are writing blind against the agency's cap.
+        pageAllocation: section.pageAllocation,
+        characterAllocation: section.characterAllocation,
+        // Where the starting content came from — 'template' means the master mold seeded it, which
+        // is a materially different thing to show an author than their own draft.
+        contentSource: section.contentSource,
         version: section.version,
         assignedTo: section.assignedTo,
         // E1/E3: artifact grouping + lock state + taxonomy for the workspace UI.

@@ -24,6 +24,7 @@ const SOL = process.env.DRIVE_SOL_ID ?? '11263a74-ab09-48bb-ada5-565aa2ee986e';
 const OPP = process.env.DRIVE_OPP_ID ?? '2e96f788-0798-42d3-b8ef-361e35a2219a';
 const TENANT = process.env.DRIVE_TENANT_SLUG ?? 'immobileyes';
 const COMP_CODE = 'rfppipelinetest';
+const TOPIC = process.env.DRIVE_TOPIC ?? 'OSW26BZ04-DP013';
 
 const ADMIN = { email: 'eric@rfppipeline.com', password: 'RFPAdmin2026!' };
 const BUYER = { email: 'admin@immobileyes.test', password: 'DemoPass123!' };
@@ -84,29 +85,60 @@ test('spine · build-out → push → comp purchase → release → the buyer ge
     opportunityId: OPP, promoCode: COMP_CODE, label: 'primary',
   });
   console.log('[spine] purchase:', purchase.status, JSON.stringify(purchase.body).slice(0, 300));
-  expect(purchase.ok, `purchase: ${JSON.stringify(purchase.body)}`).toBeTruthy();
-  const portalId = purchase.body.data?.portalId as string;
-  expect(portalId).toBeTruthy();
 
-  // The buyer waits: a comp purchase opens curation_pending, never a live build.
-  expect(purchase.body.data?.status ?? 'curation_pending').toBe('curation_pending');
+  let portalId: string;
+  if (!purchase.ok && purchase.body?.code === 'ALREADY_PURCHASED') {
+    // A second run of this drive hits the product's own one-workspace-per-opportunity rule. That
+    // refusal is correct behaviour, not a drive failure — pick up the existing portal and carry on,
+    // so the drive stays re-runnable without needing the database reset by hand.
+    const list = await buyer.request.get(`/api/portal/${TENANT}/portals`);
+    expect(list.ok(), 'must be able to list the tenant’s portals').toBeTruthy();
+    const body = (await list.json()).data as { portals?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+    const portals = (Array.isArray(body) ? body : body.portals) ?? [];
+    const mine = portals.find((p) => String(p.opportunityId) === OPP);
+    expect(mine, 'the already-purchased portal must be findable').toBeTruthy();
+    portalId = String(mine!.id);
+    console.log(`[spine] reusing the existing portal ${portalId} (status ${String(mine!.status)})`);
+  } else {
+    expect(purchase.ok, `purchase: ${JSON.stringify(purchase.body)}`).toBeTruthy();
+    portalId = purchase.body.data?.portalId as string;
+    expect(portalId).toBeTruthy();
+    // The buyer waits: a comp purchase opens curation_pending, never a live build.
+    expect(purchase.body.data?.status ?? 'curation_pending').toBe('curation_pending');
+  }
 
   // ── 4. rfp_admin: release from the provisioning cockpit ──────────────────────
   const release = await post(admin.request, `/api/admin/provisioning/${portalId}/release`, {});
   console.log('[spine] release:', release.status, JSON.stringify(release.body).slice(0, 400));
-  expect(release.ok, `release: ${JSON.stringify(release.body)}`).toBeTruthy();
-  const proposalId = (release.body.data?.proposalId ?? release.body.data?.proposal?.id) as string;
-  expect(proposalId, 'release must provision a proposal').toBeTruthy();
+  let proposalId: string;
+  if (!release.ok && /already|launched/i.test(JSON.stringify(release.body))) {
+    // Already released on an earlier run — find the provisioned proposal through the buyer's own
+    // list rather than re-releasing, which would double-provision.
+    const props = await buyer.request.get(`/api/portal/${TENANT}/proposals`);
+    expect(props.ok()).toBeTruthy();
+    const pb = (await props.json()).data as { proposals?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+    const list = (Array.isArray(pb) ? pb : pb.proposals) ?? [];
+    // The proposals list does not carry opportunityId, so match on the title provision writes:
+    // `<topicNumber>: <title>`.
+    const mine = list.find((p) => String(p.title ?? '').includes(TOPIC));
+    expect(mine, `the provisioned proposal must be findable (looked for "${TOPIC}" in ${list.length} proposals)`).toBeTruthy();
+    proposalId = String(mine!.id);
+    console.log(`[spine] reusing the provisioned proposal ${proposalId}`);
+  } else {
+    expect(release.ok, `release: ${JSON.stringify(release.body)}`).toBeTruthy();
+    proposalId = (release.body.data?.proposalId ?? release.body.data?.proposal?.id) as string;
+    expect(proposalId, 'release must provision a proposal').toBeTruthy();
+  }
 
   // ── 5. What the buyer actually received ──────────────────────────────────────
-  const docRes = await buyer.request.get(`/api/portal/${TENANT}/proposals/${proposalId}/document`);
-  expect(docRes.ok(), 'the buyer must be able to load their provisioned build').toBeTruthy();
-  const doc = (await docRes.json()).data as {
+  const secRes = await buyer.request.get(`/api/portal/${TENANT}/proposals/${proposalId}/sections`);
+  expect(secRes.ok(), 'the buyer must be able to load their provisioned build').toBeTruthy();
+  const payload = (await secRes.json()).data as {
     sections?: Array<{ title: string; volumeName: string | null; volumeNumber: number | null;
                        pageAllocation: number | null; characterAllocation: number | null;
                        status: string; contentSource: string | null }>;
   };
-  const sections = doc.sections ?? [];
+  const sections = (Array.isArray(payload) ? payload : payload.sections) ?? [];
   console.log(`[spine] provisioned ${sections.length} sections`);
   for (const s of sections) {
     console.log(`   V${s.volumeNumber ?? '?'} · ${s.title}`
