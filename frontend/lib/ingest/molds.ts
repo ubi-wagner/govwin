@@ -179,7 +179,13 @@ export async function proposeOutline(solId: string): Promise<ProposedOutline | n
     volume: v.volumeName,
     pageLimit: null,
     dsipOnly: v.dsipOnly,
-    sections: (byVol.get(v.id) ?? [])
+    // A DSIP-only VOLUME contributes no authored sections at all, regardless of what its items
+    // say — the whole volume is completed in the agency portal. Filtering only on the per-ITEM
+    // flag let Volume 4 (the Company Commercialization Report, flagged at the volume level) into
+    // the skeleton, which would then have been molded: an authoring artifact for a report SBIR.gov
+    // generates. Same rule as provision's isAuthoredVolume; the two must agree or the skeleton
+    // describes a build that never happens.
+    sections: (v.dsipOnly ? [] : (byVol.get(v.id) ?? []))
       .filter((it) => !it.dsipOnly)
       .map((it) => {
         const hint = agentSections.get(it.itemName.trim().toLowerCase());

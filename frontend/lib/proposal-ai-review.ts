@@ -30,6 +30,13 @@ export interface RequestAiReviewParams {
   role: Role;
   source: AiReviewSource;
   reviewType?: ReviewType;
+  /**
+   * Restrict the review to these sections. Used by the RETRY path, which re-queues only the
+   * sections whose last review failed: re-running everything would post a second, possibly
+   * contradictory review on each section that already succeeded, and would spend the same hourly
+   * budget that caused the failure in the first place.
+   */
+  onlySectionIds?: string[];
 }
 
 export interface RequestAiReviewResult {
@@ -42,12 +49,20 @@ export async function requestAiReview(p: RequestAiReviewParams): Promise<Request
   // Every section with content — a manual review can run pre-lock (unlike on-advance, which
   // reviews the accepted/locked content). Empty canvases are skipped after text extraction.
   let sections: { id: string; title: string | null; content: string | null; sectionType: string | null }[] = [];
+  const only = p.onlySectionIds && p.onlySectionIds.length ? p.onlySectionIds : null;
   try {
-    sections = await sql`
-      SELECT id, title, content, section_type
-      FROM proposal_sections
-      WHERE proposal_id = ${p.proposalId}::uuid AND content IS NOT NULL
-    `;
+    sections = only
+      ? await sql`
+          SELECT id, title, content, section_type
+          FROM proposal_sections
+          WHERE proposal_id = ${p.proposalId}::uuid AND content IS NOT NULL
+            AND id = ANY(${only}::uuid[])
+        `
+      : await sql`
+          SELECT id, title, content, section_type
+          FROM proposal_sections
+          WHERE proposal_id = ${p.proposalId}::uuid AND content IS NOT NULL
+        `;
   } catch (e) {
     console.error('[requestAiReview] section fetch failed', e);
     sections = [];

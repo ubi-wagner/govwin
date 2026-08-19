@@ -62,6 +62,29 @@ describe('inferTemplateType — every result must satisfy the CHECK constraint',
   });
 });
 
+describe('the authored set — volume flag and item flag must agree', () => {
+  // Found live by the molds drive: proposeOutline filtered DSIP-only ITEMS but not DSIP-only
+  // VOLUMES, so Volume 4 (Company Commercialization Report — flagged at the volume level, its
+  // single item unflagged) reached the skeleton and would have been molded. That is an authoring
+  // artifact for a report SBIR.gov generates: work the customer can never do, blocking readiness
+  // forever. The rule below is the one provision applies, and the two must not drift.
+  type Item = { dsipOnly?: boolean };
+  type Vol = { dsipOnly: boolean; items: Item[] };
+  const authoredSections = (v: Vol) => (v.dsipOnly ? [] : v.items).filter((i) => i.dsipOnly !== true);
+
+  it('a DSIP-only VOLUME contributes nothing, even when its items are unflagged', () => {
+    expect(authoredSections({ dsipOnly: true, items: [{}] })).toHaveLength(0);
+  });
+
+  it('a DSIP-only ITEM is dropped from an otherwise authored volume', () => {
+    expect(authoredSections({ dsipOnly: false, items: [{ dsipOnly: true }, {}, {}] })).toHaveLength(2);
+  });
+
+  it('an ordinary volume keeps all of its items', () => {
+    expect(authoredSections({ dsipOnly: false, items: [{}, {}, {}] })).toHaveLength(3);
+  });
+});
+
 describe('buildMoldCanvas — what a buyer actually opens', () => {
   const SPEC = { font_default: { family: 'Times New Roman', size: 10 }, min_font_size: 10 };
 
