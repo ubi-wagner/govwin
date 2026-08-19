@@ -8,7 +8,8 @@
 // sync writes carries name/trigger/source/active but NO step structure
 // (db/migrations/054), and the sync only runs inside the full pipeline boot.
 // So drawing a template's flow is a frontend concern; this file is its source.
-// It is kept 1:1 with the Python registry (29 templates, verified file:line) and
+// It is kept 1:1 with the Python registry (34 workflow classes, verified against
+// `grep -c 'class .*(Workflow):' pipeline/src/workflows/*.py`) and
 // keyed by the SAME workflow_name the engine writes to process_instances, so a
 // live instance's step_status overlays straight onto these nodes.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ export const SPINES: { key: Spine; title: string; blurb: string }[] = [
   },
 ];
 
-// ── The 29 templates ─────────────────────────────────────────────────────────
+// ── The 34 workflow shapes ───────────────────────────────────────────────────
 
 export const WORKFLOW_SHAPES: WorkflowShape[] = [
   // ── Discovery spine (finder) ───────────────────────────────────────────────
@@ -118,7 +119,14 @@ export const WORKFLOW_SHAPES: WorkflowShape[] = [
     workflowName: 'OnSolicitationReviewRequested',
     title: 'Curation Review Requested',
     spine: 'discovery',
-    trigger: 'finder:solicitation.triaged:end',
+    // The TOOL's event, not the triage route's. Two producers exist for "curation submitted for
+    // review": the workspace calls the request-review tool (lib/tools/solicitation-request-review.ts),
+    // which emits this via emitEventSingle — hence phase 'single'; the triage route emits the
+    // legacy twin `finder:solicitation.triaged` with toState='review_requested'. PATTERN_AUDIT
+    // HIGH-1 re-pointed the workflow at the tool's event because only that one fires from the
+    // workspace. This catalog kept showing the twin, so the admin map displayed a trigger the
+    // workflow does not listen to.
+    trigger: 'finder:solicitation.review_requested:single',
     launch: 'event',
     description: 'Run an advisory pre-release QA pass when a curation is submitted for review.',
     steps: [
@@ -447,6 +455,87 @@ export const WORKFLOW_SHAPES: WorkflowShape[] = [
     steps: [
       { name: 'ai_content_curate', kind: 'AI_INVOKE' },
       { name: 'email_curation', kind: 'NOTIFY' },
+    ],
+  },
+
+  // ── Ingest Studio — the four gated phases (pipeline/src/workflows/on_ingest_phase_requested.py)
+  //
+  // These were absent from this catalog while the pipeline registered them, so the Workflow Map
+  // showed 29 of 34 workflows and reported "29 workflows" as a complete statement of the system.
+  // The whole gated ingest spine — the path an admin uses to bring a solicitation IN — was
+  // invisible, and a live instance of one had no shape to overlay its step status onto.
+  //
+  // All four share one trigger, `finder:ingest.phase_requested:end`, and branch on payload.phase
+  // (the same pattern as OnFullDraftRequested{ModeA,B,C}). Each ends in the advance_phase ACTION
+  // that holds the human gate or chains the next phase.
+  {
+    workflowName: 'OnIngestPhaseRequestedExtract',
+    title: 'Ingest Studio 1 · Extract',
+    spine: 'discovery',
+    trigger: 'finder:ingest.phase_requested:end',
+    launch: 'imperative',
+    description: 'Phase 1: ingest_analyst reads the solicitation into a structured reading.',
+    steps: [
+      { name: 'extract', kind: 'AI_INVOKE' },
+      { name: 'advance_phase', kind: 'ACTION', dependsOn: 'extract' },
+    ],
+  },
+  {
+    workflowName: 'OnIngestPhaseRequestedMatrix',
+    title: 'Ingest Studio 2 · Matrix',
+    spine: 'discovery',
+    trigger: 'finder:ingest.phase_requested:end',
+    launch: 'imperative',
+    description: 'Phase 2: matrix_stager proposes a compliance matrix from the reading.',
+    steps: [
+      { name: 'stage_matrix', kind: 'AI_INVOKE' },
+      { name: 'advance_phase', kind: 'ACTION', dependsOn: 'stage_matrix' },
+    ],
+  },
+  {
+    workflowName: 'OnIngestPhaseRequestedReview',
+    title: 'Ingest Studio 3 · Review',
+    spine: 'discovery',
+    trigger: 'finder:ingest.phase_requested:end',
+    launch: 'imperative',
+    description:
+      'Phase 3: a colour team of 3 tries to REFUTE the staged matrix against its citations '
+      + '(one lens each — citation · completeness · consistency), then advisory_manager reconciles.',
+    // COLOUR_TEAM_SLOTS = 3, so the refute steps are refute_0..refute_2, generated in a loop.
+    // They are INDEPENDENT of each other; only `reconcile` depends on refute_0.
+    steps: [
+      { name: 'refute_0', kind: 'AI_INVOKE' },
+      { name: 'refute_1', kind: 'AI_INVOKE' },
+      { name: 'refute_2', kind: 'AI_INVOKE' },
+      { name: 'reconcile', kind: 'AI_INVOKE', dependsOn: 'refute_0' },
+      { name: 'record_review', kind: 'ACTION' },
+      { name: 'advance_phase', kind: 'ACTION', dependsOn: 'record_review' },
+    ],
+  },
+  {
+    workflowName: 'OnIngestPhaseRequestedMolds',
+    title: 'Ingest Studio 4 · Molds',
+    spine: 'discovery',
+    trigger: 'finder:ingest.phase_requested:end',
+    launch: 'imperative',
+    description: 'Phase 4: skeleton_architect authors volumes + section molds from a LANDED matrix.',
+    steps: [
+      { name: 'build_molds', kind: 'AI_INVOKE' },
+      { name: 'advance_phase', kind: 'ACTION', dependsOn: 'build_molds' },
+    ],
+  },
+  {
+    workflowName: 'OnPortalStageReviewRequested',
+    title: 'Portal Stage Review (AI manager gate)',
+    spine: 'build',
+    trigger: 'capture:stage_review.requested:end',
+    launch: 'event',
+    description:
+      'AI-manager portal stage gate: run the review manager, record the verdict, emit '
+      + 'stage_review.completed. Advisory — it never advances the stage itself.',
+    steps: [
+      { name: 'review_manager', kind: 'AI_INVOKE' },
+      { name: 'record', kind: 'ACTION' },
     ],
   },
 ];
