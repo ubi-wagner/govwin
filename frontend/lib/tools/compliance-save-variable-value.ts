@@ -48,6 +48,7 @@ import { writeCurationMemory, type CurationAction } from './curation-memory';
 const KNOWN_TYPES: Record<string, 'int' | 'text' | 'bool' | 'numeric'> = {
   page_limit_technical: 'int',
   page_limit_cost: 'int',
+  character_limit_narrative: 'int',
   font_family: 'text',
   font_size: 'text',
   margins: 'text',
@@ -79,6 +80,7 @@ const KNOWN_TYPES: Record<string, 'int' | 'text' | 'bool' | 'numeric'> = {
 const TYPED_COLUMNS: Record<string, string> = {
   page_limit_technical: 'page_limit_technical',
   page_limit_cost: 'page_limit_cost',
+  character_limit_narrative: 'character_limit_narrative',
   font_family: 'font_family',
   font_size: 'font_size',
   margins: 'margins',

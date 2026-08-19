@@ -84,7 +84,7 @@ export async function provisionProposalForPortal(opts: {
     console.error('[provision-proposal] compliance resolution DEGRADED for', opportunityId, '— refusing to provision a default skeleton');
     return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
   }
-  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
+  const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
     // DSIP-only volumes contribute no authored items — they are completed in the agency portal and
@@ -95,6 +95,7 @@ export async function provisionProposalForPortal(opts: {
       requiredItems.push({
         itemNumber: gi, itemName: item.itemName as string, itemType: item.itemType as string,
         pageLimit: (item.pageLimit as number) ?? null, slideLimit: (item.slideLimit as number) ?? null,
+        characterLimit: (item.characterLimit as number) ?? null,
         volumeName: (vol.volumeName as string) ?? null,
         volumeNumber: (vol.volumeNumber as number) ?? null, templateId: (item.templateId as string) ?? null,
         expertNotes: (item.expertNotes as string) ?? null,
@@ -204,8 +205,8 @@ export async function provisionProposalForPortal(opts: {
         for (const item of requiredItems) {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           const [section] = await tx<{ id: string }[]>`
-            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, volume_name, volume_number, section_type, meta)
-            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemNumber}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
+            INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, sort_index, title, content, status, page_allocation, character_allocation, volume_name, volume_number, section_type, meta)
+            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemNumber}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.characterLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
             RETURNING id
           `;
           // Compliance matrix: one requirement row per required item, linked to the

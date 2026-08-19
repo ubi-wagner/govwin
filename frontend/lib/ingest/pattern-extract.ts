@@ -272,6 +272,28 @@ const RULES: Rule[] = [
     re: /\bno\s+more\s+than\s+\(?(\d{1,3})\)?\s+pages\b/i,
     value: (m) => int(m[1], 1, 100) },
 
+  // ── narrative CHARACTER cap ──
+  // A different ruler from pages: the cover-sheet abstract, project summary and anticipated-
+  // benefits discussion are pasted into fixed-size agency form fields that truncate at the cap.
+  // The DoW 2026 BAA states it as "Each section should be no more than 3,000 characters."
+  // The bound is 100..100,000: below 100 the match is almost always a stray count in prose
+  // ("within 30 characters of..."), and no agency narrative field runs past six figures.
+  { id: 'character_limit.no_more_than', field: 'character_limit_narrative',
+    re: /\bno\s+more\s+than\s+\(?([\d,]{3,7})\)?\s+characters\b/i,
+    value: (m) => int(m[1].replace(/,/g, ''), 100, 100_000) },
+  { id: 'character_limit.limit_to', field: 'character_limit_narrative',
+    re: /\blimit(?:ed)?\s+to\s+\(?([\d,]{3,7})\)?\s+characters\b/i,
+    value: (m) => int(m[1].replace(/,/g, ''), 100, 100_000) },
+  { id: 'character_limit.not_exceed', field: 'character_limit_narrative',
+    re: /\b(?:shall|must|may|will|is|are|should)\s+not\s+(?:to\s+)?exceed\s+\(?([\d,]{3,7})\)?\s+characters\b/i,
+    value: (m) => int(m[1].replace(/,/g, ''), 100, 100_000) },
+  { id: 'character_limit.maximum_of', field: 'character_limit_narrative',
+    re: /\bmaximum\s+of\s+\(?([\d,]{3,7})\)?\s+characters\b/i,
+    value: (m) => int(m[1].replace(/,/g, ''), 100, 100_000) },
+  { id: 'character_limit.n_character_limit', field: 'character_limit_narrative',
+    re: /\b([\d,]{3,7})[-\s]character\s+(?:limit|maximum)\b/i,
+    value: (m) => int(m[1].replace(/,/g, ''), 100, 100_000) },
+
   // ── typeface (only when a typeface NAME sits beside a font/typeface token) ──
   { id: 'font_family.font_then_name', field: 'font_family',
     re: new RegExp(`\\b(?:font|typeface|type\\s*face)\\b[^.]{0,60}?\\b(${TYPEFACES})\\b`, 'i'),

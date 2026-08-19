@@ -42,6 +42,7 @@ export interface ParseHint {
 /** ParsedCompliance field ⇄ solicitation_compliance column — `fieldSources` is keyed by column. */
 const COMPLIANCE_COLUMNS: Array<[keyof ParsedCompliance, string]> = [
   ['pageLimitTechnical', 'page_limit_technical'],
+  ['characterLimitNarrative', 'character_limit_narrative'],
   ['fontFamily', 'font_family'],
   ['fontSize', 'font_size'],
   ['minFontSize', 'min_font_size'],
@@ -132,8 +133,8 @@ ${text.slice(0, MAX_TEXT)}
 ${hint?.title ? `Known title: ${hint.title}\n` : ''}${hint?.agency ? `Known agency: ${hint.agency}\n` : ''}${hint?.topicNumber ? `Known topic number: ${hint.topicNumber}\n` : ''}
 Return JSON with this shape:
 {
-  "compliance": { "pageLimitTechnical": number|null, "fontFamily": string|null, "fontSize": string|null, "minFontSize": number|null, "margins": string|null, "submissionFormat": string|null, "itarRequired": boolean, "imagesTablesAllowed": boolean, "requiredSections": string[], "requiredDocuments": string[] },
-  "volumes": [ { "name": string, "notes": string|null, "items": [ { "name": string, "type": "word_doc|spreadsheet|pdf|form_sbir_certs|form_other|other", "pageLimit": number|null, "notes": string|null } ] } ],
+  "compliance": { "pageLimitTechnical": number|null, "characterLimitNarrative": number|null, "fontFamily": string|null, "fontSize": string|null, "minFontSize": number|null, "margins": string|null, "submissionFormat": string|null, "itarRequired": boolean, "imagesTablesAllowed": boolean, "requiredSections": string[], "requiredDocuments": string[] },
+  "volumes": [ { "name": string, "notes": string|null, "items": [ { "name": string, "type": "word_doc|spreadsheet|pdf|form_sbir_certs|form_other|other", "pageLimit": number|null, "characterLimit": number|null, "notes": string|null } ] } ],
   "topics": [ { "code": string, "title": string, "agency": string|null, "office": string|null, "phaseType": "phase_1|direct_to_phase_2|other", "programType": "sbir_phase_1|sttr_phase_1", "summary": string, "techFocusAreas": string[], "openDate": "YYYY-MM-DD"|null, "closeDate": "YYYY-MM-DD"|null } ]
 }
 Rules: Technical Volume items = the white-paper sections in the mandated order. Cost Volume = Base + Option items when the topic has an option. Put the topic's Phase I base/option $ caps and periods of performance in the relevant item "notes". "topics" may be empty if this text is a single topic already tied to the opportunity; otherwise list every topic under this solicitation. Only JSON.`;
@@ -235,6 +236,7 @@ export async function parseSolicitation(text: string, hint?: ParseHint): Promise
     const aiCompliance: ParsedCompliance = {
       ...rawComp,
       pageLimitTechnical: clampInt(rawComp.pageLimitTechnical, 1, 100),
+      characterLimitNarrative: clampInt(rawComp.characterLimitNarrative, 100, 100_000),
       minFontSize: clampInt(rawComp.minFontSize, 6, 24),
     };
 
@@ -257,7 +259,7 @@ export async function parseSolicitation(text: string, hint?: ParseHint): Promise
     const volumes = buildVolumes(
       pat.volumes, [aiVolumes, DEFAULT_SBIR_CSO_SKELETON.volumes], compliance.requiredSections,
     ).map((v) => ({
-      ...v, items: (v.items ?? []).map((it) => ({ ...it, pageLimit: clampInt(it.pageLimit, 1, 100) })),
+      ...v, items: (v.items ?? []).map((it) => ({ ...it, pageLimit: clampInt(it.pageLimit, 1, 100), characterLimit: clampInt(it.characterLimit, 100, 100_000) })),
     }));
 
     return {

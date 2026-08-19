@@ -38,6 +38,8 @@ export interface CanvasRules {
   line_spacing: number;
   max_pages: number | null;
   max_slides: number | null;
+  /** Character cap for a document the agency measures in characters, not pages (E2/E4). */
+  max_characters?: number | null;
   /** Minimum allowed body font size (pt) — the RFP compliance floor (E2/E4). */
   min_font_size?: number;
   /** Whether images/figures are permitted in this artifact (E2/E4). */
@@ -66,6 +68,14 @@ export interface ComplianceSpec {
   required_sections: string[];
   header_required: boolean;
   footer_required: boolean;
+  /**
+   * Character cap for the whole artifact. A large family of required documents is measured in
+   * CHARACTERS rather than pages — SBIR cover-sheet abstracts, NSF project summaries, grants.gov
+   * narrative fields — because the agency portal pastes them into a fixed-size form field and
+   * truncates or refuses at the cap. `null` = unconstrained (the normal case for a paginated
+   * volume). Per-section caps ride `SectionLayout.character_budget`.
+   */
+  max_characters?: number | null;
 }
 
 /** Standard presets derived from common RFP requirements. */
@@ -493,6 +503,12 @@ export interface SectionLayout {
   break_before?: boolean;
   /** Soft page target (documents) — drives the page-fill gauge + reflow, never a hard cut. */
   page_budget?: number;
+  /**
+   * Hard character cap for this section, when the solicitation measures it in characters rather
+   * than pages (a cover-sheet abstract, a project summary). Unlike `page_budget` this is not a
+   * soft target: the agency's form field truncates at the cap, so exceeding it loses text.
+   */
+  character_budget?: number;
   /** Absolute placement (slides / pinned blocks only); ignored for flow document sections. */
   box?: { page: number; x: number; y: number; w: number; h: number };
 }
@@ -818,6 +834,36 @@ export function paginate(doc: CanvasDocument): LayoutResult {
 }
 
 /** Extract plain text from any node type (for search + page estimation). */
+/**
+ * countCharacters — the character ruler, the third size dimension beside pages and slides.
+ *
+ * An agency character cap is counted against the NARRATIVE the offeror types into the form
+ * field, so this counts the same thing a person pasting into DSIP would: the visible text of
+ * every text-bearing node, joined by a single space (the paragraph break the reader sees).
+ * Whitespace runs collapse to one character because the form field does the same — counting a
+ * canvas's internal indentation against the offeror's budget would report a document as over
+ * the cap that the portal accepts. Images and page furniture contribute nothing: they are not
+ * text and never reach the field.
+ *
+ * Deliberately shared by the editor gauge and the export gate so the two can never disagree —
+ * the same rule the page ruler follows (`estimatePageCount` delegating to `paginate`).
+ */
+export function countCharacters(nodes: CanvasNode[]): number {
+  let total = 0;
+  for (const n of nodes) {
+    const text = getNodeText(n).replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+    if (total > 0) total += 1; // the separator between blocks
+    total += text.length;
+  }
+  return total;
+}
+
+/** The character count of a whole document, across either doc shape. */
+export function countDocCharacters(doc: CanvasDocument): number {
+  return countCharacters(docNodes(doc));
+}
+
 export function getNodeText(node: CanvasNode): string {
   if (!node.content) return '';
   switch (node.type) {
@@ -900,6 +946,8 @@ export interface ComplianceViolation {
     | 'font_too_small'
     | 'over_page_limit'
     | 'over_slide_limit'
+    | 'over_character_limit'
+    | 'section_over_characters'
     | 'slide_overflow'
     | 'section_over_budget'
     | 'image_not_allowed'
@@ -965,6 +1013,22 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
     }
   }
 
+  // Character cap — the third size ruler. A character-capped document (an SBIR cover-sheet
+  // abstract, an NSF project summary) is pasted into a fixed-size agency form field that
+  // truncates at the cap, so going over does not merely risk a deduction: it silently loses the
+  // end of the narrative. Measured whole-artifact here; per-section caps are checked below.
+  if (spec.max_characters != null) {
+    const chars = countDocCharacters(doc);
+    if (chars > spec.max_characters) {
+      out.push({
+        code: 'over_character_limit',
+        message: `${chars.toLocaleString()} characters exceeds the ${spec.max_characters.toLocaleString()}-character limit.`,
+        limit: spec.max_characters,
+        actual: chars,
+      });
+    }
+  }
+
   // Slide overflow — a slide too tall for its frame is cut off on export, regardless of any cap.
   if (doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3') {
     const over = overflowingSlides(doc);
@@ -992,6 +1056,27 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
           message: `"${firstHeadingText(nodes) ?? 'Section'}" is estimated at ${span} pages against its ${budget}-page budget.`,
           limit: budget,
           actual: span,
+        });
+      }
+    }
+  }
+
+  // Per-SECTION character caps. A volume can mix the two rulers — the DoW cover sheet holds two
+  // separate 3,000-character narratives in one artifact — so each capped section is measured on
+  // its own. Unlike a page budget this is an exact count, not an estimate: it is checked even
+  // when the document declares no canvas.
+  if (doc.sections?.length) {
+    for (const s of doc.sections) {
+      const budget = s.layout?.character_budget;
+      if (budget == null || budget <= 0) continue;
+      const nodes = sectionsToNodes([s]);
+      const chars = countCharacters(nodes);
+      if (chars > budget) {
+        out.push({
+          code: 'section_over_characters',
+          message: `"${firstHeadingText(nodes) ?? 'Section'}" is ${chars.toLocaleString()} characters against its ${budget.toLocaleString()}-character limit — the agency form truncates the overflow.`,
+          limit: budget,
+          actual: chars,
         });
       }
     }

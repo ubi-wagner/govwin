@@ -118,6 +118,20 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   // Falls back to the matrix volume limit (page_limit_technical) when no item declares a budget.
   const summedItemPages = itemPages.reduce((a, b) => a + b, 0);
   const maxPages = isSlide ? null : (itemPages.length ? summedItemPages : matrixPages);
+
+  // Whole-volume CHARACTER cap — the third ruler, for volumes the agency measures in characters
+  // rather than pages (the DoW cover sheet's two 3,000-character narratives). Like pages, the
+  // items' caps SUM to the volume total; each item is still capped individually by its section's
+  // character_budget, and this is the total across them.
+  //
+  // Deliberately NO matrix fallback. `character_limit_narrative` states the cap on the
+  // solicitation's NARRATIVE SUMMARY documents — it is not a document-wide rule the way
+  // page_limit_technical is, and applying it as a whole-volume default would cap the 10-page
+  // Technical Volume at 3,000 characters: a limit the solicitation never states about it. A
+  // volume whose items declare no character cap is unconstrained on this ruler, which is the
+  // normal case for every paginated volume. Curation decides WHICH items the matrix cap governs.
+  const itemChars = items.map((i) => i.characterLimit).filter((v): v is number => typeof v === 'number' && v > 0);
+  const maxCharacters = itemChars.length ? itemChars.reduce((a, b) => a + b, 0) : null;
   const maxSlides = isSlide
     ? (itemSlides.length ? Math.max(...itemSlides) : firstNum(compliance.slideLimit))
     : null;
@@ -162,6 +176,7 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   const complianceSpec: ComplianceSpec = {
     max_pages: maxPages,
     max_slides: maxSlides,
+    max_characters: maxCharacters,
     min_font_size: minFontSize,
     images_allowed: imagesAllowed,
     required_sections: requiredSections,

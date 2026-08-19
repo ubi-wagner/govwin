@@ -146,11 +146,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; meta: unknown } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; characterAllocation: number | null; meta: unknown } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; meta: unknown }[]>`
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean; contentSource: string | null; complianceSpec: ComplianceSpec | null; characterAllocation: number | null; meta: unknown }[]>`
         SELECT ps.id, ps.version, ps.status, ps.title, ps.content, ps.completed_stage, ps.completed_at, ps.is_locked,
-               ps.content_source AS "contentSource", ps.meta,
+               ps.content_source AS "contentSource", ps.character_allocation, ps.meta,
                pa.compliance_spec
         FROM proposal_sections ps
         LEFT JOIN proposal_artifacts pa ON pa.id = ps.artifact_id
@@ -397,14 +397,25 @@ export async function PUT(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/sections/save] activity log failed', logErr);
     }
 
-    // Compliance floor (E4) — section-local checks (font / images) on the saved
+    // Compliance floor (E4) — section-local checks (font / images / character cap) on the saved
     // canvas, surfaced as NON-BLOCKING warnings. Whole-doc limits (pages, header/
     // footer) are validated at the export gate, not per section-save.
+    //
+    // The CHARACTER cap is checked here against THIS section's own allocation, not the artifact
+    // spec's max_characters — that one is the sum across the volume's items, and measuring one
+    // section against the whole volume's budget would let a 3,000-character abstract run to 6,000
+    // unflagged. Unlike the page ruler this is an exact count, so it is worth reporting the moment
+    // the author saves: an over-cap narrative is silently truncated by the agency's form.
     let complianceWarnings: { code: string; message: string }[] = [];
-    if (section.complianceSpec) {
+    const sectionSpec: ComplianceSpec | null = section.complianceSpec
+      ? { ...section.complianceSpec, max_characters: section.characterAllocation ?? null }
+      : (section.characterAllocation != null
+        ? { max_pages: null, max_slides: null, max_characters: section.characterAllocation, min_font_size: null, images_allowed: true, required_sections: [], header_required: false, footer_required: false }
+        : null);
+    if (sectionSpec) {
       try {
-        complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, section.complianceSpec)
-          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed')
+        complianceWarnings = validateCanvasAgainstSpec(body.content as unknown as CanvasDocument, sectionSpec)
+          .filter((v) => v.code === 'font_too_small' || v.code === 'image_not_allowed' || v.code === 'over_character_limit')
           .map((v) => ({ code: v.code, message: v.message }));
       } catch {
         // advisory only — never fail a save on the compliance check

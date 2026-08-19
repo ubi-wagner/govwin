@@ -79,6 +79,7 @@ export async function materializeSkeleton(
       : { source };
   };
   stamp('page_limit_technical', c.pageLimitTechnical);
+  stamp('character_limit_narrative', c.characterLimitNarrative);
   stamp('font_family', c.fontFamily);
   stamp('font_size', c.fontSize);
   stamp('min_font_size', c.minFontSize);
@@ -146,11 +147,12 @@ export async function materializeSkeleton(
   await sql.begin(async (tx: any) => {
     await tx`DELETE FROM solicitation_compliance WHERE solicitation_id = ${solicitationId}::uuid`;
     await tx`INSERT INTO solicitation_compliance
-      (solicitation_id, page_limit_technical, font_family, font_size, min_font_size, margins,
+      (solicitation_id, page_limit_technical, character_limit_narrative, font_family, font_size, min_font_size, margins,
        submission_format, itar_required, images_tables_allowed, required_sections, required_documents,
        field_provenance, custom_variables)
       VALUES (${solicitationId}::uuid,
               ${keep('page_limit_technical', c.pageLimitTechnical ?? null)},
+              ${keep('character_limit_narrative', c.characterLimitNarrative ?? null)},
               ${keep('font_family', c.fontFamily ?? null)},
               ${keep('font_size', c.fontSize ?? null)},
               ${keep('min_font_size', c.minFontSize ?? null)},
@@ -173,8 +175,8 @@ export async function materializeSkeleton(
       let n = 0;
       for (const item of vol.items ?? []) {
         n++; itemCount++;
-        await tx`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, expert_notes)
-                  VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.notes ?? null})`;
+        await tx`INSERT INTO volume_required_items (volume_id, item_number, item_name, item_type, required, page_limit, character_limit, expert_notes)
+                  VALUES (${row.id}::uuid, ${String(n)}, ${item.name}, ${coerceItemType(item.type)}, true, ${item.pageLimit ?? null}, ${item.characterLimit ?? null}, ${item.notes ?? null})`;
       }
     }
   });

@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -280,6 +280,23 @@ export function CanvasRenderer({
                 <span>&middot;</span>
                 <span className={over ? 'text-rose-600 font-semibold' : undefined}>
                   ~{pages} of {canvas.max_pages} pages{over ? ' — over' : ''}
+                </span>
+              </>
+            );
+          })()
+        ) : null}
+        {/* Character cap — shown alongside the page/slide gauge because a character-capped
+            document (an SBIR cover-sheet abstract, a project summary) is pasted into an agency
+            form field that truncates at the cap. Exact count, not an estimate, so no "~". */}
+        {canvas.max_characters != null ? (
+          (() => {
+            const chars = countDocCharacters(doc);
+            const over = chars > canvas.max_characters;
+            return (
+              <>
+                <span>&middot;</span>
+                <span className={over ? 'text-rose-600 font-semibold' : undefined}>
+                  {chars.toLocaleString()} of {canvas.max_characters.toLocaleString()} characters{over ? ' — over' : ''}
                 </span>
               </>
             );

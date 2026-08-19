@@ -82,7 +82,7 @@ function moldNodes(content: string | null): { nodes: CanvasNode[]; canvas: Canva
  * mold's canvas rules win; malformed/empty mold content is skipped, not fatal.
  */
 export function assembleArtifactCanvas(
-  sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null }>,
+  sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null; characterAllocation?: number | null }>,
   artifactType: string | null | undefined,
   title: string,
 ): CanvasDocument {
@@ -109,6 +109,10 @@ export function assembleArtifactCanvas(
           mode: 'flow',
           ...(ci > 0 ? { break_before: true } : {}),
           ...(ci === 0 && s.pageAllocation != null && s.pageAllocation > 0 ? { page_budget: s.pageAllocation } : {}),
+          // Same for the item's CHARACTER cap (proposal_sections.character_allocation), which is
+          // how the agency measures a cover-sheet abstract or project summary. Rides the first
+          // chunk so section_over_characters fires at the export gate.
+          ...(ci === 0 && s.characterAllocation != null && s.characterAllocation > 0 ? { character_budget: s.characterAllocation } : {}),
         },
         groups,
       });

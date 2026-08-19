@@ -8,10 +8,12 @@
  */
 
 // ── Types (the parse contract) ──────────────────────────────────────
-export interface ParsedItem { name: string; type?: string; pageLimit?: number | null; notes?: string | null }
+export interface ParsedItem { name: string; type?: string; pageLimit?: number | null; characterLimit?: number | null; notes?: string | null }
 export interface ParsedVolume { name: string; format?: string; notes?: string | null; items: ParsedItem[] }
 export interface ParsedCompliance {
   pageLimitTechnical?: number | null;
+  /** Character cap on narrative summary documents (technical abstract, project summary). */
+  characterLimitNarrative?: number | null;
   fontFamily?: string | null; fontSize?: string | null; minFontSize?: number | null;
   margins?: string | null; submissionFormat?: string | null;
   itarRequired?: boolean; imagesTablesAllowed?: boolean;
