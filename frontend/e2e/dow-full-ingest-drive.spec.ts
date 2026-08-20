@@ -21,13 +21,16 @@
  * Run: npx playwright test --project=drive dow-full-ingest
  */
 import { test, expect, type Page } from '@playwright/test';
-import path from 'node:path';
+import { requireUploads } from './upload-fixtures';
+
+// Skips (does not fail) when the source PDFs are not on this machine — see e2e/upload-fixtures.ts.
+const [BAA, COMPONENT, TOPIC] = requireUploads(
+  'b4c6858c-DoW_2026_SBIR_BAA_Preface_07152026.pdf',
+  'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf',
+  'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF',
+);
 
 const SHOTS = 'public/guides/rfp-ingest';
-const UPLOADS = '/root/.claude/uploads/34d597b2-183f-5787-9057-fc7251e3f9ff';
-const BAA = path.join(UPLOADS, 'b4c6858c-DoW_2026_SBIR_BAA_Preface_07152026.pdf');
-const COMPONENT = path.join(UPLOADS, 'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf');
-const TOPIC = path.join(UPLOADS, 'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF');
 
 async function signInAsRfpAdmin(page: Page) {
   await page.goto('/login');

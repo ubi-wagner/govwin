@@ -50,3 +50,9 @@ export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD="1"
 export GOVWIN_RUN_DIR="/home/user/.govwin/run"
 
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
+
+# e2e/hitl-foundation-build.spec.ts asserts `TVSF_OPP env must be set` before it does anything, so
+# without this the spec fails in 200ms and looks like a broken comp-purchase flow. It is the TVSF
+# Round-45 opportunity that migration 143 seeds and that hitl-foundation-ui-walk hardcodes; keeping
+# it here means the two specs cannot drift onto different opportunities.
+export TVSF_OPP="d53a22e4-792d-4fe7-8253-a42270fd9981"

@@ -17,11 +17,14 @@
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { requireUploads } from './upload-fixtures';
 
-const UPLOADS = '/root/.claude/uploads/34d597b2-183f-5787-9057-fc7251e3f9ff';
-const COMPONENT = path.join(UPLOADS, 'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf');
-const TOPIC_PDF = path.join(UPLOADS, 'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF');
+// Skips (does not fail) when the source PDFs are not on this machine — see e2e/upload-fixtures.ts.
+const [COMPONENT, TOPIC_PDF] = requireUploads(
+  'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf',
+  'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF',
+);
+
 
 const SOL = process.env.FLEX_SOL_ID ?? 'aca5e83a-11b6-4a06-9049-2f17400f1ed9';
 const SLUG = 'foundation';
