@@ -64,7 +64,39 @@ for (const d of suspects) {
   if (notice) console.log(`      still truncated: ${notice}`);
 }
 
-console.log(`\nrepaired ${repaired} · unreachable ${unreachable} · checked ${suspects.length}`);
+// ── curated_solicitations.full_text ────────────────────────────────────────
+// The documents are only half the repair. full_text is the COMBINED text the AI layer reads, and
+// the shredder wrote it under its own (tighter, 200,000) ceiling — so a solicitation whose
+// documents are now complete can still be answered from a fifth of itself. Rebuild it the way the
+// shredder does: join the document texts with the same separator, then cap and record.
+const SEPARATOR = '\n\n---DOCUMENT---\n\n';
+const stale = await sqlBypass<Array<{ id: string; n: number }>>`
+  SELECT cs.id, length(cs.full_text) AS n
+  FROM curated_solicitations cs
+  WHERE cs.full_text IS NOT NULL
+    AND EXISTS (SELECT 1 FROM solicitation_documents d
+                WHERE d.solicitation_id = cs.id AND d.extracted_text IS NOT NULL)`;
+let combined = 0;
+console.log('\ncombined full_text (what the AI layer reads):');
+for (const c of stale) {
+  const docs = await sqlBypass<Array<{ t: string }>>`
+    SELECT extracted_text AS t FROM solicitation_documents
+    WHERE solicitation_id = ${c.id}::uuid AND extracted_text IS NOT NULL
+    ORDER BY is_primary DESC NULLS LAST, created_at ASC`;
+  const rebuilt = capSourceText(docs.map((x) => x.t).join(SEPARATOR));
+  if (rebuilt.chars <= c.n) {
+    console.log(`  = ${c.id.slice(0, 8)}  already at ${c.n.toLocaleString()}`);
+    continue;
+  }
+  await sqlBypass`
+    UPDATE curated_solicitations SET full_text = ${rebuilt.text}, updated_at = now()
+    WHERE id = ${c.id}::uuid`;
+  combined++;
+  console.log(`  ✓ ${c.id.slice(0, 8)}  ${c.n.toLocaleString()} → ${rebuilt.chars.toLocaleString()} chars`
+    + `  (+${(rebuilt.chars - c.n).toLocaleString()})`);
+}
+
+console.log(`\nrepaired ${repaired} document(s) · rebuilt ${combined} combined text(s) · unreachable ${unreachable}`);
 if (repaired > 0) {
   console.log('\nNOTE: any compliance field on these solicitations that reads "not stated in the source"');
   console.log('was decided against half a document. Re-run Ingest Assist to re-derive them.');
