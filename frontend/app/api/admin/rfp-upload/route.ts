@@ -30,6 +30,7 @@
  * Returns: { data: { solicitation_id, opportunity_id, document_ids[] } }
  */
 
+import { capSourceText } from '@/lib/ingest/source-text-cap';
 import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -547,13 +548,27 @@ export async function POST(request: Request) {
         try {
           const parser = new PDFParse({ data: new Uint8Array(fb.buffer) });
           const textResult = await parser.getText();
-          const rawText = textResult.text?.slice(0, 500000) || '';
+          // Cap AND record. A bare .slice() here discarded 50.7% of the DoW 2026 SBIR BAA and
+          // 62.7% of the DoD 25.1 BAA without telling anyone, so every "not stated in the source"
+          // downstream was really "not read from the source" (docs/INGEST_PROVENANCE.md).
+          const capped = capSourceText(textResult.text);
+          const rawText = capped.text;
           try { await parser.destroy(); } catch { /* ignore cleanup */ }
           if (rawText.length <= 100) continue;
+          if (capped.truncated) {
+            console.error('[rfp-upload] extraction TRUNCATED', fb.file.name,
+              `${capped.chars}/${capped.originalChars} chars`);
+          }
 
           await sql`
             UPDATE solicitation_documents
-            SET extracted_text = ${rawText}, extracted_at = now(), updated_at = now()
+            SET extracted_text = ${rawText}, extracted_at = now(), updated_at = now(),
+                metadata = COALESCE(metadata, '{}'::jsonb) || ${sql.json({
+                  extraction: {
+                    chars: capped.chars, truncated: capped.truncated,
+                    originalChars: capped.originalChars, capChars: capped.capChars,
+                  },
+                })}
             WHERE id = ${documentIds[i]}::uuid
           `;
           // First readable PDF is the umbrella — topics are extracted from it, not from the

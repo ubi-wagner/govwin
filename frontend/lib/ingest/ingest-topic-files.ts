@@ -19,6 +19,7 @@
  * and drive-verifiable without live object storage.
  */
 
+import { capSourceText } from '@/lib/ingest/source-text-cap';
 import { createHash } from 'crypto';
 import { sql } from '@/lib/db';
 import { putObject } from '@/lib/storage/s3-client';
@@ -100,7 +101,7 @@ async function extractText(buffer: Buffer, filename: string): Promise<string | n
   const ext = extFromName(filename);
   try {
     if (ext === 'txt' || ext === 'md') {
-      const t = buffer.toString('utf8').slice(0, 500000);
+      const t = capSourceText(buffer.toString('utf8')).text;
       return t.trim().length > 0 ? t : null;
     }
     if (ext === 'pdf') {
@@ -108,7 +109,7 @@ async function extractText(buffer: Buffer, filename: string): Promise<string | n
       const { PDFParse } = await loadPdfParse();
       const parser = new PDFParse({ data: new Uint8Array(buffer) });
       const textResult = await parser.getText();
-      const raw = textResult.text?.slice(0, 500000) || '';
+      const raw = capSourceText(textResult.text).text;
       try { await parser.destroy(); } catch { /* ignore cleanup */ }
       return raw.length > 40 ? raw : null;
     }

@@ -40,7 +40,7 @@ import asyncpg
 
 from errors import ShredderBudgetError
 from shredder.compliance_mapping import split_matches
-from shredder.extractor import MAX_CHARS_PER_DOCUMENT, extract_text_from_pdf
+from shredder.extractor import MAX_CHARS_PER_DOCUMENT, cap_source_text, extract_text_from_pdf
 from shredder.namespace import compute_namespace_key
 
 log = logging.getLogger("pipeline.shredder.runner")
@@ -279,7 +279,7 @@ async def shred_solicitation(
                 doc_id,
             )
             if existing_text:
-                capped = existing_text[:MAX_CHARS_PER_DOCUMENT]
+                capped, _reused = cap_source_text(existing_text)
                 doc_texts.append(capped)
                 log.info(
                     "shredder: document %s already extracted (%d chars), reusing",
@@ -312,7 +312,22 @@ async def shred_solicitation(
                 )
                 continue
 
-            capped = extracted[:MAX_CHARS_PER_DOCUMENT]
+            capped, extraction = cap_source_text(extracted)
+            if extraction["truncated"]:
+                log.error(
+                    "shredder: document %s TRUNCATED at %d of %d chars — %d%% of the source was not "
+                    "read; any 'not stated in the source' result for this solicitation is unverified",
+                    doc_id, extraction["chars"], extraction["original_chars"],
+                    round(100 * (1 - extraction["chars"] / max(extraction["original_chars"], 1))),
+                )
+            # Persist the coverage record beside the text. A cap nobody can see downstream is the
+            # bug this replaces (docs/INGEST_PROVENANCE.md).
+            await conn.execute(
+                "UPDATE solicitation_documents "
+                "SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('extraction', $2::jsonb) "
+                "WHERE id = $1",
+                doc_id, json.dumps(extraction),
+            )
             doc_texts.append(capped)
 
             # Write text.md artifact to S3 (alongside the source PDF)
@@ -365,15 +380,24 @@ async def shred_solicitation(
             sol_uuid,
         )
         if full_text:
-            capped = full_text[:MAX_CHARS_PER_DOCUMENT]
+            capped, _fallback = cap_source_text(full_text)
             doc_texts.append(capped)
 
     # Also update curated_solicitations.full_text with the combined extraction
     if doc_texts:
         combined_full = "\n\n---DOCUMENT---\n\n".join(doc_texts)
+        # This carried its own bare 500_000 literal, tighter than the per-document cap and
+        # independent of it — so a solicitation could pass every per-document check and still lose
+        # its tail here. One ceiling, one helper, reported the same way.
+        combined_capped, combined_extraction = cap_source_text(combined_full)
+        if combined_extraction["truncated"]:
+            log.error(
+                "shredder: COMBINED text for %s truncated at %d of %d chars",
+                sol_uuid, combined_extraction["chars"], combined_extraction["original_chars"],
+            )
         await conn.execute(
             "UPDATE curated_solicitations SET full_text = $2, updated_at = now() WHERE id = $1",
-            sol_uuid, combined_full[:500000],
+            sol_uuid, combined_capped,
         )
 
     if not doc_texts:
