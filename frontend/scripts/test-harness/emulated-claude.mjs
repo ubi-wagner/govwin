@@ -260,6 +260,46 @@ function harvestProse(raw) {
 const wordsIn = (s) => (s.match(/\S+/g) || []).length;
 
 // ── RESPONDER REGISTRY — expand per-agent as flows are wired. First match wins. ─────────────────────
+// ── Structured output ────────────────────────────────────────────────────────
+
+/** Did the caller ask for JSON? Matches the phrasing the real prompts use. */
+function wantsJson(req) {
+  const sys = typeof req.system === 'string' ? req.system : JSON.stringify(req.system ?? '');
+  return /respond only with valid json|respond with (?:a single )?json|valid json matching the schema|no markdown fences/i.test(sys);
+}
+
+/**
+ * Build a response shaped like the schema the prompt declares.
+ *
+ * Reads the first {...} block out of the system prompt and emits one synthetic element per
+ * array-valued key, using the same field names. Shape comes from the PROMPT rather than a
+ * per-caller hardcode, so a new JSON-returning prompt is emulated without editing this file.
+ *
+ * Placeholder values say plainly that they are emulated. A fixture that looks like a real extracted
+ * page limit is worse than no fixture — it could be mistaken for something read from a solicitation
+ * (docs/INGEST_PROVENANCE.md).
+ */
+function emulatedJsonFor(req) {
+  const sys = typeof req.system === 'string' ? req.system : '';
+  const block = sys.match(/\{[\s\S]{40,2000}\}/);
+  if (!block) return { emulated: true, note: 'no schema block found in the system prompt' };
+
+  const out = {};
+  for (const m of block[0].matchAll(/"(\w+)"\s*:\s*\[/g)) {
+    const key = m[1];
+    const objMatch = block[0].match(new RegExp('"' + key + '"\\s*:\\s*\\[\\s*\\{([\\s\\S]*?)\\}'));
+    const fields = objMatch ? [...objMatch[1].matchAll(/"(\w+)"\s*:/g)].map((f) => f[1]) : [];
+    const row = {};
+    for (const f of fields) {
+      if (/confidence/i.test(f)) row[f] = 0.5;
+      else if (/page|count|number|index/i.test(f)) row[f] = 1;
+      else row[f] = `EMULATED ${f} — sandbox harness, not a real extraction`;
+    }
+    out[key] = fields.length ? [row] : [];
+  }
+  return Object.keys(out).length ? out : { emulated: true, note: 'schema block had no array fields' };
+}
+
 const RESPONDERS = [
   // compliance_reviewer (frontend ai/compliance route) — expects a JSON ARRAY, one entry per compliance
   // variable, text-block-is-the-json (no fences). Since I'm Claude, I return a faithful assessment with
@@ -724,6 +764,17 @@ const RESPONDERS = [
       if (done >= ordered.length) return textMsg(req.model, 'Done — the emulated model completed its tool loop.');
       return toolUseMsg(req.model, ordered[done].name, genericToolInput(ordered[done], req));
     },
+  },
+  // Structured-output call: the caller demanded JSON, so prose is a wiring FAILURE, not a stand-in.
+  // The shredder says "Respond ONLY with valid JSON matching the schema below" and then json.loads()
+  // the reply — so the catch-all text rule below killed every OnRfpUploaded run with
+  // "ValueError: Claude returned unparseable JSON" (7 failed instances), and no structured-output AI
+  // flow could be driven end to end in the sandbox at all. The emulator is documented as mirroring
+  // the prod wiring exactly; here it did the opposite.
+  {
+    name: 'json-schema',
+    match: (req) => wantsJson(req),
+    respond: (req) => textMsg(req.model, JSON.stringify(emulatedJsonFor(req))),
   },
   // Plain-text agent / AI route: a concise, structured completion.
   {
