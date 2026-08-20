@@ -157,14 +157,27 @@ if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
     say "frontend    already up (running the current build)"
   fi
 fi
+# `next build` does NOT put public/ or .next/static inside .next/standalone — you stage them, every
+# build, or the server runs perfectly while serving 404 for every stylesheet. That is not a subtle
+# degradation: with no CSS, Tailwind's `fixed`, `hidden`, `lg:` and `-translate-x-full` all vanish,
+# the nav drawer renders inline at full width, and the mobile audit reports a 474px horizontal
+# overflow as if the layout had regressed. A whole suite run was spent on an unstyled app because
+# one `cp` in a restart line was killed and nothing checked. Stage it unconditionally (cheap), and
+# then PROVE the stylesheet actually serves before declaring the stack up.
+stage_assets() {
+  [ -d "$ROOT/frontend/.next/standalone" ] || return 1
+  mkdir -p "$ROOT/frontend/.next/standalone/.next" || return 1
+  cp -r "$ROOT/frontend/public" "$ROOT/frontend/.next/standalone/" 2>/dev/null
+  cp -r "$ROOT/frontend/.next/static" "$ROOT/frontend/.next/standalone/.next/" 2>/dev/null
+  [ -d "$ROOT/frontend/.next/standalone/.next/static/css" ]
+}
 if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
   :
 else
   if [ ! -d "$ROOT/frontend/.next/standalone" ]; then
     say "frontend    no build — run: cd frontend && npx next build"
   else
-    cp -r "$ROOT/frontend/public" "$ROOT/frontend/.next/standalone/" 2>/dev/null || true
-    cp -r "$ROOT/frontend/.next/static" "$ROOT/frontend/.next/standalone/.next/" 2>/dev/null || true
+    stage_assets || say "frontend    WARNING: static assets did not stage"
     ( cd "$ROOT/frontend" && nohup node .next/standalone/server.js \
         > "$GOVWIN_RUN_DIR/frontend.log" 2>&1 & )
     for _ in $(seq 1 30); do
@@ -182,6 +195,20 @@ curl -sf -o /dev/null --max-time 3 -X POST -H 'content-type: application/json' \
   -d '{"model":"x","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' \
   http://127.0.0.1:8787/v1/messages 2>/dev/null || { echo "  ✗ emulator not serving"; fail=1; }
 pgrep -f "python3 src/main.py" >/dev/null 2>&1 || { echo "  ✗ worker not running"; fail=1; }
-curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null || { echo "  ✗ frontend not serving"; fail=1; }
+if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
+  # A 200 on / says the server is alive, not that the app is dressed. Follow the stylesheet the
+  # login page actually links and check it comes back — a 404 here is the unstyled-app failure, and
+  # it is invisible to every other probe in this script.
+  css="$(curl -s --max-time 5 http://localhost:3000/login | grep -oE '/_next/static/css/[^"]+\.css' | head -1)"
+  if [ -n "$css" ]; then
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://localhost:3000$css")"
+    if [ "$code" != "200" ]; then
+      echo "  ✗ stylesheet $css → HTTP $code (app is serving UNSTYLED — stage .next/static + public)"
+      fail=1
+    fi
+  fi
+else
+  echo "  ✗ frontend not serving"; fail=1
+fi
 [ "$fail" -eq 0 ] && echo "  ✓ stack up" || echo "  ✗ stack incomplete"
 exit "$fail"

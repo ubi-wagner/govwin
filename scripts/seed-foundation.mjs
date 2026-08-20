@@ -180,17 +180,36 @@ async function run() {
     console.log(`✓ ${f.role.padEnd(12)} ${f.name} (${f.title}) ${f.email}`);
   }
 
-  // 3) Paul Jackson — EC mentor appointed SHADOW ADMIN of Foundation. Native role tenant_admin
-  //    so a NORMAL login lands him in the workspace with full access (buckets/pipeline/download);
-  //    external (no home tenant) — the dispatcher resolves Foundation from his membership. His
-  //    EC-partner origin is captured by the proposal-collaborator grant (added by the build driver).
-  //    (partner_user was too low a role: below tenant_user, so it 403'd buckets + download.)
-  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'tenant_admin', tenantId: null });
+  // 3) Paul Jackson — EC mentor appointed SHADOW ADMIN of Foundation.
+  //
+  // DO NOT DEMOTE HIM. This used to write `role: 'tenant_admin', tenantId: null`, which was right
+  // when it was written (migration 141 elevated him off partner_user so buckets and download would
+  // stop 403-ing) and became wrong when the partner-manager landed: migration 157 makes Paul a
+  // `partner_admin` and 159 gives him the Entrepreneurs' Center as his own partner_org home. Running
+  // this seed afterwards reset BOTH — role back to tenant_admin and tenant_id back to NULL — so
+  // /partner failed its `canManagePartnerTenants` gate and redirected instead of rendering, and
+  // hitl-cc-actors / hitl-cc-partner failed on a missing "Partner Console" heading. Nothing was
+  // wrong with the console; the seed had walked his identity backwards.
+  //
+  // The end state the migrations define, which this now reproduces on a bare box too:
+  //   users.role = partner_admin, users.tenant_id = entrepreneurs-center (his own org)
+  //   membership @ entrepreneurs-center = tenant_admin/home   (he builds via the tested portal)
+  //   membership @ foundation           = tenant_admin/collaborator  (the descend target)
+  const [ec] = await sql`SELECT id FROM tenants WHERE slug = 'entrepreneurs-center' LIMIT 1`;
+  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'partner_admin', tenantId: ec?.id ?? null });
+  if (ec) {
+    await sql`
+      INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+      VALUES (${paulId}::uuid, ${ec.id}::uuid, 'tenant_admin', 'active', 'home', ${paulId}::uuid)
+      ON CONFLICT (user_id, tenant_id) DO UPDATE SET role='tenant_admin', status='active', source='home'`;
+  }
   await sql`
     INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
     VALUES (${paulId}::uuid, ${tid}::uuid, 'tenant_admin', 'active', 'collaborator', ${kateId}::uuid)
     ON CONFLICT (user_id, tenant_id) DO UPDATE SET role='tenant_admin', status='active', source='collaborator'`;
-  console.log(`✓ partner/shadow-admin  ${PARTNER.name} (${PARTNER.org}) ${PARTNER.email} → tenant_admin membership`);
+  // Foundation is his first owned company, so it shows in his stable (migration 157 step 4).
+  await sql`UPDATE tenants SET owner_id = ${paulId}::uuid WHERE id = ${tid}::uuid AND owner_id IS NULL`;
+  console.log(`✓ partner-manager  ${PARTNER.name} (${PARTNER.org}) ${PARTNER.email} → partner_admin${ec ? ' @ entrepreneurs-center' : ''}, tenant_admin in foundation`);
 
   // 4) buckets (deactivate any prior, then upsert the 5 Foundation buckets)
   //
