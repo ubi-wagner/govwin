@@ -98,7 +98,24 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
     `;
     if (!o) return null;
     const num = (v: unknown): number | null => (v == null ? null : Number(v));
-    const str = (v: unknown): string | null => (v == null ? null : String(v));
+    /**
+     * Stringify a card field, ISO for dates.
+     *
+     * postgres.js hands back date/timestamp columns as JS `Date` objects, and a bare `String(date)`
+     * calls Date.prototype.toString() — "Fri Aug 28 2026 00:00:00 GMT+0000 (Coordinated Universal
+     * Time)". That is locale- and timezone-shaped prose, not a date format, and it went straight
+     * into the card jsonb that both scorers read.
+     *
+     * The consequence was a dead ranking dimension. `new Date(...)` in the TS scorer happens to
+     * parse V8's own toString output, but the Python scorer's `_close_ms` does
+     * `datetime.fromisoformat(...)` and returns None — so it SKIPS the timeline signal entirely.
+     * Across 3,486 stored bucket scores, not one carried a `timeline` factor: every card was ranked
+     * on keywords alone, and "closes in 9 days" counted for nothing. Worse, the two scorers
+     * disagreed on the same card, which bucket-ranking.ts explicitly claims they must not
+     * ("parity with the Python scorer's `_close_ms is None` skip").
+     */
+    const str = (v: unknown): string | null =>
+      v == null ? null : v instanceof Date ? v.toISOString() : String(v);
     const hasMatrix = o.pageLimitTechnical != null || o.pageLimitCost != null || (num(o.volumeCount) ?? 0) > 0;
     return {
       opportunityId,

@@ -187,6 +187,17 @@ if (newId) {
     const scores = rows.map((r) => Number(r.score ?? 0));
     check(scores.every((s, i) => i === 0 || scores[i - 1] >= s), 'the ranking is actually ordered, best first',
       `top=${scores[0]} … last=${scores.at(-1)}`);
+
+    // A ranking of all zeros is trivially "ordered", and this check passed on exactly that for
+    // months: every stored score was 0 because the timeline signal was dead, so the list a customer
+    // saw was 42 cards in arbitrary order. Sortedness is not the property that matters —
+    // DISCRIMINATION is. Assert the ranking actually separates the cards.
+    const levels = new Set(scores).size;
+    check(levels > 1, 'the ranking DISCRIMINATES rather than scoring everything the same',
+      `${levels} distinct score level(s) across ${scores.length} cards`);
+    const withTimeline = rows.filter((r) => r.factors && Object.prototype.hasOwnProperty.call(r.factors, 'timeline')).length;
+    check(withTimeline > 0, 'the close-date timeline signal reached the scores',
+      `${withTimeline}/${rows.length} carry a timeline factor`);
     note(`top pick: "${String(rows[0].title ?? rows[0].opportunityTitle ?? '').slice(0, 52)}"`);
   }
 
