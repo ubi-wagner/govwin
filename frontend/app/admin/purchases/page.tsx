@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 // Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
 import { sqlBypass as sql } from '@/lib/db';
 import Link from 'next/link';
+import { CompCodesPanel } from '@/components/admin/comp-codes-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,6 +128,8 @@ export default async function PurchasesPage() {
           </table>
         </div>
       )}
+
+      <CompCodesPanel />
     </div>
   );
 }
