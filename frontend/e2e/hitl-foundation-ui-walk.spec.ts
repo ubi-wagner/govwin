@@ -59,8 +59,16 @@ test('step 2 — pin + comp-code purchase (Kate)', async ({ page }) => {
     .filter({ has: page.getByRole('heading', { name: /TVSF Round 45/ }) })
     .filter({ has: page.getByRole('button', { name: /Pin/ }) }).last();
   await card.getByRole('button', { name: /Pin/ }).click();
-  // Purchase appears only after pinning; only TVSF is pinned → the sole Purchase button.
-  await page.getByRole('button', { name: 'Purchase' }).click();
+  // Buy from the TVSF CARD, not from the page. This used to read
+  //   await page.getByRole('button', { name: 'Purchase' }).click();
+  // on the reasoning "only TVSF is pinned → the sole Purchase button", which stopped being true as
+  // soon as anything else pinned a Foundation card: strict mode found two identical buttons and the
+  // step failed with no product defect behind it. Scoping to the card the test just pinned says what
+  // it means and holds however many other cards are pinned beside it.
+  const tvsf = page.locator('div')
+    .filter({ has: page.getByRole('heading', { name: /TVSF Round 45/ }) })
+    .filter({ has: page.getByRole('button', { name: 'Purchase' }) }).last();
+  await tvsf.getByRole('button', { name: 'Purchase' }).click();
   await expect(page.getByRole('button', { name: 'Complete purchase' })).toBeVisible({ timeout: 15_000 });
   await shot(page, '02_purchase_modal');
   await page.getByPlaceholder('Enter code').fill('rfppipelinetest');

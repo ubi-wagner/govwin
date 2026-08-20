@@ -56,3 +56,10 @@ mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
 # Round-45 opportunity that migration 143 seeds and that hitl-foundation-ui-walk hardcodes; keeping
 # it here means the two specs cannot drift onto different opportunities.
 export TVSF_OPP="d53a22e4-792d-4fe7-8253-a42270fd9981"
+
+# The proposal-creation paywall is FAIL-SAFE: lib/paywall.ts enforces it unless a deploy explicitly
+# opts out, so /proposals/create returns 402 PAYMENT_REQUIRED by default. This sandbox mirrors the
+# product's current posture — self-serve Stripe checkout is descoped and the comp code stands in —
+# which is exactly the founding-cohort case the flag exists for. Without it, e2e/matrix.tenant fails
+# on a 402 while its own header says it drives "the admin-granted provision path (no Stripe)".
+export FOUNDING_COHORT_BYPASS="true"
