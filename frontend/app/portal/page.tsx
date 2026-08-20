@@ -71,6 +71,15 @@ export default async function PortalDispatcher() {
   const dispatchPinned = (sessionUser as { membershipPinned?: boolean }).membershipPinned === true;
   let tenantSlug = sessionUser.tenantSlug ?? null;
 
+  // A partner-manager's company picker IS their console. Running more than one company is the whole
+  // role, so the multi-membership rule — "more than one active company, hasn't committed yet, make
+  // them choose" — describes every partner_admin permanently and sent them to /select-company on
+  // every sign-in, which then forwarded to /partner anyway. Two pickers for one decision, and the
+  // wrong one first. Send them straight to the console that lists their stable with the to-do counts
+  // and lets them descend; /select-company stays the right surface for someone who belongs to
+  // several UNRELATED companies, which a manager does not.
+  if (role === 'partner_admin') redirect('/partner');
+
   if (dispatchUserId && !hasRoleAtLeast(role, 'rfp_admin')) {
     try {
       const memberships = await getActiveMemberships(dispatchUserId);

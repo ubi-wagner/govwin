@@ -139,10 +139,22 @@ fi
 # process; the same scan a minute later finds nothing, which reads exactly like "the server died".
 # What does NOT get rewritten is the working directory: server.js does process.chdir(__dirname), so
 # the standalone server is precisely the process whose cwd is .next/standalone.
+# …and matching on the working directory does not survive either, which cost a third round. Next is
+# configured with cleanDistDir, so `next build` UNLINKS .next and recreates it: the running server's
+# cwd becomes ".next/standalone (deleted)", the name no longer resolves to the live path, the matcher
+# stops matching, and the old process keeps serving from unlinked files across every subsequent
+# rebuild. Observed serving a 30-minute-old build through two of them.
+#
+# So identify it by the only thing that is definitionally true of "the server on :3000" and that
+# neither the process nor the build can invalidate: the process holding the listening socket. Read
+# the inode from /proc/net/tcp and find the pid whose fds include it.
 frontend_pids() {
-  local target="$ROOT/frontend/.next/standalone"
+  local hex inode
+  hex=$(printf '%04X' 3000)
+  inode=$(awk -v h=":$hex" 'NR>1 && $4=="0A" && index($2,h) {print $10}' /proc/net/tcp 2>/dev/null | head -1)
+  [ -n "$inode" ] || return 0
   for p in /proc/[0-9]*; do
-    [ "$(readlink -f "$p/cwd" 2>/dev/null)" = "$target" ] && basename "$p"
+    ls -l "$p/fd" 2>/dev/null | grep -q "socket:\[$inode\]" && basename "$p"
   done
 }
 # The app router does not print the build id into the HTML, so ask the clock instead: a process
