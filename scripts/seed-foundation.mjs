@@ -193,16 +193,32 @@ async function run() {
   console.log(`✓ partner/shadow-admin  ${PARTNER.name} (${PARTNER.org}) ${PARTNER.email} → tenant_admin membership`);
 
   // 4) buckets (deactivate any prior, then upsert the 5 Foundation buckets)
+  //
+  // LOOK BEFORE INSERTING. This used to read `INSERT … ON CONFLICT DO NOTHING RETURNING id` with a
+  // recover-by-name fallback, which looks idempotent and is not: tenant_spotlight_buckets has no
+  // unique on (tenant_id, name), so an untargeted ON CONFLICT has nothing to conflict ON — every
+  // run inserted a fresh row, RETURNING found it, and the fallback never ran. Four runs left
+  // Foundation with 4 copies of each of its 5 buckets, and since this seed is now part of the e2e
+  // globalSetup that would grow on every suite run until it tripped the per-tenant bucket cap and
+  // broke hitl-bucket-rls for a reason that has nothing to do with the product.
   await sql`UPDATE tenant_spotlight_buckets SET is_active=false WHERE tenant_id=${tid}::uuid`;
   const bucketRows = [];
   for (const b of BUCKETS) {
-    const [row] = await sql`
-      INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, is_active, created_by)
-      VALUES (${tid}::uuid, ${b.name}, ${b.description}, ${sql.json(b.criteria)}, true, ${kateId}::uuid)
-      ON CONFLICT DO NOTHING RETURNING id`;
-    let bid = row?.id;
-    if (!bid) { const [ex] = await sql`SELECT id FROM tenant_spotlight_buckets WHERE tenant_id=${tid}::uuid AND name=${b.name} LIMIT 1`; bid = ex.id;
-      await sql`UPDATE tenant_spotlight_buckets SET description=${b.description}, criteria=${sql.json(b.criteria)}, is_active=true WHERE id=${bid}::uuid`; }
+    const [existing] = await sql`
+      SELECT id FROM tenant_spotlight_buckets
+      WHERE tenant_id = ${tid}::uuid AND name = ${b.name} ORDER BY created_at LIMIT 1`;
+    let bid = existing?.id;
+    if (bid) {
+      await sql`UPDATE tenant_spotlight_buckets
+                   SET description = ${b.description}, criteria = ${sql.json(b.criteria)}, is_active = true
+                 WHERE id = ${bid}::uuid`;
+    } else {
+      const [row] = await sql`
+        INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, is_active, created_by)
+        VALUES (${tid}::uuid, ${b.name}, ${b.description}, ${sql.json(b.criteria)}, true, ${kateId}::uuid)
+        RETURNING id`;
+      bid = row.id;
+    }
     bucketRows.push({ id: bid, name: b.name, criteria: b.criteria });
   }
   console.log(`✓ ${bucketRows.length} spotlight buckets`);

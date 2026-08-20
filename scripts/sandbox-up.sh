@@ -107,13 +107,11 @@ fi
 #
 # So say it out loud. Compare the build stamp to the newest file the build actually depends on;
 # louder than a comment in a runbook, and it costs one `find`.
-STALE=0
 if [ -f frontend/.next/BUILD_ID ]; then
   newest="$(find frontend/app frontend/lib frontend/components frontend/package.json \
               -newer frontend/.next/BUILD_ID -type f \
               \( -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.css' \) 2>/dev/null | head -1)"
   if [ -n "$newest" ]; then
-    STALE=1
     say "build       STALE — $(basename "$newest") is newer than .next/BUILD_ID"
     say "            rebuild before testing:  cd frontend && npx next build"
   else
@@ -124,8 +122,43 @@ fi
 # ── Frontend (:3000) ────────────────────────────────────────────────────────
 # `next start` is broken here (output:'standalone') — the standalone server is the only way in, and
 # it needs public/ + .next/static staged beside it. See docs/CONTINUATION.md §2.
+#
+# "Responding" is not "running the build on disk". A rebuild replaces .next while the OLD process
+# keeps its modules in memory, so the box answers 200 with code from whenever it was started — and
+# that is exactly how a whole test run got measured against a five-day-old binary. Next stamps the
+# build id into every page it renders, so ask the SERVER which build it is, not the filesystem.
+#
+# Two traps live here, both hit for real:
+#   • the standalone server renames itself to `next-server (v15.x)`, so `pkill -f standalone/server.js`
+#     matches NOTHING and a "restart" silently no-ops;
+#   • `pkill -f next-server` from an interactive shell matches the shell's OWN command line and
+#     kills the caller. Match on the script path in /proc instead — the title is cosmetic, argv is not.
+frontend_pids() {
+  for p in /proc/[0-9]*; do
+    tr '\0' ' ' < "$p/cmdline" 2>/dev/null | grep -q 'standalone/server\.js' && basename "$p"
+  done
+}
+# The app router does not print the build id into the HTML, so ask the clock instead: a process
+# that started BEFORE .next/BUILD_ID was stamped loaded the previous build's modules and is still
+# holding them. That comparison is exact for the failure that actually happens (rebuild, forget to
+# restart / think you restarted) and needs nothing from the page.
 if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
-  say "frontend    already up"
+  build_at=$(stat -c %Y frontend/.next/BUILD_ID 2>/dev/null || echo 0)
+  restart=0
+  for pid in $(frontend_pids); do
+    started=$(stat -c %Y "/proc/$pid" 2>/dev/null || echo 0)
+    [ "$started" -lt "$build_at" ] && restart=1
+  done
+  if [ "$restart" = 1 ]; then
+    say "frontend    process predates the build — restarting so it serves what is on disk"
+    for pid in $(frontend_pids); do kill "$pid" 2>/dev/null; done
+    sleep 2
+  else
+    say "frontend    already up (running the current build)"
+  fi
+fi
+if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
+  :
 else
   if [ ! -d "$ROOT/frontend/.next/standalone" ]; then
     say "frontend    no build — run: cd frontend && npx next build"
