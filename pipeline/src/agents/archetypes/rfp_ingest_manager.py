@@ -40,6 +40,7 @@ import logging
 import uuid
 
 from .base import BaseArchetype
+from shredder.section_locate import locate_sections
 
 logger = logging.getLogger("pipeline.agents.rfp_ingest_manager")
 
@@ -391,7 +392,7 @@ Be specific and conservative. This is advisory — the admin runs the agents and
                     "number": row["solicitation_number"],
                     "type": row["solicitation_type"],
                     "ai_extracted": ai_extracted,
-                    "full_text_excerpt": (row["full_text"][:12000] if row["full_text"] else ""),
+                    "full_text_excerpt": locate_sections(row["full_text"], budget=12000).text,
                 },
             }
         except Exception as e:

@@ -26,6 +26,7 @@ import logging
 import uuid
 
 from .base import BaseArchetype
+from shredder.section_locate import locate_sections
 
 logger = logging.getLogger("pipeline.agents.matrix_stager")
 
@@ -143,7 +144,7 @@ Use get_solicitation and get_compliance to read the master data. Output the matr
                 "number": row["solicitation_number"],
                 "type": row["solicitation_type"],
                 "ai_extracted": ai_extracted,
-                "full_text": (row["full_text"][:16000] if row["full_text"] else ""),
+                "full_text": locate_sections(row["full_text"], budget=16000).text,
             }}
         except Exception as e:
             logger.warning("get_solicitation failed: %s", e)
