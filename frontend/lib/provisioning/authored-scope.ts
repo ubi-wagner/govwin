@@ -20,9 +20,32 @@
  * routes) is what tells the buyer WHERE, so "not authored here" never reads as "not required".
  */
 
-/** The shape provisioning needs; the resolver returns a superset. */
-export interface ScopedItem { dsipOnly?: boolean; expertNotes?: string | null; [k: string]: unknown }
-export interface ScopedVolume { dsipOnly?: boolean; expertNotes?: string | null; items?: ScopedItem[]; [k: string]: unknown }
+/**
+ * The shape provisioning needs; the resolver returns a superset.
+ *
+ * `dsipOnly` admits null as well as undefined because that is what the two callers actually hold:
+ * the resolver maps a missing jsonb key to undefined, while a UI row reading
+ * `(metadata->>'dsipOnly')::boolean` gets null. Both mean "nobody decided", and the predicates
+ * below test for `true` and `false` explicitly so either spelling lands in the same branch.
+ *
+ * The index signature lets the resolver's rich volume/item objects pass straight through; a caller
+ * holding a narrower shape (the curation UI) projects onto just these fields instead. Both reach
+ * the SAME predicate deliberately — a chip that disagrees with what provisioning will do is worse
+ * than no chip at all.
+ */
+export interface ScopedItem {
+  dsipOnly?: boolean | null;
+  expertNotes?: string | null;
+  itemName?: string;
+  [k: string]: unknown;
+}
+export interface ScopedVolume {
+  dsipOnly?: boolean | null;
+  expertNotes?: string | null;
+  volumeName?: string;
+  items?: ScopedItem[];
+  [k: string]: unknown;
+}
 
 /** Fallback text for a checklist row whose admin left no note. */
 export const DEFAULT_ELSEWHERE_NOTE =
@@ -68,7 +91,7 @@ export function elsewhereNote(...candidates: unknown[]): string {
  * sitting beside two narrative documents that genuinely are written here.
  */
 export function elsewhereRequirements(vol: ScopedVolume): Array<{ text: string; note: string }> {
-  const source = (vol.volumeName as string) || 'RFP';
+  const source = vol.volumeName || 'RFP';
   const volNote = vol.expertNotes;
   const items = vol.items ?? [];
 
@@ -76,10 +99,10 @@ export function elsewhereRequirements(vol: ScopedVolume): Array<{ text: string; 
     // The whole volume is done elsewhere: one row per named item if the master listed any,
     // otherwise a single row for the volume itself — that is the empty-volume portal form.
     return items.length > 0
-      ? items.map((it) => ({ text: (it.itemName as string) || source, note: elsewhereNote(it.expertNotes, volNote) }))
+      ? items.map((it) => ({ text: it.itemName || source, note: elsewhereNote(it.expertNotes, volNote) }))
       : [{ text: source, note: elsewhereNote(volNote) }];
   }
   return items
     .filter((it) => !isAuthoredItem(it))
-    .map((it) => ({ text: (it.itemName as string) || source, note: elsewhereNote(it.expertNotes, volNote) }));
+    .map((it) => ({ text: it.itemName || source, note: elsewhereNote(it.expertNotes, volNote) }));
 }

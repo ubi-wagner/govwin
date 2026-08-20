@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { DispositionControl } from './disposition-control';
+import { isAuthoredVolume } from '@/lib/provisioning/authored-scope';
 import { useTool } from '@/lib/hooks/use-tool';
 import { toast } from '@/lib/toast';
 import type { ShredAuditReport } from '@/lib/compliance/shred-audit';
@@ -94,6 +96,8 @@ interface RequiredItem {
   templateId: string | null;
   templateName: string | null;
   expertNotes: string | null;
+  /** true = completed elsewhere (a portal form, a signed original); null/false = authored here. */
+  dsipOnly: boolean | null;
 }
 
 interface Volume {
@@ -104,6 +108,16 @@ interface Volume {
   description: string | null;
   specialRequirements: string[];
   appliesToPhase: string[] | null;
+  /**
+   * Tri-state, and the three states are genuinely different:
+   *   true  — completed elsewhere (the agency portal, SAM, a signed original)
+   *   false — the rfp_admin's explicit "authored here" OVERRIDE
+   *   null  — nobody has decided. For a volume with items that is fine (they are authored by
+   *           default); for a volume with NO items it means the product is assuming portal form,
+   *           which is the one guess worth a person's confirmation.
+   */
+  dsipOnly: boolean | null;
+  expertNotes: string | null;
   items: RequiredItem[];
 }
 
@@ -2525,6 +2539,23 @@ function VolumesPanel({
                     <span className="text-xs text-gray-500">
                       {vol.items.length} item{vol.items.length !== 1 ? 's' : ''}
                     </span>
+                    <span className="relative">
+                      <DispositionControl
+                        solId={solicitationId}
+                        grain="volume"
+                        id={vol.id}
+                        dsipOnly={vol.dsipOnly}
+                        note={vol.expertNotes}
+                        itemless={vol.items.length === 0}
+                        effectiveElsewhere={!isAuthoredVolume({
+                          dsipOnly: vol.dsipOnly,
+                          items: vol.items.map((i) => ({ dsipOnly: i.dsipOnly })),
+                        })}
+                        onChanged={({ dsipOnly, note }) =>
+                          setVolumes((prev) => prev.map((x) => (x.id === vol.id ? { ...x, dsipOnly, expertNotes: note } : x)))
+                        }
+                      />
+                    </span>
                     {vol.appliesToPhase && vol.appliesToPhase.length > 0 && (
                       <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
                         {vol.appliesToPhase.join(', ')}
@@ -2561,7 +2592,12 @@ function VolumesPanel({
                     )}
 
                     {vol.items.length === 0 ? (
-                      <p className="text-xs text-gray-400 italic">No required items. Add the artifacts this volume requires.</p>
+                      <p className="text-xs text-gray-500 italic">
+                        No required items. That usually means the volume IS a form the company
+                        completes in the agency portal — it is treated that way at provision, and
+                        appears on the buyer&apos;s checklist rather than as a blank page to write.
+                        Add the artifacts it requires, or confirm the assumption with a note above.
+                      </p>
                     ) : (
                       <table className="w-full text-xs">
                         <thead>
@@ -2597,6 +2633,20 @@ function VolumesPanel({
                                       ✎ notes
                                     </span>
                                   )}
+                                  <span className="relative inline-flex">
+                                    <DispositionControl
+                                      solId={solicitationId}
+                                      grain="item"
+                                      id={item.id}
+                                      dsipOnly={item.dsipOnly}
+                                      note={item.expertNotes}
+                                      onChanged={({ dsipOnly, note }) =>
+                                        setVolumes((prev) => prev.map((v) => v.id === vol.id
+                                          ? { ...v, items: v.items.map((i) => (i.id === item.id ? { ...i, dsipOnly, expertNotes: note } : i)) }
+                                          : v))
+                                      }
+                                    />
+                                  </span>
                                 </div>
                               </td>
                               <td className="py-1.5 pr-2 text-gray-600">

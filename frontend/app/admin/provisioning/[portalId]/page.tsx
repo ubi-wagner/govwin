@@ -232,7 +232,28 @@ function ReadinessBars({ r }: { r: import('@/lib/provisioning/readiness').BuildR
         <Row ok={r.itemsWithTemplate > 0}
              label={`${r.itemsWithTemplate}/${r.requiredItemCount} items have a template mold`}
              detail={r.itemsWithTemplate < r.requiredItemCount ? 'the rest fall back to the registry (advisory)' : undefined} />
+        {/* The two legs that say WHY the bar is short. Without them "Below the bar" is a verdict
+            with no next action — and these are the ones that reach the buyer if left undone. */}
+        <Row ok={r.itemsUndecided === 0}
+             label={r.itemsUndecided === 0
+               ? 'Every item is built or marked'
+               : `${r.itemsUndecided} item${r.itemsUndecided === 1 ? '' : 's'} still need a mold or a mark`}
+             detail={r.itemsUndecided === 0 ? undefined
+               : 'an undecided item provisions as a blank section the drafter will fill'} />
+        <Row ok={r.volumesUndecided === 0}
+             label={r.volumesUndecided === 0
+               ? 'Every item-less volume has a decision on record'
+               : `${r.volumesUndecided} volume${r.volumesUndecided === 1 ? '' : 's'} with no items await confirmation`}
+             detail={r.volumesUndecided === 0 ? undefined
+               : 'assumed to be a portal form — confirm with a note, or override to authored here'} />
       </ul>
+      {r.itemsUndecided > 0 || r.volumesUndecided > 0 ? (
+        <p className="mt-3 text-xs text-gray-500">
+          Decide these in the solicitation workspace: each volume and item carries a
+          <span className="mx-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-800">Completed elsewhere</span>
+          control with a note saying where the buyer files it.
+        </p>
+      ) : null}
     </div>
   );
 }

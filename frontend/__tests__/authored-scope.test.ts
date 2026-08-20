@@ -60,6 +60,23 @@ describe('isAuthoredVolume', () => {
       expect(isAuthoredVolume(vol({ items: [], dsipOnly: false }))).toBe(true);
     });
 
+    it('treats NULL exactly like undefined — the UI reads jsonb, which gives null', () => {
+      // The curation workspace selects (metadata->>'dsipOnly')::boolean, so an undecided volume
+      // arrives as null, not undefined. If null fell through to a different branch the chip would
+      // say the opposite of what provisioning does — which is worse than showing no chip.
+      expect(isAuthoredVolume(vol({ items: [], dsipOnly: null }))).toBe(false);
+      expect(isAuthoredVolume(vol({ items: [item('a')], dsipOnly: null }))).toBe(true);
+      expect(isAuthoredItem(item('a', { dsipOnly: null }))).toBe(true);
+    });
+
+    it('is elsewhere when every item is marked, even with no volume-level flag', () => {
+      // The case the curation chip got wrong first time: the volume itself carries no decision, but
+      // nothing under it is authored here, so provisioning yields no sections for it.
+      const v = vol({ items: [item('webform', { dsipOnly: true }), item('cert', { dsipOnly: true })] });
+      expect(isAuthoredVolume(v)).toBe(false);
+      expect(elsewhereRequirements(v).map((r) => r.text)).toEqual(['webform', 'cert']);
+    });
+
     it('keeps undefined and false distinct — collapsing them restores the old bug', () => {
       // `dsipOnly !== true` was the old test, which made undecided and overridden identical and so
       // handed every unlisted portal form back to the buyer as a blank page.
