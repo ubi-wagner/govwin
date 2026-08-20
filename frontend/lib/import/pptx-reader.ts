@@ -212,7 +212,16 @@ function parseSlideXml(xml: string): SlideContent {
   return { title, bodyParagraphs };
 }
 
-/** Decode the five XML predefined entities in extracted cell text. */
+/**
+ * Decode the five XML predefined entities.
+ *
+ * PPTX text lives in XML, so a slide reading "Core Technology & IP" is stored as
+ * "Core Technology &amp; IP". This was applied to table cells only, so every slide TITLE and BODY
+ * paragraph kept its raw entities — measured on a real deck: atoms titled
+ * "Slide 4 Core Technology &amp; IP", "Slide 7 Facilities &amp; Capabilities". Those are library
+ * content: they get ranked, inserted into a section, and exported into a customer's proposal with
+ * the "&amp;" intact. Decoding belongs at the run level, where ALL slide text passes through.
+ */
 function decodeXmlEntities(s: string): string {
   return s
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
@@ -285,7 +294,9 @@ function extractParagraphs(shapeXml: string): string[] {
     let textMatch;
 
     while ((textMatch = textRegex.exec(paraXml)) !== null) {
-      textRuns.push(textMatch[1]);
+      // Decode per RUN, before joining: a run boundary can fall inside an entity's own text in
+      // pathological files, and decoding after the join would then mis-read it.
+      textRuns.push(decodeXmlEntities(textMatch[1]));
     }
 
     const paragraph = textRuns.join('').trim();
