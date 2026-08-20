@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Bring the whole sandbox up, idempotently, and don't return until it is actually serving.
+#
+# WHY THIS EXISTS. The container has stopped every process three times during this run, and each
+# recovery cost several round-trips of "start postgres, start the emulator, start the worker, start
+# the frontend, check each one". None of that is interesting work. This is the one command.
+#
+# Idempotent by design: anything already up is left alone, so it is safe to run before any journey
+# without thinking about what state the box is in.
+#
+#   source scripts/sandbox-env.sh && scripts/sandbox-up.sh
+#
+# Exits non-zero if anything is still not serving at the end, so a caller can trust a zero.
+set -uo pipefail
+cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
+: "${GOVWIN_RUN_DIR:?source scripts/sandbox-env.sh first}"
+mkdir -p "$GOVWIN_RUN_DIR"
+
+say() { printf '  %s\n' "$*"; }
+
+# ── Postgres ────────────────────────────────────────────────────────────────
+if pg_isready -q 2>/dev/null; then
+  say "postgres    already up"
+else
+  pg_ctlcluster 16 main start >/dev/null 2>&1 || service postgresql start >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do pg_isready -q 2>/dev/null && break; sleep 1; done
+  pg_isready -q 2>/dev/null && say "postgres    started" || say "postgres    FAILED"
+fi
+
+# ── Schema drift ────────────────────────────────────────────────────────────
+# The container restores the Postgres data directory to an old snapshot on every restart, the same
+# way it restores the repo and /tmp. Observed three times: the DB came back 21 migrations behind
+# the tree with tables the code depends on simply absent, and a security migration plus an operator
+# password reset silently undone. Nothing survives except what is pushed to the git remote.
+#
+# So the box heals itself here rather than in my head: compare the applied head to the newest file
+# on disk and migrate forward if it is behind. A missing ledger means a bare or wiped database, and
+# only then is a full reset allowed — never as a convenience.
+if pg_isready -q 2>/dev/null; then
+  disk_head="$(ls db/migrations/*.sql 2>/dev/null | xargs -n1 basename | sort | tail -1)"
+  db_head="$(psql "$DATABASE_URL_OWNER" -tAc "SELECT max(filename) FROM _migration_history" 2>/dev/null || echo '')"
+  if [ -z "$db_head" ]; then
+    say "schema      no migration ledger — building from 001"
+    ALLOW_SCHEMA_RESET=true DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs >"$GOVWIN_RUN_DIR/migrate.log" 2>&1
+    say "schema      $(tail -1 "$GOVWIN_RUN_DIR/migrate.log")"
+  elif [ "$db_head" != "$disk_head" ]; then
+    say "schema      DRIFT: db at ${db_head%%_*}, disk at ${disk_head%%_*} — migrating forward"
+    DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs >"$GOVWIN_RUN_DIR/migrate.log" 2>&1
+    say "schema      $(tail -1 "$GOVWIN_RUN_DIR/migrate.log")"
+  else
+    say "schema      at head (${disk_head%%_*})"
+  fi
+
+  # Migrations 124 and 198 deliberately leave every seeded admin on a random hash nobody holds, so
+  # a restored database has no way into /admin. This is the out-of-band reset a real operator does,
+  # and it refuses to run against anything but a local DSN.
+  if ! psql "$DATABASE_URL_OWNER" -tAc \
+      "SELECT 1 FROM users WHERE email='eric@rfppipeline.com' AND temp_password=false AND password_hash LIKE '\$2a\$12\$%'" \
+      2>/dev/null | grep -q 1; then
+    ( cd frontend && node ../scripts/sandbox-reset-passwords.mjs ) >"$GOVWIN_RUN_DIR/pwreset.log" 2>&1 \
+      && say "accounts    sandbox passwords set" || say "accounts    reset FAILED (see pwreset.log)"
+  else
+    say "accounts    already driveable"
+  fi
+fi
+
+# ── Emulated Claude (:8787) ─────────────────────────────────────────────────
+# Every AI-gated flow routes here via ANTHROPIC_BASE_URL, mirroring the production wiring with no
+# live key (docs/AI_FLOWS_PROOF.md). Without it, agent steps safe-skip and journeys quietly do less.
+if curl -sf -o /dev/null --max-time 3 -X POST -H 'content-type: application/json' \
+     -d '{"model":"x","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' \
+     http://127.0.0.1:8787/v1/messages 2>/dev/null; then
+  say "emulator    already up"
+else
+  nohup node "$ROOT/frontend/scripts/test-harness/emulated-claude.mjs" \
+    > "$GOVWIN_RUN_DIR/emulator.log" 2>&1 &
+  for _ in $(seq 1 20); do
+    curl -sf -o /dev/null --max-time 2 -X POST -H 'content-type: application/json' \
+      -d '{"model":"x","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' \
+      http://127.0.0.1:8787/v1/messages 2>/dev/null && break
+    sleep 1
+  done
+  say "emulator    started"
+fi
+
+# ── Pipeline worker ─────────────────────────────────────────────────────────
+# Runs as the OWNER role: the workflow engine's instances are platform-scope (tenant_id IS NULL) and
+# the tenant policies are tenant-equality, so under govtech_app it cannot claim its own instance.
+# rfp_agent is still deploy-gated (docs/RLS_CUTOVER.md:6).
+if pgrep -f "python3 src/main.py" >/dev/null 2>&1; then
+  say "worker      already up"
+else
+  ( cd "$ROOT/pipeline" && DATABASE_URL="$DATABASE_URL_OWNER" PYTHONPATH=src \
+      nohup python3 src/main.py > "$GOVWIN_RUN_DIR/worker.log" 2>&1 & )
+  sleep 3
+  pgrep -f "python3 src/main.py" >/dev/null 2>&1 && say "worker      started" || say "worker      FAILED"
+fi
+
+# ── Frontend (:3000) ────────────────────────────────────────────────────────
+# `next start` is broken here (output:'standalone') — the standalone server is the only way in, and
+# it needs public/ + .next/static staged beside it. See docs/CONTINUATION.md §2.
+if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
+  say "frontend    already up"
+else
+  if [ ! -d "$ROOT/frontend/.next/standalone" ]; then
+    say "frontend    no build — run: cd frontend && npx next build"
+  else
+    cp -r "$ROOT/frontend/public" "$ROOT/frontend/.next/standalone/" 2>/dev/null || true
+    cp -r "$ROOT/frontend/.next/static" "$ROOT/frontend/.next/standalone/.next/" 2>/dev/null || true
+    ( cd "$ROOT/frontend" && nohup node .next/standalone/server.js \
+        > "$GOVWIN_RUN_DIR/frontend.log" 2>&1 & )
+    for _ in $(seq 1 30); do
+      curl -sf -o /dev/null --max-time 2 http://localhost:3000/ 2>/dev/null && break
+      sleep 1
+    done
+    say "frontend    started"
+  fi
+fi
+
+# ── Verdict ─────────────────────────────────────────────────────────────────
+fail=0
+pg_isready -q 2>/dev/null || { echo "  ✗ postgres not serving"; fail=1; }
+curl -sf -o /dev/null --max-time 3 -X POST -H 'content-type: application/json' \
+  -d '{"model":"x","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' \
+  http://127.0.0.1:8787/v1/messages 2>/dev/null || { echo "  ✗ emulator not serving"; fail=1; }
+pgrep -f "python3 src/main.py" >/dev/null 2>&1 || { echo "  ✗ worker not running"; fail=1; }
+curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null || { echo "  ✗ frontend not serving"; fail=1; }
+[ "$fail" -eq 0 ] && echo "  ✓ stack up" || echo "  ✗ stack incomplete"
+exit "$fail"
