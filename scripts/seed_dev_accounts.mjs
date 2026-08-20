@@ -18,6 +18,14 @@
  *   eric@rfppipeline.com   RFPAdmin2026!      master_admin   (password re-set to the expected one)
  *   eric@lighthouse.com    LighthouseAdmin    tenant_admin   of the `lighthouse` tenant
  *   collab@lighthouse.com  CollabPass1        partner_user   scoped into `lighthouse`
+ *   eric@ubihere.com       UbihereAdmin       tenant_admin   of the ZERO-PROPOSAL `ubihere` tenant
+ *   member@ubihere.com     MemberPass1        tenant_user    scoped into `ubihere`
+ *
+ * The `ubihere` pair is the cold-start fixture: zzblockers.tenant.spec asserts that an admin of an
+ * empty tenant sees the "Get started" checklist and that a base member sees the honest
+ * "you're on the team" card instead of a redirect trap. Both only mean anything in a tenant with
+ * NO proposals, which is why this tenant exists and why nothing else may seed work into it.
+ * scripts/e2e_fixtures.sql already says "member@ubihere is seeded by seed_dev_accounts" — it is now.
  *
  * FIXTURES, NOT PRODUCTION. These are test credentials for a local box, which is why the script
  * refuses to run against a non-local DSN. Migrations 124 and 198 exist precisely to keep known
@@ -41,6 +49,11 @@ const ADMIN = { email: 'eric@rfppipeline.com', password: process.env.RFP_ADMIN_P
 const TENANT = { slug: 'lighthouse', name: 'Lighthouse Defense Systems' };
 const OWNER = { email: 'eric@lighthouse.com', name: 'Eric (Lighthouse)', password: process.env.LIGHTHOUSE_PW || 'LighthouseAdmin', role: 'tenant_admin' };
 const COLLAB = { email: process.env.COLLAB_EMAIL || 'collab@lighthouse.com', name: 'Lighthouse Collaborator', password: process.env.COLLAB_PW || 'CollabPass1', role: 'partner_user' };
+
+/** The cold-start tenant. Keep it EMPTY — its whole job is to have nothing in it. */
+const EMPTY_TENANT = { slug: 'ubihere', name: 'Ubihere' };
+const EMPTY_OWNER = { email: 'eric@ubihere.com', name: 'Eric (Ubihere)', password: process.env.UBIHERE_PW || 'UbihereAdmin', role: 'tenant_admin' };
+const EMPTY_MEMBER = { email: 'member@ubihere.com', name: 'Ubihere Member', password: process.env.MEMBER_PW || 'MemberPass1', role: 'tenant_user' };
 
 const hash = (pw) => bcrypt.hash(pw, 12);
 
@@ -73,6 +86,16 @@ try {
 
   for (const acct of [OWNER, COLLAB]) {
     const u = await upsertUser({ ...acct, tenantId: tenant.id });
+    console.log(`  ✓ ${u.email.padEnd(24)} [${u.role}]`);
+  }
+
+  const [empty] = await sql`
+    INSERT INTO tenants (name, slug, status) VALUES (${EMPTY_TENANT.name}, ${EMPTY_TENANT.slug}, 'active')
+    ON CONFLICT (slug) DO UPDATE SET status = 'active', name = EXCLUDED.name
+    RETURNING id, slug`;
+  console.log(`  ✓ tenant ${empty.slug} (cold-start — intentionally empty)`);
+  for (const acct of [EMPTY_OWNER, EMPTY_MEMBER]) {
+    const u = await upsertUser({ ...acct, tenantId: empty.id });
     console.log(`  ✓ ${u.email.padEnd(24)} [${u.role}]`);
   }
 

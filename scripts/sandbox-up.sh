@@ -97,6 +97,30 @@ else
   pgrep -f "python3 src/main.py" >/dev/null 2>&1 && say "worker      started" || say "worker      FAILED"
 fi
 
+# ── Stale build ─────────────────────────────────────────────────────────────
+# The build is a SNAPSHOT of the source, and nothing here rebuilds it — so a box that is "already
+# up" can be serving code from days ago while every test reads the current tree and concludes the
+# product is broken. That is exactly what happened: the running server was built Aug 15 01:20, the
+# bucket criteria-merge + synchronous re-rank landed at 03:02 the same day, and hitl-bucket-rls
+# spent a whole run reporting a clobbered PATCH that the source had already fixed. A test result
+# against a stale binary is worse than no result — it is a confident wrong answer.
+#
+# So say it out loud. Compare the build stamp to the newest file the build actually depends on;
+# louder than a comment in a runbook, and it costs one `find`.
+STALE=0
+if [ -f frontend/.next/BUILD_ID ]; then
+  newest="$(find frontend/app frontend/lib frontend/components frontend/package.json \
+              -newer frontend/.next/BUILD_ID -type f \
+              \( -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.css' \) 2>/dev/null | head -1)"
+  if [ -n "$newest" ]; then
+    STALE=1
+    say "build       STALE — $(basename "$newest") is newer than .next/BUILD_ID"
+    say "            rebuild before testing:  cd frontend && npx next build"
+  else
+    say "build       current"
+  fi
+fi
+
 # ── Frontend (:3000) ────────────────────────────────────────────────────────
 # `next start` is broken here (output:'standalone') — the standalone server is the only way in, and
 # it needs public/ + .next/static staged beside it. See docs/CONTINUATION.md §2.
