@@ -40,7 +40,12 @@ const CAPPED_SECTIONS: Array<[string, number]> =
       });
 
 const ADMIN = { email: 'eric@rfppipeline.com', password: 'RFPAdmin2026!' };
-const BUYER = { email: 'admin@immobileyes.test', password: 'DemoPass123!' };
+// The BUYER is per-scenario, like the tenant and the solicitation: each company buys a different
+// OPP. Defaults to the immobileyes fixture so the original scenario is unchanged.
+const BUYER = {
+  email: process.env.DRIVE_BUYER_EMAIL ?? 'admin@immobileyes.test',
+  password: process.env.DRIVE_BUYER_PW ?? 'DemoPass123!',
+};
 
 async function signIn(page: Page, who: { email: string; password: string }) {
   await page.goto('/login');

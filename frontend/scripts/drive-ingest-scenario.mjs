@@ -20,10 +20,18 @@ import fs from 'node:fs';
 const BASE = 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const REPO = path.resolve(process.cwd(), '..');
-const BAA = path.join(REPO, 'docs/DoW 2026 SBIR BAA FULL_R1_04132026.pdf');
-const CSO = path.join(REPO, 'docs/DoW 2026 SBIR CSO FULL_R1_04132026.pdf');
 
-for (const f of [BAA, CSO]) {
+// Scenario from the command line, so one driver stands up every solicitation in the matrix:
+//   node scripts/drive-ingest-scenario.mjs "<title>" <programType> <closeDate> <pdf> [pdf…]
+// Every PDF path is repo-relative, because the whole point is that the fixture lives in the
+// repository and survives a clean checkout.
+const [, , TITLE, PROGRAM, CLOSE, ...PDFS] = process.argv;
+if (!TITLE || !PROGRAM || !CLOSE || PDFS.length === 0) {
+  console.error('usage: drive-ingest-scenario.mjs "<title>" <programType> <YYYY-MM-DD> <pdf> [pdf…]');
+  process.exit(2);
+}
+const FILES = PDFS.map((f) => (path.isAbsolute(f) ? f : path.join(REPO, f)));
+for (const f of FILES) {
   if (!fs.existsSync(f)) { console.error(`missing ${f}`); process.exit(2); }
   console.log(`  source: ${path.basename(f)}  ${(fs.statSync(f).size / 1e6).toFixed(1)} MB`);
 }
@@ -40,22 +48,22 @@ console.log('\nsigned in as rfp_admin');
 
 // ── upload through the real form, both documents, CSO marked as instructions ──
 await page.goto(`${BASE}/admin/rfp-curation/upload`, { waitUntil: 'networkidle' });
-await page.fill('input[name="title"]', 'DoW 2026 SBIR — Annual BAA (repo fixture)');
-await page.fill('input[name="agency"]', 'Department of War');
-await page.selectOption('select[name="programType"]', 'sbir_phase_1');
-await page.fill('input[name="closeDate"]', '2026-12-15');
+await page.fill('input[name="title"]', TITLE);
+await page.fill('input[name="agency"]', process.env.SCENARIO_AGENCY || 'Department of Defense');
+await page.selectOption('select[name="programType"]', PROGRAM);
+await page.fill('input[name="closeDate"]', CLOSE);
 
 const fileInputs = page.locator('input[type="file"]');
-await fileInputs.nth(0).setInputFiles([BAA, CSO]);
+await fileInputs.nth(0).setInputFiles(FILES);
 await page.waitForTimeout(600);
 
 // Tell the form which of the two is component-level instructions, if it offers the choice.
 const instrSelects = page.locator('select').filter({ hasText: 'Component instructions' });
 const nSel = await instrSelects.count();
-if (nSel > 1) { await instrSelects.nth(1).selectOption('instructions'); console.log('marked the CSO as component instructions'); }
+if (nSel > 1) { await instrSelects.nth(1).selectOption('instructions'); console.log('marked file 2 as component instructions'); }
 else console.log(`(no per-file role select surfaced — ${nSel} found)`);
 
-console.log('submitting — the form waits for the async shred, this takes minutes on a 3 MB BAA…');
+console.log('submitting — the form waits for the async shred…');
 const t0 = Date.now();
 await page.click('button[type="submit"]');
 await page.waitForURL(/\/admin\/rfp-curation\/[0-9a-f-]{36}/, { timeout: 15 * 60 * 1000 });
@@ -79,6 +87,7 @@ console.log(`documents : ${docs?.n ?? 0} shredded, ${docs?.chars ?? 0} chars of 
 const [mx] = await sql`SELECT count(*)::int AS n FROM solicitation_compliance WHERE solicitation_id = ${SOL}::uuid`;
 console.log(`compliance: ${mx?.n ?? 0} row(s)`);
 
-console.log(`\nnew scenario id: ${SOL}`);
+const [oppRow] = await sql`SELECT id FROM opportunities WHERE solicitation_id = ${SOL}::uuid LIMIT 1`;
+console.log(`\nSCENARIO SOL=${SOL} OPP=${oppRow?.id ?? ''}`);
 await browser.close();
 await sql.end();
