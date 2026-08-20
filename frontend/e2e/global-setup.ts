@@ -24,7 +24,17 @@ export default async function globalSetup() {
   const repoRoot = path.join(__dirname, '..', '..'); // frontend/e2e → repo root
   try {
     console.log('[e2e globalSetup] seeding e2e fixtures (scripts/seed_e2e_fixtures.mjs)…');
-    execSync('node scripts/seed_e2e_fixtures.mjs', { cwd: repoRoot, stdio: 'inherit', env: process.env });
+    // The seed WRITES tenant-scoped, RLS-forced tables (library_atoms among them) and holds no
+    // per-request tenant context, so under the app role every insert is refused:
+    //   [e2e-fixtures] FAILED: new row violates row-level security policy for table "library_atoms"
+    // That failure is swallowed below, so the suite proceeded with no fixtures and the persona
+    // specs failed for reasons that had nothing to do with the product. Seeding is a bootstrap
+    // job — it runs as the OWNER when one is available, exactly like migrations and the pipeline
+    // worker (docs/RLS_CUTOVER.md). DATABASE_URL is left alone for everything else, so specs that
+    // deliberately probe RLS as the app role still get the app role.
+    const seedEnv = { ...process.env };
+    if (process.env.DATABASE_URL_OWNER) seedEnv.DATABASE_URL = process.env.DATABASE_URL_OWNER;
+    execSync('node scripts/seed_e2e_fixtures.mjs', { cwd: repoRoot, stdio: 'inherit', env: seedEnv });
   } catch (err) {
     console.warn('[e2e globalSetup] fixture seed failed (continuing — persona specs will report the real gap):', (err as Error).message);
   }
