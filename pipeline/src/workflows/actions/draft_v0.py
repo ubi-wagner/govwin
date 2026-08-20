@@ -30,6 +30,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from workflows.actions.authorable import is_authorable
+
 import asyncpg
 
 log = logging.getLogger("pipeline.workflows.actions.draft_v0")
@@ -258,7 +260,7 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         """
         SELECT s.id, s.title, s.status, s.section_type, s.page_allocation,
                s.character_allocation, s.artifact_id,
-               s.content, s.content_source, a.format_spec
+               s.content, s.content_source, s.meta, a.format_spec
         FROM proposal_sections s
         LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
         WHERE s.proposal_id = $1 AND s.status IN ('empty', 'ai_drafted')
@@ -268,8 +270,17 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         proposal_uuid,
     )
     rows = [r for r in rows if r["content_source"] != "template" or not _has_prose(r["content"])]
+    # Drop the sections that are not written at all — forms, signed attachments, the computed cost
+    # workbook. publish_section_draft refuses these at landing, and the two selections MUST agree:
+    # without this the drafter spends a model call per certification and every one is thrown away at
+    # the door, which is the expensive way to do nothing. Same rule, one module.
+    before = len(rows)
+    rows = [r for r in rows if is_authorable(r["meta"])]
+    if before != len(rows):
+        log.info("draft_v0: skipping %d form/attachment section(s) — obtained or filed, not authored here",
+                 before - len(rows))
     if not rows:
-        return {"drafted": 0, "skipped": False, "reason": "no_empty_sections"}
+        return {"drafted": 0, "skipped": False, "reason": "no_authorable_sections"}
 
     sol_id = await conn.fetchval("SELECT solicitation_id FROM proposals WHERE id = $1", proposal_uuid)
     rfp = await _load_rfp_context(conn, proposal_uuid)

@@ -37,6 +37,8 @@ from typing import Any
 
 import asyncpg
 
+from workflows.actions.authorable import is_authorable, item_type_of, refusal_reason
+
 log = logging.getLogger("pipeline.workflows.actions.publish_section_draft")
 
 _LANDABLE = ("empty", "ai_drafted")
@@ -71,7 +73,7 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     # be safe to fill (untouched or prior auto-draft). One row, one lock.
     row = await conn.fetchrow(
         """
-        SELECT id, status, version, content_source, content
+        SELECT id, status, version, content_source, content, meta
         FROM proposal_sections
         WHERE id = $1::uuid AND proposal_id = $2::uuid
         FOR UPDATE
@@ -82,6 +84,17 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
     if row is None:
         log.warning("publish_section_draft: section %s not in proposal %s — skipping", section_id, proposal_id)
         return {"published": False, "skipped": True, "reason": "section_not_found"}
+    # NOT-AUTHORED-HERE guard, judged by the item's TYPE. A solicitation's required items are not
+    # all narrative: `item_type` already separates the Volume 2 word_docs a proposer writes from the
+    # pdfs, forms and cost spreadsheets that are obtained, signed, filed or computed. Landing prose
+    # into one of those produces an AI-written "DD Form 2345" — fluent, plausible, and not a form.
+    # Measured on a live DoW 2026 build: ten sections, ~4 KB each. Empty would have been safer, so
+    # this refuses first, before any of the ownership gates: those ask "is it safe to overwrite",
+    # and here the answer is that nothing should be written at all.
+    if not is_authorable(row["meta"]):
+        log.info("publish_section_draft: section %s is a form/attachment (itemType=%s) — not authored here",
+                 section_id, item_type_of(row["meta"]))
+        return {"published": False, "skipped": True, "reason": refusal_reason(row["meta"])}
     if row["status"] not in _LANDABLE:
         log.info("publish_section_draft: section %s is '%s' (human-owned) — leaving it alone",
                  section_id, row["status"])
