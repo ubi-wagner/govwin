@@ -133,9 +133,16 @@ fi
 #     matches NOTHING and a "restart" silently no-ops;
 #   • `pkill -f next-server` from an interactive shell matches the shell's OWN command line and
 #     kills the caller. Match on the script path in /proc instead — the title is cosmetic, argv is not.
+# Matching on /proc/*/cmdline does NOT work either, and this cost a full debugging round: Node
+# rewrites its own argv memory when it sets process.title, so moments after boot the cmdline reads
+# `next-server (v15.5.14)` with no trace of the script path. A scan run right after `nohup` finds the
+# process; the same scan a minute later finds nothing, which reads exactly like "the server died".
+# What does NOT get rewritten is the working directory: server.js does process.chdir(__dirname), so
+# the standalone server is precisely the process whose cwd is .next/standalone.
 frontend_pids() {
+  local target="$ROOT/frontend/.next/standalone"
   for p in /proc/[0-9]*; do
-    tr '\0' ' ' < "$p/cmdline" 2>/dev/null | grep -q 'standalone/server\.js' && basename "$p"
+    [ "$(readlink -f "$p/cwd" 2>/dev/null)" = "$target" ] && basename "$p"
   done
 }
 # The app router does not print the build id into the HTML, so ask the clock instead: a process
