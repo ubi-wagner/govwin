@@ -9,8 +9,20 @@ export interface ResolvedCompliance {
   volumes: Array<{
     volumeName: string;
     volumeNumber: number;
-    /** Completed in DSIP (webform / agency-generated report) — not authored in this workspace. */
+    /**
+     * Completed in DSIP (webform / agency-generated report) — not authored in this workspace.
+     *
+     * TRI-STATE, deliberately. `undefined` means nobody has decided, and that is NOT the same as
+     * `false`: a volume the extraction found no required items for is USUALLY a portal form the
+     * company files in DSIP, so an undecided empty volume defaults to not-authored. `false` is an
+     * rfp_admin's explicit OVERRIDE saying this one really is written here despite having no
+     * itemised requirements. Collapsing the two turns the override into the default and silently
+     * hands every unlisted portal form back to the buyer as a blank section to write.
+     */
     dsipOnly?: boolean;
+    /** The rfp_admin's note — WHERE this is completed, if not here. Rides onto the buyer's
+     *  compliance checklist so "not authored here" never reads as "not required". */
+    expertNotes?: string | null;
     items: Array<Record<string, unknown>>;
   }>;
   /** Set when resolution ERRORED and fell back to SYSTEM_DEFAULTS + no volumes. A provision
@@ -238,9 +250,10 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        expertNotes: string | null;
         metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name, metadata
+        SELECT id, volume_number, volume_name, expert_notes, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id = ${topicId}
@@ -250,9 +263,10 @@ async function resolveVolumes(
         id: string;
         volumeNumber: number;
         volumeName: string;
+        expertNotes: string | null;
         metadata: Record<string, unknown> | null;
       }[]>`
-        SELECT id, volume_number, volume_name, metadata
+        SELECT id, volume_number, volume_name, expert_notes, metadata
         FROM solicitation_volumes
         WHERE solicitation_id = ${solicitationId}
           AND topic_id IS NULL
@@ -307,14 +321,21 @@ async function resolveVolumes(
     itemsByVolume.set(item.volumeId, existing);
   }
 
-  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string; metadata?: Record<string, unknown> | null }) => ({
+  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string; expertNotes?: string | null; metadata?: Record<string, unknown> | null }) => ({
     volumeName: vol.volumeName,
     volumeNumber: vol.volumeNumber,
     // A DSIP-ONLY volume is completed inside the agency's own submission portal (a DSIP webform or
     // a report pulled from SBIR.gov) — the company never authors a document for it here. Carrying
     // the flag lets provision list it as a submission checklist item instead of standing up an
     // authoring artifact nobody can fill, which would then block readiness forever.
-    dsipOnly: (vol.metadata as { dsipOnly?: boolean } | null)?.dsipOnly === true,
+    //
+    // PRESERVE THE TRI-STATE. `=== true` collapsed "nobody decided" into "decided: authored here",
+    // and those differ for the case that matters most: a volume the extraction found no items for.
+    // That is usually a portal form, so undecided must NOT read as an instruction to author it.
+    dsipOnly: typeof (vol.metadata as { dsipOnly?: unknown } | null)?.dsipOnly === 'boolean'
+      ? (vol.metadata as { dsipOnly: boolean }).dsipOnly
+      : undefined,
+    expertNotes: vol.expertNotes ?? null,
     items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null; metadata?: Record<string, unknown> | null }) => ({
       itemNumber: item.itemNumber,
       itemName: item.itemName,

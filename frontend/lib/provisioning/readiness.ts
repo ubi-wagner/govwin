@@ -41,6 +41,18 @@ export interface BuildReadiness {
    * count is part of the bar, not a footnote beside it.
    */
   itemsUndecided: number;
+  /**
+   * Volumes with NO required items and no disposition on record.
+   *
+   * An empty volume is usually a portal form — a DSIP webform, an SBIR.gov-generated
+   * commercialization report, a training certificate — which is why the extraction found nothing to
+   * itemise under it. Provisioning now DEFAULTS such a volume to completed-elsewhere rather than
+   * standing up a blank section, so an undecided one is no longer dangerous. It is still worth a
+   * person's glance: this is the one place the product guesses, and the admin either confirms it
+   * with a note saying where the buyer files it, or OVERRIDES to "authored here" for the minority
+   * case where the volume really is written and the extraction simply missed the items.
+   */
+  volumesUndecided: number;
   /** The deliberate admin "done" flag (mig 182) — distinct from `ready` (the computed bar). */
   buildComplete: boolean;
   buildCompletedAt: string | null;
@@ -48,7 +60,7 @@ export interface BuildReadiness {
 
 const EMPTY: BuildReadiness = {
   ready: false, hasCompliance: false, volumeCount: 0, requiredItemCount: 0,
-  itemsWithTemplate: 0, itemsUndecided: 0, buildComplete: false, buildCompletedAt: null,
+  itemsWithTemplate: 0, itemsUndecided: 0, volumesUndecided: 0, buildComplete: false, buildCompletedAt: null,
 };
 
 export async function getBuildReadiness(solId: string): Promise<BuildReadiness> {
@@ -56,7 +68,7 @@ export async function getBuildReadiness(solId: string): Promise<BuildReadiness> 
   try {
     const [r] = await sqlBypass<Array<{
       hasCompliance: boolean; volumeCount: number; requiredItemCount: number;
-      itemsWithTemplate: number; itemsUndecided: number;
+      itemsWithTemplate: number; itemsUndecided: number; volumesUndecided: number;
       buildComplete: boolean; buildCompletedAt: Date | null;
     }>>`
       SELECT
@@ -81,17 +93,27 @@ export async function getBuildReadiness(solId: string): Promise<BuildReadiness> 
              AND vri.template_id IS NULL
              AND COALESCE((vri.metadata->>'dsipOnly')::boolean, false) = false
              AND COALESCE((sv.metadata->>'dsipOnly')::boolean, false) = false) AS items_undecided,
+        -- An empty volume nobody has ruled on. dsipOnly is TRI-STATE here: absent means undecided,
+        -- and FALSE is the admin's explicit "authored here" override — so test for the KEY, not for
+        -- a truthy value. (->>'dsipOnly' IS NULL is true both when the key is missing and when it
+        -- is JSON null; either way nobody decided.)
+        (SELECT count(*)::int FROM solicitation_volumes sv
+           WHERE sv.solicitation_id = ${solId}::uuid
+             AND sv.metadata->>'dsipOnly' IS NULL
+             AND NOT EXISTS (SELECT 1 FROM volume_required_items vri WHERE vri.volume_id = sv.id)) AS volumes_undecided,
         cs.build_complete, cs.build_completed_at
       FROM curated_solicitations cs
       WHERE cs.id = ${solId}::uuid`;
     if (!r) return EMPTY;
     return {
-      ready: r.hasCompliance && r.volumeCount > 0 && r.requiredItemCount > 0 && r.itemsUndecided === 0,
+      ready: r.hasCompliance && r.volumeCount > 0 && r.requiredItemCount > 0
+             && r.itemsUndecided === 0 && r.volumesUndecided === 0,
       hasCompliance: r.hasCompliance,
       volumeCount: r.volumeCount,
       requiredItemCount: r.requiredItemCount,
       itemsWithTemplate: r.itemsWithTemplate,
       itemsUndecided: r.itemsUndecided,
+      volumesUndecided: r.volumesUndecided,
       buildComplete: r.buildComplete,
       buildCompletedAt: r.buildCompletedAt ? new Date(r.buildCompletedAt).toISOString() : null,
     };

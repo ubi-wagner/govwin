@@ -17,7 +17,7 @@ import { getBuildReadiness } from '@/lib/provisioning/readiness';
 
 const row = (over: Record<string, unknown> = {}) => [{
   hasCompliance: true, volumeCount: 7, requiredItemCount: 22,
-  itemsWithTemplate: 12, itemsUndecided: 0,
+  itemsWithTemplate: 12, itemsUndecided: 0, volumesUndecided: 0,
   buildComplete: false, buildCompletedAt: null, ...over,
 }];
 
@@ -41,6 +41,28 @@ describe('getBuildReadiness', () => {
     expect(r.hasCompliance).toBe(true);
     expect(r.volumeCount).toBeGreaterThan(0);
     expect(r.requiredItemCount).toBeGreaterThan(0);
+  });
+
+  it('is NOT ready while an empty volume has no disposition on record', async () => {
+    // A volume the extraction found no items under is usually a portal form the company files in
+    // DSIP, and provisioning now defaults it that way rather than handing the buyer a blank page.
+    // The guess is still worth a glance: the admin either confirms it with a note saying where, or
+    // overrides to "authored here" for the volume the extraction simply failed to itemise.
+    sqlMock.mockResolvedValueOnce(row({ volumesUndecided: 1 }));
+    const r = await getBuildReadiness('11111111-1111-4111-8111-111111111111');
+    expect(r.ready).toBe(false);
+    expect(r.volumesUndecided).toBe(1);
+    expect(r.itemsUndecided).toBe(0);   // the item leg is separately satisfied
+  });
+
+  it('counts an empty volume as decided once dsipOnly is SET, either way', async () => {
+    sqlMock.mockResolvedValueOnce(row());
+    await getBuildReadiness('11111111-1111-4111-8111-111111111111');
+    const q = (sqlMock.mock.calls.at(-1)?.[0] as string[]).join('?');
+    // Tests the KEY, not a truthy value — dsipOnly=false is the admin's explicit "authored here"
+    // override, and treating it as undecided would nag forever on a volume already ruled on.
+    expect(q).toMatch(/sv\.metadata->>'dsipOnly' IS NULL/);
+    expect(q).toMatch(/NOT EXISTS \(SELECT 1 FROM volume_required_items/);
   });
 
   it('still fails on the original three legs, so the new one only ADDS a condition', async () => {
@@ -68,5 +90,6 @@ describe('getBuildReadiness', () => {
     const r = await getBuildReadiness('11111111-1111-4111-8111-111111111111');
     expect(r.ready).toBe(false);
     expect(r.itemsUndecided).toBe(0);
+    expect(r.volumesUndecided).toBe(0);
   });
 });

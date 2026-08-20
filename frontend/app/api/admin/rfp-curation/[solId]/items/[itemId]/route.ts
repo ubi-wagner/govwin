@@ -55,7 +55,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    let body: { disposition?: unknown };
+    let body: { disposition?: unknown; note?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     const disposition = body.disposition as Disposition;
     if (!DISPOSITIONS.includes(disposition)) {
@@ -65,12 +65,23 @@ export async function PATCH(
       );
     }
 
+    // The NOTE is what turns "not authored here" into something the buyer can act on. A checklist
+    // row saying only "DD Form 2345 — completed elsewhere" invites the question "elsewhere WHERE?";
+    // this carries the answer onto the row at provision. Optional, because the default text ("in the
+    // agency submission portal") is right for the common case, and blank CLEARS a stale note.
+    const rawNote = body.note;
+    if (rawNote !== undefined && typeof rawNote !== 'string') {
+      return NextResponse.json({ error: 'note must be a string', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    const note = typeof rawNote === 'string' ? rawNote.trim().slice(0, 2000) : undefined;
+
     // The item must belong to THIS solicitation. Without the join an admin could retarget any item
     // in the system by pairing a real item id with a solicitation they happen to be looking at.
     const external = disposition === 'external';
     const rows = await sqlBypass<Array<{ id: string; itemName: string; volumeNumber: number }>>`
       UPDATE volume_required_items vri
-         SET metadata = COALESCE(vri.metadata, '{}'::jsonb) || ${sqlBypass.json({ dsipOnly: external })}
+         SET metadata = COALESCE(vri.metadata, '{}'::jsonb) || ${sqlBypass.json({ dsipOnly: external })},
+             expert_notes = ${note === undefined ? sqlBypass`vri.expert_notes` : (note || null)}
         FROM solicitation_volumes sv
        WHERE sv.id = vri.volume_id
          AND vri.id = ${itemId}::uuid
@@ -86,7 +97,7 @@ export async function PATCH(
       type: 'required_item.disposition_set',
       actor: userActor(u.id, u.email ?? undefined),
       tenantId: null,
-      payload: { solicitationId: solId, itemId, disposition, itemName: rows[0].itemName, volumeNumber: rows[0].volumeNumber },
+      payload: { solicitationId: solId, note: note ?? null, itemId, disposition, itemName: rows[0].itemName, volumeNumber: rows[0].volumeNumber },
     });
 
     return NextResponse.json({ data: { itemId, disposition, itemName: rows[0].itemName } });
