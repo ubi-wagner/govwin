@@ -1,0 +1,27 @@
+Border style is 0.
+tables=110
+migrations=175
+head=176_seed_program_guide_drafts.sql
+tenants=4
+users=12
+memberships=10
+curated_solicitations=15
+opportunity_bridge=10
+tenant_opportunity_cards=18
+buckets=11
+bucket_scores=84
+proposals=4
+proposal_sections=64
+proposal_artifacts=17
+canvas_versions=1
+library_atoms=639
+atom_embeddings=628
+content_pages=59
+process_instances=7
+tasks=14
+system_events=410
+psql:/tmp/govwin-sandbox/census.sql:24: ERROR:  relation "master_templates" does not exist
+LINE 1: SELECT 'master_templates='||count(*) FROM master_templates;
+                                                  ^
+purchases=3
+proposal_portals=4
