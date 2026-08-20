@@ -32,6 +32,66 @@ logger = logging.getLogger("pipeline.workflows.ingest_actions")
 NEXT_PHASE = {"extract": "matrix", "matrix": "review", "review": None, "molds": "complete"}
 _PHASES = ("extract", "matrix", "review", "molds")
 
+#: The phase machine in order, INCLUDING the states only the frontend writes. A worker hop must
+#: never move the phase to a lower rank than it already holds — see `_advance_to`.
+PHASE_ORDER = ("not_started", "extract", "matrix", "review", "landed", "molds", "complete")
+
+
+async def _advance_to(conn, sid, to_phase):
+    """Move the phase FORWARD only. Returns the phase actually in effect afterwards.
+
+    WHY THIS IS NOT A PLAIN UPDATE. Two writers share `curated_solicitations.ingest_phase`: this
+    worker, hopping asynchronously through the auto chain, and the human at the Ingest Studio gate
+    panel. They are not serialized, and the worker's hops are SLOW — each one waits on an agent
+    cohort. So the ordering that actually happens is:
+
+        20:18:33  human   auto → the chain is dispatched at 'extract'
+        20:18:33  human   ...parks at the land gate, reviews the blocker, LANDS it by hand
+        20:18:34  human   molds proposed + built → phase 'complete'
+        20:18:34  worker  extract hop finishes  → SET ingest_phase = 'matrix'
+        20:18:44  worker  matrix  hop finishes  → SET ingest_phase = 'review'
+        20:18:54  worker  review  hop finishes  → SET ingest_phase = 'review'
+
+    — measured on a live drive of the DoD X25.5 CSO. The compliance row, six volumes, 22 items and
+    21 molds all exist; the panel says the solicitation is still awaiting review. The admin is
+    invited to redo work that is already done, and `landSkeleton` will happily re-land against the
+    draft the chain restaged.
+
+    The frontend has had the discipline all along — `setIngestPhase(id, to, expected)` is a
+    compare-and-swap, and the approve gate passes `expected` exactly so two clicks cannot
+    double-advance. This side ignored it. The phase machine is a total order, so the guard does
+    not need coordination or a lock: refuse any write that would LOWER the rank.
+
+    Deliberately scoped to the worker. A human restart legitimately moves backwards — `regenerate`
+    returns to 'matrix', `auto` returns to 'extract' — and those go through the frontend's own
+    writer, which is unaffected.
+    """
+    try:
+        row = await conn.fetchrow(
+            """UPDATE curated_solicitations SET ingest_phase = $1, updated_at = now()
+                WHERE id = $2
+                  AND array_position($3::text[], COALESCE(ingest_phase, 'not_started'))
+                    < array_position($3::text[], $1::text)
+               RETURNING ingest_phase""",
+            to_phase, sid, list(PHASE_ORDER),
+        )
+    except Exception as exc:
+        logger.error("advance_ingest_phase: state update failed: %s", exc)
+        return None
+    if row:
+        return row["ingest_phase"]
+    # Refused: someone is further along than this hop. Say so out loud — silently doing nothing is
+    # how the original bug hid, and an operator watching a chain needs to see the hop arrive late.
+    try:
+        cur = await conn.fetchval("SELECT ingest_phase FROM curated_solicitations WHERE id = $1", sid)
+    except Exception:
+        cur = None
+    logger.info(
+        "advance_ingest_phase: hop to '%s' arrived after the solicitation reached '%s' — not rewinding",
+        to_phase, cur,
+    )
+    return cur
+
 
 async def advance_ingest_phase(
     conn,
@@ -69,23 +129,18 @@ async def advance_ingest_phase(
     # The review phase ends AT the land gate, auto or not. This is the one place the automation
     # policy is deliberately not sovereign (docs/INGEST_STUDIO_DESIGN.md §"never auto").
     if phase == "review":
-        try:
-            await conn.execute(
-                "UPDATE curated_solicitations SET ingest_phase = 'review', updated_at = now() WHERE id = $1",
-                sid,
-            )
-        except Exception as exc:
-            logger.error("advance_ingest_phase: review state update failed: %s", exc)
+        now_at = await _advance_to(conn, sid, "review")
+        if now_at is not None and now_at != "review":
+            # The gate is already behind them — a human landed while this cohort was running.
+            return {"advanced": False, "status": "superseded", "phase": now_at}
         return {"advanced": True, "status": "awaiting_land", "phase": "review"}
 
     if is_auto and nxt:
-        try:
-            await conn.execute(
-                "UPDATE curated_solicitations SET ingest_phase = $1, updated_at = now() WHERE id = $2",
-                nxt, sid,
-            )
-        except Exception as exc:
-            logger.error("advance_ingest_phase: state update failed: %s", exc)
+        now_at = await _advance_to(conn, sid, nxt)
+        if now_at is not None and now_at != nxt:
+            # Chaining the next phase from here would restage a draft over a matrix a person has
+            # already landed, so the chain ENDS instead: the human took it from here.
+            return {"advanced": False, "status": "superseded", "phase": now_at}
         try:
             # START/END pair, like every other trigger emitter (EVENT_CONTRACT). The END is what
             # the processor's trigger matches, so it carries the full payload; the START gives
