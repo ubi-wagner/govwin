@@ -6,11 +6,15 @@
  * brings on day one:
  *
  *   1. AUTO mode segments a document into atoms and hands the cocoon to the librarian
- *   2. MANUAL mode returns selectable chunks instead, leaving the choice to a person
- *   3. every format the product claims to read actually reads
+ *   2. every format the product claims to read actually reads
+ *   3. the uploader's context (agency / program / phase / sol / topic) reaches every atom
  *   4. the new atoms are tenant-scoped — another tenant cannot see them, at the API or in RLS
  *   5. embeddings follow the atoms (when an engine is on) and never cross a tenant
  *   6. the atoms come back out: selectForSection surfaces them for a matching section
+ *
+ * NOT here: the MANUAL path, where the drop card dry-runs a preview and a person chooses which
+ * chunks become atoms. That is drive-preview-atomize.mts. This header used to claim it, which made
+ * the pair look like it had one more driver than it did.
  *
  * Run: cd frontend && . ../scripts/sandbox-env.sh && node scripts/drive-atomization.mjs
  */
@@ -49,17 +53,33 @@ async function login(page, email, pw) {
   ]);
 }
 
-/** Two real demo tenants — the isolation check needs a second pair of eyes, with its own login. */
-const WHO = [
+/* Two real tenants. Tenant A is the SUBJECT — the one we upload into and whose library we grow.
+ * Tenant B is only ever the second pair of eyes: the isolation checks need a real, logged-in user
+ * in a DIFFERENT tenant, because "an anonymous request is refused" proves nothing about tenant
+ * scoping. WHICH tenant B is does not matter, only that it is not A.
+ *
+ * This used to name `lighthouse` — a tenant that does not exist in this database — so the script
+ * exited at line 62 before its first assertion and had never once run. Candidates are resolved
+ * against the DB and the first two that exist are used, so the drive survives any one demo tenant
+ * being absent. Their passwords come from scripts/sandbox-reset-passwords.mjs.
+ */
+const CANDIDATES = [
   { slug: 'foundation', email: 'kate.ulepic@foundation3dp.com', pw: process.env.FOUNDATION_PW || 'DemoPass123!' },
-  { slug: 'lighthouse', email: 'eric@lighthouse.com', pw: process.env.LIGHTHOUSE_PW || 'LighthouseAdmin' },
+  { slug: 'immobileyes', email: 'admin@immobileyes.test', pw: process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!' },
 ];
 const pair = [];
-for (const w of WHO) {
+for (const w of CANDIDATES) {
   const [t] = await sql`SELECT id AS "tenantId", slug FROM tenants WHERE slug = ${w.slug} AND archived_at IS NULL`;
-  if (t) pair.push({ ...w, tenantId: t.tenantId });
+  if (!t) { note(`no tenant "${w.slug}" — skipping it as a candidate`); continue; }
+  const [u] = await sql`SELECT id FROM users WHERE email = ${w.email} AND is_active = true`;
+  if (!u) { note(`no active login for ${w.email} — skipping "${w.slug}"`); continue; }
+  pair.push({ ...w, tenantId: t.tenantId });
 }
-if (pair.length < 2) { console.log('! need both demo tenants (foundation, lighthouse)'); process.exit(1); }
+if (pair.length < 2) {
+  console.log(`! need two tenants with active logins for the isolation checks — found ${pair.length}`);
+  console.log('  run: node ../scripts/sandbox-reset-passwords.mjs');
+  process.exit(1);
+}
 const [A, B] = pair;
 console.log(`\ntenant A: ${A.slug}  (${A.email})`);
 console.log(`tenant B: ${B.slug}  (${B.email})`);

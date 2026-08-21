@@ -37,6 +37,12 @@ const TARGETS = [
   'eric.c.wagner@gmail.com',     // master_admin — rotated by 124
   'pjackson@ecinnovates.com',    // partner_admin (Entrepreneurs' Center)
   'sgaffney@ybi.org',            // partner_admin (Youngstown Business Incubator)
+  // A SECOND tenant_admin, in a different tenant from Foundation. Every isolation drive needs one:
+  // proving "tenant B cannot see tenant A's rows" requires B to have a real login, or the check
+  // degrades into asserting that an anonymous request is refused — which proves nothing about
+  // tenant scoping. drive-atomization.mjs used to name a `lighthouse` tenant that does not exist
+  // here and bailed before its first assertion.
+  'admin@immobileyes.test',      // tenant_admin (Immobileyes Inc.)
 ];
 
 const hash = await bcrypt.hash(PW, 12);
