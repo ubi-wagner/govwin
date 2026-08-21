@@ -63,7 +63,7 @@ async function main() {
   await tctx.close();
 
   const actx = await b.newContext();
-  const ap = await login(actx, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  const ap = await login(actx, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   console.log('admin login →', ap.url());
   for (const [label, path, token] of ADMIN) {
     const { status, has, len, err } = await checkPage(ap, path, token);

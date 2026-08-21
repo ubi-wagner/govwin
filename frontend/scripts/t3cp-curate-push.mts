@@ -35,7 +35,7 @@ async function login(b: Browser, email: string, password: string): Promise<APIRe
 }
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const admin = await login(b, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+const admin = await login(b, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 
 /** POST /api/tools/<name> exactly as lib/hooks/use-tool.ts does. */
 async function tool<T = unknown>(name: string, input: unknown): Promise<{ status: number; body: any }> {

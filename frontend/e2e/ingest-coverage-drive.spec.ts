@@ -50,7 +50,7 @@ async function signIn(page: Page, email: string, password: string) {
     page.click('button[type="submit"]'),
   ]);
 }
-const asAdmin = (page: Page) => signIn(page, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+const asAdmin = (page: Page) => signIn(page, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 
 async function uploadViaForm(page: Page, opts: { title: string; files: string[]; topicFiles?: string[]; instructionsIdx?: number }) {
   await page.goto('/admin/rfp-curation/upload');

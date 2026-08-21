@@ -18,7 +18,7 @@ const CR = path.join(ROOT, 'docs/manuals/img/crops/admin');
 fs.mkdirSync(SH, { recursive: true });
 fs.mkdirSync(CR, { recursive: true });
 
-const ADMIN = { email: 'eric@rfppipeline.com', pw: 'RFPAdmin2026!' };
+const ADMIN = { email: 'eric@rfppipeline.com', pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const SOL = '0fdf2ada-40e7-45e9-b993-c654b6ea3137';
 const TENANT = 'dd831b77-2d6b-4b53-bb18-4d48569a2258'; // immobileyes
 const WF_PAUSED = '70465b09-e79f-46f8-aa60-5db69740363b';

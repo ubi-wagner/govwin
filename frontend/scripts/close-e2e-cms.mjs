@@ -11,7 +11,7 @@ const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const OUT = '/home/user/govwin/docs/assets/close-e2e';
 fs.mkdirSync(OUT, { recursive: true });
 const sql = postgres(process.env.DATABASE_URL || 'postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 3 });
-const ADMIN = { email: 'eric@rfppipeline.com', pw: 'RFPAdmin2026!' };
+const ADMIN = { email: 'eric@rfppipeline.com', pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const SLUG = 'what-is-a-baa';
 const shot = async (p, n) => { await p.screenshot({ path: path.join(OUT, n + '.png'), fullPage: true }); console.log('  ✓ shot', n); };
 const settle = async (p, ms = 2000) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };

@@ -21,7 +21,7 @@ async function main(){
   await p.close(); await t.close();
   // rfp_admin: triage queue → mobile cards with actions
   const a=await b.newContext({viewport:{width:390,height:844},isMobile:true});
-  p=await a.newPage(); await login(p,'eric@rfppipeline.com','RFPAdmin2026!');
+  p=await a.newPage(); await login(p,'eric@rfppipeline.com',(process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await p.goto(`${BASE}/admin/rfp-curation`,{waitUntil:'networkidle',timeout:40000}); await p.waitForTimeout(1000);
   await shot(p,'p3-triage-cards',true);                  // titles + agency/status + Claim/Open per card
   await p.close(); await a.close();

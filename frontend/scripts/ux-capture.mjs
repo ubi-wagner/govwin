@@ -14,7 +14,7 @@ const PROP = 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';
 
 const ACTORS = {
   kate:   { email: 'kate.ulepic@foundation3dp.com', pw: 'DemoPass123!', role: 'tenant_admin' },
-  eric:   { email: 'eric@rfppipeline.com',          pw: 'RFPAdmin2026!', role: 'rfp_admin' },
+  eric:   { email: 'eric@rfppipeline.com',          pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'), role: 'rfp_admin' },
   connor: { email: 'connor.casey@foundation3dp.com', pw: 'DemoPass123!', role: 'tenant_user' },
   paul:   { email: 'pjackson@ecinnovates.com',       pw: 'DemoPass123!', role: 'partner' },
 };

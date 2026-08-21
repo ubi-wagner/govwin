@@ -39,7 +39,7 @@ const CAPPED_SECTIONS: Array<[string, number]> =
         return [t.trim(), Number(c)] as [string, number];
       });
 
-const ADMIN = { email: 'eric@rfppipeline.com', password: 'RFPAdmin2026!' };
+const ADMIN = { email: 'eric@rfppipeline.com', password: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 // The BUYER is per-scenario, like the tenant and the solicitation: each company buys a different
 // OPP. Defaults to the immobileyes fixture so the original scenario is unchanged.
 const BUYER = {

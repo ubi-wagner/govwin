@@ -47,7 +47,7 @@ function tenantCount(data) {
 async function main() {
   const b = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
   const ctx = await b.newContext();
-  const p = await login(ctx, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  const p = await login(ctx, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   console.log('admin login →', p.url());
   const rows = [];
   const fails = [];

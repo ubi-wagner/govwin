@@ -45,7 +45,7 @@ async function signIn(page: Page, email: string, password: string) {
     page.click('button[type="submit"]'),
   ]);
 }
-const asAdmin = (page: Page) => signIn(page, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+const asAdmin = (page: Page) => signIn(page, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 const asKate = (page: Page) => signIn(page, 'kate.ulepic@foundation3dp.com', 'DemoPass123!');
 
 const tool = (page: Page, name: string, input: Record<string, unknown>) =>

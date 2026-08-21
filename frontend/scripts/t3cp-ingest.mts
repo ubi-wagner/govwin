@@ -47,7 +47,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const page = await (await b.newContext()).newPage();
 await page.goto(`${BASE}/login`);
 await page.fill('input[type="email"]', 'eric@rfppipeline.com');
-await page.fill('input[type="password"]', 'RFPAdmin2026!');
+await page.fill('input[type="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 await Promise.all([page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 60_000 }), page.click('button[type="submit"]')]);
 console.log('✓ logged in as eric@rfppipeline.com (rfp_admin)');
 const api = page.request;

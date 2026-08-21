@@ -64,7 +64,7 @@ try {
   // ── rfp_admin (Eric): the admin in-flight build-workflows index (TW-10) ──
   const ctxA = await browser.newContext({ viewport: { width: 1400, height: 1700 } });
   const a = await ctxA.newPage();
-  await login(a, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  await login(a, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await a.goto(`${BASE}/admin/workflows`, { waitUntil: 'networkidle' });
   await a.waitForTimeout(1800);
   await a.screenshot({ path: `${OUT}/03-admin-build-index.png`, fullPage: true });

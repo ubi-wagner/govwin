@@ -26,7 +26,7 @@ const SOL = process.env.DRIVE_SOL_ID ?? '11263a74-ab09-48bb-ada5-565aa2ee986e';
 async function signIn(page: Page) {
   await page.goto('/login');
   await page.fill('input[type="email"]', 'eric@rfppipeline.com');
-  await page.fill('input[type="password"]', 'RFPAdmin2026!');
+  await page.fill('input[type="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await Promise.all([
     page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 60_000 }),
     page.click('button[type="submit"]'),

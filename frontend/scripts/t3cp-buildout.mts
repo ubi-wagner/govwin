@@ -38,7 +38,7 @@ async function login(b: Browser, email: string, password: string): Promise<APIRe
 }
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const admin = await login(b, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+const admin = await login(b, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 
 async function tool(name: string, input: unknown): Promise<{ status: number; body: any }> {
   const r = await admin.post(`${BASE}/api/tools/${name}`, { data: { input } });

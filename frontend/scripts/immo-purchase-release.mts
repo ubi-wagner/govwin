@@ -50,7 +50,7 @@ if (!existingPortal) {
   console.log(`  portalId=${portalId}`);
 
   // ── 2 · RFP ADMIN: cockpit Complete & Release ──
-  const admin = await login(b, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  const admin = await login(b, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   const rel = await admin.post(`${BASE}/api/admin/provisioning/${portalId}/release`, { data: {} });
   const relBody = await rel.json().catch(() => ({}));
   const proposalId: string | null = relBody?.data?.proposalId ?? null;
