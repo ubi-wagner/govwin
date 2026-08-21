@@ -97,12 +97,69 @@ interface MatrixRow {
   requirementText: string | null;
   status: string;
   sectionId: string | null;
+  notes: string | null;
 }
 interface ArtifactRow {
   id: string;
   complianceSpec: unknown;
   artifactType: string | null;
   volumeName: string | null;
+}
+
+/**
+ * Decide what an UNMET compliance-matrix requirement means for submission. Exported and pure so the
+ * decision can be tested directly rather than asserted against source text.
+ *
+ * Three outcomes:
+ *
+ *   null      — met, or already represented by a live section. That section's own empty/unlocked
+ *               blocker covers it; surfacing the requirement too would double-count.
+ *
+ *   warning   — COMPLETED ELSEWHERE. A null section_id is written by exactly one code path:
+ *               provision-proposal.ts's "completed elsewhere" loop, for items an rfp_admin marked
+ *               as done in the agency portal — the DSIP cover sheet, the CCR, the FWA training
+ *               certificate, a volume that arrived with no items at all. Every other insert (the
+ *               per-item rows, the placeholder-volume row, the default Technical Volume row, both
+ *               rows in the self-serve create route) passes a real section id, so the NULL is
+ *               structural rather than incidental — which is what makes it safe to key on. A note
+ *               would not be: notes are free text an admin can leave blank.
+ *
+ *               Treating these as blockers made marking something completed-elsewhere create a
+ *               submission blocker the buyer could NEVER clear — no section to lock, no field to
+ *               fill, no control that satisfies a section-less row. Measured on a live DoW 2026
+ *               SBIR build: nine such rows, so the proposal could not reach `final`, could not
+ *               lock, and could not export a package. The admin doing the right thing in the
+ *               provisioning cockpit is what broke it.
+ *
+ *               It stays mandatory, stays in the matrix, stays counted as unmet, and carries the
+ *               admin's note saying where it is filed. Not authored here must never read as not
+ *               required — and must not read as forgotten either.
+ *
+ *   blocker   — a REAL orphan: the row names a section that no longer exists. Something was
+ *               deleted out from under a requirement, and no one can submit past that.
+ */
+export function classifyUnmetRequirement(
+  m: { requirementText: string | null; status: string; sectionId: string | null; notes: string | null },
+  liveSectionIds: Set<string>,
+): ReadinessBlocker | null {
+  if (m.status === 'satisfied' || m.status === 'not_applicable') return null;
+  if (m.sectionId && liveSectionIds.has(m.sectionId)) return null;
+
+  const what = (m.requirementText ?? '').slice(0, 120);
+  if (!m.sectionId) {
+    const where = (m.notes ?? '').trim();
+    return {
+      category: 'orphan_requirement',
+      severity: 'warning',
+      message: `Completed outside this workspace — you still have to file it: ${what}`
+        + (where ? ` — ${where.slice(0, 160)}` : ''),
+    };
+  }
+  return {
+    category: 'orphan_requirement',
+    severity: 'blocker',
+    message: `Required item not covered by any section (${m.status}): ${what}`,
+  };
 }
 
 const CATEGORY_ORDER: Record<BlockerCategory, number> = {
@@ -160,7 +217,7 @@ export async function computeSubmissionReadiness(
     ORDER BY sort_index NULLS LAST, id
   `;
   const matrix = await sql<MatrixRow[]>`
-    SELECT requirement_text AS "requirementText", status, section_id AS "sectionId"
+    SELECT requirement_text AS "requirementText", status, section_id AS "sectionId", notes
     FROM proposal_compliance_matrix
     WHERE proposal_id = ${proposalId}::uuid AND is_mandatory = true
   `;
@@ -433,16 +490,8 @@ export async function computeSubmissionReadiness(
   const sectionIds = new Set(sections.map((s) => s.id));
   const satisfiedReq = matrix.filter((m) => m.status === 'satisfied' || m.status === 'not_applicable').length;
   for (const m of matrix) {
-    const met = m.status === 'satisfied' || m.status === 'not_applicable';
-    // Only surface an unmet requirement as its OWN blocker when no owning section represents it
-    // (otherwise it is already covered by that section's empty/unlocked blocker — no double-count).
-    if (!met && (!m.sectionId || !sectionIds.has(m.sectionId))) {
-      blockers.push({
-        category: 'orphan_requirement',
-        severity: 'blocker',
-        message: `Required item not covered by any section (${m.status}): ${(m.requirementText ?? '').slice(0, 120)}`,
-      });
-    }
+    const b = classifyUnmetRequirement(m, sectionIds);
+    if (b) blockers.push(b);
   }
 
   // ── Required document/form coverage — the #1 avoidable administrative DQ ─────
