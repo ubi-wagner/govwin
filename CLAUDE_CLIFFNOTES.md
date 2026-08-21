@@ -27,16 +27,33 @@ mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library
 side-to-side V1 test. State at launch: migs **148**, `tsc 0 · vitest 855 · next build`. Full launch
 punch list: **docs/V1_LAUNCH_PUNCHLIST.md**. Standalone-serving caveats: CLAUDE.md SOP + docs/CONTINUATION.md §2.
 
-**Sandbox facts:** DB `postgresql://claude@127.0.0.1:5433/govtech_intel` (pg data dir `/tmp/pgs_gov/data`).
-App served standalone on **:3000** (`next start` is BROKEN — `output:'standalone'`). Chromium for Playwright:
-`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`, not `127.0.0.1`.
+**Sandbox facts:** Postgres on **:5432** via `pg_ctlcluster 16 main` (data dir
+`/var/lib/postgresql/16/main`). TWO roles, not interchangeable (docs/RLS_CUTOVER.md): `DATABASE_URL`
+= `govtech_app` (NOBYPASSRLS — what the FRONTEND runs as) and `DATABASE_URL_OWNER` = `govtech` (owner
+— migrations, admin cross-tenant reads, and **the pipeline worker**, which cannot write a
+tenant-scoped `process_instances` row on any other role). App served standalone on **:3000**
+(`next start` is BROKEN — `output:'standalone'`). Emulated Claude on **:8787**. Chromium for
+Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`,
+not `127.0.0.1`. Everything above is exported by `scripts/sandbox-env.sh` — source it first, always.
 
-### FAST refresh (~2 min — box already has DB data dir + a `.next` build)
+### FAST refresh (~1 min — box already has a DB data dir + a `.next` build)
 ```bash
-bash scripts/heartbeat.sh          # idempotent: (re)starts pg :5433 + standalone server :3000; prints HEARTBEAT status
-export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
-node scripts/seed_dev_accounts.mjs # additive: admin + Lighthouse/Ubihere tenants + backfills every tenant's cards
+source scripts/sandbox-env.sh      # the ONLY source of DSNs, secrets, driver passwords
+bash scripts/sandbox-up.sh         # idempotent: postgres + schema drift + accounts + emulator + worker + frontend
 ```
+`sandbox-up.sh` is safe to run at any time and exits non-zero if anything is still not serving, so a
+zero means the stack is genuinely up — it checks the CSS actually serves and that the running server
+is not older than the build on disk.
+
+**Keep it up:** `nohup scripts/sandbox-watch.sh > "$GOVWIN_RUN_DIR/watch.log" 2>&1 &` — a 60s
+supervisor that probes each service with a REAL transaction and repairs what broke. Silent while
+healthy (`$GOVWIN_RUN_DIR/watch.beat` mtime proves it is cycling). `ONCE=1 scripts/sandbox-watch.sh`
+for a one-shot check. Rationale + per-probe reasoning: `scripts/sandbox-probe.sh`.
+
+Admin password is **`SandboxDrive2026!`** (`scripts/sandbox-reset-passwords.mjs` writes it;
+`sandbox-env.sh` exports it as `$RFP_ADMIN_PW`/`$ADMIN_PW`/`$DRIVE_ADMIN_PW` so every driver script
+picks it up). It is NOT `RFPAdmin2026!` any more — migrations 124 and 198 rotated the seeded admins
+onto random hashes nobody holds, and the reset script is the out-of-band operator fix.
 Accounts after the seed (passwords ROTATED by the seed — these are the e2e-canonical ones):
 `eric@rfppipeline.com`/`RFPAdmin2026!` (master), `eric@lighthouse.com`/`LighthouseAdmin`,
 `eric@ubihere.com`/`UbihereAdmin`. The **Foundation demo** accounts are separate and use `DemoPass123!`
@@ -45,11 +62,11 @@ Accounts after the seed (passwords ROTATED by the seed — these are the e2e-can
 `RFPAdmin2026!` — so after seeding, admin login is NOT `DemoPass123!` anymore on the sandbox.
 
 ### FULL refresh (rebuild from migrations — container reclaim / schema drift)
-`heartbeat.sh` prints `pg=DATA_GONE` when the data dir is gone → rebuild:
+`sandbox-up.sh` reports `no migration ledger` when the database is bare or wiped → rebuild:
 `initdb` + `createdb govtech_intel` → `DATABASE_URL=<sandbox> node db/migrations/migrate.mjs` (⚠ never
 `ALLOW_SCHEMA_RESET` unless you mean the destructive 000_drop_all) → `node scripts/seed_dev_accounts.mjs`.
 Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone/.next/static && cp -r public
-.next/standalone/public`, and `heartbeat.sh` will boot it. Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
+.next/standalone/public`, and `sandbox-up.sh` will boot it (it stages those two directories itself). Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
 
 > **Starter content is now migration-seeded** (no separate step). `migrate.mjs` applies **mig 152**
 > (`system_starter` MASTER LIBRARY — the 18-foundation `STARTER_SET` decomposed into the rfp-pipeline
