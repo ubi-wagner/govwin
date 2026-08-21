@@ -105,6 +105,18 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
   is the one thing that heals a tenant who never opens their feed, whose weekly digest and admin rollups are
   otherwise computed off a stale mirror. `reconcileActiveTenants` and its cron endpoint both already existed —
   nothing called them on a schedule. Inert (logs once) when unset, like its sibling.
+
+  **Verified live 2026-08-21**, whole chain, on the sandbox's real drift — 5 of 8 active tenants were
+  behind the bridge head:
+
+      immobileyes  3 → 12    lighthouse   3 → 14    rfp-pipeline  3 → 12
+      ubihere      1 → 12    youngstown   3 → 12    (49 cards applied)
+
+  A second sweep applied 0 — idempotent. The auth boundary was checked against the running server and
+  holds: no header, wrong secret, `Basic` scheme, a sibling admin route with the right secret, and a
+  path BELOW a cron path all still 401. And the pipeline poker closes the loop on its own —
+  seven cards deleted from one tenant, worker restarted, first pass logged
+  `card reconcile sweep: caught up 7 card(s) across 1 tenant(s)` and the tenant was back at 12.
 - **`AGENT_DATABASE_URL` (the `rfp_agent` NOBYPASSRLS role)** — agents run on the owner connection today; the
   RLS-enforced agent role is built but deploy-gated (defense-in-depth, not a blocker).
 - **Wake more agents** — the workforce is registered (36 archetypes) and the core journey's agents are live. The
