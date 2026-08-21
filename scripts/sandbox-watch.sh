@@ -4,8 +4,33 @@
 #   source scripts/sandbox-env.sh
 #   nohup scripts/sandbox-watch.sh > "$GOVWIN_RUN_DIR/watch.log" 2>&1 &
 #
-#   INTERVAL=60   seconds between cycles (default 60)
-#   ONCE=1        run a single cycle and exit with the failure count — for CI or a manual check
+#   INTERVAL=60     seconds between cycles (default 60)
+#   ONCE=1          run a single cycle and exit with the failure count — for CI or a manual check
+#   AUTO_REBUILD=1  rebuild the frontend in the background when the build on disk is older than the
+#                   source, then restart the server against it. OFF by default — see below.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# WHY AUTO_REBUILD IS OPT-IN, AND WHY THIS BOX NEEDS IT ON
+#
+# The first version of this file treated a stale build as strictly advisory, on the reasoning that a
+# `next build` takes minutes and must never be triggered behind someone's back. That is the right
+# default for a machine a person is working on.
+#
+# It is the WRONG default here, and today proved it. This container restores itself from a fixed
+# snapshot roughly every half hour — six times in one session — and the snapshot carries a SIX-DAY-OLD
+# .next. So the supervisor would faithfully heal the stack back to "healthy" while the server served
+# code from before most of the work under test. That is not a degraded state, it is a confidently
+# wrong one: a route was investigated as a product defect for several rounds before the six-day-old
+# build turned out to be the whole explanation. Two rebuilds were then destroyed by resets before a
+# server could be restarted against them.
+#
+# So: opt in, and this sandbox opts in. The safety properties that made it advisory are kept —
+#   • never more than one build at a time (a pidfile, not a `pgrep`);
+#   • the build runs DETACHED and the cycle returns immediately, so a 5-minute build never blocks
+#     the health loop or delays the repair of anything else;
+#   • the running server is replaced only AFTER a build completes successfully — a failed build
+#     leaves the current server untouched, because a stale stack still beats no stack;
+#   • the log says what it is doing, because a rebuild is the one repair with a visible cost.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # WHAT THIS REPLACES, AND WHY
@@ -85,7 +110,51 @@ STATE="$GOVWIN_RUN_DIR/watch.state"    # last reported condition, for edge-trigg
 #: line, because at that point the message is "a human is needed", not "news".
 _MAX_LOUD_REPAIRS=3
 
+AUTO_REBUILD="${AUTO_REBUILD:-}"
+BUILD_PID="$GOVWIN_RUN_DIR/rebuild.pid"
+BUILD_LOG="$GOVWIN_RUN_DIR/rebuild.log"
+
 log() { printf '%s  %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
+
+# ── Rebuild-on-stale ─────────────────────────────────────────────────────────
+# Called once per cycle when AUTO_REBUILD is set. Three states, and it must be cheap in all of them
+# because it runs every 60s:
+#   a build is already running  → do nothing (checked by PID, not by `pgrep -f "next build"`, which
+#                                 matches this script's own command line — the self-match trap that
+#                                 has killed a calling shell twice on this box)
+#   a build just finished       → stage assets, restart the server against it, report
+#   the build is stale          → start one, detached, and return immediately
+rebuild_if_stale() {
+  local pid
+  # (a) in flight?
+  if [ -f "$BUILD_PID" ]; then
+    pid="$(cat "$BUILD_PID" 2>/dev/null)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      return 0                      # still building — say nothing, it is expected
+    fi
+    rm -f "$BUILD_PID"
+    # (b) it finished while we were away. Did it work? `Route (app)` is the route table Next prints
+    # only on a successful build; grepping for the ABSENCE of errors would pass on a truncated log.
+    if grep -q "Route (app)" "$BUILD_LOG" 2>/dev/null; then
+      log "           rebuild finished — restarting the server against it"
+      for p in $(frontend_pids); do kill "$p" 2>/dev/null; done
+      sleep 2
+      # sandbox-up.sh stages public/ + .next/static and starts the standalone server. Reusing it
+      # keeps one implementation of that sequence, which has three separate traps in its history.
+      timeout 300 bash "$ROOT/scripts/sandbox-up.sh" >"$GOVWIN_RUN_DIR/watch-repair.log" 2>&1
+    else
+      log "           rebuild FAILED — leaving the running server alone (see rebuild.log)"
+      log "           $(grep -m1 -E 'Failed to compile|Type error|Error:' "$BUILD_LOG" 2>/dev/null | cut -c1-140)"
+    fi
+    return 0
+  fi
+  # (c) nothing in flight — start one only if the build is actually behind the source.
+  probe_build_fresh >/dev/null 2>&1 && return 0
+  log "           build is stale — rebuilding in the background (server keeps serving meanwhile)"
+  ( cd "$ROOT/frontend" && setsid nohup npx next build > "$BUILD_LOG" 2>&1 &
+    echo $! > "$BUILD_PID" ) 2>/dev/null
+  return 0
+}
 
 running=1
 # Exit cleanly so a `kill` does not leave a half-written state file behind, and
@@ -113,6 +182,10 @@ cycle() {
       last_state="healthy"; : > "$STATE"; echo "healthy" > "$STATE"
     fi
     consecutive=0
+    # A stale build is ORTHOGONAL to service health — every service can be up and correct while the
+    # server serves last week's code. So this runs on the HEALTHY path, which is in fact where it
+    # matters most: after a container reset the stack comes back "healthy" on the snapshot's build.
+    [ -n "$AUTO_REBUILD" ] && rebuild_if_stale
     touch "$BEAT"
     return 0
   fi
@@ -171,6 +244,12 @@ cycle() {
     last_state="$after_reasons"
     printf '%s\n' "$after_reasons" > "$STATE"
   fi
+  # Also on the repair path, and this is the case that actually happens: a container reset takes the
+  # services AND restores the snapshot's build, so the very cycle that brings the stack back up is
+  # the one that must notice the build is six days old. Wiring it only to the healthy path would
+  # have left the rebuild waiting for the NEXT cycle at best, and never at all if anything stayed
+  # unhealthy. (Caught by testing — the first version did exactly that.)
+  [ -n "$AUTO_REBUILD" ] && rebuild_if_stale
   touch "$BEAT"
   return "$after_rc"
 }
