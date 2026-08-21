@@ -138,6 +138,21 @@ async def main() -> None:
     release = os.getenv("APP_RELEASE") or sha
     log.info("RFP Pipeline worker starting... (release=%s, env=%s, version=%s)", release, env, sha)
 
+    # Preflight: can this role write a TENANT-scoped workflow instance? On a role RLS applies to it
+    # cannot, and the failure is silent — platform workflows keep draining while every build
+    # workflow dies one log line at a time. Report it in the first seconds instead.
+    try:
+        import asyncpg as _pg
+
+        from db_role_preflight import check_workflow_write_role
+        _c = await _pg.connect(DATABASE_URL)
+        try:
+            await check_workflow_write_role(_c)
+        finally:
+            await _c.close()
+    except Exception as exc:
+        log.warning("workflow-write preflight skipped: %s", exc)
+
     # Bootstrap seed: ensure a master_admin user exists so the
     # platform has a working login immediately after deploy.
     try:
