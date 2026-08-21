@@ -94,6 +94,17 @@ Surrounding surfaces (Command Center, Workflow Setup, notifications/ToDos, partn
 - **Fixed the lying "Suggest regions" button** (§5.1) — **DONE 2026-08-16**: route honest-inert by default, client degrades honestly. The one customer-facing credibility crack, closed.
 - **`AGENT_GATE_SWEEP_URL` (+`CRON_SECRET`)** — until set, AI-manager auto-advance ships **inert** (the pipeline
   poker logs once and returns); assisted one-click gate-close works regardless. Set it to make auto-advance autonomous.
+  ⚠️ **Setting it was not sufficient until 2026-08-21.** The route's headless-cron bearer path
+  (`Authorization: Bearer $CRON_SECRET`) was unreachable: `middleware.ts` required a session for every
+  non-public path and ran first, so a correctly-authenticated poke got `{"error":"unauthenticated"}` before the
+  handler was entered. The middleware now lets a valid bearer through for exactly the two cron endpoints
+  (the route still re-checks the secret AND the role). Any deploy that set this variable before that date was
+  getting 401s, not auto-advance.
+- **`CARD_RECONCILE_URL` (+`CRON_SECRET`)** — hourly sweep that catches every active tenant's opportunity mirror
+  up to the bridge head. The customer feed read-repairs on `GET /cards`, but only for a tenant that VISITS; this
+  is the one thing that heals a tenant who never opens their feed, whose weekly digest and admin rollups are
+  otherwise computed off a stale mirror. `reconcileActiveTenants` and its cron endpoint both already existed —
+  nothing called them on a schedule. Inert (logs once) when unset, like its sibling.
 - **`AGENT_DATABASE_URL` (the `rfp_agent` NOBYPASSRLS role)** — agents run on the owner connection today; the
   RLS-enforced agent role is built but deploy-gated (defense-in-depth, not a blocker).
 - **Wake more agents** — the workforce is registered (36 archetypes) and the core journey's agents are live. The

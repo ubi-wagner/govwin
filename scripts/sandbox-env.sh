@@ -69,6 +69,15 @@ export NODE_ENV="production"
 export PLAYWRIGHT_BROWSERS_PATH="/opt/pw-browsers"
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD="1"
 
+# Cron-endpoint auth + the sweeps the pipeline pokes over HTTP. Both endpoints already accept
+# `Authorization: Bearer $CRON_SECRET`; without the URL set, each poker logs once and stays inert,
+# so the sandbox mirrors a deploy that has not configured them. The reconcile sweep is what heals a
+# tenant that never opens its feed — the customer feed read-repairs only for a tenant that VISITS.
+export CRON_SECRET="sandbox-cron-secret-not-a-production-value"
+export CARD_RECONCILE_URL="http://localhost:3000/api/admin/reconcile-cards"
+# AGENT_GATE_SWEEP_URL is deliberately left UNSET here: TW-8 auto-advance ships inert until a deploy
+# opts in (docs/LAUNCH_READINESS_2026-08.md), and the sandbox should show that default, not hide it.
+
 # Durable working directory for run artifacts (logs, captures, PID files).
 export GOVWIN_RUN_DIR="/home/user/.govwin/run"
 

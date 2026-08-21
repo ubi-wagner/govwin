@@ -77,6 +77,42 @@ const PUBLIC_EXACT_PATHS = [
 const STATIC_ASSET_RE =
   /\.(ico|png|jpe?g|gif|svg|webp|avif|css|js|mjs|map|woff2?|ttf|otf|eot|txt|xml|json|webmanifest)$/i;
 
+/**
+ * Endpoints a HEADLESS SCHEDULER may call with `Authorization: Bearer $CRON_SECRET` instead of a
+ * session. Exact paths only — never a prefix, so nothing under /api/admin is opened by accident.
+ *
+ * WHY THIS EXISTS. Both routes were written with a bearer path in the handler:
+ *
+ *     const viaCron = !!cronSecret && authz === `Bearer ${cronSecret}`;
+ *
+ * …which this middleware made UNREACHABLE. Every non-public path needs a session here, and the
+ * check runs first, so a correctly-authenticated cron poke got `{"error":"unauthenticated"}` before
+ * the handler was ever entered. Proven live: with CRON_SECRET set on both sides, the right bearer
+ * still 401'd, and the lowercase body is what gave the middleware away — the routes answer
+ * `{ error: 'Authentication required', code: 'UNAUTHENTICATED' }`.
+ *
+ * That silently disabled two features. The card-reconcile sweep is the only thing that heals a
+ * tenant which never opens its feed (the feed read-repairs only for a tenant that VISITS), and the
+ * TW-8 agent-gate auto-advance is documented as "inert until AGENT_GATE_SWEEP_URL is set" when in
+ * fact it would have stayed inert after it was set.
+ *
+ * This only stops the middleware REJECTING. Each route still performs its own bearer check and its
+ * own role check, so a path added here without a handler-side check fails closed: the handler sees
+ * no session and refuses.
+ */
+const CRON_EXACT_PATHS = [
+  '/api/admin/reconcile-cards',
+  '/api/admin/agent-gates/sweep',
+];
+
+function isAuthorizedCron(pathname: string, authorization: string | null): boolean {
+  const secret = process.env.CRON_SECRET;
+  // No secret configured ⇒ no cron path exists. Never fall open on an unset variable.
+  if (!secret || !authorization) return false;
+  if (!CRON_EXACT_PATHS.includes(pathname)) return false;
+  return authorization === `Bearer ${secret}`;
+}
+
 function isPublicPath(pathname: string): boolean {
   if (
     pathname.startsWith('/_next') ||
@@ -162,6 +198,12 @@ export default auth((req) => {
   }
 
   if (isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  // A headless scheduler carrying the right bearer for a known cron endpoint gets past the SESSION
+  // gate — and only that. The route still checks the same secret and its own role requirement.
+  if (isAuthorizedCron(pathname, req.headers.get('authorization'))) {
     return NextResponse.next();
   }
 
