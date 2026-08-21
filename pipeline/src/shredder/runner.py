@@ -43,6 +43,7 @@ from safe_skip import MAX_MODEL_RETRIES, skip_evidence
 from shredder.compliance_mapping import split_matches
 from shredder.extractor import MAX_CHARS_PER_DOCUMENT, cap_source_text, extract_text_from_pdf
 from shredder.namespace import compute_namespace_key
+from shredder.section_locate import TOPICS, locate_sections
 
 log = logging.getLogger("pipeline.shredder.runner")
 
@@ -62,6 +63,20 @@ DEFAULT_MODEL = os.environ.get("SHREDDER_MODEL", "claude-sonnet-4-20250514")
 # Good enough for budget enforcement; exact counts come back from the
 # API response and get logged in the end event.
 _CHARS_PER_TOKEN_ESTIMATE = 4
+
+# Share of the run budget the ONE section-extraction call may spend. The rest covers the per-section
+# compliance calls (~1-2K tokens each) plus the ×1.25 pre-flight multiplier. 0.55 leaves room for
+# roughly forty section calls, well above the ~10 a real BAA yields.
+_SECTION_CALL_BUDGET_SHARE = 0.55
+
+#: Character ceiling for the section-extraction call, DERIVED from the token budget rather than
+#: written down beside it. The two were independent before and drifted: the extractor's own cap was
+#: raised to 2M chars so a full BAA is READ, which pushed every real BAA past the token budget and
+#: turned the pre-flight guard from a runaway-cost backstop into an unconditional failure. Deriving
+#: it means raising one raises the other.
+MAX_SECTION_CALL_CHARS = int(
+    MAX_INPUT_TOKENS_PER_RUN * _SECTION_CALL_BUDGET_SHARE * _CHARS_PER_TOKEN_ESTIMATE
+)
 
 # Cached prompt contents to avoid disk reads per invocation.
 _PROMPT_CACHE: dict[str, str] = {}
@@ -439,13 +454,88 @@ async def shred_solicitation(
 
     combined_text = "\n\n---DOCUMENT---\n\n".join(doc_texts)
 
-    # ── Step 4: Pre-flight budget check ─────────────────────────────────
-    # Section extraction ships the full combined_text once. Per-section
-    # compliance calls each ship ~500 chars of raw_text_excerpt + master
-    # variable list + few-shot examples — ~1-2K tokens each. For a
-    # typical 5-10 section RFP, the per-section calls add ~20% overhead
-    # on top of the main extraction. ×1.25 pre-flight multiplier is
-    # accurate without being wastefully pessimistic.
+    # ── Step 4: Fit the document to the budget by LOCATING, not by failing ──
+    #
+    # Section extraction ships combined_text once. Per-section compliance calls each ship ~500 chars
+    # of raw_text_excerpt + master variable list + few-shot examples — ~1-2K tokens each. For a
+    # typical 5-10 section RFP the per-section calls add ~20% on top, so ×1.25 pre-flight.
+    #
+    # WHAT THIS REPLACES, and why an unconditional raise was wrong. The guard was written when the
+    # extractor capped documents at 200K chars (~50K tokens), so exceeding 150K meant something
+    # pathological. Raising that cap to 2M — so a full BAA is actually READ rather than silently
+    # truncated at the cover page — put every real federal BAA over the line. Measured on the three
+    # in this repo: DoW 2026 SBIR 316,863 tokens, DoD 25.1 SBIR 419,138, DoD 25.A STTR similar. The
+    # guard fired on all of them. Not one AI shred of a real BAA has ever succeeded.
+    #
+    # Both old behaviours were wrong in the same way: shred a truncated prefix (the cover page and
+    # the table of contents) and call it the document, or refuse the document entirely. The product
+    # requirement is neither — it is to SCAN a large BAA for the sections that state the rules and
+    # shred those. section_locate.py exists for exactly that and was already wired into six agents;
+    # this is the shred path finally using it.
+    #
+    # Documents that already fit are passed through untouched — byte-for-byte the previous
+    # behaviour, so no normal-sized RFP changes.
+    excerpt_meta: dict[str, Any] | None = None
+    if len(combined_text) > MAX_SECTION_CALL_CHARS:
+        located = locate_sections(combined_text, budget=MAX_SECTION_CALL_CHARS)
+        if not located.text:
+            # The locator found no rule-stating passage anywhere. Falling back to a prefix here
+            # would reintroduce the cover-page bug with none of the honesty, so the run stops and
+            # says which topics it searched for. Pattern-match assist still lands a draft.
+            await _update_status(conn, sol_uuid, "shredder_failed")
+            await _emit_event(
+                conn, "finder", "rfp.shredding.end",
+                {
+                    "solicitation_id": solicitation_id,
+                    "status": "shredder_failed",
+                    "reason": "no_locatable_sections",
+                    "source_chars": len(combined_text),
+                    "topics_searched": sorted(TOPICS),
+                    "duration_ms": _ms_since(started_at),
+                },
+                phase="end",
+                parent_event_id=start_event_id,
+            )
+            raise ShredderBudgetError(
+                f"{len(combined_text)} chars exceed the {MAX_SECTION_CALL_CHARS}-char section-call "
+                "budget and no rule-stating passage could be located",
+                details={"solicitation_id": solicitation_id, "chars": len(combined_text)},
+            )
+        # PROVENANCE. Everything downstream reads `sections` as "what the solicitation says". If it
+        # was derived from 4% of the document, that has to travel with it, or a missing page limit
+        # reads as "the BAA does not state one" when it means "we did not send that part".
+        # docs/INGEST_PROVENANCE.md: a value the product did not read must never look like one it did.
+        excerpt_meta = {
+            "excerpted": True,
+            "source_chars": len(combined_text),
+            "excerpt_chars": len(located.text),
+            "coverage": round(len(located.text) / len(combined_text), 4),
+            "budget_chars": MAX_SECTION_CALL_CHARS,
+            "topics_covered": located.covered,
+            "topics_missing": located.missing,
+            "span_count": len(located.spans),
+            # Capped for payload size, like artifact_keys below — a 1.3M-char BAA locates ~80
+            # passages and the full list would dominate the event row. span_count carries the total.
+            "spans": [
+                {"topic": s.topic, "start": s.start, "end": s.end, "heading": s.heading}
+                for s in sorted(located.spans, key=lambda s: s.score, reverse=True)[:20]
+            ],
+        }
+        log.warning(
+            "shredder: %s is %d chars — shredding %d located chars (%.1f%%) across %d passages: %s",
+            solicitation_id, len(combined_text), len(located.text),
+            100 * len(located.text) / len(combined_text), len(located.spans),
+            ", ".join(s.heading or s.topic for s in located.spans),
+        )
+        await _emit_event(
+            conn, "finder", "rfp.sections_located",
+            {"solicitation_id": solicitation_id, **excerpt_meta},
+            parent_event_id=start_event_id,
+        )
+        combined_text = located.text
+
+    # The guard stays, now as the runaway-cost backstop it was meant to be rather than the normal
+    # path. After locating, exceeding it means the derived ceiling itself is wrong.
     est_input = int(_estimate_tokens(combined_text) * 1.25)
     if est_input > MAX_INPUT_TOKENS_PER_RUN:
         await _update_status(conn, sol_uuid, "shredder_failed")
@@ -474,14 +564,33 @@ async def shred_solicitation(
     # orphan starts. Close the bracket with an error end before re-raising.
     try:
         # ── Step 5: Section extraction Claude call ──────────────────────────
+        #
+        # EVIDENCE, so it SKIPS rather than fabricates (safe_skip.py). Sections carry
+        # raw_text_excerpt — an assertion about what this solicitation says and where — and there is
+        # no honest way to generate one. On a skip the run continues with no sections: every
+        # compliance field falls to source='default', renders as "Default — unverified", and the
+        # readiness bar counts it until a person closes it. That is machinery that already exists,
+        # and it beats failing the workflow instance, which is what killed 7 OnRfpUploaded runs.
+        #
+        # _call_claude already retried once with a repair instruction before it got here.
+        section_skip: dict[str, Any] | None = None
         section_prompt = _load_prompt("section_extraction")
         system_section, user_template = _split_system_and_examples(section_prompt)
-        section_result, sec_in_tokens, sec_out_tokens = await _call_claude(
-            anthropic_client,
-            system_prompt=system_section,
-            user_message=f"{user_template}\n\nDOCUMENT:\n{combined_text}",
-        )
-        sections = section_result.get("sections", [])
+        sections: list[dict[str, Any]] = []
+        sec_in_tokens = sec_out_tokens = 0
+        try:
+            section_result, sec_in_tokens, sec_out_tokens = await _call_claude(
+                anthropic_client,
+                system_prompt=system_section,
+                user_message=f"{user_template}\n\nDOCUMENT:\n{combined_text}",
+            )
+            sections = section_result.get("sections", [])
+        except Exception as e:
+            log.warning("shredder: section extraction failed for %s — skipping: %s",
+                        solicitation_id, e)
+            section_skip = skip_evidence(
+                "section_extraction", str(e), attempts=MAX_MODEL_RETRIES + 1,
+            ).as_result()
 
         # ── Step 6: Compliance extraction per section ───────────────────────
         compliance_prompt = _load_prompt("compliance_extraction")
@@ -533,9 +642,12 @@ async def shred_solicitation(
             "sections": sections,
             "compliance_matches": all_matches,
             "skipped_matches": skipped,
-        # A skipped evidence step must be visible, or "no sections" reads like a document that
-        # genuinely had none.
-        **({"section_extraction_skipped": section_skip} if section_skip else {}),
+            # A skipped evidence step must be visible, or "no sections" reads like a document that
+            # genuinely had none.
+            **({"section_extraction_skipped": section_skip} if section_skip else {}),
+            # Likewise an excerpted read: "no page limit found" means something different when only
+            # 4% of the document was sent.
+            **({"source_excerpt": excerpt_meta} if excerpt_meta else {}),
             "extracted_at": started_at.isoformat(),
         }
 
@@ -591,9 +703,10 @@ async def shred_solicitation(
                 "column_updates_applied": len(column_updates),
                 "custom_variables_stored": len(custom_vars),
                 "skipped_matches": skipped,
-        # A skipped evidence step must be visible, or "no sections" reads like a document that
-        # genuinely had none.
-        **({"section_extraction_skipped": section_skip} if section_skip else {}),
+                # A skipped evidence step must be visible, or "no sections" reads like a document
+                # that genuinely had none.
+                **({"section_extraction_skipped": section_skip} if section_skip else {}),
+                **({"source_excerpt": excerpt_meta} if excerpt_meta else {}),
                 "total_input_tokens": sec_in_tokens + comp_in_tokens,
                 "total_output_tokens": sec_out_tokens + comp_out_tokens,
                 "artifact_keys": artifact_keys,
@@ -639,6 +752,12 @@ async def shred_solicitation(
                 "namespace": namespace_key,
                 "prompt_version": 1,
                 "model": DEFAULT_MODEL,
+                # The end event is what the admin queue and the workflow monitor read. A run that
+                # shredded a located excerpt has to look different there from one that read the
+                # whole document, or "6 sections extracted" carries an accuracy it did not earn.
+                **({"section_extraction_skipped": True,
+                    "section_skip_reason": section_skip.get("reason")} if section_skip else {}),
+                **({"source_excerpt": excerpt_meta} if excerpt_meta else {}),
                 "total_input_tokens": total_in,
                 "total_output_tokens": total_out,
                 "duration_ms": _ms_since(started_at),

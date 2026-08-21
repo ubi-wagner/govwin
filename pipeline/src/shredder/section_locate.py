@@ -144,6 +144,36 @@ def _in_ranges(pos: int, ranges: list[tuple[int, int]]) -> bool:
     return any(a <= pos <= b for a, b in ranges)
 
 
+def _snap_to_lines(text: str, start: int, end: int, slack: int = 300) -> tuple[int, int]:
+    """Move an excerpt's edges onto line boundaries.
+
+    A window is centred on a keyword hit and its edges land wherever arithmetic puts them, which is
+    usually mid-line and often mid-word. Two things go wrong when that happens, and only one of them
+    is cosmetic. The excerpt opens mid-sentence, which is merely ugly. But `_heading_for` reads the
+    first heading inside the opening — so a start that lands inside "REGARDING THIS BAA" yields the
+    label "DING THIS BAA", and "5.1 Award Information" becomes "5.1 Award Informati". That label is
+    the `[source: …]` attribution the model is asked to cite from, and a mangled one is a citation
+    to a heading that does not exist.
+
+    Both heading regexes are anchored with re.MULTILINE, so snapping the start to a line boundary is
+    also what lets them match at all.
+
+    `slack` bounds the search: past it the window is left alone rather than distorted to find a
+    newline that may not be nearby in a badly extracted PDF.
+    """
+    nl = text.rfind("\n", max(0, start - slack), start)
+    if nl != -1:
+        start = nl + 1
+    elif start > 0:
+        nl = text.find("\n", start, start + slack)
+        if nl != -1:
+            start = nl + 1
+    nl = text.rfind("\n", max(start, end - slack), end)
+    if nl != -1 and nl > start:
+        end = nl
+    return start, end
+
+
 def _kw_at(lower_text: str, pos: int, keywords: list[str]) -> str:
     """Which keyword matched at `pos` — used to count DISTINCT phrasings, not raw hits."""
     for kw in keywords:
@@ -215,6 +245,8 @@ def locate_sections(
     # Best non-TOC window per topic, scored by keyword hits. A hit that sits right after a heading
     # counts double: a rule under "5.4 Page Limitations" is the rule, a passing mention is not.
     best: dict[str, Span] = {}
+    #: Runner-up windows, spent only after every topic has its primary (see the two-phase fill).
+    extra: list[Span] = []
     for topic, keywords in wanted.items():
         positions: list[int] = []
         for kw in keywords:
@@ -237,46 +269,84 @@ def locate_sections(
         # 62 against "page_limits" at 7 on a real BAA purely because it owns words like "submit".
         # A window matching five different page-limit phrasings is the page-limit section; a window
         # repeating one word twenty times is prose.
-        best_score, best_at = 0.0, positions[0]
+        scored: list[tuple[float, int]] = []
         lo = 0
         for hi in range(len(positions)):
             while positions[hi] - positions[lo] > window:
                 lo += 1
             cluster = positions[lo:hi + 1]
-            distinct = len({_kw_at(lower, p, keywords) for p in cluster}) 
+            distinct = len({_kw_at(lower, p, keywords) for p in cluster})
             score = float(distinct) + 0.05 * len(cluster)
             if _has_heading_near(src, positions[lo]):
                 score *= 2.0
             score *= PRIORITY.get(topic, 1.0)
-            if score > best_score:
-                best_score, best_at = score, positions[lo]
-        start = max(0, best_at - 400)
-        end = min(len(src), best_at + window)
-        best[topic] = Span(topic=topic, start=start, end=end, score=best_score,
-                           heading=_heading_for(src, start, end))
+            scored.append((score, positions[lo]))
+        if not scored:
+            continue
+        # Every distinct, non-overlapping window for this topic — not just the single best.
+        #
+        # A federal BAA states the same rule in more than one place, and the places disagree on
+        # purpose: umbrella guidelines, then component-specific instructions that SUPERSEDE them.
+        # Keeping only the strongest window keeps whichever of those happened to score higher and
+        # silently drops the other, so the shred can miss the binding rule entirely. On the DoD 25.1
+        # BAA the top page-limit window sits at char 1,142,877 and the component instructions that
+        # override it are elsewhere.
+        #
+        # These are RUNNER-UPS, spent only after every topic has its primary window — see the
+        # two-phase fill below. A caller with a small budget never reaches them, so its output is
+        # unchanged.
+        scored.sort(key=lambda t: t[0], reverse=True)
+        taken: list[Span] = []
+        for score, at in scored:
+            start, end = _snap_to_lines(src, max(0, at - 400), min(len(src), at + window))
+            if any(start < t.end and t.start < end for t in taken):
+                continue
+            span = Span(topic=topic, start=start, end=end, score=score,
+                        heading=_heading_for(src, start, end))
+            taken.append(span)
+            if len(taken) == 1:
+                best[topic] = span
+            else:
+                extra.append(span)
 
     if not best:
         # Nothing matched anywhere. Falling back to the prefix would be the old bug, so say so:
         # an empty excerpt with every topic listed missing is an honest "we found nothing".
         return LocatedExcerpt(text="", missing=list(wanted))
 
-    # Spend the budget on the strongest topics first, merging overlaps so nothing is paid twice.
+    # TWO-PHASE FILL.
+    #
+    # Phase 1 — one window per topic, strongest first. Unchanged from before runner-ups existed, so
+    # every topic still gets its best passage before any topic gets a second one. A caller whose
+    # budget is spent here (8K on a large BAA: 2 passages) sees exactly the old output.
+    #
+    # Phase 2 — spend whatever is LEFT on the runner-up windows. Strictly additive: it never
+    # displaces a primary, it only fills budget that was previously returned unused. It matters
+    # because the shredder's section extraction asks for 330K chars — it has to enumerate the
+    # solicitation's structure, not answer one question about it — and one-window-per-topic spends
+    # 1.3% of that. Six passages out of a 1.3M-char BAA reads as though each rule is stated once,
+    # in one place, which is the opposite of how a BAA works.
     chosen: list[Span] = []
     spent = 0
-    for span in sorted(best.values(), key=lambda s: s.score, reverse=True):
-        merged = False
+
+    def _place(span: Span) -> None:
+        nonlocal spent
         for c in chosen:
-            if span.start < c.end and c.start < span.end:  # overlap
+            if span.start < c.end and c.start < span.end:  # overlap — widen, pay only the delta
                 spent += max(0, span.end - c.end) + max(0, c.start - span.start)
                 c.start, c.end = min(c.start, span.start), max(c.end, span.end)
-                merged = True
-                break
-        if merged:
-            continue
+                return
         if spent + span.length > budget:
-            continue
+            return
         chosen.append(span)
         spent += span.length
+
+    for span in sorted(best.values(), key=lambda s: s.score, reverse=True):
+        _place(span)
+    for span in sorted(extra, key=lambda s: s.score, reverse=True):
+        if spent >= budget:
+            break
+        _place(span)
 
     chosen.sort(key=lambda s: s.start)
     parts: list[str] = []

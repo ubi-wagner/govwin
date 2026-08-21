@@ -50,6 +50,16 @@ console.log('\nsigned in as rfp_admin');
 await page.goto(`${BASE}/admin/rfp-curation/upload`, { waitUntil: 'networkidle' });
 await page.fill('input[name="title"]', TITLE);
 await page.fill('input[name="agency"]', process.env.SCENARIO_AGENCY || 'Department of Defense');
+// Check the value against the form's OWN option list before selecting. Playwright's failure for an
+// absent option is a 30s timeout ending in "did not find some options" — which names neither the
+// value you passed nor the ones that exist, so it reads like the form failed to render. The list
+// lives in the component (PROGRAM_TYPES in upload-form.tsx) and is not exported, so ask the page.
+const PROGRAM_OPTIONS = await page.$$eval('select[name="programType"] option',
+  (os) => os.map((o) => o.value).filter(Boolean));
+if (!PROGRAM_OPTIONS.includes(PROGRAM)) {
+  console.error(`programType "${PROGRAM}" is not one the form offers.\n  valid: ${PROGRAM_OPTIONS.join(' | ')}`);
+  process.exit(2);
+}
 await page.selectOption('select[name="programType"]', PROGRAM);
 await page.fill('input[name="closeDate"]', CLOSE);
 

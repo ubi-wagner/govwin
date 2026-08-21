@@ -23,6 +23,29 @@
 export DATABASE_URL="postgresql://govtech_app:apppass@localhost:5432/govtech_intel"
 export DATABASE_URL_OWNER="postgresql://govtech:changeme@localhost:5432/govtech_intel"
 
+# The admin password, in ONE place. sandbox-reset-passwords.mjs WRITES $SANDBOX_PASSWORD; eighteen
+# driver scripts READ $RFP_ADMIN_PW / $ADMIN_PW / $DRIVE_ADMIN_PW, each with its own hardcoded
+# default of 'RFPAdmin2026!' — a value nothing sets any more. On a fresh sandbox that mismatch
+# surfaces as a bare `/login?error=invalid` redirect and a 60s Playwright timeout, which reads like
+# a broken auth flow rather than a wrong constant. Deriving the aliases from the one variable means
+# the writer and the readers cannot disagree.
+export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
+export RFP_ADMIN_PW="$SANDBOX_PASSWORD"
+export ADMIN_PW="$SANDBOX_PASSWORD"
+export DRIVE_ADMIN_PW="$SANDBOX_PASSWORD"
+
+# A SEPARATE, THROWAWAY database for the DB-dependent pytest suite. Not optional, and not the same
+# database as above: those tests clean up with unscoped statements like
+# `DELETE FROM system_events WHERE namespace='finder'`. Pointed at the sandbox that deletes real
+# audit history, and the deletes that DON'T fail on a foreign key are the ones that do damage. It
+# also skews every count the drive scripts measure.
+#
+# Without this set, the ~257 DB-dependent tests SKIP — so the suite reports green while the half
+# that touches Postgres never ran. Create it once with:
+#   psql "$DATABASE_URL_OWNER" -c 'CREATE DATABASE govtech_test OWNER govtech'
+#   ALLOW_SCHEMA_RESET=true DATABASE_URL="$TEST_DATABASE_URL" node db/migrations/migrate.mjs
+export TEST_DATABASE_URL="postgresql://govtech:changeme@localhost:5432/govtech_test"
+
 export AUTH_SECRET="sandbox-auth-secret-do-not-use-in-production-0000"
 export AUTH_TRUST_HOST="true"
 export NEXTAUTH_URL="http://localhost:3000"

@@ -81,12 +81,31 @@ def _patch_env_and_reload(monkeypatch):
     file red (see the module docstring).
     """
     monkeypatch.setenv("API_KEY_ENCRYPTION_SECRET", "test-secret-for-unit-tests-32bytes!")
+    saved = {name: sys.modules.get(name) for name in ("config", "crypto")}
     for mod_name in ("config", "crypto"):
         sys.modules.pop(mod_name, None)
     yield
-    # Teardown: evict again so other test modules start from the real environment.
-    for mod_name in ("config", "crypto"):
-        sys.modules.pop(mod_name, None)
+    # TEARDOWN RESTORES THE ORIGINAL MODULE OBJECTS. It used to evict them a second time, "so other
+    # test modules start from the real environment" — but eviction does not undo an import, it only
+    # hides it. Every module that had already done `import config` still holds the ORIGINAL object,
+    # while the next `import config` builds a SECOND one. Two live config modules, and a test that
+    # patches the one it can reach has no effect on the one the code under test reads.
+    #
+    # That is not hypothetical: it made ingest.sam_gov ignore USE_STUB_DATA and issue a real request
+    # to the SAM.gov API (403 Forbidden). The tests passed when run alone and failed in the full
+    # suite, because this file sorts before test_ingest_e2e.py.
+    #
+    # Restoring the saved objects and reloading them in place gives one module identity with values
+    # re-read from the real environment — which is what the eviction was reaching for.
+    for mod_name, mod in saved.items():
+        if mod is not None:
+            sys.modules[mod_name] = mod
+            try:
+                importlib.reload(mod)
+            except Exception:  # a module that cannot re-import must not fail an unrelated test
+                pass
+        else:
+            sys.modules.pop(mod_name, None)
 
 
 def _load_crypto():
