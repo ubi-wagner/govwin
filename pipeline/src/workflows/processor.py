@@ -95,29 +95,50 @@ log = logging.getLogger("pipeline.workflows.processor")
 
 # ─── Duplicate tracking ──────────────────────────────────────────────
 
-# In-memory set of trigger event IDs already processed in this
-# processor lifetime. Prevents double-processing if the high-water
-# mark query returns an event that was already handled (e.g., due to
-# timestamp collisions at millisecond granularity).
-_processed_event_ids: set[str] = set()
+# In-memory record of trigger event IDs already processed in this processor lifetime.
+#
+# WHY IT IS LOAD-BEARING, not a nicety. The poll bound is `created_at >= last_processed_at` and the
+# watermark is set to the newest event's OWN timestamp, so the newest event is re-selected on EVERY
+# poll — for ever, until a newer one arrives. That inclusive bound is deliberate: system_events
+# timestamps collide at millisecond granularity, and `>` would silently drop an event that shares a
+# millisecond with the last one processed. So re-selection is the design, and this is the only thing
+# standing between it and a re-triggered workflow.
+#
+# A dict, not a set, because eviction has to drop the OLDEST — see _track_processed. Python dicts
+# are insertion-ordered (3.7+), so this is an ordered set; the values are unused.
+_processed_event_ids: dict[str, None] = {}
 
-# Cap the size of the dedup set to prevent unbounded memory growth.
-# When exceeded, we clear the oldest half (approximated by clearing all).
+# Cap the size to prevent unbounded memory growth.
 _MAX_DEDUP_SET_SIZE = 50_000
+#: How much to drop when the cap is hit. Half, so eviction is amortised rather than every-insert.
+_DEDUP_EVICT_FRACTION = 0.5
 
 
 def _track_processed(event_id: str) -> bool:
     """Record an event ID as processed. Returns True if it was already seen."""
-    global _processed_event_ids
     if event_id in _processed_event_ids:
         return True
     if len(_processed_event_ids) >= _MAX_DEDUP_SET_SIZE:
+        # DROP THE OLDEST HALF — this used to clear the WHOLE set.
+        #
+        # Wiping it forgets the newest event ids along with the oldest, and the newest is exactly
+        # the one the `>=` bound re-selects on the very next poll. So a clear that landed while an
+        # event was still the newest let that event through a second time and re-triggered its
+        # workflow: a duplicate process_instance from a single emission, roughly once per 50,000
+        # events, with nothing in the log to explain it.
+        #
+        # Evicting oldest-first keeps every recent id, which is the only region the re-selection
+        # window can reach. The oldest ids are unreachable anyway — the watermark has long since
+        # advanced past them.
+        drop = int(_MAX_DEDUP_SET_SIZE * _DEDUP_EVICT_FRACTION)
+        for stale in list(_processed_event_ids)[:drop]:
+            del _processed_event_ids[stale]
         log.info(
-            "dedup set reached %d entries, clearing to prevent memory growth",
-            _MAX_DEDUP_SET_SIZE,
+            "dedup set reached %d entries, evicted the %d oldest (newest ids retained — the poll's "
+            ">= bound re-selects those every tick)",
+            _MAX_DEDUP_SET_SIZE, drop,
         )
-        _processed_event_ids = set()
-    _processed_event_ids.add(event_id)
+    _processed_event_ids[event_id] = None
     return False
 
 
@@ -761,7 +782,13 @@ async def run_workflow_processor(
                     # Duplicate detection — skip if already processed
                     event_id = event_dict["id"]
                     if _track_processed(event_id):
-                        log.info(
+                        # DEBUG, not INFO. The `>=` poll bound re-selects the newest event on every
+                        # tick, so on an idle platform this fires once per 10s for ever, on the same
+                        # id. At INFO it is not a signal — it is a screen that hides real ones: 40 of
+                        # the last 40 lines in a live worker log, which is how a burst of
+                        # "new row violates row-level security policy" went unnoticed for half an
+                        # hour. Expected-by-design behaviour does not belong at INFO.
+                        log.debug(
                             "skipping duplicate event %s (already processed)",
                             event_id,
                         )
