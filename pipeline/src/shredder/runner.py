@@ -39,6 +39,7 @@ from typing import Any, Optional
 import asyncpg
 
 from errors import ShredderBudgetError
+from safe_skip import MAX_MODEL_RETRIES, skip_evidence
 from shredder.compliance_mapping import split_matches
 from shredder.extractor import MAX_CHARS_PER_DOCUMENT, cap_source_text, extract_text_from_pdf
 from shredder.namespace import compute_namespace_key
@@ -98,11 +99,13 @@ async def _call_claude(
     user_message: str,
     model: str = DEFAULT_MODEL,
     max_tokens: int = 4096,
+    _attempt: int = 0,
 ) -> tuple[dict[str, Any], int, int]:
     """Call Claude and parse the JSON response.
 
-    Returns (parsed_json, input_tokens, output_tokens). Raises on API
-    error or unparseable JSON.
+    Retries ONCE on unparseable JSON with an explicit repair instruction, then raises — callers
+    decide whether that is fatal or a safe skip (safe_skip.py: evidence steps skip with a comment
+    and never fabricate; artifact steps land a labelled placeholder).
     """
     response = await client.messages.create(
         model=model,
@@ -130,8 +133,23 @@ async def _call_claude(
     try:
         parsed = json.loads(cleaned)
     except json.JSONDecodeError as e:
+        # RETRY ONCE. A malformed reply is usually transient — the model opened with prose, or
+        # fenced the object in a way the stripper missed — and re-asking costs one call, which is
+        # what a person would do. The retry SAYS what was wrong, so it is a repair request rather
+        # than a hopeful repeat.
+        if _attempt < MAX_MODEL_RETRIES:
+            log.warning("shredder: unparseable JSON on attempt %d (%s) — re-asking", _attempt + 1, e)
+            return await _call_claude(
+                client, system_prompt=system_prompt,
+                user_message=(
+                    f"{user_message}\n\nYOUR PREVIOUS REPLY WAS NOT VALID JSON. Reply with the "
+                    "JSON object only — no preamble, no explanation, no markdown fences."
+                ),
+                model=model, max_tokens=max_tokens, _attempt=_attempt + 1,
+            )
         raise ValueError(
-            f"Claude returned unparseable JSON: {e}; first 200 chars: {cleaned[:200]!r}"
+            f"Claude returned unparseable JSON after {_attempt + 1} attempt(s): {e}; "
+            f"first 200 chars: {cleaned[:200]!r}"
         ) from e
 
     return parsed, input_tokens, output_tokens
@@ -515,6 +533,9 @@ async def shred_solicitation(
             "sections": sections,
             "compliance_matches": all_matches,
             "skipped_matches": skipped,
+        # A skipped evidence step must be visible, or "no sections" reads like a document that
+        # genuinely had none.
+        **({"section_extraction_skipped": section_skip} if section_skip else {}),
             "extracted_at": started_at.isoformat(),
         }
 
@@ -570,6 +591,9 @@ async def shred_solicitation(
                 "column_updates_applied": len(column_updates),
                 "custom_variables_stored": len(custom_vars),
                 "skipped_matches": skipped,
+        # A skipped evidence step must be visible, or "no sections" reads like a document that
+        # genuinely had none.
+        **({"section_extraction_skipped": section_skip} if section_skip else {}),
                 "total_input_tokens": sec_in_tokens + comp_in_tokens,
                 "total_output_tokens": sec_out_tokens + comp_out_tokens,
                 "artifact_keys": artifact_keys,

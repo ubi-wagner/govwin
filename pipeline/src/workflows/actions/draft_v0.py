@@ -34,6 +34,8 @@ from workflows.actions.authorable import is_authorable
 
 import asyncpg
 
+from safe_skip import STYLE_NOT_SUBSTANCE_NOTE, placeholder_text, skip_artifact
+
 log = logging.getLogger("pipeline.workflows.actions.draft_v0")
 
 # Default canvas rules if a section's artifact has no frozen format_spec.
@@ -306,6 +308,7 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         log.warning("draft_v0: draft.completed:start emit failed (non-fatal): %s", exc)
 
     drafted = 0
+    placeheld = 0
     skipped = 0
     held = 0
     blocked = 0
@@ -413,8 +416,43 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
             else:
                 skipped += 1
         except Exception as exc:  # noqa: BLE001 — one section must never abort the rest
-            log.error("draft_v0: section %s failed: %s", section_id, exc)
-            skipped += 1
+            # ARTIFACT step: this produces prose a proposer would have written, not an assertion
+            # about the solicitation. So the safe-skip lands a LABELLED placeholder rather than
+            # nothing — the canvas keeps a valid node, the export does not collapse, and the builder
+            # sees exactly which section still needs writing. The note says what it is:
+            # "meets style and form but not substance requirements" (safe_skip.py).
+            #
+            # Contrast the shredder, which skips outright: there is no honest way to fabricate a
+            # source_excerpt. Nothing here claims to be a fact, so a stand-in is safe.
+            #
+            # The authorable guard still applies — publish_section_draft refuses a form or
+            # certification, so a DD Form 2345 gets no placeholder either.
+            log.error("draft_v0: section %s failed: %s — landing a labelled placeholder", section_id, exc)
+            try:
+                ph = skip_artifact(
+                    "draft_v0", str(exc)[:200],
+                    content=placeholder_text(s.get("title") or "untitled", str(exc)[:120]),
+                )
+                ph_canvas = s["format_spec"] if (s["format_spec"] and isinstance(s["format_spec"], dict) and s["format_spec"]) else _DEFAULT_CANVAS
+                placeholder_doc = build_canvas_document(
+                    ph.content,
+                    document_id=section_id,
+                    canvas=ph_canvas,
+                    metadata=_metadata(s, str(proposal_id), str(sol_id) if sol_id else None),
+                    source="placeholder",
+                )
+                landed = await publish_section_draft(
+                    conn, proposal_id=str(proposal_id), section_id=section_id,
+                    content=placeholder_doc, source="placeholder", ai_model=None,
+                    instruction=ph.note,
+                )
+                if landed.get("published"):
+                    placeheld += 1
+                else:
+                    skipped += 1
+            except Exception as ph_exc:  # noqa: BLE001 — a failed placeholder must not abort either
+                log.error("draft_v0: placeholder for %s also failed: %s", section_id, ph_exc)
+                skipped += 1
 
     # Completion event (best-effort).
     try:
