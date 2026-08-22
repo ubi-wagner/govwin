@@ -228,7 +228,7 @@ if (done('curate')) {
      WHERE c.opportunity_id = ${journal.ids.opp}::uuid AND t.slug = ${TENANT} LIMIT 1`;
   prove('database', `${TENANT} received the card`, !!mine?.id,
         mine ? `${mine.id} (${mine.lifecycleStatus}/${mine.pursuitStatus})` : 'none');
-  await provedEvent(['finder.opportunity.published', 'capture.opportunity.matched'], t0, 'the push posted');
+  await provedEvent(['solicitation.pushed', 'solicitation.approved', 'card.applied'], t0, 'the push posted');
 
   journal.ids.card = mine?.id ?? null;
   journal.stages.curate = { ok: failures === 0, at: new Date().toISOString() };
@@ -258,8 +258,7 @@ if (done('buy')) {
 
   const [secs] = await sql`SELECT count(*)::int AS n FROM proposal_sections WHERE proposal_id = ${prop?.id}::uuid`;
   prove('database', 'the compliance matrix instantiated sections', (secs?.n ?? 0) >= 1, `${secs?.n} section(s)`);
-  await provedEvent(['capture.purchase.completed', 'capture.portal.launched', 'proposal.provisioned'], t0,
-                    'purchase + provision posted');
+  await provedEvent(['purchase.completed', 'portal.created'], t0, 'purchase + provision posted');
 
   journal.ids.proposal = prop?.id ?? null;
   journal.ids.buyer = buyer.email;
@@ -325,7 +324,7 @@ const [locked] = await sql`
     FROM proposal_sections WHERE proposal_id = ${journal.ids.proposal}::uuid`;
 prove('database', 'sections reached a locked state', (locked?.locked ?? 0) >= 1,
       `${locked?.locked}/${locked?.total} locked`);
-await provedEvent(['proposal.artifact.exported', 'proposal.section.locked'], t0, 'authoring + export posted');
+await provedEvent(['artifact.exported', 'section.locked', 'section.saved'], t0, 'authoring + export posted');
 
 // Storage plane: the shredded artifacts B42 used to silently drop.
 try {

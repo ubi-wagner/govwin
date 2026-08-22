@@ -66,7 +66,10 @@ const login = async (email, pw) => {
 const [meta] = await sql`
   SELECT o.id AS "oppId", o.title, cs.ingest_phase AS phase, t.id AS "tenantId", t.name AS "tenantName"
   FROM curated_solicitations cs
-  JOIN opportunities o ON o.solicitation_id = cs.id
+  -- B46: the push writes cs.opportunity_id and leaves o.solicitation_id NULL, so the
+  -- back-link alone finds nothing for a freshly-pushed solicitation. Resolve through EITHER,
+  -- the same way lib/opportunity-bridge.ts:88 already does.
+  JOIN opportunities o ON o.solicitation_id = cs.id OR cs.opportunity_id = o.id
   CROSS JOIN LATERAL (SELECT id, name FROM tenants WHERE slug = ${SLUG}) t
   WHERE cs.id = ${SOL}::uuid LIMIT 1`;
 if (!meta) { console.error(`no opportunity for solicitation ${SOL}, or no tenant ${SLUG}`); process.exit(2); }
