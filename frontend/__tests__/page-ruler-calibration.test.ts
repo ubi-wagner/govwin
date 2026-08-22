@@ -22,7 +22,7 @@
  *   npx tsx scripts/calibrate-page-ruler.mts     (needs a Chromium; exits non-zero on any drift)
  */
 import { describe, it, expect } from 'vitest';
-import { paginate, CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
+import { paginate, overflowingSlides, CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 let seq = 0;
 const node = (type: string, content: unknown): CanvasNode => ({
@@ -92,5 +92,69 @@ describe('page ruler — calibrated against real Chromium output', () => {
 
   it('an empty table does not claim a page', () => {
     expect(paginate(doc([node('table', { headers: [], rows: [] })])).totalPages).toBe(1);
+  });
+});
+
+describe('page ruler — a list is not a paragraph (B65)', () => {
+  const bullets = (n: number) => node('bulleted_list', {
+    items: Array.from({ length: n }, (_, i) => ({
+      text: `Qualification milestone ${i + 1} — coupons printed, sectioned and tested to ASTM D2344`,
+    })),
+  });
+
+  it('each bullet takes its own line, so a long list spills', () => {
+    // Measured against Chromium: 120 of these bullets print 4 pages. Falling through to the prose
+    // default concatenated them into one string and reflowed it, giving 3.
+    expect(paginate(doc([bullets(120)])).totalPages).toBe(4);
+  });
+
+  it('the count scales with ITEMS, not with total characters', () => {
+    // The sharp form of the defect. Under the old model these two were nearly identical, because
+    // the same characters reflowed to the same number of lines either way; what actually differs
+    // is that one is 40 separate blocks and the other is one paragraph.
+    const asList = paginate(doc([bullets(40)])).totalPages;
+    const asProse = paginate(doc([node('text_block', {
+      text: Array.from({ length: 40 },
+        (_, i) => `Qualification milestone ${i + 1} — coupons printed, sectioned and tested to ASTM D2344`).join(' '),
+    })])).totalPages;
+    expect(asList).toBeGreaterThan(asProse);
+  });
+
+  it('nested children add height rather than disappearing', () => {
+    const flat = node('bulleted_list', { items: Array.from({ length: 10 }, () => ({ text: 'Coupon set printed and sectioned' })) });
+    const nested = node('bulleted_list', {
+      items: Array.from({ length: 10 }, () => ({
+        text: 'Coupon set printed and sectioned',
+        children: [{ text: 'Witness coupons retained' }, { text: 'ILSS reported per orientation' }],
+      })),
+    });
+    const h = (n: typeof flat) => paginate(doc([n, n, n, n, n])).totalPages;
+    expect(h(nested)).toBeGreaterThan(h(flat));
+  });
+
+  it('an empty list does not claim a page', () => {
+    expect(paginate(doc([node('bulleted_list', { items: [] })])).totalPages).toBe(1);
+  });
+});
+
+describe('deck ruler — overflow must fire before content is cut off', () => {
+  const slideDoc = (n: number): CanvasDocument => ({
+    version: 1,
+    canvas: CANVAS_PRESETS.slide_deck,
+    metadata: { title: 'deck' },
+    nodes: [node('bulleted_list', {
+      items: Array.from({ length: n }, (_, i) => ({ text: `Qualification milestone ${i + 1} — coupons sectioned and tested` })),
+    })],
+  } as unknown as CanvasDocument);
+
+  it('a slide holding far more than its frame reports overflow', () => {
+    // 30 bullets need ~648pt of a 452pt frame. `overflowingSlides` is the ONLY thing between a
+    // customer and a deck with content cut off the bottom, and it stayed silent until 60 while a
+    // list was measured as reflowed prose.
+    expect(overflowingSlides(slideDoc(30))).toContain(0);
+  });
+
+  it('a slide that comfortably fits does not', () => {
+    expect(overflowingSlides(slideDoc(4))).toHaveLength(0);
   });
 });

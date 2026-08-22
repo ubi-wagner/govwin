@@ -34,6 +34,17 @@
 > the stylesheet — the stylesheet-derived value falls outside the measured bracket. The missing
 > instrument is the real deliverable: **`scripts/calibrate-page-ruler.mts`** renders every case
 > through Chromium and exits non-zero on drift; run it after anything that touches layout.
+>
+> **B65 — the same defect in lists, found by extending the method to decks.** `nodeStackHeightPt`
+> had no `bulleted_list` / `numbered_list` case, so a list fell through to the prose default: every
+> bullet concatenated and reflowed at full width. A 120-bullet document read 3 pages and printed 4,
+> and a slide holding 30 bullets — needing 648pt of a 452pt frame — reported **no overflow**, the
+> one check standing between a customer and a deck with content cut off. Second harness:
+> **`scripts/calibrate-slide-ruler.mts`** (7/7); the page harness is now 20/20.
+>
+> **The class to keep sweeping for:** *a model that flattens structure the renderer preserves.*
+> B64 found it in table cells, B65 in list items. Any node whose content is a LIST of things —
+> rows, items, series, steps — is a candidate; measuring its text length is not measuring its height.
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter

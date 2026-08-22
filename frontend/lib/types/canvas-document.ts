@@ -784,6 +784,40 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
     }
     case 'caption':
       return bodyLineH;
+    case 'bulleted_list':
+    case 'numbered_list': {
+      // A LIST IS NOT A PARAGRAPH. Falling through to the flow-text default concatenated every
+      // bullet into one string and reflowed it at full column width, so twenty short bullets
+      // measured as three lines instead of twenty. Consequences in both rulers:
+      //   • a 120-bullet document read 3 pages and printed 4
+      //   • a slide holding 30 bullets — needing 648pt of a 452pt frame — reported NO overflow,
+      //     so `overflowingSlides` (the only thing standing between a customer and a deck with
+      //     content cut off the bottom) stayed silent until 60.
+      // Same defect as the table-wrap bug: the model flattened structure the renderer preserves.
+      //
+      // Geometry from canvas-html: `ul, ol { margin: 0 0 8pt 20pt }`, `li { margin: 0 0 3pt }`,
+      // and each item is its own block that wraps inside the indented column. Nested children
+      // indent another 20pt each level.
+      const items = (node.content as ListContent | undefined)?.items ?? [];
+      const LIST_INDENT_PT = 20;
+      const ITEM_GAP_PT = 3;
+      const LIST_BOTTOM_PT = 8;
+      // The stylesheet floors line-height at 1.28 (`Math.max(lineSpacing, 1.28)`), and for a list
+      // that floor matters: an error of a fraction of a line repeats per ITEM instead of averaging
+      // out across a reflowed paragraph.
+      const lineH = fs * Math.max(m.bodyLineH / fs, 1.28);
+      const walk = (list: ListContent['items'], depth: number): number => {
+        const w = Math.max(1, usableW - LIST_INDENT_PT * (depth + 1));
+        const per = Math.max(1, Math.floor(w / (fs * CHAR_W)));
+        let h = 0;
+        for (const it of list ?? []) {
+          h += linesFor((it?.text ?? '').length, per) * lineH + ITEM_GAP_PT;
+          if (it?.children?.length) h += walk(it.children, depth + 1);
+        }
+        return h;
+      };
+      return items.length ? walk(items, 0) + LIST_BOTTOM_PT : bodyLineH;
+    }
     default:
       return linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
   }

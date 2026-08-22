@@ -98,6 +98,15 @@ const image = (which: keyof typeof IMG) => node('image', {
   width: IMG[which].w, height: IMG[which].h,
 });
 const pageBreak = () => node('page_break', {});
+/** A real `bulleted_list` — NOT `list`, which is not a NodeType and silently renders as nothing. */
+const bullets = (n: number, nested = false) => node('bulleted_list', {
+  items: Array.from({ length: n }, (_, i) => ({
+    text: `Qualification milestone ${i + 1} — coupons printed, sectioned and tested to ASTM D2344`,
+    ...(nested && i % 4 === 0
+      ? { children: [{ text: 'Witness coupons retained for the option year' }, { text: 'ILSS reported per orientation' }] }
+      : {}),
+  })),
+});
 
 function doc(nodes: CanvasNode[], overrides: Partial<NonNullable<CanvasDocument['canvas']>> = {}): CanvasDocument {
   return {
@@ -139,6 +148,14 @@ const CASES: Case[] = [
     doc: doc([text(prose(12)), image('tall'), text(prose(3))]),
     note: 'the case that produced the 9-vs-10 disagreement recorded in the engine',
   },
+
+  // ── Lists. Each item is its own block; measuring them as reflowed prose under-counted a
+  //    120-bullet document by a page and kept the deck overflow check silent (B65). ──
+  { name: 'list · 20 bullets', doc: doc([bullets(20)]) },
+  { name: 'list · 60 bullets', doc: doc([bullets(60)]) },
+  { name: 'list · 120 bullets (spills)', doc: doc([bullets(120)]) },
+  { name: 'list · 40 bullets with nested children', doc: doc([bullets(40, true)]) },
+  { name: 'list · prose + bullets + prose', doc: doc([text(prose(6)), bullets(25), text(prose(6))]) },
 
   // ── Explicit breaks + mixed. What a real volume looks like. ──
   {
