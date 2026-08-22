@@ -8,10 +8,13 @@ upstream libraries installed in the CI image.
 """
 import sys
 import types
+from pathlib import Path
+
 import pytest
 
 from shredder.extractor import (
     extract_text_from_pdf,
+    pdf_page_count,
     MAX_CHARS_PER_DOCUMENT,
     ExtractionError,
 )
@@ -81,3 +84,33 @@ class TestExtractTextFromPdf:
 
         with pytest.raises(ExtractionError, match="not available"):
             extract_text_from_pdf(b"whatever")
+
+
+class TestPdfPageCount:
+    """A page count must be READ, or absent. It must never be estimated.
+
+    runner.py stored `len(pdf_bytes) // 40000 + 1` in solicitation_documents.page_count and handed
+    that to the packaging specialist beside genuinely-extracted values. Measured against the real
+    solicitations in docs/, the guess was 72-81% low — a 254-page DoD SBIR BAA recorded as 60
+    pages. docs/INGEST_PROVENANCE.md: a value the product did not read must never look like one it
+    did, and absence is a finding.
+    """
+
+    def test_reads_the_real_page_count(self) -> None:
+        pdf = (
+            Path(__file__).resolve().parents[2] / "docs/DoD 25.2 SBIR BAA FULL_04212025.pdf"
+        )
+        if not pdf.exists():
+            pytest.skip("solicitation fixture not present in this checkout")
+        assert pdf_page_count(pdf.read_bytes()) == 254
+
+    @pytest.mark.parametrize("bad", [b"", b"this is not a pdf"])
+    def test_unreadable_input_is_none_never_a_guess(self, bad: bytes) -> None:
+        """The old expression returned 1 for both of these — a document claiming to have a page."""
+        assert pdf_page_count(bad) is None
+
+    def test_missing_library_is_none_not_a_raise(self, monkeypatch) -> None:
+        """Unlike extraction, an absent page count is not fatal: the column is nullable and the
+        caller stores NULL. Raising here would fail a shred over a nice-to-have."""
+        monkeypatch.setitem(sys.modules, "pymupdf", None)
+        assert pdf_page_count(b"whatever") is None

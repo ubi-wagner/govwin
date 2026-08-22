@@ -124,6 +124,29 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     return markdown
 
 
+def pdf_page_count(pdf_bytes: bytes) -> Optional[int]:
+    """How many pages the PDF actually has, or None when that cannot be determined.
+
+    None is the point. The caller previously stored `len(pdf_bytes) // 40000 + 1` in a column named
+    page_count — a byte-size guess wearing the name of a measurement, handed on to the packaging
+    specialist beside genuinely-read values with nothing marking it as estimated. That is the
+    failure docs/INGEST_PROVENANCE.md exists to prevent: a value the product did not read must
+    never look like one it did. An unknown page count has to stay unknown.
+
+    pymupdf is already opened one function above to extract the text; the count is free.
+    """
+    try:
+        import pymupdf  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+    try:
+        with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+            return int(doc.page_count)
+    except Exception as e:
+        log.warning("pdf_page_count: could not read page count: %s", e)
+        return None
+
+
 async def extract_text_from_s3_key(
     s3_key: str,
     s3_client: Optional[object] = None,

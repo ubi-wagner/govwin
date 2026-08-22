@@ -41,7 +41,12 @@ import asyncpg
 from errors import ShredderBudgetError
 from safe_skip import MAX_MODEL_RETRIES, skip_evidence
 from shredder.compliance_mapping import split_matches
-from shredder.extractor import MAX_CHARS_PER_DOCUMENT, cap_source_text, extract_text_from_pdf
+from shredder.extractor import (
+    MAX_CHARS_PER_DOCUMENT,
+    cap_source_text,
+    extract_text_from_pdf,
+    pdf_page_count,
+)
 from shredder.namespace import compute_namespace_key
 from shredder.section_locate import TOPICS, locate_sections
 
@@ -388,7 +393,11 @@ async def shred_solicitation(
                     """,
                     doc_id,
                     capped,
-                    len(pdf_bytes) // 40000 + 1,  # rough page estimate
+                    # The real count, or NULL. This was `len(pdf_bytes) // 40000 + 1` — a byte-size
+                    # guess stored under the name of a measurement and passed to the packaging
+                    # specialist next to values genuinely read from the document. Unknown must
+                    # read as unknown (docs/INGEST_PROVENANCE.md).
+                    pdf_page_count(pdf_bytes),
                 )
             except Exception as e:
                 log.warning("shredder: doc row update failed for %s: %s", doc_id, e)
