@@ -282,19 +282,31 @@
       "caption": "Scout Monitor — pool health, recent runs, and detected changes.",
       "steps": [
         {
-          "t": "Read the <b>five metric cards</b>: Active sources · Healthy · Degraded/error · Running scouts · Changes (24h)."
+          "t": "Read the stage strip across the top — <b>Sources → Scout Monitor → Intake → RFP Curation → Opportunity Cards</b>. The badges are live counts, so it doubles as a queue depth gauge: if Intake is climbing and Curation is flat, triage is the bottleneck."
         },
         {
-          "t": "Scan the <b>Worker Pool</b> table (Source · Agency · Health · Fails · Last success · Avg run · Last visit). Health is <b>healthy</b>/<b>degraded</b>/<b>error</b>/<b>unknown</b>; a red Fails count needs attention."
+          "t": "Work <b>Candidate opportunities — new or updated</b> first. Scout findings land here classified NEW vs UPDATE; release a new one into RFP intake, log an update as an amendment on the matched opportunity, or dismiss it. This is the only part of the page that is a queue."
         },
         {
-          "t": "Check <b>Recent scout runs</b> and <b>Changes detected</b> to confirm the pool is finding new opportunities."
+          "t": "Read <b>Recent scout runs</b> and <b>Changes detected</b> to confirm the pool is actually finding things. Runs come from <code>pipeline_jobs kind='scout_source'</code>, so a <code>completed</code> row here is real evidence a source was visited.",
+          "img": "docs/manuals/img/crops/admin/scout-health.png",
+          "cap": "Active sources 6 · Healthy 0 — the Healthy and Degraded tiles are not wired to anything."
+        },
+        {
+          "t": "<b>Ignore the Health column and the Healthy / Degraded tiles.</b> They read from <code>source_health</code>, which is seeded once at install and never written again — no job updates it. Health therefore shows <code>unknown</code> and Last success shows <code>never</code> for every source, forever, even while runs are completing normally. Judge the pool by Recent scout runs instead."
+        },
+        {
+          "t": "Set up sources and kick a crawl from the <b>Sources</b> page — this screen is a monitor only, with no controls of its own."
         }
       ],
       "callouts": [
         {
+          "kind": "warn",
+          "html": "<b>Healthy 0 does not mean the pool is down.</b> Nothing in the frontend or the pipeline writes <code>source_health</code>; the tiles are structurally always zero. A pool that is genuinely working looks exactly like a pool that is dead on this panel — so read <b>Recent scout runs</b>, which is sourced from real job rows. Tracked as B53 in docs/BUG_LOG_2026-08-19.md."
+        },
+        {
           "kind": "note",
-          "html": "Scouts run <b>managed and audited</b> — a run that fails on one source continues on the others; nothing dead-ends. Kick a run from <b>Sources → Scout Now</b>."
+          "html": "Scouts run managed and audited — a run that fails on one source continues on the others; nothing dead-ends. Kick a run from Sources → Scout Now."
         }
       ]
     },
@@ -637,22 +649,67 @@
       "caption": "The purchases queue — comp-code and Stripe buys, with the release action.",
       "steps": [
         {
-          "t": "Find the <code>curation_pending</code> purchase (watch the 72h clock)."
+          "t": "Find the <code>curation_pending</code> purchase and watch its 72-hour clock. Release itself happens in <b>Releases &amp; SLA</b> (next section) — this page is the ledger and the comp-code desk."
         },
         {
-          "t": "Open the tenant’s build and <b>Release to customer</b> — this provisions the matrix + molds and unlocks the build.",
+          "t": "Issue a comp code from the <b>Comp codes</b> panel. <b>Issued to</b> is a note for your own records, <b>How many</b> mints that many distinct codes, and <b>Expires in (days)</b> left blank means never. A code's <b>Uses</b> column reads <code>redeemed / limit</code>.",
           "img": "docs/manuals/img/crops/admin/purchase-release.png",
-          "cap": "The release control on a pending purchase.",
-          "w": "half"
+          "cap": "Three states: Used up (1/1), Outstanding (0/1, revocable), and a standing 1/∞ code that never expires."
         },
         {
-          "t": "Confirm the tenant now sees an unlocked proposal workspace with a populated compliance matrix."
+          "t": "Codes come in two shapes, and the panel's blurb only describes one of them. A <b>single-use</b> code (<code>1 / 1</code>) burns on first redemption. A <b>standing</b> code — <code>rfppipelinetest</code>, shown as <code>1 / ∞</code> with no expiry — keeps working for every buyer. Read the Uses column, not the blurb."
+        },
+        {
+          "t": "<b>Revoke</b> an Outstanding code you issued by mistake; a Used-up code needs no action."
+        },
+        {
+          "t": "Confirm the redemption landed: the purchase appears in the table above with status <code>completed</code>, and the tenant's portal enters the release queue."
         }
       ],
       "callouts": [
         {
           "kind": "note",
           "html": "You can also grant a build <b>free</b> — approve it as a <b>comped portal</b> instead of waiting on a purchase. That records a <b>$0 purchase</b> row (<code>metadata.grant=admin</code>) and emits the same <code>capture:purchase.completed</code> event, so a comp <b>audits exactly like a paid buy</b>. (Self-serve Stripe checkout is descoped for V1 — the comp code <code>rfppipelinetest</code> and this admin grant are the two paths in.)"
+        },
+        {
+          "kind": "warn",
+          "html": "The Comp codes blurb reads <i>“A one-time code … the first redemption burns it.”</i> That is true of the codes the form mints, but not of every code in the table — <code>rfppipelinetest</code> is unlimited and never expires by design. Trust the <b>Uses</b> column."
+        }
+      ]
+    },
+    {
+      "id": "releases",
+      "toc": "Releases & SLA",
+      "heading": "Releases & SLA — the provisioning cockpit",
+      "where": "/admin/provisioning · /admin/provisioning/&lt;portalId&gt;",
+      "lead": "<p>This is the screen that <b>lands the 72-hour SLA</b>. A comp-code purchase creates a portal in <code>curation_pending</code>; it queues here until an RFP admin releases it. Reach it from the sidebar as <b>Releases &amp; SLA</b> — the route is <code>/admin/provisioning</code>, and the <code>proposal_setup</code> ToDo on the purchase deep-links straight to the buyer's cockpit.</p>",
+      "img": "docs/manuals/img/shots/admin/releases-sla.png",
+      "caption": "The release queue when it is clear — the empty state names the next action.",
+      "steps": [
+        {
+          "t": "Open <b>Releases &amp; SLA</b>. Purchased portals are sorted by their 72-hour curation clock, most urgent first. An empty queue says <i>“The release queue is clear.”</i> and links you to Purchases — that is the healthy state, not a fault."
+        },
+        {
+          "t": "Open a queued portal to reach its cockpit: the buyer, a live SLA countdown, and the master <b>build-out readiness bar</b> — compliance authored, at least one volume, at least one required item. The bar reads the master solicitation, not this buyer's copy."
+        },
+        {
+          "t": "If the master is not ready, follow the deep link into the authoring workspace and finish the build-out. A portal whose master is already built out can be released in one click."
+        },
+        {
+          "t": "Press <b>Complete &amp; Release</b>. Two things happen in order: <code>completeBuildOut</code> marks the master built out and broadcasts an <code>updated</code> fan-out to <b>every</b> tenant's mirror card, then <code>provisionAndReleasePortal</code> provisions <b>this buyer's</b> private portal, flips <code>curation_pending → launched</code>, and starts their workflow."
+        },
+        {
+          "t": "Confirm the buyer now has an unlocked workspace with a populated compliance matrix, and a required <b>Workflow Setup</b> ToDo waiting for their tenant admin."
+        }
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "The two outcomes are deliberately different in scope. The build-out broadcast touches the <b>shared master</b> — every tenant sees the improved card. The provision touches <b>one buyer's private portal</b>. Segregation and continuity, in that order."
+        },
+        {
+          "kind": "tip",
+          "html": "The tenant-side <code>?action=release</code> path and this cockpit call the same <code>provisionAndReleasePortal</code> helper, so the two routes cannot drift."
         }
       ]
     },

@@ -167,7 +167,9 @@
       "caption": "The opportunity pipeline — ranked cards with pin, purchase, and build actions.",
       "steps": [
         {
-          "t": "Toggle <b>Include closed</b> to widen the list; <b>Refresh</b> re-pulls; the count shows how many cards you have."
+          "t": "By default the list shows only opportunities you can still bid on. <b>Include closed</b> adds back the ones whose close date has passed or that we have marked closed; <b>Show passed</b> adds back the ones you marked <i>Not interested</i>. <b>Refresh</b> re-pulls, and the count beside it always describes what is on screen.",
+          "img": "docs/manuals/img/crops/tenant/cards-filter.png",
+          "cap": "Unchecked means open only — the count reflects the filtered list, not the total."
         },
         {
           "t": "Read a card: title, a <b>submission-stage badge</b> (NOFO / Pre-Release / Updated / Closed / Archived), agency, program type, and the close date.",
@@ -208,6 +210,12 @@
               "html": "In the verified run, the NAVAIR/NAVSEA C-UAS topic <b>DON26BX03-NP002</b> ranked <b>#1</b> for Immobileyes — the best fit for a counter-drone optics company."
             }
           ]
+        }
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "An opportunity with no published close date is treated as open and stays on the list — we would rather show you one you cannot bid on than hide one you can."
         }
       ]
     },
