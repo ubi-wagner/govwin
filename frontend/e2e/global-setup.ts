@@ -17,6 +17,18 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 
 export default async function globalSetup() {
+  // A drive that COMPOSES its own world must not have one seeded under it. The midterm run starts
+  // from scripts/reset-minimal.sh — schema, platform config and one operator — and then creates
+  // every tenant, opportunity, library and proposal by driving the UI, because that composition IS
+  // the thing being tested. Seeding a demo world first would leave those phases asserting against
+  // fixtures wearing the costume of an outcome.
+  //
+  // Unsetting DATABASE_URL happens to have this effect too, but that is a side effect nobody would
+  // guess from the call site. This is the named way to ask.
+  if (process.env.E2E_NO_SEED === '1') {
+    console.warn('[e2e globalSetup] E2E_NO_SEED=1 — composing from a minimal database; seeding nothing.');
+    return;
+  }
   if (!process.env.DATABASE_URL) {
     console.warn('[e2e globalSetup] DATABASE_URL unset — skipping fixture seed (assuming fixtures are seeded externally).');
     return;

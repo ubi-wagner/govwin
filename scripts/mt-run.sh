@@ -37,6 +37,9 @@ say "server      $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/
 
 # ── run each spec, recording its own exit status ───────────────────────────────
 . "$ROOT/scripts/sandbox-env.sh" >/dev/null 2>&1
+# The midterm drives COMPOSE their own world from a minimal database; Playwright's global setup
+# must not seed a demo one under them (see e2e/global-setup.ts).
+export E2E_NO_SEED=1
 rc_all=0
 for spec in "$@"; do
   log="$S/$spec.log"
