@@ -742,6 +742,64 @@ New workflow tracking:
 
 ## 4. Common Mistakes We've Fixed (Do NOT Repeat)
 
+### Mistake 0: A handler that catches its own failure and carries on
+**The highest-yield class in this file.** Four bugs on 2026-08-22 (B42–B45) had one shape: a
+`try/except` that logged a warning, or a route that returned `201` with the error folded into a
+`failed[]` array nobody reads. Each produced a run that **reported success having done less than it
+claimed** — which no test suite can catch, because there is nothing to fail.
+
+```python
+# The pattern. Every one of B42-B45 is a variant of this.
+try:
+    write_the_artifact(key)
+except Exception as e:
+    log.warning("write failed: %s", e)   # ← run continues, reports success
+```
+
+What it cost: half of every solicitation's shredded-section artifacts were never written (B42);
+every topic upload failed while the route returned 201 (B44); the sandbox exercised none of the
+per-section path while appearing to (B45).
+
+**Rule — the fix is always two-part.** Correct the behaviour, AND make the failure legible in the
+record the run writes. `runner.py` already had the right instinct ten lines below the B42 guard:
+`section_extraction_skipped` is recorded in `metadata.json`, not merely logged, with the comment
+*"a skipped evidence step must be visible, or 'no sections' reads like a document that genuinely had
+none."* Apply that everywhere.
+
+**Sweep for:** a bare `log.warning`/`console.error` inside an `except`/`catch` in a loop body; a
+`failed[]` array on a 2xx response; any best-effort write whose absence the caller cannot detect.
+
+### Mistake 0b: A validator that disagrees with the vocabulary it validates
+`_SECTION_SLUG_RE` allowed `[a-z0-9-]`. The shredder prompt enumerates ten canonical section keys
+and says use EXACTLY those — five contain underscores. The list lived in a prompt, the rule in a
+regex, two files apart, and they drifted silently for as long as both existed.
+
+**Rule:** when a controlled list is declared in one place (a prompt, a CHECK, an enum, a docs table)
+and enforced by a pattern somewhere else, write the test so it **parses the list from its own
+source** and asserts every member passes. `test_storage_paths.py::test_every_canonical_section_key_can_be_written`
+reads the keys out of the prompt file — add an unwritable key and CI fails, loudly, instead of a
+warning line during a live shred.
+
+### Mistake 0c: An estimate stored in a field named for a measurement
+`page_count = len(pdf_bytes) // 40000 + 1  # rough page estimate` — handed to the packaging
+specialist beside genuinely-extracted values, 72–81% low on real BAAs (a 254-page document recorded
+as 60 pages). This is docs/INGEST_PROVENANCE.md's rule applied outside the compliance matrix: *a
+value the product did not read must never look like one it did.*
+
+**Rule:** if it cannot be measured, the column is nullable and the value is `NULL` — never a
+fallback number. If it genuinely must be approximate, the NAME says so (`page_count_estimated`).
+**Sweep for:** `# rough`, `# approx`, `estimate`, arithmetic on a byte length landing in a column a
+human or agent reads as fact.
+
+### Mistake 0d: `startswith` is not containment; `importlib.reload` is not reversible
+Two bugs found in the *fixes* for the above, before they landed:
+- `str(target).startswith(str(root))` let `../testbucket-evil/x` past a traversal guard for bucket
+  `testbucket` — it resolves outside the root yet still starts with it. Use `Path.is_relative_to`
+  (Python) / a real path relationship, never a string prefix, for anything hierarchical.
+- A test fixture used `monkeypatch.setenv` + `importlib.reload` to pick up module-scope config.
+  monkeypatch reverts the env but NOT the globals the reload rebound, so the leaked value broke an
+  assertion in a *later file*. Patch module attributes with `monkeypatch.setattr` instead.
+
 ### Mistake 1: Wrong column names in SQL
 The #1 source of runtime crashes. Column names in the DB are snake_case.
 postgres.js auto-converts results to camelCase, but the QUERY must use
