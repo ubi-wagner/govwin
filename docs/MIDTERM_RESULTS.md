@@ -32,8 +32,48 @@ surprise.
 | `note` | an observation worth keeping (counts, sizes, verdicts) |
 | `blocked` | failed; recorded with its message, and the arc continued |
 
-**Result: `ok=113 · decision=24 · note=27 · override=1 · blocked=3`** across ACT 1–8.
-All three blocks were defects in the *harness*, not the product — each is named below and fixed.
+The ledger is also the record of the run converging. Each figure is one full arc against a freshly
+reset database, and every block that closed between them was a defect in the *harness* — the drive
+speaking a dialect the API never offered — not in the product:
+
+| run | ok | blocked | what closed |
+|---|---|---|---|
+| first complete pass | 71 | 29 | — |
+| after verb + gate-walk fixes | 113 | 3 | reached submission and exported all four formats |
+| after the collaborator / comment / shadow fixes | 89 | 3 | ACTs 1–8 clean; only the second-portal release left |
+| after the sign-out fix | 89 | 0 | all nine acts, including the automated divergent path |
+| **final** | **133** | **0** | the informed pursuit choice — a full 22-section build end to end |
+
+The final tally reads **`ok=133 · decision=33 · note=29 · override=2 · blocked=0`**, in 2.3 minutes.
+
+The two overrides are both deliberate and both recorded with what was overridden: accepting a
+default skeleton on a solicitation that defers its format elsewhere, and then entering that
+deferred value by hand as the curator. Nothing else in the run needed one.
+
+The jump from 89 to 133 is the last real fix, and it is worth naming because it looks like a
+harness detail and is not. The customer was buying whichever opportunity happened to be first,
+which on one pass was the master whose skeleton had never been landed — so the build provisioned a
+single generic "Technical Volume" and there was nothing to author. The product was being honest;
+the drive was not reading. A customer reads the card before buying, and the card carries
+`complianceSummary.volumeCount`. The drive now sorts on it, says which one it chose and why, and
+records any opportunity that has no volume structure yet:
+
+```
+◆ [HITL] pursuit choice — pursuing "NSF STTR Phase I — Robotics for the Built Environment
+         (NSF 26-522)" — 6 volume(s) on the card, so there is a real build behind it
+·  [system] sections provisioned — 22
+```
+
+### Two invariants the run checks rather than assumes
+
+- **The operator's descent is visible to the customer.** After the admin descends into the tenant's
+  space and ascends back, the drive opens `/portal/<slug>/activity` — the page a customer would
+  open — and confirms both crossings appear there. `descended=true ascended=true`. An audit trail
+  nobody can read is not an audit trail.
+- **The agent workforce is advisory, not autonomous.** After the admin doorbell fires a full draft
+  in Mode C (full auto, adversarial gate on), the drive re-reads the proposal: `stage=draft
+  locked=false`. Work was proposed; nothing advanced, locked, or submitted. An agent writing text
+  is the product working — an agent submitting a bid would be the product being dangerous.
 
 ## The arc
 
@@ -44,9 +84,12 @@ All three blocks were defects in the *harness*, not the product — each is name
 | 3 · tenant library | tenant_admin | first sign-in, forced password reset, two company PDFs uploaded and atomized, and the company's own scoring bucket authored |
 | 4 · purchase + provision | tenant_admin → master_admin | comp code redeemed → `curation_pending`; operator completed build-out and released the portal; 22 sections provisioned from the compliance matrix |
 | 5 · authoring | tenant_admin | all 22 sections authored |
+| 5b · collaborators | tenant_admin | a teammate invited as `contributor` (edit) and an outside consultant as `external` (comment), then a review note anchored to a section |
+| 5c · shadow descend / ascend | master_admin | the operator entered the customer's space, read their live build, and left — both crossings audited |
 | 6 · reviews | tenant_admin | AI/color-team review, compliance matrix, packaging review, readiness verdict — each read and accepted as **advisory** |
-| 7 · lock + export | tenant_admin | 22/22 sections locked, gates walked to submission, all four formats exported |
+| 7 · lock + export | tenant_admin | all sections locked, gates walked to submission, all four formats exported |
 | 8 · artifact inspection | — | the exports opened and checked (below) |
+| 9 · divergent path | tenant_admin → master_admin | a **second** portal on a different opportunity, released, then handed to the agent workforce via the admin doorbell (Mode C, full auto) and never hand-authored |
 
 ## The artifacts, actually opened
 
@@ -135,16 +178,42 @@ volumes and twenty-two required items still reported `ready:false`. The summary 
 "compliance + ≥1 volume + ≥1 required item", but the implementation also requires
 `itemsUndecided === 0` and `volumesUndecided === 0` — folded in later, and load-bearing: an
 undecided item provisions as an authorable section, and the drafter then writes plausible prose
-where a signed federal form belongs. The code was right; the summaries were stale. Corrected.
+where a signed federal form belongs. The code was right; the summaries were stale.
+
+Confirmed against the live data rather than inferred from the source — every one of those
+twenty-two items is undecided, so the verdict is exactly right:
+
+```
+  sol    | vols | items | undecided
+---------+------+-------+-----------
+ 391eaa2a|    6 |    22 |        22
+ c2aa4185|    6 |    22 |        22
+ b168c015|    6 |    22 |        22
+ c9b74492|    0 |     0 |         0   ← the master whose skeleton was never landed
+```
+
+Corrected in `readiness.ts`, the design doc, and the RFP-admin guide.
 
 ## What this run does not cover
 
 Stated plainly rather than left for someone to discover:
 
-- **One tenant, not several.** The arc composes Northwind Additive end to end. Multi-tenant
+- **One tenant, not several.** The arc composes Northwind Additive end to end and runs two
+  divergent completion paths *within* it — manual authoring on the first build, the agent
+  workforce on the second — which is what isolates the path as the variable. Cross-tenant
   isolation is exercised by the separate `mt3-library-drive` spec; this arc does not re-prove it.
+- **The partner-manager console is not walked.** Shadow descent and ascent are driven and audited
+  as rfp_admin; the `partner_admin` stable-of-companies path is not part of this arc.
+- **The canvas is exercised through its outputs, not its editor.** The per-volume-native export
+  proves the doc and xls surfaces fork correctly (`.docx` narrative volumes, `.xlsx` cost volume),
+  but the drive writes sections through the save API rather than clicking in `CanvasRenderer` /
+  `SheetEditor` / `SlideEditor`. The interaction layer — overlays, act-on-selection verbs, the
+  assist panel — is not touched here.
 - **The AI-gated flows run against the committed emulator**, not a live key (`EMULATE=1`,
   docs/AI_FLOWS_PROOF.md). The wiring is real and identical to production; the model is not.
 - **Volume-level page budgets are checked by the compliance floor at export**, and the drive records
   the `X-Compliance-Violations` header, but the arc does not assert a specific page budget per
   volume against each agency's stated limit.
+- **The second build is left mid-flight on purpose.** ACT 9 requests the full draft and then checks
+  that nothing advanced. Landing the workforce's staged output is a separate human act
+  (docs/FULL_DRAFT_LANDING_DESIGN.md) and the arc stops short of it deliberately.

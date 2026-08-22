@@ -5,6 +5,31 @@
 
 ---
 
+## 📍 Most recent work — the midterm end-to-end drive (2026-08-22, migration head **203**)
+
+The last session ran the product start to finish **from a database holding nothing a user could
+have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
+shelf, one operator). Every tenant, opportunity, library, bucket, purchase, portal, section,
+review and export was composed by driving the real surfaces.
+
+- **Read first: `docs/MIDTERM_RESULTS.md`** — the nine acts, the ledger, the artifacts as opened
+  (not as counted), and what the run deliberately does not cover.
+- **The drive: `frontend/e2e/mt-arc-drive.spec.ts`** — run it with
+  `scripts/reset-minimal.sh && scripts/mt-run.sh mt-arc-drive`. It never throws on a block: every
+  step is recorded `ok` / `decision` / `override` / `note` / `blocked` and the arc continues, so a
+  run always reaches the end and reports honestly. Final tally **`ok=89 · blocked=0`**.
+- **New findings: bug log B62 and B63.** B62 is the real one — a new tenant was born at 100% of
+  the spotlight-bucket cap, so the first thing a customer does answered 409. Fixed by mig **203**
+  plus `lib/automation/policy.ts` deriving the cap from the seeded set instead of duplicating a
+  number. B63 is the harness: `playwright.config.ts` had no `actionTimeout`, and Playwright's
+  default of 0 means *wait forever* — one missing selector ate whole runs silently.
+- **Two behaviours that read as bugs and are not** (now documented in `readiness.ts`,
+  `PROVISIONING_WORKSPACE_DESIGN.md` and the RFP-admin guide): a deferred compliance field
+  correctly blocks the push until a human enters it, and the build-out readiness bar has **five**
+  conditions, not the three its own summary used to claim.
+
+---
+
 ## ⭐ SOP — LAUNCH FIRST every session (keep-alive + verify-agents)
 
 > **⛑️ RLS IS LIVE — emulate production EXACTLY.** RLS is real and enforced (two-layer): the app runs as

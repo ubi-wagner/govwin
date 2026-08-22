@@ -486,7 +486,13 @@ test('the arc: supply → customer → library → portal → authored → revie
   const oppId = await step('find an opportunity to pursue', state.adminEmail, async () => {
     const r = await page.request.get(`/api/portal/${state.slug}/cards`);
     const j = await r.json();
-    type Card = { opportunityId: string; card?: { title?: string }; complianceSummary?: { volumeCount?: number } };
+    // complianceSummary is INSIDE `card`, a sibling of title — the whole denormalized snapshot is
+    // one jsonb column. Reading it at the top level silently yields undefined, which sorts every
+    // card to zero and picks whatever happened to be first.
+    type Card = {
+      opportunityId: string;
+      card?: { title?: string; complianceSummary?: { volumeCount?: number } };
+    };
     const cards = (j?.data?.cards ?? []) as Card[];
     rec('cards visible to the tenant', 'system', 'note', `${cards.length}`);
     if (!cards.length) throw new Error('no cards fanned out to this tenant');
@@ -497,7 +503,7 @@ test('the arc: supply → customer → library → portal → authored → revie
     // record. Buying THAT one provisions a single generic "Technical Volume" and there is nothing
     // to build. That is the product being honest, not broken; the right response is the one a
     // customer would have: pursue the opportunity that is actually ready, and say why.
-    const vols = (c: Card) => c.complianceSummary?.volumeCount ?? 0;
+    const vols = (c: Card) => c.card?.complianceSummary?.volumeCount ?? 0;
     const ranked = [...cards].sort((a, b) => vols(b) - vols(a));
     const pick = ranked[0];
     const thin = cards.filter((c) => vols(c) === 0);
@@ -505,8 +511,10 @@ test('the arc: supply → customer → library → portal → authored → revie
       rec('opportunities not yet built out', 'HITL', 'note',
         `${thin.length} of ${cards.length} carry no volume structure yet: ${thin.map((c) => c.card?.title?.slice(0, 40) ?? '?').join(' · ')}`);
     }
-    hitl('pursuit choice',
-      `pursuing "${pick.card?.title ?? pick.opportunityId}" — ${vols(pick)} volume(s) on the card, so there is a real build behind it`);
+    hitl('pursuit choice', vols(pick) > 0
+      ? `pursuing "${pick.card?.title ?? pick.opportunityId}" — ${vols(pick)} volume(s) on the card, so there is a real build behind it`
+      : `pursuing "${pick.card?.title ?? pick.opportunityId}" — NO opportunity on this list shows a volume structure yet, `
+        + 'so this build will provision thin; proceeding anyway and recording that');
     state.oppId = pick.opportunityId; // ACT 9 picks a DIFFERENT one off this
     return pick.opportunityId;
   });
