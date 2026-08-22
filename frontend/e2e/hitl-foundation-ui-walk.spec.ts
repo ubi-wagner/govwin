@@ -285,8 +285,18 @@ test('step 11 — download the completed proposal (.docx)', async ({ page }) => 
    * proposal is a finding, not something to swallow.
    */
   const dlBtn = page.getByRole('button', { name: /Download Proposal \(\.docx\)/i }).first();
-  const present = await dlBtn.isVisible({ timeout: 15_000 }).catch(() => false);
-  expect(present, 'the Artifacts tab of a completed proposal must offer the .docx download').toBe(true);
+  /* ENABLED, not merely VISIBLE.
+   *
+   * `isVisible()` is true for a DISABLED button, and that distinction cost a wrong diagnosis here:
+   * on a draft proposal the export controls are correctly disabled — with the hint "Lock the
+   * proposal or advance to submitted stage to export" beside them — so this check passed, the click
+   * did nothing, and the missing download looked like a broken control rather than a working gate.
+   * Ask what the user can actually do.
+   */
+  await expect(dlBtn, 'the Artifacts tab of a completed proposal must offer the .docx download')
+    .toBeVisible({ timeout: 15_000 });
+  await expect(dlBtn, 'the .docx download must be ENABLED once the proposal is exportable')
+    .toBeEnabled({ timeout: 15_000 });
   const st = await proposalState();
   console.log(`[walk] downloading from stage=${st.stage} (${st.locked}/${st.sections} locked)`);
   const [download] = await Promise.all([
