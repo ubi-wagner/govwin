@@ -943,7 +943,10 @@ class WorkflowManager:
         )
 
         task_type = r_or_none(step.task_type) or "task"
-        title = r_or_none(step.task_title) or task_type
+        # A task_type is a machine key; when it stands in for a missing title (an unresolved
+        # payload path, or a template that declared none) the human sees "triage_new_opportunities"
+        # in their inbox. Humanize it so the fallback is at least readable.
+        title = r_or_none(step.task_title) or task_type.replace("_", " ").capitalize()
         assignee_role = r_or_none(step.assignee_role)
         assignee_user = r(step.assignee_user)
         entity_type = r_or_none(step.entity_type)

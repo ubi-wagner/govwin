@@ -36,9 +36,14 @@ export async function tenantRollupStats(tenantIds: string[]): Promise<Map<string
       -- tasks that are still open. Mirrors listOpenTasksForActor's tenant branch (hierarchical roles),
       -- so the console count matches what surfaces once they descend. Admin-bucket tasks are excluded
       -- (not the manager's concern).
+      -- The `assignee_user_id IS NOT NULL` arm MUST match lib/partner/todos.ts:45 — the two run on
+      -- the same screen, this one as the "N open to-dos" badge and that one as the list beneath it.
+      -- Without it a ToDo named to a PERSON (no role) rendered in the feed but went uncounted, and
+      -- the console read "7 open to-dos" above a list of 8.
       (SELECT count(*)::int FROM tasks tk
          WHERE tk.tenant_id = t.id AND tk.status IN ('open', 'in_progress')
-           AND tk.assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user')) AS "openTodos",
+           AND (tk.assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user')
+                OR tk.assignee_user_id IS NOT NULL)) AS "openTodos",
       poc.name  AS "adminPocName",
       poc.email AS "adminPocEmail"
     FROM tenants t

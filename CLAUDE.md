@@ -335,10 +335,16 @@ See CLAUDE_CLIFFNOTES.md for:
   DESCENT rule as authority: an rfp_admin has no ambient cross-tenant reach, so work done in TENANT
   space is that tenant's, and work done in PLATFORM space (curation, triage — the `tenantScoped:false`
   tools acting on MASTER records before any tenant mirror exists) is owned by NO tenant. `tasks`,
-  `process_instances` and `episodic_memories` (mig 186) all model it as NULL. Because the policies are
-  tenant-EQUALITY and NULL never equals anything, such a row is invisible AND un-writable through the
-  context-aware `sql` under `govtech_app` — reachable only via an explicit `sqlBypass` admin path, and
-  excluded from every tenant-scoped memory search. Do NOT file platform rows under the house
+  `process_instances` and `episodic_memories` (mig 186) all model it as NULL. Such a row is
+  **un-writable** through the context-aware `sql` under `govtech_app` — the UPDATE/DELETE policies are
+  tenant-EQUALITY and NULL never equals anything, so writing one needs an explicit `sqlBypass`/
+  `enterBypass` admin path. It is **NOT invisible**: `tenant_isolation_select` carries an explicit
+  `OR (tenant_id IS NULL)` arm, so a platform row is READABLE from any tenant context (verified —
+  a tenant context counts all 35 platform `tasks`). What keeps it off a tenant's screen is the
+  APP-layer predicate, not RLS: `listOpenTasksForActor` scopes non-admins to
+  `assignee_role IN ('tenant_admin','tenant_user','partner_user') AND tenant_id = $1`. Treat that belt
+  as load-bearing — a new platform-row reader that omits it leaks, and RLS will not catch it
+  (docs/BUG_LOG_2026-08-19.md B55). Do NOT file platform rows under the house
   `rfp-pipeline` tenant: that works, but hands the whole platform history to anyone holding that
   tenant's context. (The house tenant IS correct for copy-forward CONTENT — the system_starter
   library, mig 152 — which is a source shelf tenants copy from, not platform state.)

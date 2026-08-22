@@ -162,7 +162,20 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
     } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
-  const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
+  // An opportunity whose close date has passed is closed to the customer whatever the admin
+  // lifecycle says — nobody has flipped lifecycle_status, because that is a manual admin
+  // transition with no date sweeper behind it. So "Include closed" has to honour the date too,
+  // using the same predicate the chip renders from; otherwise the filter hides admin-closed
+  // cards while leaving expired ones on screen, which reads as simply broken.
+  // The card a notification deep-linked to is always kept: telling someone to look at an
+  // opportunity and then hiding it because it just closed is worse than showing it closed.
+  const visible = useMemo(
+    () => (includeClosed
+      ? cards
+      : cards.filter((c) => c.opportunityId === focusOpp || (daysUntil(str(c, 'closeDate')) ?? 0) >= 0)),
+    [cards, includeClosed, focusOpp],
+  );
+  const sorted = useMemo(() => sortCards(visible, sortBy), [visible, sortBy]);
   const selectedBucketId = sortBy.startsWith('bucket:') ? sortBy.slice(7) : null;
   const selectedBucketName = selectedBucketId ? buckets.find((b) => b.id === selectedBucketId)?.name : null;
 
@@ -179,7 +192,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
           <input type="checkbox" checked={includePassed} onChange={(e) => setIncludePassed(e.target.checked)} /> Show passed
         </label>
         <button onClick={load} className="text-blue-600 hover:underline">Refresh</button>
-        <span className="text-gray-400">· {cards.length} cards</span>
+        <span className="text-gray-400">· {visible.length} cards</span>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
@@ -196,7 +209,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       </div>
 
       {loading && <p className="text-gray-400 text-sm py-8 text-center">Loading…</p>}
-      {!loading && cards.length === 0 && (
+      {!loading && visible.length === 0 && (
         <div className="text-center py-16 text-gray-400">
           <p className="text-lg">No opportunities yet.</p>
           <p className="text-sm mt-1">Cards appear here as the RFP team releases opportunities.</p>

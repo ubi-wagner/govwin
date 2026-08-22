@@ -115,6 +115,14 @@ export async function stageIntake(input: IntakeInput, actorId: string | null): P
           newTopics: 0,
           sampleTitles: [title],
           runId: result.solicitationId,
+          // The triage ToDo's identity. It used to carry a STATIC title and an entity_ref of
+          // `source` — a string like "intake:admin", which tasks.entity_id (uuid) silently
+          // dropped. So every intake raised a row reading "Triage new opportunities from source"
+          // with no link: 21 open, 1 distinct title, entity_id NULL on all of them. The intakes
+          // were real; the rows just could not be told apart or opened. These two fields name the
+          // solicitation and point at it (entity_type 'solicitation' → /admin/rfp-curation/<id>).
+          solicitationId: result.solicitationId,
+          triageTitle: `Triage new opportunity: ${title}`.slice(0, 300),
         },
       });
     } catch {
