@@ -29,7 +29,11 @@ const SHOTS = 'public/guides/rfp-ingest';
  * /api/admin/rfp-curation/undefined/… and this file failed on a bare false. The resolver, its
  * rationale, and how to stand a solicitation up live in e2e/resolve-solicitation.ts. */
 let SOL = '';
-test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation()).id; });
+/* dow-assist OWNS a scenario too, and for the opposite reason to the others: it asserts that a
+ * deferral blocker keeps the matrix STAGED. Any drive that lands a shared solicitation first turns
+ * that assertion into landed:true — which is what happened once ingest-studio started running on
+ * the same one. Its scenario must stay untouched. */
+test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID', 'assist')).id; });
 
 async function loginAsRfpAdmin(page: import('@playwright/test').Page) {
   await page.goto('/login');

@@ -64,8 +64,26 @@ test('B1 · kate finds the launched portal and a NON-EMPTY ToDo queue', async ({
   const portals = ((await (await page.request.get(`/api/portal/${SLUG}/portals`)).json()).data?.portals ?? []) as Array<Record<string, unknown>>;
   const launched = portals.filter((p) => p.proposalId && (p.status === 'launched' || p.status === 'executing'));
   expect(launched.length, 'a launched portal with a linked proposal must exist (run p2r first)').toBeGreaterThan(0);
-  launched.sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
-  const target = launched[launched.length - 1];
+  /* PICK THE RICHEST BUILD, NOT THE NEWEST.
+   *
+   * This took the most recently created launched portal. B8 then asserts the packaged zip carries
+   * the cost volume as native xlsx — so it needs a build that HAS a cost volume, and "newest" is no
+   * guarantee of that. Once flex-midwindow and p2r began provisioning Foundation portals from a
+   * bare late topic, newest became a two-volume build with no cost workbook at all and B8 failed on
+   * "got: V1_Technical_Volume.docx". Resolve by the property the spec needs
+   * (docs/FIXTURE_INTEGRITY.md). */
+  const withSections = await Promise.all(launched.map(async (p) => {
+    const d = await (await page.request.get(
+      `/api/portal/${SLUG}/proposals/${p.proposalId}/document`)).json().catch(() => ({}));
+    const secs = (d?.data?.sections ?? []) as Array<{ volumeName?: string }>;
+    const hasCost = secs.some((x) => /cost|budget|pricing/i.test(x.volumeName ?? ''));
+    return { p, n: secs.length, hasCost };
+  }));
+  withSections.sort((a, b) =>
+    (Number(b.hasCost) - Number(a.hasCost)) || (b.n - a.n));
+  const best = withSections[0];
+  console.log(`[B1] ${launched.length} launched portal(s); chose one with ${best.n} section(s), cost volume: ${best.hasCost}`);
+  const target = best.p;
   PORTAL = String(target.id);
   PROPOSAL = String(target.proposalId);
 

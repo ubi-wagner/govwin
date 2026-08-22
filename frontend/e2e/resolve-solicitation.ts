@@ -115,3 +115,34 @@ export async function resolveShreddedSolicitation(
     await sql.end();
   }
 }
+
+/**
+ * Make sure this solicitation's matrix is LANDED, and return whether we had to do it.
+ *
+ * Specs that read a built skeleton (volumes, required items, molds) need one. A freshly ingested
+ * solicitation is STAGED, not landed — deliberately: the DoW BAA defers its technical-volume page
+ * limit, that is a blocker, and a blocker keeps the matrix staged so a person decides. Now that
+ * each mutating drive owns a PRISTINE scenario rather than inheriting one somebody else already
+ * landed, the drive has to take that decision itself.
+ *
+ * Landing manually is the sanctioned way through: stage-skeleton.ts refuses only an AUTO land over
+ * a blocker — "landing the same draft explicitly is always allowed, that is a person taking
+ * responsibility for a known gap, which is a different act from a machine doing it silently."
+ */
+export async function ensureLandedSkeleton(
+  request: { post: (url: string, opts?: unknown) => Promise<{ ok(): boolean; status(): number; json(): Promise<unknown>; text(): Promise<string> }>;
+             get: (url: string) => Promise<{ json(): Promise<unknown> }> },
+  solicitationId: string,
+): Promise<boolean> {
+  const url = `/api/admin/rfp-curation/${solicitationId}/ingest-phase`;
+  const before = (await (await request.get(url)).json()) as { data?: { phase?: string } };
+  if (before?.data?.phase === 'landed') return false;
+
+  // Stage a matrix if none is open, then land it.
+  await request.post(url, { data: { action: 'start' }, timeout: 180_000 });
+  const land = await request.post(url, { data: { action: 'land' }, timeout: 180_000 });
+  expect(land.ok(), `could not land the skeleton for ${solicitationId}: `
+    + `${land.status()} ${(await land.text()).slice(0, 200)}`).toBeTruthy();
+  console.log(`[drive] landed the skeleton for ${solicitationId}`);
+  return true;
+}

@@ -15,7 +15,13 @@ import { resolveShreddedSolicitation } from './resolve-solicitation';
 
 const SHOTS = 'public/guides/rfp-ingest';
 /* Resolved from the DB in beforeAll — `process.env.DRIVE_SOL_ID!` was unset, so every request
- * went to /…/undefined/… and this file failed on a bare false. See e2e/resolve-solicitation.ts. */
+ * went to /…/undefined/… and this file failed on a bare false.
+ *
+ * This drive OWNS its scenario ("[owned:studio]"). It mutates the solicitation's matrix/structure,
+ * and a shared one meant the next drive read state this one had left behind — dow-assist asserting
+ * a deferral stays STAGED found it already landed, t3cp-v1-items found its items rearranged. Heavy
+ * mutators get their own; the shared pool excludes every owned scenario. See
+ * e2e/resolve-solicitation.ts and docs/FIXTURE_INTEGRITY.md. */
 let SOL = '';
 async function signIn(page: Page) {
   await page.goto('/login');
@@ -31,7 +37,7 @@ const phase = (page: Page) => page.request.get(`/api/admin/rfp-curation/${SOL}/i
   .then((r) => r.json()).then((j) => j.data);
 
 test.beforeAll(async () => {
-  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID')).id;
+  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID', 'studio')).id;
 });
 
 test('gates · staged → reviewed → landed, with the panel telling the truth at each step', async ({ page }) => {
