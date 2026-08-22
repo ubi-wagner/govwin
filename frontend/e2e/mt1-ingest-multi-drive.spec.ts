@@ -40,7 +40,7 @@ const SOLS: Sol[] = [
     expect: { minFont: 11, margins: '1 inch (all sides)', pageLimit: 'DEFERRED', charLimit: 4000 },
   },
   {
-    slug: 'nsf-sttr-p1', programType: 'sttr',
+    slug: 'nsf-sttr-p1', programType: 'sttr_phase_1',
     title: 'NSF STTR Phase I — Robotics for the Built Environment (NSF 26-522)',
     agency: 'National Science Foundation', office: 'Directorate for Engineering',
     number: 'NSF-26-522', close: '2026-12-03',
@@ -80,7 +80,10 @@ test('four agencies through upload → shred → assist → matrix', async ({ pa
 
   const manifest: Record<string, unknown>[] = [];
 
-  for (const s of SOLS) {
+  // MT1_ONLY=<slug> narrows the run to one fixture — the way to tell a document-specific failure
+  // apart from a fourth-upload-in-a-session failure without guessing.
+  const only = process.env.MT1_ONLY;
+  for (const s of (only ? SOLS.filter((x) => x.slug === only) : SOLS)) {
     const pdf = path.join(FIXTURES, `${s.slug}.pdf`);
     expect(fs.existsSync(pdf), `fixture missing: ${pdf}`).toBe(true);
     console.error(`\n══ ${s.slug} — ${s.title}`);
@@ -94,6 +97,12 @@ test('four agencies through upload → shred → assist → matrix', async ({ pa
     if (await num.count()) await num.fill(s.number);
     const close = page.locator('input[name="closeDate"]');
     if (await close.count()) await close.fill(s.close);
+    // Program Type is REQUIRED and only auto-fills when the parse recognises a program in the
+    // title (upload-form.tsx setIfEmpty). "Technology Validation & Startup Fund" carries no such
+    // token, so the select stayed empty, the browser blocked submit, no request was sent, and the
+    // drive waited on a redirect that could never come. An admin uploading a non-SBIR/STTR
+    // solicitation has to choose it by hand — so the drive does too.
+    await page.selectOption('select[name="programType"]', s.programType);
 
     await page.locator('input[type="file"]').first().setInputFiles([pdf]);
     await page.screenshot({ path: `${SHOTS}/${s.slug}-1-upload.png`, fullPage: true });
