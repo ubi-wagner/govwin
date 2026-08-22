@@ -157,6 +157,16 @@ function buildPageIndex(text: string): PageIndex {
       const page = parseInt(m[1], 10);
       const total = m[2] ? parseInt(m[2], 10) : 0;
       if (!Number.isFinite(page) || page < 1) { ok = false; break; }
+      // ONE BOUNDARY, SEEN TWICE. The upload route reads PDFs with pdf-parse, which injects its
+      // own "-- N of M --" separator at every page break — and a real solicitation also PRINTS a
+      // page footer, because government documents number their pages. Both match the patterns
+      // above, so the marker stream arrives as 1,1,2,2,3,3. The monotonicity guard below then
+      // reads the repeat as "not a paging scheme", discards EVERY page number, and the extractor
+      // reports "no page markers" on precisely the documents most likely to be real. Verified on
+      // a fixture that prints its own footer: pageResolved false, every anchor collapsed to p1;
+      // with the duplicate removed, p2, correctly. A mark repeating the previous page AND total is
+      // the same boundary — keep the first, skip the echo.
+      if (prev && page === prev.page && total === prev.total) continue;
       if (prev && (page <= prev.page || total !== prev.total)) {
         // A restart is a document boundary — but only a restart AT PAGE 1 of a new total.
         // Anything else (7, 3, 9) is not a paging scheme at all and must not be trusted.

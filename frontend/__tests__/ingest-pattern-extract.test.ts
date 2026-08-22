@@ -429,3 +429,69 @@ describe('phrasings other agencies actually print', () => {
     expect(r.compliance.fontFamily).toBe('Arial');
   });
 });
+
+describe('a document that prints its own page numbers', () => {
+  /**
+   * The upload route reads PDFs with pdf-parse, which injects "-- N of M --" at every page
+   * break. Government solicitations also PRINT a page footer. Both match the marker patterns, so
+   * the stream arrives doubled — and the monotonicity guard used to read the repeat as a broken
+   * paging scheme and throw away every page number, on exactly the documents most likely to be
+   * real. This is the shape taken verbatim from a live ingest.
+   */
+  const doubled = [
+    'A. FORMAT',
+    'Type size shall be no smaller than 11 point. Use 1 inch margins on all sides.',
+    '-- Page 1 of 3 --',
+    '',
+    '-- 1 of 3 --',
+    '',
+    'B. LENGTH',
+    'The Technical Volume shall not exceed 20 pages.',
+    '-- Page 2 of 3 --',
+    '',
+    '-- 2 of 3 --',
+    '',
+    'C. REVIEW',
+    'Applications are evaluated on merit.',
+    '-- Page 3 of 3 --',
+    '',
+    '-- 3 of 3 --',
+  ].join('\n');
+
+  it('resolves pages through the doubled markers', () => {
+    const r = extractByPattern(doubled);
+    expect(r.evidence.min_font_size.pageResolved).toBe(true);
+    expect(r.evidence.min_font_size.anchor.page).toBe(1);
+    expect(r.evidence.page_limit_technical.anchor.page).toBe(2);
+  });
+
+  it('does not report "no page markers" when the document is full of them', () => {
+    const r = extractByPattern(doubled);
+    expect(r.notes.join(' ')).not.toMatch(/no page markers/i);
+  });
+
+  it('still refuses a genuinely erratic sequence rather than mis-citing', () => {
+    // 7, 3, 9 is not a paging scheme; collapsing duplicates must not soften that.
+    const erratic = [
+      // Padded past MIN_USABLE_TEXT_CHARS: extractByPattern declines a document too short to be
+      // a real one, and a 110-character fixture would prove nothing about the paging guard.
+      'filler. '.repeat(30),
+      'Type size shall be no smaller than 11 point.',
+      '-- 7 of 50 --', '', 'more text', '-- 3 of 50 --', '', 'more text', '-- 9 of 50 --',
+    ].join('\n');
+    const r = extractByPattern(erratic);
+    expect(r.evidence.min_font_size.pageResolved).toBe(false);
+  });
+
+  it('still segments a real document boundary (page numbering restarting at 1)', () => {
+    const twoDocs = [
+      'filler. '.repeat(30),
+      'Type size shall be no smaller than 11 point.',
+      '-- 1 of 2 --', '', 'text', '-- 2 of 2 --', '',
+      'SECOND DOCUMENT', '-- 1 of 2 --', '', 'text', '-- 2 of 2 --',
+    ].join('\n');
+    const r = extractByPattern(twoDocs);
+    expect(r.evidence.min_font_size.pageResolved).toBe(true);
+    expect(r.evidence.min_font_size.docSegment).toBe(1);
+  });
+});
