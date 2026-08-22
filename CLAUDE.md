@@ -249,7 +249,10 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - EVERY error response MUST include both `error` and `code` fields
 - EVERY `await sql` call MUST be inside try/catch
 - Portal routes MUST verify tenant access — never query by ID alone
-- Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
+- Before writing SQL, verify against **docs/SCHEMA_MAP.md** (generated from the live DB — columns,
+  value vocabularies, and which direction of each FK is actually populated). Check your file with
+  `node scripts/schema-check.mjs <file>` before running it. CLAUDE_CLIFFNOTES §1 is SUPERSEDED —
+  it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
   (1129 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky

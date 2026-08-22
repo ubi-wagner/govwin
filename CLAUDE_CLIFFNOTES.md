@@ -137,6 +137,24 @@ deliberately re-capturing the guides (in which case rebuild them: `python3 docs/
 
 ## 1. Database Schema Quick Reference
 
+> ## ⛔ SUPERSEDED — use **`docs/SCHEMA_MAP.md`**
+> 
+> Measured 2026-08-22: this section described **72 tables frozen at migration 067** against a live
+> schema of **113 tables at migration 202** — 135 migrations and 41 tables stale, while instructing
+> "Do NOT guess column names. Look them up here." Following that instruction would have MISLED you.
+> It cost six schema mistakes in one session (`opportunities.status`, `tenant_opportunity_cards.status`,
+> `proposal_sections.status = 'locked'`, the direction of the solicitation↔opportunity link, the
+> `system_events` namespace/type split), each rediscovered by a failing live run.
+>
+> `docs/SCHEMA_MAP.md` is **generated from the live database** and carries what a column list cannot:
+> the actual VALUE VOCABULARIES (with CHECK constraints), and every foreign key with **how full each
+> direction actually is**. Regenerate with `node scripts/schema-map.mjs`; validate your SQL before
+> running it with `node scripts/schema-check.mjs <file>`.
+>
+> The text below is kept as history — it explains intent, and is accurate for the tables that
+> existed at mig 067. It is not a reference.
+
+
 The schema is defined across **69 migrations (000–067, plus the interleaved
 `030a_ensure_full_schema.sql`)** — highest numbered file is `067`. This
 produces **72 live tables across 14 domains**. Full per-table detail:

@@ -322,16 +322,28 @@ for (const fmt of ['json', 'docx', 'pdf', 'zip']) {
 // The json package is the machine-readable truth; assert it carries the proposal's own content
 // rather than an empty envelope.
 if (sizes.json) {
-  const pkg = JSON.parse(readFileSync(join(OUT, 'arc-proposal.json'), 'utf8'));
-  const secCount = (pkg.sections ?? pkg.volumes?.flatMap?.((v) => v.sections ?? []) ?? []).length;
+  // The package envelope is { data: … } — the API's standard success shape (CLAUDE.md: return
+  // { data: T }). Reading pkg.sections at the top level found nothing and called a real package
+  // empty. Unwrap first, then look for sections wherever the volumes carry them.
+  const raw = JSON.parse(readFileSync(join(OUT, 'arc-proposal.json'), 'utf8'));
+  const pkg = raw.data ?? raw;
+  const secCount = (pkg.sections
+                    ?? pkg.volumes?.flatMap?.((v) => v.sections ?? [])
+                    ?? []).length;
   prove('filesystem', 'the json package carries sections, not an empty envelope', secCount >= 1, `${secCount} section(s)`);
 }
 
+// LOCKED IS locked_at, NOT status. The status vocabulary is ai_drafted | approved | in_progress —
+// 'locked' is not a member of it, so `status = 'locked'` matched nothing and reported a correctly
+// locked section as unlocked. Sixth schema assumption of the session; see docs/SCHEMA_MAP.md, which
+// exists because of this run.
 const [locked] = await sql`
-  SELECT count(*) FILTER (WHERE status = 'locked')::int AS locked, count(*)::int AS total
+  SELECT count(*) FILTER (WHERE locked_at IS NOT NULL)::int AS locked,
+         count(*)::int AS total,
+         string_agg(DISTINCT status, ',') AS statuses
     FROM proposal_sections WHERE proposal_id = ${journal.ids.proposal}::uuid`;
 prove('database', 'sections reached a locked state', (locked?.locked ?? 0) >= 1,
-      `${locked?.locked}/${locked?.total} locked`);
+      `${locked?.locked}/${locked?.total} have locked_at (status: ${locked?.statuses})`);
 await provedEvent(['artifact.exported', 'section.locked', 'section.saved'], t0, 'authoring + export posted');
 
 // Storage plane: the shredded artifacts B42 used to silently drop.
