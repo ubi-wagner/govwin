@@ -41,7 +41,10 @@ import { resolveShreddedSolicitation } from './resolve-solicitation';
  * data like every other drive (docs/FIXTURE_INTEGRITY.md).
  */
 let SOL = '';
-test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation('FLEX_SOL_ID')).id; });
+/* flex OWNS its scenario. It curates, pushes, amends and adds a late topic to whatever solicitation
+ * it is given, so sharing one with the other drives made five of them fail on state they never
+ * created once this file stopped skipping. */
+test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation('FLEX_SOL_ID', 'flex')).id; });
 const SLUG = 'foundation';
 const SHOTS = 'public/guides/rfp-ingest';
 

@@ -49,6 +49,12 @@ const shot = async (page: any, name: string) => {
  * then photographed a DRAFT proposal as "the completed proposal", and step 11's download failed
  * with no visible cause — the package route 403s on anything not locked or submitted. A step that
  * cannot tell whether it worked is worse than one that fails. */
+/* PIN TO TVSF, not to "the newest launched portal".
+ *
+ * This tour drives the TVSF build specifically, and other drives create Foundation portals too —
+ * once flex-midwindow stopped skipping, "newest" became ITS fresh draft and step 10 failed
+ * asserting that a build it never touched had left draft. Resolve by identity
+ * (docs/FIXTURE_INTEGRITY.md). */
 async function proposalState(): Promise<{ id: string; stage: string; sections: number; locked: number }> {
   const dsn = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
   const sql = postgres(dsn!, { max: 1 });
@@ -62,6 +68,7 @@ async function proposalState(): Promise<{ id: string; stage: string; sections: n
       JOIN proposals p ON p.id = pp.proposal_id
       LEFT JOIN proposal_sections s ON s.proposal_id = p.id
       WHERE pp.status = 'launched' AND pp.proposal_id IS NOT NULL
+        AND pp.opportunity_id = ${TVSF_OPP}::uuid
       GROUP BY p.id, p.stage, pp.created_at
       ORDER BY pp.created_at DESC LIMIT 1`;
     return r;
@@ -70,6 +77,14 @@ async function proposalState(): Promise<{ id: string; stage: string; sections: n
 
 // Reach the provisioned build workspace (portals → "Open build →"), no proposalId needed.
 async function openBuild(page: any) {
+  /* Navigate straight to the TVSF build rather than clicking the first "Open build" on the page —
+   * that link list holds every Foundation portal, so "first" drifts onto another drive's build. */
+  const st = await proposalState();
+  if (st?.id) {
+    await page.goto(`/portal/${SLUG}/proposals/${st.id}`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    return;
+  }
   await page.goto(`/portal/${SLUG}/portals`);
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.getByRole('link', { name: /Open build/i }).first().click();

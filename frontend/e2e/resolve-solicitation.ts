@@ -44,8 +44,17 @@ export interface ResolvedSolicitation {
  * Fails LOUDLY with the command to fix it — a drive that silently skips is how a suite reports
  * green over work that never ran.
  */
+/* Solicitations a drive OWNS and mutates heavily are marked in their title and kept OUT of the
+ * shared pool. flex-midwindow curates, pushes, amends and adds a late topic to whatever it is given
+ * — so once it stopped skipping, five other specs that resolve "the newest / the largest" silently
+ * retargeted onto its artifacts and failed on state they never created. Resolve by IDENTITY, not by
+ * recency (docs/FIXTURE_INTEGRITY.md). */
+export const OWNED_MARKER = '[owned:';
+
 export async function resolveShreddedSolicitation(
   envVar = 'DRIVE_SOL_ID',
+  /** Set to claim the scenario titled "… [owned:<owner>]" instead of the shared pool. */
+  owner?: string,
 ): Promise<ResolvedSolicitation> {
   const pinned = process.env[envVar];
   const dsn = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
@@ -68,19 +77,31 @@ export async function resolveShreddedSolicitation(
        * for the first and `extract` for the second. That reads as a flaky product; it was a
        * non-deterministic fixture. Newest ingest wins, which is also what an operator means by
        * "the BAA I just loaded". */
-      : await sql<{ id: string; chars: number; title: string | null }[]>`
-          SELECT cs.id, length(cs.full_text)::int AS chars, o.title
-          FROM curated_solicitations cs
-          LEFT JOIN opportunities o ON o.id = cs.opportunity_id
-          WHERE cs.full_text IS NOT NULL
-          ORDER BY length(cs.full_text) DESC, cs.created_at DESC, cs.id DESC LIMIT 1`;
+      : owner
+        ? await sql<{ id: string; chars: number; title: string | null }[]>`
+            SELECT cs.id, length(cs.full_text)::int AS chars, o.title
+            FROM curated_solicitations cs
+            LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+            WHERE cs.full_text IS NOT NULL AND o.title LIKE ${'%' + OWNED_MARKER + owner + ']%'}
+            ORDER BY cs.created_at DESC LIMIT 1`
+        : await sql<{ id: string; chars: number; title: string | null }[]>`
+            SELECT cs.id, length(cs.full_text)::int AS chars, o.title
+            FROM curated_solicitations cs
+            LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+            WHERE cs.full_text IS NOT NULL
+              AND coalesce(o.title, '') NOT LIKE ${'%' + OWNED_MARKER + '%'}
+            ORDER BY length(cs.full_text) DESC, cs.created_at DESC, cs.id DESC LIMIT 1`;
 
     const row = rows[0];
     expect(
       row?.chars ?? 0,
       pinned
         ? `${envVar}=${pinned} is not a shredded solicitation`
-        : 'no shredded solicitation in the database — run:\n'
+        : owner
+          ? `no solicitation owned by "${owner}" — stand one up with:\n`
+            + '  node scripts/drive-ingest-scenario.mjs "FLEX mid-window scenario '
+            + `${OWNED_MARKER}${owner}]" baa 2026-12-15 "docs/DoD 25.2 SBIR BAA FULL_04212025.pdf"`
+          : 'no shredded solicitation in the database — run:\n'
           + '  node scripts/drive-ingest-scenario.mjs "DoW 2026 SBIR BAA (R1)" baa 2026-12-15 '
           + '"docs/DoW 2026 SBIR BAA FULL_R1_04132026.pdf"',
     ).toBeGreaterThan(MIN_DRIVE_CHARS);
