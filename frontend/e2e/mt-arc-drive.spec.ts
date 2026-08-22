@@ -1415,19 +1415,40 @@ test('the arc: supply → customer → library → portal → authored → revie
   // reload to confirm the change survived. The API path can be perfect while the editor is broken.
   ACT = 'ACT 12 · canvas editor';
   console.error(`\n${ACT}`);
-  const firstSection = (sections ?? [])[0];
+  // EDIT THE BUILD THAT IS OPEN, NOT THE ONE THAT IS FILED. The first proposal was locked and
+  // advanced to 'submitted' in ACT 7, and the editor correctly renders a submitted build
+  // READ-ONLY — no editable blocks, and the sidebar does not even render its "Add" tab
+  // (canvas-sidebar: the edit tabs are gated behind !readOnly). Pointing this act at that build
+  // measured the product refusing to let someone edit a filed proposal and called it a failure.
+  // The second build from ACT 9 is still draft and unlocked, which is what a customer edits.
+  const editable = { proposalId: second.proposalId || state.proposalId, slug: state.slug };
+  const editSections = await step('find an unlocked section to edit', state.adminEmail, async () => {
+    await signIn(page, state.adminEmail, TENANT_PW);
+    const r = await page.request.get(`/api/portal/${editable.slug}/proposals/${editable.proposalId}/sections`, { timeout: 60_000 });
+    if (!ok(r)) throw new Error(`sections ${r.status()}`);
+    const all = ((await r.json().catch(() => ({})))?.data?.sections ?? []) as Array<{ id: string; title?: string; isLocked?: boolean }>;
+    const open = all.filter((s) => !s.isLocked);
+    rec('sections open for editing', 'system', 'note',
+      `${open.length} of ${all.length} unlocked on the build being edited`);
+    if (!open.length) throw new Error('every section on this build is locked — nothing is editable');
+    return open;
+  });
+
+  const firstSection = (editSections ?? [])[0];
   if (firstSection) {
     await step('open the section in the editor', state.adminEmail, async () => {
-      await signIn(page, state.adminEmail, TENANT_PW);
-      await page.goto(`/portal/${state.slug}/proposals/${state.proposalId}/sections/${firstSection.id}`,
+      await page.goto(`/portal/${editable.slug}/proposals/${editable.proposalId}/sections/${firstSection.id}`,
         { waitUntil: 'networkidle', timeout: 90_000 });
       const shown = await page.locator('body').innerText().catch(() => '');
-      // The authored prose must be ON THE PAGE — an editor that loads empty over saved content is
-      // the worst failure here, because it invites the author to overwrite their own work.
-      const carries = shown.includes('Northwind') || shown.includes('binder') || shown.includes('gantry');
-      rec('the editor shows the authored content', 'HITL', carries ? 'ok' : 'blocked',
-        carries ? `${shown.length.toLocaleString()} chars rendered` : 'the editor opened WITHOUT the saved prose');
-      if (!carries) throw new Error('the editor did not render the section that is saved');
+      // The section this editor was asked for must be the one on screen — an editor that opens
+      // blank or on the wrong section is the worst failure here, because it invites the author to
+      // overwrite their own work without noticing.
+      const title = (firstSection.title ?? '').trim();
+      const carries = title.length > 4 && shown.includes(title);
+      rec('the editor shows the section it was asked for', 'HITL', carries ? 'ok' : 'blocked',
+        carries ? `"${title}" rendered, ${shown.length.toLocaleString()} chars on the page`
+                : `expected "${title}" on the page; got: ${shown.replace(/\s+/g, ' ').slice(0, 160)}`);
+      if (!carries) throw new Error(`the editor did not render "${title}"`);
     });
     await shot(page, '17-canvas-editor');
 
@@ -1445,12 +1466,28 @@ test('the arc: supply → customer → library → portal → authored → revie
       rec('palette inserted a block', 'HITL', after > before ? 'ok' : 'note',
         `editable blocks ${before} → ${after}${after > before ? '' : ' (palette control not found under that name)'}`);
 
-      const box = page.locator('[contenteditable="true"]').last();
-      if (await box.count()) {
-        await box.click({ timeout: 10_000 }).catch(() => {});
-        await page.keyboard.type(EDITOR_MARK, { delay: 8 });
-        await page.waitForTimeout(300);
+      // Find somewhere to type, and SAY WHICH KIND it was. A blank "nothing survived" tells you
+      // nothing about whether the editor is broken or the selector was wrong; naming the target
+      // (or the absence of one) makes the next person's first question answerable.
+      const targets: Array<[string, string]> = [
+        ['contenteditable', '[contenteditable="true"]'],
+        ['textarea', 'textarea'],
+        ['text input', 'input[type="text"]'],
+      ];
+      let typedInto = '';
+      for (const [label, sel] of targets) {
+        const box = page.locator(sel).last();
+        if (await box.count()) {
+          await box.click({ timeout: 10_000 }).catch(() => {});
+          await page.keyboard.type(EDITOR_MARK, { delay: 8 });
+          await page.waitForTimeout(300);
+          typedInto = label;
+          break;
+        }
       }
+      rec('typed into the editor', 'HITL', typedInto ? 'ok' : 'blocked',
+        typedInto ? `keyboard input went into a ${typedInto}` : 'the page offered NOTHING to type into');
+      if (!typedInto) throw new Error('found no editable target on the section editor');
     });
 
     await step('save from the editor, then reload and look', state.adminEmail, async () => {
