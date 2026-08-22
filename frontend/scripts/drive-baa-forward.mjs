@@ -52,13 +52,17 @@ console.log('signed in as rfp_admin\n');
 /** What a tenant would actually see — measured past the bridge, not at the push. */
 async function farSide(sol) {
   const [row] = await sql`
-    SELECT (SELECT count(*)::int FROM opportunities            WHERE solicitation_id = ${sol}::uuid) AS opps,
+    SELECT (SELECT count(*)::int FROM opportunities o WHERE o.solicitation_id = ${sol}::uuid
+                 OR o.id IN (SELECT opportunity_id FROM curated_solicitations WHERE id = ${sol}::uuid)) AS opps,
            (SELECT count(*)::int FROM opportunity_bridge       WHERE opportunity_id IN
-                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid)) AS bridge,
+                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid
+                  UNION SELECT opportunity_id FROM curated_solicitations WHERE id = ${sol}::uuid)) AS bridge,
            (SELECT count(*)::int FROM tenant_opportunity_cards WHERE opportunity_id IN
-                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid)) AS cards,
+                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid
+                  UNION SELECT opportunity_id FROM curated_solicitations WHERE id = ${sol}::uuid)) AS cards,
            (SELECT count(*)::int FROM tenant_bucket_scores     WHERE opportunity_id IN
-                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid)) AS scores`;
+                (SELECT id FROM opportunities WHERE solicitation_id = ${sol}::uuid
+                  UNION SELECT opportunity_id FROM curated_solicitations WHERE id = ${sol}::uuid)) AS scores`;
   return row;
 }
 
