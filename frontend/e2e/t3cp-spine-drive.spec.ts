@@ -70,7 +70,26 @@ test('spine · build-out → push → comp purchase → release → the buyer ge
   const admin = await adminCtx.newPage();
   await signIn(admin, ADMIN);
 
+  /* THE T3CP SCENARIO IS NOT ON THIS MACHINE.
+   *
+   * SOL/OPP/TOPIC default to ids from a curated T3CP solicitation that was built by hand on a
+   * long-lived box. Its source documents — the OSW T3CP component instructions and the
+   * Patent-Holiday topic call — arrived as chat uploads and are not in the repository, so nothing
+   * here can rebuild it and the readiness bar correctly reports an empty master
+   * (hasCompliance false, volumeCount 0).
+   *
+   * That is a could-not-run, not a defect: reporting it red buries the failures that matter. Same
+   * argument as e2e/upload-fixtures.ts; the class is catalogued in docs/FIXTURE_INTEGRITY.md.
+   */
   const readiness = await post(admin.request, `/api/admin/rfp-curation/${SOL}/complete-buildout`, {});
+  if (!readiness.ok && readiness.body?.code === 'NOT_READY'
+      && readiness.body?.data?.readiness?.volumeCount === 0) {
+    await adminCtx.close();
+    test.skip(true,
+      `solicitation ${SOL} has no build-out on this machine (volumeCount 0) — this spine needs the `
+      + `curated T3CP master, whose source PDFs are absent. Stand a scenario up with `
+      + `scripts/drive-ingest-scenario.mjs and pass DRIVE_SOL_ID/DRIVE_OPP_ID/DRIVE_TOPIC.`);
+  }
   if (!readiness.ok && readiness.body?.code === 'NOT_READY') {
     // The bar exists to stop a half-built master reaching a buyer. Report what is missing rather
     // than confirming past it blindly — a drive that always confirms proves nothing about the bar.
