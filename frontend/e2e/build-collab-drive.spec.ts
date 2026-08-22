@@ -32,6 +32,15 @@ let PROPOSAL = '';
 let TECH_SECTION = '';   // the mold-provisioned tech section we edit
 let NODE_ID = '';        // a node in it (comment anchor)
 
+/* B3 obtains the editable section that B4–B6 then comment on, review and lock. When it cannot —
+ * every build submitted and past its close date, so a tenant_admin may not reopen one — those
+ * downstream steps have nothing to act on either. Skipping only B3 left them failing on empty
+ * strings, which reports one honest could-not-run as four defects. One guard, one reason. */
+const requireEditableSection = () =>
+  test.skip(!TECH_SECTION,
+    'B3 could not obtain an editable section (every build is submitted and past close, so the '
+    + 'tenant cannot reopen one) — see the note in B3 and e2e/upload-fixtures.ts.');
+
 async function signIn(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.fill('input[type="email"]', email);
@@ -248,6 +257,7 @@ test('B3 · canvas save advances the version; a stale baseVersion is refused 409
 // ═════════ B4 · node-anchored comments ═════════
 
 test('B4 · a node-anchored comment posts and lists', async ({ page }) => {
+  requireEditableSection();
   test.setTimeout(90_000);
   await asKate(page);
   expect(NODE_ID, 'B3 must have captured a node id').toBeTruthy();
@@ -273,6 +283,7 @@ test('B4 · a node-anchored comment posts and lists', async ({ page }) => {
 // ═════════ B5 · emulated AI compliance review (AI-gated flow, no live key) ═════════
 
 test('B5 · AI compliance review runs through the emulator', async ({ page }) => {
+  requireEditableSection();
   test.setTimeout(180_000);
   await asKate(page);
   const r = await page.request.post(`/api/portal/${SLUG}/proposals/${PROPOSAL}/ai/compliance`, {
@@ -286,6 +297,7 @@ test('B5 · AI compliance review runs through the emulator', async ({ page }) =>
 // ═════════ B6 · lock → matrix satisfied ═════════
 
 test('B6 · locking the section flips its compliance matrix row to satisfied', async ({ page }) => {
+  requireEditableSection();
   test.setTimeout(120_000);
   await asKate(page);
 
