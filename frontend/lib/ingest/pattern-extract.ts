@@ -325,6 +325,60 @@ const RULES: Rule[] = [
     value: () => true },
 ];
 
+/* ── Component-scoped rules must not become solicitation-wide ────────────────────────────────
+ *
+ * A joint BAA is not one voice. The DoW 2026 SBIR BAA sets the common rules and then carries each
+ * Service's own instructions INLINE, under its own heading, each of which may override. Measured on
+ * the real R1 document, the anchored technical-volume rule matched this line on page 31:
+ *
+ *     "• DON Phase I Technical Volume (Volume 2) page limit is not to exceed 10 pages."
+ *
+ * — one bullet below "The information provided in the DON Proposal Submission Instructions takes
+ * precedence over the DoW Instructions posted for this BAA." That is a NAVY rule. It became the
+ * solicitation-wide page_limit_technical = 10, stamped `pattern_match`, and an Air Force or Army
+ * proposer was told their technical volume was capped at 10 pages on the authority of a Navy
+ * instruction.
+ *
+ * This is worse than the fabricated default the provenance doctrine was written against. A default
+ * is badged red, "Default — unverified", and invites challenge. This arrived badged "Read from
+ * source" with a page number and a verbatim excerpt — MORE credible than a default, and wrong.
+ *
+ * Two things made it invisible, and both are fixed here:
+ *
+ *   1. The match ANCHORS on "technical volume", so the excerpt began there and the "DON" that
+ *      disqualified it sat just outside the quoted span. A reviewer checking the citation saw a
+ *      sentence that read as document-wide. The excerpt now extends left to the start of its own
+ *      sentence or bullet, so the qualifier travels WITH the evidence.
+ *   2. Nothing looked for the qualifier. A positive match whose own sentence names a specific
+ *      Component is now rejected as a solicitation-wide value and recorded as a note instead, which
+ *      also lets the DEFERRAL rules below run — and the deferral is the truth for the document as a
+ *      whole: this BAA does defer the technical-volume page limit to the Component instructions.
+ *
+ * Scope note: this is deliberately NOT applied to every field. A Component qualifier on a font or
+ * margin rule is usually restating the common rule, and suppressing those would lose real
+ * information. It is applied to the fields where a Component override is both common and
+ * consequential — the page and character limits that gate a submission.
+ */
+const COMPONENT_QUALIFIER =
+  /\b(?:DON|DoN|DAF|USAF|DHA|MDA|DTRA|DARPA|SOCOM|NGA|NRO|NAVAIR|NAVSEA|NAVWAR|SPAWAR|CBD|USSF|DLA|OSD)\b|\bDepartment\s+of\s+the\s+(?:Navy|Army|Air\s+Force)\b|\b(?:Air\s+Force|Army|Navy|Space\s+Force|Marine\s+Corps)\b/;
+
+/** Fields where a Component override is common AND consequential enough to reject document-wide. */
+const COMPONENT_SCOPED_FIELDS = new Set(['page_limit_technical', 'character_limit_narrative']);
+
+/** Widen a match back to the start of its own sentence or bullet, so qualifiers stay visible. */
+const SENTENCE_LOOKBACK = 240;
+function sentenceAround(norm: string, start: number, end: number): string {
+  const from = Math.max(0, start - SENTENCE_LOOKBACK);
+  const before = norm.slice(from, start);
+  // Nearest sentence end, bullet, or list marker to the LEFT — whichever is closest to the match.
+  const cut = Math.max(
+    before.lastIndexOf('. '), before.lastIndexOf('•'), before.lastIndexOf('; '),
+    before.lastIndexOf(': '), before.lastIndexOf('- '),
+  );
+  const head = cut >= 0 ? before.slice(cut + 1) : before;
+  return `${head}${norm.slice(start, end)}`.replace(/\s+/g, ' ').trim();
+}
+
 /** The document says the rule lives elsewhere — a positive fact, not a missing value. */
 const DEFERRAL_RULES: Array<{ id: string; field: string; re: RegExp; reason: string }> = [
   { id: 'page_limit.deferred_component_a', field: 'page_limit_technical',
@@ -474,16 +528,39 @@ export function extractByPattern(text: string): PatternExtraction {
   const evidence: Record<string, PatternEvidence> = {};
   const pseudo: Record<string, { value: RuleValue; offset: number; excerpt: string }> = {};
 
+  const componentScoped: string[] = [];
+  const componentLocked = new Set<string>();
   for (const rule of RULES) {
     if (evidence[rule.field] || pseudo[rule.field]) continue;   // first (strongest) rule wins
+    // Once the STRONGEST evidence for a field turned out to be Component-scoped, the weaker rules
+    // below it cannot outrank it. Measured: after the anchored DON rule was rejected, the generic
+    // `page_limit.n_page_limit` matched "Include, within the 10-page limit" nine pages later — a
+    // back-reference to the very rule just rejected, in the same Component's section, and it does
+    // not even name a volume. Letting an unanchored fragment fill a field whose best evidence was
+    // disqualified reintroduces the bug through the back door.
+    if (componentLocked.has(rule.field)) continue;
     const m = rule.re.exec(norm);
     if (!m) continue;
     const value = rule.value(m);
     if (value === undefined) continue;
 
     const offset = map[m.index] ?? 0;
-    const excerpt = m[0].trim();
+    // The excerpt is the EVIDENCE a reviewer checks, so quote the whole statement — not just the
+    // span the regex happened to anchor on. See COMPONENT_QUALIFIER above: the disqualifying word
+    // sat one token to the left of the match, outside the quote, and that is what hid the bug.
+    const excerpt = sentenceAround(norm, m.index, m.index + m[0].length);
     if (rule.field.startsWith('~')) { pseudo[rule.field] = { value, offset, excerpt }; continue; }
+
+    // A rule stated for ONE Component is not this solicitation's rule. Record it, do not adopt it,
+    // and leave the field open so the deferral rules can explain the empty cell honestly.
+    if (COMPONENT_SCOPED_FIELDS.has(rule.field) && COMPONENT_QUALIFIER.test(excerpt)) {
+      componentLocked.add(rule.field);
+      componentScoped.push(
+        `A Component-specific ${rule.field.replace(/_/g, ' ')} appears in this document and was NOT `
+        + `applied solicitation-wide — it binds only that Component: "${excerpt}"`,
+      );
+      continue;
+    }
 
     (compliance as Record<string, unknown>)[toCamel(rule.field)] = value;
     evidence[rule.field] = { rule: rule.id, ...cite(raw, idx, offset, excerpt, rule.field) };
@@ -547,6 +624,10 @@ export function extractByPattern(text: string): PatternExtraction {
   if (pseudo['~no_active_media']) notes.push('Active graphics (video, animation, embedded media) are prohibited in the uploaded file.');
   if (pseudo['~no_encryption']) notes.push('The uploaded file must not be locked, password-protected, or encrypted.');
   for (const d of deferrals) notes.push(d.reason);
+  // A Component rule we declined to adopt is a FINDING, not a discard: the curator needs to know
+  // the document contains it, so they can apply it if this build is for that Component. Deduped —
+  // several rules can match the same sentence, and the curator should read it once.
+  for (const c of new Set(componentScoped)) notes.push(c);
   if (!idx.resolved) notes.push('No page markers in the extracted text — evidence cites excerpts, not page numbers.');
   if (idx.segments > 1) {
     notes.push(

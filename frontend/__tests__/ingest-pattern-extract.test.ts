@@ -302,3 +302,61 @@ describe('parseSolicitation — layers pattern over default (no API key)', () =>
     expect(r.fieldSources!.page_limit_technical).toBe('default');
   });
 });
+
+describe('a Component rule is not the solicitation rule', () => {
+  /* The text below is VERBATIM from the DoW 2026 SBIR BAA (R1), page 31 — found by ingesting the
+   * real 3 MB PDF and reading the char offset the extractor itself cited. It is quoted rather than
+   * paraphrased because the whole bug lives in one leading token. */
+  const JOINT_BAA = `
+DEPARTMENT OF THE NAVY (DON) PROPOSAL SUBMISSION INSTRUCTIONS
+
+• The information provided in the DON Proposal Submission Instructions takes precedence
+over the DoW Instructions posted for this BAA.
+• DON Phase I Technical Volume (Volume 2) page limit is not to exceed 10 pages.
+• Proposing SBCs that are more than 50% owned by multiple venture capital operating
+companies are eligible to submit proposals in response to DON topics advertised in this BAA.
+
+GENERAL PROPOSAL PREPARATION
+
+Proposals must be typed with no type smaller than 10-point font on standard 8-1/2" x 11" paper
+with one-inch margins on all sides.
+Refer to the Component-specific instructions for the applicable Technical Volume page limit.
+`;
+
+  it('does NOT adopt a Navy-only page limit as the whole solicitation\'s', () => {
+    const r = extractByPattern(JOINT_BAA);
+    // The DON bullet is real, cited, and 10 pages — and binds only the Navy. Adopting it told an
+    // Air Force proposer their cap was 10, badged "Read from source", which is worse than a
+    // default: a default is flagged unverified, this arrives with a page number and a quote.
+    expect(r.compliance.pageLimitTechnical).toBeUndefined();
+    expect(r.evidence.page_limit_technical).toBeUndefined();
+  });
+
+  it('records the Component rule as a finding rather than discarding it', () => {
+    const r = extractByPattern(JOINT_BAA);
+    const note = r.notes.find((n) => /Component-specific/i.test(n) && /NOT\s+applied/i.test(n));
+    expect(note, 'the curator must be told the document contains it').toBeTruthy();
+    expect(note).toMatch(/DON/);   // and which Component it binds
+  });
+
+  it('falls through to the DEFERRAL, which is the truth for the document as a whole', () => {
+    const r = extractByPattern(JOINT_BAA);
+    const d = r.deferrals.find((x) => x.field === 'page_limit_technical');
+    expect(d, 'the BAA defers the page limit to the Component instructions').toBeTruthy();
+    expect(r.notes.join(' ')).toMatch(/defers the technical-volume page limit/i);
+  });
+
+  it('quotes the whole statement, so the disqualifying qualifier travels with the evidence', () => {
+    // The rules anchor on "technical volume", so the match span began AFTER "DON" — a reviewer
+    // checking the citation saw a sentence that read document-wide. Every excerpt now extends back
+    // to the start of its own sentence or bullet.
+    const r = extractByPattern(JOINT_BAA);
+    expect(r.evidence.min_font_size.anchor.excerpt).toMatch(/Proposals must be typed/i);
+  });
+
+  it('still reads the common rules the joint BAA does set for everyone', () => {
+    const r = extractByPattern(JOINT_BAA);
+    expect(r.compliance.minFontSize).toBe(10);
+    expect(r.compliance.margins).toBe('1 inch (all sides)');
+  });
+});
