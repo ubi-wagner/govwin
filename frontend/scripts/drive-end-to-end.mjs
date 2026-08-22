@@ -91,13 +91,29 @@ function sh(cmd, argv, env = {}) {
   });
 }
 
-async function login(page, email, password) {
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+// The two credential sets in this sandbox are NOT the same, which cost a run: the arc signed the
+// curator in with the tenant password, got no session, and the HITL step surfaced as a bare 401
+// three calls later instead of as "login failed" at the point of failure.
+const RFP_ADMIN = { email: 'eric@rfppipeline.com', pw: process.env.RFP_ADMIN_PW || 'RFPAdmin2026!' };
+const TENANT_PW = process.env.TENANT_PW || 'DemoPass123!';
+
+/** Sign in, and REFUSE to continue silently if it did not work. The first version returned a
+ *  boolean that one caller ignored; an unauthenticated context then produced a 401 far from the
+ *  cause. A helper whose failure is easy to ignore will be ignored. */
+async function login(page, email, password, { required = true } = {}) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', password);
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
-                     page.click('button[type="submit"]')]);
-  return !new URL(page.url()).pathname.startsWith('/login');
+  await Promise.all([
+    page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 60_000 }).catch(() => {}),
+    page.click('button[type="submit"]'),
+  ]);
+  const ok = !new URL(page.url()).pathname.startsWith('/login');
+  if (!ok && required) {
+    prove('database', `sign in as ${email}`, false, 'still on /login — wrong password?');
+    throw new Error(`login failed for ${email} — every later call would 401 with no explanation`);
+  }
+  return ok;
 }
 
 const t0 = new Date().toISOString();
@@ -167,9 +183,9 @@ if (done('curate')) {
   const admin = await (await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] })).newContext();
   const apage = await admin.newPage();
   const [rfpAdmin] = await sql`
-    SELECT email FROM users WHERE role = 'rfp_admin' AND is_active ORDER BY created_at LIMIT 1`;
-  prove('database', 'an rfp_admin exists to curate', !!rfpAdmin?.email, rfpAdmin?.email);
-  await login(apage, rfpAdmin.email, 'DemoPass123!');
+    SELECT email FROM users WHERE email = ${RFP_ADMIN.email} AND is_active`;
+  prove('database', 'the curator account is active', !!rfpAdmin?.email, RFP_ADMIN.email);
+  await login(apage, RFP_ADMIN.email, RFP_ADMIN.pw);
 
   const res = await apage.request.post(
     `${BASE}/api/admin/rfp-curation/${journal.ids.sol}/compliance`,
@@ -222,7 +238,7 @@ if (done('buy')) {
   prove('database', 'the tenant has an active admin to buy as', !!buyer?.email, buyer?.email);
   if (!buyer?.email) { save(); process.exit(1); }
 
-  sh('node', ['scripts/drive-buy-and-build.mjs', journal.ids.sol, TENANT, buyer.email, 'DemoPass123!']);
+  sh('node', ['scripts/drive-buy-and-build.mjs', journal.ids.sol, TENANT, buyer.email, TENANT_PW]);
 
   const [prop] = await sql`
     SELECT p.id, p.stage, p.title FROM proposals p JOIN tenants t ON t.id = p.tenant_id
@@ -248,7 +264,7 @@ if (done('package')) {
   console.log('\n4. AUTHOR + LOCK + PACKAGE — carry the build to a downloadable submission');
   sh('node', ['scripts/drive-finish-build.mjs'], {
     TENANT, PROP: journal.ids.proposal, OPP: journal.ids.opp,
-    EMAIL: journal.ids.buyer, PASSWORD: 'DemoPass123!', OUT,
+    EMAIL: journal.ids.buyer, PASSWORD: TENANT_PW, OUT,
   });
   journal.stages.package = { ok: true, at: new Date().toISOString() };
   save();
@@ -262,7 +278,7 @@ console.log('\n5. CROSS-PLANE VERIFICATION — the download is real, and everyth
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 const ctx = await browser.newContext({ acceptDownloads: true });
 const page = await ctx.newPage();
-prove('database', 'the buyer can sign in', await login(page, journal.ids.buyer, 'DemoPass123!'), journal.ids.buyer);
+prove('database', 'the buyer can sign in', await login(page, journal.ids.buyer, TENANT_PW), journal.ids.buyer);
 
 const MAGIC = {
   json: (b) => b[0] === 0x7b || b[0] === 0x5b,                                   // { or [
