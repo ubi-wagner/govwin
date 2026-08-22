@@ -668,7 +668,29 @@ function flowMetrics(c: CanvasDocument['canvas']) {
   const bodyLineH = fs * c.line_spacing;
   const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated to the exporter)
   const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
-  return { usableW, usableH, fs, bodyLineH, CHAR_W, cpl };
+  // tocRows is filled in by paginate(), which can see the whole document; a per-node ruler cannot.
+  // See the 'toc' case in nodeStackHeightPt.
+  return { usableW, usableH, fs, bodyLineH, CHAR_W, cpl, tocRows: undefined as TocRow[] | undefined };
+}
+
+/** One rendered contents-list entry: its indent level and the length of its label. */
+interface TocRow { level: number; len: number }
+
+/** The headings a `toc` node will render, in document order (mirrors canvas-html::buildTocHtml). */
+function collectTocRows(doc: CanvasDocument): TocRow[] {
+  const rows: TocRow[] = [];
+  const visit = (nodes: CanvasNode[] | undefined) => {
+    for (const n of nodes ?? []) {
+      if (n.type !== 'heading') continue;
+      const c = n.content as HeadingContent | undefined;
+      const num = c?.numbering ? `${c.numbering} ` : '';
+      rows.push({ level: c?.level ?? 1, len: (num + (c?.text ?? '')).length });
+    }
+  };
+  if (doc.sections?.length) {
+    for (const s of doc.sections) for (const g of s.groups ?? []) visit(g.nodes);
+  } else visit(doc.nodes);
+  return rows;
 }
 
 /** Vertical height (pt) a single node occupies in normal flow. page_break / toc contribute nothing. */
@@ -677,8 +699,41 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
   const linesFor = (chars: number, per: number) => Math.max(1, Math.ceil(chars / per));
   switch (node.type) {
     case 'page_break':
-    case 'toc':
       return 0;
+    case 'toc': {
+      // A CONTENTS LIST IS NOT FREE. `buildTocHtml` emits one indented block per heading in the
+      // document — `<div style="margin-left:…;padding:2pt 0">` — under a small uppercase label,
+      // inside `<nav style="margin:4pt 0 14pt">`. Modelling it as 0 meant a 40-entry contents page
+      // cost nothing in the estimate and two pages in the print.
+      //
+      // The height depends on the WHOLE document, which a per-node function cannot see, so
+      // paginate() counts the headings once and threads them in. Without that (sectionPageSpan,
+      // overflowingSlides — neither of which meets a toc in practice, since decks have none) this
+      // falls back to zero rather than inventing a number.
+      //
+      // MEASURED, not read off the stylesheet: binary-searching the largest contents list that
+      // still fits one 648pt page gives 31 entries, which brackets the per-entry height at
+      // (19.14, 19.76]pt once the fixed label + nav margin is subtracted. The 19.36 below is inside
+      // that bracket. KNOWN RESIDUAL, stated rather than tuned away: on a document that is a
+      // contents list followed by nothing but headings, the total can still be ±1 page, because
+      // the ruler does not implement `h1,h2,h3 { break-after: avoid }` — a heading at the foot of
+      // a page moves to the next one WITH its first paragraph, leaving whitespace the model spends.
+      // That is a separate gap (it shows only when a toc pushes headings to a page boundary); both
+      // documents above are exact without a toc. See docs/BUG_LOG B66.
+      const rows = m.tocRows;
+      if (!rows || rows.length === 0) return 0;
+      const TOC_ENTRY_PAD_PT = 4;    // 2pt top + 2pt bottom
+      const TOC_LABEL_PT = 9 * 1.28 + 6;
+      const TOC_NAV_MARGIN_PT = 18;  // 4pt above + 14pt below
+      const line = fs * Math.max(bodyLineH / fs, 1.28);
+      let h = TOC_LABEL_PT + TOC_NAV_MARGIN_PT;
+      for (const r of rows) {
+        const w = Math.max(1, usableW - (r.level - 1) * 20);
+        const per = Math.max(1, Math.floor(w / (fs * CHAR_W)));
+        h += linesFor(r.len, per) * line + TOC_ENTRY_PAD_PT;
+      }
+      return h;
+    }
     case 'spacer': {
       const h = (node.content as { height?: number } | undefined)?.height;
       return typeof h === 'number' && h > 0 ? h : bodyLineH;
@@ -784,6 +839,25 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
     }
     case 'caption':
       return bodyLineH;
+    case 'code_block': {
+      // A CODE BLOCK PRESERVES ITS NEWLINES. It renders inside
+      // `<pre style="white-space:pre-wrap; padding:12pt; font-size:9pt; font-family:Courier New">`,
+      // so every `\n` is a hard line and a long line wraps rather than being clipped. Reflowing it
+      // as prose (the old default) collapsed 60 lines of code into one paragraph's worth: measured
+      // 1 page against a printed 2. Same class as the table and list defects — structure the
+      // renderer keeps and the model threw away.
+      //
+      // Monospace advances wider than the proportional CHAR_W: Courier New is 0.6em per glyph, so
+      // using the body's 0.45 would over-estimate how much code fits on a line.
+      const code = String((node.content as { code?: unknown } | undefined)?.code ?? '');
+      const CODE_FS = 9;
+      const MONO_CHAR_W = 0.6;
+      const PRE_PAD_PT = 24;                       // 12pt top + 12pt bottom
+      const codeLine = CODE_FS * Math.max(bodyLineH / fs, 1.28);
+      const per = Math.max(1, Math.floor((usableW - PRE_PAD_PT) / (CODE_FS * MONO_CHAR_W)));
+      const lines = code.split('\n').reduce((n, ln) => n + Math.max(1, Math.ceil(ln.length / per)), 0);
+      return Math.max(1, lines) * codeLine + PRE_PAD_PT;
+    }
     case 'bulleted_list':
     case 'numbered_list': {
       // A LIST IS NOT A PARAGRAPH. Falling through to the flow-text default concatenated every
@@ -915,6 +989,12 @@ const ATOMIC_NODES: ReadonlySet<CanvasNode['type']> = new Set<CanvasNode['type']
 
 export function paginate(doc: CanvasDocument): LayoutResult {
   const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
+  // Give the per-node ruler the document-wide fact it cannot derive on its own: what a `toc` node
+  // will actually render. Only computed when the document has one, so the common path is unchanged.
+  if ((doc.sections?.length ? doc.sections.some((s) => (s.groups ?? []).some((g) => (g.nodes ?? []).some((n) => n.type === 'toc')))
+                            : (doc.nodes ?? []).some((n) => n.type === 'toc'))) {
+    m.tocRows = collectTocRows(doc);
+  }
   const usableH = m.usableH;
   const sections = toSections(doc);
   const perSection: SectionPageInfo[] = [];

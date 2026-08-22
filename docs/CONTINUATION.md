@@ -45,6 +45,20 @@
 > **The class to keep sweeping for:** *a model that flattens structure the renderer preserves.*
 > B64 found it in table cells, B65 in list items. Any node whose content is a LIST of things —
 > rows, items, series, steps — is a candidate; measuring its text length is not measuring its height.
+>
+> **B66 — swept the remaining twelve node types through the same harness.** Two more: `code_block`
+> (newlines inside `white-space:pre-wrap` were reflowed away — 60 lines read 1 page, printed 2) and
+> `toc` (modelled as **zero height**, so a 40-entry contents list cost nothing and printed two
+> pages). Both fixed and measured. One **named residual** left deliberately un-modelled: the ruler
+> does not implement `h1,h2,h3 { break-after: avoid }`, which binds a heading to its first
+> paragraph; it only bites when a toc pushes headings onto a page boundary, and both affected
+> documents are exact without the toc. Two cases carry an explicit `tolerance: 1` with that reason.
+>
+> **And the harness defeated itself once** — a `tolerance` defaulted at the comparison instead of
+> at the push left it `undefined`, and every comparison against `undefined` is false, so the script
+> printed "off by −1" beside two rows and then declared all 28 passing. It would have reported
+> success for any delta. *A calibration harness that cannot fail is worth less than none, because
+> it is believed.* Second class to sweep for: **a check whose failure path is never exercised.**
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
