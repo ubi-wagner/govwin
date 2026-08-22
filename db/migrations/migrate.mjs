@@ -35,7 +35,21 @@ if (!CONN) {
   process.exit(1);
 }
 
-const sql = postgres(CONN, { max: 1, idle_timeout: 5 });
+// Render server notices as one legible line instead of postgres.js's default, which dumps the
+// whole notice object — `severity_local`, `file: 'pl_exec.c'`, `routine: 'exec_stmt_raise'` and all
+// — to stderr. A migration that ends in `RAISE NOTICE` then looks like it threw, in the deploy log
+// of the very run that succeeded. Silencing them (as lib/db.ts does for the app) would be the other
+// wrong answer: a migration raises a notice precisely so the deploy log records what it did.
+// WARNING and above stay visually distinct, because those are meant to be noticed.
+const sql = postgres(CONN, {
+  max: 1,
+  idle_timeout: 5,
+  onnotice: (n) => {
+    const sev = n?.severity ?? 'NOTICE';
+    const msg = [n?.message, n?.detail, n?.hint].filter(Boolean).join(' — ');
+    console.log(`[pg ${sev}] ${msg}`);
+  },
+});
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 

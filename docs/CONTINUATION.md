@@ -59,6 +59,18 @@
 > printed "off by −1" beside two rows and then declared all 28 passing. It would have reported
 > success for any delta. *A calibration harness that cannot fail is worth less than none, because
 > it is believed.* Second class to sweep for: **a check whose failure path is never exercised.**
+>
+> **B46 + B67 — the last open defect, and the claim that hid it.** B46: `opportunities.solicitation_id`
+> was written by 7 of 10 writers (every topic path stamped it; three umbrella paths did not), so the
+> column was reliable-looking and inconsistent. `compliance-resolver.ts` already carried a fallback
+> with a comment recording the cost of not having one — an umbrella purchase provisioning a default
+> skeleton "while the fully-authored master sits unread". The three writers now stamp it and **mig 205**
+> backfills; verified safe first, because every topic-only query also filters on `topic_number`.
+> B67: I had reported the log clear using a grep that understood one of its **three** heading
+> conventions. **`node frontend/scripts/bug-log-status.mjs`** now reads the status from either end,
+> refuses to guess, and says *"5 deferred entries remain by choice — name them rather than calling the
+> log clear."* **Run it before claiming the log is clean.** The five deferred are B30, B33, B34, B35
+> and **B40 (high — a large solicitation is silently truncated at 500,000 characters)**.
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter

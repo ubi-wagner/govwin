@@ -155,6 +155,20 @@ class BaseIngester(ABC):
                 namespace,
                 description or None,
             )
+            # Stamp the BACK-link too (bug log B46), from whichever triage row
+            # now owns this opportunity — the one just inserted, or the existing
+            # one the WHERE NOT EXISTS guard deferred to. Unconditional so a
+            # re-run repairs a row an earlier ingest left NULL, and idempotent
+            # because it writes the same id every time.
+            await conn.execute(
+                """UPDATE opportunities o
+                      SET solicitation_id = cs.id, updated_at = now()
+                     FROM curated_solicitations cs
+                    WHERE cs.opportunity_id = o.id
+                      AND o.id = $1
+                      AND o.solicitation_id IS DISTINCT FROM cs.id""",
+                opp_id,
+            )
             # asyncpg returns a command tag like "INSERT 0 1"; the trailing
             # number is the affected row count (0 when WHERE NOT EXISTS skipped).
             return bool(status) and status.rsplit(" ", 1)[-1] != "0"
