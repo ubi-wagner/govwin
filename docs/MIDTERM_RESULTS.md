@@ -43,13 +43,35 @@ speaking a dialect the API never offered — not in the product:
 | after the collaborator / comment / shadow fixes | 89 | 3 | ACTs 1–8 clean; only the second-portal release left |
 | after the sign-out fix | 89 | 0 | all nine acts, including the automated divergent path |
 | the informed pursuit choice | 133 | 0 | a full 22-section build end to end |
-| **final** | **139** | **0** | figures, tables and charts authored and proven into the artifacts |
+| figures, tables and charts | 139 | 0 | the primaries authored and proven into the artifacts |
+| twelve acts, first pass | 164 | 2 | isolation and the partner manager; the editor act pointed at a locked build |
+| **final** | **170** | **0** | the editor driven the way it actually works |
 
-The final tally reads **`ok=139 · decision=35 · note=32 · override=3 · blocked=0`**.
+The final tally reads **`ok=170 · decision=42 · note=36 · override=3 · blocked=0`** across twelve acts.
 
-The two overrides are both deliberate and both recorded with what was overridden: accepting a
-default skeleton on a solicitation that defers its format elsewhere, and then entering that
-deferred value by hand as the curator. Nothing else in the run needed one.
+### The readiness gate earned its keep
+
+The third override is the one worth reading. Adding real figures to the Technical Volume pushed it
+past its page budget, and the submission gate refused to advance until a human said so:
+
+```
+page_overflow: "Technical Volume" is estimated at 13 pages against a 10-page limit
+               — trim 3 page(s) before submission
+               (same estimate the export compliance check uses)
+```
+
+That is the product working: a compliance problem introduced by the author's own content, caught
+before submission, in the same page-estimator the export gate uses — so the editor's gauge and the
+export check cannot disagree. The drive overrode it deliberately, the way a customer clicks
+"Submit anyway", and the override is on the record with its reason.
+
+**So state it plainly: the artifact this run produced is over its page limit.** It was submitted
+anyway, knowingly. A real bid would trim three pages first — and the product told us exactly that,
+unprompted, which is the behaviour worth having.
+
+All three overrides are deliberate and each is recorded with what was overridden: accepting a
+default skeleton on a solicitation that defers its format elsewhere, entering that deferred value
+by hand as the curator, and the page-overflow above. Nothing else in the run needed one.
 
 The jump from 89 to 133 is the last real fix, and it is worth naming because it looks like a
 harness detail and is not. The customer was buying whichever opportunity happened to be first,
@@ -93,7 +115,27 @@ records any opportunity that has no volume structure yet:
 | 9 · divergent path | tenant_admin → master_admin | a **second** portal on a different opportunity, released, then handed to the agent workforce via the admin doorbell (Mode C, full auto) and never hand-authored |
 | 10 · second customer + isolation | public → master_admin → both tenants | a second company (Kestrel Robotics) walks the **same public form**, is accepted, builds its own library — then each tenant is asked for the other's library, cards and build |
 | 11 · partner manager | master_admin → partner_admin | an EconDev partner org is created, its manager submits a client company for RFP-admin approval, descends into it as its company admin, ascends — and is refused a tenant outside their stable |
-| 12 · canvas editor | tenant_admin | the section is opened in the **editor a customer uses**, a block is inserted from the palette, text is typed by keyboard, saved, and the page reloaded to see whether the keystrokes survived |
+| 12 · canvas editor | tenant_admin | the section is opened in the **editor a customer uses**, a block is inserted from the INSERT ribbon, a block is selected to open its editor, text is typed by keyboard, saved, and the page reloaded to see whether the keystrokes survived |
+
+### The editor is click-to-edit, and two guesses cost more than one probe
+
+ACT 12 failed twice before it passed, both times because the harness asserted where an affordance
+*should* be. The eight-second probe (`e2e/probe-editor-drive.spec.ts`, kept in the repo) settled it:
+
+```
+at rest                      contenteditable=0  textarea=0
+after clicking a paragraph   contenteditable=0  textarea=1
+INSERT ribbon labels         "¶ Text"  "H Heading"  "⊞ Table"  "▨ Image"  "📊 Chart" …
+```
+
+Nothing is editable at rest — a block must be **selected**, and only then does a `<textarea>` open.
+And the ribbon labels carry icon prefixes, so an anchored `/^Text$/` cannot match them. Driven that
+way the act passes cleanly: ribbon click, block select, keystrokes into the `<textarea>`, save
+`HTTP 200`, and the typed sentence still on the page after a reload from the server.
+
+Worth stating because the ledger cannot: **nothing was ever wrong with the editor.** It carries
+Undo/Redo, a live "Saved ✓", Save, Accept &amp; Lock, three export formats, From Library, and an
+eighteen-item insert ribbon.
 
 ## The artifacts, actually opened
 
@@ -257,7 +299,7 @@ Stated plainly rather than left for someone to discover:
   isolation is exercised by the separate `mt3-library-drive` spec; this arc does not re-prove it.
 - **The partner-manager console is not walked.** Shadow descent and ascent are driven and audited
   as rfp_admin; the `partner_admin` stable-of-companies path is not part of this arc.
-- **The canvas is exercised through its content and its outputs, not its editor.** The drive
+- **The canvas editor is now driven, but only its text path.** The drive
   authors text, image, table, chart and caption nodes and proves each survives to Word and PDF, and
   the per-volume-native export proves the doc and xls surfaces fork correctly (`.docx` narrative
   volumes, `.xlsx` cost volume). But it writes through the save API rather than clicking in
