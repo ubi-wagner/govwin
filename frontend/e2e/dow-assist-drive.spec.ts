@@ -21,37 +21,15 @@
  */
 import { test, expect } from '@playwright/test';
 import postgres from 'postgres';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
 const SHOTS = 'public/guides/rfp-ingest';
 
-/* RESOLVE THE SOLICITATION FROM THE DATA.
- *
- * This was `process.env.DRIVE_SOL_ID!` — a required env var nobody set, so the URL became
- * `/api/admin/rfp-curation/undefined/ingest-assist`, every assertion failed on a bare `false`, and
- * the whole file read like a broken Assist. Find the shredded DoW BAA the way anything else would:
- * the curated solicitation with the most extracted text. Stand one up with
- *
- *   node scripts/drive-ingest-scenario.mjs "DoW 2026 SBIR BAA (R1)" baa 2026-12-15 \
- *     "docs/DoW 2026 SBIR BAA FULL_R1_04132026.pdf"
- *
- * DRIVE_SOL_ID still wins when set, for pointing this at one specific document.
- */
-let SOL = process.env.DRIVE_SOL_ID ?? '';
-test.beforeAll(async () => {
-  if (SOL) return;
-  const dsn = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
-  expect(dsn, 'DATABASE_URL_OWNER must be set to resolve the solicitation').toBeTruthy();
-  const sql = postgres(dsn!, { max: 1 });
-  try {
-    const [row] = await sql<{ id: string; chars: number }[]>`
-      SELECT id, length(full_text)::int AS chars FROM curated_solicitations
-      WHERE full_text IS NOT NULL ORDER BY length(full_text) DESC LIMIT 1`;
-    expect(row?.chars ?? 0, 'no shredded solicitation — run drive-ingest-scenario.mjs first')
-      .toBeGreaterThan(100_000);
-    SOL = row.id;
-    console.log(`[drive] resolved solicitation ${SOL} (${row.chars} chars)`);
-  } finally { await sql.end(); }
-});
+/* Resolved from the DB — `process.env.DRIVE_SOL_ID!` was unset, so every request went to
+ * /api/admin/rfp-curation/undefined/… and this file failed on a bare false. The resolver, its
+ * rationale, and how to stand a solicitation up live in e2e/resolve-solicitation.ts. */
+let SOL = '';
+test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation()).id; });
 
 async function loginAsRfpAdmin(page: import('@playwright/test').Page) {
   await page.goto('/login');

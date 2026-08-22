@@ -11,10 +11,12 @@
  * Run: DRIVE_SOL_ID=<curated_solicitations.id> npx playwright test --project=drive ingest-studio
  */
 import { test, expect, type Page } from '@playwright/test';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
 const SHOTS = 'public/guides/rfp-ingest';
-const SOL = process.env.DRIVE_SOL_ID!;
-
+/* Resolved from the DB in beforeAll — `process.env.DRIVE_SOL_ID!` was unset, so every request
+ * went to /…/undefined/… and this file failed on a bare false. See e2e/resolve-solicitation.ts. */
+let SOL = '';
 async function signIn(page: Page) {
   await page.goto('/login');
   await page.fill('input[type="email"]', 'eric@rfppipeline.com');
@@ -27,6 +29,10 @@ async function signIn(page: Page) {
 
 const phase = (page: Page) => page.request.get(`/api/admin/rfp-curation/${SOL}/ingest-phase`)
   .then((r) => r.json()).then((j) => j.data);
+
+test.beforeAll(async () => {
+  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID')).id;
+});
 
 test('gates · staged → reviewed → landed, with the panel telling the truth at each step', async ({ page }) => {
   test.setTimeout(12 * 60 * 1000);
@@ -108,7 +114,18 @@ test('colour team · auto runs the adversarial review through the WORKER and rec
   });
   expect(r.ok()).toBeTruthy();
   const d = (await r.json()).data;
-  expect(d.phase).toBe('review');
+  /* AUTO returns the chain's FIRST hop, not its destination.
+   *
+   * The route emits ingest.phase_requested(phase='extract', auto=true) and returns immediately;
+   * the worker then makes each hop itself — extract → matrix → review — via advance_ingest_phase,
+   * stopping at the land gate (route.ts:262-278, "Starting auto mid-chain would leave the earlier
+   * phases' agents and the chain hops themselves permanently unexercised").
+   *
+   * This asserted `toBe('review')` on that synchronous response, so it demanded the endpoint
+   * report a state only the worker can reach. It cannot pass by design. The asynchronous outcome
+   * is what matters and the poll below already measures it.
+   */
+  expect(d.phase, 'auto starts the chain at extract; the worker walks it forward').toBe('extract');
   expect(d.draft.status).toBe('staged');
   console.log('[studio] auto → review, draft', d.draft.id, 'audit read =', d.draft.audit?.read);
 

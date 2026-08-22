@@ -20,8 +20,11 @@
  * Run: DRIVE_SOL_ID=<id> npx playwright test --project=drive t3cp-molds
  */
 import { test, expect, type Page } from '@playwright/test';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
-const SOL = process.env.DRIVE_SOL_ID ?? '11263a74-ab09-48bb-ada5-565aa2ee986e';
+/* Resolved from the DB in beforeAll — `process.env.DRIVE_SOL_ID!` was unset, so every request
+ * went to /…/undefined/… and this file failed on a bare false. See e2e/resolve-solicitation.ts. */
+let SOL = '';
 
 async function signIn(page: Page) {
   await page.goto('/login');
@@ -42,6 +45,10 @@ const act = async (page: Page, action: string) => {
   });
   return { ok: res.ok(), status: res.status(), body: await res.json() };
 };
+
+test.beforeAll(async () => {
+  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID')).id;
+});
 
 test('molds gate · propose a skeleton, build the molds, and only then read complete', async ({ page }) => {
   test.setTimeout(6 * 60 * 1000);

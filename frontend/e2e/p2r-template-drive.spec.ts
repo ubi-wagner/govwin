@@ -16,8 +16,11 @@
  * Serial; resume-safe. Run: npx playwright test --project=drive p2r-template
  */
 import { test, expect, type Page } from '@playwright/test';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
-const SOL = process.env.FLEX_SOL_ID ?? 'aca5e83a-11b6-4a06-9049-2f17400f1ed9';
+/* Resolved from the DB in beforeAll — `process.env.FLEX_SOL_ID!` was unset, so every request
+ * went to /…/undefined/… and this file failed on a bare false. See e2e/resolve-solicitation.ts. */
+let SOL = '';
 const SLUG = 'foundation';
 const TPL = {
   techDoc: 'd4476dc5-23ae-4cb8-b9e4-651dd6970c84',   // N26D-CAM07 — Technical Volume (canvas.format 'letter')
@@ -52,6 +55,10 @@ const tool = (page: Page, name: string, input: Record<string, unknown>) =>
   page.request.post(`/api/tools/${name}`, { data: { input } });
 
 // ═════════ P1 · admin resolves the target topic + authors per-item template selection ═════════
+
+test.beforeAll(async () => {
+  SOL = (await resolveShreddedSolicitation('FLEX_SOL_ID')).id;
+});
 
 test('P1 · admin selects the PROPER template per item (doc mold · slide mold · computed cost · dangling fallback)', async ({ page }) => {
   test.setTimeout(240_000);

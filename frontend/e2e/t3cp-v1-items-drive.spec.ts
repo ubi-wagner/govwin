@@ -16,8 +16,11 @@
  * Run: npx playwright test --project=drive t3cp-v1-items
  */
 import { test, expect, type Page } from '@playwright/test';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
-const SOL = process.env.DRIVE_SOL_ID ?? '11263a74-ab09-48bb-ada5-565aa2ee986e';
+/* Resolved from the DB in beforeAll — `process.env.DRIVE_SOL_ID!` was unset, so every request
+ * went to /…/undefined/… and this file failed on a bare false. See e2e/resolve-solicitation.ts. */
+let SOL = '';
 
 /** Read off DoW_2026_SBIR_BAA_Preface_07152026.pdf — the sentence the cap comes from. */
 const CITATION =
@@ -41,6 +44,10 @@ async function tool(page: Page, name: string, input: unknown) {
   const body = await res.json();
   return { ok: res.ok(), status: res.status(), body };
 }
+
+test.beforeAll(async () => {
+  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID')).id;
+});
 
 test('Volume 1 carries the DSIP webform plus two 3,000-character narrative documents', async ({ page }) => {
   test.setTimeout(5 * 60 * 1000);
