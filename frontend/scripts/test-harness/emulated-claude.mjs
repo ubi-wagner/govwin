@@ -279,23 +279,59 @@ function wantsJson(req) {
  * page limit is worse than no fixture — it could be mistaken for something read from a solicitation
  * (docs/INGEST_PROVENANCE.md).
  */
+const SLUG_FIELD = /^(key|slug)$|_(key|slug)$/i;
+
+/**
+ * The controlled vocabulary a prompt enumerates for itself, if it does.
+ *
+ * The shredder's section_extraction prompt writes:
+ *
+ *   Canonical section keys (use EXACTLY these strings, no others):
+ *   - cover                   — front matter, ...
+ *   - technical_approach      — technical volume requirements, ...
+ *
+ * Harvesting the list from the prompt keeps the emulator honest for free: change the canonical
+ * keys and the harness follows, with nothing here to update.
+ */
+function enumeratedSlugs(sys) {
+  const list = sys.match(/canonical[^\n]*\b(?:keys?|values?|slugs?)\b[^\n]*:\s*\n((?:[ \t]*[-*][ \t]*[a-z0-9][a-z0-9_-]*[^\n]*\n?)+)/i);
+  if (!list) return [];
+  return [...list[1].matchAll(/^[ \t]*[-*][ \t]*([a-z0-9][a-z0-9_-]*)/gm)].map((m) => m[1]);
+}
+
 function emulatedJsonFor(req) {
   const sys = typeof req.system === 'string' ? req.system : '';
   const block = sys.match(/\{[\s\S]{40,2000}\}/);
   if (!block) return { emulated: true, note: 'no schema block found in the system prompt' };
 
+  // A key is STRUCTURE, not content — it gets routed on, matched against, and (in the shredder)
+  // used to build an object-storage path. Filling it with the prose placeholder below meant the
+  // shredder's artifact write raised `invalid section slug` for every section, runner.py swallowed
+  // it as a warning, and the harness silently exercised none of the per-section artifact path
+  // while reporting the run a success. Emitting a real slug does not soften the honesty rule in
+  // the docstring above: every prose field still says EMULATED, so nothing here can be mistaken
+  // for a value read from a solicitation.
+  const canonical = enumeratedSlugs(sys);
   const out = {};
   for (const m of block[0].matchAll(/"(\w+)"\s*:\s*\[/g)) {
     const key = m[1];
     const objMatch = block[0].match(new RegExp('"' + key + '"\\s*:\\s*\\[\\s*\\{([\\s\\S]*?)\\}'));
     const fields = objMatch ? [...objMatch[1].matchAll(/"(\w+)"\s*:/g)].map((f) => f[1]) : [];
-    const row = {};
-    for (const f of fields) {
-      if (/confidence/i.test(f)) row[f] = 0.5;
-      else if (/page|count|number|index/i.test(f)) row[f] = 1;
-      else row[f] = `EMULATED ${f} — sandbox harness, not a real extraction`;
-    }
-    out[key] = fields.length ? [row] : [];
+    if (!fields.length) { out[key] = []; continue; }
+
+    // With a vocabulary in hand, emit one row per value (capped) so a consumer that LOOPS over the
+    // rows is actually made to loop. One row cannot tell a working iteration from a broken one.
+    const slugs = fields.some((f) => SLUG_FIELD.test(f)) && canonical.length ? canonical.slice(0, 3) : [null];
+    out[key] = slugs.map((slug, i) => {
+      const row = {};
+      for (const f of fields) {
+        if (SLUG_FIELD.test(f)) row[f] = slug ?? `emulated_${f.toLowerCase()}`;
+        else if (/confidence/i.test(f)) row[f] = 0.5;
+        else if (/page|count|number|index/i.test(f)) row[f] = i + 1;
+        else row[f] = `EMULATED ${f} — sandbox harness, not a real extraction`;
+      }
+      return row;
+    });
   }
   return Object.keys(out).length ? out : { emulated: true, note: 'schema block had no array fields' };
 }

@@ -32,7 +32,18 @@ _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
-_SECTION_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+# Underscores are allowed because the canonical section vocabulary USES them. The shredder's own
+# prompt (shredder/prompts/v1/section_extraction.txt) enumerates ten keys and tells Claude to use
+# EXACTLY those strings — five of which are technical_approach, cost_volume, evaluation_criteria,
+# submission_format, compliance_requirements. A hyphens-only rule rejected every one of them, so
+# rfp_pipeline_path(kind="shredded") raised, runner.py's per-section guard logged a warning, and
+# half the shredded-section artifacts were never written on any real solicitation. Nothing failed
+# loudly: metadata.json still listed all ten in section_keys while artifact_keys held five.
+#
+# The vocabulary is not wrong about the validator; the validator was wrong about the vocabulary —
+# and an underscore is a perfectly safe object-key character. Widening is purely permissive, so
+# nothing previously accepted changes meaning.
+_SECTION_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 _EXT_RE = re.compile(r"^[a-z0-9]{1,8}$")
 _EXTERNAL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RFP_SOURCES: tuple[RfpSource, ...] = (

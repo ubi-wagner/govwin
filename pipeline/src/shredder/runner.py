@@ -665,6 +665,7 @@ async def shred_solicitation(
             from storage.paths import rfp_pipeline_path
 
             # Per-section markdown artifacts
+            section_artifact_failures: list[dict[str, str]] = []
             for section in sections:
                 sec_key = section.get("key", "").strip()
                 if not sec_key:
@@ -687,6 +688,13 @@ async def shred_solicitation(
                     s3_put_text(key=section_path, text=sec_header + sec_text)
                     artifact_keys.append(section_path)
                 except Exception as e:
+                    # Recorded, not just logged. This guard hid a real defect for as long as it has
+                    # existed: the section-slug rule rejected half the canonical keys, so five of
+                    # every ten sections never got an artifact and the only trace was a warning
+                    # line. metadata.json listed all ten in section_keys and five in artifact_keys,
+                    # and nothing reconciled the two. Same rule as section_extraction_skipped below
+                    # — a step that did not happen has to be visible in the record.
+                    section_artifact_failures.append({"key": sec_key, "error": str(e)})
                     log.warning("shredder: section %s S3 write failed: %s", sec_key, e)
 
             # Metadata.json — full extraction record for auditability
@@ -706,6 +714,8 @@ async def shred_solicitation(
                 # A skipped evidence step must be visible, or "no sections" reads like a document
                 # that genuinely had none.
                 **({"section_extraction_skipped": section_skip} if section_skip else {}),
+                **({"section_artifacts_failed": section_artifact_failures}
+                   if section_artifact_failures else {}),
                 **({"source_excerpt": excerpt_meta} if excerpt_meta else {}),
                 "total_input_tokens": sec_in_tokens + comp_in_tokens,
                 "total_output_tokens": sec_out_tokens + comp_out_tokens,

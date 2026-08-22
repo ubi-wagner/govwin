@@ -5,7 +5,9 @@ test here requires the same change there.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
@@ -102,6 +104,40 @@ class TestRfpPipelinePath:
     def test_rejects_non_uuid_opportunity_id(self) -> None:
         with pytest.raises(StoragePathError, match="invalid opportunity id"):
             rfp_pipeline_path(opportunity_id="not-a-uuid", kind="text")
+
+    def test_every_canonical_section_key_can_be_written(self) -> None:
+        """The vocabulary and the validator must not drift apart.
+
+        They had. The section-slug rule allowed hyphens only, while the shredder prompt tells
+        Claude to use EXACTLY these ten keys — five of which contain underscores. Those five
+        raised here, runner.py's per-section guard logged a warning and moved on, and the run
+        reported success with half its artifacts missing. The keys are parsed from the prompt
+        itself so that adding one there without it being writable fails HERE, loudly, instead of
+        in a warning line during a live shred.
+        """
+        prompt = (
+            Path(__file__).resolve().parents[1]
+            / "src/shredder/prompts/v1/section_extraction.txt"
+        ).read_text(encoding="utf-8")
+        block = re.search(
+            r"Canonical section keys[^\n]*:\n((?:\s*-\s*\S+[^\n]*\n)+)", prompt,
+        )
+        assert block, "canonical section key list not found in the shredder prompt"
+        keys = re.findall(r"^\s*-\s*(\S+)", block.group(1), re.MULTILINE)
+        assert len(keys) >= 10, f"expected the full canonical list, parsed {keys}"
+
+        for key in keys:
+            assert (
+                rfp_pipeline_path(opportunity_id=OPP_UUID, kind="shredded", name=key)
+                == f"rfp-pipeline/{OPP_UUID}/shredded/{key}.md"
+            )
+
+    def test_still_rejects_a_key_that_is_not_a_slug(self) -> None:
+        """Widening for underscores must not have widened into anything goes — the emulator's
+        prose placeholder is the exact string that first exposed this."""
+        for bad in ("EMULATED key — sandbox harness, not a real extraction", "../escape", "Cover"):
+            with pytest.raises(StoragePathError, match="invalid section slug"):
+                rfp_pipeline_path(opportunity_id=OPP_UUID, kind="shredded", name=bad)
 
 
 class TestCustomerPath:

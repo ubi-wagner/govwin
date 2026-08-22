@@ -14,7 +14,13 @@
 
 const TENANT_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SECTION_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// Underscores allowed — mirrors pipeline/src/storage/paths.py, where a hyphens-only rule rejected
+// five of the shredder's ten canonical section keys (technical_approach, cost_volume,
+// evaluation_criteria, submission_format, compliance_requirements) and silently dropped their
+// artifacts. Nothing on this side builds a 'shredded' path yet, but the two files are declared
+// mirrors and this side READS what the pipeline writes: a divergence here would mean the frontend
+// cannot address an artifact the pipeline just stored. Purely permissive, as there.
+const SECTION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const EXT_RE = /^[a-z0-9]{1,8}$/;
 const EXTERNAL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
