@@ -86,14 +86,17 @@ async function signIn(page: Page, email: string, pw: string) {
     // There is no password field there, so the fill waits (forever, before the timeouts went in).
     // Going through about:blank drops the cached tree, and re-checking afterwards makes the
     // recovery explicit rather than hopeful.
-    await page.context().clearCookies();
-    await page.goto('about:blank');
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    if (!page.url().includes('/login')) {
+    // Wait for the FIELD, not for a URL. The bounce back to the previous role's dashboard happens
+    // after domcontentloaded, so a URL check right after the goto sees "/login", passes, and then
+    // the redirect fires underneath it — which is how this failed twice while looking correct.
+    // Waiting on the password input is the only condition that means "the login form is here".
+    const reach = async () => {
       await page.context().clearCookies();
       await page.goto('about:blank');
       await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    }
+      await page.locator('input[name="password"]').waitFor({ state: 'visible', timeout: 15_000 });
+    };
+    try { await reach(); } catch { await reach(); } // one clean retry, then let it throw
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', pw);
     await Promise.all([
@@ -483,12 +486,29 @@ test('the arc: supply → customer → library → portal → authored → revie
   const oppId = await step('find an opportunity to pursue', state.adminEmail, async () => {
     const r = await page.request.get(`/api/portal/${state.slug}/cards`);
     const j = await r.json();
-    const cards = (j?.data?.cards ?? []) as Array<{ opportunityId: string; card?: { title?: string } }>;
+    type Card = { opportunityId: string; card?: { title?: string }; complianceSummary?: { volumeCount?: number } };
+    const cards = (j?.data?.cards ?? []) as Card[];
     rec('cards visible to the tenant', 'system', 'note', `${cards.length}`);
     if (!cards.length) throw new Error('no cards fanned out to this tenant');
-    hitl('pursuit choice', `pursuing "${cards[0].card?.title ?? cards[0].opportunityId}"`);
-    state.oppId = cards[0].opportunityId; // ACT 9 picks a DIFFERENT one off this
-    return cards[0].opportunityId;
+
+    // A CUSTOMER READS THE CARD BEFORE BUYING, and the card says whether the opportunity has a
+    // volume structure behind it. One of this run's masters deliberately never got a skeleton —
+    // its solicitation defers the format elsewhere, so the curator accepted a bare compliance
+    // record. Buying THAT one provisions a single generic "Technical Volume" and there is nothing
+    // to build. That is the product being honest, not broken; the right response is the one a
+    // customer would have: pursue the opportunity that is actually ready, and say why.
+    const vols = (c: Card) => c.complianceSummary?.volumeCount ?? 0;
+    const ranked = [...cards].sort((a, b) => vols(b) - vols(a));
+    const pick = ranked[0];
+    const thin = cards.filter((c) => vols(c) === 0);
+    if (thin.length) {
+      rec('opportunities not yet built out', 'HITL', 'note',
+        `${thin.length} of ${cards.length} carry no volume structure yet: ${thin.map((c) => c.card?.title?.slice(0, 40) ?? '?').join(' · ')}`);
+    }
+    hitl('pursuit choice',
+      `pursuing "${pick.card?.title ?? pick.opportunityId}" — ${vols(pick)} volume(s) on the card, so there is a real build behind it`);
+    state.oppId = pick.opportunityId; // ACT 9 picks a DIFFERENT one off this
+    return pick.opportunityId;
   });
 
   if (oppId) {

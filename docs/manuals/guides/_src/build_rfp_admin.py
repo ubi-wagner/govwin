@@ -165,6 +165,24 @@ sec(id="curation", toc="6 · RFP Curation cockpit", heading="RFP Curation — th
          "build the volume/section skeleton, and finish with <b>Push</b> — the fan-out that puts the opportunity in every "
          "tenant’s pipeline. This is a multi-part workspace; take it in order.</p>",
     img=SHOT+"curation.png", caption="The triage queue — claim, filter, and open solicitations for curation.",
+    callouts=[
+      {"kind":"warn","html":
+       "<b>When Ingest Assist says a value is “Set elsewhere”, that is a job for you, not an error.</b> "
+       "A solicitation that defers its page limit or submission format to the Component-specific "
+       "instructions leaves that field genuinely unknown — and the product will not invent one, because "
+       "a value it did not read must never look like one it did. <b>Push</b> then holds the opportunity "
+       "until a person supplies it. Open the referenced instructions, enter the value yourself, and it is "
+       "recorded as <b>your</b> entry (<code>hitl</code> provenance) with a note of where it came from — "
+       "never laundered into looking machine-read."},
+      {"kind":"note","html":
+       "<b>Why a master with everything filled in can still read “below the bar”.</b> Build-out readiness "
+       "checks five things, not three: compliance authored, ≥1 volume, ≥1 required item, <b>no undecided "
+       "items</b>, and <b>no undecided volumes</b>. The last two matter more than they look — an item "
+       "nobody has ruled on still provisions as a writable section, and the drafter will fill it with "
+       "plausible prose, which is how a build ends up with an AI-written “Reps &amp; Certifications” where "
+       "a signed federal form belongs. Either attach a mold or mark it completed elsewhere; the bar is "
+       "asking you to decide, not reporting a fault."},
+    ],
     subs=[
       {"id":"triage","heading":"The triage queue","toc":"6.1 · Triage queue",
        "steps":[
@@ -623,6 +641,26 @@ spec = {
 }
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
+
+# ── Releases & SLA — the provisioning cockpit ────────────────────────────────
+# Restored into the builder after a rebuild dropped it: this section had only ever existed
+# in the generated JSON, so regenerating deleted it. The generator is the source of truth.
+sec(id="releases", toc="Releases & SLA", heading="Releases & SLA — the provisioning cockpit",
+    where="/admin/provisioning · /admin/provisioning/&lt;portalId&gt;",
+    lead="<p>This is the screen that <b>lands the 72-hour SLA</b>. A comp-code purchase creates a portal in <code>curation_pending</code>; it queues here until an RFP admin releases it. Reach it from the sidebar as <b>Releases &amp; SLA</b> — the route is <code>/admin/provisioning</code>, and the <code>proposal_setup</code> ToDo on the purchase deep-links straight to the buyer's cockpit.</p>",
+    img="docs/manuals/img/shots/admin/releases-sla.png", caption="The release queue when it is clear — the empty state names the next action.",
+    steps=[
+      S("Open <b>Releases &amp; SLA</b>. Purchased portals are sorted by their 72-hour curation clock, most urgent first. An empty queue says <i>“The release queue is clear.”</i> and links you to Purchases — that is the healthy state, not a fault."),
+      S("Open a queued portal to reach its cockpit: the buyer, a live SLA countdown, and the master <b>build-out readiness bar</b> — compliance authored, at least one volume, at least one required item. The bar reads the master solicitation, not this buyer's copy."),
+      S("If the master is not ready, follow the deep link into the authoring workspace and finish the build-out. A portal whose master is already built out can be released in one click."),
+      S("Press <b>Complete &amp; Release</b>. Two things happen in order: <code>completeBuildOut</code> marks the master built out and broadcasts an <code>updated</code> fan-out to <b>every</b> tenant's mirror card, then <code>provisionAndReleasePortal</code> provisions <b>this buyer's</b> private portal, flips <code>curation_pending → launched</code>, and starts their workflow."),
+      S("Confirm the buyer now has an unlocked workspace with a populated compliance matrix, and a required <b>Workflow Setup</b> ToDo waiting for their tenant admin."),
+    ],
+    callouts=[
+      {"kind":"note","html":"The two outcomes are deliberately different in scope. The build-out broadcast touches the <b>shared master</b> — every tenant sees the improved card. The provision touches <b>one buyer's private portal</b>. Segregation and continuity, in that order."},
+      {"kind":"tip","html":"The tenant-side <code>?action=release</code> path and this cockpit call the same <code>provisionAndReleasePortal</code> helper, so the two routes cannot drift."},
+    ])
+
 json.dump(spec, open(OUT, "w"), ensure_ascii=False, indent=2)
 print(f"wrote {OUT}: {len(SECTIONS)} sections, "
       f"{sum(len(s.get('subs',[])) for s in SECTIONS)} subsections")

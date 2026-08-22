@@ -167,9 +167,7 @@
       "caption": "The opportunity pipeline — ranked cards with pin, purchase, and build actions.",
       "steps": [
         {
-          "t": "By default the list shows only opportunities you can still bid on. <b>Include closed</b> adds back the ones whose close date has passed or that we have marked closed; <b>Show passed</b> adds back the ones you marked <i>Not interested</i>. <b>Refresh</b> re-pulls, and the count beside it always describes what is on screen.",
-          "img": "docs/manuals/img/crops/tenant/cards-filter.png",
-          "cap": "Unchecked means open only — the count reflects the filtered list, not the total."
+          "t": "Toggle <b>Include closed</b> to widen the list; <b>Refresh</b> re-pulls; the count shows how many cards you have."
         },
         {
           "t": "Read a card: title, a <b>submission-stage badge</b> (NOFO / Pre-Release / Updated / Closed / Archived), agency, program type, and the close date.",
@@ -211,12 +209,6 @@
             }
           ]
         }
-      ],
-      "callouts": [
-        {
-          "kind": "note",
-          "html": "An opportunity with no published close date is treated as open and stays on the list — we would rather show you one you cannot bid on than hide one you can."
-        }
       ]
     },
     {
@@ -227,7 +219,16 @@
       "lead": "<p>Spotlight <b>buckets</b> are your scoring criteria — the themes you care about. Each bucket ranks the whole pipeline by your rules, and editing one re-ranks your Opportunities automatically.</p>",
       "img": "docs/manuals/img/shots/tenant/buckets.png",
       "caption": "Spotlight buckets — define a lens, then rank the pipeline by it.",
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "Your portal arrives with <b>six starter buckets</b> already in place (AI &amp; Autonomy, Counter-UAS, Sensing &amp; RF, Power &amp; Energy, Human Performance, SBIR/STTR Phase I) so opportunities rank the moment they reach you rather than arriving unsorted. They are yours to keep, edit or delete. There is a platform cap on how many buckets one company may hold — the starter six leave room for several of your own, and if you reach the ceiling the product says so and asks you to delete one first."
+        }
+      ],
       "steps": [
+        {
+          "t": "<b>Start by editing a starter bucket, not by adding a seventh.</b> The six that came with your portal are broad on purpose. Renaming one to your actual technology area — and replacing its keywords with the words that appear in the solicitations you win — moves your ranking further than adding another lens beside it."
+        },
         {
           "t": "In <b>New bucket</b>, set a Name plus any of keywords, agencies, program types, and NAICS codes; tick <b>Include closed opportunities</b> if you want them scored. Click <b>Create</b>.",
           "img": "docs/manuals/img/crops/tenant/bucket-add.png",
