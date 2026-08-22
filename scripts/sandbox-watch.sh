@@ -216,6 +216,24 @@ cycle() {
     fi
   fi
 
+  # ── Targeted pre-repair: missing drive scenarios ───────────────────────────
+  # sandbox-up.sh restores the tenant and the logins but NOT the ingested BAAs each heavy drive
+  # spec claims (docs/FIXTURE_INTEGRITY.md, "owned scenarios"). Without them the stack probes
+  # healthy and six or seven specs go red for a reason that is not a code defect — which happened
+  # twice before this hook existed. Rebuilding one drives the product's real upload + async shred,
+  # so it is slow and deliberately NOT part of the ordinary bring-up; it runs only when the probe
+  # says a scenario is actually gone, and it rebuilds only the missing ones.
+  if printf '%s' "$reasons" | grep -q 'scenario:'; then
+    log "           repairing: rebuilding missing drive scenarios (real upload+shred, ~1 min each)"
+    if timeout 1800 bash "$ROOT/scripts/seed-drive-scenarios.sh" \
+         >"$GOVWIN_RUN_DIR/watch-scenarios.log" 2>&1; then
+      log "           scenarios rebuilt"
+    else
+      log "           scenario rebuild FAILED — see $GOVWIN_RUN_DIR/watch-scenarios.log"
+    fi
+    repaired=1
+  fi
+
   # ── Repair: one idempotent bring-up ────────────────────────────────────────
   # Timed out rather than trusted: a bring-up that wedges (a hung migration, a
   # build that never finishes) must not take the supervisor down with it.

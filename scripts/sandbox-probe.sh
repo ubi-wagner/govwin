@@ -275,8 +275,46 @@ probe_fixtures() {
   timeout 10 psql "$DATABASE_URL_OWNER" -tAc \
     "SELECT 1 FROM users WHERE email='eric@lighthouse.com' AND is_active" 2>/dev/null | grep -q 1 \
     || missing="${missing} e2e-logins"
+  # ── Owned drive scenarios ────────────────────────────────────────────────
+  # The tenant + logins above are restored by seed_dev_accounts.mjs; these are NOT, and their
+  # absence cost two e2e runs before it was noticed. Each drive spec that mutates heavily claims a
+  # scenario of its own via resolveShreddedSolicitation(env, owner), matched by an opportunity title
+  # carrying "[owned:<name>]". A container restart takes the ingested BAAs with it, the resolver
+  # then correctly refuses, and 6-7 specs report red for a reason that is not a code defect.
+  #
+  # The owner list is DERIVED from the call sites, not written down here, because a hand-kept copy
+  # is exactly what let "flex" go missing: an earlier grep for the literal marker found four owners
+  # and missed the fifth, which is passed as an argument.
+  local owners want have
+  owners="$(grep -rhoE "resolveShreddedSolicitation\([^)]*'[a-z0-9]+'\)" \
+              "$_PROBE_ROOT/frontend/e2e"/*.ts 2>/dev/null \
+            | grep -oE "'[a-z0-9]+'\)$" | tr -d "')" | sort -u)"
+  for want in $owners; do
+    have=$(timeout 10 psql "$DATABASE_URL_OWNER" -tAc \
+      "SELECT count(*) FROM curated_solicitations cs
+         JOIN opportunities o ON o.id = cs.opportunity_id
+        WHERE cs.full_text IS NOT NULL
+          AND length(cs.full_text) > 100000
+          AND o.title LIKE '%[owned:${want}]%'" 2>/dev/null)
+    [ "${have:-0}" -ge 1 ] || missing="${missing} scenario:${want}"
+  done
+  # The shared pool — what a spec resolves when it does NOT claim an owner.
+  have=$(timeout 10 psql "$DATABASE_URL_OWNER" -tAc \
+    "SELECT count(*) FROM curated_solicitations cs
+       LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+      WHERE cs.full_text IS NOT NULL
+        AND length(cs.full_text) > 100000
+        AND coalesce(o.title,'') NOT LIKE '%[owned:%'" 2>/dev/null)
+  [ "${have:-0}" -ge 1 ] || missing="${missing} scenario:shared-pool"
+
   [ -z "$missing" ] && return 0
-  echo "fixtures: missing —${missing} (every drive spec exits at its guard; run scripts/seed_dev_accounts.mjs)"
+  echo "fixtures: missing —${missing}"
+  case "$missing" in
+    *lighthouse-tenant*|*e2e-logins*) echo "  → node scripts/seed_dev_accounts.mjs" ;;
+  esac
+  case "$missing" in
+    *scenario:*) echo "  → bash scripts/seed-drive-scenarios.sh   (rebuilds every missing one)" ;;
+  esac
   return 1
 }
 
