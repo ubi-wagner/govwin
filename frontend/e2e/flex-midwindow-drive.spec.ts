@@ -17,16 +17,31 @@
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { requireUploads } from './upload-fixtures';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
-// Skips (does not fail) when the source PDFs are not on this machine — see e2e/upload-fixtures.ts.
-const [COMPONENT, TOPIC_PDF] = requireUploads(
-  'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf',
-  'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF',
-);
-
-
-const SOL = process.env.FLEX_SOL_ID ?? 'aca5e83a-11b6-4a06-9049-2f17400f1ed9';
+/* THIS FILE USED TO SKIP FOR TWO PDFs IT NEVER OPENS.
+ *
+ * It opened with
+ *
+ *     const [COMPONENT, TOPIC_PDF] = requireUploads(
+ *       'bc936179-OSWT3CP_SBIR_26BZ_R4_v2.pdf',
+ *       'a4bcf95d-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF');
+ *
+ * and neither binding is referenced anywhere below — grep the file. They are a vestige of an earlier
+ * shape. `requireUploads` skips the whole suite when a named file is absent, and those two chat
+ * uploads did not survive the container, so all SEVEN tests skipped for a dependency that does not
+ * exist. The one T3CP-looking thing F5 actually needs it GENERATES itself (topic_OSW26BZ97ZZ…,
+ * a number it invents per run) precisely so the content-hash dedup never trips.
+ *
+ * That mattered beyond this file: F5 creates the dated late topic p2r-template selects a template
+ * for, so p2r had nothing to act on either. Two dead lines were holding eleven tests shut.
+ *
+ * SOL was likewise a hard-coded id (aca5e83a-…) for a solicitation nobody can rebuild — absent here,
+ * so F1 failed and serial mode skipped F2–F7 even when the suite did reach them. Resolve it from the
+ * data like every other drive (docs/FIXTURE_INTEGRITY.md).
+ */
+let SOL = '';
+test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation('FLEX_SOL_ID')).id; });
 const SLUG = 'foundation';
 const SHOTS = 'public/guides/rfp-ingest';
 

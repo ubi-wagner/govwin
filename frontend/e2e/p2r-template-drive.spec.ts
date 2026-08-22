@@ -42,6 +42,14 @@ let COST_ITEM_NAME = '';
  * released topic, because flex-midwindow F5 creates it and skips here for want of its topic-call
  * PDF — those have nothing to act on either, and letting them fail on empty strings reports one
  * honest could-not-run as four defects. One guard, one reason (docs/FIXTURE_INTEGRITY.md). */
+/* P4 inspects the per-item templates P1 assigns, so it needs the built-out volumes P1 skipped for.
+ * P2 and P3 do NOT — a purchase and a cockpit release work on the bare late topic — which is why
+ * this is a second, narrower guard rather than widening requireTopic. */
+const requireVolumes = () =>
+  test.skip(!VOL1,
+    'P1 skipped for want of a built-out master (needs three volumes to template per item), so there '
+    + 'are no assigned templates for this step to inspect — see e2e/upload-fixtures.ts.');
+
 const requireTopic = () =>
   test.skip(!TOPIC,
     'P1 could not select a late topic (flex-midwindow F5 creates it and skips here — see '
@@ -88,6 +96,18 @@ test('P1 · admin selects the PROPER template per item (doc mold · slide mold �
   TOPIC = TOPIC_CANDIDATES[TOPIC_CANDIDATES.length - 1];
 
   const vols = detail.volumes as Array<{ id: string; volumeNumber: number; volumeName: string; requiredItems: Array<{ id: string; itemName: string; itemNumber: number }> | null }>;
+
+  /* This spec selects a template PER VOLUME ITEM across four shapes — doc mold, slide mold, computed
+   * cost, dangling fallback — so it needs a solicitation whose volumes are already built out. The
+   * late topic flex-midwindow F5 adds is a bare post-push addition with no volume structure, and
+   * the curated T3CP master that has one cannot be rebuilt here (its source PDFs are absent).
+   * Without three volumes the next lines read `.id` off undefined; say what is missing instead
+   * (docs/FIXTURE_INTEGRITY.md). */
+  test.skip(vols.filter((v) => v.volumeNumber >= 1 && v.volumeNumber <= 3).length < 3,
+    `the resolved solicitation has ${vols.length} volume(s); this spec needs a built-out master with `
+    + 'at least three to template per item. The curated T3CP master supplies that and its source '
+    + 'documents are not on this machine — see e2e/upload-fixtures.ts.');
+
   const v1 = vols.find((v) => v.volumeNumber === 1)!; VOL1 = v1.id;
   const v2 = vols.find((v) => v.volumeNumber === 2)!; VOL2 = v2.id;
   const v3 = vols.find((v) => v.volumeNumber === 3)!; VOL3 = v3.id;
@@ -198,6 +218,7 @@ test('P3 · cockpit Complete & Release provisions the build', async ({ page }) =
 // ═════════ P4 · THE TEMPLATE VALIDATION — every item got the PROPER canvas ═════════
 
 test('P4 · every volume item carries the proper template on ONE canvas (formats · limits · matrix)', async ({ page }) => {
+  requireVolumes();
   requireTopic();
   test.setTimeout(120_000);
   await asKate(page);

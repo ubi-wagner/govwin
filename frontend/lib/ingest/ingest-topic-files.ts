@@ -221,7 +221,27 @@ export async function ingestTopicFilesForSolicitation(params: {
 
       const extractedText = await extractText(file.buffer, displayName);
 
-      // Create the topic document (document_type='topic').
+      /* Create the topic document (document_type='topic').
+       *
+       * THE ON CONFLICT MUST NAME THE INDEX'S OWN COLUMN LIST. The unique index it arbitrates is
+       * two columns, not one:
+       *
+       *   CREATE UNIQUE INDEX idx_sol_docs_hash_per_solicitation
+       *     ON solicitation_documents (solicitation_id, content_hash)
+       *     WHERE content_hash IS NOT NULL
+       *
+       * This named only (content_hash), which matches no index, so Postgres raised "there is no
+       * unique or exclusion constraint matching the ON CONFLICT specification" and EVERY topic
+       * upload failed. The route returned 201 with an empty created list and the error tucked into
+       * a per-file failed entry, so it read as a document that would not parse rather than SQL that
+       * never ran. It stayed invisible because the only spec exercising this path was skipping for
+       * two unrelated fixtures. (CLAUDE.md data-layer rule: restate the index's columns AND its
+       * WHERE predicate.)
+       *
+       * Per-solicitation is also the semantics the index name states and the one we want: the same
+       * PDF attached to two different solicitations is two legitimate documents; only a re-upload
+       * to the SAME solicitation is a duplicate.
+       */
       const docRows = await sql<{ id: string }[]>`
         INSERT INTO solicitation_documents
           (solicitation_id, document_type, original_filename, storage_key,
@@ -231,7 +251,7 @@ export async function ingestTopicFilesForSolicitation(params: {
            ${file.size}, ${file.type || null}, ${hash}, ${extractedText},
            ${userId ?? null}::uuid,
            ${sql.json({ parsed_topic_number: parsed.topicNumber, parsed_title: title } as Parameters<typeof sql.json>[0])})
-        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
+        ON CONFLICT (solicitation_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
       if (docRows.length === 0) {
