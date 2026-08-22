@@ -360,3 +360,72 @@ Refer to the Component-specific instructions for the applicable Technical Volume
     expect(r.compliance.margins).toBe('1 inch (all sides)');
   });
 });
+
+/**
+ * Phrasing coverage found by the midterm ingest drive. The corpus above came from ONE real
+ * document (a joint DoW BAA), so the rules were written to its wording and quietly missed forms
+ * that are just as common elsewhere. Each case below is lifted verbatim from a fixture under
+ * e2e/fixtures/solicitations, and each one returned nothing before the rule that now covers it.
+ */
+describe('phrasings other agencies actually print', () => {
+  const wrap = (s: string) => `${'filler. '.repeat(30)}\n-- Page 1 of 1 --\n${s}`;
+
+  it('reads a minimum type size stated SUBJECT-first', () => {
+    // DoD/DOE/state wording. The pre-existing rule only matched the inversion, "no font smaller
+    // than 11 point", so "Type size shall be no smaller than 11 point" fell through to a default.
+    const r = extractByPattern(wrap('Type size shall be no smaller than 11 point.'));
+    expect(r.compliance.minFontSize).toBe(11);
+    expect(r.evidence.min_font_size.rule).toBe('min_font.size_no_smaller_than');
+  });
+
+  it('still reads the object-first inversion it always did', () => {
+    const r = extractByPattern(wrap('Use no font smaller than 10 point.'));
+    expect(r.compliance.minFontSize).toBe(10);
+  });
+
+  it('does not capture a bare "no smaller than" with no type/font subject', () => {
+    // The guard that keeps the widened rule honest: without a type/font subject this is a
+    // statement about something else entirely.
+    const r = extractByPattern(wrap('The award shall be no smaller than 11 point on the scale.'));
+    expect(r.compliance.minFontSize).toBeUndefined();
+  });
+
+  it('reads a FRACTIONAL margin', () => {
+    // DOE asks for 0.75 inch. The alternation was (one|two|1|2), so this returned nothing —
+    // and, worse, inches() used parseInt, so a "1.5 inch" that ever reached it would have been
+    // reported as "1 inch": a margin the document does not state.
+    const r = extractByPattern(wrap('Applications shall use 0.75 inch margins on all sides.'));
+    expect(r.compliance.margins).toBe('0.75 inch (all sides)');
+  });
+
+  it('reads a one-and-a-half inch margin as 1.5, not 1', () => {
+    const r = extractByPattern(wrap('Use 1.5 inch margins on all sides.'));
+    expect(r.compliance.margins).toBe('1.5 inch (all sides)');
+  });
+
+  it('still reads worded and integer margins', () => {
+    expect(extractByPattern(wrap('Page margins one inch on all sides.')).compliance.margins)
+      .toBe('1 inch (all sides)');
+    expect(extractByPattern(wrap('Use 1 inch margins on all sides.')).compliance.margins)
+      .toBe('1 inch (all sides)');
+  });
+
+  it('rejects an out-of-range margin rather than reporting a wrong one', () => {
+    const r = extractByPattern(wrap('Use 9 inch margins on all sides.'));
+    expect(r.compliance.margins).toBeUndefined();
+  });
+
+  it('declines a typeface with no font token beside it — Georgia is also a place', () => {
+    // Deliberate conservatism, verified rather than assumed: the typeface whitelist contains
+    // Georgia and Cambria, which are also place names, so a name needs a font/typeface token in
+    // the same sentence before it becomes a mandate.
+    const r = extractByPattern(wrap('Proposals shall be prepared in Georgia. Type size shall be no smaller than 12 point.'));
+    expect(r.compliance.fontFamily).toBeUndefined();
+    expect(r.compliance.minFontSize).toBe(12);
+  });
+
+  it('reads a typeface when a font token IS beside it', () => {
+    const r = extractByPattern(wrap('Proposals must use Arial typeface.'));
+    expect(r.compliance.fontFamily).toBe('Arial');
+  });
+});

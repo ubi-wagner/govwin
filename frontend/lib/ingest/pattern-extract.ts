@@ -211,10 +211,20 @@ const int = (s: string | undefined, min: number, max: number): number | undefine
   return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
 };
 const WORD_NUM: Record<string, number> = { one: 1, two: 2, three: 3, half: 0.5 };
+/**
+ * A margin measurement, worded or numeric. parseFLOAT, not parseInt: a fractional margin is
+ * ordinary (DOE asks for 0.75 inch, plenty of programs ask for 0.5), and parseInt would turn
+ * "0.75" into 0 (rejected, a miss) and "1.5" into 1 — silently reporting a margin the document
+ * does not state, which is the one failure this extractor exists to prevent. The rules below
+ * previously alternated over `(one|two|1|2)` only, which was the sole thing keeping "1.5 inch"
+ * away from parseInt; MARGIN_NUM now admits decimals, so the parse has to be honest.
+ */
 const inches = (w: string): string | undefined => {
-  const n = WORD_NUM[w.toLowerCase()] ?? parseInt(w, 10);
+  const n = WORD_NUM[w.toLowerCase()] ?? parseFloat(w);
   return Number.isFinite(n) && n > 0 && n <= 3 ? `${n} inch (all sides)` : undefined;
 };
+/** Worded or decimal margin measurement, e.g. one · half · 1 · 0.75 · 1.5 */
+const MARGIN_NUM = '(one|two|three|half|\\d(?:\\.\\d{1,2})?)';
 
 /**
  * Typefaces we will name. A bare capitalized word near "font" is not enough — the token has
@@ -227,6 +237,13 @@ const RULES: Rule[] = [
   { id: 'min_font.no_smaller_than', field: 'min_font_size',
     re: /\bno\s+(?:type|font)(?:\s+size)?\s+smaller\s+than\s+(\d{1,2})[-\s]?(?:point|pt)\b/i,
     value: (m) => int(m[1], 6, 24) },
+  // "Type size shall be no smaller than 11 point" — the subject-first wording, which is what DoD,
+  // DOE and most state programs actually print. The rule above only matches the inversion
+  // ("no font smaller than 11 point"), so every one of those documents fell through to a default.
+  // Anchored on the type/font subject so a bare "no smaller than" elsewhere cannot be captured.
+  { id: 'min_font.size_no_smaller_than', field: 'min_font_size',
+    re: /\b(?:type|font)\s*(?:size)?\s+(?:must|shall|should|is|will)\s+be\s+no\s+smaller\s+than\s+(\d{1,2})[-\s]?(?:point|pt)\b/i,
+    value: (m) => int(m[1], 6, 24) },
   { id: 'min_font.minimum_of', field: 'min_font_size',
     re: /\b(?:minimum|min\.?)\s+(?:font|type)\s*(?:size)?\s*(?:of|:|is)?\s*(\d{1,2})[-\s]?(?:point|pt)\b/i,
     value: (m) => int(m[1], 6, 24) },
@@ -236,13 +253,13 @@ const RULES: Rule[] = [
 
   // ── margins ──
   { id: 'margins.on_all_sides', field: 'margins',
-    re: /\b(?:page\s+)?margins?\s+(one|two|1|2)[-\s]inch(?:es)?\s+on\s+all\s+sides\b/i,
+    re: new RegExp(`\\b(?:page\\s+)?margins?\\s+${MARGIN_NUM}[-\\s]inch(?:es)?\\s+on\\s+all\\s+sides\\b`, 'i'),
     value: (m) => inches(m[1]) },
   { id: 'margins.n_inch_all_sides', field: 'margins',
-    re: /\b(one|two|1|2)[-\s]inch\s+margins\s+on\s+all\s+sides\b/i,
+    re: new RegExp(`\\b${MARGIN_NUM}[-\\s]inch\\s+margins\\s+on\\s+all\\s+sides\\b`, 'i'),
     value: (m) => inches(m[1]) },
   { id: 'margins.with_n_inch', field: 'margins',
-    re: /\bwith\s+(one|two|1|2)[-\s]inch\s+margins\b/i,
+    re: new RegExp(`\\bwith\\s+${MARGIN_NUM}[-\\s]inch\\s+margins\\b`, 'i'),
     value: (m) => inches(m[1]) },
 
   // ── technical-volume page limit (POSITIVE forms only — the deferral rules run separately) ──
