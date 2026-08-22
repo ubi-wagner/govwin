@@ -42,9 +42,10 @@ speaking a dialect the API never offered — not in the product:
 | after verb + gate-walk fixes | 113 | 3 | reached submission and exported all four formats |
 | after the collaborator / comment / shadow fixes | 89 | 3 | ACTs 1–8 clean; only the second-portal release left |
 | after the sign-out fix | 89 | 0 | all nine acts, including the automated divergent path |
-| **final** | **133** | **0** | the informed pursuit choice — a full 22-section build end to end |
+| the informed pursuit choice | 133 | 0 | a full 22-section build end to end |
+| **final** | **139** | **0** | figures, tables and charts authored and proven into the artifacts |
 
-The final tally reads **`ok=133 · decision=33 · note=29 · override=2 · blocked=0`**, in 2.3 minutes.
+The final tally reads **`ok=139 · decision=35 · note=32 · override=3 · blocked=0`**.
 
 The two overrides are both deliberate and both recorded with what was overridden: accepting a
 default skeleton on a solicitation that defers its format elsewhere, and then entering that
@@ -117,6 +118,55 @@ Per-volume-native means each volume exports in the format that volume actually i
 comes out as `.xlsx` because a burden waterfall is a spreadsheet; the narrative volumes come out as
 `.docx`. That is the unified canvas forking on `canvas.format` at the export boundary, visible in
 the file extensions.
+
+### The primaries — pictures, tables and charts
+
+A proposal argues in figures as much as in sentences, so the drive authors them: two photographs
+uploaded through the customer's own image-upload surface into their own storage prefix, a milestone
+table, a throughput bar chart, and a Phase I Gantt — each with its own caption node, so the
+numbering is part of the document rather than an afterthought. Five sections carry 28 such nodes.
+
+Each of the three takes a different route out of the canvas, and only one of them is pure data:
+
+| primary | how it leaves the canvas |
+|---|---|
+| `table` | rendered natively as an OOXML `<w:tbl>` — no intermediate step |
+| `chart` | drawn to SVG (`renderChartSvg`), then rasterized to PNG with sharp for Word; the PDF path keeps it as **vector** SVG, because Word has no SVG primitive and Chromium does |
+| `image` | `storage_key` → fetched from object storage → inlined and rasterized |
+
+**All three degrade silently.** A key that does not resolve, an SVG that fails to render, storage
+misconfigured — none of them throw. The document simply comes out with grey italic `[Image: …]` or
+`[Chart: bar]` where the figure belonged, and a byte-count check calls that a pass. So the check
+counts the real ones and fails on the stubs:
+
+```
+docx : 5 media parts, 3 native <w:tbl>, 17 drawings, 0 placeholder stubs
+       table cell text "M1 · Mix qualification" / "28 MPa at 28 days" / "Success criterion" — all present
+       captions "Figure 1", "Chart 1", "Table 1" — all present
+pdf  : 16 pages (up from 6 without figures), 10 raster images
+       chart title "Print throughput by course height" present in the text layer
+```
+
+The PDF growing from 6 to 16 pages is itself the evidence: the figures occupy real space on the
+page rather than being dropped on the way out.
+
+Two behaviours worth knowing before you author figures, both found by reading the finished PDF:
+
+**Captions are renumbered in document order — do not hand-number them.** The caption nodes were
+authored as "Figure 1", "Figure 2"; the assembled document renumbers every caption per prefix in
+the order the elements actually appear, so the run produced Figures 1–10, Charts 1–6 and Tables 1–3
+with **no repeated label**. That is `numberFigures` in `lib/proposal/document-furniture.ts` doing
+exactly what its own comment promises — *"a proposal whose figure numbers do not match its
+cross-references reads as unproofed"* — and it is right: a section cannot know its position in the
+final document, so the author writes the caption and the assembler numbers it.
+
+**Sections without a figure get one from the library.** The finished PDF holds ten figure
+placements of only **two distinct pictures**. Five come from the image nodes this drive authored;
+the other five are `finishVolumeCanvas`'s library-figure picker filling in sections that had none,
+captioned from the picture's own alt text. Nothing is duplicated in error — every placement is
+numbered and captioned correctly. It is visible here only because the fixture library contains
+exactly two images, so the picker has nothing else to reach for; a real tenant library would vary
+them. Worth knowing when reviewing a draft: a figure you did not place may still be yours.
 
 **Section ordering was checked for teeth, not just for pass.** The export order is compared against
 a natural (numeric-aware) sort AND against a naive string sort. Sections number 1…22, so a string
@@ -204,11 +254,13 @@ Stated plainly rather than left for someone to discover:
   isolation is exercised by the separate `mt3-library-drive` spec; this arc does not re-prove it.
 - **The partner-manager console is not walked.** Shadow descent and ascent are driven and audited
   as rfp_admin; the `partner_admin` stable-of-companies path is not part of this arc.
-- **The canvas is exercised through its outputs, not its editor.** The per-volume-native export
-  proves the doc and xls surfaces fork correctly (`.docx` narrative volumes, `.xlsx` cost volume),
-  but the drive writes sections through the save API rather than clicking in `CanvasRenderer` /
-  `SheetEditor` / `SlideEditor`. The interaction layer — overlays, act-on-selection verbs, the
-  assist panel — is not touched here.
+- **The canvas is exercised through its content and its outputs, not its editor.** The drive
+  authors text, image, table, chart and caption nodes and proves each survives to Word and PDF, and
+  the per-volume-native export proves the doc and xls surfaces fork correctly (`.docx` narrative
+  volumes, `.xlsx` cost volume). But it writes through the save API rather than clicking in
+  `CanvasRenderer` / `SheetEditor` / `SlideEditor`, so the interaction layer — overlays,
+  act-on-selection verbs, the assist panel — is not touched, and no `.pptx` deck is produced
+  (nothing in this solicitation's volume set is a slide artifact).
 - **The AI-gated flows run against the committed emulator**, not a live key (`EMULATE=1`,
   docs/AI_FLOWS_PROOF.md). The wiring is real and identical to production; the model is not.
 - **Volume-level page budgets are checked by the compliance floor at export**, and the drive records

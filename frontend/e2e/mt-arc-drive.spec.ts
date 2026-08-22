@@ -176,6 +176,76 @@ const proseFor = (title: string): string => {
   return PROSE.technical;
 };
 
+/**
+ * The primaries — a section is not only prose.
+ *
+ * A real proposal argues in figures, tables and schedules as much as in sentences, and each of
+ * those is a distinct canvas node with a distinct export path: a `table` renders natively as an
+ * OOXML table, a `chart` is drawn to SVG and rasterized, and an `image` resolves its storage key
+ * out of object storage and is rasterized too. Only the first of those three is pure data — the
+ * other two go through pipelines that FAIL QUIETLY, degrading to a grey "[Chart: bar]" or
+ * "[Image: …]" stub rather than throwing. So the only way to know they work is to author them and
+ * then open the file.
+ *
+ * Nodes are keyed by the section they belong in, and each figure carries its own caption node so
+ * the numbering ("Figure 1", "Table 2") is part of the document rather than an afterthought.
+ */
+type Node = { id: string; type: string; content: Record<string, unknown> };
+const textNode = (id: string, text: string): Node => ({ id, type: 'text_block', content: { text } });
+
+/** Phase I milestone schedule — the table every technical volume carries. */
+const milestoneTable = (): Node => ({
+  id: 'tbl-milestones',
+  type: 'table',
+  content: {
+    headers: ['Milestone', 'Month', 'Deliverable', 'Success criterion'],
+    rows: [
+      ['M1 · Mix qualification', '1–2', 'Rheology + cure report', '≥ 28 MPa at 28 days, slump 180–220 mm'],
+      ['M2 · Gantry integration', '2–4', 'Integrated print cell', 'Continuous 14-course wall, no cold joints'],
+      ['M3 · Expeditionary trial', '4–5', 'Field trial report', 'Shelter printed in < 26 h on unimproved grade'],
+      ['M4 · Phase II transition', '5–6', 'Phase II plan + data package', 'TRL 6 evidence accepted by the TPOC'],
+    ],
+    header_style: { bold: true, bg: '122342', fg: 'FFFFFF', alignment: 'left' },
+    border_style: 'single',
+  },
+});
+
+/** Throughput against the topic's threshold — the chart that makes the claim checkable. */
+const throughputChart = (): Node => ({
+  id: 'cht-throughput',
+  type: 'chart',
+  content: {
+    chart_type: 'bar',
+    title: 'Print throughput by course height (m²/h)',
+    categories: ['20 mm', '26 mm', '32 mm', '38 mm'],
+    series: [
+      { name: 'Measured (Rhode Island slab)', data: [3.1, 4.4, 5.2, 5.6], color: '#122342' },
+      { name: 'Topic threshold', data: [4.0, 4.0, 4.0, 4.0], color: '#C47A3A' },
+    ],
+  },
+});
+
+/** Phase I schedule as a Gantt — the same data a reviewer wants to see laid out in time. */
+const scheduleChart = (): Node => ({
+  id: 'cht-schedule',
+  type: 'chart',
+  content: {
+    chart_type: 'gantt',
+    title: 'Phase I schedule (months from award)',
+    categories: ['Mix qualification', 'Gantry integration', 'Expeditionary trial', 'Phase II transition'],
+    series: [
+      { name: 'Start', data: [0, 2, 4, 5] },
+      { name: 'End', data: [2, 4, 5, 6] },
+    ],
+  },
+});
+
+const caption = (id: string, prefix: 'Figure' | 'Table' | 'Chart', number: number, text: string): Node =>
+  ({ id, type: 'caption', content: { prefix, number, text } });
+
+const imageNode = (id: string, storageKey: string, alt: string, w: number, h: number): Node =>
+  ({ id, type: 'image', content: { storage_key: storageKey, alt_text: alt, width: w, height: h } });
+
 test('the arc: supply → customer → library → portal → authored → reviewed → exported', async ({ page, context }) => {
   test.setTimeout(90 * 60_000);
   for (const d of [SHOTS, DL]) fs.mkdirSync(d, { recursive: true });
@@ -615,21 +685,84 @@ test('the arc: supply → customer → library → portal → authored → revie
     return s;
   });
 
+  // ── upload the figures first, the way a customer does ────────────────────
+  // An image node references a STORAGE KEY, so the picture has to exist in object storage before
+  // any section can point at it. This is also the one step that proves storage is really wired:
+  // if the upload silently no-ops, the export degrades to a "[Image: …]" stub and everything else
+  // still looks green.
+  const figures: Record<string, { key: string; w: number; h: number }> = {};
+  for (const [name, alt, w, h] of [
+    ['northwind-print-bed', 'Gantry print bed mid-deposit, course 11 of 14', 1000, 620],
+    ['northwind-site-plan', 'Expeditionary basing layout — 11 printed shelters', 900, 560],
+  ] as Array<[string, string, number, number]>) {
+    await step(`upload figure ${name}`, state.adminEmail, async () => {
+      const p = path.join(__dirname, 'fixtures', 'figures', `${name}.png`);
+      if (!fs.existsSync(p)) throw new Error(`missing fixture ${p} — run scripts/make-figure-fixtures.py`);
+      const r = await page.request.post(`/api/portal/${state.slug}/uploads/image`, {
+        multipart: { file: { name: `${name}.png`, mimeType: 'image/png', buffer: fs.readFileSync(p) } },
+        timeout: 120_000,
+      });
+      if (!ok(r)) throw new Error(`uploads/image ${r.status()} ${(await r.text()).slice(0, 160)}`);
+      const key = ((await r.json().catch(() => ({})))?.data?.storageKey ?? '') as string;
+      if (!key) throw new Error('upload returned no storageKey');
+      figures[name] = { key, w, h };
+      rec(`figure stored`, 'system', 'note', `${name} → ${key}`);
+    });
+  }
+  hitl('figures', 'a proposal argues in pictures too — uploading the print-bed photo and the site plan before writing');
+
+  /** What each section carries beyond its prose. The technical volume gets the figure, the
+   *  schedule and the milestone table; the cost section gets the throughput chart it cites. */
+  const extrasFor = (title: string): Node[] => {
+    const t = title.toLowerCase();
+    const out: Node[] = [];
+    if (/technical objective|statement of work|significance|approach/.test(t)) {
+      const f = figures['northwind-print-bed'];
+      if (f) {
+        out.push(imageNode('img-print-bed', f.key, 'Gantry print bed mid-deposit, course 11 of 14', f.w, f.h));
+        out.push(caption('cap-print-bed', 'Figure', 1, 'Gantry print cell mid-deposit. Course 11 of 14, 26 mm bead, unimproved grade.'));
+      }
+      out.push(throughputChart());
+      out.push(caption('cap-throughput', 'Chart', 1, 'Measured throughput against the topic threshold at four course heights.'));
+      out.push(milestoneTable());
+      out.push(caption('cap-milestones', 'Table', 1, 'Phase I milestone schedule with success criteria.'));
+    }
+    if (/related work|facilities|equipment/.test(t)) {
+      const f = figures['northwind-site-plan'];
+      if (f) {
+        out.push(imageNode('img-site-plan', f.key, 'Expeditionary basing layout', f.w, f.h));
+        out.push(caption('cap-site-plan', 'Figure', 2, 'Basing layout printed in a single gantry pass — eleven shelters.'));
+      }
+    }
+    if (/schedule|objective|work/.test(t) && !out.some((n) => n.id === 'cht-schedule')) {
+      out.push(scheduleChart());
+      out.push(caption('cap-schedule', 'Chart', 2, 'Phase I schedule, months from award.'));
+    }
+    return out;
+  };
+
   let authored = 0;
+  let withPrimaries = 0;
   for (const sec of sections ?? []) {
     const body = proseFor(sec.title ?? '');
-    const r = await step(`author "${(sec.title ?? sec.id).slice(0, 44)}"`, state.adminEmail, async () => {
-      // The section save route is PUT. POSTing returns 405, which reads like a broken save
-      // rather than a wrong verb.
-      const res = await page.request.put(
-        `/api/portal/${state.slug}/proposals/${state.proposalId}/sections/${sec.id}/save`,
-        { data: { content: { nodes: [{ id: 'p1', type: 'text_block', content: { text: body } }] }, status: 'in_progress' }, timeout: 60_000 });
-      if (!ok(res)) throw new Error(`save ${res.status()} ${(await res.text()).slice(0, 120)}`);
-      return true;
-    });
-    if (r) authored++;
+    const extras = extrasFor(sec.title ?? '');
+    const r = await step(
+      `author "${(sec.title ?? sec.id).slice(0, 40)}"${extras.length ? ` +${extras.length} primaries` : ''}`,
+      state.adminEmail, async () => {
+        // The section save route is PUT. POSTing returns 405, which reads like a broken save
+        // rather than a wrong verb.
+        const nodes: Node[] = [textNode('p1', body), ...extras];
+        const res = await page.request.put(
+          `/api/portal/${state.slug}/proposals/${state.proposalId}/sections/${sec.id}/save`,
+          { data: { content: { nodes }, status: 'in_progress' }, timeout: 60_000 });
+        if (!ok(res)) throw new Error(`save ${res.status()} ${(await res.text()).slice(0, 120)}`);
+        return true;
+      });
+    if (r) { authored++; if (extras.length) withPrimaries++; }
   }
-  rec('sections authored', 'HITL', 'note', `${authored}/${(sections ?? []).length} — prose written by me, as the customer would`);
+  rec('sections authored', 'HITL', 'note',
+    `${authored}/${(sections ?? []).length} — prose written by me, as the customer would; ` +
+    `${withPrimaries} also carry figures, charts or tables`);
   await page.reload().catch(() => {});
   await shot(page, '11-authored');
 
@@ -875,6 +1008,46 @@ test('the arc: supply → customer → library → portal → authored → revie
     if (dupes.length) throw new Error(`duplicate section numbers: ${[...new Set(dupes)].join(', ')}`);
   });
 
+  // What is stored, as distinct from what is exported. Read the sections back out of the product
+  // and count the node types: if the primaries are missing HERE, the export never had a chance,
+  // and the docx check above would be blaming the exporter for a save that dropped them.
+  await step('the stored sections still hold the primaries', 'HITL', async () => {
+    // COUNT NODES WITHOUT ASSUMING AN ENVELOPE. Two earlier versions of this check guessed where
+    // the canvas lives in the response — the sections LIST (which returns only metadata, never the
+    // document) and then a nested `data.sections[].content` — and both reported zero, indicting a
+    // save that was in fact perfect while the exported .docx sat there full of the very figures
+    // they claimed were missing. A check that can falsely accuse the product is worse than no
+    // check. So walk the whole payload and count anything shaped like a canvas node, wherever it
+    // sits and whether `content` arrives as an object or a JSON string.
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals/${state.proposalId}/document`, { timeout: 120_000 });
+    if (!ok(r)) throw new Error(`document ${r.status()}`);
+    const NODE_TYPES = new Set(['text_block', 'heading', 'image', 'chart', 'table', 'caption',
+      'bulleted_list', 'numbered_list', 'divider', 'page_break', 'callout', 'blockquote']);
+    const tally: Record<string, number> = {};
+    const walk = (v: unknown, depth = 0): void => {
+      if (depth > 12 || v == null) return;
+      if (typeof v === 'string') {
+        // A section's canvas often arrives as a JSON string; parse it and keep walking.
+        if (v.length > 2 && v.trimStart().startsWith('{')) {
+          try { walk(JSON.parse(v), depth + 1); } catch { /* not a document */ }
+        }
+        return;
+      }
+      if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
+      if (typeof v !== 'object') return;
+      const o = v as Record<string, unknown>;
+      if (typeof o.type === 'string' && NODE_TYPES.has(o.type) && 'content' in o) {
+        tally[o.type] = (tally[o.type] ?? 0) + 1;
+      }
+      for (const x of Object.values(o)) walk(x, depth + 1);
+    };
+    walk(await r.json().catch(() => ({})));
+    rec('stored node types', 'system', 'note',
+      Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(' · ') || '(none)');
+    const missing = (['image', 'chart', 'table', 'caption'] as const).filter((t) => !tally[t]);
+    if (missing.length) throw new Error(`the assembled document exposes no ${missing.join(', ')} node(s)`);
+  });
+
   // ── docx: a real OOXML package whose body carries the titles IN ORDER ──
   await step('docx is OOXML and its body carries the sections in order', 'HITL', async () => {
     const f = path.join(DL, 'arc-proposal.docx');
@@ -901,6 +1074,24 @@ test('the arc: supply → customer → library → portal → authored → revie
       throw new Error(`${outOfOrder.length} section(s) appear out of order in the docx body, first: "${outOfOrder[0].t.slice(0, 50)}"`);
     }
     rec('docx body order matches the export', 'HITL', 'ok', `${found.length} titles in ascending document position`);
+
+    // ── THE PRIMARIES: pictures, tables and charts, or the stubs that replace them ──
+    // Every one of these degrades QUIETLY. An image whose storage key does not resolve, a chart
+    // whose SVG fails to rasterize, a table the writer skipped — none of them throw. The docx just
+    // comes out with grey italic "[Image: …]" / "[Chart: bar]" text where the figure belonged, and
+    // a byte-count check calls that a pass. So: count the real ones, and fail on the stubs.
+    // `word/media/` itself is a directory entry in the zip listing — count only actual files.
+    const media = names.filter((n) => /^word\/media\/.+\.\w+$/.test(n));
+    const tables = (xml.match(/<w:tbl>/g) ?? []).length;
+    const stubs = [...plain.matchAll(/\[(Image|Chart|Table):/g)].map((m) => m[1]);
+    rec('docx carries real pictures', 'HITL', media.length > 0 ? 'ok' : 'blocked',
+      media.length ? `${media.length} embedded image part(s): ${media.slice(0, 4).join(', ')}` : 'word/media is EMPTY — every figure exported as a text stub');
+    rec('docx carries real tables', 'HITL', tables > 0 ? 'ok' : 'blocked',
+      tables ? `${tables} native <w:tbl> element(s)` : 'no OOXML table in the body');
+    if (stubs.length) {
+      throw new Error(`${stubs.length} figure(s) exported as placeholder stubs instead of content: ${[...new Set(stubs)].join(', ')}`);
+    }
+    rec('no figure degraded to a placeholder', 'HITL', 'ok', 'no "[Image:" / "[Chart:" stub anywhere in the body');
   });
 
   // ── pdf: real pages, real text, and a page count to hold against the budget ──

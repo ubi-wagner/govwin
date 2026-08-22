@@ -14,6 +14,12 @@ review and export was composed by driving the real surfaces.
 
 - **Read first: `docs/MIDTERM_RESULTS.md`** — the nine acts, the ledger, the artifacts as opened
   (not as counted), and what the run deliberately does not cover.
+- **The primaries are part of it.** Sections carry images, tables, charts and captions, not just
+  prose: two photographs uploaded through the customer's own image surface, a milestone table, a
+  throughput bar chart and a Phase I Gantt. Each leaves the canvas a different way (native OOXML
+  table · SVG rasterized for Word but kept vector in the PDF · storage key fetched and inlined) and
+  **all three degrade to a grey `[Image: …]` stub instead of failing**, so the drive counts the real
+  ones and fails on the stubs. Fixtures: `scripts/make-figure-fixtures.py`.
 - **The drive: `frontend/e2e/mt-arc-drive.spec.ts`** — run it with
   `scripts/reset-minimal.sh && scripts/mt-run.sh mt-arc-drive`. It never throws on a block: every
   step is recorded `ok` / `decision` / `override` / `note` / `blocked` and the arc continues, so a

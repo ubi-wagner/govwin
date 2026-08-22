@@ -384,6 +384,14 @@ sec(id="canvas", toc="8 · The canvas editor", heading="The section canvas — w
          "matrix. The top bar carries the title, a status pill, export buttons, Undo/Redo, <b>+ From Library</b>, "
          "<b>Save</b>, and (admins) <b>Complete &amp; Lock</b>.</p>",
     img=TS+"canvas.png", caption="The canvas editor — toolbar, page canvas, and the toolbox sidebar.",
+    callouts=[{"kind":"tip","html":
+      "<b>Argue in figures, not only sentences.</b> A section is a document, so put the picture, the "
+      "table and the chart where a reviewer expects them. Each is its own block with its own export "
+      "path: a <b>table</b> becomes a real Word table, a <b>chart</b> is drawn from your numbers "
+      "(vector in the PDF, a sharp image in Word), and an uploaded <b>image</b> is embedded in the "
+      "file rather than linked — so the download stands on its own. Give every figure a "
+      "<b>caption</b> block; that is what numbers it “Figure 1”, “Table 1”, "
+      "“Chart 1” in the finished document."}],
     subs=[
       {"id":"canvas-toolbar","heading":"The formatting toolbar & node types","toc":"8.1 · Toolbar & nodes",
        "steps":[
