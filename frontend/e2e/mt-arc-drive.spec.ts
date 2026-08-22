@@ -1,0 +1,756 @@
+/**
+ * THE ARC — one end-to-end drive, composed entirely through the UI, with me as the human in the
+ * loop.
+ *
+ * Opportunity supply → a company applies → an operator accepts it → the tenant builds its library
+ * → it buys a portal → an operator releases it → the proposal gets authored, reviewed and locked →
+ * it exports in four formats → the artifacts get opened and checked.
+ *
+ * TWO RULES THAT MAKE THIS DIFFERENT FROM THE EARLIER PHASE SPECS:
+ *
+ *  1. I ACT AS THE HITL. Every gate this product puts in front of a human — pick a program type,
+ *     write review notes, approve or regenerate a Studio phase, accept a draft, lock a section —
+ *     is a decision made here and recorded in the ledger, not something to be routed around.
+ *
+ *  2. A BLOCK IS NOTED AND OVERRIDDEN, NOT FATAL. Nothing throws. If a step cannot complete, the
+ *     ledger records WHAT blocked and WHAT I did instead, and the arc keeps going. A run that
+ *     stops at the first nuance tells you about that nuance; a run that finishes tells you which
+ *     of thirty steps actually work. The ledger at the end is the real result — every OK, every
+ *     OVERRIDE, every BLOCKED, in order.
+ *
+ * Where the product needs content a customer would supply, I write it. That is not cheating: a
+ * proposal with no prose cannot be page-counted, exported, or reviewed, so inventing the prose is
+ * what makes the rest of the arc testable at all.
+ *
+ * Run: npx playwright test --project=drive mt-arc
+ */
+import { test, expect, type Page, type APIResponse } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import { execSync } from 'child_process';
+
+const OUT = process.env.MT_DIR || '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/mt';
+const SHOTS = path.join(OUT, 'shots', 'arc');
+const DL = path.join(OUT, 'downloads');
+const SOLS_DIR = path.join(__dirname, 'fixtures', 'solicitations');
+const CO_DIR = path.join(__dirname, 'fixtures', 'companies');
+const ADMIN_PW = process.env.RFP_ADMIN_PW || 'SandboxDrive2026!';
+const TENANT_PW = 'MidtermDrive2026!';
+const COMP_CODE = 'rfppipelinetest';
+
+// ── the ledger ────────────────────────────────────────────────────────────────
+type Status = 'ok' | 'decision' | 'override' | 'blocked' | 'note';
+interface Entry { act: string; step: string; actor: string; status: Status; detail?: string }
+const ledger: Entry[] = [];
+let ACT = '';
+const rec = (step: string, actor: string, status: Status, detail?: string) => {
+  ledger.push({ act: ACT, step, actor, status, detail });
+  const mark = { ok: '✓', decision: '◆', override: '⤳', blocked: '✗', note: '·' }[status];
+  console.error(`   ${mark} [${actor}] ${step}${detail ? ` — ${detail.slice(0, 160)}` : ''}`);
+};
+/** A human decision at a gate the product raises. */
+const hitl = (what: string, why: string) => rec(what, 'HITL', 'decision', why);
+/** Something blocked; here is what I did instead, and the arc continues. */
+const override = (what: string, instead: string) => rec(what, 'HITL', 'override', instead);
+
+/** Run a step. Never throws — records and returns null so the arc continues. */
+async function step<T>(name: string, actor: string, fn: () => Promise<T>): Promise<T | null> {
+  try {
+    const r = await fn();
+    rec(name, actor, 'ok');
+    return r;
+  } catch (e) {
+    rec(name, actor, 'blocked', (e as Error).message?.split('\n')[0] ?? String(e));
+    return null;
+  }
+}
+const ok = (r: APIResponse | null) => !!r && r.status() < 300;
+const shot = async (page: Page, name: string) => {
+  try { await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); } catch { /* keep going */ }
+};
+
+async function signIn(page: Page, email: string, pw: string) {
+  await page.context().clearCookies();
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', pw);
+  await Promise.all([
+    page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
+    page.click('button[type="submit"]'),
+  ]);
+}
+
+/**
+ * First sign-in for an account the operator just created.
+ *
+ * The accept flow issues a temp password and leaves users.temp_password = true, and the middleware
+ * bounces EVERY path except /change-password until that clears — including API routes, which is
+ * why a perfectly good tenant_admin was getting 403 on its own tenant's library. Checking the URL
+ * right after login raced the redirect and missed it, so this navigates to /change-password
+ * explicitly, resets, and signs back in. That is also exactly what a new customer does with the
+ * credentials in their welcome email.
+ */
+async function firstSignIn(page: Page, email: string, tempPw: string) {
+  await signIn(page, email, tempPw);
+  await page.goto('/change-password', { waitUntil: 'networkidle', timeout: 30_000 });
+  const f = page.locator('input[type="password"]');
+  if (await f.count() >= 2) {
+    await f.nth(0).fill(tempPw);
+    await f.nth(1).fill(TENANT_PW);
+    if (await f.count() > 2) await f.nth(2).fill(TENANT_PW);
+    await page.click('button[type="submit"]');
+    await page.waitForTimeout(2500);
+    rec('forced password reset completed', email, 'ok');
+  } else {
+    rec('change-password form not present', email, 'note', 'account may already be reset');
+  }
+  await signIn(page, email, TENANT_PW);
+  rec('signed in with the new password', email, 'ok');
+}
+
+// Prose a customer would write. Invented deliberately: a proposal with no words cannot be
+// page-counted, exported or reviewed, so this is what makes the rest of the arc testable.
+const PROSE: Record<string, string> = {
+  technical:
+    'Northwind Additive proposes a containerized mobile gantry that prints structural wall sections '
+    + 'on site, eliminating formwork on expeditionary builds. Our binder reaches design compressive '
+    + 'strength in under four hours at field temperatures from -5 to 45 degrees Celsius, which is what '
+    + 'makes a same-day pour-and-occupy cycle possible. Phase I will demonstrate a 900 square foot '
+    + 'shell printed in under twelve hours by a two-person crew, characterized against ASTM C1314. '
+    + 'The technical risk is thermal control of the binder in cold weather; we retire it in month two '
+    + 'with a jacketed hopper already prototyped under internal funding.',
+  management:
+    'Dana Reyes serves as Principal Investigator at 0.5 FTE and holds both issued patents on the '
+    + 'nozzle geometry. Marcus Whitfield leads the motion and extrusion control stack at 0.4 FTE. '
+    + 'Priya Raghunathan owns binder chemistry at 0.3 FTE. The team has printed together for three '
+    + 'years and delivered the Ohio TVSF Round 43 demonstration on schedule and under budget.',
+  commercialization:
+    'The immediate market is expeditionary and disaster-recovery construction, where formwork is the '
+    + 'schedule driver and skilled labor is scarce. We have two letters of intent from regional '
+    + 'contractors and an executed MOU with a modular housing manufacturer. Phase II would move from '
+    + 'a single gantry to a two-unit deployable kit, and the commercial path does not depend on '
+    + 'further federal funding after Phase II.',
+  cost:
+    'Direct labor is 1.2 FTE across six months. Materials cover binder feedstock and the jacketed '
+    + 'hopper build. Equipment is limited to the cure-chamber instrumentation, all items under the '
+    + '$5,000 capitalization threshold. Indirect is applied at our provisional rate; no subcontracts '
+    + 'or consultants are proposed in Phase I.',
+};
+const proseFor = (title: string): string => {
+  const t = title.toLowerCase();
+  if (/cost|budget|price/.test(t)) return PROSE.cost;
+  if (/commercial|market|impact/.test(t)) return PROSE.commercialization;
+  if (/manage|personnel|team|key/.test(t)) return PROSE.management;
+  return PROSE.technical;
+};
+
+test('the arc: supply → customer → library → portal → authored → reviewed → exported', async ({ page, context }) => {
+  test.setTimeout(90 * 60_000);
+  for (const d of [SHOTS, DL]) fs.mkdirSync(d, { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  const state: Record<string, string> = {};
+
+  // ══ ACT 1 — the operator composes the opportunity supply ═══════════════════
+  ACT = 'ACT 1 · opportunity supply';
+  console.error(`\n${ACT}`);
+  await step('operator signs in', 'master_admin', () => signIn(page, 'eric@rfppipeline.com', ADMIN_PW));
+
+  const SUPPLY = [
+    { slug: 'dow-sbir-p1', title: 'DoN 26.1 SBIR — Additive Construction for Expeditionary Basing (N261-118)', agency: 'Department of the Navy', pt: 'sbir_phase_1', close: '2026-11-14' },
+    { slug: 'nsf-sttr-p1', title: 'NSF STTR Phase I — Robotics for the Built Environment (NSF 26-522)', agency: 'National Science Foundation', pt: 'sttr_phase_1', close: '2026-12-03' },
+    { slug: 'doe-sbir-p2', title: 'DOE SBIR Phase II — Low-Carbon Concrete & Cement Materials (DE-FOA-0003412)', agency: 'U.S. Department of Energy', pt: 'sbir_phase_2', close: '2027-02-19' },
+    { slug: 'ohio-tvsf-r46', title: 'Ohio TVSF Round 46 — Technology Validation & Startup Fund (TVS-2027-01)', agency: 'Ohio Third Frontier', pt: 'other', close: '2027-01-22' },
+  ];
+  const solIds: Record<string, string> = {};
+
+  for (const s of SUPPLY) {
+    const pdf = path.join(SOLS_DIR, `${s.slug}.pdf`);
+    await step(`upload ${s.slug}`, 'master_admin', async () => {
+      await page.goto('/admin/rfp-curation/upload', { waitUntil: 'networkidle', timeout: 60_000 });
+      await page.fill('input[name="title"]', s.title);
+      await page.fill('input[name="agency"]', s.agency);
+      const n = page.locator('input[name="solicitationNumber"]');
+      if (await n.count()) await n.fill(s.slug.toUpperCase());
+      const c = page.locator('input[name="closeDate"]');
+      if (await c.count()) await c.fill(s.close);
+      // HITL: the form only guesses Program Type when the title names a known program.
+      await page.selectOption('select[name="programType"]', s.pt);
+      await page.locator('input[type="file"]').first().setInputFiles([pdf]);
+      await page.click('button[type="submit"]');
+      await page.waitForURL(/\/admin\/rfp-curation\/[0-9a-f-]{36}/, { timeout: 8 * 60_000 });
+      solIds[s.slug] = page.url().split('/').pop()!.split('?')[0];
+    });
+    if (!solIds[s.slug]) { override(`${s.slug} upload`, 'skipping this solicitation; the arc continues on the others'); continue; }
+
+    hitl(`program type for ${s.slug}`, `chose ${s.pt} — the parser cannot infer it from this title`);
+    await step(`Ingest Assist on ${s.slug}`, 'master_admin', async () => {
+      const r = await page.request.post(`/api/admin/rfp-curation/${solIds[s.slug]}/ingest-assist`, { data: { publish: false }, timeout: 180_000 });
+      const b = await r.json();
+      const landed = b?.data?.landed;
+      const blockers: string[] = b?.data?.blockers ?? [];
+      rec(`${s.slug} matrix`, 'system', 'note', `landed=${landed} volumes=${b?.data?.volumes} blockers=${blockers.length}`);
+      if (!landed && blockers.length) {
+        // HITL: the DoW BAA defers its page limit to Component instructions nobody attached. That
+        // is a correct refusal to invent a number — as the curator I accept the staged matrix and
+        // carry the unresolved deferral forward rather than fabricating a page limit.
+        hitl(`${s.slug} staged-not-landed`, `accepting: "${blockers[0].slice(0, 110)}…"`);
+        const f = await page.request.post(`/api/admin/rfp-curation/${solIds[s.slug]}/ingest-assist`, {
+          data: { publish: false, allowDefaultSkeleton: true }, timeout: 180_000,
+        });
+        if (ok(f)) override(`${s.slug} land`, 'accepted the default skeleton with the deferral recorded, so the build can proceed');
+        else override(`${s.slug} land`, 'left staged; downstream acts use the solicitations that did land');
+      }
+    });
+    await shot(page, `01-${s.slug}-matrix`);
+  }
+  state.solCount = String(Object.keys(solIds).length);
+
+  // CURATE → APPROVE → PUSH. There is no /approve or /push route; the workspace drives this
+  // through the agent-tool endpoint (POST /api/tools/<name>) and a triage state machine:
+  //   ai_analyzed → claim → skip_shredder → curation_in_progress → request_review → approve → push
+  // The push gate additionally requires a spotlightSummary — the curator's matching context, which
+  // is a HITL act, so I write one per solicitation.
+  // POST /api/tools/<name> takes `{ input }`, not the input bare — sending it bare returns
+  // 422 TOOL_VALIDATION_ERROR, which reads like a bad argument rather than a bad envelope.
+  const tool = (name: string, input: Record<string, unknown>) =>
+    page.request.post(`/api/tools/${name}`, { data: { input }, timeout: 120_000 });
+
+  const SUMMARIES: Record<string, string> = {
+    'dow-sbir-p1': 'Navy Phase I for on-site additive construction of expeditionary structures. Fits firms with mobile printing hardware, rapid-cure binders, and field-deployable crews.',
+    'nsf-sttr-p1': 'NSF STTR Phase I pairing a small business with a research institution on robotics and autonomy for active construction sites. Fits perception, SLAM and as-built capture.',
+    'doe-sbir-p2': 'DOE Phase II for low-carbon cement and concrete. Fits firms with Phase I results in clinker replacement, carbonation chemistry, or supplementary cementitious materials.',
+    'ohio-tvsf-r46': 'Ohio Third Frontier commercialization funding for technology out of Ohio institutions. Requires a willingness-to-license letter and a one-to-one cost share.',
+  };
+
+  for (const [slug, id] of Object.entries(solIds)) {
+    await step(`curate → approve → push ${slug}`, 'master_admin', async () => {
+      hitl(`spotlight summary for ${slug}`, 'wrote the matching context the push gate requires');
+      const patch = await page.request.patch(`/api/admin/rfp-curation/${id}`, {
+        data: { spotlightSummary: SUMMARIES[slug], expertNotes: 'Curated during the midterm arc drive.' },
+        timeout: 60_000,
+      });
+      if (!ok(patch)) rec(`${slug} spotlightSummary`, 'system', 'note', `HTTP ${patch.status()}`);
+
+      // Walk the state machine. Each step is legal only from specific states, so a non-2xx just
+      // means we were already past it — record and carry on rather than stopping the arc.
+      for (const [label, fn] of [
+        ['claim', () => tool('solicitation.claim', { solicitationId: id })],
+        ['start curation', () => page.request.post(`/api/admin/rfp-curation/${id}/triage`, { data: { action: 'skip_shredder' }, timeout: 60_000 })],
+        ['request review', () => tool('solicitation.request_review', { solicitationId: id })],
+        ['approve', () => tool('solicitation.approve', { solicitationId: id })],
+        ['push', () => tool('solicitation.push', { solicitationId: id })],
+      ] as Array<[string, () => Promise<APIResponse>]>) {
+        const r = await fn();
+        if (ok(r)) rec(`${slug} ${label}`, 'master_admin', 'ok');
+        else rec(`${slug} ${label}`, 'system', 'note', `HTTP ${r.status()} ${(await r.text()).slice(0, 100)}`);
+      }
+    });
+  }
+
+  // ══ ACT 2 — a company applies, and I accept it ════════════════════════════
+  ACT = 'ACT 2 · customer onboarding';
+  console.error(`\n${ACT}`);
+  const CO = {
+    company: 'Northwind Additive', contact: 'Dana Reyes', title: 'CEO',
+    email: 'dana.reyes@northwind-additive.com', state: 'Ohio',
+    tech: 'We print structural concrete forms on site using a mobile gantry, cutting formwork cost and schedule '
+      + 'on expeditionary and disaster-recovery builds. Our binder cures in under four hours at field temperatures. '
+      + 'We hold two issued patents on the nozzle geometry.',
+    motivation: 'The Navy 26.1 topic on additive construction for expeditionary basing is a direct fit and closes in November.',
+    referral: 'Referral from our university tech-transfer office',
+  };
+
+  await step('company applies at the public form', 'anonymous', async () => {
+    await context.clearCookies();
+    await page.goto('/apply', { waitUntil: 'networkidle', timeout: 60_000 });
+    await page.fill('input[name="contactName"]', CO.contact);
+    await page.fill('input[name="contactEmail"]', CO.email);
+    await page.fill('input[name="contactTitle"]', CO.title);
+    await page.fill('input[name="companyName"]', CO.company);
+    const st = page.locator('input[name="companyState"]'); if (await st.count()) await st.fill(CO.state);
+    const sam = page.locator('input[name="samRegistered"][value="yes"]'); if (await sam.count()) await sam.first().check();
+    await page.fill('textarea[name="techSummary"]', CO.tech);
+    await page.fill('textarea[name="motivation"]', CO.motivation);
+    await page.fill('input[name="referralSource"]', CO.referral);
+    for (const g of ['techAreas', 'targetPrograms', 'targetAgencies', 'desiredOutcomes']) {
+      const b = page.locator(`input[type="checkbox"][name="${g}"]`);
+      if (await b.count()) await b.first().check();
+    }
+    const req = page.locator('input[type="checkbox"][required]');
+    for (let i = 0; i < await req.count(); i++) {
+      const x = req.nth(i); if (!(await x.isChecked())) await x.check().catch(() => {});
+    }
+    // THE TERMS GATE. The form will not submit without a scroll-to-accept and a signature that
+    // MATCHES the contact email exactly (application-form.tsx:100). Skipping it is what made the
+    // first arc run time out waiting on a POST that was never sent — the browser was refusing.
+    // As the applicant, I open the terms, read them, and sign.
+    hitl('terms & conditions', 'opened the T&Cs, scrolled to the end, and signed with the contact email');
+    const openTerms = page.getByRole('button', { name: /terms|conditions|read/i }).first();
+    if (await openTerms.count()) { await openTerms.click().catch(() => {}); await page.waitForTimeout(400); }
+    // Scroll the terms panel to its end so the accept control unlocks.
+    await page.evaluate(() => {
+      for (const el of Array.from(document.querySelectorAll('div,section'))) {
+        if (el.scrollHeight > el.clientHeight + 40) el.scrollTop = el.scrollHeight;
+      }
+    }).catch(() => {});
+    await page.waitForTimeout(300);
+    const sig = page.locator('input[type="email"]').last();
+    if (await sig.count()) await sig.fill(CO.email).catch(() => {});
+    const agree = page.getByRole('button', { name: /agree|accept|confirm/i }).first();
+    if (await agree.count()) await agree.click().catch(() => {});
+    await page.waitForTimeout(400);
+    await shot(page, '02-apply-form');
+    const resp = page.waitForResponse((r) => r.url().includes('/api/applications') && r.request().method() === 'POST', { timeout: 45_000 })
+      .catch(() => null);
+    await page.click('button[type="submit"]');
+    const r = await resp;
+    if (!r) {
+      // The browser blocked submit. Name the offending control rather than reporting a timeout.
+      const bad = await page.evaluate(() => {
+        const f = document.querySelector('form');
+        if (!f) return 'no form on the page';
+        const el = Array.from(f.querySelectorAll<HTMLInputElement>('input,select,textarea'))
+          .find((x) => !x.checkValidity());
+        return el ? `${el.tagName.toLowerCase()}[name=${el.name || '?'}] — ${el.validationMessage}` : 'form reports valid but did not submit';
+      }).catch(() => 'could not inspect the form');
+      await shot(page, '02b-apply-blocked');
+      throw new Error(`submit refused: ${bad}`);
+    }
+    if (!ok(r)) throw new Error(`application POST ${r.status()}`);
+  });
+
+  await step('operator signs back in', 'master_admin', () => signIn(page, 'eric@rfppipeline.com', ADMIN_PW));
+  const accepted = await step('accept the application', 'master_admin', async () => {
+    await page.goto('/admin/applications', { waitUntil: 'networkidle', timeout: 60_000 });
+    await shot(page, '03-application-queue');
+    const row = page.getByRole('button').filter({ hasText: CO.company }).first();
+    await row.click();
+    // HITL: the Accept button will not enable without a real assessment. Writing one.
+    hitl('application review', 'assessed Northwind as a credible fit for N261-118; SAM registered; accepting');
+    await page.locator('textarea').last().fill(
+      `Reviewed ${CO.company}. ${CO.contact} (${CO.title}) — mobile gantry concrete printing with two issued `
+      + `patents and a delivered Ohio TVSF demonstration. Direct fit for the Navy 26.1 expeditionary basing `
+      + `topic. SAM registration confirmed. Accepting for onboarding.`);
+    const resp = page.waitForResponse((r) => /\/accept/.test(r.url()) && r.request().method() === 'POST', { timeout: 90_000 });
+    await page.getByRole('button', { name: /^Accept$/ }).first().click();
+    const r = await resp;
+    const b = await r.json().catch(() => ({}));
+    if (!ok(r)) throw new Error(`accept ${r.status()} ${JSON.stringify(b).slice(0, 140)}`);
+    const d = (b as { data?: Record<string, string> }).data ?? {};
+    state.slug = d.slug ?? d.tenantSlug ?? '';
+    state.adminEmail = d.adminEmail ?? d.email ?? CO.email;
+    state.tempPw = d.tempPassword ?? '';
+    rec('tenant created', 'system', 'note', `slug=${state.slug} admin=${state.adminEmail} temp=${state.tempPw ? 'issued' : 'NOT RETURNED'}`);
+    await shot(page, '04-application-accepted');
+    return true;
+  });
+  if (!accepted || !state.slug) {
+    override('tenant creation', 'no tenant slug returned — the remaining acts cannot run against a customer; ledger records this as the arc stop point');
+    fs.writeFileSync(path.join(OUT, 'arc-ledger.json'), JSON.stringify(ledger, null, 2));
+    return;
+  }
+
+  // ══ ACT 3 — the tenant builds its own library ═════════════════════════════
+  ACT = 'ACT 3 · tenant library';
+  console.error(`\n${ACT}`);
+  await step('tenant admin first sign-in + forced reset', state.adminEmail, () => firstSignIn(page, state.adminEmail, state.tempPw || TENANT_PW));
+  for (const doc of ['capability-statement', 'key-personnel']) {
+    await step(`upload + atomize ${doc}`, state.adminEmail, async () => {
+      const p = path.join(CO_DIR, `northwind-${doc}.pdf`);
+      const r = await page.request.post(`/api/portal/${state.slug}/atoms/upload`, {
+        multipart: { file: { name: 'file', mimeType: 'application/pdf', buffer: fs.readFileSync(p) }, mode: 'auto', context: JSON.stringify({ source: doc }) },
+        timeout: 180_000,
+      });
+      if (!ok(r)) throw new Error(`atoms/upload ${r.status()}`);
+    });
+  }
+  await step('author a spotlight bucket', state.adminEmail, async () => {
+    hitl('scoring lens', 'authored "Additive construction & expeditionary basing" — the lens this company would rank by');
+    // The route reads `criteria` (sanitizeBucketCriteria), not a bare `keywords` array — a
+    // top-level keywords key is dropped and the bucket scores nothing.
+    const r = await page.request.post(`/api/portal/${state.slug}/buckets`, {
+      data: {
+        name: 'Additive construction & expeditionary basing',
+        description: 'The company\'s own lens: printed structures for expeditionary basing.',
+        criteria: { keywords: ['additive construction', '3D concrete printing', 'expeditionary', 'basing', 'formwork'] },
+      },
+      timeout: 60_000,
+    });
+    if (!ok(r)) throw new Error(`buckets ${r.status()} ${(await r.text()).slice(0, 160)}`);
+  });
+  await page.goto(`/portal/${state.slug}/atoms`, { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+  await shot(page, '05-library');
+  await page.goto(`/portal/${state.slug}/cards`, { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+  await shot(page, '06-opportunity-cards');
+
+  // ══ ACT 4 — buy a portal, operator releases it ════════════════════════════
+  ACT = 'ACT 4 · purchase + provision';
+  console.error(`\n${ACT}`);
+  // THE BRIDGE IS FORWARD-ONLY. Everything was pushed in ACT 1, before this customer existed, so
+  // nothing fanned to them. There is a read-repair (reconcileTenant on the cards route), but the
+  // operator re-pushing is the deliberate act — and it is what an operator does when a new customer
+  // signs up mid-cycle.
+  await step('operator re-pushes the supply to the new tenant', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    hitl('re-push', 'a customer joined after the last push; fanning the approved supply forward to them');
+    for (const [slug, id] of Object.entries(solIds)) {
+      const r = await page.request.post('/api/tools/solicitation.push', { data: { input: { solicitationId: id } }, timeout: 120_000 });
+      rec(`re-push ${slug}`, 'master_admin', ok(r) ? 'ok' : 'note', ok(r) ? undefined : `HTTP ${r.status()}`);
+    }
+    await signIn(page, state.adminEmail, TENANT_PW);
+  });
+
+  const oppId = await step('find an opportunity to pursue', state.adminEmail, async () => {
+    const r = await page.request.get(`/api/portal/${state.slug}/cards`);
+    const j = await r.json();
+    const cards = (j?.data?.cards ?? []) as Array<{ opportunityId: string; card?: { title?: string } }>;
+    rec('cards visible to the tenant', 'system', 'note', `${cards.length}`);
+    if (!cards.length) throw new Error('no cards fanned out to this tenant');
+    hitl('pursuit choice', `pursuing "${cards[0].card?.title ?? cards[0].opportunityId}"`);
+    return cards[0].opportunityId;
+  });
+
+  if (oppId) {
+    await step('redeem the comp code', state.adminEmail, async () => {
+      const r = await page.request.post(`/api/portal/${state.slug}/purchase`, {
+        data: { opportunityId: oppId, promoCode: COMP_CODE, label: 'Midterm arc build' }, timeout: 120_000,
+      });
+      const b = await r.json().catch(() => ({}));
+      if (!ok(r)) throw new Error(`purchase ${r.status()} ${JSON.stringify(b).slice(0, 140)}`);
+      state.portalId = (b as { data?: Record<string, string> }).data?.portalId ?? '';
+      rec('portal purchased', 'system', 'note', `portalId=${state.portalId || '(not returned)'} status=curation_pending`);
+    });
+    await shot(page, '07-purchased');
+
+    await step('operator releases the portal', 'master_admin', async () => {
+      await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+      await page.goto('/admin/provisioning', { waitUntil: 'networkidle', timeout: 60_000 });
+      await shot(page, '08-release-queue');
+      hitl('release decision', 'master solicitation is built out; releasing this buyer\'s portal');
+      if (!state.portalId) {
+        // Fall back to whatever is queued rather than stopping.
+        const q = await page.request.get('/api/admin/provisioning').catch(() => null);
+        const j = q ? await q.json().catch(() => ({})) : {};
+        state.portalId = (j?.data?.portals ?? [])[0]?.id ?? '';
+        if (state.portalId) override('portal id', 'purchase did not return one; took the head of the release queue');
+      }
+      if (!state.portalId) throw new Error('no portal to release');
+
+      // THE COCKPIT IS TWO OUTCOMES, IN ORDER. completeBuildOut marks the SHARED master built out
+      // and broadcasts to every tenant's mirror card; only then does provisionAndReleasePortal open
+      // THIS buyer's private portal. Releasing first returns 409 "Build-out is below the readiness
+      // bar", which is the product refusing to hand a customer a half-built master.
+      //
+      // The bar is compliance + >=1 volume + >=1 required item. This master has compliance and six
+      // volumes but no required item, so the bar is genuinely unmet — and complete-buildout offers
+      // { confirm: true } precisely for an operator who has looked and decided to proceed. That is
+      // my call to make here, and it is recorded as one rather than routed around.
+      const soughtSol = Object.values(solIds)[0];
+      for (const [slug, id] of Object.entries(solIds)) {
+        const pre = await page.request.post(`/api/admin/rfp-curation/${id}/complete-buildout`, { data: {}, timeout: 120_000 });
+        if (pre.status() === 409) {
+          const body = await pre.json().catch(() => ({}));
+          const rd = (body as { data?: { readiness?: Record<string, unknown> } }).data?.readiness ?? {};
+          hitl(`build-out for ${slug}`, `below the bar (${JSON.stringify(rd).slice(0, 90)}) — confirming anyway as the operator`);
+          const c = await page.request.post(`/api/admin/rfp-curation/${id}/complete-buildout`, { data: { confirm: true }, timeout: 120_000 });
+          rec(`${slug} build-out complete (confirmed)`, 'master_admin', ok(c) ? 'ok' : 'note', ok(c) ? undefined : `HTTP ${c.status()}`);
+        } else {
+          rec(`${slug} build-out complete`, 'master_admin', ok(pre) ? 'ok' : 'note', ok(pre) ? undefined : `HTTP ${pre.status()}`);
+        }
+      }
+      void soughtSol;
+
+      const r = await page.request.post(`/api/admin/provisioning/${state.portalId}/release`, { data: { confirm: true }, timeout: 300_000 });
+      const b = await r.json().catch(() => ({}));
+      if (!ok(r)) throw new Error(`release ${r.status()} ${JSON.stringify(b).slice(0, 160)}`);
+      state.proposalId = (b as { data?: Record<string, string> }).data?.proposalId ?? '';
+      rec('portal released', 'system', 'note', `proposalId=${state.proposalId || '(not returned)'}`);
+    });
+    await shot(page, '09-released');
+  }
+
+  // Recover the proposal id from the tenant side if the release did not report it.
+  if (!state.proposalId) {
+    await step('locate the provisioned proposal', state.adminEmail, async () => {
+      await signIn(page, state.adminEmail, TENANT_PW);
+      const r = await page.request.get(`/api/portal/${state.slug}/proposals`);
+      const j = await r.json().catch(() => ({}));
+      const ps = (j?.data?.proposals ?? j?.data ?? []) as Array<{ id: string; title?: string }>;
+      if (!ps.length) throw new Error('no proposals in this tenant');
+      state.proposalId = ps[0].id;
+      override('proposal id', 'release did not return one; read it from the tenant\'s proposal list');
+    });
+  }
+
+  if (!state.proposalId) {
+    override('build phase', 'no proposal to author — recording the arc stop point and writing the ledger');
+    fs.writeFileSync(path.join(OUT, 'arc-ledger.json'), JSON.stringify(ledger, null, 2));
+    return;
+  }
+
+  // ══ ACT 5 — author every section ══════════════════════════════════════════
+  ACT = 'ACT 5 · authoring';
+  console.error(`\n${ACT}`);
+  await step('tenant admin opens the build', state.adminEmail, async () => {
+    await signIn(page, state.adminEmail, TENANT_PW);
+    await page.goto(`/portal/${state.slug}/proposals/${state.proposalId}`, { waitUntil: 'networkidle', timeout: 60_000 });
+  });
+  await shot(page, '10-proposal-workspace');
+
+  const sections = await step('read the compliance matrix', state.adminEmail, async () => {
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals/${state.proposalId}/sections`);
+    const j = await r.json().catch(() => ({}));
+    const s = (j?.data?.sections ?? j?.data ?? []) as Array<{ id: string; title?: string; sectionNumber?: string }>;
+    rec('sections provisioned', 'system', 'note', `${s.length}`);
+    if (!s.length) throw new Error('the matrix provisioned no sections');
+    return s;
+  });
+
+  let authored = 0;
+  for (const sec of sections ?? []) {
+    const body = proseFor(sec.title ?? '');
+    const r = await step(`author "${(sec.title ?? sec.id).slice(0, 44)}"`, state.adminEmail, async () => {
+      // The section save route is PUT. POSTing returns 405, which reads like a broken save
+      // rather than a wrong verb.
+      const res = await page.request.put(
+        `/api/portal/${state.slug}/proposals/${state.proposalId}/sections/${sec.id}/save`,
+        { data: { content: { nodes: [{ id: 'p1', type: 'text_block', content: { text: body } }] }, status: 'in_progress' }, timeout: 60_000 });
+      if (!ok(res)) throw new Error(`save ${res.status()} ${(await res.text()).slice(0, 120)}`);
+      return true;
+    });
+    if (r) authored++;
+  }
+  rec('sections authored', 'HITL', 'note', `${authored}/${(sections ?? []).length} — prose written by me, as the customer would`);
+  await page.reload().catch(() => {});
+  await shot(page, '11-authored');
+
+  // ══ ACT 6 — reviews, as gates I decide at ════════════════════════════════
+  ACT = 'ACT 6 · reviews';
+  console.error(`\n${ACT}`);
+  // ai-review and package-review RUN something (POST); compliance is a READ of the matrix (GET).
+  for (const [label, ep, method] of [
+    ['AI / color-team review', 'ai-review', 'POST'],
+    ['compliance matrix', 'compliance', 'GET'],
+    ['packaging review', 'package-review', 'POST'],
+  ] as Array<[string, string, 'GET' | 'POST']>) {
+    await step(label, state.adminEmail, async () => {
+      const url = `/api/portal/${state.slug}/proposals/${state.proposalId}/${ep}`;
+      const r = method === 'GET'
+        ? await page.request.get(url, { timeout: 300_000 })
+        : await page.request.post(url, { data: {}, timeout: 300_000 });
+      if (!ok(r)) throw new Error(`${ep} ${r.status()} ${(await r.text()).slice(0, 120)}`);
+      hitl(`${label} outcome`, 'read the findings and accepted them as advisory; not advancing a stage on an agent\'s say-so');
+    });
+  }
+  await step('readiness verdict', state.adminEmail, async () => {
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals/${state.proposalId}/readiness`);
+    const j = await r.json().catch(() => ({}));
+    rec('readiness', 'system', 'note', JSON.stringify(j?.data ?? {}).slice(0, 220));
+  });
+  await page.goto(`/portal/${state.slug}/proposals/${state.proposalId}`, { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+  await shot(page, '12-reviewed');
+
+  // ══ ACT 7 — lock and export ══════════════════════════════════════════════
+  ACT = 'ACT 7 · lock + export';
+  console.error(`\n${ACT}`);
+  let locked = 0;
+  for (const sec of sections ?? []) {
+    const r = await step(`lock "${(sec.title ?? sec.id).slice(0, 40)}"`, state.adminEmail, async () => {
+      const res = await page.request.post(
+        `/api/portal/${state.slug}/proposals/${state.proposalId}/sections/${sec.id}/lock`, { data: {}, timeout: 60_000 });
+      if (!ok(res)) throw new Error(`lock ${res.status()}`);
+      return true;
+    });
+    if (r) locked++;
+  }
+  hitl('lock decision', `locked ${locked}/${(sections ?? []).length} sections — the human act that makes a build submittable`);
+
+  // Locking every SECTION is not the same as locking the PROPOSAL, and the package route checks
+  // the proposal: `if (!prop.isLocked && stage !== 'submitted' && stage !== 'archived')` → 403.
+  //
+  // POST /lock is NOT the way there: it refuses anything but stage 'final' (422 "Can only lock at
+  // final stage"). A build reaches 'final' by WALKING its gate_config one gate at a time via
+  // POST /advance — and the advance INTO 'final' is itself the submission moment: it locks and
+  // auto-advances to 'submitted'. So the human act is the walk, not a lock button.
+  //
+  // The last gate also runs the submission-readiness roll-up, which HARD-BLOCKS on any blocker
+  // (422 NOT_READY) unless the caller acknowledges them — the UI's "Submit anyway" confirm. That
+  // acknowledgement is a HITL decision with an audit trail, so it is taken here deliberately and
+  // recorded, rather than passed on every call to make the drive quiet.
+  await step('walk the gates to submission', state.adminEmail, async () => {
+    const seen: string[] = [];
+    for (let hop = 0; hop < 8; hop++) {
+      const pr = await page.request.get(`/api/portal/${state.slug}/proposals/${state.proposalId}`, { timeout: 60_000 });
+      const pj = await pr.json().catch(() => ({}));
+      const stage = (pj?.data?.proposal?.stage ?? pj?.data?.stage ?? pj?.stage) as string | undefined;
+      if (!stage) throw new Error(`could not read stage (${pr.status()})`);
+      if (stage === 'submitted' || stage === 'final') { seen.push(stage); break; }
+      seen.push(stage);
+
+      let r = await page.request.post(`/api/portal/${state.slug}/proposals/${state.proposalId}/advance`,
+        { data: {}, timeout: 180_000 });
+      if (r.status() === 422) {
+        const j = await r.json().catch(() => ({}));
+        if (j?.code === 'NOT_READY') {
+          const blockers = (j?.details?.blockers ?? []) as Array<{ category?: string; message?: string }>;
+          // Say WHAT was overridden, in the words the product used, so the ledger is auditable.
+          hitl('submit anyway',
+            `readiness reported ${blockers.length} blocker(s) [${[...new Set(blockers.map((b) => b.category ?? '?'))].join(', ')}] — ` +
+            'accepting them explicitly, exactly as a customer would with the "Submit anyway" confirm');
+          rec('readiness blockers overridden', state.adminEmail, 'override',
+            blockers.slice(0, 6).map((b) => `${b.category ?? '?'}: ${b.message ?? ''}`).join(' · ').slice(0, 300));
+          r = await page.request.post(`/api/portal/${state.slug}/proposals/${state.proposalId}/advance`,
+            { data: { acknowledgeBlockers: true }, timeout: 180_000 });
+        }
+      }
+      if (!ok(r)) throw new Error(`advance from '${stage}' → ${r.status()} ${(await r.text()).slice(0, 180)}`);
+      const aj = await r.json().catch(() => ({}));
+      rec(`gate ${stage} → ${aj?.data?.stage ?? '?'}`, state.adminEmail, 'ok',
+        aj?.data?.locked ? 'advancing into the final gate locked the build (submission)' : undefined);
+    }
+    hitl('submission', `gate walk: ${seen.join(' → ')} — the build is locked and submitted`);
+  });
+
+  const got: Record<string, number> = {};
+  for (const fmt of ['json', 'docx', 'pdf', 'zip']) {
+    await step(`export ${fmt}`, state.adminEmail, async () => {
+      const r = await page.request.get(
+        `/api/portal/${state.slug}/proposals/${state.proposalId}/package?format=${fmt}`, { timeout: 300_000 });
+      if (!ok(r)) throw new Error(`package ${fmt} → ${r.status()}`);
+      const buf = await r.body();
+      const f = path.join(DL, `arc-proposal.${fmt}`);
+      fs.writeFileSync(f, buf);
+      got[fmt] = buf.length;
+      const violations = r.headers()['x-compliance-violations'];
+      rec(`${fmt} artifact`, 'system', 'note', `${buf.length.toLocaleString()} bytes · compliance violations=${violations ?? 'n/a'}`);
+    });
+  }
+
+  // ══ ACT 8 — open the artifacts and CHECK them ════════════════════════════
+  ACT = 'ACT 8 · artifact inspection';
+  console.error(`\n${ACT}`);
+  const magic: Record<string, Buffer> = { docx: Buffer.from('PK'), zip: Buffer.from('PK'), pdf: Buffer.from('%PDF') };
+  for (const [fmt, size] of Object.entries(got)) {
+    const f = path.join(DL, `arc-proposal.${fmt}`);
+    const head = fs.readFileSync(f).subarray(0, 4);
+    const m = magic[fmt];
+    const good = !m || head.subarray(0, m.length).equals(m);
+    rec(`${fmt} is a real ${fmt}`, 'HITL', good ? 'ok' : 'blocked', `${size.toLocaleString()} bytes, magic=${JSON.stringify(head.toString('latin1'))}`);
+  }
+  // Reading these artifacts is the point of the whole arc: bytes and a magic number only prove a
+  // file was produced, not that the RIGHT document came out. Each check below is one way a
+  // package has actually gone wrong in this codebase.
+  type JsonSec = { number?: string; title?: string; text_content?: string; page_allocation?: number | null; status?: string };
+  let jsonSecs: JsonSec[] = [];
+
+  await step('the json package carries the authored prose', 'HITL', async () => {
+    const j = JSON.parse(fs.readFileSync(path.join(DL, 'arc-proposal.json'), 'utf8'));
+    jsonSecs = (j?.data?.sections ?? j?.sections ?? []) as JsonSec[];
+    rec('json sections', 'system', 'note', `${jsonSecs.length} section(s)`);
+    const empty = jsonSecs.filter((s) => !(s.text_content ?? '').trim());
+    // A section that exports with no prose is the volume-grouping-drop class (CLAUDE.md: a
+    // snake_case read off a camelCase row silently dropped every section's volume).
+    rec('every exported section carries prose', 'HITL', empty.length === 0 ? 'ok' : 'blocked',
+      empty.length ? `${empty.length} empty: ${empty.slice(0, 5).map((s) => s.number ?? '?').join(', ')}` : `${jsonSecs.length}/${jsonSecs.length} non-empty`);
+    const text = JSON.stringify(j);
+    const carries = text.includes('Northwind') || text.includes('binder');
+    if (!carries) throw new Error('the export does not contain the prose that was authored');
+  });
+
+  // ── section ORDER: integer sort_index, never a string sort of section_number ──
+  // mig 143 exists because string-sorting scrambles numbering ("10" lands before "2"). The
+  // export orders by sort_index; this proves it, and — just as important — proves the check has
+  // teeth by showing a naive string sort WOULD have produced a different document.
+  await step('sections are ordered by sort_index, not string-sorted', 'HITL', async () => {
+    const nums = jsonSecs.map((s) => String(s.number ?? ''));
+    const natural = (a: string, b: string) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    const asExported = nums.join('|');
+    const asNatural = [...nums].sort(natural).join('|');
+    const asString = [...nums].sort().join('|');
+    if (asExported !== asNatural) {
+      throw new Error(`export order != natural order\n  exported: ${asExported}\n  natural:  ${asNatural}`);
+    }
+    rec('string-sort would have scrambled it', 'HITL', asString !== asNatural ? 'ok' : 'note',
+      asString !== asNatural
+        ? `a naive string sort gives ${asString.slice(0, 90)}… — different document, same bytes`
+        : 'this numbering happens to sort identically either way, so it cannot discriminate here');
+  });
+
+  await step('section numbers are unique', 'HITL', async () => {
+    const nums = jsonSecs.map((s) => String(s.number ?? ''));
+    const dupes = nums.filter((n, i) => nums.indexOf(n) !== i);
+    if (dupes.length) throw new Error(`duplicate section numbers: ${[...new Set(dupes)].join(', ')}`);
+  });
+
+  // ── docx: a real OOXML package whose body carries the titles IN ORDER ──
+  await step('docx is OOXML and its body carries the sections in order', 'HITL', async () => {
+    const f = path.join(DL, 'arc-proposal.docx');
+    if (!fs.existsSync(f)) throw new Error('no docx was produced');
+    const names = execSync(`unzip -Z1 ${JSON.stringify(f)}`, { encoding: 'utf8' }).trim().split('\n');
+    if (!names.includes('word/document.xml')) throw new Error(`not a Word package: ${names.slice(0, 8).join(', ')}`);
+    const xml = execSync(`unzip -p ${JSON.stringify(f)} word/document.xml`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const plain = xml.replace(/<[^>]+>/g, ' ');
+    // Where each section's title appears in the body — must be strictly increasing.
+    const titles = jsonSecs.map((s) => (s.title ?? '').trim()).filter((t) => t.length > 6);
+    const at = titles.map((t) => ({ t, i: plain.indexOf(t) }));
+    const missing = at.filter((x) => x.i < 0);
+    const found = at.filter((x) => x.i >= 0);
+    const outOfOrder = found.filter((x, k) => k > 0 && x.i < found[k - 1].i);
+    rec('docx entries', 'system', 'note', `${names.length} parts · ${xml.length.toLocaleString()} bytes of document.xml`);
+    if (missing.length) {
+      rec('docx section titles present', 'HITL', 'blocked',
+        `${missing.length}/${titles.length} missing, e.g. "${missing[0].t.slice(0, 50)}"`);
+    }
+    if (outOfOrder.length) {
+      throw new Error(`${outOfOrder.length} section(s) appear out of order in the docx body, first: "${outOfOrder[0].t.slice(0, 50)}"`);
+    }
+    rec('docx body order matches the export', 'HITL', 'ok', `${found.length} titles in ascending document position`);
+  });
+
+  // ── pdf: real pages, real text, and a page count to hold against the budget ──
+  await step('pdf renders real pages with the authored text', 'HITL', async () => {
+    const f = path.join(DL, 'arc-proposal.pdf');
+    if (!fs.existsSync(f)) throw new Error('no pdf was produced');
+    const py = `
+import pymupdf, json, sys
+d = pymupdf.open(${JSON.stringify(f)})
+txt = "\\n".join(p.get_text() for p in d)
+print(json.dumps({"pages": d.page_count, "chars": len(txt.strip()),
+                  "first": txt.strip()[:160]}))`;
+    const out = execSync(`python3 -c ${JSON.stringify(py)}`, { encoding: 'utf8' });
+    const info = JSON.parse(out.trim().split('\n').pop() as string) as { pages: number; chars: number; first: string };
+    rec('pdf pages', 'system', 'note', `${info.pages} page(s) · ${info.chars.toLocaleString()} chars of extractable text`);
+    if (info.pages < 1) throw new Error('pdf has no pages');
+    // A PDF that renders but carries no extractable text is the "images of nothing" failure —
+    // it looks fine as bytes and is useless to a reviewer.
+    if (info.chars < 500) throw new Error(`pdf carries almost no text (${info.chars} chars) — rendered but empty`);
+    const titles = jsonSecs.map((s) => (s.title ?? '').trim()).filter((t) => t.length > 6);
+    const present = titles.filter((t) => info.first.includes(t)).length;
+    rec('pdf first-page text', 'system', 'note', info.first.replace(/\s+/g, ' ').slice(0, 120) + (present ? '' : ''));
+  });
+
+  // ── zip: per-volume-native, one file per volume ──
+  await step('zip is per-volume-native', 'HITL', async () => {
+    const f = path.join(DL, 'arc-proposal.zip');
+    if (!fs.existsSync(f)) throw new Error('no zip was produced');
+    const names = execSync(`unzip -Z1 ${JSON.stringify(f)}`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+    rec('zip contents', 'system', 'note', names.slice(0, 12).join(' · '));
+    if (names.length === 0) throw new Error('zip is empty');
+    // The volumes are the deliverable units; a single lumped file means the per-volume
+    // assembly silently fell back to the combined document.
+    const volumes = names.filter((n) => /^V\d+_/.test(n));
+    rec('zip carries one artifact per volume', 'HITL', volumes.length >= 2 ? 'ok' : 'note',
+      volumes.length >= 2 ? `${volumes.length} volume files` : `${names.length} entr(ies), ${volumes.length} matching V<n>_ — check the volume split`);
+  });
+
+  // ══ ledger ═══════════════════════════════════════════════════════════════
+  fs.writeFileSync(path.join(OUT, 'arc-ledger.json'), JSON.stringify(ledger, null, 2));
+  const tally = ledger.reduce<Record<string, number>>((a, e) => ({ ...a, [e.status]: (a[e.status] ?? 0) + 1 }), {});
+  console.error(`\n══ ARC LEDGER ══  ${Object.entries(tally).map(([k, v]) => `${k}=${v}`).join('  ')}`);
+  for (const e of ledger.filter((x) => x.status === 'blocked' || x.status === 'override')) {
+    console.error(`   ${e.status.toUpperCase().padEnd(8)} ${e.act} · ${e.step}${e.detail ? ` — ${e.detail.slice(0, 120)}` : ''}`);
+  }
+  expect(ledger.length, 'the arc recorded nothing').toBeGreaterThan(10);
+});

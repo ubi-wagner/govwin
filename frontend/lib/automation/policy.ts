@@ -25,6 +25,7 @@
  */
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
+import { DEFAULT_BUCKETS } from '@/lib/spotlight/default-buckets';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('automation-policy');
@@ -86,18 +87,30 @@ interface TenantPolicyRow {
 
 /**
  * The platform cap on spotlight buckets per tenant (automation_framework
- * .max_buckets_per_tenant, mig 126; default raised 12→6 in mig 181). rfp_admin tunes it
+ * .max_buckets_per_tenant, mig 126; mig 181 moved the default 12→6). rfp_admin tunes it
  * globally at /admin/automation-framework. Framework-HARD: a tenant may not exceed it.
  * Falls back to DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
+ *
+ * AUTHORING HEADROOM IS PART OF THE CAP (bug log B62). Every tenant-creation path seeds
+ * DEFAULT_BUCKETS so cards rank on arrival, and mig 181 set the cap to 6 — exactly the
+ * number seeded. RANKING_SPINE.md §15 asks for both in one breath ("12 → 6; keep all 6
+ * seeded defaults"), and the arithmetic of that pairing is a closed door: a brand-new
+ * tenant opens at 100% of cap, so the spine's own headline act — a customer authoring
+ * their own scoring lens — answers 409 BUCKET_LIMIT before they have authored anything.
+ * The floor below keeps the two numbers in a relationship instead of leaving them as
+ * independent constants that silently collide again the next time either one moves.
  */
-export const DEFAULT_MAX_BUCKETS = 6;
+export const BUCKET_AUTHORING_HEADROOM = 4;
+export const DEFAULT_MAX_BUCKETS = DEFAULT_BUCKETS.length + BUCKET_AUTHORING_HEADROOM;
+/** No configured cap may leave a freshly-seeded tenant unable to author a lens of its own. */
+export const MIN_MAX_BUCKETS = DEFAULT_BUCKETS.length + 1;
 export async function getMaxBucketsPerTenant(): Promise<number> {
   try {
     // camelCase off toCamel: max_buckets_per_tenant → maxBucketsPerTenant (declare + read camelCase).
     const [row] = await sql<Array<{ maxBucketsPerTenant: number }>>`
       SELECT max_buckets_per_tenant FROM automation_framework WHERE id = 1`;
     const n = row?.maxBucketsPerTenant;
-    return typeof n === 'number' && n > 0 ? n : DEFAULT_MAX_BUCKETS;
+    return typeof n === 'number' && n > 0 ? Math.max(n, MIN_MAX_BUCKETS) : DEFAULT_MAX_BUCKETS;
   } catch (e) {
     log.warn?.({ msg: 'max-buckets read failed — using default', err: e instanceof Error ? e.message : String(e) });
     return DEFAULT_MAX_BUCKETS;

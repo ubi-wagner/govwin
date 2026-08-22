@@ -12,8 +12,14 @@ spine is built; this pass closes named gaps and wires the last-mile capabilities
 
 1. **Designee** — a tenant_admin delegates bucket authoring to a chosen team member via
    an audited, revocable per-membership grant (`user_memberships.can_manage_buckets`).
-2. **Cap** — global default raised **12 → 6**; keep all 6 seeded defaults; enforce the cap
+2. **Cap** — global default lowered **12 → 6**; keep all 6 seeded defaults; enforce the cap
    (rfp_admin tunes it globally later at `/admin/automation-framework`).
+   > **Superseded — this pairing was a closed door (bug log B62).** A cap of 6 alongside a
+   > seeded set of 6 means a tenant opens at 100% of cap, so bucket authoring — item ① of this
+   > very spine — answered 409 `BUCKET_LIMIT` before the customer had authored anything. Mig 203
+   > raises the stored cap to **10** and `lib/automation/policy.ts` now derives it as
+   > `DEFAULT_BUCKETS.length + BUCKET_AUTHORING_HEADROOM`, flooring any configured value at
+   > `DEFAULT_BUCKETS.length + 1`. The cap and the seeded set are one decision, not two.
 3. **Admin pin** — rfp_admin arms **OPP-level** update tracking that fans out to every
    tenant holding the mirror card, **pre-purchase** (today's amendment engine only reaches
    opps that already have a proposal).
