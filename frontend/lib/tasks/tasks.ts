@@ -9,7 +9,8 @@
  * step result. It reuses forceAdvanceProcess for the resume so there is exactly
  * one paused→retrying transition path in the frontend.
  */
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
+import { runInBypass } from '@/lib/tenant-context';
 import { forceAdvanceProcess } from '@/lib/process/force-advance';
 import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -501,4 +502,82 @@ export async function completeTask(opts: {
   });
 
   return { ok: true, data: { taskId, resumed } };
+}
+
+/**
+ * Close every open ToDo attached to an entity, because the thing it asked about has been decided.
+ *
+ * A ToDo is a question posed to a human. Once the question is answered — the application accepted,
+ * the solicitation dismissed — the ToDo is not "done later", it is *moot*, and leaving it open
+ * makes the queue a liar: an operator opens their inbox to work that no longer exists, and the
+ * list grows monotonically for as long as the product runs (bug log B51 — three applications, all
+ * accepted, six open ToDos still asking someone to review them).
+ *
+ * Deciding is therefore the moment to close, and the decision routes own that. This helper exists
+ * so accept and reject cannot drift apart, and so the closing runs through `completeTask` — which
+ * keeps the audit event, the workflow resume and the broadcast semantics identical to a human
+ * pressing the button.
+ *
+ * BEST-EFFORT BY CONTRACT. A ToDo that fails to close must never fail the decision it follows:
+ * the application really was accepted, and a stale row is a smaller problem than a 500 on a
+ * customer's onboarding. Failures are counted and returned so the caller can log them.
+ *
+ * ADMIN-ONLY, AND IT RUNS UNDER BYPASS — both halves of that are load-bearing.
+ *
+ * The rows this closes are PLATFORM-scope (`tenant_id IS NULL`, CLAUDE.md). Since mig 185 split
+ * the coarse FOR ALL policy on `tasks` into per-command policies, UPDATE is `own only`:
+ *
+ *     USING (tenant_id = (NULLIF(current_setting('app.tenant_id', true), ''))::uuid)
+ *
+ * and NULL never equals anything, so a platform ToDo is READABLE but NOT UPDATABLE through the
+ * context-aware `sql` under the NOBYPASSRLS `govtech_app` role. Verified live against the
+ * enforced sandbox: SELECT returns the row, the paired UPDATE returns 0 rows. `completeTask`
+ * would then see `closed.length === 0` and report `TASK_CLOSED` — a *silent no-op that looks like
+ * success*, which is the exact failure B51 is about, only one layer deeper and harder to see.
+ * `/api/admin/tasks` already handles this by calling `enterBypass()` before `completeTask`;
+ * `runInBypass` is the scoped form, so this helper is correct no matter what its caller entered.
+ *
+ * Bypass disables the RLS layer, so the role gate below is what keeps that from being an
+ * escalation: only an rfp_admin+ decision route may close another party's ToDos this way.
+ * `completeTask` still applies its own assignee + tenant belts to every row.
+ */
+export async function closeTasksForEntity(opts: {
+  entityType: string;
+  entityId: string;
+  actor: { id: string; email: string | null; role: Role; tenantId: string | null };
+  /** Recorded on each task as the reason it closed — shows in the audit trail. */
+  result?: Record<string, unknown>;
+}): Promise<{ closed: number; alreadyClosed: number; failed: number }> {
+  const { entityType, entityId, actor, result } = opts;
+  const out = { closed: 0, alreadyClosed: 0, failed: 0 };
+  if (!entityType || !entityId) return out;
+  if (!hasRoleAtLeast(actor.role, 'rfp_admin')) {
+    console.error('[tasks/closeTasksForEntity] refused — admin role required', actor.role);
+    return { ...out, failed: 1 };
+  }
+
+  let open: { id: string }[];
+  try {
+    open = await sqlBypass<{ id: string }[]>`
+      SELECT id FROM tasks
+      WHERE entity_type = ${entityType} AND entity_id = ${entityId}::uuid
+        AND status IN ('open', 'in_progress')
+    `;
+  } catch (e) {
+    console.error('[tasks/closeTasksForEntity] lookup failed', entityType, entityId, e);
+    return { ...out, failed: 1 };
+  }
+
+  for (const t of open) {
+    try {
+      const r = await runInBypass(() => completeTask({ taskId: t.id, actor, result }));
+      if (r.ok) out.closed += 1;
+      else if (r.code === 'TASK_CLOSED') out.alreadyClosed += 1;
+      else { out.failed += 1; console.error('[tasks/closeTasksForEntity] complete refused', t.id, r.code); }
+    } catch (e) {
+      out.failed += 1;
+      console.error('[tasks/closeTasksForEntity] complete threw', t.id, e);
+    }
+  }
+  return out;
 }

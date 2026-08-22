@@ -5,6 +5,8 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
+import { closeTasksForEntity } from '@/lib/tasks/tasks';
+import type { Role } from '@/lib/rbac';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -97,6 +99,20 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[admin/applications/reject] update query failed:', e);
       await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // The question the triage ToDo asked has now been answered, so the ToDo is moot, not pending.
+    // Rejecting drains it exactly as accepting does — the two decisions must not diverge (B51).
+    try {
+      const closed = await closeTasksForEntity({
+        entityType: 'application',
+        entityId: id,
+        actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: role as Role, tenantId: null },
+        result: { decision: 'rejected', reason },
+      });
+      if (closed.failed) console.error('[admin/applications/reject] some triage ToDos did not close', closed);
+    } catch (taskErr) {
+      console.error('[admin/applications/reject] ToDo close failed (non-fatal):', taskErr);
     }
 
     // Send rejection email (non-fatal)

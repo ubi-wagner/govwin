@@ -5,7 +5,17 @@
 
 ---
 
-## 📍 Most recent work — the midterm end-to-end drive (2026-08-22, migration head **203**)
+## 📍 Most recent work — the midterm end-to-end drive (2026-08-22, migration head **204**)
+
+> **B51 is closed (mig 204).** An application used to raise two ToDos — the route's typed,
+> entity-linked `application_triage` row and an untyped, unlinked copy from a mig-040 automation
+> rule — and neither closed when the application was decided. Mig 204 retires the rule and cancels
+> its orphans; a shared `closeTasksForEntity` (`lib/tasks/tasks.ts`) drains the real ToDo from
+> **both** the accept and the reject route. The non-obvious half: those rows are platform-scope
+> (`tenant_id IS NULL`) and mig 185 made `tasks` UPDATE own-only, so the completion had to run
+> under `runInBypass` — without it `completeTask` reports `TASK_CLOSED` while changing nothing
+> (proven: `select_no_ctx=1 · update_no_ctx=0`). Verified live by
+> `frontend/e2e/b51-application-todos-drive.spec.ts` (accept + reject, both green).
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
