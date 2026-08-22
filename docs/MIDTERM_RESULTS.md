@@ -91,6 +91,9 @@ records any opportunity that has no volume structure yet:
 | 7 · lock + export | tenant_admin | all sections locked, gates walked to submission, all four formats exported |
 | 8 · artifact inspection | — | the exports opened and checked (below) |
 | 9 · divergent path | tenant_admin → master_admin | a **second** portal on a different opportunity, released, then handed to the agent workforce via the admin doorbell (Mode C, full auto) and never hand-authored |
+| 10 · second customer + isolation | public → master_admin → both tenants | a second company (Kestrel Robotics) walks the **same public form**, is accepted, builds its own library — then each tenant is asked for the other's library, cards and build |
+| 11 · partner manager | master_admin → partner_admin | an EconDev partner org is created, its manager submits a client company for RFP-admin approval, descends into it as its company admin, ascends — and is refused a tenant outside their stable |
+| 12 · canvas editor | tenant_admin | the section is opened in the **editor a customer uses**, a block is inserted from the palette, text is typed by keyboard, saved, and the page reloaded to see whether the keystrokes survived |
 
 ## The artifacts, actually opened
 
@@ -261,8 +264,14 @@ Stated plainly rather than left for someone to discover:
   `CanvasRenderer` / `SheetEditor` / `SlideEditor`, so the interaction layer — overlays,
   act-on-selection verbs, the assist panel — is not touched, and no `.pptx` deck is produced
   (nothing in this solicitation's volume set is a slide artifact).
-- **The AI-gated flows run against the committed emulator**, not a live key (`EMULATE=1`,
-  docs/AI_FLOWS_PROOF.md). The wiring is real and identical to production; the model is not.
+- **The AI-gated flows run against the committed emulator, and cannot do otherwise here.** This is
+  an environment limit, not a choice: the sandbox's `ANTHROPIC_API_KEY` is the literal string
+  `emulated-claude` and `ANTHROPIC_BASE_URL` points at the committed test harness on `:8787`. The
+  wiring exercised is byte-for-byte the production wiring (docs/AI_FLOWS_PROOF.md) — what is absent
+  is the model behind it, so every AI flow proves its plumbing and none of them prove their output.
+  Two things in particular stay unproven until a real key is present: the quality of any generated
+  prose, and the **vision** half of the atom enricher, which the emulator cannot do at all because
+  it cannot see an image.
 - **Volume-level page budgets are checked by the compliance floor at export**, and the drive records
   the `X-Compliance-Violations` header, but the arc does not assert a specific page budget per
   volume against each agency's stated limit.

@@ -24,7 +24,7 @@
  *
  * Run: npx playwright test --project=drive mt-arc
  */
-import { test, expect, type Page, type APIResponse } from '@playwright/test';
+import { test, expect, type Page, type APIResponse, type BrowserContext } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
@@ -246,6 +246,99 @@ const caption = (id: string, prefix: 'Figure' | 'Table' | 'Chart', number: numbe
 const imageNode = (id: string, storageKey: string, alt: string, w: number, h: number): Node =>
   ({ id, type: 'image', content: { storage_key: storageKey, alt_text: alt, width: w, height: h } });
 
+/** A phrase typed BY HAND in the editor — distinctive enough that finding it after a reload
+ *  proves the keystrokes reached the server, not merely that a save button existed. */
+const EDITOR_MARK = 'Typed in the canvas editor during the midterm drive — this sentence proves the keystrokes persisted.';
+
+/**
+ * Accept a pending application THROUGH THE ADMIN SCREEN, the way an operator does.
+ *
+ * There is no list API to query — the queue is a page, and the Accept button stays disabled until
+ * a real assessment is written into the review box. Driving the screen is therefore both the
+ * faithful path and the only one, and it is why the assessment text below is an actual judgement
+ * rather than filler.
+ */
+async function acceptApplicationInUI(page: Page, company: string, assessment: string): Promise<Record<string, string>> {
+  await page.goto('/admin/applications', { waitUntil: 'networkidle', timeout: 60_000 });
+  const row = page.getByRole('button').filter({ hasText: company }).first();
+  if (!(await row.count())) throw new Error(`${company} is not in the application queue`);
+  await row.click();
+  await page.locator('textarea').last().fill(assessment);
+  const resp = page.waitForResponse((r) => /\/accept/.test(r.url()) && r.request().method() === 'POST', { timeout: 180_000 });
+  await page.getByRole('button', { name: /^Accept$/ }).first().click();
+  const r = await resp;
+  const b = await r.json().catch(() => ({}));
+  if (r.status() >= 300) throw new Error(`accept ${r.status()} ${JSON.stringify(b).slice(0, 160)}`);
+  return ((b as { data?: Record<string, string> }).data ?? {});
+}
+
+/** One applicant's answers on the public form. */
+interface Applicant {
+  company: string; contact: string; title: string; email: string; state: string;
+  tech: string; motivation: string; referral: string;
+}
+
+/**
+ * Walk the PUBLIC application form as an anonymous visitor and submit it.
+ *
+ * Extracted so a second company can walk the identical path — onboarding two tenants through the
+ * same door is what makes the isolation check afterwards mean something. If the second one went in
+ * through a seed or an admin shortcut, "these two tenants cannot see each other" would only be a
+ * statement about how they were inserted.
+ */
+async function applyAtPublicForm(page: Page, context: BrowserContext, CO: Applicant): Promise<void> {
+  await context.clearCookies();
+  await page.goto('/apply', { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.fill('input[name="contactName"]', CO.contact);
+  await page.fill('input[name="contactEmail"]', CO.email);
+  await page.fill('input[name="contactTitle"]', CO.title);
+  await page.fill('input[name="companyName"]', CO.company);
+  const st = page.locator('input[name="companyState"]'); if (await st.count()) await st.fill(CO.state);
+  const sam = page.locator('input[name="samRegistered"][value="yes"]'); if (await sam.count()) await sam.first().check();
+  await page.fill('textarea[name="techSummary"]', CO.tech);
+  await page.fill('textarea[name="motivation"]', CO.motivation);
+  await page.fill('input[name="referralSource"]', CO.referral);
+  for (const g of ['techAreas', 'targetPrograms', 'targetAgencies', 'desiredOutcomes']) {
+    const b = page.locator(`input[type="checkbox"][name="${g}"]`);
+    if (await b.count()) await b.first().check();
+  }
+  const req = page.locator('input[type="checkbox"][required]');
+  for (let i = 0; i < await req.count(); i++) {
+    const x = req.nth(i); if (!(await x.isChecked())) await x.check().catch(() => {});
+  }
+  // THE TERMS GATE. The form will not submit without a scroll-to-accept and a signature that
+  // MATCHES the contact email exactly (application-form.tsx:100). Skipping it is what made the
+  // first arc run time out waiting on a POST that was never sent — the browser was refusing.
+  const openTerms = page.getByRole('button', { name: /terms|conditions|read/i }).first();
+  if (await openTerms.count()) { await openTerms.click().catch(() => {}); await page.waitForTimeout(400); }
+  await page.evaluate(() => {
+    for (const el of Array.from(document.querySelectorAll('div,section'))) {
+      if (el.scrollHeight > el.clientHeight + 40) el.scrollTop = el.scrollHeight;
+    }
+  }).catch(() => {});
+  await page.waitForTimeout(300);
+  const sig = page.locator('input[type="email"]').last();
+  if (await sig.count()) await sig.fill(CO.email).catch(() => {});
+  const agree = page.getByRole('button', { name: /agree|accept|confirm/i }).first();
+  if (await agree.count()) await agree.click().catch(() => {});
+  await page.waitForTimeout(400);
+  const resp = page.waitForResponse((r) => r.url().includes('/api/applications') && r.request().method() === 'POST', { timeout: 45_000 })
+    .catch(() => null);
+  await page.click('button[type="submit"]');
+  const r = await resp;
+  if (!r) {
+    const bad = await page.evaluate(() => {
+      const f = document.querySelector('form');
+      if (!f) return 'no form on the page';
+      const el = Array.from(f.querySelectorAll<HTMLInputElement>('input,select,textarea'))
+        .find((x) => !x.checkValidity());
+      return el ? `${el.tagName.toLowerCase()}[name=${el.name || '?'}] — ${el.validationMessage}` : 'form reports valid but did not submit';
+    }).catch(() => 'could not inspect the form');
+    throw new Error(`submit refused: ${bad}`);
+  }
+  if (r.status() >= 300) throw new Error(`application POST ${r.status()}`);
+}
+
 test('the arc: supply → customer → library → portal → authored → reviewed → exported', async ({ page, context }) => {
   test.setTimeout(90 * 60_000);
   for (const d of [SHOTS, DL]) fs.mkdirSync(d, { recursive: true });
@@ -412,62 +505,9 @@ test('the arc: supply → customer → library → portal → authored → revie
   };
 
   await step('company applies at the public form', 'anonymous', async () => {
-    await context.clearCookies();
-    await page.goto('/apply', { waitUntil: 'networkidle', timeout: 60_000 });
-    await page.fill('input[name="contactName"]', CO.contact);
-    await page.fill('input[name="contactEmail"]', CO.email);
-    await page.fill('input[name="contactTitle"]', CO.title);
-    await page.fill('input[name="companyName"]', CO.company);
-    const st = page.locator('input[name="companyState"]'); if (await st.count()) await st.fill(CO.state);
-    const sam = page.locator('input[name="samRegistered"][value="yes"]'); if (await sam.count()) await sam.first().check();
-    await page.fill('textarea[name="techSummary"]', CO.tech);
-    await page.fill('textarea[name="motivation"]', CO.motivation);
-    await page.fill('input[name="referralSource"]', CO.referral);
-    for (const g of ['techAreas', 'targetPrograms', 'targetAgencies', 'desiredOutcomes']) {
-      const b = page.locator(`input[type="checkbox"][name="${g}"]`);
-      if (await b.count()) await b.first().check();
-    }
-    const req = page.locator('input[type="checkbox"][required]');
-    for (let i = 0; i < await req.count(); i++) {
-      const x = req.nth(i); if (!(await x.isChecked())) await x.check().catch(() => {});
-    }
-    // THE TERMS GATE. The form will not submit without a scroll-to-accept and a signature that
-    // MATCHES the contact email exactly (application-form.tsx:100). Skipping it is what made the
-    // first arc run time out waiting on a POST that was never sent — the browser was refusing.
-    // As the applicant, I open the terms, read them, and sign.
     hitl('terms & conditions', 'opened the T&Cs, scrolled to the end, and signed with the contact email');
-    const openTerms = page.getByRole('button', { name: /terms|conditions|read/i }).first();
-    if (await openTerms.count()) { await openTerms.click().catch(() => {}); await page.waitForTimeout(400); }
-    // Scroll the terms panel to its end so the accept control unlocks.
-    await page.evaluate(() => {
-      for (const el of Array.from(document.querySelectorAll('div,section'))) {
-        if (el.scrollHeight > el.clientHeight + 40) el.scrollTop = el.scrollHeight;
-      }
-    }).catch(() => {});
-    await page.waitForTimeout(300);
-    const sig = page.locator('input[type="email"]').last();
-    if (await sig.count()) await sig.fill(CO.email).catch(() => {});
-    const agree = page.getByRole('button', { name: /agree|accept|confirm/i }).first();
-    if (await agree.count()) await agree.click().catch(() => {});
-    await page.waitForTimeout(400);
+    await applyAtPublicForm(page, context, CO);
     await shot(page, '02-apply-form');
-    const resp = page.waitForResponse((r) => r.url().includes('/api/applications') && r.request().method() === 'POST', { timeout: 45_000 })
-      .catch(() => null);
-    await page.click('button[type="submit"]');
-    const r = await resp;
-    if (!r) {
-      // The browser blocked submit. Name the offending control rather than reporting a timeout.
-      const bad = await page.evaluate(() => {
-        const f = document.querySelector('form');
-        if (!f) return 'no form on the page';
-        const el = Array.from(f.querySelectorAll<HTMLInputElement>('input,select,textarea'))
-          .find((x) => !x.checkValidity());
-        return el ? `${el.tagName.toLowerCase()}[name=${el.name || '?'}] — ${el.validationMessage}` : 'form reports valid but did not submit';
-      }).catch(() => 'could not inspect the form');
-      await shot(page, '02b-apply-blocked');
-      throw new Error(`submit refused: ${bad}`);
-    }
-    if (!ok(r)) throw new Error(`application POST ${r.status()}`);
   });
 
   await step('operator signs back in', 'master_admin', () => signIn(page, 'eric@rfppipeline.com', ADMIN_PW));
@@ -1214,6 +1254,226 @@ test('the arc: supply → customer → library → portal → authored → revie
     rec('workforce did not advance or lock the build', 'HITL', safe ? 'ok' : 'blocked',
       `stage=${p.stage ?? '?'} locked=${p.isLocked ?? '?'} — advisory contract ${safe ? 'held' : 'VIOLATED'}`);
   });
+
+  // ══ ACT 10 — a second customer, and the wall between them ═════════════════
+  // Both companies come in through the SAME public door. That is what makes the isolation check
+  // afterwards mean something: if the second tenant were seeded or inserted by an admin shortcut,
+  // "these two cannot see each other" would only be a statement about how they were created.
+  ACT = 'ACT 10 · second customer + isolation';
+  console.error(`\n${ACT}`);
+  const CO2: Applicant = {
+    company: 'Kestrel Robotics', contact: 'Priya Raman', title: 'Founder',
+    email: 'priya.raman@kestrel-robotics.com', state: 'Michigan',
+    tech: 'We build autonomous site-survey robots that produce as-built models of active construction sites, '
+      + 'using onboard SLAM and a progress-comparison engine that flags deviation from the design model.',
+    motivation: 'The NSF STTR topic on robotics for the built environment matches our perception stack directly.',
+    referral: 'Saw the topic on the NSF site',
+  };
+  const two: Record<string, string> = {};
+  await step('a second company applies at the same form', 'anonymous', () => applyAtPublicForm(page, context, CO2));
+  await step('operator accepts the second application', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    hitl('second review', 'Kestrel\'s SLAM and progress-comparison stack is a direct fit for the NSF robotics topic; accepting');
+    const d = await acceptApplicationInUI(page, CO2.company,
+      `Reviewed ${CO2.company}. ${CO2.contact} (${CO2.title}) — autonomous site-survey robots producing as-built `
+      + `models, with a deviation engine against the design model. Direct fit for NSF 26-522. Accepting for onboarding.`);
+    two.slug = d.slug ?? d.tenantSlug ?? '';
+    two.email = CO2.email;
+    two.tempPw = d.tempPassword ?? '';
+    rec('second tenant created', 'system', 'note', `slug=${two.slug} admin=${two.email}`);
+  });
+
+  if (two.slug) {
+    await step('the second tenant builds its own library', two.email, async () => {
+      await firstSignIn(page, two.email, two.tempPw || TENANT_PW);
+      const p = path.join(CO_DIR, 'kestrel-capability-statement.pdf');
+      if (!fs.existsSync(p)) throw new Error(`missing fixture ${p}`);
+      const r = await page.request.post(`/api/portal/${two.slug}/atoms/upload`, {
+        multipart: { file: { name: 'file', mimeType: 'application/pdf', buffer: fs.readFileSync(p) }, mode: 'auto', context: JSON.stringify({ source: 'capability-statement' }) },
+        timeout: 180_000,
+      });
+      if (!ok(r)) throw new Error(`atoms/upload ${r.status()}`);
+    });
+
+    // THE WALL. Ask, as each tenant, for the other's private things. A 2xx carrying rows is the
+    // failure this whole architecture exists to prevent — so the check reports what came back,
+    // not merely that a request was made.
+    await step('neither tenant can read the other', 'HITL', async () => {
+      hitl('isolation probe', 'signed in as each company in turn and asked for the other\'s library, cards and build');
+      const probes: Array<{ as: string; slug: string; what: string; url: string }> = [
+        { as: two.email, slug: state.slug, what: 'library', url: `/api/portal/${state.slug}/atoms` },
+        { as: two.email, slug: state.slug, what: 'opportunity cards', url: `/api/portal/${state.slug}/cards` },
+        { as: two.email, slug: state.slug, what: 'the build', url: `/api/portal/${state.slug}/proposals/${state.proposalId}` },
+        { as: state.adminEmail, slug: two.slug, what: 'library', url: `/api/portal/${two.slug}/atoms` },
+        { as: state.adminEmail, slug: two.slug, what: 'opportunity cards', url: `/api/portal/${two.slug}/cards` },
+      ];
+      const breaches: string[] = [];
+      let current = '';
+      for (const p of probes) {
+        if (current !== p.as) { await signIn(page, p.as, TENANT_PW); current = p.as; }
+        const r = await page.request.get(p.url, { timeout: 60_000 });
+        const body = await r.text();
+        let rows = 0;
+        try {
+          const j = JSON.parse(body || '{}');
+          const d = j?.data ?? {};
+          rows = (d.atoms ?? d.cards ?? (d.proposal ? [d.proposal] : []) ?? []).length ?? 0;
+        } catch { /* non-JSON is a refusal */ }
+        const leaked = r.status() < 300 && rows > 0;
+        if (leaked) breaches.push(`${p.as} read ${rows} of ${p.slug}'s ${p.what}`);
+        rec(`${p.as.split('@')[0]} → ${p.slug} ${p.what}`, 'HITL', leaked ? 'blocked' : 'ok',
+          `HTTP ${r.status()}${rows ? `, ${rows} row(s) RETURNED` : ', nothing returned'}`);
+      }
+      if (breaches.length) throw new Error(`ISOLATION BREACH — ${breaches.join('; ')}`);
+    });
+  }
+
+  // ══ ACT 11 — the partner manager and their stable ═════════════════════════
+  // An EconDev partner runs a book of client companies. They are a tenant themselves, they submit
+  // new companies for RFP-admin approval rather than creating them, and they descend into one as
+  // its tenant_admin. Every one of those is a different authority boundary.
+  ACT = 'ACT 11 · partner manager';
+  console.error(`\n${ACT}`);
+  const partner: Record<string, string> = {};
+  await step('operator stands up a partner organisation', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    hitl('partner onboarding', 'the Entrepreneurs\' Center runs a stable of client companies; creating their org');
+    const r = await page.request.post('/api/admin/partners', {
+      data: {
+        orgName: 'Midwest Entrepreneurs\' Center', legalName: 'Midwest Entrepreneurs Center Inc.',
+        website: 'https://mec.example', adminName: 'Paul Jackson', adminEmail: 'paul.jackson@mec.example',
+      }, timeout: 120_000,
+    });
+    if (!ok(r)) throw new Error(`admin/partners ${r.status()} ${(await r.text()).slice(0, 160)}`);
+    const d = ((await r.json().catch(() => ({})))?.data ?? {}) as Record<string, string>;
+    partner.slug = d.slug ?? ''; partner.email = 'paul.jackson@mec.example'; partner.tempPw = d.tempPassword ?? '';
+    rec('partner org created', 'system', 'note', `slug=${partner.slug} admin=${partner.email}`);
+  });
+
+  if (partner.email) {
+    await step('the partner manager signs in and opens their console', partner.email, async () => {
+      await firstSignIn(page, partner.email, partner.tempPw || TENANT_PW);
+      await page.goto('/partner', { waitUntil: 'networkidle', timeout: 60_000 });
+      const shown = await page.locator('body').innerText().catch(() => '');
+      rec('partner console', 'system', 'note', shown.replace(/\s+/g, ' ').slice(0, 140));
+    });
+    await shot(page, '15-partner-console');
+
+    await step('the partner submits a client company for approval', partner.email, async () => {
+      hitl('managed company', 'submitting a client for RFP-admin approval — a partner cannot mint a tenant themselves');
+      const r = await page.request.post('/api/partner/registrations', {
+        data: {
+          companyName: 'Calcite Materials', adminName: 'Tomas Alvarez', adminEmail: 'tomas@calcite-materials.example',
+          companyWebsite: 'https://calcite-materials.example', companyState: 'Ohio',
+          description: 'Low-carbon cement using carbonated slag as a clinker replacement; two pilot kilns running.',
+          partnerNotes: 'Client of the centre since 2024; ready for a DOE Phase II run.',
+          dedupDecision: 'confirmed_new',
+        }, timeout: 120_000,
+      });
+      if (!ok(r)) throw new Error(`partner/registrations ${r.status()} ${(await r.text()).slice(0, 160)}`);
+    });
+
+    const managed = await step('operator approves the partner\'s company', 'master_admin', async () => {
+      await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+      hitl('partner-sourced approval', 'the referral comes from a known partner and the dedup check is clear; accepting into their stable');
+      const d = await acceptApplicationInUI(page, 'Calcite Materials',
+        'Reviewed Calcite Materials, referred by the Midwest Entrepreneurs\' Center. Carbonated-slag clinker '
+        + 'replacement with two pilot kilns running — credible for a DOE Phase II. Accepting into the partner\'s stable.');
+      return (d.slug ?? d.tenantSlug ?? '') as string;
+    });
+
+    if (managed) {
+      await step('the partner descends into their company and back', partner.email, async () => {
+        await signIn(page, partner.email, TENANT_PW);
+        hitl('partner descent', `entering ${managed} as its company admin — the partner works inside, not above`);
+        await page.goto(`/api/partner/enter?slug=${managed}`, { waitUntil: 'networkidle', timeout: 60_000 });
+        const inside = new URL(page.url()).pathname;
+        const canRead = await page.request.get(`/api/portal/${managed}/cards`, { timeout: 60_000 });
+        rec('partner works inside the company', 'HITL', inside.includes(managed) && ok(canRead) ? 'ok' : 'note',
+          `landed on ${inside} · cards HTTP ${canRead.status()}`);
+        await shot(page, '16-partner-descended');
+        await page.goto('/api/partner/exit', { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+        rec('partner ascends to their console', 'HITL', 'ok', `back at ${new URL(page.url()).pathname}`);
+      });
+
+      // The partner runs a STABLE, not the platform. They must not reach a company that is not theirs.
+      await step('the partner cannot reach a company outside their stable', 'HITL', async () => {
+        const r = await page.request.get(`/api/portal/${state.slug}/atoms`, { timeout: 60_000 });
+        let rows = 0;
+        try { rows = (((await r.json())?.data?.atoms) ?? []).length ?? 0; } catch { /* refusal */ }
+        const leaked = r.status() < 300 && rows > 0;
+        rec('partner → an unmanaged tenant\'s library', 'HITL', leaked ? 'blocked' : 'ok',
+          `HTTP ${r.status()}${rows ? `, ${rows} row(s) RETURNED` : ', nothing returned'}`);
+        if (leaked) throw new Error(`a partner manager read ${rows} atoms belonging to ${state.slug}, which they do not manage`);
+      });
+    }
+  }
+
+  // ══ ACT 12 — the canvas editor, driven by hand ════════════════════════════
+  // Everything above wrote through the save API. This opens the editor a customer actually uses
+  // and works in it: read what is on the page, insert a block from the palette, type, save, and
+  // reload to confirm the change survived. The API path can be perfect while the editor is broken.
+  ACT = 'ACT 12 · canvas editor';
+  console.error(`\n${ACT}`);
+  const firstSection = (sections ?? [])[0];
+  if (firstSection) {
+    await step('open the section in the editor', state.adminEmail, async () => {
+      await signIn(page, state.adminEmail, TENANT_PW);
+      await page.goto(`/portal/${state.slug}/proposals/${state.proposalId}/sections/${firstSection.id}`,
+        { waitUntil: 'networkidle', timeout: 90_000 });
+      const shown = await page.locator('body').innerText().catch(() => '');
+      // The authored prose must be ON THE PAGE — an editor that loads empty over saved content is
+      // the worst failure here, because it invites the author to overwrite their own work.
+      const carries = shown.includes('Northwind') || shown.includes('binder') || shown.includes('gantry');
+      rec('the editor shows the authored content', 'HITL', carries ? 'ok' : 'blocked',
+        carries ? `${shown.length.toLocaleString()} chars rendered` : 'the editor opened WITHOUT the saved prose');
+      if (!carries) throw new Error('the editor did not render the section that is saved');
+    });
+    await shot(page, '17-canvas-editor');
+
+    await step('insert a block from the palette and type into it', state.adminEmail, async () => {
+      hitl('hand authoring', 'adding a paragraph the way a customer does — palette, then keyboard');
+      const before = await page.locator('[contenteditable="true"]').count();
+      // The palette is behind the sidebar's "Add" TAB — the button exists in the DOM only once
+      // that tab is showing, so clicking straight at "Paragraph" finds nothing on a fresh open.
+      const addTab = page.getByRole('button', { name: /^add$/i }).first();
+      if (await addTab.count()) { await addTab.click({ timeout: 10_000 }).catch(() => {}); await page.waitForTimeout(400); }
+      // Insert items are labelled by what they are, not by node type: text_block reads "Paragraph".
+      const insert = page.getByRole('button', { name: /^Paragraph$/i }).first();
+      if (await insert.count()) { await insert.click({ timeout: 10_000 }).catch(() => {}); await page.waitForTimeout(600); }
+      const after = await page.locator('[contenteditable="true"]').count();
+      rec('palette inserted a block', 'HITL', after > before ? 'ok' : 'note',
+        `editable blocks ${before} → ${after}${after > before ? '' : ' (palette control not found under that name)'}`);
+
+      const box = page.locator('[contenteditable="true"]').last();
+      if (await box.count()) {
+        await box.click({ timeout: 10_000 }).catch(() => {});
+        await page.keyboard.type(EDITOR_MARK, { delay: 8 });
+        await page.waitForTimeout(300);
+      }
+    });
+
+    await step('save from the editor, then reload and look', state.adminEmail, async () => {
+      const saved = page.waitForResponse(
+        (r) => /\/sections\/.+\/save/.test(r.url()) && ['PUT', 'POST'].includes(r.request().method()),
+        { timeout: 30_000 }).catch(() => null);
+      const btn = page.getByRole('button', { name: /^Save$/i }).first();
+      if (await btn.count()) await btn.click({ timeout: 10_000 }).catch(() => {});
+      else await page.keyboard.press('Control+s').catch(() => {});
+      const r = await saved;
+      rec('editor issued a save', 'HITL', r && r.status() < 300 ? 'ok' : 'note',
+        r ? `HTTP ${r.status()}` : 'no save request observed (autosave may own it)');
+
+      // The only claim worth making is that the typing SURVIVED. Reload from the server and look.
+      await page.reload({ waitUntil: 'networkidle', timeout: 90_000 });
+      const shown = await page.locator('body').innerText().catch(() => '');
+      const survived = shown.includes(EDITOR_MARK);
+      rec('typed text survived a reload', 'HITL', survived ? 'ok' : 'blocked',
+        survived ? `"${EDITOR_MARK}" is on the page after reloading from the server` : 'the typed text was lost on reload');
+      await shot(page, '18-canvas-saved');
+      if (!survived) throw new Error('text typed in the editor did not survive a reload');
+    });
+  }
 
   // ══ ledger ═══════════════════════════════════════════════════════════════
   fs.writeFileSync(path.join(OUT, 'arc-ledger.json'), JSON.stringify(ledger, null, 2));
