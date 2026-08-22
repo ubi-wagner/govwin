@@ -24,6 +24,7 @@ import { sql } from '@/lib/db';
 import type { JSONValue } from 'postgres';
 import { coerceJsonb } from '@/lib/jsonb';
 import { auditProvenance, type ProvenanceAudit } from './provenance-audit';
+import { extractionOf } from './source-text-cap';
 import { materializeSkeleton, type MaterializeResult } from './materialize';
 import { republishSolicitationCards } from '@/lib/curation/republish';
 import type { ParsedSolicitation } from './skeleton';
@@ -106,9 +107,15 @@ export async function stageSkeleton(
   parsed: ParsedSolicitation,
   opts: { phase?: 'extract' | 'matrix' | 'review'; guidance?: string | null; userId?: string | null } = {},
 ): Promise<ComplianceDraft> {
-  const documents = await sql<Array<{ documentType: string | null; fileName: string | null }>>`
-    SELECT document_type AS "documentType", original_filename AS "fileName"
+  // Carry each document's extraction stamp into the audit (bug log B40) so a matrix built from a
+  // document we did not finish reading says so. The stamp was being written at upload and read by
+  // nothing; the audit is where a curator actually looks before landing.
+  const documentRows = await sql<Array<{ documentType: string | null; fileName: string | null; metadata: unknown }>>`
+    SELECT document_type AS "documentType", original_filename AS "fileName", metadata
     FROM solicitation_documents WHERE solicitation_id = ${solicitationId}::uuid`;
+  const documents = documentRows.map((d) => ({
+    documentType: d.documentType, fileName: d.fileName, extraction: extractionOf(d.metadata),
+  }));
 
   // Provenance entries in the SAME shape the landed column uses, so landing is a copy and a
   // reviewer sees exactly what a curator will see — and so the audit below reads the same

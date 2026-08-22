@@ -100,8 +100,17 @@ export interface ProvenanceAuditInput {
   fieldProvenance: Record<string, unknown> | null | undefined;
   /** The compliance row itself (camelCase, as postgres.js returns it) — to see which are set. */
   values: Record<string, unknown> | null | undefined;
-  /** Attached documents, so a deferral can be checked against what is actually on file. */
-  documents: Array<{ documentType?: string | null; fileName?: string | null }>;
+  /**
+   * Attached documents, so a deferral can be checked against what is actually on file — and so a
+   * document we did not finish reading can say so. `extraction` is the stamp written at upload
+   * (`lib/ingest/source-text-cap.ts`); absent on rows ingested before it existed, which reads as
+   * "unknown", not as "complete".
+   */
+  documents: Array<{
+    documentType?: string | null;
+    fileName?: string | null;
+    extraction?: { chars: number; originalChars: number; truncated: boolean } | null;
+  }>;
 }
 
 const camel = (col: string) => col.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -172,6 +181,39 @@ export function auditProvenance(input: ProvenanceAuditInput): ProvenanceAudit {
       field: f.field,
       issue: `${f.label} shows a value that was NOT read from this solicitation — it is a system default.`,
       fix: 'Verify it against the source document and correct or confirm it, so it stops being presented as a rule.',
+    });
+  }
+
+  // A DOCUMENT WE STOPPED READING CANNOT SUPPORT "not stated in the source" (bug log B40).
+  // Extraction caps source text, and two of five real BAAs landed on the cap to the character —
+  // the last 50.7% of the DoW 2026 SBIR BAA and 62.7% of the DoD 25.1 BAA were never examined.
+  // Every `default` above is reported as "the solicitation does not state this", and past the cut
+  // that claim is unfounded: the rule may be stated on a page nobody read. The truncation was
+  // being recorded on the document and read by nothing, which made it a fact filed where no one
+  // looks — so it is surfaced HERE, at the audit a curator actually reads before landing a matrix.
+  //
+  // Warning, not blocker, and deliberately so: the values that WERE read still stand, and the
+  // existing model already lands defaults wearing a red "unverified" badge. What was missing is
+  // the reason they are more than usually suspect. The blocker case is already covered — if
+  // nothing at all was read, `nothingRead` fires below regardless of why.
+  const truncatedDocs = docs.filter((d) => d.extraction?.truncated === true);
+  if (truncatedDocs.length > 0) {
+    const worst = truncatedDocs.reduce((a, b) => {
+      const lost = (x: typeof a) => (x.extraction!.originalChars - x.extraction!.chars);
+      return lost(b) > lost(a) ? b : a;
+    });
+    const e = worst.extraction!;
+    const pct = e.originalChars > 0 ? Math.round(((e.originalChars - e.chars) / e.originalChars) * 100) : 0;
+    findings.push({
+      severity: 'warning',
+      field: null,
+      issue: `${truncatedDocs.length} source document(s) were only partly read — worst: `
+        + `${worst.fileName ?? worst.documentType ?? 'document'} at ${e.chars.toLocaleString()} of `
+        + `${e.originalChars.toLocaleString()} characters (${pct}% not examined). Any field showing a `
+        + `system default may be stated on a page that was never read, so "not stated in this `
+        + `solicitation" is unverified for this matrix.`,
+      fix: 'Check the constraints against the tail of the source document before releasing this master. '
+        + 'If the document is routinely this long, raise the extraction cap rather than curating around it.',
     });
   }
 

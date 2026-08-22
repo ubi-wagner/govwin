@@ -19,7 +19,7 @@
  * and drive-verifiable without live object storage.
  */
 
-import { capSourceText } from '@/lib/ingest/source-text-cap';
+import { capSourceText, type CappedSourceText } from '@/lib/ingest/source-text-cap';
 import { createHash } from 'crypto';
 import { sql } from '@/lib/db';
 import { putObject } from '@/lib/storage/s3-client';
@@ -97,21 +97,24 @@ function extFromName(name: string): string {
 /** Best-effort text extraction. Plain text/markdown read directly; PDFs via
  *  the shared pdf-parse loader. Anything else (docx, unknown) returns null —
  *  the topic opportunity is still created, just without body text. */
-async function extractText(buffer: Buffer, filename: string): Promise<string | null> {
+async function extractText(buffer: Buffer, filename: string): Promise<CappedSourceText | null> {
   const ext = extFromName(filename);
   try {
     if (ext === 'txt' || ext === 'md') {
-      const t = capSourceText(buffer.toString('utf8')).text;
-      return t.trim().length > 0 ? t : null;
+      // RETURN the cap result rather than discarding it (bug log B40). `capSourceText(...).text`
+      // threw away the one fact that distinguishes "the solicitation does not state this" from
+      // "we stopped reading before the part that states it" — and this path recorded neither.
+      const capped = capSourceText(buffer.toString('utf8'));
+      return capped.text.trim().length > 0 ? capped : null;
     }
     if (ext === 'pdf') {
       const { loadPdfParse } = await import('@/lib/pdf-parse-quiet');
       const { PDFParse } = await loadPdfParse();
       const parser = new PDFParse({ data: new Uint8Array(buffer) });
       const textResult = await parser.getText();
-      const raw = capSourceText(textResult.text).text;
+      const capped = capSourceText(textResult.text);
       try { await parser.destroy(); } catch { /* ignore cleanup */ }
-      return raw.length > 40 ? raw : null;
+      return capped.text.length > 40 ? capped : null;
     }
   } catch (err) {
     console.error('[ingest-topic-files] text extraction failed (non-fatal):', filename, err);
@@ -219,7 +222,12 @@ export async function ingestTopicFilesForSolicitation(params: {
         metadata: { 'original-filename': displayName, 'topic-number': topicNumber },
       });
 
-      const extractedText = await extractText(file.buffer, displayName);
+      const extraction = await extractText(file.buffer, displayName);
+      const extractedText = extraction?.text ?? null;
+      if (extraction?.truncated) {
+        console.error('[ingest-topic-files] extraction TRUNCATED', displayName,
+          `${extraction.chars}/${extraction.originalChars} chars`);
+      }
 
       /* Create the topic document (document_type='topic').
        *
@@ -250,7 +258,15 @@ export async function ingestTopicFilesForSolicitation(params: {
           (${solicitationId}::uuid, 'topic', ${displayName}, ${storageKey},
            ${file.size}, ${file.type || null}, ${hash}, ${extractedText},
            ${userId ?? null}::uuid,
-           ${sql.json({ parsed_topic_number: parsed.topicNumber, parsed_title: title } as Parameters<typeof sql.json>[0])})
+           ${sql.json({
+             parsed_topic_number: parsed.topicNumber, parsed_title: title,
+             // Same stamp shape the rfp-upload route writes, so one reader (extractionOf) serves
+             // both paths and the provenance audit sees a truncated topic file too.
+             ...(extraction ? { extraction: {
+               chars: extraction.chars, truncated: extraction.truncated,
+               originalChars: extraction.originalChars, capChars: extraction.capChars,
+             } } : {}),
+           } as Parameters<typeof sql.json>[0])})
         ON CONFLICT (solicitation_id, content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
