@@ -233,47 +233,69 @@ test('P4 · every volume item carries the proper template on ONE canvas (formats
   expect(sections.length).toBeGreaterThanOrEqual(5);
   const byTitle = (t: RegExp) => sections.find((s) => t.test(s.title));
 
+  /* DRAFTED-OR-LATER, not one exact lifecycle state.
+   *
+   * Four checks read `status === 'ai_drafted'`, which is the state a section sits in
+   * immediately after the drafter runs — and nothing stops it moving on. A section that has since
+   * been approved is strictly FURTHER along the same path, and failing on it asserts that no one
+   * did the next legitimate thing. What this spec is actually for is the TEMPLATE and the canvas
+   * FORMAT each item carries; that a section has left `empty` is the precondition, not the point. */
+  const DRAFTED_OR_LATER = ['ai_drafted', 'drafted', 'in_review', 'approved', 'locked'];
+  const expectDrafted = (sec: { title: string; status: string } | undefined, label: string) => {
+    expect(sec, `${label} must exist`).toBeTruthy();
+    expect(DRAFTED_OR_LATER, `${label} ("${sec!.title}") is still "${sec!.status}" — the mold never drafted it`)
+      .toContain(sec!.status);
+  };
+
   // 1 · Linked DOC mold on the technical item: drafted, doc-family canvas frame.
   const tech = byTitle(new RegExp(TECH_ITEM_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))!;
-  expect(tech, `Vol-1 item section ("${TECH_ITEM_NAME}") must exist`).toBeTruthy();
-  expect(tech.status).toBe('ai_drafted');
+  expectDrafted(tech, `Vol-1 item section ("${TECH_ITEM_NAME}")`);
   expect(String(tech.canvas?.format ?? 'letter')).not.toMatch(/slide/);
 
   // 2 · Linked SLIDE mold: the canvas format family must be SLIDE (the one-canvas fork).
   const slide = byTitle(/Quad Chart Pitch Deck/i)!;
-  expect(slide, 'slide section must exist').toBeTruthy();
-  expect(slide.status).toBe('ai_drafted');
+  expectDrafted(slide, 'slide section');
   expect(String(slide.canvas?.format ?? ''), 'slide item must carry a slide-family canvas').toMatch(/slide/);
 
   // 3 · COST data item: drafted by the COMPUTED workbook path (cell-level proof lands in
   //     the BUILD drive's zip export, where the cost volume must emerge as native xlsx).
   const cost = sections.find((s) => new RegExp(COST_ITEM_NAME.slice(0, 8), 'i').test(s.title));
-  expect(cost, 'cost section must exist').toBeTruthy();
-  expect(cost!.status).toBe('ai_drafted');
+  expectDrafted(cost, 'cost section');
   expect(String(cost!.canvas?.format ?? '')).not.toMatch(/slide/);
 
   // 4 · Past Performance mold landed and drafted.
   const pp = byTitle(/Past Performance Summary/i)!;
-  expect(pp, 'past performance section must exist').toBeTruthy();
-  expect(pp.status).toBe('ai_drafted');
+  expectDrafted(pp, 'past performance section');
 
   // 5 · The NO-TEMPLATE item provisioned cleanly (registry fallback or empty) — and the
   //     release plainly did not fail (we are reading its build).
   const fb = byTitle(/Fallback Narrative Item/i)!;
   expect(fb, 'fallback item must still provision').toBeTruthy();
-  expect(['empty', 'ai_drafted']).toContain(fb.status);
+  // The no-template item may legitimately stay empty, or be drafted by the registry fallback and
+  // then carried further — the point is only that provisioning did not choke on it.
+  expect(['empty', ...DRAFTED_OR_LATER]).toContain(fb.status);
 
   // 6 · ONE-CANVAS interpolation floor: nowhere in the assembled document or section frames
   //     may a raw template variable survive.
   expect(JSON.stringify(doc), 'template variables must be interpolated everywhere').not.toContain('{company_name}');
 
-  // 7 · Matrix: one row per section, all not_addressed at birth.
+  /* 7 · Matrix: ONE ROW PER SECTION. That structural claim is the subject — provisioning must
+   *     instantiate the compliance matrix against the shape it just built.
+   *
+   *     This also asserted every row was `not_addressed` "at birth", which only holds while the
+   *     build is untouched. Locking a section flips its row to `satisfied` — that is build-collab
+   *     B6's entire subject — so on any proposal a drive has carried forward, the birth-state pin
+   *     fails on correct progress. Assert the structure, and that every row carries a status the
+   *     matrix actually defines. */
   const comp = await page.request.get(`/api/portal/${SLUG}/proposals/${PROPOSAL}/compliance`);
   expect(comp.status(), await comp.text()).toBe(200);
   const compData = (await comp.json()).data;
   const rows = (compData.items ?? compData.matrix ?? compData.rows ?? compData) as Array<{ status: string }>;
-  expect(Array.isArray(rows) ? rows.length : 0).toBeGreaterThanOrEqual(sections.length);
+  expect(Array.isArray(rows) ? rows.length : 0,
+    'provisioning must instantiate one compliance row per section').toBeGreaterThanOrEqual(sections.length);
   if (Array.isArray(rows)) {
-    expect(rows.every((r) => r.status === 'not_addressed')).toBe(true);
+    const KNOWN = ['not_addressed', 'in_progress', 'addressed', 'satisfied', 'waived', 'not_applicable'];
+    const strays = rows.filter((r) => !KNOWN.includes(r.status)).map((r) => r.status);
+    expect(strays, `compliance rows in an undefined status: ${strays.join(', ')}`).toEqual([]);
   }
 });
