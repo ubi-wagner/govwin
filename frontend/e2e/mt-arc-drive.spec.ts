@@ -69,15 +69,44 @@ const shot = async (page: Page, name: string) => {
   try { await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); } catch { /* keep going */ }
 };
 
+/**
+ * Sign in, and if it does not work SAY WHAT THE PAGE SHOWED.
+ *
+ * A bare `page.fill` on an absent field used to hang the whole drive (the project set no
+ * actionTimeout, and Playwright's default is "wait forever"). The timeouts now live in
+ * playwright.config.ts; what is left is making the failure legible — "sign-in failed" is
+ * useless, "landed on /portal/x with no password field" is a diagnosis.
+ */
 async function signIn(page: Page, email: string, pw: string) {
-  await page.context().clearCookies();
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', pw);
-  await Promise.all([
-    page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
-    page.click('button[type="submit"]'),
-  ]);
+  try {
+    // CLEARING COOKIES IS NOT THE SAME AS SIGNING OUT, and the difference cost a whole run.
+    // `clearCookies()` empties the jar, but the App Router keeps a client-side route cache from
+    // the previous session; navigating to /login then resolves against that cache and lands on the
+    // PREVIOUS role's dashboard — /admin/dashboard while trying to sign in as the tenant admin.
+    // There is no password field there, so the fill waits (forever, before the timeouts went in).
+    // Going through about:blank drops the cached tree, and re-checking afterwards makes the
+    // recovery explicit rather than hopeful.
+    await page.context().clearCookies();
+    await page.goto('about:blank');
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    if (!page.url().includes('/login')) {
+      await page.context().clearCookies();
+      await page.goto('about:blank');
+      await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    }
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', pw);
+    await Promise.all([
+      page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
+      page.click('button[type="submit"]'),
+    ]);
+  } catch (e) {
+    const where = page.url(); // sync — awaiting it and calling .catch throws inside the handler
+    const visible = await page.locator('body').innerText().catch(() => '');
+    throw new Error(
+      `sign-in as ${email} failed at ${where}: ${(e as Error).message.split('\n')[0]}` +
+      ` | page said: ${visible.replace(/\s+/g, ' ').trim().slice(0, 200)}`);
+  }
 }
 
 /**
@@ -223,6 +252,13 @@ test('the arc: supply → customer → library → portal → authored → revie
     'ohio-tvsf-r46': 'Ohio Third Frontier commercialization funding for technology out of Ohio institutions. Requires a willingness-to-license letter and a one-to-one cost share.',
   };
 
+  // What a curator would write into a field the solicitation deferred elsewhere. These are the
+  // values a human enters after reading the referenced instructions — invented here because this
+  // is a fixture, and recorded as manual_entry so they never masquerade as read-from-source.
+  const MANUAL_ENTRY: Record<string, string> = {
+    submission_format: 'Single PDF, letter portrait, uploaded through the DoD SBIR/STTR portal (per the Component-specific instructions).',
+  };
+
   for (const [slug, id] of Object.entries(solIds)) {
     await step(`curate → approve → push ${slug}`, 'master_admin', async () => {
       hitl(`spotlight summary for ${slug}`, 'wrote the matching context the push gate requires');
@@ -241,7 +277,48 @@ test('the arc: supply → customer → library → portal → authored → revie
         ['approve', () => tool('solicitation.approve', { solicitationId: id })],
         ['push', () => tool('solicitation.push', { solicitationId: id })],
       ] as Array<[string, () => Promise<APIResponse>]>) {
-        const r = await fn();
+        let r = await fn();
+
+        // THE DEFERRAL AND THE PUSH GATE MEET HERE, and both are behaving correctly.
+        // Ingest Assist refuses to invent a value the solicitation does not state: when this DoW
+        // BAA says the submission format lives in the Component-specific instructions, the
+        // provenance layer CLEARS the default and records a deferral rather than fabricating one
+        // ("a value the product did not read from the solicitation must never look like one it
+        // did"). The push gate then refuses to release an opportunity whose submission_format is
+        // unknown. Neither is a bug — together they are an instruction to a human: go read the
+        // Component instructions and enter what they say.
+        //
+        // So do that. compliance.save_variable_value with action 'manual_entry' is the curator's
+        // marquee HITL act, and it records WHERE the value came from, which is the whole point —
+        // the value ends up trusted as `hitl`, not laundered into looking like something the
+        // shredder read.
+        // Key on the PAYLOAD, not the status: a tool ValidationError is 422, not the 400 a REST
+        // habit expects, and hard-coding either one makes the branch dead code that reads as live.
+        if (label === 'push' && !ok(r)) {
+          const body = await r.text();
+          const missing = (() => {
+            try { return (JSON.parse(body || '{}')?.details?.missingVariables ?? []) as string[]; }
+            catch { return [] as string[]; }
+          })();
+          if (missing.length) {
+            hitl(`${slug} deferred fields`,
+              `the push gate wants ${missing.join(', ')}; the solicitation defers ${missing.length > 1 ? 'them' : 'it'} to the Component-specific instructions, so I am entering ${missing.length > 1 ? 'them' : 'it'} by hand as the curator`);
+            for (const v of missing) {
+              const value = MANUAL_ENTRY[v] ?? 'See Component-specific instructions';
+              const sv = await tool('compliance.save_variable_value', {
+                solicitationId: id,
+                variableName: v,
+                value,
+                action: 'manual_entry',
+                notes: 'Midterm arc: solicitation defers this to the Component-specific instructions; entered by the curator from that source rather than defaulted.',
+              });
+              rec(`${slug} enter ${v} by hand`, 'master_admin', ok(sv) ? 'override' : 'blocked',
+                ok(sv) ? `${v} = "${value}" (provenance: hitl, not default)` : `HTTP ${sv.status()} ${(await sv.text()).slice(0, 120)}`);
+            }
+            r = await fn(); // push again now that a human has answered the question
+          }
+        }
+
         if (ok(r)) rec(`${slug} ${label}`, 'master_admin', 'ok');
         else rec(`${slug} ${label}`, 'system', 'note', `HTTP ${r.status()} ${(await r.text()).slice(0, 100)}`);
       }
@@ -341,6 +418,8 @@ test('the arc: supply → customer → library → portal → authored → revie
     state.slug = d.slug ?? d.tenantSlug ?? '';
     state.adminEmail = d.adminEmail ?? d.email ?? CO.email;
     state.tempPw = d.tempPassword ?? '';
+    state.tenantId = d.tenantId ?? d.id ?? '';
+    state.company = CO.company;
     rec('tenant created', 'system', 'note', `slug=${state.slug} admin=${state.adminEmail} temp=${state.tempPw ? 'issued' : 'NOT RETURNED'}`);
     await shot(page, '04-application-accepted');
     return true;
@@ -408,6 +487,7 @@ test('the arc: supply → customer → library → portal → authored → revie
     rec('cards visible to the tenant', 'system', 'note', `${cards.length}`);
     if (!cards.length) throw new Error('no cards fanned out to this tenant');
     hitl('pursuit choice', `pursuing "${cards[0].card?.title ?? cards[0].opportunityId}"`);
+    state.oppId = cards[0].opportunityId; // ACT 9 picks a DIFFERENT one off this
     return cards[0].opportunityId;
   });
 
@@ -524,6 +604,83 @@ test('the arc: supply → customer → library → portal → authored → revie
   rec('sections authored', 'HITL', 'note', `${authored}/${(sections ?? []).length} — prose written by me, as the customer would`);
   await page.reload().catch(() => {});
   await shot(page, '11-authored');
+
+  // ══ ACT 5b — collaborators: the build is not a solo act ═══════════════════
+  // A real build has more than one pair of hands. Invite a teammate and an outside partner at the
+  // two access levels the product distinguishes, and have the partner leave a comment on a
+  // section — the smallest act that proves stage-scoped access actually reaches the document.
+  ACT = 'ACT 5b · collaborators';
+  console.error(`\n${ACT}`);
+  // The route's vocabulary is `contributor` | `external` with a `permission` — NOT the platform
+  // role names. A collaborator on a build is not the same thing as a user role, and the API says
+  // so; sending `tenant_user` earns "Role must be contributor or external".
+  const COLLABS = [
+    { email: `sam.okafor@${state.slug}.com`, name: 'Sam Okafor', role: 'contributor', permission: 'edit', why: 'a teammate who writes' },
+    { email: 'lee.barros@heritage-proposals.example', name: 'Lee Barros', role: 'external', permission: 'comment', why: 'an outside proposal consultant who may only comment' },
+  ];
+  for (const c of COLLABS) {
+    await step(`invite ${c.role} (${c.permission})`, state.adminEmail, async () => {
+      hitl(`collaborator ${c.role}`, `${c.why}; granting ${c.permission} on this build only`);
+      const r = await page.request.post(`/api/portal/${state.slug}/proposals/${state.proposalId}/collaborators`,
+        { data: { email: c.email, name: c.name, role: c.role, permission: c.permission }, timeout: 60_000 });
+      if (!ok(r)) throw new Error(`collaborators ${r.status()} ${(await r.text()).slice(0, 160)}`);
+    });
+  }
+  await step('a collaborator comments on a section', state.adminEmail, async () => {
+    const sec = (sections ?? [])[0];
+    if (!sec) throw new Error('no section to comment on');
+    // Comments are ANCHORED (mig 183): `nodeId` is the section the note is pinned to and `text`
+    // carries it. A body-shaped payload is refused — the product will not take a floating comment.
+    const r = await page.request.post(`/api/portal/${state.slug}/proposals/${state.proposalId}/comments`, {
+      data: { nodeId: sec.id, text: 'Tie the throughput claim to the Rhode Island slab test — reviewers will look for a number here, not an adjective.' },
+      timeout: 60_000,
+    });
+    if (!ok(r)) throw new Error(`comments ${r.status()} ${(await r.text()).slice(0, 160)}`);
+    hitl('review comment', 'left the note a proposal consultant would leave, anchored to the section it belongs to');
+  });
+
+  // ══ ACT 5c — the operator descends into the customer's space, and comes back ══
+  // This is the ONLY place authority crosses the tenant boundary, and both directions are audited
+  // on purpose (docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md). Drive it as the support call it models:
+  // the customer is stuck, an admin goes in as their company admin, helps, and leaves.
+  ACT = 'ACT 5c · shadow descend / ascend';
+  console.error(`\n${ACT}`);
+  await step('rfp_admin descends into the tenant', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    hitl('descend', `${state.company} asked for help on their build; entering their space as their company admin`);
+    const r = await page.request.post('/api/admin/shadow-transition',
+      { data: { direction: 'down', tenantId: state.tenantId }, timeout: 60_000 });
+    if (!ok(r)) throw new Error(`shadow-transition down ${r.status()} ${(await r.text()).slice(0, 140)}`);
+  });
+  await step('and can actually work in there', 'master_admin', async () => {
+    // Descent is worthless if it only writes an event. Read the customer's build as the admin.
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals/${state.proposalId}`, { timeout: 60_000 });
+    if (!ok(r)) throw new Error(`admin could not read the tenant's build: ${r.status()}`);
+    const j = await r.json().catch(() => ({}));
+    rec('admin sees the build', 'master_admin', 'ok', `"${j?.data?.proposal?.title ?? '?'}" · stage=${j?.data?.proposal?.stage ?? '?'}`);
+    await page.goto(`/portal/${state.slug}/proposals/${state.proposalId}`, { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+  });
+  await shot(page, '09b-shadow-descent');
+  await step('rfp_admin ascends back to the platform', 'master_admin', async () => {
+    hitl('ascend', 'finished assisting; leaving the customer\'s space');
+    const r = await page.request.post('/api/admin/shadow-transition',
+      { data: { direction: 'up', tenantId: state.tenantId }, timeout: 60_000 });
+    if (!ok(r)) throw new Error(`shadow-transition up ${r.status()} ${(await r.text()).slice(0, 140)}`);
+  });
+  await step('both crossings are on the record', 'HITL', async () => {
+    // The point of auditing a descent is that someone can later ask "who was in our account?".
+    // Ask it the way an auditor would — by LOOKING AT THE PAGE the tenant is given, not by
+    // querying a table. (There is no tenant-scoped activity API; the surface is the page at
+    // /portal/<slug>/activity, which is what a customer would actually open.)
+    await page.goto(`/portal/${state.slug}/activity`, { waitUntil: 'networkidle', timeout: 60_000 });
+    const shown = await page.locator('body').innerText().catch(() => '');
+    const down = /descend/i.test(shown);
+    const up = /ascend/i.test(shown);
+    await shot(page, '09c-shadow-audit-trail');
+    rec('descend/ascend visible to the customer', 'HITL', down && up ? 'ok' : 'note',
+      `descended=${down} ascended=${up} on the tenant's own activity page`);
+  });
+  await signIn(page, state.adminEmail, TENANT_PW);
 
   // ══ ACT 6 — reviews, as gates I decide at ════════════════════════════════
   ACT = 'ACT 6 · reviews';
@@ -643,6 +800,12 @@ test('the arc: supply → customer → library → portal → authored → revie
   // package has actually gone wrong in this codebase.
   type JsonSec = { number?: string; title?: string; text_content?: string; page_allocation?: number | null; status?: string };
   let jsonSecs: JsonSec[] = [];
+  /** Collapse every run of whitespace, so a title wrapped across lines still matches. */
+  const flat = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const decodeEntities = (s: string) => s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&apos;/g, "'").replace(/&amp;/g, '&'); // &amp; last, or "&amp;lt;" double-decodes
 
   await step('the json package carries the authored prose', 'HITL', async () => {
     const j = JSON.parse(fs.readFileSync(path.join(DL, 'arc-proposal.json'), 'utf8'));
@@ -691,10 +854,13 @@ test('the arc: supply → customer → library → portal → authored → revie
     const names = execSync(`unzip -Z1 ${JSON.stringify(f)}`, { encoding: 'utf8' }).trim().split('\n');
     if (!names.includes('word/document.xml')) throw new Error(`not a Word package: ${names.slice(0, 8).join(', ')}`);
     const xml = execSync(`unzip -p ${JSON.stringify(f)} word/document.xml`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-    const plain = xml.replace(/<[^>]+>/g, ' ');
+    // Strip tags, then DECODE ENTITIES and flatten whitespace. A title containing "&" is stored
+    // in the XML as "&amp;", and a long one is broken across runs/lines — comparing raw text to
+    // raw title reports both as "missing" and invents a defect that is not there.
+    const plain = flat(decodeEntities(xml.replace(/<[^>]+>/g, ' ')));
     // Where each section's title appears in the body — must be strictly increasing.
     const titles = jsonSecs.map((s) => (s.title ?? '').trim()).filter((t) => t.length > 6);
-    const at = titles.map((t) => ({ t, i: plain.indexOf(t) }));
+    const at = titles.map((t) => ({ t, i: plain.indexOf(flat(t)) }));
     const missing = at.filter((x) => x.i < 0);
     const found = at.filter((x) => x.i >= 0);
     const outOfOrder = found.filter((x, k) => k > 0 && x.i < found[k - 1].i);
@@ -713,22 +879,36 @@ test('the arc: supply → customer → library → portal → authored → revie
   await step('pdf renders real pages with the authored text', 'HITL', async () => {
     const f = path.join(DL, 'arc-proposal.pdf');
     if (!fs.existsSync(f)) throw new Error('no pdf was produced');
-    const py = `
-import pymupdf, json, sys
-d = pymupdf.open(${JSON.stringify(f)})
-txt = "\\n".join(p.get_text() for p in d)
-print(json.dumps({"pages": d.page_count, "chars": len(txt.strip()),
-                  "first": txt.strip()[:160]}))`;
-    const out = execSync(`python3 -c ${JSON.stringify(py)}`, { encoding: 'utf8' });
-    const info = JSON.parse(out.trim().split('\n').pop() as string) as { pages: number; chars: number; first: string };
+    // Write the probe to a FILE. Passing multi-line Python through `python3 -c "…"` after JS
+    // string-escaping turns the newlines into backslash-n inside the shell word, and Python
+    // answers "unexpected character after line continuation character" — a syntax error in the
+    // harness that reads exactly like a broken PDF.
+    const pyFile = path.join(DL, '_probe_pdf.py');
+    fs.writeFileSync(pyFile, [
+      'import pymupdf, json, sys',
+      'd = pymupdf.open(sys.argv[1])',
+      'txt = "\\n".join(p.get_text() for p in d)',
+      'print(json.dumps({"pages": d.page_count, "chars": len(txt.strip()), "text": txt}))',
+    ].join('\n'));
+    const out = execSync(`python3 ${JSON.stringify(pyFile)} ${JSON.stringify(f)}`,
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const info = JSON.parse(out.trim().split('\n').pop() as string) as { pages: number; chars: number; text: string };
     rec('pdf pages', 'system', 'note', `${info.pages} page(s) · ${info.chars.toLocaleString()} chars of extractable text`);
     if (info.pages < 1) throw new Error('pdf has no pages');
     // A PDF that renders but carries no extractable text is the "images of nothing" failure —
     // it looks fine as bytes and is useless to a reviewer.
     if (info.chars < 500) throw new Error(`pdf carries almost no text (${info.chars} chars) — rendered but empty`);
+
     const titles = jsonSecs.map((s) => (s.title ?? '').trim()).filter((t) => t.length > 6);
-    const present = titles.filter((t) => info.first.includes(t)).length;
-    rec('pdf first-page text', 'system', 'note', info.first.replace(/\s+/g, ' ').slice(0, 120) + (present ? '' : ''));
+    const norm = flat(info.text);
+    const pos = titles.map((t) => ({ t, i: norm.indexOf(flat(t)) }));
+    const missing = pos.filter((x) => x.i < 0);
+    const located = pos.filter((x) => x.i >= 0);
+    const ooo = located.filter((x, k) => k > 0 && x.i < located[k - 1].i);
+    rec('pdf carries every section, in order', 'HITL', missing.length === 0 && ooo.length === 0 ? 'ok' : 'blocked',
+      missing.length || ooo.length
+        ? `${missing.length} missing, ${ooo.length} out of order (first missing: "${missing[0]?.t.slice(0, 60) ?? '—'}")`
+        : `${located.length}/${titles.length} titles present in ascending page order across ${info.pages} pages`);
   });
 
   // ── zip: per-volume-native, one file per volume ──
@@ -743,6 +923,77 @@ print(json.dumps({"pages": d.page_count, "chars": len(txt.strip()),
     const volumes = names.filter((n) => /^V\d+_/.test(n));
     rec('zip carries one artifact per volume', 'HITL', volumes.length >= 2 ? 'ok' : 'note',
       volumes.length >= 2 ? `${volumes.length} volume files` : `${names.length} entr(ies), ${volumes.length} matching V<n>_ — check the volume split`);
+  });
+
+  // ══ ACT 9 — the SAME customer, a DIFFERENT completion path ════════════════
+  // The build above was the manual path: a human wrote every section, then walked the gates. This
+  // one is the opposite end of the same product — a second opportunity, provisioned the same way,
+  // then handed to the agent workforce from the admin plane and never hand-authored at all.
+  // Running both against one tenant is the point: the divergence has to be in the PATH, not in a
+  // differently-prepared world.
+  ACT = 'ACT 9 · divergent path (automated)';
+  console.error(`\n${ACT}`);
+  const second: Record<string, string> = {};
+  await step('buy a second portal on a different opportunity', state.adminEmail, async () => {
+    await signIn(page, state.adminEmail, TENANT_PW);
+    const r = await page.request.get(`/api/portal/${state.slug}/cards`);
+    const cards = ((await r.json().catch(() => ({})))?.data?.cards ?? []) as Array<{ opportunityId: string; card?: { title?: string } }>;
+    const other = cards.find((c) => c.opportunityId !== state.oppId) ?? cards[1] ?? cards[0];
+    if (!other) throw new Error('no second opportunity available to pursue');
+    hitl('second pursuit', `pursuing "${other.card?.title ?? other.opportunityId}" — same company, second bid, automated path`);
+    const p = await page.request.post(`/api/portal/${state.slug}/purchase`, {
+      data: { opportunityId: other.opportunityId, promoCode: COMP_CODE, label: 'Midterm arc · automated path' },
+      timeout: 120_000,
+    });
+    if (!ok(p)) throw new Error(`purchase ${p.status()} ${(await p.text()).slice(0, 140)}`);
+    second.portalId = ((await p.json().catch(() => ({})))?.data?.portalId ?? '') as string;
+    second.oppId = other.opportunityId;
+  });
+
+  await step('operator releases it', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    if (!second.portalId) throw new Error('no second portal to release');
+    hitl('second release', 'the master is already built out from the first buyer; releasing this portal only');
+    const r = await page.request.post(`/api/admin/provisioning/${second.portalId}/release`,
+      { data: { confirm: true }, timeout: 300_000 });
+    if (!ok(r)) throw new Error(`release ${r.status()} ${(await r.text()).slice(0, 160)}`);
+  });
+
+  await step('find the second build', state.adminEmail, async () => {
+    await signIn(page, state.adminEmail, TENANT_PW);
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals`);
+    const ps = ((await r.json().catch(() => ({})))?.data?.proposals ?? []) as Array<{ id: string; title?: string }>;
+    const p = ps.find((x) => x.id !== state.proposalId);
+    if (!p) throw new Error(`only ${ps.length} proposal(s) in this tenant — the second never provisioned`);
+    second.proposalId = p.id;
+    rec('second build', 'system', 'note', `"${p.title ?? p.id}"`);
+  });
+
+  // THE DOORBELL. The tenant-side Proposal Draft Manager is drivable from the admin plane, and
+  // Mode C is full auto: plan → draft → the review-gate cohort → advisory reconcile. It is still
+  // ADVISORY by contract — it never advances a stage, locks or submits — so what should be true
+  // afterwards is that work was PROPOSED, not that the build moved on its own.
+  await step('admin rings the full-draft doorbell (Mode C, full auto)', 'master_admin', async () => {
+    await signIn(page, 'eric@rfppipeline.com', ADMIN_PW);
+    if (!second.proposalId) throw new Error('no second build to draft');
+    hitl('automation choice', 'Mode C — hand this one to the workforce end to end, and judge the output rather than the typing');
+    const r = await page.request.post(`/api/admin/proposals/${second.proposalId}/full-draft`,
+      { data: { mode: 'c', adversarial: true, adversarialPolicy: 'auto' }, timeout: 300_000 });
+    if (!ok(r)) throw new Error(`full-draft ${r.status()} ${(await r.text()).slice(0, 200)}`);
+    rec('full draft requested', 'master_admin', 'ok', 'source=admin_doorbell mode=c adversarial=auto');
+  });
+  await page.goto('/admin/agents', { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => {});
+  await shot(page, '14-agent-workforce');
+
+  await step('the automated path is advisory, not autonomous', 'HITL', async () => {
+    // The invariant worth checking is the SAFETY one: a full-draft request must not have advanced
+    // the stage or locked anything. An agent proposing text is the product working; an agent
+    // submitting a bid is the product being dangerous.
+    const r = await page.request.get(`/api/portal/${state.slug}/proposals/${second.proposalId}`, { timeout: 60_000 });
+    const p = ((await r.json().catch(() => ({})))?.data?.proposal ?? {}) as { stage?: string; isLocked?: boolean };
+    const safe = p.stage !== 'submitted' && p.isLocked !== true;
+    rec('workforce did not advance or lock the build', 'HITL', safe ? 'ok' : 'blocked',
+      `stage=${p.stage ?? '?'} locked=${p.isLocked ?? '?'} — advisory contract ${safe ? 'held' : 'VIOLATED'}`);
   });
 
   // ══ ledger ═══════════════════════════════════════════════════════════════

@@ -4,9 +4,20 @@
  * Computes whether a master OPP (curated_solicitations) is "fully built out" — the advisory bar the
  * provisioning cockpit shows and the "Mark build-out complete" action gates on (owner decision:
  * advisory + confirm, so `ready=false` doesn't BLOCK release, it just requires an explicit confirm).
- * The bar = compliance authored (a solicitation_compliance row with a submission_format — named
- * column OR the curator's custom_variables layer, matching the push gate) + >=1 volume + >=1
- * required item. Scope-agnostic on purpose: the provisioner PREFERS topic overrides
+ *
+ * The bar has FIVE conditions, not three:
+ *   1. compliance authored (a solicitation_compliance row with a submission_format — named column
+ *      OR the curator's custom_variables layer, matching the push gate)
+ *   2. >= 1 volume
+ *   3. >= 1 required item
+ *   4. itemsUndecided === 0    ← see the field docs below; this is part of the bar, not a footnote
+ *   5. volumesUndecided === 0  ←
+ * Conditions 4 and 5 were folded in after the first three, and the one-line summaries that used to
+ * live here and on `ready` still said "compliance + >=1 volume + >=1 required item" long
+ * afterwards. That reads as a bug the first time you meet a master with compliance, six volumes and
+ * twenty-two items reporting `ready:false` — it is not one; the undecided counts are why.
+ *
+ * Scope-agnostic on purpose: the provisioner PREFERS topic overrides
  * (compliance-resolver), so a fully topic-scoped build satisfies the bar exactly like a baseline
  * one — counting only `topic_id IS NULL` made a topic-only build read "below the bar" and forced
  * a spurious confirm. `itemsWithTemplate` is a soft recommendation (the provision cascade has a
@@ -18,7 +29,8 @@
 import { sqlBypass } from '@/lib/db';
 
 export interface BuildReadiness {
-  /** Meets the bar: compliance + >=1 volume + >=1 required item. */
+  /** Meets the bar: compliance + >=1 volume + >=1 required item + nothing left undecided
+   *  (itemsUndecided === 0 && volumesUndecided === 0). See the file header. */
   ready: boolean;
   hasCompliance: boolean;
   volumeCount: number;
