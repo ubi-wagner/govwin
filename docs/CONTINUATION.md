@@ -23,6 +23,17 @@
 > seed, so its HEALTHY tile was 0 *by construction*. Status is derived from what a scout pass really
 > writes, and `manual` (a source a person reads) is now its own status rather than being reported as
 > a fault. **The bug log's open list is empty.**
+>
+> **B64 — the page ruler now agrees with the printed page.** `estimatePageCount` is what tells a
+> customer whether their volume is inside its page limit, and it under-counted: a 40-row table by a
+> page, the same table with *wrapping* cells by two, and **two of the four real proposals in the
+> sandbox by a page each**. Four defects — a table row modelled as body text, no term for a wrapped
+> cell, equal-width columns in an auto-layout table, and `fitKeep` refusing to relocate an oversized
+> `break-inside: avoid` block. All under-counting, i.e. the direction that clears a bid the printer
+> rejects. Constants are now MEASURED (`scripts/measure-table-row-height.mts`) rather than read off
+> the stylesheet — the stylesheet-derived value falls outside the measured bracket. The missing
+> instrument is the real deliverable: **`scripts/calibrate-page-ruler.mts`** renders every case
+> through Chromium and exits non-zero on drift; run it after anything that touches layout.
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter

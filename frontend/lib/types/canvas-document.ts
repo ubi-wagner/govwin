@@ -719,9 +719,68 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       return fs * 15.5 + bodyLineH;
     }
     case 'table': {
+      // A TABLE ROW IS NOT A LINE OF BODY TEXT, and treating it as 1.35 of one under-counted
+      // every table in the product — in the dangerous direction, where the ruler clears a volume
+      // the printer does not. Measured against Chromium (scripts/measure-table-row-height.mts):
+      //
+      //   40 single-line rows   ruler 2 pages   printed 3     (row height 9% short)
+      //   40 wrapping rows      ruler 2 pages   printed 4     (row height 74% short)
+      //
+      // The second number is the real defect: the old model counted ROWS, so a cell whose text
+      // wraps to two lines moved the printed table by a whole page and moved the estimate by
+      // nothing at all. A milestone table with real deliverable descriptions in it — the single
+      // most common table in a proposal — is exactly that shape.
+      //
+      // A row is `ROW_BASE + lines × ROW_LINE`, and a row is as tall as its TALLEST cell, so the
+      // line count is a max across the row. Both constants are measured, not derived from reading
+      // the CSS: binary-searching the largest table that still fits one 648pt page brackets the
+      // true row height at three different cell lengths —
+      //
+      //   1-line cells   31 data rows + header = 32 boxes   → 19.64pt < row ≤ 20.25pt
+      //   2-line cells   19 data rows + header = 20 boxes   → 30.86pt < row ≤ 32.40pt
+      //   3-line cells   13 data rows + header = 14 boxes   → 43.20pt < row ≤ 46.29pt
+      //
+      // Those three brackets solved together admit ROW_LINE ∈ (10.8, 12.76); 12.0 with a base of
+      // 8.0 satisfies all three (20.0 / 32.0 / 44.0), leaving under a third of a point of residual
+      // per row. Reading the stylesheet instead would have given 10 × 1.28 = 12.8 from the body's
+      // unitless line-height, which is outside the measured bracket — the table text resolves at
+      // `normal` leading, not the body's. That is exactly why these are measured.
+      // (scripts/measure-table-row-height.mts + scripts/calibrate-page-ruler.mts.)
       const t = node.content as TableContent;
-      const rows = (Array.isArray(t.headers) && t.headers.length ? 1 : 0) + (t.rows?.length ?? 0);
-      return Math.max(1, rows) * bodyLineH * 1.35;
+      const header = Array.isArray(t.headers) && t.headers.length ? [t.headers] : [];
+      const allRows = [...header, ...(t.rows ?? [])];
+      if (allRows.length === 0) return bodyLineH;
+
+      const TABLE_FS = 10;            // canvas-html::renderTable hardcodes font-size:10pt
+      const ROW_LINE = 12.0;          // measured leading of one line of table text
+      const ROW_BASE = 8.0;           // measured: 4px+4px padding + the collapsed 1px rule
+      const CELL_SIDE_PAD_PT = 12;    // 8px left + 8px right, taken out of the text column
+
+      const cellText = (v: unknown): string =>
+        typeof v === 'string' ? v : String((v as { text?: unknown } | null)?.text ?? '');
+      const cols = Math.max(1, ...allRows.map((r) => (r?.length ?? 0)));
+
+      // COLUMNS ARE NOT EQUAL WIDTH. The table renders `width:100%` with no fixed layout, so
+      // Chromium auto-sizes each column to its content: a "Month" column holding "1".."40" takes a
+      // sliver, and the "Deliverable" column holding a sentence takes most of the table. Dividing
+      // the width evenly instead made every wide column look far narrower than it renders, so its
+      // text appeared to wrap to twice as many lines as it does — a 40-row table read as 5 pages
+      // and printed as 4. Weighting by each column's longest cell is the same rule auto-layout
+      // uses, and it lands the estimate on the printed number.
+      const colChars = Array.from({ length: cols }, (_, i) =>
+        Math.max(1, ...allRows.map((r) => cellText(r?.[i]).length)));
+      const totalChars = colChars.reduce((a, b) => a + b, 0) || 1;
+      const textWidth = Math.max(1, usableW - cols * CELL_SIDE_PAD_PT);
+      const cplPerCol = colChars.map((ch) =>
+        Math.max(1, Math.floor((textWidth * (ch / totalChars)) / (TABLE_FS * CHAR_W))));
+
+      let h = 0;
+      for (const row of allRows) {
+        const lines = Math.max(1, ...(row ?? []).map((c, i) =>
+          Math.ceil(cellText(c).length / cplPerCol[i]) || 1));
+        h += ROW_BASE + lines * ROW_LINE;
+      }
+      return h;
     }
     case 'caption':
       return bodyLineH;
@@ -841,10 +900,22 @@ export function paginate(doc: CanvasDocument): LayoutResult {
       newPage();
     }
   };
-  // A keep-together block: if it fits on a page but not in the remaining space,
-  // move it whole to the next page; an oversized block still spills.
+  // A keep-together block moves whole to the next page when it does not fit in what is left.
+  //
+  // THE OVERSIZED CASE TOO — this used to carry an `h <= usableH` guard, so a block taller than a
+  // page kept flowing from wherever it landed. Chromium does not do that. `break-inside: avoid`
+  // (canvas-html: `table`, `figure`, and any keep_together group/section) pushes the element to a
+  // fresh page even when it cannot possibly fit there, and only then lets it overflow. Measured:
+  //
+  //   table(40 rows) alone                  → 2 pages
+  //   ONE sentence of prose + the same table → 3 pages
+  //
+  // A single line of text moved the document by a whole page, because the table was relocated
+  // rather than filled in behind the prose. Under the old guard the ruler read 2 for both — so any
+  // volume with a long table under a paragraph, which is most of them, was under-counted at the
+  // exact gate meant to catch it.
   const fitKeep = (h: number) => {
-    if (y > 0 && h <= usableH && y + h > usableH) newPage();
+    if (y > 0 && y + h > usableH) newPage();
     advance(h);
   };
 
