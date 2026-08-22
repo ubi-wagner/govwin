@@ -1454,40 +1454,37 @@ test('the arc: supply → customer → library → portal → authored → revie
 
     await step('insert a block from the palette and type into it', state.adminEmail, async () => {
       hitl('hand authoring', 'adding a paragraph the way a customer does — palette, then keyboard');
-      const before = await page.locator('[contenteditable="true"]').count();
-      // The palette is behind the sidebar's "Add" TAB — the button exists in the DOM only once
-      // that tab is showing, so clicking straight at "Paragraph" finds nothing on a fresh open.
-      const addTab = page.getByRole('button', { name: /^add$/i }).first();
-      if (await addTab.count()) { await addTab.click({ timeout: 10_000 }).catch(() => {}); await page.waitForTimeout(400); }
-      // Insert items are labelled by what they are, not by node type: text_block reads "Paragraph".
-      const insert = page.getByRole('button', { name: /^Paragraph$/i }).first();
-      if (await insert.count()) { await insert.click({ timeout: 10_000 }).catch(() => {}); await page.waitForTimeout(600); }
-      const after = await page.locator('[contenteditable="true"]').count();
-      rec('palette inserted a block', 'HITL', after > before ? 'ok' : 'note',
-        `editable blocks ${before} → ${after}${after > before ? '' : ' (palette control not found under that name)'}`);
+      // THE EDITOR IS CLICK-TO-EDIT, and nothing on the page is editable at rest. Probing it live
+      // (e2e/probe-editor-drive.spec.ts) settled what two rounds of guessing had not:
+      //     at rest                     contenteditable=0  textarea=0
+      //     after clicking a paragraph  contenteditable=0  textarea=1
+      // So a block must be SELECTED before there is anywhere to type. Reaching straight for an
+      // editable element and finding none says nothing about the editor — only about the guess.
+      const blocks = page.locator('.prose, [data-node-id], p').filter({ hasText: /\w{24,}/ });
+      const blockCount = await blocks.count();
+      if (blockCount) await blocks.last().click({ timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(600);
 
-      // Find somewhere to type, and SAY WHICH KIND it was. A blank "nothing survived" tells you
-      // nothing about whether the editor is broken or the selector was wrong; naming the target
-      // (or the absence of one) makes the next person's first question answerable.
-      const targets: Array<[string, string]> = [
-        ['contenteditable', '[contenteditable="true"]'],
-        ['textarea', 'textarea'],
-        ['text input', 'input[type="text"]'],
-      ];
-      let typedInto = '';
-      for (const [label, sel] of targets) {
-        const box = page.locator(sel).last();
-        if (await box.count()) {
-          await box.click({ timeout: 10_000 }).catch(() => {});
-          await page.keyboard.type(EDITOR_MARK, { delay: 8 });
-          await page.waitForTimeout(300);
-          typedInto = label;
-          break;
-        }
+      // The INSERT ribbon labels carry an icon prefix — "¶ Text", "H Heading", "⊞ Table" — so an
+      // anchored /^Text$/ never matches. Allow the prefix.
+      const insert = page.getByRole('button', { name: /^\W*Text$/i }).first();
+      if (await insert.count()) { await insert.click({ timeout: 10_000 }).catch(() => {}); await page.waitForTimeout(700); }
+      rec('insert ribbon offers a text block', 'HITL', await insert.count() ? 'ok' : 'note',
+        await insert.count() ? 'clicked "¶ Text" on the INSERT ribbon' : 'no text-block control found on the ribbon');
+
+      const box = page.locator('textarea, [contenteditable="true"]').last();
+      const kind = await box.count()
+        ? (await box.evaluate((el) => el.tagName.toLowerCase()).catch(() => 'element'))
+        : '';
+      if (kind) {
+        await box.click({ timeout: 10_000 }).catch(() => {});
+        await page.keyboard.type(EDITOR_MARK, { delay: 8 });
+        await page.waitForTimeout(400);
       }
-      rec('typed into the editor', 'HITL', typedInto ? 'ok' : 'blocked',
-        typedInto ? `keyboard input went into a ${typedInto}` : 'the page offered NOTHING to type into');
-      if (!typedInto) throw new Error('found no editable target on the section editor');
+      rec('typed into the editor', 'HITL', kind ? 'ok' : 'blocked',
+        kind ? `selecting a block opened a <${kind}>; keystrokes went into it`
+             : `clicked ${blockCount} candidate block(s) and the page still offered nothing to type into`);
+      if (!kind) throw new Error('selecting a block did not open an editable field');
     });
 
     await step('save from the editor, then reload and look', state.adminEmail, async () => {
