@@ -142,6 +142,9 @@ export default async function PortalLayout({
             {canManageBucketsHere && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
             {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
+            {/* Contracts — the awards won. Without this the entity was reachable ONLY through the
+                contract_kickoff ToDo's deep-link, so dismissing that ToDo lost it (bug log B50). */}
+            {!isPartner && <PortalNavLink href={`${basePath}/contracts`}>Contracts</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
             {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}

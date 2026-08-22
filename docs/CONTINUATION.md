@@ -16,6 +16,13 @@
 > under `runInBypass` — without it `completeTask` reports `TASK_CLOSED` while changing nothing
 > (proven: `select_no_ctx=1 · update_no_ctx=0`). Verified live by
 > `frontend/e2e/b51-application-todos-drive.spec.ts` (accept + reject, both green).
+>
+> **B50 and B53 are closed too** (`frontend/e2e/b50-b53-reachability-drive.spec.ts`). B50: contracts
+> now have an index page and a rail link, so an award is not lost when its kickoff ToDo is dismissed.
+> B53: `/admin/scouts` no longer reads `source_health` — a table written exactly once, by the mig-002
+> seed, so its HEALTHY tile was 0 *by construction*. Status is derived from what a scout pass really
+> writes, and `manual` (a source a person reads) is now its own status rather than being reported as
+> a fault. **The bug log's open list is empty.**
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
