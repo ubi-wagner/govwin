@@ -21,7 +21,14 @@ from storage.s3_client import (
 
 @pytest.fixture(autouse=True)
 def mock_s3(monkeypatch):
-    """Replace the lazy boto3 client with a mock for every test."""
+    """Replace the lazy boto3 client with a mock for every test, on the S3 driver.
+
+    Pinning the driver is not ceremony. s3_client now has a local-filesystem branch for the sandbox
+    (STORAGE_DRIVER=local, see test_storage_local_driver.py), and scripts/sandbox-env.sh exports
+    exactly that — so these tests, which exist to verify the boto3 calls, silently took the local
+    path and every assert-called-with failed. A test of one driver has to say which one it means.
+    """
+    monkeypatch.setattr("storage.s3_client.LOCAL", False)
     mock_client = MagicMock()
     monkeypatch.setattr("storage.s3_client._s3_client", mock_client)
     return mock_client
