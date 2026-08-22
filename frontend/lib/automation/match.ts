@@ -15,10 +15,22 @@ export interface AutomationEvent {
 /** Actions the evaluator executes for real (vs. records-only / deferred). */
 export const EXECUTABLE = new Set(['create_todo', 'notify_admin']);
 
-/** `{key}` interpolation from the event payload; unknown keys collapse to ''. */
+const toCamel = (k: string) => k.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
+const toSnake = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+
+/**
+ * `{key}` interpolation from the event payload; unknown keys collapse to ''.
+ *
+ * Case-tolerant on purpose. Rule templates are admin-authored data (/admin/automation)
+ * while payloads are JS objects, so the two sides drift: the seeded
+ * `Review application from {company_name}` rule silently rendered
+ * "Review application from " for every applicant because both emitters send
+ * `companyName`. Resolving a placeholder against its camelCase and snake_case
+ * spellings means neither the admin nor the emitter has to know the other's convention.
+ */
 export function interpolate(template: string, payload: Record<string, unknown>): string {
   return template.replace(/\{(\w+)\}/g, (_m, k: string) => {
-    const v = payload?.[k];
+    const v = payload?.[k] ?? payload?.[toCamel(k)] ?? payload?.[toSnake(k)];
     return v == null ? '' : String(v);
   });
 }

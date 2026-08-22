@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { interpolate, conditionsMatch } from '@/lib/automation/match';
 
 describe('interpolate — {key} substitution from the event payload', () => {
-  it('fills known keys and blanks unknown ones', () => {
+  it('fills known keys and blanks genuinely-absent ones', () => {
     expect(interpolate('Review application from {company_name}', { company_name: 'Acme' }))
       .toBe('Review application from Acme');
     expect(interpolate('Review scout changes: {source_name}', {})).toBe('Review scout changes: ');
@@ -10,6 +10,26 @@ describe('interpolate — {key} substitution from the event payload', () => {
   it('coerces non-string values and leaves plain text intact', () => {
     expect(interpolate('n={count}', { count: 3 })).toBe('n=3');
     expect(interpolate('no placeholders', { a: 1 })).toBe('no placeholders');
+  });
+
+  // Regression: the seeded rule (mig 040) says {company_name}; BOTH emitters of
+  // capture.application.submitted (app/api/applications/route.ts, lib/partner/registration.ts)
+  // send `companyName`. That mismatch shipped 3 live ToDos reading "Review application from ".
+  // The payloads below are the emitters' real shapes — not a shape chosen to satisfy the template.
+  it('renders the seeded rule against the payload the emitters actually send', () => {
+    const publicApply = { correlationId: 'c', applicationId: 'a', companyName: 'Acme Labs' };
+    expect(interpolate('Review application from {company_name}', publicApply))
+      .toBe('Review application from Acme Labs');
+
+    const partnerApply = { correlationId: 'c', applicationId: 'a', companyName: 'Acme Labs', source: 'partner' };
+    expect(interpolate('Review application from {company_name}', partnerApply))
+      .toBe('Review application from Acme Labs');
+  });
+  it('resolves a placeholder written in either convention', () => {
+    expect(interpolate('{companyName}', { company_name: 'Acme' })).toBe('Acme');
+    expect(interpolate('{company_name}', { companyName: 'Acme' })).toBe('Acme');
+    // An exact hit always wins over a case-folded one.
+    expect(interpolate('{company_name}', { company_name: 'exact', companyName: 'folded' })).toBe('exact');
   });
 });
 
