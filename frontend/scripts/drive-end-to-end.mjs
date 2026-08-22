@@ -65,14 +65,22 @@ function prove(plane, claim, ok, detail = '') {
 }
 
 /** Every action must leave a trace. A stage that changed the database but posted nothing is a
- *  stage no operator can audit, which this product's own contract forbids. */
+ *  stage no operator can audit, which this product's own contract forbids.
+ *
+ *  Match on TYPE ONLY, against the `type` column. The first version of this concatenated the
+ *  namespace into the type ('finder.rfp.shredding') and matched nothing — so stage 1 reported the
+ *  events plane failing while the events were in fact being written correctly the whole time.
+ *  system_events stores them split: namespace='finder', type='rfp.shredding.start'. A verifier
+ *  that reports a passing system as broken is worse than no verifier, because it spends the
+ *  reader's trust on a false alarm. */
 async function provedEvent(types, sinceIso, label) {
   const rows = await sql`
-    SELECT type, count(*)::int AS n FROM system_events
+    SELECT namespace, type, count(*)::int AS n FROM system_events
      WHERE type = ANY(${types}) AND created_at >= ${sinceIso}
-     GROUP BY type`;
+     GROUP BY namespace, type`;
   const total = rows.reduce((s, r) => s + r.n, 0);
-  return prove('events', label, total > 0, rows.map((r) => `${r.type}×${r.n}`).join(', ') || 'none');
+  return prove('events', label, total > 0,
+               rows.map((r) => `${r.namespace}·${r.type}×${r.n}`).join(', ') || 'none');
 }
 
 function sh(cmd, argv, env = {}) {
@@ -123,8 +131,8 @@ if (done('ingest')) {
   prove('database', 'page_count is read from the PDF, not guessed',
         doc?.pageCount === null || doc?.pageCount === undefined || doc.pageCount > 200,
         `page_count=${doc?.pageCount ?? 'NULL'} (a 254pp BAA; the old byte-guess said 60)`);
-  await provedEvent(['finder.rfp.shredding', 'finder.compliance.extracted', 'finder.rfp.uploaded'], t0,
-                    'ingest posted to system_events');
+  await provedEvent(['rfp.uploaded', 'rfp.shredding.start', 'rfp.shredding.end',
+                     'shred.executed', 'compliance.extracted'], t0, 'ingest posted to system_events');
 
   journal.ids.sol = sol; journal.ids.opp = row?.oppId ?? null;
   journal.stages.ingest = { ok: failures === 0, at: new Date().toISOString(), chars: row?.chars };
@@ -137,7 +145,45 @@ if (done('ingest')) {
 if (done('curate')) {
   console.log(`\n2. CURATE + PUSH — already proven (opp=${journal.ids.opp})`);
 } else {
-  console.log('\n2. CURATE + PUSH — triage → assist → publish → fan out');
+  console.log('\n2. CURATE + PUSH — triage → assist → HITL gate → publish → fan out');
+
+  // ── The HITL gate this arc exists to surface ──────────────────────────────
+  // The first run stopped dead here, and it was the product behaving correctly:
+  //
+  //     assist  200 landed=false volumes=0 items=0 source=pattern_match
+  //     push    422 cannot push: required compliance variables missing
+  //
+  // Ingest Assist read the BAA, could not establish submission_format from the source, and
+  // DECLINED to land a default skeleton rather than invent one — docs/INGEST_PROVENANCE.md, "a
+  // value the product did not read must never look like one it did". solicitation-push.ts then
+  // refuses to fan an opportunity with no compliance matrix out to tenants.
+  //
+  // So the chain from a raw BAA to a tenant card is NOT fully automatic, by design: a curator must
+  // supply what the document did not state. No per-stage test shows this, because each stage's own
+  // fixture already has the value. An arc is the only thing that finds it.
+  //
+  // The arc therefore does what the curator does, through the curator's own route, and LABELS it
+  // as a human step rather than quietly papering over the gate.
+  const admin = await (await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] })).newContext();
+  const apage = await admin.newPage();
+  const [rfpAdmin] = await sql`
+    SELECT email FROM users WHERE role = 'rfp_admin' AND is_active ORDER BY created_at LIMIT 1`;
+  prove('database', 'an rfp_admin exists to curate', !!rfpAdmin?.email, rfpAdmin?.email);
+  await login(apage, rfpAdmin.email, 'DemoPass123!');
+
+  const res = await apage.request.post(
+    `${BASE}/api/admin/rfp-curation/${journal.ids.sol}/compliance`,
+    { data: {
+        variableName: 'submission_format',
+        value: 'Electronic submission via DSIP. PDF, 8.5x11, 1in margins, Times New Roman 11pt.',
+        notes: 'Set by a curator during the end-to-end arc — the BAA did not state it in a form '
+             + 'the deterministic extractor could cite, so Assist correctly refused to default it.',
+      } });
+  prove('database', 'HUMAN STEP: curator supplies submission_format (assist refused to invent it)',
+        res.status() === 200, `HTTP ${res.status()}`);
+  await admin.close();
+  await provedEvent(['compliance_value.saved'], t0, 'the curator-set value posted');
+
   sh('node', ['scripts/drive-baa-forward.mjs', journal.ids.sol]);
 
   const [opp] = await sql`
