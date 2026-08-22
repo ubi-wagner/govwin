@@ -33,6 +33,18 @@ import { execSync } from 'child_process';
 const sql = postgres(process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL, { max: 4 });
 
 let files = process.argv.slice(2);
+// Unqualified checking is OPT-IN. It raises coverage 5.5x (622 -> 3406 references) but its
+// false-positive rate is unacceptable as a default: identifying which text in a .ts file is
+// actually SQL needs a parser, and a stray backtick anywhere makes the block extractor swallow a
+// docblock, at which point English prose ("this", "every", "needs", "wrap") gets reported as
+// missing columns. Five rounds of fixes did not get it clean.
+//
+// Shipping it on by default would be the exact failure this whole tool exists to prevent — a check
+// that produces confident output it has not earned. Qualified checking IS trustworthy: mutation
+// tested 8/8, zero false positives across 245 files. That is the default.
+const UNQUALIFIED = process.argv.includes('--unqualified');
+files = files.filter((f) => f !== '--unqualified');
+
 if (files[0] === '--changed') {
   files = execSync('git diff --name-only HEAD; git diff --cached --name-only', { encoding: 'utf8' })
     .split('\n').map((f) => f.trim())
@@ -153,6 +165,53 @@ for (const file of files) {
         const near = [...columnsOf.get(table)].filter((c) => c.includes(col) || col.includes(c)).slice(0, 3);
         hits.push(`  ✗ ${file}: ${table}.${col} does not exist`
                 + (near.length ? `  — did you mean ${near.map((n) => `${table}.${n}`).join(' / ')}?` : ''));
+      }
+    }
+
+    // 1b · UNQUALIFIED columns, when the statement names exactly ONE table.
+    //
+    // This was missing, and its absence made the first sweep's "0 findings / the product's SQL is
+    // clean" a false reassurance. Most postgres.js code in this repo does not alias:
+    //
+    //     sql`SELECT id, stage, title FROM proposals WHERE id = ${id}`
+    //
+    // so ~47% of all column references were never examined. A mutation test proved it: three real
+    // product files, an invented column injected into each, ZERO references verified and nothing
+    // caught. A checker that skips half the code and reports "0 findings" is worse than none,
+    // because the number reads as a clean bill of health.
+    //
+    // Single-table statements are unambiguous, so bare identifiers resolve safely. Multi-table
+    // statements are skipped here — the column could belong to either side, and this tool does not
+    // guess.
+    const tablesInStmt = new Set(alias.values());
+    if (UNQUALIFIED && tablesInStmt.size === 1) {
+      const only = [...tablesInStmt][0];
+      const known = columnsOf.get(only);
+      // Identifiers in column position: after SELECT/WHERE/SET/AND/OR/,/( — not values, not
+      // keywords, not the table name itself.
+      // Strip literals, interpolations, AND `AS alias` output names. An alias is a name being
+      // DEFINED, not a column being read: `SELECT template AS snapshot FROM template_bridge` was
+      // reported as "template_bridge.snapshot does not exist". Third false-positive class in this
+      // tool, and like the other two it was only found by running it against real code rather than
+      // reasoning about it.
+      const body = src
+        .replace(/'[^']*'/g, "''")
+        .replace(/\$\{[^}]*\}/g, '?')
+        .replace(/\bAS\s+"?[a-zA-Z_][a-zA-Z0-9_]*"?/gi, ' ')
+        .replace(/::\s*[a-zA-Z_][a-zA-Z0-9_]*(\s*\[\s*\])?/g, ' ')   // ::uuid ::vector ::int[]
+        .replace(/\b(?:COUNT|SUM|MAX|MIN|AVG|ROUND|LENGTH|COALESCE|GREATEST|LEAST)\s*\(/gi, '(');
+      const KEYWORDS = new Set(['select','from','where','and','or','not','null','is','as','on','join','left','right','inner','outer','order','by','group','having','limit','offset','insert','into','values','update','set','delete','returning','distinct','case','when','then','else','end','count','coalesce','sum','max','min','avg','now','true','false','asc','desc','exists','in','any','all','union','with','cast','interval','filter','over','partition','nulls','first','last','conflict','do','nothing','default','array','jsonb','text','uuid','int','boolean','timestamptz','lateral','using','string_agg','array_agg','length','round']);
+      for (const m of body.matchAll(/(?<![.\w])([a-z_][a-z0-9_]{2,})(?![\w.(])/g)) {
+        const id = m[1];
+        if (KEYWORDS.has(id) || id === only) continue;
+        if (columnsOf.has(id)) continue;            // another table name
+        if (known.has(id)) { checked += 1; continue; }
+        // Only report when it LOOKS like a column reference — i.e. the statement is a plain
+        // single-table query. Anything else is left unresolved rather than accused.
+        checked += 1;
+        const near = [...known].filter((c) => c.includes(id) || id.includes(c)).slice(0, 3);
+        hits.push(`  ✗ ${file}: ${only}.${id} does not exist (unqualified)`
+                + (near.length ? `  — did you mean ${near.join(' / ')}?` : ''));
       }
     }
 
