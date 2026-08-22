@@ -202,8 +202,17 @@ if (done('curate')) {
 
   sh('node', ['scripts/drive-baa-forward.mjs', journal.ids.sol]);
 
+  // Resolve through the FORWARD link, and only that one. B46: the push writes
+  // curated_solicitations.opportunity_id and leaves opportunities.solicitation_id NULL, so a join
+  // on the back-link finds nothing — which is exactly how drive-baa-forward came to report
+  // "nothing reached a tenant card" against a push that had just fanned seventeen.
+  //
+  // No o.status here: opportunities has no such column (it carries topic_status). The first version
+  // selected it and died at this line — the same mistake I had already made once in psql the same
+  // hour without carrying the lesson into the script. CLAUDE.md's rule exists for this: verify the
+  // column in CLIFFNOTES §1 before writing the SQL, every time, including when it "obviously" exists.
   const [opp] = await sql`
-    SELECT o.id, o.title, o.status FROM opportunities o
+    SELECT o.id, o.title FROM opportunities o
       JOIN curated_solicitations cs ON cs.opportunity_id = o.id
      WHERE cs.id = ${journal.ids.sol}::uuid LIMIT 1`;
   prove('database', 'an opportunity exists off the solicitation', !!opp?.id, opp?.id);
@@ -215,9 +224,10 @@ if (done('curate')) {
   prove('database', 'the bridge fanned a mirror card to tenants', (cards?.n ?? 0) >= 1, `${cards?.n} card(s)`);
 
   const [mine] = await sql`
-    SELECT c.id, c.status FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
+    SELECT c.id, c.lifecycle_status, c.pursuit_status FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
      WHERE c.opportunity_id = ${journal.ids.opp}::uuid AND t.slug = ${TENANT} LIMIT 1`;
-  prove('database', `${TENANT} received the card`, !!mine?.id, mine?.id);
+  prove('database', `${TENANT} received the card`, !!mine?.id,
+        mine ? `${mine.id} (${mine.lifecycleStatus}/${mine.pursuitStatus})` : 'none');
   await provedEvent(['finder.opportunity.published', 'capture.opportunity.matched'], t0, 'the push posted');
 
   journal.ids.card = mine?.id ?? null;
