@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Semantic health probes for the sandbox — the shared definition of "healthy".
 #
-# SOURCE THIS, don't execute it:  . scripts/sandbox-probe.sh
+# Two ways in, both supported (see the dispatch at the foot of this file):
+#   . scripts/sandbox-probe.sh                     source it, then call the functions
+#   bash scripts/sandbox-probe.sh [probe_name]     run one (default probe_all) and exit its code
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # WHY SEMANTIC PROBES, AND NOT PINGS
@@ -253,13 +255,63 @@ probe_build_fresh() {
 # Build freshness is reported but does NOT count as a failure: it cannot be
 # repaired automatically, and a supervisor that treats it as an outage would
 # restart a healthy stack in a loop for ever.
+# ── e2e fixture accounts ─────────────────────────────────────────────────────
+# A SERVING box is not a DRIVABLE box.
+#
+# The container has been reset eight times in this run. Postgres survives with its data directory,
+# but that directory rolls back to the image snapshot — which predates the fixture accounts. So the
+# stack comes up perfectly healthy and every driver still fails, because `lighthouse` does not
+# exist, `admin@immobileyes.test` has no known password, and the specs that need them exit at their
+# guards. Measured cost: the FIRST full suite of this session was 13 passed / 59 failed / 97 never
+# run, and the entire difference was this seed not having been applied.
+#
+# It is cheap to check and cheap to fix, so the supervisor should do both rather than leaving a
+# person to remember. Both seeders are idempotent and refuse a non-local DSN.
+probe_fixtures() {
+  local missing=""
+  timeout 10 psql "$DATABASE_URL_OWNER" -tAc \
+    "SELECT 1 FROM tenants WHERE slug='lighthouse'" 2>/dev/null | grep -q 1 \
+    || missing="${missing} lighthouse-tenant"
+  timeout 10 psql "$DATABASE_URL_OWNER" -tAc \
+    "SELECT 1 FROM users WHERE email='eric@lighthouse.com' AND is_active" 2>/dev/null | grep -q 1 \
+    || missing="${missing} e2e-logins"
+  [ -z "$missing" ] && return 0
+  echo "fixtures: missing —${missing} (every drive spec exits at its guard; run scripts/seed_dev_accounts.mjs)"
+  return 1
+}
+
 probe_all() {
   local fails=0
   probe_postgres || fails=$((fails + 1))
   probe_emulator || fails=$((fails + 1))
   probe_worker   || fails=$((fails + 1))
   probe_frontend || fails=$((fails + 1))
+  probe_fixtures || fails=$((fails + 1))
   probe_testdb   || true          # advisory
   probe_build_fresh || true       # advisory — needs a human-triggered rebuild
   return "$fails"
 }
+
+# ── CLI dispatch ─────────────────────────────────────────────────────────────
+# WHY THIS EXISTS. This file is designed to be SOURCED (sandbox-watch.sh sources it and calls the
+# functions), and it had nothing at the bottom — so `bash scripts/sandbox-probe.sh probe_all`
+# defined the functions, reached EOF, and exited 0 without running a single check.
+#
+# That is the worst possible failure for a health tool: it answers "healthy" to every question,
+# including ones about a box that is on fire. It was used that way repeatedly in this session and
+# its `probe=0` was quoted as evidence of a working stack; it was evidence of nothing.
+#
+# Sourced use is unchanged — $0 differs from BASH_SOURCE when sourced, so this block is skipped.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  fn="${1:-probe_all}"
+  case "$fn" in
+    probe_*) ;;
+    -h|--help|help)
+      echo "usage: bash scripts/sandbox-probe.sh [probe_all|probe_postgres|probe_emulator|probe_worker|probe_frontend|probe_fixtures|probe_testdb|probe_build_fresh]"
+      exit 0 ;;
+    *) echo "unknown probe: $fn (try --help)" >&2; exit 2 ;;
+  esac
+  if ! declare -F "$fn" >/dev/null; then echo "unknown probe: $fn" >&2; exit 2; fi
+  "$fn"
+  exit $?
+fi

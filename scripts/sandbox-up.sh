@@ -63,6 +63,29 @@ if pg_isready -q 2>/dev/null; then
   else
     say "accounts    already driveable"
   fi
+
+  # The e2e FIXTURE accounts — a different problem from the admin password above, and the one that
+  # actually decides whether this box can be driven.
+  #
+  # Postgres survives a container reset with its data directory, but that directory rolls back to
+  # the image snapshot, which predates these rows. The stack then comes up perfectly healthy and
+  # every drive spec still fails: `lighthouse` does not exist, so auth.setup cannot sign in, so the
+  # specs that depend on it never run. Measured on the first full suite of this session:
+  # 13 passed / 59 failed / 97 NEVER RAN, and the whole difference was this seed.
+  #
+  # seed_dev_accounts.mjs is idempotent and refuses a non-local DSN, so running it whenever the
+  # tenant is absent costs nothing and removes a step no one should have to remember eight times.
+  if ! psql "$DATABASE_URL_OWNER" -tAc "SELECT 1 FROM tenants WHERE slug='lighthouse'" \
+      2>/dev/null | grep -q 1; then
+    ( cd frontend && node ../scripts/seed_dev_accounts.mjs ) >"$GOVWIN_RUN_DIR/fixtures.log" 2>&1 \
+      && say "fixtures    e2e accounts seeded (lighthouse + ubihere)" \
+      || say "fixtures    seed FAILED (see fixtures.log)"
+    # seed_dev_accounts sets the master_admin to the SUITE's expected password; re-assert the
+    # sandbox one so the two writers cannot disagree about who owns that account.
+    ( cd frontend && node ../scripts/sandbox-reset-passwords.mjs ) >>"$GOVWIN_RUN_DIR/pwreset.log" 2>&1 || true
+  else
+    say "fixtures    e2e accounts present"
+  fi
 fi
 
 # ── Emulated Claude (:8787) ─────────────────────────────────────────────────
