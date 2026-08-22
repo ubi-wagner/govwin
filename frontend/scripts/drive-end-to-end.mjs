@@ -91,11 +91,19 @@ function sh(cmd, argv, env = {}) {
   });
 }
 
-// The two credential sets in this sandbox are NOT the same, which cost a run: the arc signed the
-// curator in with the tenant password, got no session, and the HITL step surfaced as a bare 401
-// three calls later instead of as "login failed" at the point of failure.
+// THREE credential sets in this sandbox, not one, and not two — which cost two runs. First the
+// curator got the tenant password (401 at the HITL step), then lighthouse got the Foundation
+// password (?error=invalid at redemption). Each time the failure surfaced somewhere downstream of
+// the wrong guess.
+//
+// Resolved per tenant rather than carried as one constant, because "the password" does not exist:
+//     rfp_admin   eric@rfppipeline.com   RFPAdmin2026!
+//     lighthouse  eric@lighthouse.com    LighthouseAdmin
+//     everyone else                      DemoPass123!
+// Every value is env-overridable, and the map is the one place to change when a seed rotates.
 const RFP_ADMIN = { email: 'eric@rfppipeline.com', pw: process.env.RFP_ADMIN_PW || 'RFPAdmin2026!' };
-const TENANT_PW = process.env.TENANT_PW || 'DemoPass123!';
+const TENANT_PW_BY_SLUG = { lighthouse: process.env.LIGHTHOUSE_PW || 'LighthouseAdmin' };
+const TENANT_PW = TENANT_PW_BY_SLUG[TENANT] || process.env.TENANT_PW || 'DemoPass123!';
 
 /** Sign in, and REFUSE to continue silently if it did not work. The first version returned a
  *  boolean that one caller ignored; an unauthenticated context then produced a 401 far from the

@@ -81,6 +81,24 @@ export CARD_RECONCILE_URL="http://localhost:3000/api/admin/reconcile-cards"
 # Durable working directory for run artifacts (logs, captures, PID files).
 export GOVWIN_RUN_DIR="/home/user/.govwin/run"
 
+# ── Drive credentials — ONE source, because two disagreed and it cost a run ──────────────────────
+#
+# scripts/sandbox-reset-passwords.mjs sets the seeded admin accounts to SANDBOX_PASSWORD, and the
+# self-heal calls it on every repair. Every drive script and e2e spec, meanwhile, defaulted to a
+# DIFFERENT literal ('RFPAdmin2026!') — 48 sites of it. So the sandbox healing itself silently
+# invalidated every admin drive, and the symptom was `?error=invalid` on a login that had worked
+# twenty minutes earlier. Diagnosing that from the symptom is expensive; it looks like a broken
+# product, not a rotated password.
+#
+# All 48 sites already read process.env.RFP_ADMIN_PW before their literal, so exporting it here
+# fixes all of them at once and makes the reset script the single authority. The literals stay as
+# a last-resort default for anyone running a script without sourcing this file.
+export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
+export RFP_ADMIN_PW="${RFP_ADMIN_PW:-$SANDBOX_PASSWORD}"
+# lighthouse is NOT in the reset script's target list, so it keeps its seeded password.
+export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"
+export TENANT_PW="${TENANT_PW:-DemoPass123!}"
+
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
 
 # e2e/hitl-foundation-build.spec.ts asserts `TVSF_OPP env must be set` before it does anything, so
