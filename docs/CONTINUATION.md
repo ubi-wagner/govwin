@@ -99,15 +99,22 @@
 > a list, failing on a rendered error surface OR a client throw, and **reporting** (never skipping)
 > any route it cannot address from sandbox data.
 >
-> **Standing after both fixes: 76 surfaces driven · 76 clean · 0 broken.** Five routes are NOT
-> driven and are named in the run — `/admin/documents/[documentId]`, `/admin/site/[pageKey]`,
-> `/admin/site/docs/[type]/[slug]`, `/portal/[slug]/contracts/[contractId]`,
-> `/portal/[slug]/documents/[documentId]` — because the sandbox has no row to address them. That is
-> a real coverage gap (seed those five and it closes), not a pass. The sweep itself had the same
-> defect it exists to catch: `addressable()` tested the bound STRING for a leftover `[…]`, and an
-> empty substitution passes, so `/admin/documents/` — a different route that happens to exist — was
-> counted as a clean drive of a page never visited. Five routes were reported that way before it was
-> fixed to test the bindings.
+> **Standing: 79 surfaces driven · 79 clean · 0 broken.** Two routes are NOT driven, and the run
+> now says WHY for each, because "no row in the sandbox" sends the next reader hunting for a seed
+> that would not help:
+> `/admin/documents/[documentId]` is addressed by the OBJECT-STORAGE document index
+> (`reference/documents/_index.json`), not a table — and it is excluded by route rather than handed
+> a `tenant_documents.id` it would reject, since a harness inventing a failure is no better than one
+> inventing a pass. `/portal/[slug]/contracts/[contractId]` is the one real data gap: `contracts` is
+> empty.
+>
+> **The sweep took two passes to become honest, and both were the instrument.** First,
+> `addressable()` tested the bound STRING for a leftover `[…]` — an empty substitution passes, so
+> `/admin/documents/` (a different route that happens to exist) counted as a clean drive of a page
+> never visited. Then, with that fixed, five routes reported "no row in the sandbox" when four of
+> them had rows all along: the lookups queried a `documents` table that does not exist and never
+> looked for a page key or a content slug at all. Every lookup now targets what the PAGE itself
+> reads. Same shape as B74 and B78 — the tool was wrong, not the product.
 >
 > ### B68–B74 — the ruler, the vocabulary, and the tool that was clearing SQL it never read
 >
