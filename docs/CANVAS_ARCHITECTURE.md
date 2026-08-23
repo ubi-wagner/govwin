@@ -4,9 +4,25 @@
 build log, the data-model reference, or a superseded design that has been folded into this file — the full
 map is §9. Read this first; when the canvas changes, change this.
 
-_Last realigned: 2026-08-13 — a four-surface source sweep (doc/pdf · ppt · xls · editor shell) plus the
-unified-UI direction. Line refs below were re-verified this pass unless marked "(P1)" (Phase-1-dated —
-authoritative fact holds, exact line may have drifted)._
+_Last realigned: **2026-08-23** — a full design-vs-as-built re-verification against the code (the previous
+realignment, 2026-08-13, had gone stale in BOTH directions: it understated two shipped phases and
+overstated one gap). Every status in §2 and §7 below was re-read from source this pass; line refs marked
+"(P1)" are Phase-1-dated (fact holds, exact line may have drifted)._
+
+> **Two different things are called "one canvas". Keep them apart.**
+>
+> **(A) The unified canvas UI** — "one canvas, three surfaces, ONE interaction layer" (§3, §7). This is a
+> *UI* programme. **Substantially shipped**: phases 0, 1 and 5 are done, phase 2 is built but unevenly
+> mounted, phase 3 is part-done. Phases 4 and 6 are not.
+>
+> **(B) T2.x — the polymorphic artifact key.** This is a *data-model* refactor: re-key `canvas_versions`
+> and `proposal_comments` off `(artifact_type, artifact_id)` so a standalone document stops being
+> second-class. **Not done, and structurally visible:** `canvas_versions.section_id` is
+> `NOT NULL REFERENCES proposal_sections(id)` (`017_canvas_templates.sql:49`) and
+> `proposal_comments.proposal_id` is `NOT NULL REFERENCES proposals(id)` (`001_baseline.sql:382`), so a
+> one-off document **cannot** carry version history or comments at all. No migration introduces
+> `(artifact_type, artifact_id)` on either table. This is what `LAUNCH_READINESS_2026-08.md` descopes, and
+> what T7.x (agents drafting letters/marketing) is gated on.
 
 ---
 
@@ -52,9 +68,19 @@ on `canvas.format` into three bespoke surfaces over the same `CanvasNode[]`:**
 - **The spreadsheet is the one siloed surface** — `SheetEditor` returns *before* the shell, so it has no
   overlays, no selection/range-verbs, no AI-assist, and no chart affordance in the grid
   (`sheet-media-strip.tsx:34` = images+shapes only).
-- **Selection-verbs today:** `Atomize · Annotate · Regenerate` (`selection-toolbar.tsx:16`). `Reuse` and
-  `Compliance-check` do **not** exist as selection verbs. The read-only fluid view
-  (`fluid-document-view.tsx`, behind the admin-only "Document" tab) wires Atomize + Annotate only.
+- **Selection-verbs (re-read 2026-08-23 — the previous text here was wrong on both counts).**
+  `SelectionToolbar` accepts **all five** verbs as optional props — `onAtomize · onRegenerate · onAnnotate ·
+  onReuse · onComplianceCheck` (`selection-toolbar.tsx:18-22`). What differs is what each host *mounts*:
+  | Host | Verbs wired | Ref |
+  |---|---|---|
+  | Fluid document view | Atomize · Annotate · **Reuse · Compliance-check** (no Regenerate — read-only) | `fluid-document-view.tsx:543-546` |
+  | Section canvas editor | Atomize · Regenerate · Annotate | `canvas-editor.tsx:1175-1177` |
+  | Sheet editor | **none** — it returns before the shell | `canvas-editor.tsx:191` |
+  So the verb *component* is unified; the **mounting** is not. That is the whole of the remaining Phase 2.
+- **The fluid document view is the DEFAULT surface, not an admin-only tab.** `proposal-workspace.tsx:177`
+  opens tenant-wide members on `document` and scopes non-tenant-wide collaborators to `my-sections` — which
+  is simultaneously "fluid as default" (§7.5) and the collaboration lens (§3). The earlier "behind the
+  admin-only Document tab" line described a state the product left behind.
 - **Export** (`lib/export/*`, `renderCanvas` dispatcher): docx (`docx`) · pptx (`pptxgenjs`, one section =
   one slide) · xlsx (`exceljs`, one table = one worksheet, real formulas) · pdf (Chromium). Whole-proposal
   package `?format=json|docx|pdf|zip`. Uploaded S3 images now inline to data-URIs across all four (W4.3).
@@ -147,15 +173,46 @@ From the Phase-1 baseline (G1–G17), updated to current reality:
 | G16 | Prior-proposal reuse fragmented + admin-gated + upload-blind | **Closed** — W3.1 + W3.2 |
 | G17 | No per-tenant opp scoping | **Open** (niche opps stay single-tenant by never pushing) |
 
-## 7. Phased path to the unified UI (design only until each phase is signed off)
+## 7. Phased path to the unified UI — status re-verified against source 2026-08-23
 
-0. Revert the nav-sectioning (compartment drift) — **DONE**. 1. Shared **`OverlayLayer`** (F3, dotted layers +
-toggle) — **SHIPPED** (Sections/Atoms/Provenance across all four surfaces; Compliance/Budget layers pending).
-2. Unify **`ActOnSelection`** (+ Reuse/Compliance-check + sheet range). 3. **Sheets into the shell** (ribbon +
-chart-from-range + overlays + AI). 4. **Slides finish** (section=slide canonical + on-slide placement).
-5. **Fluid as default** (list view optional; `Manage` tabs dissolve). 6. Consistency pass (one action bar,
-one lens, one AssistPanel). Each phase: green backbone (`tsc` 0 · `vitest` · `next build`) + live-proven,
-both lenses.
+| # | Phase | Status | Evidence |
+|---|---|---|---|
+| 0 | Revert nav-sectioning (compartment drift) | ✅ **DONE** | — |
+| 1 | Shared **`OverlayLayer`** | ✅ **SHIPPED, 3 of 5 layers** | `canvas-overlays.tsx:19-21` defines exactly `sections · atoms · provenance`. Mounted on the fluid view (`:437`), the section editor, **and the sheet grid** (`sheet-editor.tsx:692`). **Compliance + Budget layers do not exist.** |
+| 2 | Unify **`ActOnSelection`** | 🟡 **BUILT, UNEVENLY MOUNTED** | All five verbs are props on `SelectionToolbar` (`:18-22`); the fluid view wires 4, the editor 3, the sheet 0. Nothing left to *build* — only to mount. |
+| 3 | **Sheets into the shell** | 🟡 **PART-DONE — overlays only** | The sheet got `CanvasOverlayBar`, but `canvas-editor.tsx:191` still early-returns to `SheetEditor` *before* `CanvasEditorInner`, so it has no selection verbs, no sidebar, no AI. No ribbon. `sheet-media-strip.tsx:33` filters `image \| shape` → **no chart-from-range**. |
+| 4 | **Slides finish** | ❌ **NOT DONE** | `slide-editor.tsx:35` still splits the flat node list on `page_break`; section=slide is not canonical. No `position` handling → no on-slide direct placement. |
+| 5 | **Fluid as default** | ✅ **SHIPPED** | `proposal-workspace.tsx:177` — tenant-wide members open on `document`; scoped collaborators on `my-sections`. |
+| 6 | Consistency pass (one action bar · one lens · one **`AssistPanel`**) | ❌ **NOT DONE** | No `AssistPanel` component exists (`components/canvas/` has `ai-revision-panel.tsx`, reachable only through `CanvasSidebar` → doc + slides). The lens shipped with phase 5; the single action bar did not. |
+
+**The honest one-liner:** the *model* was already unified before this programme began (§1) — one
+`CanvasDocument`, one `canvas.format` discriminator, no second type key. What phases 1–6 unify is the
+**interaction layer**, and that is **about two-thirds done**: overlays and the fluid default are in, the
+verb component is built but not mounted everywhere, and the two genuinely unbuilt pieces are the
+**spreadsheet's escape from its early return** and the **shared assist panel**.
+
+### 7a. What the unfinished phase actually costs — the cost volume is on the island
+
+Phase 3 is not an abstract tidiness item. **Every cost/budget volume is a `spreadsheet`-format canvas**
+(`lib/artifact-spec.ts:115` — `artifactType === 'cost'` → the spreadsheet preset; `artifact-export.ts:41`
+→ xlsx; the `dod-sbir-phase1-cost` and `sf424a-budget` templates are declared `format:'spreadsheet'`,
+`lib/templates/index.ts:189,221`). And `spreadsheet` is the one format that returns *before* the shell.
+
+So the customer filling in the volume with the **highest compliance and arithmetic risk** — the one an
+agency rejects outright for a wrong indirect rate or a missing form line — is the only one working without:
+
+- the **selection verbs** (no Atomize, no Regenerate, no Compliance-check on a range),
+- the **sidebar**, and with it the whole **Compliance tab** (`canvas-sidebar.tsx:531`), which is simply
+  unreachable for a sheet because the sidebar mounts inside `CanvasEditorInner`, and
+- any **AI assist** at all.
+
+They do get the overlays (phase 1 reached the grid). The deterministic burden engine
+(`cost-model.ts`/`cost-forms.ts`) is still the source of computed cells, so the *numbers* are sound — what
+is missing is every affordance for checking, revising, or reusing them. Closing phase 3 is therefore worth
+more than its position in the list suggests, and "add a ribbon + chart-from-range" undersells it: **the
+valuable half is moving the early return so the sheet mounts the shell.**
+
+Each remaining phase: green backbone (`tsc` 0 · `vitest` · `next build`) + live-proven, both lenses.
 
 ## 8. Two-lens rule (standing)
 
