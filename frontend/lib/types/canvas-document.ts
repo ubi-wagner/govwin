@@ -759,7 +759,30 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       // and a Technical Volume the ruler cleared at 10 of 10 pages rendered as 11. A ruler that
       // reads a different document from the one Chromium lays out is not a ruler — this is the
       // same defect class as the three the ruler already documents.
-      const c = node.content as { width?: number; height?: number } | undefined;
+      const c = node.content as { width?: number; height?: number; storage_key?: unknown } | undefined;
+
+      // AN IMAGE WITH NOWHERE TO LOAD FROM IS NOT A FIGURE — it is a placeholder box.
+      // canvas-html::renderImage draws `<img>` only when the key is a data: URI (the export path
+      // inlines real storage keys first); with nothing to inline it emits a small dashed
+      // `<div style="border:1px dashed;padding:24px">alt text</div>` instead, where the declared
+      // height acts as a `max-height` CAP rather than a height. Measuring the declared size anyway
+      // made every template mold read far longer than it prints: the DOE STTR Phase I mold carries
+      // five images with an EMPTY storage_key declared at up to 900×520, and the ruler spent ~3
+      // pages on figures Chromium drew as five one-line boxes — 10 pages estimated against 7
+      // printed, before any of this session's other fixes.
+      //
+      // Scoped to an EMPTY key on purpose. A real storage key resolves through
+      // `inlineImageDataUris` at export and does take its declared size — which is why real
+      // authored proposals measured exactly right. Only the provably-unresolvable case changes.
+      const key = typeof c?.storage_key === 'string' ? c.storage_key.trim() : '';
+      if (node.type === 'image' && key === '') {
+        const PLACEHOLDER_PAD_PT = 36;     // 24px top + 24px bottom
+        const FIGURE_MARGIN_PT = 18;       // the <figure>'s own 12px margins
+        const box = PLACEHOLDER_PAD_PT + fs * Math.max(bodyLineH / fs, 1.28) + 1.5 /* dashed border */;
+        const declared = typeof c?.height === 'number' && c.height > 0 ? c.height * 0.75 : box;
+        return Math.min(box, declared) + FIGURE_MARGIN_PT + bodyLineH;
+      }
+
       const w = typeof c?.width === 'number' && c.width > 0 ? c.width : 0;
       const h = typeof c?.height === 'number' && c.height > 0 ? c.height : 0;
       if (w > 0 && h > 0) {
