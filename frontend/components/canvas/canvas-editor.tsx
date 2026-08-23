@@ -13,7 +13,7 @@ import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } fro
 import type { LibraryAtomCandidate } from './library-picker';
 import { createNode, getNodeText, toEditableFlat, withCanvasDefaults } from '@/lib/types/canvas-document';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
-import { CanvasRenderer } from './canvas-renderer';
+import { CanvasRenderer, groupMapOf, type GroupMap } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
@@ -187,6 +187,14 @@ export function CanvasEditor(props: Props) {
   // is visible + editable in the canvas — every editor surface edits `nodes`.
   const initialDocument = toEditableFlat(withCanvasDefaults(props.initialDocument));
 
+  // The group layer, rescued BEFORE the line above throws it away. `toEditableFlat` sets
+  // `sections: undefined` deliberately — the editable surface is one flat node list — so by the
+  // time anything downstream looks, the groups are gone. Derived here, from the document as
+  // LOADED, and carried alongside as provenance: which library atom each node came from, and which
+  // runs move as one block. Editing a node does not change either answer, so a map keyed by node
+  // id stays correct across the whole session.
+  const groups = groupMapOf(withCanvasDefaults(props.initialDocument));
+
   // Delegate to SheetEditor for spreadsheet format
   if (initialDocument.canvas.format === 'spreadsheet') {
     return (
@@ -201,11 +209,12 @@ export function CanvasEditor(props: Props) {
     );
   }
 
-  return <CanvasEditorInner {...props} initialDocument={initialDocument} />;
+  return <CanvasEditorInner {...props} initialDocument={initialDocument} groups={groups} />;
 }
 
 function CanvasEditorInner({
   initialDocument,
+  groups,
   onSave,
   onExport,
   variables,
@@ -237,7 +246,7 @@ function CanvasEditorInner({
   triggerLockRef,
   triggerPanelRef,
   triggerExportRef,
-}: Props) {
+}: Props & { groups?: GroupMap }) {
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // Structure-as-overlay (Phase 1): togglable dotted Atoms/Provenance layers over the editing
@@ -965,7 +974,14 @@ function CanvasEditorInner({
           <CanvasOverlayBar
             active={overlays}
             onToggle={toggleOverlay}
-            items={OVERLAYS.filter((o) => o.key !== 'sections')}
+            // No `sections` here — this surface IS one section. `groups` only when the document
+            // actually carries them: a toggle that provably paints nothing reads as "there are no
+            // groups" when it really means "this shape cannot express them".
+            // Gated on the rescued GROUP MAP, not on `doc` — `doc` here is the flattened editable
+            // document, whose `sections` is undefined by construction, so `documentHasGroups(doc)`
+            // is false for every document and the chip would never appear.
+            items={OVERLAYS.filter((o) => o.key !== 'sections'
+              && (o.key !== 'groups' || Object.keys(groups ?? {}).length > 0))}
           />
         </div>
         <div className={`flex-1 overflow-y-auto min-h-0 ${overlayClass(overlays)}`}>
@@ -1164,6 +1180,7 @@ function CanvasEditorInner({
             variables={variables}
             readOnly={readOnly}
             onMoveNodeToIndex={handleMoveNodeToIndex}
+            groups={groups}
           />
         )}
         {/* Fluid-canvas F0: highlight a span → floating Atomize / Regenerate menu. Only in the

@@ -64,6 +64,49 @@
   outline-offset: 2px;
   border-radius: 3px;
 }
+/* GROUPS — a run of nodes from ONE library atom, drawn as one bracket.
+   Not an outline per node (that is what `atoms` already does, and repeating it says nothing new):
+   the point of this layer is where a run STARTS and ENDS, because that is the unit `keep_together`
+   moves across a page edge and the unit a scoped review addresses. A left rail spans the run;
+   the first and last members close it top and bottom.
+   DASHED rail = ordinary group. SOLID = keep_together, which is a real layout promise, so it reads
+   as a firmer line rather than a different colour the reader has to decode. */
+.cv-ov.ov-groups [data-group-id] {
+  position: relative;
+  padding-left: 10px;
+}
+.cv-ov.ov-groups [data-group-id]::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+  border-left: 2px dashed rgba(194, 65, 12, .55);
+  pointer-events: none;
+}
+.cv-ov.ov-groups [data-group-keep="1"]::after { border-left-style: solid; }
+.cv-ov.ov-groups [data-group-pos="start"]::after,
+.cv-ov.ov-groups [data-group-pos="solo"]::after { top: 4px; border-top-left-radius: 3px; }
+.cv-ov.ov-groups [data-group-pos="end"]::after,
+.cv-ov.ov-groups [data-group-pos="solo"]::after { bottom: 4px; border-bottom-left-radius: 3px; }
+/* Close the bracket with a short arm at each end, so a run reads as a bracket and not a margin. */
+.cv-ov.ov-groups [data-group-pos="start"],
+.cv-ov.ov-groups [data-group-pos="end"],
+.cv-ov.ov-groups [data-group-pos="solo"] { box-shadow: inset 8px 0 0 -6px rgba(194, 65, 12, .55); }
+/* The atom's name at the head of its run — provenance a reader can act on. */
+.cv-ov.ov-groups [data-group-pos="start"]::before,
+.cv-ov.ov-groups [data-group-pos="solo"]::before {
+  content: attr(data-group-label);
+  position: absolute;
+  top: -8px; left: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8px; font-weight: 700; letter-spacing: .1em;
+  color: #c2410c; background: #fff; padding: 0 4px;
+  pointer-events: none;
+}
+/* A group with no label still needs its head marked, or the bracket looks like it starts nowhere. */
+.cv-ov.ov-groups [data-group-pos="start"]:not([data-group-label])::before,
+.cv-ov.ov-groups [data-group-pos="solo"]:not([data-group-label])::before { content: "GROUP"; }
+
 /* Provenance = a source-colored ::before left gutter. NOT box-shadow: Tailwind's ring-*
    selection/hover affordances are themselves box-shadow, and a box-shadow rule (higher
    specificity, later in source) would REPLACE the ring. A ::before is a separate paint that

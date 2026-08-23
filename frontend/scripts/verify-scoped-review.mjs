@@ -121,19 +121,28 @@ const PROSE = 'Foundation 3DCP prints structural concrete walls at forty millime
 const canvasFor = (tag, opts = {}) => JSON.stringify({
   version: 2,
   document_id: `${PROBE}-${tag}`,
+  // COPIED from a stored row, not typed from memory: the real frame is in POINTS
+  // (`width`/`margins`/`font_default`), and an invented `width_in`/`body_font` shape renders an
+  // error boundary in the editor while still answering every API call correctly — which is exactly
+  // how a fixture bug survives an API-only harness.
   canvas: {
-    format: 'letter', width_in: 8.5, height_in: 11,
-    margins_in: { top: 1, bottom: 1, left: 1, right: 1 },
-    body_font: 'Times New Roman', body_size_pt: 11,
+    width: 612, height: 792,
+    margins: { top: 72, right: 72, bottom: 72, left: 72 },
+    format: 'letter', header: null, footer: null,
+    font_default: { family: 'Times New Roman', size: 11 },
+    line_spacing: 1, min_font_size: 10, max_pages: 10, max_slides: null,
   },
   ...(opts.flat
     ? { nodes: opts.nodes }
     : { sections: [{ id: `s-${tag}`, title: tag, layout: { mode: 'flow' }, source_atom_ids: [],
         groups: opts.groups }] }),
-  metadata: { title: tag },
+  metadata: { title: tag, status: 'in_progress', version_number: 1 },
 });
 
-const textNode = (id, reps) => ({ id, type: 'text_block', content: { text: PROSE.repeat(reps) } });
+const textNode = (id, reps) => ({
+  id, type: 'text_block', content: { text: PROSE.repeat(reps) },
+  style: {}, provenance: { source: 'manual' }, history: [], library_eligible: false,
+});
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 let proposalId = null;

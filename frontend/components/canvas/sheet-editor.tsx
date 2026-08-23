@@ -19,7 +19,7 @@ import type {
 import { createNode, withCanvasDefaults } from '@/lib/types/canvas-document';
 import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
 import { SheetMediaStrip } from './sheet-media-strip';
-import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS } from './canvas-overlays';
+import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS, documentHasGroups } from './canvas-overlays';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -694,7 +694,10 @@ export function SheetEditor({
         <CanvasOverlayBar
           active={overlays}
           onToggle={toggleOverlay}
-          items={OVERLAYS.filter((o) => o.key === 'atoms' || o.key === 'provenance')}
+          // A sheet is one grid primitive — `sections` says nothing here, and `groups` only when
+          // this workbook actually carries them (today, none do).
+          items={OVERLAYS.filter((o) => o.key === 'atoms' || o.key === 'provenance'
+            || (o.key === 'groups' && documentHasGroups(doc)))}
         />
       </div>
       {/* ── Toolbar ── */}

@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CanvasRenderer } from './canvas-renderer';
 import { SelectionToolbar } from './selection-toolbar';
-import { CanvasOverlayBar, overlayClass, useOverlays } from './canvas-overlays';
+import { CanvasOverlayBar, overlayClass, useOverlays, overlaysFor } from './canvas-overlays';
 import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
 import { originalNodeId, reconstructSectionDoc, type AssembledProposal, type FluidSectionMeta } from '@/lib/canvas/assemble-proposal';
 import { estimatePageCount, getNodeText, withCanvasDefaults, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
@@ -436,7 +436,7 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
       {/* Slim action bar: overlays + editable save state (the Manage tab-row dissolves into this). */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 px-1">
         <div className="flex flex-wrap items-center gap-2">
-          <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} />
+          <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} items={overlaysFor(doc)} />
           {/* F3 — Compliance + Budget layers (real data), summonable like the dotted layers. */}
           <button type="button" onClick={() => setShowCompliance((v) => !v)} aria-pressed={showCompliance}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${showCompliance ? 'border-transparent bg-rose-500 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}

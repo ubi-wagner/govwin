@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules, NodeType } from '@/lib/types/canvas-document';
-import { getNodeText } from '@/lib/types/canvas-document';
+import { getNodeText, docNodes } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
 import { CommentThread, type NodeComment } from './collaboration';
@@ -448,12 +448,15 @@ export function CanvasSidebar({
   const maxPages = doc.canvas.max_pages;
   // Real word-budget fit (the section "mold") — replaces the old ceil(nodeCount/8) guess.
   const budget = computeSectionBudget({ pageLimit: maxPages, fontSize: doc.canvas.font_default?.size, lineSpacing: doc.canvas.line_spacing });
-  const fit = evaluateFit(doc.nodes, budget);
+  // `docNodes`, not `doc.nodes`: a canvas carrying the SECTION layer has no top-level `nodes`, and
+  // every read below would throw on it — taking the whole workspace to the error boundary.
+  const allNodes = docNodes(doc);
+  const fit = evaluateFit(allNodes, budget);
   const pageOk = fit.withinBudget;
 
-  const aiNodes = doc.nodes.filter((n) => n.provenance?.source === 'ai_draft').length;
-  const libraryNodes = doc.nodes.filter((n) => n.provenance?.source === 'library').length;
-  const manualNodes = doc.nodes.filter((n) => n.provenance?.source === 'manual').length;
+  const aiNodes = allNodes.filter((n) => n.provenance?.source === 'ai_draft').length;
+  const libraryNodes = allNodes.filter((n) => n.provenance?.source === 'library').length;
+  const manualNodes = allNodes.filter((n) => n.provenance?.source === 'manual').length;
 
   // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
   // user keeps the read panels (status, node info, history, comments).
@@ -536,11 +539,18 @@ export function CanvasSidebar({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status</span>
-                  <span className="font-medium">{doc.metadata.status.replace(/_/g, ' ')}</span>
+                  {/* B78 class, third occurrence: an unguarded read of a stored canvas field takes
+                      the ENTIRE section workspace to the route error boundary — status 200, no
+                      server log, nothing rendered. `metadata.status` and `nodes` are both typed
+                      required and both absent from real shapes the product can produce (a canvas
+                      carrying the section layer has no top-level `nodes` at all). No stored row
+                      violates either today; the guard costs nothing and the failure mode is a
+                      white screen on a customer's proposal. */}
+                  <span className="font-medium">{(doc.metadata?.status ?? 'draft').replace(/_/g, ' ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Atoms</span>
-                  <span className="font-medium">{doc.nodes.length}</span>
+                  <span className="font-medium">{allNodes.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Version</span>

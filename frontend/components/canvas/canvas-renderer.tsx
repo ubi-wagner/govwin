@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -50,6 +50,41 @@ interface Props {
   variables?: Record<string, string>;
   readOnly?: boolean;
   onMoveNodeToIndex?: (nodeId: string, targetIndex: number) => void;
+  /**
+   * node id → its group, for the `groups` overlay. Supplied by a host whose document has already
+   * been flattened for editing (`toEditableFlat` drops `sections`), so the group layer survives as
+   * provenance even though the editable shape cannot carry it. Omit and it is derived from
+   * `document.sections` instead.
+   */
+  groups?: GroupMap;
+}
+
+/** What the `groups` overlay needs to know about one node. */
+export type GroupMap = Record<string, { id: string; label?: string; keep: boolean; pos: string }>;
+
+/**
+ * Derive the group map from a document that still HAS its section layer.
+ *
+ * Exported because the editor must call it on the document it loaded, before `toEditableFlat`
+ * throws the sections away — and calling it after would silently return an empty map, which is
+ * exactly the shape of "there are no groups" rather than "I looked too late".
+ */
+export function groupMapOf(doc: Pick<CanvasDocument, 'sections'> | null | undefined): GroupMap {
+  const map: GroupMap = {};
+  for (const section of doc?.sections ?? []) {
+    for (const g of section.groups ?? []) {
+      const gn = g.nodes ?? [];
+      gn.forEach((n, i) => {
+        map[n.id] = {
+          id: g.id,
+          label: g.label ?? undefined,
+          keep: !!g.keep_together,
+          pos: gn.length === 1 ? 'solo' : i === 0 ? 'start' : i === gn.length - 1 ? 'end' : 'mid',
+        };
+      });
+    }
+  }
+  return map;
 }
 
 /**
@@ -94,15 +129,38 @@ export function CanvasRenderer({
   variables = {},
   readOnly = false,
   onMoveNodeToIndex,
+  groups,
 }: Props) {
   // A stored canvas may be PARTIAL — `{width, height, margins}` with no `font_default` is a shape
   // that exists in the database today (four TVSF sections carry it). Reading `.font_default.family`
   // off that threw in a client component and took the whole proposal workspace down to the error
   // boundary while the same volume still exported as a correct PDF (bug log B78, the render-path
   // sibling of B73). Normalize to what the exporter draws, once, at the boundary.
-  const { nodes, metadata } = doc;
+  // `docNodes`, not `doc.nodes`. A canvas carrying the SECTION layer (`sections[].groups[].nodes`)
+  // has no top-level `nodes` at all, so reading it directly rendered a blank page for a document
+  // the model considers perfectly valid — and the moment the library assembler starts writing real
+  // groups, that would be every assembled section. Flattening for display is what the exporters
+  // already do; the group layer is not lost, it is carried in the map below.
+  const nodes = docNodes(doc);
+  const { metadata } = doc;
   const canvas = normalizeCanvas(doc.canvas);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+
+  // node id → its group, for the `groups` overlay. The group is the unit of PROVENANCE (`atom_ref`)
+  // and of COHESION (`keep_together`) — the run that moves across a page edge as one — and until
+  // now nothing in the UI could show either. `pos` lets the CSS close the bracket at both ends
+  // without the stylesheet needing to know how many nodes are in between.
+  //
+  // Two sources, in that order. `doc.sections` covers a surface that renders a sectioned canvas
+  // directly. `groups` (the prop) covers the EDITOR, which cannot use the first: `toEditableFlat`
+  // sets `sections: undefined` on purpose — the editable surface works on one flat node list — so
+  // by the time the document reaches here the group layer is already gone. The editor therefore
+  // derives the map from the document it LOADED and hands it in.
+  //
+  // A map keyed by node id is the right shape for that because a group is PROVENANCE, not layout:
+  // it records which library atom a node came from. Editing the node does not change that, moving
+  // it does not change that, and a stale entry for a deleted node is simply never looked up.
+  const groupOf = React.useMemo(() => groups ?? groupMapOf(doc), [doc, groups]);
 
   // Scale the page to the ACTUAL available column width (measured), so it fits
   // any viewport — including a Chrome split-screen half — instead of overflowing
@@ -220,6 +278,7 @@ export function CanvasRenderer({
                   isDragging={draggingNodeId === node.id}
                   onDragStart={() => setDraggingNodeId(node.id)}
                   onDragEnd={() => setDraggingNodeId(null)}
+                  group={groupOf[node.id]}
                 />
               )}
               </NodeErrorBoundary>
@@ -505,6 +564,7 @@ function NodeRenderer({
   isDragging,
   onDragStart,
   onDragEnd,
+  group,
 }: {
   node: CanvasNode;
   isSelected: boolean;
@@ -516,6 +576,8 @@ function NodeRenderer({
   isDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
+  /** The group this node belongs to, when the document carries the group layer. */
+  group?: { id: string; label?: string; keep: boolean; pos: string };
 }) {
   const borderClass = isSelected
     ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
@@ -567,6 +629,12 @@ function NodeRenderer({
     <div
       data-node-id={node.id}
       data-node-source={node.provenance?.source}
+      // Read by the `groups` overlay (globals.css). Present only when the document carries the
+      // group layer, so a flat canvas paints exactly as it did before.
+      data-group-id={group?.id}
+      data-group-pos={group?.pos}
+      data-group-keep={group?.keep ? '1' : undefined}
+      data-group-label={group?.label}
       className={`relative rounded px-1 cursor-text transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
       // The node body is NOT draggable (only the grip is) and the text is selectable, so a
       // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,
