@@ -222,6 +222,53 @@ is missing is every affordance for checking, revising, or reusing them. Closing 
 more than its position in the list suggests, and "add a ribbon + chart-from-range" undersells it: **the
 valuable half is moving the early return so the sheet mounts the shell.**
 
+### 7b. Phase 3 design — how the sheet gets into the shell (DESIGN, not yet signed off)
+
+**Why it is not a wiring change.** `SheetEditor` is **1,225 lines** and is a *whole editor*: it owns
+`doc` state (`:122`), undo/redo stacks (`:132-133`), the save cycle (`onSave`/`saving`/`dirty`/
+`saveError`, `:127-129`, `:592`), cell + sheet selection (`:123-126`), and its own chrome — sheet tabs,
+formula bar, media strip, overlay bar. `CanvasEditorInner` owns all of the same for doc and slides.
+Mounting one inside the other duplicates every one of them: two doc states, two save buttons, two
+overlay bars. Deleting the early return at `canvas-editor.tsx:191` is the *last* step, not the first.
+
+**The shape to aim at.** `CanvasRenderer` and `SlideEditor` are presentational — they take `document`,
+a selection, and `onUpdateNode`, and the shell owns everything stateful. The sheet must become the
+third of those. Extract **`SheetSurface`**: the grid, and nothing else.
+
+| Stays in the shell (already there for doc + slides) | Genuinely sheet-specific — becomes props/callbacks |
+|---|---|
+| `doc` state · undo/redo · save + dirty + error | Worksheet tabs (which `table` node is active) |
+| `CanvasToolbar` · `CanvasSidebar` (incl. the Compliance tab) | Formula bar (edit the active cell's `formula`) |
+| `SelectionToolbar` verbs · `CanvasOverlayBar` | Cell/range selection · add/remove rows + columns |
+
+**Order — smallest reversible steps, each independently verifiable:**
+
+1. **3a · Extract `SheetSurface`, no behaviour change.** `SheetEditor` keeps owning all state and
+   renders the new component. *Verify:* the sheet still edits and saves; `verify-exports-on-stored-artifacts`
+   produces byte-identical xlsx for every stored cost volume.
+2. **3b · Lift the state up.** Move `doc`/undo/redo/save out of `SheetEditor` into `CanvasEditorInner`;
+   `SheetEditor` becomes a thin adapter over `SheetSurface`. *Verify:* same as 3a, plus undo/redo and
+   the 409 non-destructive save path still behave.
+3. **3c · Delete the early return.** The centre fork becomes three-way
+   (`isSlideFormat ? SlideEditor : isSheet ? SheetSurface : CanvasRenderer`). *Verify:* opening a cost
+   volume now reaches the sidebar, and **the Compliance tab is finally reachable on a spreadsheet**
+   (`canvas-sidebar.tsx:531`) — the whole point of the phase.
+4. **3d · Range-aware verbs.** `ActOnSelection` reads a **cell range** on the sheet, not a span; wire
+   Atomize/Regenerate/Compliance-check against it. Completes phase 2 for the third surface.
+5. **3e · Move Compliance + Budget into `OVERLAYS`.** They exist today only as hand-rolled buttons on
+   the fluid view (§2); promoting them to the shared array gives the editor and the sheet the last two
+   layers and closes the phase-1 residual found on 2026-08-23.
+
+**The invariant that must not break, at any step.** The deterministic burden engine
+(`cost-model.ts`/`cost-forms.ts`) stays the source of computed cells; `lib/numeric-cell.ts` keeps edited
+`value`s in sync so tenant edits still drive the roll-up and the exports; AI is advisory *over* the
+numbers and never writes them. A cost volume that changes its arithmetic during this refactor is a
+failed step, not a merge conflict — `verify-exports-on-stored-artifacts.mts` is the gate.
+
+**Do not start at step 3.** Deleting the early return first is the tempting one-line change and it
+produces two doc states editing the same document — the class of bug that looks like it works until a
+save races.
+
 Each remaining phase: green backbone (`tsc` 0 · `vitest` · `next build`) + live-proven, both lenses.
 
 ## 8. Two-lens rule (standing)
