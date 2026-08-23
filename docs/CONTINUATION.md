@@ -435,6 +435,37 @@ Shipped this sprint:
   under `docs/tvsf-build-guide/`, driven by `frontend/e2e/hitl-tvsf-build-guide.spec.ts`) and
   `docs/Foundation_TVSF_Proposal.pdf`.
 
+> ### ⚠️ SERVE AS `govtech_app`, OR YOUR ISOLATION RESULTS ARE MEANINGLESS (bug log B86)
+>
+> The single most expensive mistake available on this box. `govtech` is `rolsuper = t`, and **a
+> superuser bypasses row-level security entirely** — so a rig started with
+> `DATABASE_URL=postgresql://govtech:…` produces isolation output *identical* to a perfectly
+> isolated one. An entire session's worth of "RLS proven" once came from exactly that.
+>
+> It is the path of least resistance because `govtech_app` is created **NOLOGIN** by migration
+> (094/177) and prod supplies its password by env, so a fresh box has no usable app credential.
+> Give it one, then serve as it:
+>
+> ```bash
+> psql "$OWNER_URL" -c "ALTER ROLE govtech_app LOGIN PASSWORD 'changeme'"   # once per box
+>
+> DATABASE_URL='postgresql://govtech_app:changeme@localhost:5432/govtech_intel' \
+> DATABASE_URL_OWNER='postgresql://govtech:changeme@localhost:5432/govtech_intel' \
+>   node .next/standalone/server.js
+> ```
+>
+> `DATABASE_URL_OWNER` stays the owner — `sqlBypass` and the legitimate cross-tenant admin reads
+> need it, and so does any HARNESS computing what a tenant *should* see (that is what
+> `harnessDbUrl()` in `scripts/lib/drive-actor.mjs` is for; a harness that asks through the scoped
+> connection sees nothing and concludes the box is empty).
+>
+> **Don't take this on trust — check it.** `node scripts/check-rls-posture.mjs` verifies the role,
+> the policies, and the only assertion that cannot be faked: set one tenant's context, count another
+> tenant's rows, require zero, then require the tenant's OWN rows to be non-zero so a deny-all
+> cannot masquerade as isolation. `run-branch-drives.sh` runs it as a preflight and marks every
+> isolation drive **CANT-RUN** when the posture is wrong, rather than letting them report a verdict
+> they cannot earn.
+
 **Operational reality that ate the most tokens** (now fixed in §2): `next start` does NOT serve
 `output:'standalone'` — you must run `node .next/standalone/server.js` after staging static/public;
 and auth flows must hit `localhost:3000` (not `127.0.0.1`) or NextAuth bounces. Full recipe + the

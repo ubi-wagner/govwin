@@ -72,6 +72,32 @@ if [ -z "${TEST_TENANT_ID:-}" ]; then
   fi
 fi
 
+# ── PREFLIGHT: is this box enforcing RLS, or only appearing to? (bug log B86) ───────────────────
+#
+# A superuser connection bypasses row-level security entirely, and a run against one produces
+# isolation output indistinguishable from a perfectly isolated box. An entire session's worth of
+# "RLS proven" once came from exactly that. So the posture is checked BEFORE anything runs.
+#
+# It does not abort the suite: the non-isolation drives still measure real things. What it does is
+# refuse to let the isolation drives report a verdict they cannot earn — they are marked CANT-RUN,
+# which is uncovered rather than passing, and the banner says why.
+RLS_OK=1
+if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
+  echo "RLS posture: correct (isolation results from this box mean what they say)"
+else
+  RLS_OK=0
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ RLS POSTURE WRONG — the isolation drives will be reported as CANT-RUN, not run.       ║"
+  echo "║ A bypassed database layer produces the same output as a perfectly isolated one, so    ║"
+  echo "║ their verdicts would be meaningless. Everything else still runs.                      ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/rls-posture.log" | head -8
+fi
+echo
+
+# Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
+ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collaborator-boundary"
+
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
   "award-to-contract|scripts/drive-award-to-contract.mjs"
@@ -132,6 +158,11 @@ for entry in "${DRIVES[@]}"; do
   if [ ! -f "$script" ]; then
     printf '%-24s %-8s %s\n' "$label" "MISSING" "$script does not exist"
     missing=$((missing+1)); FAILED+=("$label (missing)"); continue
+  fi
+
+  if [ "$RLS_OK" -eq 0 ] && [[ " $ISOLATION_DRIVES " == *" $label "* ]]; then
+    printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "RLS posture wrong — an isolation verdict here would be meaningless"
+    cantrun=$((cantrun+1)); FAILED+=("$label"); continue
   fi
 
   log="$OUT/$label.log"
