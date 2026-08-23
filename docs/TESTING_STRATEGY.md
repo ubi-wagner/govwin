@@ -295,6 +295,8 @@ should be driven through all four; each exits non-zero on drift.
 | `scripts/sweep-mold-quality.mts` | all 39 shipped templates: rendered pages, compliance violations, page furniture, token leaks |
 | `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
 | `scripts/verify-exports-on-stored-artifacts.mts` | the question under the ruler: does the file come out AT ALL, in every format offered for its shape |
+| `scripts/verify-surfaces.mjs` | **every** `page.tsx` under `app/admin` and `app/portal/[tenantSlug]`, driven as the right actor: does the page RENDER — no error boundary, no client throw (B78 · B79) |
+| `scripts/capture-guides.mjs` | the ~35 surfaces the two front-door guides document, captured as evidence and gated the same way |
 
 When one of them disagrees, `scripts/diagnose-mold-ruler.mts` says WHY: `--nodes` charges every node
 against the height Chromium gives that same node in place, `--segments` does it per page-break

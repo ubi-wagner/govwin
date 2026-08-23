@@ -16,7 +16,7 @@ import type {
   TableCell as TableCellType,
   TableCellStyle,
 } from '@/lib/types/canvas-document';
-import { createNode } from '@/lib/types/canvas-document';
+import { createNode, withCanvasDefaults } from '@/lib/types/canvas-document';
 import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
 import { SheetMediaStrip } from './sheet-media-strip';
 import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS } from './canvas-overlays';
@@ -117,7 +117,9 @@ export function SheetEditor({
   actorName,
   readOnly = false,
 }: SheetEditorProps) {
-  const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
+  // Same partial-canvas normalization as the doc editor (B78) — the ribbon reads
+  // `doc.canvas.font_default.family` straight into an <input value>.
+  const [doc, setDoc] = useState<CanvasDocument>(() => withCanvasDefaults(initialDocument));
   const [activeSheet, setActiveSheet] = useState(0);
   const [activeCell, setActiveCell] = useState<CellPosition | null>(null);
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null);

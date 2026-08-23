@@ -73,6 +73,32 @@
 > open, 2 deferred** — B30 and B33. (B34, B35 and B40 were all closed later in the same session;
 > the "five deferred" line this paragraph used to carry was true when written and is not now.)
 
+> ### B78–B79 — two live defects a status code could not see, found by LOOKING at the page
+>
+> The guide screenshot pass (docs/CUSTOMER_ONBOARDING_GUIDE.md and
+> docs/RFP_ADMIN_OPERATIONS_GUIDE.md now carry 30 captured screenshots each side) drove the two
+> front-door guides against the running build as real actors, and found two customer-facing
+> surfaces that were **broken while answering HTTP 200**:
+>
+> **B78** — `CanvasRenderer` read `canvas.font_default.family` on a stored partial canvas. Four
+> sections of the Foundation TVSF build carry `{width,height,margins}` and no `font_default`, so the
+> whole **proposal workspace** rendered *"Something went wrong — This page failed to load."* It
+> threw in a client component, so nothing reached the server log, and the capture harness printed
+> `✓ 200`. This is B73's sibling: B73 fixed the RULER's copy of the same defect, and left every
+> other reader brittle. There is now ONE `normalizeCanvas()` and `withCanvasDefaults` is expressed
+> in terms of it (its fast path also no longer waves through a header with no font).
+>
+> **B79** — found ten minutes later by the widened check: `/admin/events` read `Date.now()` during
+> render, so the server wrote "2s ago", the client hydrated and wrote "4s ago", and React #418 took
+> the Event Stream to its error boundary on **every load**. Also 200 throughout.
+>
+> **The class, and the instrument.** A 200 is not evidence that a page rendered — Next serves both a
+> client error boundary and a failed hydration with a 200, and a client-side throw never reaches the
+> server log. `frontend/scripts/verify-surfaces.mjs` now drives **every** `page.tsx` under
+> `app/admin` and `app/portal/[tenantSlug]` as the right actor, enumerated from the tree rather than
+> a list, failing on a rendered error surface OR a client throw, and **reporting** (never skipping)
+> any route it cannot address from sandbox data.
+>
 > ### B68–B74 — the ruler, the vocabulary, and the tool that was clearing SQL it never read
 >
 > **The page ruler now agrees with the page on every authored proposal, and the safety property is
@@ -107,6 +133,8 @@
 > | `scripts/calibrate-page-ruler.mts` | 36 synthetic cases against Chromium's printed page count |
 > | `scripts/calibrate-slide-ruler.mts` | 7 deck cases against a real rendered `.pptx` |
 > | `scripts/sweep-mold-quality.mts` | all 39 shipped templates |
+> | `scripts/verify-surfaces.mjs` | **every page** under `app/admin` + `app/portal/[tenantSlug]`, as the right actor: does it RENDER (boundary / client throw), not just answer 200 |
+> | `scripts/capture-guides.mjs` | the guide surfaces, captured as evidence — same gate |
 >
 > When one disagrees, `scripts/diagnose-mold-ruler.mts --nodes / --segments / --pages` says WHY.
 > Do NOT amplify one node type ×N to find it — that method lies about anything with a vertical

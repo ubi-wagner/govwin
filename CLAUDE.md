@@ -266,6 +266,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   still downloads in every format; `calibrate-page-ruler` (36), `calibrate-slide-ruler` (7) and
   `sweep-mold-quality` (39 molds) are the regression net. `diagnose-mold-ruler --nodes/--segments/--pages`
   says WHY when one disagrees. Bug log B64–B76 is the record of what they have caught.
+- **A 200 IS NOT EVIDENCE THAT A PAGE RENDERED** (bug log B78 · B79). Next serves a client-side
+  error boundary and a failed hydration with **status 200**, and a throw inside a client component
+  never reaches the server log — so a harness gating on `resp.status() < 400` is structurally
+  incapable of catching either. Two live customer-facing defects sat behind exactly that blind spot
+  (a stored partial canvas white-screened the proposal workspace; a `Date.now()` read during render
+  failed hydration on `/admin/events`). `frontend/scripts/verify-surfaces.mjs` drives **every**
+  `page.tsx` under `app/admin` and `app/portal/[tenantSlug]` as the right actor and fails on a
+  rendered error surface OR a client throw — routes enumerated from the tree, and any route it
+  cannot address is REPORTED, never silently skipped. Run it after a UI change or a deploy;
+  `scripts/capture-guides.mjs` applies the same gate to the surfaces the two front-door guides
+  document.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
   `node .next/standalone/server.js` after staging `.next/static`+`public`; auth flows must hit
   `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.

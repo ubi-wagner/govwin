@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount, countDocCharacters } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -95,7 +95,13 @@ export function CanvasRenderer({
   readOnly = false,
   onMoveNodeToIndex,
 }: Props) {
-  const { canvas, nodes, metadata } = doc;
+  // A stored canvas may be PARTIAL — `{width, height, margins}` with no `font_default` is a shape
+  // that exists in the database today (four TVSF sections carry it). Reading `.font_default.family`
+  // off that threw in a client component and took the whole proposal workspace down to the error
+  // boundary while the same volume still exported as a correct PDF (bug log B78, the render-path
+  // sibling of B73). Normalize to what the exporter draws, once, at the boundary.
+  const { nodes, metadata } = doc;
+  const canvas = normalizeCanvas(doc.canvas);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
 
   // Scale the page to the ACTUAL available column width (measured), so it fits

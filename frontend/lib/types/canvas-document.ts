@@ -683,14 +683,53 @@ const FRAME_DEFAULTS = {
   line_spacing: 1.15,
 } as const;
 
-function flowMetrics(raw: CanvasDocument['canvas']) {
-  const c = {
+/**
+ * Fill a partial canvas with the defaults the EXPORTER draws — the one place that decision lives.
+ *
+ * B73 fixed this for the ruler by defaulting inside `flowMetrics`. That left the same shape
+ * unguarded in every other reader, and B78 is what that cost: `CanvasRenderer` reads
+ * `canvas.font_default.family` directly, four stored TVSF sections carry a canvas with no
+ * `font_default`, and the whole proposal workspace route rendered "Something went wrong" for the
+ * tenant that owns them — `TypeError: Cannot read properties of undefined (reading 'family')`,
+ * thrown in a client component, so nothing reached the server log and the page still returned 200.
+ *
+ * A private default inside one function is a fix for one caller. This is exported so the ruler, the
+ * editor, the sidebar and the previewers all resolve a partial canvas the SAME way the stylesheet
+ * does, and a new reader gets the tolerance by construction instead of by remembering.
+ *
+ * `header`/`footer` are normalized only when present: a null header means "no header", which is a
+ * real and different thing from "a header with unstated fonts".
+ */
+export function normalizeCanvas(raw: Partial<CanvasRules> | null | undefined): CanvasRules {
+  const font = { ...FRAME_DEFAULTS.font_default, ...(raw?.font_default ?? {}) };
+  const furniture = (f: CanvasRules['header']): CanvasRules['header'] =>
+    // Field by field, not by spread: `f.font` is TYPED as present, so a spread would be compiled
+    // as "always overwrites" — and the whole point is that the stored row may not have it. Furniture
+    // inherits the body FAMILY but not its size; every preset carrying a header/footer sets 10pt.
+    (f ? {
+      template: f.template ?? '',
+      height: f.height ?? 36,
+      font: { family: f.font?.family ?? font.family, size: f.font?.size ?? 10 },
+    } : null);
+  return {
+    ...(raw ?? {}),
+    // `||`, not `??`: an empty-string format is a real persisted shape (an agent's
+    // markdown_to_canvas output), and it is just as unusable as a missing one.
+    format: raw?.format || 'letter',
     width: raw?.width ?? FRAME_DEFAULTS.width,
     height: raw?.height ?? FRAME_DEFAULTS.height,
     margins: { ...FRAME_DEFAULTS.margins, ...(raw?.margins ?? {}) },
-    font_default: { ...FRAME_DEFAULTS.font_default, ...(raw?.font_default ?? {}) },
+    header: furniture(raw?.header ?? null),
+    footer: furniture(raw?.footer ?? null),
+    font_default: font,
     line_spacing: raw?.line_spacing ?? FRAME_DEFAULTS.line_spacing,
+    max_pages: raw?.max_pages ?? null,
+    max_slides: raw?.max_slides ?? null,
   };
+}
+
+function flowMetrics(raw: CanvasDocument['canvas']) {
+  const c = normalizeCanvas(raw);
   const usableW = Math.max(1, c.width - c.margins.left - c.margins.right);
   // A RUNNING HEADER TAKES NOTHING FROM THE CONTENT BOX — it lives IN the margin (B69).
   //
@@ -1811,17 +1850,20 @@ export function toEditableFlat(doc: CanvasDocument): CanvasDocument {
  */
 export function withCanvasDefaults(doc: CanvasDocument): CanvasDocument {
   const c = doc.canvas as Partial<CanvasRules> | undefined;
-  // Fast path: a fully-formed canvas is returned UNCHANGED (stable identity, no re-render for valid docs).
-  if (c && c.format && c.width && c.height && c.margins && c.font_default && typeof c.line_spacing === 'number') {
+  // Fast path: a fully-formed canvas is returned UNCHANGED (stable identity, no re-render for valid
+  // docs). Page furniture counts as a field: a header present but font-less is exactly the shape
+  // that crashes `canvas.header.font.family`, and the old predicate waved it through.
+  const furnitureOk = (f: CanvasRules['header']) => !f || !!f.font;
+  if (c && c.format && c.width && c.height && c.margins && c.font_default
+      && typeof c.line_spacing === 'number' && furnitureOk(c.header ?? null) && furnitureOk(c.footer ?? null)) {
     return doc;
   }
-  // Otherwise merge the letter_standard defaults under whatever the doc supplies, so EVERY field the
-  // renderer reads (format, font_default, line_spacing, margins, header/footer, page limits) is present.
-  // Any single missing field (e.g. an agent doc with format but no font_default) would otherwise crash a
-  // downstream `doc.canvas.<field>.<prop>` access and white-screen the section.
-  const canvas = { ...CANVAS_PRESETS.letter_standard, ...(c ?? {}) } as CanvasRules;
-  if (!canvas.format) canvas.format = 'letter';
-  return { ...doc, canvas };
+  // Otherwise fill against ONE definition of the defaults (B78). This used to spread
+  // `CANVAS_PRESETS.letter_standard` directly, which is a second copy of the same constants
+  // `flowMetrics` keeps in `FRAME_DEFAULTS` — two places to keep in step, and only one of them
+  // handled page furniture. `normalizeCanvas` is now the single answer to "what does a missing
+  // canvas field mean", shared by the ruler, the renderer and every editor.
+  return { ...doc, canvas: normalizeCanvas(c) };
 }
 
 /** Build a group from nodes (optionally a labeled, keep-together, atom-backed group). */

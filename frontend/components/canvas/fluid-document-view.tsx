@@ -27,7 +27,7 @@ import { SelectionToolbar } from './selection-toolbar';
 import { CanvasOverlayBar, overlayClass, useOverlays } from './canvas-overlays';
 import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
 import { originalNodeId, reconstructSectionDoc, type AssembledProposal, type FluidSectionMeta } from '@/lib/canvas/assemble-proposal';
-import { estimatePageCount, getNodeText, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
+import { estimatePageCount, getNodeText, withCanvasDefaults, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { toast } from '@/lib/toast';
 
 interface Props {
@@ -54,7 +54,9 @@ const STATUS_DOT: Record<string, string> = {
 
 export function FluidDocumentView({ assembled, sections: sectionsProp, canManage = false, tenantSlug, proposalId, variables, canAct = true }: Props) {
   const { sectionOf, outline } = assembled;
-  const [doc, setDoc] = useState<CanvasDocument>(assembled.doc);
+  // Partial-canvas normalization (B78) — an assembled multi-section document inherits the
+  // canvas of whichever section supplied it, and those are not all complete.
+  const [doc, setDoc] = useState<CanvasDocument>(() => withCanvasDefaults(assembled.doc));
   // Per-section meta held in STATE so a lock/unlock (F2b) flips editability live without a reload.
   const [sections, setSections] = useState<FluidSectionMeta[]>(sectionsProp);
   const [lockBusy, setLockBusy] = useState<string | null>(null);

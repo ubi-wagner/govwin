@@ -2,6 +2,13 @@
 
 **From Application to First AI Draft**
 
+> **Every screenshot below was taken from the running product**, driven as a real
+> `tenant_admin` (Kate Ulepic, Foundation) through the real login — not mocked, not drawn.
+> Re-capture them with `cd frontend && node scripts/capture-guides.mjs --only customer`, which
+> visits each documented route as that actor and **fails the run** if any surface 404s, redirects
+> somewhere else, or renders an error boundary. Where a screenshot contradicted the text, the text
+> was corrected; those corrections are noted inline.
+
 ---
 
 ## What is RFP Pipeline?
@@ -59,6 +66,8 @@ purchase); live self-serve checkout is coming soon.
 
 ## Step 2: First Login
 
+![The sign-in page](./assets/guides/customer/02-login.png)
+
 1. You'll receive a temporary password from the admin (via email or direct communication)
 2. Navigate to `/login`
 3. Enter your email and temporary password
@@ -75,35 +84,60 @@ purchase); live self-serve checkout is coming soon.
 
 After login, you land at `/portal/[your-company-slug]/dashboard`
 
+![The tenant dashboard, with builds in the centre and the count rail on the right](./assets/guides/customer/03-dashboard.png)
+
 **What you see:**
 
-- **Company name** and welcome message
-- **Count tiles** (right rail) — **To-dos**, **Library** (your content atoms), and — for admins
-  — **Opportunities** and **Buckets**, each opening a drawer (all start at 0)
-- **Center** — your **active proposal builds**, or, when you have none:
+- **"Welcome back, {your first name}"**, and under it a one-line roll-up —
+  *"6 active builds · 10 opportunities · 24 to-dos"*
+- **Count tiles** (right rail) — **To-dos**, **Library** (your content atoms), **Opportunities**,
+  **Buckets** and **Activity**. Each opens a drawer; on a brand-new workspace they read 0.
+  *(Corrected from the screenshot: Activity is a right-rail tile, not a centre-column feed, and
+  Opportunities/Buckets are not admin-only.)*
+- **Centre — CONTINUE BUILDING**: a card per active build, each stamped with its stage
+  (**Drafting** · **Final** · **Submitted**), a 🔒 **locked** badge once it is locked, and an
+  **Open canvas →** link straight into the work
+- When you have no builds yet:
   - **Admins** see a **Get started** checklist: upload company documents, set up your company
     profile, review your matched opportunities, start your first proposal build (each ticks off
     as you finish it)
   - A **base team member** with nothing assigned sees a *"You're on the team"* card instead —
     *"Nothing is assigned to you yet; ask your admin to add you to a build"* — not a checklist
     that leads nowhere
-- **Recent Activity** — a feed of events in your workspace
 
-**Your sidebar navigation:**
-- Dashboard
-- Library / Atoms (your content atoms — upload and atomize)
-- Opportunities (the **card** feed at `/cards`; the old `/spotlights` link redirects here)
-- Buckets (saved Spotlight filters that **rank** your cards)
-- Portals / Proposals (purchased proposal portals + your active proposals)
-- Documents, Profile, Team (additional features)
+**Your sidebar navigation** (as shipped — the earlier six-item list in this guide was out of date):
+
+| Group | Items |
+|---|---|
+| Work | **Command Center**, **Dashboard** |
+| Pursue | **Opportunities** (the card feed at `/cards`), **Buckets** (the lenses that rank it) |
+| Build | **Proposals**, **Builds** (your purchased proposal portals), **Contracts** |
+| Content | **Library** (atoms — upload, atomize, review), **Vaults**, **Documents**, **Templates** |
+| Coordinate | **To-dos**, **Processes** (your running workflows), **Activity**, **Team** |
+| Admin | **Manage**, **Billing**, **AI Usage**, **Automation**, **Settings** |
+
+### The Command Center
+
+`/portal/[slug]/command` is the "what changed since I last looked" cockpit — opportunities,
+to-dos, workflows and activity in one place, with an unread watermark so returning after a few
+days shows you only what is new.
+
+![The tenant Command Center](./assets/guides/customer/03b-command-center.png)
 
 ---
 
 ## Step 4: Upload Your Company Documents
 
-**Navigate to:** Library → Upload Documents (or click the dashboard checklist link)
+**Navigate to:** **Library** in the sidebar (or click the dashboard checklist link)
 
-**Path:** `/portal/[slug]/library/upload`
+**Path:** `/portal/[slug]/atoms` → the **Upload package** tab
+
+> **Route correction.** Upload, review and browse are **tabs on one page**, not three pages. The
+> three routes this guide used to name — `/library/upload`, `/library/review` and `/library` — are
+> retired and now **redirect to `/atoms`**. Old bookmarks still land in the right place; the paths
+> in this guide have been updated to the real ones.
+
+![The unified library — Upload package tab](./assets/guides/customer/04-library-upload.png)
 
 **Supported formats:** PDF, DOCX, DOC, PPTX, PPT, TXT, MD
 
@@ -141,15 +175,21 @@ For the best AI drafting results, upload these documents in order of priority:
 
 ### After upload completes:
 
-A green **"Review & Categorize Atoms"** button appears. Click it to proceed to the review step.
+The file lands in the library and its atoms appear under the **Review** tab. The **Atomize** tab is
+the hand-shred path for the same job: drop a document, draw boxes on the rendered page, and keep
+only the parts you want as atoms.
+
+![The Atomize tab — hand-shred a document into atoms](./assets/guides/customer/04b-library-atomize.png)
 
 ---
 
 ## Step 5: Review and Categorize Your Atoms
 
-**Path:** `/portal/[slug]/library/review`
+**Path:** `/portal/[slug]/atoms` → the **Review** tab
 
 This is where you shape the quality of your library. The system extracted semantic units ("atoms") from your documents. Now you review each one.
+
+![The Review tab](./assets/guides/customer/05-library-review.png)
 
 ### What you see:
 
@@ -187,23 +227,38 @@ Accepted atoms go into your **approved library**. When the AI drafts proposal se
 
 ## Step 6: Browse Your Content Library
 
-**Path:** `/portal/[slug]/library`
+**Path:** `/portal/[slug]/atoms` → the **Library** tab
 
-After accepting atoms, they appear in your library as a searchable, filterable table.
+After accepting atoms, they appear in your library as a searchable, filterable list.
 
-- **Category filter pills** across the top — click to filter by category
-- **Table columns**: Category, Content preview, Status (draft/approved/archived), Tags, Created date
-- **Upload more** anytime using the "Upload Documents" button in the top right
+![The Library tab — 24 atoms with taxonomy tags and provenance badges](./assets/guides/customer/06-library.png)
+
+- **Browse library** at the top spans **All · Foundations · Sections · Groups · Atoms** — the four
+  grains a piece of content can have
+- Each row carries its **grain** (`primitive` / `foundational`), title, word count, its
+  **taxonomy tags** (`agency:…`, `fmt:…`, `kind:…`, `sol:…`, `vol:…`), where it came from
+  (**UPLOADED** / **RETURNED**), whether it is yours (**MINE**), who added it, and its status
+  (`approved`), with an **Archive** action
+- **Filters**: free-text search, grain, status, active/all, plus **Select all** for bulk work
+- **Reuse a past proposal** — turn a past proposal you uploaded into a reusable template: its
+  winning structure kept, its content stripped, then start a fresh draft from it filled from your
+  library
+- **+ Create canvas** builds a foundation artifact from scratch that decomposes into the same atoms
+- **+ Add starter set** copies in the shared system starter library so a new workspace is not empty
 
 Your library grows over time. Every proposal you work on can feed content back into the library.
 
 ---
 
-## Step 7: Review Your Spotlight Feed
+## Step 7: Review Your Opportunity Feed
 
-**Path:** `/portal/[slug]/cards` (the old `/spotlights` link redirects here)
+**Path:** `/portal/[slug]/cards` — reached from **Opportunities** in the sidebar. (The old
+`/spotlights` link still works and redirects here; verified live in this pass.)
 
-The Spotlight feed shows federal opportunities ranked by how well they match your profile.
+The feed — titled **Opportunity Pipeline** — shows federal and state opportunities ranked by how
+well they match your profile.
+
+![The opportunity card feed, ranked per bucket](./assets/guides/customer/07-cards.png)
 
 ### How scoring works:
 
@@ -219,18 +274,34 @@ The Spotlight feed shows federal opportunities ranked by how well they match you
 
 ### Each opportunity card shows:
 
-- Topic title and number
-- Agency and program type
-- Close date (with overdue highlighting in red)
-- Match score
-- **Pin** button — save this topic for later
+- Topic title, with the topic number in parentheses
+- Agency and program type (`National Science Foundation (NSF) · sbir`)
+- A **"Closes in 5d"** chip — amber as the date approaches
+- **A score pill per bucket**, not one overall number: *Advanced Manufacturing & Automation 100* ·
+  *Non-dilutive Capital (SBIR/STTR & State) 75* · *Construction Technology & Housing 56* …, with a
+  `+N` when the card ranks in more buckets than fit. This is the correction the screenshot forced:
+  a card carries **as many ranks as you have buckets**, and there is no single "match score" field.
+- **Pin to pursue** · **Not interested** (passes the card) · **Build →** (starts the purchase)
+
+Above the cards: **Include closed** and **Show passed** toggles, a **Refresh**, the card count, and
+a **Sort** selector (default *Best match*).
 
 ### What to do:
 
-1. Browse the feed — highest-scoring topics appear first
+1. Browse the feed — highest-scoring cards appear first under the current sort
 2. Click into topics that interest you to see details
-3. **Pin** the topics you want to pursue
+3. **Pin to pursue** the topics you want, or **Not interested** to pass on one
 4. Pinned topics count toward your **Opportunities** tile and are available for proposal creation
+
+### Buckets — the lenses that do the ranking
+
+**Path:** `/portal/[slug]/buckets`
+
+![Spotlight buckets](./assets/guides/customer/07b-buckets.png)
+
+A bucket is a saved thesis (agency / program type / keyword). Every card is scored **within every
+bucket**, so you can watch several theses at once without duplicating cards. Up to **six** buckets;
+a `tenant_admin` or a designee with `can_manage_buckets` maintains them.
 
 > **If a pin or refresh fails**, the cards now surface an inline message (*"That action could not
 > be completed — please try again"* or *"Could not load your opportunity cards"*) rather than
@@ -240,13 +311,13 @@ The Spotlight feed shows federal opportunities ranked by how well they match you
 
 ## Step 8: Purchase a Proposal Portal for a Pinned Topic
 
-**Path:** `/portal/[slug]/cards` → the pinned card → **Purchase**
+**Path:** `/portal/[slug]/cards` → the card → **Build →**
 
 Pinning tracks an opportunity; **purchasing** a proposal portal is what unlocks the build workspace.
 
 ### How the founding cohort buys (comp code)
 
-1. On a pinned card, click **Purchase**
+1. On the card, click **Build →**
 2. Enter the comp code **`rfppipelinetest`** and confirm
    - This records a **$0 purchase** — live self-serve card checkout is coming soon (⚠ future); the
      comp code stands in for the founding cohort
@@ -259,6 +330,46 @@ Pinning tracks an opportunity; **purchasing** a proposal portal is what unlocks 
 > and formatted blank "molds" for your opportunity) — not your drafting. If the skeleton was already
 > built for a prior buyer of the same opportunity, your release is usually **~15 minutes**, not 72h.
 
+### Your Builds page
+
+Every portal you own lives at `/portal/[slug]/portals` — **Builds** in the sidebar, titled
+**Proposal Portals**: *"Each portal is a build for an opportunity — accept guardrails to launch,
+then run the stages to closeout."*
+
+![The Builds list](./assets/guides/customer/08-portals.png)
+
+Each row shows the portal's state (**LAUNCHED**) and four actions — **Open build →**,
+**Manage workflow →**, **Advance stage**, **Force advance** — with a line telling you where you
+are: *"Build ready — open the canvas to run V1. ToDos land in your task queue."*
+
+---
+
+## Step 8b: Accept Your Build Workflow (required, once per portal)
+
+**Path:** `/portal/[slug]/portals/[portalId]` — raised as a **required to-do** the moment your
+portal is released, and reachable from **Manage workflow →** on the Builds list.
+
+![Workflow setup — the recommended plan, editable before you start](./assets/guides/customer/08b-workflow-setup.png)
+
+This step did not exist when this guide was first written, and it is not optional: a released
+portal parks a required **Workflow Setup** to-do, and the build does not start until a
+`tenant_admin` (or a delegated manager) accepts a plan.
+
+You are shown a **pre-filled, recommended plan** — inferred from your own prior *accepted* plans
+for similar opportunities, never from anyone else's. Adjust it and press **Accept & Start**:
+
+| Control | What it does |
+|---|---|
+| **Stage name + Due date** | Three stages by default — *Kickoff & Compliance*, *Draft (V0.5)*, *Review, Lock & Submit* — each with an absolute date, reorderable (↑ ↓) and removable |
+| **Closed by** | Who closes the stage gate: **Human**, or an **AI-manager** that advances it for you |
+| **Per-to-do row** | Type (*Acknowledge / review*, *Draft sections*, *Upload documents*), title, **owner** (a named person, or a role like *Any admin* / *Any contributor*), and its own due date |
+| **+ add to-do** | Add a step the recommended plan didn't include |
+| **Reminders** | Up to three nudges, in days before a to-do is due (default `5, 2, 1`); the last also copies your managers |
+| **Shift timeline / Set deadline from solicitation** | Re-baseline every date at once — move the whole plan ±N days, or anchor it to the solicitation's close date |
+
+Everything here stays editable after launch. Editing re-projects onto the live to-dos, so changing
+a due date re-arms its reminders rather than leaving stale ones behind.
+
 ### The Proposal Workspace (V0) shows:
 
 - **Proposal header**: Title, topic number, agency, program type, close date
@@ -269,6 +380,8 @@ Pinning tracks an opportunity; **purchasing** a proposal portal is what unlocks 
   - Page allocation (if the RFP specified page limits)
   - Node count (how many content blocks are in the section)
   - Version number
+
+![The proposal workspace](./assets/guides/customer/09-proposal-workspace.png)
 
 ---
 
@@ -305,10 +418,20 @@ Click into any section to review the AI's work in the canvas editor.
 
 Click any section from the workspace to open the **WYSIWYG Canvas Editor**.
 
+![The canvas editor — the page at real dimensions, with the compliance sidebar](./assets/guides/customer/10-canvas-editor.png)
+
 ### What you see:
 
 - **Main content area**: Your section rendered at actual page dimensions with headers, footers, and margins matching the RFP requirements
-- **Sidebar**: Three tabs — Compliance, Node Detail, Add Content
+- **Sidebar**: up to six tabs — **Compliance**, **Node** (the selected block), **Add** (insert
+  content), **Review** (comments), **History** (versions) and **Settings** (page layout). *Corrected
+  from the screenshot: the earlier "three tabs" was the read-only subset.* A view/comment
+  collaborator keeps the read panels and loses **Add** and **Settings**.
+- **Your toolbox** sits above the tabs — the most-likely tool for your role and the stage you're in,
+  first. It only ever offers tools that work; a card with nowhere to go is not shown.
+- A **page gauge** that counts your section against its page budget as you type. It is the *same*
+  ruler the export gate enforces, so what the editor says and what the download allows cannot
+  disagree.
 
 ### AI Revision Tools (in the sidebar):
 
@@ -337,11 +460,37 @@ Click any section from the workspace to open the **WYSIWYG Canvas Editor**.
   isn't, you'll see *"PDF export is temporarily unavailable. Use .docx."* — the DOCX / PPTX /
   XLSX exports always work
 
+The whole proposal downloads as **json · docx · pdf · zip** (`?format=…`). Figures export as native
+chart objects, not pictures of charts, and sections come out in their real order.
+
+> **The export is gated on compliance.** Font, page limits, per-section page budgets, slide counts
+> and image rules are checked against what the solicitation requires, using the same ruler as the
+> editor gauge. If a volume is over its limit the download tells you which rule and by how much
+> rather than quietly shipping a non-compliant package.
+
 ### Finalize (V1)
 
 When your sections are ready, **Lock all** (or **Force advance to V1** to finalize without locking
 every section). Advancing to V1 auto-locks the workspace and enables the final **Download Proposal
 (.docx)**. A first unlock is free if you need to make changes; further unlocks may need admin help.
+
+### Your to-dos and your team
+
+Everything the build asks of you lands in one queue at `/portal/[slug]/todos` — the same to-dos your
+workflow plan (Step 8b) projected, plus review requests, amendment acknowledgements and broadcasts.
+
+![The to-do queue](./assets/guides/customer/11-todos.png)
+
+**Team** (`/portal/[slug]/team`) is where you invite colleagues and external collaborators, and set
+what each can reach — the whole workspace, specific builds, or a single section to comment on.
+
+![The team page](./assets/guides/customer/12-team.png)
+
+**Documents** (`/portal/[slug]/documents`) is for the standalone work that is not part of a
+proposal — a capability statement, a one-page flier, a deck. It uses the same canvas, and the
+same size checks: a 2-page flier or a 10-slide deck is measured too.
+
+![The documents surface](./assets/guides/customer/13-documents.png)
 
 For the full operator walkthrough of purchase → curation → release → build, see
 [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) (design:

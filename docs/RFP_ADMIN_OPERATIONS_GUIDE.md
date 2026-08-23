@@ -2,6 +2,13 @@
 
 **For eric@rfppipeline.com (master_admin) and future rfp_admin users**
 
+> **Every screenshot below was taken from the running product**, driven as a real `master_admin`
+> through the real login. Re-capture them with
+> `cd frontend && node scripts/capture-guides.mjs --only admin`, which visits each documented route
+> as that actor and **fails the run** if any surface 404s, redirects elsewhere, or renders an error
+> boundary. Where a screenshot contradicted the text, the text was corrected — those corrections are
+> marked inline.
+
 ---
 
 ## Overview
@@ -79,6 +86,26 @@ The master_admin account is created automatically when the pipeline service firs
 7. Click **Change Password**
 8. You're redirected to the portal. Navigate to `/admin/dashboard`
 
+### Your console
+
+![The admin dashboard](./assets/guides/admin/01-dashboard.png)
+
+The left rail is the whole job, grouped:
+
+| Group | Items |
+|---|---|
+| **Overview** | Command Center · Dashboard · Our Workspace |
+| **Opportunities** | Intake · RFP Curation · Opportunity Cards · Opportunity Rollup · Sources · Scout Monitor · Pipeline Monitor · Templates · Template Stable · Guardrail Defaults |
+| **Customers** | Applications · Tenants · Billing · Waitlist · Purchases · Proposals · Releases & SLA · Expert Time |
+| **Content** | Site Content · Document Builder · S3 Storage |
+| **System** | Workflows (Process Monitor · Process Ledger) · Automation (Automation Framework) · System State · System Health · Event Stream · Agents · Analytics · Architecture |
+| **CRM** | CRM Console |
+
+**Command Center** (`/admin/command`) is the "what changed since I last looked" view across all of
+it, with an unread watermark — the fastest way back in after a day away.
+
+![The admin Command Center](./assets/guides/admin/01b-command-center.png)
+
 ### If you lose the temp password:
 
 ```sql
@@ -94,9 +121,16 @@ Then restart the pipeline service. A new temp password will be generated and pri
 
 **Path:** `/admin/applications`
 
+![The applications queue](./assets/guides/admin/02-applications.png)
+
 ### What you see:
 
 A list of pending applications with company information submitted via the public application form.
+
+> **One application, one to-do.** A submitted application raises exactly one typed
+> `application_triage` to-do, linked to the application itself, and **accepting or rejecting closes
+> it**. (Until migration 204 a second, entity-less copy was raised by an automation rule; it could
+> never be closed by any decision, so the queue only grew. That rule is retired.)
 
 ### For each application, review:
 
@@ -139,12 +173,15 @@ Click **"Reject"** — the application is archived. No tenant or user is created
 
 ## 3. Upload RFPs to the System
 
-**Path:** `/admin/rfp-curation` → Upload area
+**Path:** `/admin/rfp-curation` → **+ Upload RFP** (top right of the triage queue) →
+`/admin/rfp-curation/upload`
+
+![The RFP upload form](./assets/guides/admin/03-upload-rfp.png)
 
 ### Manual upload flow:
 
-1. Navigate to the RFP curation page
-2. Use the upload area to add RFP PDFs (one or more per solicitation)
+1. Click **+ Upload RFP** on the curation page
+2. Use the upload form to add RFP PDFs (one or more per solicitation)
 3. For each uploaded file, the system:
    - Stores the PDF to S3 at `rfp-admin/inbox/...`
    - Creates an **opportunity** record (or links to existing one)
@@ -167,7 +204,24 @@ The RFP appears in the triage queue. The shredder job runs asynchronously — it
 
 ## 4. Triage Incoming RFPs
 
-The triage queue shows all solicitations that need attention.
+**Path:** `/admin/rfp-curation`
+
+![The curation page — your to-do inbox above, the triage queue below](./assets/guides/admin/04-triage-queue.png)
+
+This one page is where a shift starts. Top to bottom:
+
+1. **The four intake stages**, as tabs with live counts — **Sources** (*where we look*) ·
+   **Scout Monitor** (*what we found*) · **Intake** (*staged for reading*) · **RFP Curation**
+   (*read & approved*) · **Opportunity Cards** (*live for tenants*).
+2. **Your To-Dos** — the admin inbox, inline, with an overdue count. Each row is typed and carries
+   its route: a `Proposal setup` task shows *Purchases → Curate & release → Draft sections →
+   Review* with **Open →** / **Approve / Done** / **Dismiss**; a `Broadcast note` shows *Read →
+   Acknowledge*; an `Application triage` shows *Approve / Done* / **Dismiss**; a
+   `Content review & publish` shows *Draft → Review → Publish*. This is the single completable
+   admin inbox — you do not go hunting for work on other screens.
+3. **RFP Triage Queue** — *"N solicitations · Claim, review, and curate incoming RFPs"*, with a
+   status filter, **Refresh**, and columns **Title · Source · Agency · Status · Namespace ·
+   Ingested · Actions**. A `new` row carries a **Claim** button.
 
 ### States:
 
@@ -192,22 +246,35 @@ The triage queue shows all solicitations that need attention.
 
 **This is the most important screen in the system.** Open a claimed solicitation to enter the curation workspace.
 
+![The curation workspace](./assets/guides/admin/05-curation-workspace.png)
+
 ### Layout:
 
-```
-┌─────────────────────────┬──────────────────────────┐
-│                         │                          │
-│    PDF VIEWER           │   COMPLIANCE MATRIX      │
-│    (left panel)         │   (right panel)          │
-│                         │                          │
-│    - Scrollable PDF     │   - Variable list        │
-│    - Text selectable    │   - Source anchors       │
-│    - Highlight overlays │   - AI suggestions       │
-│                         │   - Topics panel         │
-│                         │   - Volumes panel        │
-│                         │   - Activity feed        │
-└─────────────────────────┴──────────────────────────┘
-```
+> **Corrected against the screenshot.** This used to be drawn as a two-pane "PDF viewer left,
+> compliance matrix right". It isn't. The workspace is a single scrolling page with release gates at
+> the top, a two-column body, and the PDF reachable from the **Section Rail** rather than pinned
+> beside you.
+
+Top to bottom:
+
+| Band | What it is |
+|---|---|
+| **Spotlight-match summary** ⭑ | The plain-language "why this matches", first-passed from the shred. **Required before release** — while it's empty the page says *"Summary empty — push will be blocked."* Editable after release too; saving re-fans every tenant's mirror card. |
+| **Expert note** `Customer-visible` | A short note shown on every tenant's card (e.g. *"Component instructions expected in Amendment 3 — page limits may tighten."*) |
+| **Ingest Studio** | The shred state — *Not started* / *Source text not ready* — with **Show gates** |
+| **Title bar** | Solicitation title, agency and program, plus **✨ Ingest Assist**, **Assess readiness**, **Shred audit**, and the status chip (`new`) |
+| **Amendments** | *"Log a compliance-affecting change, then confirm to notify affected tenants"* + **Log amendment** |
+| **Curation notes** | Internal — never customer-visible |
+| **Tabs** | **Documents · Topics · Compliance · Customer Interest** |
+| **Claim** | Take ownership; only a claimed solicitation can be curated |
+
+Then the body, in two columns:
+
+- **Left** — **Source Documents** (typed upload with a Primary flag) · **Source Text** (what the
+  shredder actually read) · **Topics** · **Response Volumes** · **Opportunity Description**
+- **Right** — **Compliance Matrix**, **Metadata** (namespace, solicitation #, close/posted dates,
+  claimed/curated/approved by), and **Activity**
+- **Bottom** — **Customer Interest**
 
 ### 5a. Building the Compliance Matrix
 
@@ -224,21 +291,34 @@ The compliance matrix captures every requirement from the RFP as a structured va
 5. The highlighted text becomes the variable's **value**
 6. A **source anchor** is automatically captured: document ID, page number, excerpt text, character offsets
 
-**Compliance variable categories:**
+**The matrix is a fixed list of named rules**, not a free-form set of categories. As shipped it
+carries: *Page Limit (Technical)* · *Page Limit (Cost)* · *Font Family* · *Font Size* · *Margins* ·
+*Line Spacing* · *Header Required* · *Header Format* · *Footer Required* · *Footer Format* ·
+*Submission Format* · *Slides Allowed* · *Slide Limit* · *TABA Allowed* · *PI Must Be Employee* ·
+*Partner Max %* · *Clearance Required* · *ITAR Required*. An unfilled rule shows an em dash.
 
-| Category | Examples |
-|---|---|
-| Format | Page limit, font, margins, line spacing, header/footer requirements |
-| Content | Required sections, evaluation criteria, submission instructions |
-| Eligibility | NAICS codes, clearance requirements, past performance minimums |
-| Submission | Due date, submission portal, point of contact, Q&A deadline |
-| Budget | Funding ceiling, cost sharing requirements, indirect rate caps |
+*(Corrected: an earlier draft of this guide described five free-form categories — Format, Content,
+Eligibility, Submission, Budget. That is not what the workspace shows.)*
 
-**AI pre-fill:** The system suggests values for common variables based on curation memory from previous RFPs. When you see an AI suggestion:
-- **Accept** if it's correct (saves time)
-- **Correct** if it's wrong (the correction is saved to memory — next time the AI gets it right)
+**AI pre-fill and where the value came from.** **Ingest Assist** fills the matrix from the shredded
+source, and every field records **how** it was filled:
 
-Every correction you make trains the system. The first few solicitations will need more manual work. By the 10th, the AI handles most common variables automatically.
+| Provenance | Badge | Meaning |
+|---|---|---|
+| `pattern_match` | **Read from source** | A deterministic extractor lifted an unambiguously-stated rule, and cited it — rule, page, excerpt, character offset, and which document |
+| `ai` | **Read from source** | The model read it out of the text |
+| *deferral* | **Set elsewhere** | The source explicitly points somewhere else (*"the page limit lives in the Component-specific instructions"*). The default is **cleared**, and the citation is shown. |
+| `default` | **Default — unverified** (red) | Nobody read this. It is a guess. |
+
+The rule behind all of it: **a value the product did not read from the solicitation must never look
+like one it did.** Trust order is `hitl > verified > override > pattern_match > ai > default`.
+
+Assist **refuses an unshredded solicitation** (409 `SOURCE_TEXT_NOT_READY`) rather than inventing a
+skeleton; the upload form polls readiness instead of racing the shred.
+
+When you see a suggestion: **Accept** if correct, **Correct** if wrong — the correction is saved to
+curation memory under `{agency}:{program_office}:{type}:{phase}` and pre-fills the next solicitation
+from that program. The first few need real work; by the tenth the AI handles most of it.
 
 ### 5b. Adding Topics
 
@@ -255,6 +335,12 @@ A solicitation may contain multiple topics. Each topic is a pursuable opportunit
   - Phase (Phase I, Phase II, etc.)
 - **AI extraction**: Click "Extract Topics from PDF" — the AI parses the document and suggests topics
 - **Bulk import**: Paste or upload structured topic data
+
+The Topics card offers **Manage Compliance · Extract Topics · Import all topics from source ·
+Bulk Import · + Add Topic**, plus a drop zone — each dropped file becomes a topic opportunity under
+this solicitation, ready to push. Open a topic to see and edit it:
+
+![A topic, with its volumes and required items](./assets/guides/admin/05c-topic-volumes.png)
 
 **For SBIR BAAs:** These typically have dozens or hundreds of topics. Use the AI extraction + bulk import workflow. Review the extracted topics for accuracy.
 
@@ -311,6 +397,11 @@ After curation is complete:
 3. Click **"Approve"** — marks as `approved`
 4. Click **"Push to Spotlight"** — releases to customer feeds
 
+Once pushed, the topic is live on tenant cards. `/admin/opportunities` is the master list behind
+every one of those mirrors:
+
+![The master opportunity list](./assets/guides/admin/06-opportunities.png)
+
 ### What happens on push:
 
 - All topics from this solicitation become visible in customer Spotlight feeds
@@ -328,7 +419,12 @@ After curation is complete:
 
 ## 7. Monitor Customer Activity
 
-**Path:** `/admin/dashboard` or `/admin/system`
+**Path:** `/admin/events` (**Event Stream**) — with `/admin/system-state` for the infrastructure
+view and `/admin/analytics` for the roll-ups. *(Corrected: the old text pointed at `/admin/system`.)*
+
+![The event stream](./assets/guides/admin/10-events.png)
+
+![System state](./assets/guides/admin/10c-system-state.png)
 
 The event stream shows all system activity:
 
@@ -348,6 +444,29 @@ The event stream shows all system activity:
 
 > **Namespace note.** Events use the namespaces `finder` (admin), `capture` (customer),
 > `identity` (auth), `proposal`, `library`, `system`, `tool` — never `admin`, `cms`, or `spotlight`.
+> A long-running operation writes **two rows of the same type** — a start and an end — with the
+> phase in the `phase` column and the end carrying `duration_ms`; the phase is never baked into the
+> type name. Full contract: [`EVENT_CONTRACT.md`](./EVENT_CONTRACT.md).
+
+### Watching the other customer surfaces
+
+| Screen | Path | What it answers |
+|---|---|---|
+| **Tenants** | `/admin/tenants` | Who is on the platform, and their licence state |
+| **Purchases** | `/admin/purchases` | Every paid and comped build, with its promo code |
+| **Opportunities** | `/admin/opportunities` | The master OPP list behind every tenant's cards |
+| **Scout Monitor** | `/admin/scouts` | The review→release queue for crawler and HITL scout findings, classified NEW vs UPDATE |
+| **Site Content** | `/admin/site` | Draft→publish→archive for everything front-facing |
+
+![Tenants](./assets/guides/admin/07-tenants.png)
+
+![A tenant's detail page](./assets/guides/admin/07b-tenant-detail.png)
+
+![Purchases](./assets/guides/admin/08-purchases.png)
+
+![Scout intake queue](./assets/guides/admin/10b-scouts.png)
+
+![Site content — draft, publish, archive](./assets/guides/admin/10d-site-content.png)
 
 ---
 
@@ -369,21 +488,46 @@ admin-provision. The authoritative click-by-click sequence is
    - emits **`capture:purchase.completed`**, and
    - parks a **72h `proposal_setup` ToDo** for `rfp_admin`.
    The customer's portal shows **"Waiting for RFP Expert Curation" + a live 72h countdown.**
-2. **Resolve the ToDo.** Go to `/admin/rfp-curation` — the **"Purchase — needs curation"** task is
-   surfaced there (the one tenant-scoped task an admin sees). Clicking it routes you, as the
-   **shadow admin**, down into the buyer's RLS-scoped tenant. *(⚠ security: today
-   `verifyTenantAccess` still grants admins a global god-view that `shadow_admin_grants` was meant to
-   replace — the grant is auditable/revocable metadata, not yet the enforced gate.)*
-3. **Finish or reuse the master skeleton (Release 2).** If you built the skeleton in advance
-   (§5c), this is a **~15-minute review**. If not, build it now — the **72h clock covers
-   skeletoning only**, not the draft.
+2. **Resolve the ToDo.** The **"Curate + release the purchased proposal workspace"**
+   (`proposal_setup`) task appears in **Your To-Dos** on `/admin/rfp-curation`, showing its route —
+   *Purchases → Curate & release → Draft sections → Review*. It deep-links to the
+   **provisioning cockpit** (below). Clicking through routes you, as the **shadow admin**, down into
+   the buyer's RLS-scoped tenant. *(⚠ security: today `verifyTenantAccess` still grants admins a
+   global god-view that `shadow_admin_grants` was meant to replace — the grant is
+   auditable/revocable metadata, not yet the enforced gate.)*
+3. **Work the provisioning cockpit** — `/admin/provisioning`, and per buyer
+   `/admin/provisioning/[portalId]`. This is the screen that lands the 72h SLA.
+
+   ![The provisioning queue](./assets/guides/admin/08b-provisioning.png)
+
+   ![The provisioning cockpit for one buyer](./assets/guides/admin/08c-provisioning-cockpit.png)
+
+   It shows the buyer, a **live SLA countdown**, and the master **build-out readiness bar**
+   (compliance filled · at least one volume · at least one required item), deep-links into the
+   authoring workspace, and ends in one two-outcome **Complete & Release**:
+
+   1. **`completeBuildOut`** marks the *master* built out and broadcasts an `updated` fan-out to
+      **every** tenant's mirror card (`provisionReady=true`) — the shared master, so everyone
+      watching that opportunity learns it is ready.
+   2. **`provisionAndReleasePortal`** provisions **this** buyer's private portal, flips
+      `curation_pending → launched`, and starts their workflow — the private portal, so continuity
+      belongs to them alone.
+
+   If you built the skeleton in advance (§5c), step 1 is a **~15-minute review**. If not, build it
+   now — the **72h clock covers skeletoning only**, not the draft.
 4. **Release** to the customer (`action=release`): `curation_pending → launched` →
    `provisionProposalForPortal` provisions the workspace **UNLOCKED** — `proposals` +
    `proposal_artifacts` per volume + `proposal_sections` per required item + a per-tenant
    `proposal_compliance_matrix` (rows `not_addressed`), with molds interpolated (`{company_name}` →
    tenant name). `OnProposalCreated → draft_v0` then auto-drafts sections via the `section_drafter`
    agent. This is **V0** — the instantiated skeleton. Emits **`capture:workspace.released`**.
-5. **Customer builds V0 → V0.5 → V1** (see the version model below).
+5. **The buyer accepts their workflow.** Release also raises a **required tenant Workflow Setup**
+   to-do (`guardrail_config._setup = pending`). Their `tenant_admin` opens
+   `/portal/[slug]/portals/[portalId]`, reviews a plan recommended from *their own* prior accepted
+   plans, and presses **Accept & Start**. Until they do, the build has no live stages. Editing it
+   later re-projects onto the live task rows and re-arms the nudges. See the customer guide's
+   Step 8b for the screen they see.
+6. **Customer builds V0 → V0.5 → V1** (see the version model below).
 
 > **Comp a build instead of a purchase.** On the tenant's **Portals** page (expert view) the
 > **"Approve free portal"** form comps the paid build for an opportunity: it records a **$0
@@ -411,9 +555,46 @@ automatic skip for already-skeletoned opportunities is on the backlog.
 ### Your role during proposal build
 
 Today the shadow admin bootstraps the build (draft, lock, force-advance). The intended end state is
-**mostly customer-executed** via Workplan automation (nudges/actions pushed into the approved shadow
-+ company-admin accounts) — **⚠ partial** today: `section_drafter` auto-drafts on release,
-`compliance_reviewer` runs inline in the AI route, and `color_team_reviewer` is defined but not wired.
+**mostly customer-executed** via the tenant's own accepted workflow plan (stage gates, per-to-do
+owners and nudges) — see step 5 above. Agent coverage as shipped: `section_drafter` auto-drafts on
+release, `compliance_reviewer` runs inline in the AI route, and `color_team_reviewer` runs off the
+advance queue. *(Corrected: `color_team_reviewer` was described here as "defined but not wired".)*
+
+---
+
+## 8b. Workflows and Agents — the oversight plane
+
+### Workflows
+
+**Path:** `/admin/workflows`
+
+![The workflow map and live monitor](./assets/guides/admin/09-workflows.png)
+
+Three things on one screen:
+
+- **Workflow Map** — every template rendered as a dependency graph, grouped by the two spines
+  (discovery · build) plus platform
+- **Live instance graphs** — the same DAG with a per-step status overlay for a running instance
+- **A sortable, filterable monitor** with a Live mode
+
+Operator detail, including how to instantiate and how to unstick a paused instance:
+[`WORKFLOW_ADMIN_GUIDE.md`](./WORKFLOW_ADMIN_GUIDE.md).
+
+### Agents
+
+**Path:** `/admin/agents`
+
+![The agent workforce](./assets/guides/admin/09b-agents.png)
+
+The roster of every archetype, with per-tenant usage over the forward-only bridge. This page is also
+where the **Proposal Auto-Drive doorbell** lives — it fires the same full-draft trigger a tenant's
+own portal button does, recorded with `source='admin_doorbell'` so a draft you started is
+distinguishable from one they started.
+
+The non-negotiables, in one line each: a tenant-space agent is **tenant-bound**; its output is
+**advisory** and lands only through a guardrail into review; untrusted tenant content is
+**injection-fenced**; and the runtime bounds runaway work without ever dead-ending a workflow.
+Full contract: [`AGENT_WORKFORCE.md`](./AGENT_WORKFORCE.md).
 
 ---
 
@@ -464,21 +645,26 @@ VALUES (
 
 ```
 Morning:
-  [ ] Check /admin/applications for new applications → accept or reject
-  [ ] Check triage queue for new solicitations from scrapers
-  [ ] Review any pending customer support emails
+  [ ] /admin/command — what changed since you last looked (one screen, unread-watermarked)
+  [ ] /admin/rfp-curation — work Your To-Dos down, oldest overdue first
+  [ ] Anything on the SLA clock: /admin/provisioning, sorted by time remaining
+  [ ] /admin/applications for new applications → accept or reject (this closes their to-do)
+  [ ] /admin/scouts — release or dismiss what the scouts found overnight
 
 Curation block (1-2 hours):
   [ ] Claim new solicitations
-  [ ] Build compliance matrices for claimed solicitations
+  [ ] Run Ingest Assist, then CHECK THE BADGES — every red "Default — unverified" is a
+      value nobody read from the source. Fix it or accept it knowingly.
   [ ] Add topics (manual or AI-assisted extraction)
-  [ ] Define volumes and required items
+  [ ] Define volumes and required items — this is the reusable master skeleton
+  [ ] Write the spotlight-match summary (push is blocked without it)
   [ ] Push completed solicitations to Spotlight
 
 Monitoring:
-  [ ] Check event stream for errors
-  [ ] Verify recently pushed solicitations appear in Spotlight
-  [ ] Review AI compliance suggestions — correct any errors
+  [ ] /admin/events, phase=error — anything that started and did not finish
+  [ ] /admin/workflows — any instance paused or failed
+  [ ] Verify recently pushed solicitations appear on tenant cards
+  [ ] Review AI compliance suggestions — correct any errors (each correction trains the next one)
 
 Weekly:
   [ ] Upload new solicitations from SAM.gov, SBIR.gov, Grants.gov
@@ -542,6 +728,21 @@ Correct them. Every correction writes to curation memory with the namespace key 
 1. Check pipeline logs in Railway for errors
 2. The shredder requires: PDF in S3, `pymupdf4llm` installed, valid solicitation record
 3. If the pipeline crashed during extraction, restart the service — jobs will be re-queued
+
+### A page looks broken but the URL is fine
+
+Two failure shapes render as a red card while the server reports success, because they throw in the
+browser rather than on the server:
+
+- **"Something went wrong — this page failed to load."** A React component threw. Nothing will be in
+  the server log. Reload once; if it repeats, it is a defect on that route with that data — capture
+  the browser console and file it.
+- **A page that renders and then blanks.** A hydration mismatch (React error #418 and friends):
+  the server and the browser produced different text for the same element.
+
+Both were live in this codebase until the guide pass drove the pages and *looked at them*
+(bug log B78, B79). `cd frontend && node scripts/verify-surfaces.mjs` drives every page under
+`/admin` and `/portal/[slug]` as the right actor and fails on either shape — run it after a deploy.
 
 ### An action seemed to do nothing
 
