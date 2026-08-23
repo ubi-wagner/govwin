@@ -40,12 +40,31 @@ function pdfPageCount(buf: Buffer): number {
   return m ? m.length : 0;
 }
 
-/** Lorem-free filler: real sentences, so line-breaking behaves like real prose. */
-const SENTENCE =
+/**
+ * Filler that breaks like a PROPOSAL, not like a lorem generator.
+ *
+ * This was one lowercase sentence repeated, which is the least representative text in the corpus.
+ * Measured against Chromium (scripts/measure-char-width.mts), the average glyph advance of Times
+ * New Roman depends on the register: 0.41 of the font size for lowercase technical prose, 0.42 for
+ * numerals, 0.44-0.47 for long compound words, 0.58 for acronym-dense text. The ruler's single
+ * CHAR_W of 0.45 is the average of those — so it runs ~10% conservative on lowercase and ~20%
+ * optimistic on capitals, and a harness fed nothing but lowercase was measuring the ruler in the
+ * one register where it has the most slack. Five cases over-counted the moment an unrelated
+ * correction landed; the eight authored NILOC volumes, which mix all three registers, stayed exact.
+ *
+ * The rotation below keeps that mixture in the filler: narrative, boilerplate with agency
+ * acronyms, and a sentence of quantities.
+ */
+const SENTENCES = [
   'The additive manufacturing cell maintains a controlled thermal profile across the build volume, '
-  + 'which keeps interlaminar shear strength within the qualification band for the full print. ';
+  + 'which keeps interlaminar shear strength within the qualification band for the full print. ',
+  'The offeror certifies that this SBIR Phase I effort does not duplicate work funded under any other '
+  + 'Federal award, and that the PI identified in the DoD DSIP submission is available at the stated LOE. ',
+  'Coupon sets are printed at 0.015 in. layer height and 210 C, sectioned per ASTM D2344, and reported '
+  + 'across 4,800 specimens at a 99.7% yield over the 36-month period of performance (FY2026-FY2029). ',
+];
 function prose(sentences: number): string {
-  return SENTENCE.repeat(sentences).trim();
+  return Array.from({ length: sentences }, (_, i) => SENTENCES[i % SENTENCES.length]).join('').trim();
 }
 
 // A CanvasNode carries its payload under `content`, with `style`/`provenance`/`history` siblings —
@@ -97,7 +116,24 @@ const image = (which: keyof typeof IMG) => node('image', {
   storage_key: IMG[which].key, alt_text: 'Print bed thermal map',
   width: IMG[which].w, height: IMG[which].h,
 });
+/**
+ * An image node with NOTHING to load — the shape every authored TEMPLATE mold carries, since a
+ * mold declares its figure slots before a customer supplies a figure. `renderImage` draws a dashed
+ * box around one line of alt text, and the declared height acts as a `max-height` CAP on that box
+ * rather than as its height, so a slot declared 900×520 prints ~64pt, not ~390pt (B68).
+ */
+const placeholder = (opts: { w?: number; h?: number; alt?: string; caption?: string } = {}) => node('image', {
+  storage_key: '',
+  alt_text: opts.alt ?? 'Figure 1. System architecture',
+  ...(opts.w ? { width: opts.w } : {}), ...(opts.h ? { height: opts.h } : {}),
+  ...(opts.caption ? { caption: opts.caption } : {}),
+});
 const pageBreak = () => node('page_break', {});
+/** The page furniture every agency mold carries — a running header and a page-numbered footer. */
+const HF = {
+  header: { template: '{topic_number} — {company_name}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+  footer: { template: '{company_name} | Page {n} of {N}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+} as const;
 /** A real `bulleted_list` — NOT `list`, which is not a NodeType and silently renders as nothing. */
 const bullets = (n: number, nested = false) => node('bulleted_list', {
   items: Array.from({ length: n }, (_, i) => ({
@@ -159,6 +195,32 @@ const CASES: Case[] = [
     note: 'the case that produced the 9-vs-10 disagreement recorded in the engine',
   },
 
+  // ── Figure SLOTS — an image with an empty storage_key. The mold shape, and the one the
+  //    harness had no case for, which is how a ~35% per-figure over-count survived 28 green
+  //    cases (B68). Amplified deliberately: one slot is a rounding error, twenty decide a page. ──
+  { name: 'placeholder · 20 empty figure slots', doc: doc(Array.from({ length: 20 }, () => placeholder({ w: 900, h: 520 }))) },
+  {
+    name: 'placeholder · 20 slots interleaved with prose',
+    doc: doc(Array.from({ length: 20 }, () => [text(prose(2)), placeholder({ w: 640, h: 360 })]).flat()),
+    tolerance: 1,
+    note: 'the mold shape — figure margins collapse against the paragraph above, which a by-hand '
+        + 'reading of the stylesheet double-counts. Any residual here is the PROSE half, not the '
+        + 'figure: the slot measures 63.86pt modelled against 63.76pt printed.',
+  },
+  { name: 'placeholder · 24 slots with captions', doc: doc(Array.from({ length: 24 }, () => placeholder({ caption: 'Interlaminar shear strength by build orientation' }))) },
+  {
+    name: 'placeholder · 20 slots, alt text that wraps',
+    doc: doc(Array.from({ length: 20 }, () => placeholder({
+      alt: 'Figure. Interlaminar shear strength measured across all three build orientations for the '
+         + 'qualification coupon set, sectioned and tested to ASTM D2344 with witness coupons retained',
+    }))),
+  },
+  {
+    name: 'placeholder · 30 slots with a SHORT declared height (max-height caps the box)',
+    doc: doc(Array.from({ length: 30 }, () => placeholder({ w: 320, h: 60 }))),
+    note: 'the declared height can only make the box SHORTER — it is a max-height, not a height',
+  },
+
   // ── Lists. Each item is its own block; measuring them as reflowed prose under-counted a
   //    120-bullet document by a page and kept the deck overflow check silent (B65). ──
   { name: 'list · 20 bullets', doc: doc([bullets(20)]) },
@@ -212,6 +274,15 @@ const CASES: Case[] = [
 
   // ── Explicit breaks + mixed. What a real volume looks like. ──
   {
+    // ±1, and the cause is measured rather than assumed. CHAR_W is ONE constant standing in for a
+    // font whose real average advance depends on the words (scripts/measure-char-width.mts, long
+    // paragraphs so line quantisation does not dominate): 0.41 for lowercase technical prose, 0.42
+    // for numerals, 0.44-0.47 for long compound words, 0.58 for acronym-dense text. 0.45 is the
+    // average of those, so it runs ~10% conservative on lowercase and ~20% optimistic on capitals.
+    // This case's table holds two long lowercase cells: 86 characters against a 42-character column
+    // is 2.05 lines, rounded to 3, on every row — 284pt modelled against 221.7pt printed. Closing
+    // it means estimating the advance per text from its character mix, not moving the constant.
+    tolerance: 1,
     name: 'mixed · realistic technical volume',
     doc: doc([
       heading('1. Identification and Significance', 1), text(prose(10)),
@@ -226,9 +297,37 @@ const CASES: Case[] = [
     doc: doc([text(prose(3)), pageBreak(), text(prose(3)), pageBreak(), text(prose(3))]),
   },
 
-  // ── Frame variations. A different margin or font size must move BOTH numbers together. ──
-  { name: 'frame · narrow margins', doc: doc([text(prose(30))], { margin_in: 0.5 }) },
-  { name: 'frame · 12pt body', doc: doc([text(prose(30))], { body_pt: 12 }) },
+  // ── Frame variations. A different margin or font size must move BOTH numbers together.
+  //    These two spent their whole life testing nothing: they passed `{ margin_in: 0.5 }` and
+  //    `{ body_pt: 12 }`, which are not fields of CanvasRules (`margins` and `font_default` are),
+  //    so the override landed as an ignored property and both cases re-ran the plain 2-page prose
+  //    case. A frame variation that does not vary the frame is the same defect this harness
+  //    exists to catch, one level up. ──
+  { name: 'frame · narrow margins (0.5in)', doc: doc([text(prose(30))], { margins: { top: 36, right: 36, bottom: 36, left: 36 } }) },
+  { name: 'frame · 10pt body', doc: doc([text(prose(30))], { font_default: { family: 'Times New Roman', size: 10 } }) },
+
+  // ── Running header + footer. EVERY case above this line uses `letter_standard`, which declares
+  //    `header: null, footer: null` — so the entire header/footer path was uncalibrated, on a
+  //    product where every agency mold carries both. `page.pdf` draws them INSIDE the page
+  //    margins, so they take nothing from the content box (B69). ──
+  {
+    name: 'frame · running header + footer, 4 pages of prose',
+    doc: doc([text(prose(62))], { header: HF.header, footer: HF.footer }),
+    note: 'must match the same prose without furniture — the header lives in the top margin',
+  },
+  {
+    name: 'frame · running header + footer, prose + figures + a table',
+    doc: doc([
+      heading('1. Identification and Significance', 1), text(prose(10)),
+      heading('2. Phase I Technical Objectives', 1), text(prose(8)), table(6),
+      heading('3. Work Plan', 1), text(prose(14)), chart(),
+      heading('4. Facilities', 1), text(prose(9)), image('wide'),
+    ], { header: HF.header, footer: HF.footer }),
+  },
+  {
+    name: 'frame · footer only',
+    doc: doc([text(prose(30))], { footer: HF.footer }),
+  },
 ];
 
 async function main() {

@@ -663,9 +663,34 @@ export function createNode(opts: {
 /** Per-format usable geometry + flow metrics (points) — shared by the page, slide, and section rulers. */
 function flowMetrics(c: CanvasDocument['canvas']) {
   const usableW = Math.max(1, c.width - c.margins.left - c.margins.right);
-  const usableH = Math.max(1, c.height - c.margins.top - c.margins.bottom - (c.header?.height ?? 0) - (c.footer?.height ?? 0));
+  // A RUNNING HEADER TAKES NOTHING FROM THE CONTENT BOX — it lives IN the margin (B69).
+  //
+  // This used to subtract `header.height + footer.height` on top of the margins, which took 72pt
+  // off every page of any document carrying both — 11% of a letter page, on a product where every
+  // agency mold has a running header and a page-numbered footer. `exportToPdf` passes the canvas
+  // margins straight to `page.pdf({ margin })` and sets `displayHeaderFooter`, and Chromium draws
+  // those templates INSIDE the margin box; the content box is height − top − bottom, full stop.
+  // The editor's page frame agrees (canvas-renderer positions header/footer absolutely in the
+  // margin bands). Measured: four pages of prose print as 3 with furniture and 3 without, and the
+  // ruler read 4 with and 3 without.
+  //
+  // Nothing caught it because every case in scripts/calibrate-page-ruler.mts used the one preset
+  // that declares `header: null, footer: null`, so the furniture path had no measurement at all —
+  // the same shape as the harness bug in B66 and the two frame cases whose override key was not a
+  // field of CanvasRules. There are now cases with furniture.
+  const usableH = Math.max(1, c.height - c.margins.top - c.margins.bottom);
   const fs = c.font_default.size;
-  const bodyLineH = fs * c.line_spacing;
+  // THE SAME LEADING FLOOR THE STYLESHEET APPLIES. canvas-html sets
+  // `line-height: Math.max(lineSpacing, 1.28)` — deliberately, so a solicitation that mandates
+  // "single spaced" does not render as a grey slab — and this read the raw `line_spacing`. On
+  // `letter_standard` (1.15) that measured every line of prose at 13.8pt where the page draws
+  // 15.36pt: 11% short, on the most common node in a proposal.
+  //
+  // Four node cases had already worked around it locally with `Math.max(bodyLineH / fs, 1.28)`
+  // (lists, code_block, toc, the figure placeholder) — the flow-text default, which is most of a
+  // volume, had not. A local workaround repeated four times is the shape of a fact that belongs
+  // one level up; those four are now no-ops and left in place as documentation.
+  const bodyLineH = fs * Math.max(c.line_spacing, 1.28);
   const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated to the exporter)
   const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
   // tocRows is filled in by paginate(), which can see the whole document; a per-node ruler cannot.
@@ -694,6 +719,61 @@ function collectTocRows(doc: CanvasDocument): TocRow[] {
 }
 
 /** Vertical height (pt) a single node occupies in normal flow. page_break / toc contribute nothing. */
+/**
+ * The vertical MARGINS canvas-html gives a node's outermost element, in points.
+ *
+ * Kept separate from the node's box height for one reason: CSS collapses adjacent vertical margins
+ * to the LARGER of the two, and a model that bakes margins into each node's height cannot. The
+ * ruler used to do exactly that, inconsistently — a heading carried its 20pt and 5pt, a paragraph
+ * carried nothing at all (`p { margin: 0 0 7pt }` was simply absent), a figure carried both of its
+ * own — so consecutive paragraphs lost 7pt each while a paragraph followed by a heading came out
+ * right by accident. On real prose-heavy proposals the missing paragraph margins won: four of the
+ * eight authored NILOC volumes UNDER-counted by a page, which is the one direction that matters —
+ * the export gate clearing a volume that is over its limit.
+ *
+ * Read straight off canvas-html (canvasBaseCss + the inline styles in renderNode); a type not
+ * listed here has no vertical margin.
+ */
+function nodeMarginsPt(node: CanvasNode): { top: number; bottom: number } {
+  switch (node.type) {
+    case 'heading': {
+      const level = (node.content as HeadingContent | undefined)?.level ?? 1;
+      return level <= 1 ? { top: 20, bottom: 5 } : level === 2 ? { top: 14, bottom: 4 } : { top: 11, bottom: 3 };
+    }
+    // `p { margin: 0 0 7pt }` — text_block, and the three node types that also render as a <p>.
+    case 'text_block':
+    case 'caption':
+    case 'footnote':
+    case 'url':
+      return { top: 0, bottom: 7 };
+    case 'bulleted_list':                       // ul, ol { margin: 0 0 8pt 20pt }
+    case 'numbered_list':
+      return { top: 0, bottom: 8 };
+    case 'image':                               // <figure style="margin:12px 0">
+      return { top: 9, bottom: 9 };
+    case 'chart':                               // a bare <svg style="margin:10pt 0">, not a figure
+      return { top: 10, bottom: 10 };
+    case 'table':                               // <table style="margin:10px 0">
+      return { top: 7.5, bottom: 7.5 };
+    case 'callout':                             // margin:10pt 0
+    case 'blockquote':
+      return { top: 10, bottom: 10 };
+    case 'code_block':                          // <pre>'s UA default margin, 1em at 9pt
+      return { top: 9, bottom: 9 };
+    case 'equation':                            // margin:8pt 0
+      return { top: 8, bottom: 8 };
+    case 'divider':                             // <hr style="margin:12pt 0">
+      return { top: 12, bottom: 12 };
+    case 'signature':                           // margin:16pt 0
+      return { top: 16, bottom: 16 };
+    case 'toc':                                 // <nav style="margin:4pt 0 14pt">
+      return { top: 4, bottom: 14 };
+    default:
+      return { top: 0, bottom: 0 };
+  }
+}
+
+/** nodeStackHeightPt returns the node's BOX — margins are `nodeMarginsPt`, collapsed by the caller. */
 function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>): number {
   const { usableW, fs, bodyLineH, CHAR_W, cpl } = m;
   const linesFor = (chars: number, per: number) => Math.max(1, Math.ceil(chars / per));
@@ -724,9 +804,8 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       if (!rows || rows.length === 0) return 0;
       const TOC_ENTRY_PAD_PT = 4;    // 2pt top + 2pt bottom
       const TOC_LABEL_PT = 9 * 1.28 + 6;
-      const TOC_NAV_MARGIN_PT = 18;  // 4pt above + 14pt below
       const line = fs * Math.max(bodyLineH / fs, 1.28);
-      let h = TOC_LABEL_PT + TOC_NAV_MARGIN_PT;
+      let h = TOC_LABEL_PT;          // the <nav>'s 4pt/14pt margins are nodeMarginsPt's
       for (const r of rows) {
         const w = Math.max(1, usableW - (r.level - 1) * 20);
         const per = Math.max(1, Math.floor(w / (fs * CHAR_W)));
@@ -739,10 +818,25 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       return typeof h === 'number' && h > 0 ? h : bodyLineH;
     }
     case 'heading': {
+      // THE SCALE HERE MUST BE THE STYLESHEET'S SCALE. canvas-html tightened headings — its own
+      // comment says "a tighter scale than 1.6/1.3/1.1" — and this ruler was never moved with it,
+      // so it kept modelling h1 at 2.5× the body where the page renders 1.34×, nearly double. On a
+      // mold with 22 headings that is +29% of every heading's height; amplified across 264 of them
+      // the ruler read 18 pages against 14 printed.
+      //
+      // Read straight off canvas-html::canvasBaseCss so the two cannot drift again:
+      //   h1  font-size fs×1.34   margin 20pt 0 5pt
+      //   h2  font-size fs×1.14   margin 14pt 0 4pt
+      //   h3  font-size fs×1.02   margin 11pt 0 3pt
+      //   all line-height 1.22
       const level = (node.content as HeadingContent).level ?? 1;
-      const hfs = fs * (level <= 1 ? 2.5 : level === 2 ? 1.45 : 1.2);
+      const scale = level <= 1 ? 1.34 : level === 2 ? 1.14 : 1.02;
+      const hfs = fs * scale;
       const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
-      return linesFor(getNodeText(node).length, hcpl) * hfs * 1.15 + fs * 0.7 + fs * 0.25;
+      // The 20/5 · 14/4 · 11/3 margins live in nodeMarginsPt so they can COLLAPSE against the
+      // paragraph above. Charged here they were added to that paragraph's own bottom margin, which
+      // is not what the page does.
+      return linesFor(getNodeText(node).length, hcpl) * hfs * 1.22;
     }
     case 'image':
     case 'chart': {
@@ -759,6 +853,25 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       // and a Technical Volume the ruler cleared at 10 of 10 pages rendered as 11. A ruler that
       // reads a different document from the one Chromium lays out is not a ruler — this is the
       // same defect class as the three the ruler already documents.
+      // A CHART IS A GENERATED SVG OF KNOWN SIZE — not an unknown picture to guess at.
+      //
+      // It fell through to a flat `fs * 15.5` fallback because a chart node carries no width or
+      // height: 201pt modelled against 256pt printed, a 21% UNDER-count, which is the direction
+      // that matters. `renderChartSvg` fixes the viewBox itself — 480×300 for every plot type,
+      // and 500 × (12 or 30 + 24 per category + 26) for a gantt — so the height is computable.
+      // Measured in a run (scripts/probe-chart.mts): a 300px chart advances 249.09pt, which is the
+      // 225pt box, the 10pt margin (nodeMarginsPt's, so it collapses), and ~14pt of baseline gap
+      // below an INLINE svg. `bodyLineH` covers that last part with a point to spare.
+      if (node.type === 'chart') {
+        const cc = node.content as ChartContent | undefined;
+        const gantt = cc?.chart_type === 'gantt';
+        const svgW = gantt ? 500 : 480;
+        const svgH = gantt ? (cc?.title ? 30 : 12) + (cc?.categories?.length ?? 0) * 24 + 26 : 300;
+        const PX_TO_PT = 0.75;
+        const chartScale = Math.min(1, usableW / (svgW * PX_TO_PT));
+        return svgH * PX_TO_PT * chartScale + bodyLineH;
+      }
+
       const c = node.content as { width?: number; height?: number; storage_key?: unknown } | undefined;
 
       // AN IMAGE WITH NOWHERE TO LOAD FROM IS NOT A FIGURE — it is a placeholder box.
@@ -774,13 +887,30 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       // Scoped to an EMPTY key on purpose. A real storage key resolves through
       // `inlineImageDataUris` at export and does take its declared size — which is why real
       // authored proposals measured exactly right. Only the provably-unresolvable case changes.
+      //
+      // The box below is MEASURED, not read off the stylesheet by hand — the first correction did
+      // that and still came out at roughly double (86pt modelled against 63.6pt printed), because a
+      // by-hand reading double-counts the <figure>'s margins (they COLLAPSE with the neighbouring
+      // paragraph's) and charges a caption line to a box that has no caption. Chromium reports the
+      // laid-out geometry directly; scripts/measure-image-placeholder.mts is that measurement, and
+      // the calibration harness carries the placeholder cases so it cannot drift back.
       const key = typeof c?.storage_key === 'string' ? c.storage_key.trim() : '';
       if (node.type === 'image' && key === '') {
-        const PLACEHOLDER_PAD_PT = 36;     // 24px top + 24px bottom
-        const FIGURE_MARGIN_PT = 18;       // the <figure>'s own 12px margins
-        const box = PLACEHOLDER_PAD_PT + fs * Math.max(bodyLineH / fs, 1.28) + 1.5 /* dashed border */;
-        const declared = typeof c?.height === 'number' && c.height > 0 ? c.height * 0.75 : box;
-        return Math.min(box, declared) + FIGURE_MARGIN_PT + bodyLineH;
+        const PAD_PT = 36;          // padding:24px, top + bottom
+        const BORDER_PT = 1.5;      // 1px dashed, top + bottom
+        const CAPTION_PT = 14.5;    // <figcaption> 9pt at the body's leading + its 4px margin-top
+        // The alt text wraps inside the box, at the box's own width — which is the DECLARED width
+        // when there is one (the div carries `width:Npx` with no max-width, so a 900px figure lays
+        // out 900px wide and overflows the column rather than wrapping into it).
+        const declaredWpt = typeof c?.width === 'number' && c.width > 0 ? c.width * 0.75 : usableW;
+        const textW = Math.max(1, declaredWpt - PAD_PT);
+        const alt = typeof (c as { alt_text?: unknown })?.alt_text === 'string' ? (c as { alt_text: string }).alt_text : '';
+        const lines = linesFor((alt || 'Image').length, Math.max(1, Math.floor(textW / (fs * CHAR_W))));
+        const natural = PAD_PT + BORDER_PT + lines * bodyLineH;
+        // A declared height is a `max-height` on this box, so it can only make it SHORTER.
+        const capped = typeof c?.height === 'number' && c.height > 0 ? Math.min(natural, c.height * 0.75) : natural;
+        const caption = typeof (c as { caption?: unknown })?.caption === 'string' && (c as { caption: string }).caption ? CAPTION_PT : 0;
+        return capped + caption;   // the <figure>'s 12px margins are nodeMarginsPt's, so they collapse
       }
 
       const w = typeof c?.width === 'number' && c.width > 0 ? c.width : 0;
@@ -788,11 +918,9 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       if (w > 0 && h > 0) {
         const PX_TO_PT = 0.75;                       // 96 CSS px per inch, 72 pt per inch
         const scale = Math.min(1, usableW / (w * PX_TO_PT));
-        // + the <figure> element's own 12px top and bottom margins (canvas-html::imageHtml). Small
-        // per figure, and exactly the sort of omission that accumulates into the one-page error
-        // that turns a "10 of 10" claim into an eleven-page submission.
-        const FIGURE_MARGIN_PT = 18;
-        return h * PX_TO_PT * scale + FIGURE_MARGIN_PT + bodyLineH;
+        // The <figure>'s own 12px margins are nodeMarginsPt's (they collapse); the trailing
+        // bodyLineH is the caption line, which does not.
+        return h * PX_TO_PT * scale + bodyLineH;
       }
       return fs * 15.5 + bodyLineH;
     }
@@ -845,12 +973,46 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       // text appeared to wrap to twice as many lines as it does — a 40-row table read as 5 pages
       // and printed as 4. Weighting by each column's longest cell is the same rule auto-layout
       // uses, and it lands the estimate on the printed number.
-      const colChars = Array.from({ length: cols }, (_, i) =>
+      //
+      // PROPORTIONAL WAS NOT ENOUGH: A COLUMN NEVER GETS LESS THAN ITS LONGEST WORD.
+      //
+      // Weighting purely by longest-cell starves a narrow column below the width of the text it
+      // holds. Measured on the NSF Project Description mold, a four-column milestone table whose
+      // first column holds "Task 1": the proportional share gave that column 5.8 characters, so
+      // the model wrapped a six-character cell onto a second line — and did it on every row.
+      // 148pt estimated against 105.9pt printed, a 40% over-count on one node, which was enough on
+      // its own to push a segment onto a second page and the mold from 6 pages to 8.
+      //
+      // CSS auto table layout does not work that way. Every column is first given its MIN-CONTENT
+      // width — the longest unbreakable word, which is the narrowest it can be without splitting a
+      // word — and only the space left over is shared out, in proportion to how much more each
+      // column would like (max-content − min-content). When every column's max-content fits, no
+      // cell wraps at all. That is CSS 2.1 §17.5.2, and it is what the renderer is doing.
+      const longestWord = (s: string) => Math.max(1, ...s.split(/\s+/).map((w) => w.length));
+      const minChars = Array.from({ length: cols }, (_, i) =>
+        Math.max(1, ...allRows.map((r) => longestWord(cellText(r?.[i])))));
+      const maxChars = Array.from({ length: cols }, (_, i) =>
         Math.max(1, ...allRows.map((r) => cellText(r?.[i]).length)));
-      const totalChars = colChars.reduce((a, b) => a + b, 0) || 1;
       const textWidth = Math.max(1, usableW - cols * CELL_SIDE_PAD_PT);
-      const cplPerCol = colChars.map((ch) =>
-        Math.max(1, Math.floor((textWidth * (ch / totalChars)) / (TABLE_FS * CHAR_W))));
+      const capacity = textWidth / (TABLE_FS * CHAR_W);           // the whole row, in characters
+      const sumMin = minChars.reduce((a, b) => a + b, 0);
+      const sumMax = maxChars.reduce((a, b) => a + b, 0);
+      const cplPerCol = sumMax <= capacity
+        // Everything fits: each column takes its content and nothing wraps.
+        ? maxChars.slice()
+        : minChars.map((mn, i) => {
+          // Share out what is left of the row after every column's minimum, by how much more each
+          // column wants. When even the minimums do not fit, the columns keep them and the table
+          // overflows — which is what the renderer does too.
+          const slack = Math.max(0, capacity - sumMin);
+          const want = maxChars[i] - mn;
+          const totalWant = maxChars.reduce((s, mx, j) => s + (mx - minChars[j]), 0) || 1;
+          // ROUND, not floor. A column's share is a real-valued width; truncating it down stacks a
+          // second conservatism on top of CHAR_W's (0.45 against a measured ~0.42), and it stacks
+          // once PER COLUMN. On the table above that turned a 5.9-character allocation into 5 and
+          // wrapped "Task 1" — six characters — onto a second line in every row.
+          return Math.max(1, Math.round(mn + (slack * want) / totalWant));
+        });
 
       let h = 0;
       for (const row of allRows) {
@@ -897,8 +1059,7 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       // indent another 20pt each level.
       const items = (node.content as ListContent | undefined)?.items ?? [];
       const LIST_INDENT_PT = 20;
-      const ITEM_GAP_PT = 3;
-      const LIST_BOTTOM_PT = 8;
+      const ITEM_GAP_PT = 3;   // li { margin: 0 0 3pt } — between items, so it never collapses out
       // The stylesheet floors line-height at 1.28 (`Math.max(lineSpacing, 1.28)`), and for a list
       // that floor matters: an error of a fraction of a line repeats per ITEM instead of averaging
       // out across a reflowed paragraph.
@@ -913,17 +1074,29 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
         }
         return h;
       };
-      return items.length ? walk(items, 0) + LIST_BOTTOM_PT : bodyLineH;
+      return items.length ? walk(items, 0) : bodyLineH;   // the ul/ol 8pt bottom is nodeMarginsPt's
     }
     default:
       return linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
   }
 }
 
-/** Total stacked height (pt) of a node run (a section's footprint), ignoring page breaks. */
+/** Total stacked height (pt) of a node run (a section's footprint), ignoring page breaks.
+ *  Adjacent vertical margins COLLAPSE to the larger of the two, as the renderer does. */
 function stackHeightPt(nodes: CanvasNode[], m: ReturnType<typeof flowMetrics>): number {
   let h = 0;
-  for (const n of nodes) h += nodeStackHeightPt(n, m);
+  let prevBottom = 0;
+  let first = true;
+  for (const n of nodes) {
+    if (n.type === 'page_break') { prevBottom = 0; continue; }
+    const mg = nodeMarginsPt(n);
+    // The block's OWN outer margins collapse through it (no border, no padding), so the leading
+    // top margin and the trailing bottom margin are not part of the height that has to fit.
+    if (!first) h += Math.max(prevBottom, mg.top);
+    h += nodeStackHeightPt(n, m);
+    prevBottom = mg.bottom;
+    first = false;
+  }
   return h;
 }
 
@@ -1024,7 +1197,10 @@ export function paginate(doc: CanvasDocument): LayoutResult {
 
   let page = 1;
   let y = 0; // points consumed on the current page
-  const newPage = () => { page += 1; y = 0; };
+  // The previous node's bottom margin, waiting to collapse against the next node's top one. Reset
+  // at every page boundary: a margin at the top of a fresh page is not spent, in paged CSS or here.
+  let prevBottom = 0;
+  const newPage = () => { page += 1; y = 0; prevBottom = 0; };
   // Fill the current page, then spill onto as many pages as needed — flow content
   // splits at the page edge, so pages = ceil(totalHeight / pageHeight) with no
   // phantom whitespace (matches estimatePageCount exactly for un-broken content).
@@ -1060,12 +1236,28 @@ export function paginate(doc: CanvasDocument): LayoutResult {
     if (section.layout?.break_before && i > 0 && y > 0) newPage();
     const startPage = page;
     if (section.layout?.mode === 'keep_together') {
+      // stackHeightPt collapses within the block; the pending margin from before it is spent here.
+      advance(prevBottom); prevBottom = 0;
       fitKeep((section.groups ?? []).reduce((s, g) => s + stackHeightPt(g.nodes ?? [], m), 0));
     } else {
       for (const group of section.groups ?? []) {
-        if (group.keep_together) { fitKeep(stackHeightPt(group.nodes ?? [], m)); continue; }
+        if (group.keep_together) {
+          advance(prevBottom); prevBottom = 0;
+          fitKeep(stackHeightPt(group.nodes ?? [], m));
+          continue;
+        }
         for (const node of group.nodes ?? []) {
-          if (node.type === 'page_break') { if (y > 0) newPage(); continue; }
+          if (node.type === 'page_break') { if (y > 0) newPage(); prevBottom = 0; continue; }
+          // The gap above this node: its own top margin COLLAPSED with the previous node's bottom
+          // one, not the sum of the two. Spent before the fit decision, because a figure that no
+          // longer fits once the gap is on the page is a figure the renderer relocates.
+          // A MARGIN AT THE TOP OF A PAGE IS NOT SPENT. Paged CSS discards it, and charging it
+          // anyway put `y` above zero before the first element of a page — which made `fitKeep`
+          // treat a table at the very top as one that had to be RELOCATED, sending a 2-page table
+          // to pages 2 and 3 of a 3-page document that has nothing on page 1.
+          const mg = nodeMarginsPt(node);
+          if (y > 0) advance(Math.max(prevBottom, mg.top));
+          prevBottom = mg.bottom;
           // A figure or a table is ATOMIC. The exporters' own stylesheet says so —
           // `figure, table { page-break-inside: avoid }` in canvas-html::canvasBaseCss — so when
           // one does not fit in what is left of a page the renderer moves it whole to the next and
@@ -1092,6 +1284,31 @@ export function paginate(doc: CanvasDocument): LayoutResult {
 
   const max = doc.canvas?.max_pages ?? null;
   return { totalPages: page, perSection, vsMaxPages: { max, over: max != null && page > max } };
+}
+
+/**
+ * The ruler's per-node opinion, in points — the calibration read-out.
+ *
+ * `paginate` reports pages, which is what the product needs and the worst possible signal for
+ * finding out WHY it is wrong: a mold that estimates 7 and prints 5 has spread two pages of error
+ * across forty-seven nodes, and no node's share of it is visible in the total. Every correction to
+ * this ruler so far was found by bisecting page counts or by amplifying one node type ×240 — and
+ * amplification lies about anything with a vertical margin, because a run of forty headings
+ * collapses margins that a real document does not.
+ *
+ * This exposes the number the ruler actually charges each node, so a diagnostic can set it beside
+ * the height Chromium gives that same node and name the culprit directly. Pure, allocation-only,
+ * and used by scripts/diagnose-mold-ruler.mts — not on any product path.
+ */
+export function nodeHeightsPt(doc: CanvasDocument): Array<{ index: number; type: CanvasNode['type']; heightPt: number; atomic: boolean }> {
+  const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
+  const nodes = docNodes(doc);
+  if (nodes.some((n) => n.type === 'toc')) m.tocRows = collectTocRows(doc);
+  return nodes.map((n, index) => ({
+    index, type: n.type,
+    heightPt: n.type === 'page_break' ? 0 : nodeStackHeightPt(n, m),
+    atomic: ATOMIC_NODES.has(n.type),
+  }));
 }
 
 /** Extract plain text from any node type (for search + page estimation). */
