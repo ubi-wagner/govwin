@@ -32,6 +32,14 @@ One more caveat it prints rather than hides: a key can be present-but-null in ev
 which reads as "written" here. Presence is the contract this checks; a key whose emitter always
 writes null is a weaker signal and is called out separately.
 
+HOW TO CLEAR AN "UNCOVERED", AND THE ONE WAY THAT DOES NOT COUNT. Fire the trigger through its
+DOMAIN emitter — the accept route, the upload route, `provisionProposal`, whatever really produces it
+in the product. Do NOT fire it through `POST /api/admin/workflows`: that launcher emits the trigger
+with the OPERATOR'S OVERLAY as the payload, so the payload keys would be the ones you just typed.
+Checking those against the input_map is a tautology, and it would convert every UNCOVERED into a
+false "covered" — manufacturing exactly the evidence this lens exists to find. The launcher is a fine
+way to exercise a workflow; it is worthless as evidence about an emitter.
+
 A MISS IS A LEAD, NOT A VERDICT — confirm it against the emitter before believing it. Because the
 evidence is historical emissions, a miss has two possible causes and they look identical: the emitter
 genuinely never writes the key, or the emitter writes it NOW and every stored payload predates that.
