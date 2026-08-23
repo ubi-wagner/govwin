@@ -20,6 +20,13 @@
  *
  *   cd frontend && node scripts/drive-award-to-contract.mjs [proposalId]
  * Exit 0 if the win produced a contract; 1 otherwise.
+ *
+ * ⚠️ RUN THIS **BEFORE** `capture-guides.mjs`, NEVER AFTER.
+ *
+ * Recording a win MUTATES tenant state — the winning build moves `submitted → archived` and drops
+ * out of the dashboard's build grid. Capture the guides first and the screenshots show a world that
+ * no longer exists; the dashboard shot has now been invalidated twice this way, once in each
+ * direction. Any state-mutating drive belongs ahead of the capture, and the capture belongs last.
  */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
