@@ -40,9 +40,24 @@ su postgres -c "psql -tAc \"select 1 from pg_database where datname='govtech_int
 say "running migrations…"
 DATABASE_URL="$DBURL" node "$ROOT/db/migrations/migrate.mjs" 2>&1 | tail -1
 
+# 3b) ADMIN PASSWORDS — the step whose absence made every previous rehydrate half a restore.
+#
+# Migrations 124 and 198 deliberately rotate every seeded admin onto a random hash nobody holds,
+# so a freshly-migrated box has NO usable admin login. The tenant users keep their seeded password
+# (hence the banner below), which is why this gap hid: the box looks recovered, `kate.ulepic` signs
+# in, and then every ADMIN driver — capture-guides, verify-surfaces, the award drive, any e2e that
+# touches /admin — dies at the login form with a bare `/login?error=invalid`, which reads like
+# broken auth rather than a missing setup step. Resetting here is the local stand-in for what a
+# real operator does out-of-band after a deploy; it is sandbox-only and the script refuses a
+# non-local DB.
+say "resetting admin passwords…"
+DATABASE_URL_OWNER="$DBURL" node "$ROOT/scripts/sandbox-reset-passwords.mjs" 2>&1 | tail -1
+
 # 4) verify seed
 ATOMS=$(psql -h localhost -U govtech -d govtech_intel -tAc "select count(*) from library_atoms la join tenants t on t.id=la.tenant_id where t.slug='foundation'" 2>/dev/null || echo '?')
-say "foundation atoms: $ATOMS  (login: kate.ulepic@foundation3dp.com / DemoPass123!)"
+say "foundation atoms: $ATOMS"
+say "logins — tenant: kate.ulepic@foundation3dp.com / DemoPass123!"
+say "         admin:  eric@rfppipeline.com / \${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 
 # 5) build if missing
 if [ ! -f "$STANDALONE/server.js" ]; then

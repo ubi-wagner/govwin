@@ -294,7 +294,21 @@ commit is pushed. Recover: `git fetch origin && git reset --hard origin/<branch>
 for the current env):** the sandbox Postgres is now the **system PG16 cluster on :5432** (role
 `govtech`/`changeme`, db `govtech_intel`), NOT `/tmp/pgs_gov:5433`. After a reclaim, run
 **`bash frontend/scripts/rehydrate-sandbox.sh`** — it starts PG, ensures the role+db, runs migrations
-(169/170 self-seed the Foundation demo), builds if the standalone is gone, and stages `static`+`public`.
+(169/170 self-seed the Foundation demo), **resets the admin passwords**, builds if the standalone is
+gone, and stages `static`+`public`.
+
+> **The password step was missing until 2026-08-23, and its absence made every rehydrate half a
+> restore.** Migrations 124/198 rotate every seeded ADMIN onto a random hash nobody holds; the tenant
+> users keep their seeded password. So a rehydrated box looked recovered — `kate.ulepic` signed in
+> fine — and then every admin-driven harness (`capture-guides`, `verify-surfaces`, the award drive,
+> any `/admin` e2e) died at the login form with a bare `/login?error=invalid`, which reads like broken
+> auth rather than a missing setup step.
+>
+> **Two clusters exist and they are not interchangeable.** This recipe targets `:5432` as role
+> `govtech`; a `/tmp/pgs_gov:5433` cluster as role `claude` also exists and some sessions inherit it.
+> `rehydrate-sandbox.sh` only knows about `:5432` — on a `:5433` box you must migrate and reset
+> passwords by hand against that URL. Check which one you are on (`ss -ltnp | grep 543`) before
+> assuming the one-command path applies.
 Then launch **`frontend/scripts/health-manager.sh`** as a **background task**
 (`SCR=<scratchpad> INTERVAL=60 bash frontend/scripts/health-manager.sh` via run_in_background) — it pings
 server+DB+pad every 60s and auto-restarts the server/PG *within a live VM*. Neither can prevent or survive
