@@ -28,7 +28,13 @@ import postgres from 'postgres';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const DB = process.env.GUIDE_DB || 'postgresql://claude@127.0.0.1:5433/govtech_intel';
+// MUST be the database the SERVER under test is reading. This defaulted to the retired
+// :5433/claude cluster long after the sandbox moved to :5432, so every dynamic route was addressed
+// with an id bound from a DIFFERENT database than the app was serving: ids that happen to exist in
+// both rendered 200 and the sweep reported "clean", while a :5433-only id 404'd and looked like a
+// newly-broken page. The static routes were unaffected, which is exactly why it went unnoticed.
+// The DSN is echoed at startup now — an audit that will not say what it measured cannot be trusted.
+const DB = process.env.GUIDE_DB || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const APP = '/home/user/govwin/frontend/app';
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
@@ -58,6 +64,15 @@ function routesUnder(root, prefix) {
  * A binding that genuinely cannot be made carries a REASON, so the report distinguishes "the
  * sandbox has no such row" from "this route is addressed by something other than a table row".
  */
+/**
+ * Bind every dynamic segment to a REAL row — deterministically.
+ *
+ * Every LIMIT 1 here carries an explicit tiebreaker, and that is not pedantry. The seeded
+ * `source_profiles` all share one `created_at`, so `ORDER BY created_at DESC LIMIT 1` returned a
+ * different row run to run: one pass drove a profile that rendered, the next drove one that 404'd,
+ * and the sweep reported a "new broken surface" that was nothing but the row lottery. A verification
+ * tool whose results change without the code changing cannot be used to decide anything.
+ */
 async function bindings() {
   const [prop] = await sql`
     SELECT p.id, t.slug FROM proposals p JOIN tenants t ON t.id = p.tenant_id
@@ -69,24 +84,24 @@ async function bindings() {
   const [sol] = await sql`
     SELECT id FROM curated_solicitations WHERE solicitation_title IS NOT NULL
     ORDER BY (SELECT count(*) FROM opportunities o WHERE o.solicitation_id = curated_solicitations.id) DESC LIMIT 1`;
-  const [topic] = sol ? await sql`SELECT id FROM opportunities WHERE solicitation_id = ${sol.id} LIMIT 1` : [];
-  const [portal] = await sql`SELECT id FROM proposal_portals ORDER BY created_at DESC LIMIT 1`;
+  const [topic] = sol ? await sql`SELECT id FROM opportunities WHERE solicitation_id = ${sol.id} ORDER BY id ASC LIMIT 1` : [];
+  const [portal] = await sql`SELECT id FROM proposal_portals ORDER BY created_at DESC, id ASC LIMIT 1`;
   const [tenant] = await sql`SELECT id FROM tenants WHERE slug = 'foundation'`;
   // A tenant document lives in `tenant_documents` — there is no `documents` table.
-  const [tdoc] = await sql`SELECT id FROM tenant_documents ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
+  const [tdoc] = await sql`SELECT id FROM tenant_documents ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   // `/admin/site/[pageKey]` takes a SEED PAGE KEY, not a row id — the page redirects anything else.
   const [pageRow] = await sql`
     SELECT page_key FROM content_pages WHERE content_type = 'page' AND status = 'active'
-    ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
+    ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   // `/admin/site/docs/[type]/[slug]` is a content DOCUMENT — its type and its page_key.
   const [docPage] = await sql`
     SELECT content_type, page_key FROM content_pages
-    WHERE content_type <> 'page' ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
-  const [tmpl] = await sql`SELECT id FROM document_templates ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
-  const [src] = await sql`SELECT id FROM source_profiles ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
-  const [contract] = await sql`SELECT id FROM contracts ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
-  const [vault] = await sql`SELECT id FROM proposals WHERE archived_at IS NULL LIMIT 1`;
-  const [found] = await sql`SELECT id FROM library_atoms WHERE archived_at IS NULL LIMIT 1`;
+    WHERE content_type <> 'page' ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
+  const [tmpl] = await sql`SELECT id FROM document_templates ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
+  const [src] = await sql`SELECT id FROM source_profiles ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
+  const [contract] = await sql`SELECT id FROM contracts ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
+  const [vault] = await sql`SELECT id FROM proposals WHERE archived_at IS NULL ORDER BY id ASC LIMIT 1`;
+  const [found] = await sql`SELECT id FROM library_atoms WHERE archived_at IS NULL ORDER BY id ASC LIMIT 1`;
   return {
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, solId: sol?.id,
     topicId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
@@ -167,6 +182,7 @@ async function login(ctx, email, pw) {
   return p;
 }
 
+console.log(`· serving ${BASE} · binding ids from ${DB.replace(/:[^:@/]*@/, ':***@')}`);
 const B = await bindings();
 const bind = (route) => route.replace(/\[(\w+)\]/g, (_, k) => B[k] ?? '');
 /**

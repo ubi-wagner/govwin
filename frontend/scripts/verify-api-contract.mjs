@@ -150,6 +150,7 @@ async function login(ctx, email, pw) {
   return p;
 }
 
+console.log(`· serving ${BASE} · binding ids from ${DB.replace(/:[^:@/]*@/, ':***@')}`);
 const B = await bindings();
 const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[k] ?? `[${k}]`);
 const addressable = (r) => !/\[/.test(bind(r));

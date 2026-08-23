@@ -39,9 +39,15 @@ interface CockpitProps {
   basePath: string;
   role: Role;
   grants: { canSeeOpps: boolean; canManageBuckets: boolean };
+  /** The most recent builds to SHOW — a capped slice, not the whole set. */
   proposals: CockpitProposal[];
   pendingBuilds: PendingBuild[];
-  counts: { opps: number; todos: number; buckets: number; library: number };
+  /**
+   * `builds` is the TRUE number of active builds, which is not `proposals.length` — that array is
+   * capped for display. The summary line used to count the capped array, so a tenant with twelve
+   * builds was told they had six. A number a customer reads has to be the number.
+   */
+  counts: { opps: number; todos: number; buckets: number; library: number; builds: number };
   activity: Array<{ id: string; label: string; at: string }>;
   getStarted: React.ReactNode;
 }
@@ -83,7 +89,7 @@ export function Cockpit({
   ];
 
   const summary = [
-    `${proposals.length} active build${proposals.length === 1 ? '' : 's'}`,
+    `${counts.builds} active build${counts.builds === 1 ? '' : 's'}`,
     pendingBuilds.length ? `${pendingBuilds.length} in preparation` : null,
     grants.canSeeOpps ? `${counts.opps} opportunit${counts.opps === 1 ? 'y' : 'ies'}` : null,
     `${counts.todos} to-do${counts.todos === 1 ? '' : 's'}`,

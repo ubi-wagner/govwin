@@ -86,6 +86,11 @@ export default async function DashboardPage({
   const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
 
   // ── Accessible active proposals (the cockpit center) ──
+  // Two reads, deliberately: the LIST is capped at 6 for display, the COUNT is not. The cockpit
+  // summary used to say `proposals.length` active builds, which silently became "6 active builds"
+  // for any tenant with more than six — the page stating a number that was not the number.
+  const activeBuildCount = await count('builds', sql`
+    SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage <> 'archived'`);
   let proposals: { id: string; title: string; stage: string; isLocked: boolean }[] = [];
   try {
     proposals = await sql<{ id: string; title: string; stage: string; isLocked: boolean }[]>`
@@ -228,7 +233,7 @@ export default async function DashboardPage({
         grants={grants}
         proposals={proposals}
         pendingBuilds={pendingBuilds}
-        counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount }}
+        counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount, builds: activeBuildCount }}
         activity={activity}
         getStarted={getStarted}
       />

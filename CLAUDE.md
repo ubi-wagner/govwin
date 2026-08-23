@@ -258,6 +258,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   (1670 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **Four lenses on a running box** (`frontend/scripts/verify-*.mjs`, each driven as a real signed-in
+  actor, each `console`-reporting what it could NOT reach rather than skipping it silently):
+  `verify-surfaces` — every `page.tsx` under `app/admin` + `app/portal/[tenantSlug]` RENDERS (a 200
+  is not evidence: it reads the rendered text and collects `pageerror`/console throws);
+  `verify-api-contract` — every addressable GET honours the SOP envelope (`{data}` / `{error,code}`);
+  `verify-db-crud` — writes LAND (create/read/update/soft-delete, cross-tenant refusal, plus the two
+  silent-content-loss invariants: `proposal_sections.version` stays ahead of
+  `MAX(canvas_versions.version_number)`, and a stale `baseVersion` save is refused 409);
+  `verify-ui-vs-db` — the number the page STATES is the number the table HOLDS. The fourth exists
+  because the first three were all green while the dashboard told a customer with 8 builds they had
+  6 (B80). Its rule: the expectation must be the page's **own query, copied from its source** — a
+  predicate you believe is equivalent manufactures confident, wrong findings.
 - **Anything touching layout or export** additionally runs the six canvas measurement harnesses, which
   compare the product's own writers against the artifact that comes out (docs/TESTING_STRATEGY.md):
   `verify-ruler-on-proposals` and `verify-ruler-on-stored-artifacts` are the SAFETY GATES — the ruler
