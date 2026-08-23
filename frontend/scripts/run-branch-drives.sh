@@ -68,7 +68,7 @@ DRIVES=(
   "spine-anchor|scripts/drive-spine-t7-anchor.mts"
 )
 
-pass=0; fail=0; missing=0
+pass=0; fail=0; missing=0; cantrun=0
 declare -a FAILED
 
 printf '%-24s %-8s %s\n' "DRIVE" "RESULT" "DETAIL"
@@ -91,9 +91,20 @@ for entry in "${DRIVES[@]}"; do
   fi
   code=$?
 
+  # EXIT 2 MEANS "COULD NOT RUN", AND THAT IS NOT THE SAME AS A FINDING.
+  #
+  # A drive that cannot authenticate, or cannot find the fixture it needs, measures nothing — and
+  # a logged-out browser gets 401 on every route, which reads exactly like a deny-all. Collapsing
+  # the two is how `drive-rls-app` came to print "a DENY-ALL surfaced" having never logged in
+  # (docs/E2E_SWEEP_2026-08-23.md §3). Both still count against the suite — uncovered is not
+  # passing — but the table says which is which, because they need different fixes.
   if [ $code -eq 0 ]; then
     printf '%-24s %-8s %s\n' "$label" "pass" "$(wc -l < "$log") log lines"
     pass=$((pass+1))
+  elif [ $code -eq 2 ]; then
+    why=$(grep -A1 'CANNOT RUN' "$log" | tail -1 | sed 's/^ *//' | cut -c1-92)
+    printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "${why:-exit 2, no reason given}"
+    cantrun=$((cantrun+1)); FAILED+=("$label")
   else
     last=$(grep -vE '^\s*(at |$)' "$log" | tail -1 | cut -c1-96)
     printf '%-24s %-8s %s\n' "$label" "FAIL($code)" "$last"
@@ -102,7 +113,8 @@ for entry in "${DRIVES[@]}"; do
 done
 
 echo
-echo "── ${pass} passed · ${fail} failed · ${missing} missing ──"
+echo "── ${pass} passed · ${fail} failed · ${cantrun} could-not-run · ${missing} missing ──"
+echo "   (could-not-run measured NOTHING — it is uncovered, not passing, and not a finding)"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "logs for the failures:"
   for f in "${FAILED[@]}"; do echo "  $OUT/${f%% *}.log"; done
