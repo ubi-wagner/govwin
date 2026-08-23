@@ -1,11 +1,11 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-16 (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
+**Last updated:** 2026-08-23 (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
 **Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
 
 ---
 
-## 📍 Most recent work — the midterm end-to-end drive (2026-08-22, migration head **204**)
+## 📍 Most recent work — the midterm end-to-end drive (2026-08-22/23, migration head **205**)
 
 > **B51 is closed (mig 204).** An application used to raise two ToDos — the route's typed,
 > entity-linked `application_triage` row and an untyped, unlinked copy from a mig-040 automation
@@ -69,8 +69,65 @@
 > B67: I had reported the log clear using a grep that understood one of its **three** heading
 > conventions. **`node frontend/scripts/bug-log-status.mjs`** now reads the status from either end,
 > refuses to guess, and says *"5 deferred entries remain by choice — name them rather than calling the
-> log clear."* **Run it before claiming the log is clean.** The five deferred are B30, B33, B34, B35
-> and **B40 (high — a large solicitation is silently truncated at 500,000 characters)**.
+> log clear."* **Run it before claiming the log is clean.** As of B74 the log is **74 entries, 0
+> open, 2 deferred** — B30 and B33. (B34, B35 and B40 were all closed later in the same session;
+> the "five deferred" line this paragraph used to carry was true when written and is not now.)
+
+> ### B68–B74 — the ruler, the vocabulary, and the tool that was clearing SQL it never read
+>
+> **The page ruler now agrees with the page on every authored proposal, and the safety property is
+> measured rather than assumed.** Four defects on top of B64–B66:
+> **B69** — `flowMetrics` subtracted the running header and footer from the content box on top of
+> the margins, but `page.pdf` draws those templates INSIDE the margin: 72pt of a 648pt page, on
+> every page of every agency mold. Nothing caught it because all 28 calibration cases used the one
+> preset declaring `header: null, footer: null`, and two more passed override keys that are not
+> fields of `CanvasRules`, so they silently re-ran a case that already existed.
+> **B71** — every line of prose was measured at the declared `line_spacing` where the stylesheet
+> floors leading at 1.28: 11% short. Found only by measuring the eight authored NILOC volumes, and
+> B69 did not create that under-count — it removed the mask hiding it (2 of 8 under-counted before
+> the session, 4 after B69, **0 after B71**).
+> **B72** — the ruler charged margins the page collapses, inconsistently (a heading carried both of
+> its own, a paragraph carried none). `nodeMarginsPt` + collapsing in both stackers.
+> **B73** — `flowMetrics` read `c.font_default.size` on a canvas spec that has none. Three stored
+> TVSF volumes carry `{width,height,margins}` only, so the page-budget panel returned **HTTP 500 to
+> a tenant_admin opening her own volume** while the same volume downloaded as a correct PDF. The
+> exporters default every field they read; the ruler did not. Proven live before and after.
+> **B74** — `scripts/schema-check.mjs`, the tool CLAUDE.md tells you to run before writing SQL,
+> matched `` sql` `` and `` sqlBypass` `` only, so `sql<Array<{…}>>\`` — the form the SOP itself
+> writes — never matched. **767 of 2,174 blocks visible; 213 files skipped entirely and reported
+> clean.** It cleared a column that does not exist. Now 2,560 references verified across 683 files,
+> 0 findings, 0 new false positives.
+>
+> **The instruments are the deliverable. Run all four after anything touching layout or export:**
+>
+> | harness | what it measures |
+> |---|---|
+> | `scripts/verify-ruler-on-proposals.mts` | 8 authored NILOC volumes — the safety gate: never UNDER-count |
+> | `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
+> | `scripts/calibrate-page-ruler.mts` | 36 synthetic cases against Chromium's printed page count |
+> | `scripts/calibrate-slide-ruler.mts` | 7 deck cases against a real rendered `.pptx` |
+> | `scripts/sweep-mold-quality.mts` | all 39 shipped templates |
+>
+> When one disagrees, `scripts/diagnose-mold-ruler.mts --nodes / --segments / --pages` says WHY.
+> Do NOT amplify one node type ×N to find it — that method lies about anything with a vertical
+> margin. `__tests__/node-vocabulary-coverage.test.ts` is the always-on companion: every member of
+> the `NodeType` union through all four writers, typed `Record<NodeType, …>` so a new type without
+> a case is a compile error.
+>
+> **Current standing:** calibration 36 (4 within a stated ±1) · authored 8/8 exact · stored 36/37
+> exact · decks 7/7 · molds 39 clean, 5 over-count, **0 under-counts anywhere**. The five molds are
+> one measured cause, written up in B70: `CHAR_W` is a single constant for a font whose real advance
+> runs 0.41 on lowercase prose and 0.58 on acronyms (`scripts/measure-char-width.mts`).
+>
+> **Two operational traps that cost real time here:**
+> 1. **A `next-server` from an earlier session can still own :3000.** Check the process start time
+>    against `.next/BUILD_ID`'s mtime before believing any live result — two drives "proved the fix
+>    failed" while talking to yesterday's build.
+> 2. **`pkill -f "PORT=3001"` matches its own shell** and dies before killing anything (exit 144).
+>    Kill by PID.
+> 3. **`schema-check` against a stale database invents findings.** A sandbox at migration 163 vs a
+>    repo at 205 produced 24, all phantom. It now warns first — but if you see accusations, check
+>    the ledger before believing them.
 
 The last session ran the product start to finish **from a database holding nothing a user could
 have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
@@ -654,6 +711,12 @@ mkdir -p /tmp/pgs_sock && chown -R claude:claude /tmp/pgs_gov /tmp/pgs_sock
 su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
   -o '-p 5433 -k /tmp/pgs_sock' -l /tmp/pgs_gov/log start"
 psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 4 (incl. rfp-pipeline)
+
+# 1b. BRING THE SCHEMA UP. The surviving data dir is whatever the last session left; it was found
+#     at migration 163 against a repo at 205, which is enough to make schema-check invent 24
+#     findings and to hide 15 stored proposals from any sweep. Cheap, idempotent, always worth it:
+node db/migrations/migrate.mjs
+psql "$DATABASE_URL" -tAc "SELECT max(filename) FROM _migration_history"   # expect the repo head
 # ^ If pg_ctl fails with 'could not create lock file /var/run/postgresql/...: Permission
 #   denied', the -k socket dir isn't being honoured — it MUST point at a claude-writable
 #   path (e.g. /tmp/pgs_sock). psql over TCP (127.0.0.1:5433) still works regardless.
