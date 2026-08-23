@@ -19,6 +19,7 @@ import { requestAgentTask } from '@/lib/agent-client';
 import { extractCanvasText } from '@/lib/proposal-advance';
 import type { Role } from '@/lib/rbac';
 import { requestVisualReview, type VisualReviewOutcome } from '@/lib/proposal-visual-review';
+import { buildScopeDocument, planReviewTargets, scopedId, type ScopeLevel, type Selection } from '@/lib/canvas/scope';
 
 export type AiReviewSource = 'portal' | 'admin_doorbell';
 export type ReviewType = 'red_team' | 'pink_team' | 'gold_team';
@@ -38,16 +39,162 @@ export interface RequestAiReviewParams {
    * budget that caused the failure in the first place.
    */
   onlySectionIds?: string[];
+  /**
+   * Aim the review at ONE scope instead of fanning out over every section.
+   *
+   * Omitting it takes the untouched section fan-out below — same query, same loop, same row,
+   * `scope_level` left NULL. That is deliberate: the fan-out is a live path, and the way to be
+   * sure a new feature did not disturb it is to not run its code at all.
+   *
+   * `sectionId` here is the section the CALLER is looking at, used to disambiguate a raw node id
+   * coming from the per-section editor (the fluid surface sends assembled `<sectionId>__<nodeId>`
+   * ids; the section editor sends raw ones).
+   */
+  scope?: Selection & { sectionId?: string };
 }
 
 export interface RequestAiReviewResult {
   enqueued: number;
   /** The visual pass that ran alongside the per-section text reviewers. */
   visual?: VisualReviewOutcome;
+  /** Present only for a scoped request — what the reviewer was actually pointed at. */
+  scope?: { level: ScopeLevel; label: string; sectionId: string; pages: { start: number; end: number } | null };
+}
+
+/**
+ * The scoped path: ONE reviewer, pointed at one rung of the ladder.
+ *
+ * Resolution happens against `buildScopeDocument`, NOT `assembleProposalDocument`. The latter
+ * flattens every section's nodes into one list because that is what RENDERING a fluid document
+ * needs — and flattening destroys exactly what scoping addresses. Measured live before this was
+ * corrected: a group scope and a section scope both resolved to `document`, so "review this
+ * figure" queued a review of the entire proposal.
+ *
+ * Node and group ids in the scope document are `<sectionId>__<localId>` — the same convention the
+ * fluid canvas already renders, so an id from that surface needs no translation, and one from the
+ * per-section editor needs only `scopedId`.
+ *
+ * Returns null when the scope resolves to nothing reviewable, so the caller can say so instead of
+ * reporting a queued review that will never produce a comment.
+ */
+async function queueScopedReview(
+  p: RequestAiReviewParams, reviewType: ReviewType,
+): Promise<{ enqueued: number; scope: RequestAiReviewResult['scope'] } | null> {
+  // Field names are camelCase to match postgres.js's global `toCamel` transform — a snake_case
+  // `sql<typeof rows>` assertion compiles and reads `undefined` at runtime (CLAUDE.md's #1 crash
+  // class). The ORDER BY is COPIED from the document route, not re-derived: assembly order decides
+  // which section a wide scope files against, and two orderings that "should" agree is exactly how
+  // a confident, wrong answer gets built.
+  let sections: Array<{
+    id: string; title: string | null; content: string | null; volumeName: string | null;
+  }> = [];
+  try {
+    sections = await sql<typeof sections>`
+      SELECT ps.id, ps.title, ps.content, ps.volume_name
+      FROM proposal_sections ps
+      WHERE ps.proposal_id = ${p.proposalId}::uuid
+      ORDER BY ps.volume_number ASC NULLS LAST, ps.sort_index ASC NULLS LAST, ps.section_number ASC`;
+  } catch (e) {
+    console.error('[requestAiReview] scoped section fetch failed', e);
+    return null;
+  }
+  if (!sections.length) return null;
+
+  const doc = buildScopeDocument(sections);
+
+  // The per-section editor sends a RAW node/group id; the fluid surface sends the scoped one. Try
+  // the id as given, then as it is keyed inside the section the caller says it is looking at.
+  const known = new Set<string>();
+  for (const s of doc.sections ?? []) {
+    for (const g of s.groups ?? []) {
+      known.add(g.id);
+      for (const n of g.nodes ?? []) known.add(n.id);
+    }
+  }
+  const sel: Selection = { ...p.scope };
+  const sectionHint = p.scope?.sectionId;
+  if (sectionHint) {
+    if (sel.nodeId && !known.has(sel.nodeId)) sel.nodeId = scopedId(sectionHint, sel.nodeId);
+    if (sel.groupId && !known.has(sel.groupId)) sel.groupId = scopedId(sectionHint, sel.groupId);
+  }
+  // `sectionId` is BOTH the disambiguating hint above and, on its own, a section-level scope. Once
+  // it has been used as a hint for a narrower selection it must not also widen the scope to the
+  // section — the innermost thing the caller named is what they asked for.
+  if (sel.nodeId || sel.groupId) delete sel.sectionId;
+
+  const targets = planReviewTargets(doc, sel, { sectionIdFallback: sectionHint ?? sections[0].id });
+  if (!targets.length) return null;
+
+  let enqueued = 0;
+  let landed: RequestAiReviewResult['scope'];
+  for (const t of targets) {
+    const taskId = await requestAgentTask({
+      tenantId: p.tenantId,
+      agentRole: 'color_team_reviewer',
+      taskType: 'review_section',
+      proposalId: p.proposalId,
+      sectionId: t.sectionId,
+      scopeLevel: t.scopeLevel,
+      scopeRef: t.scopeRef,
+      input: {
+        requested_by: p.actorId,
+        requestedBy: p.actorId,
+        // The reviewer is told WHAT it is looking at, not just its section's name. "Figure 3 in
+        // Technical Approach" and "Technical Approach" ask for different reviews.
+        section_title: t.label,
+        sectionTitle: t.label,
+        section_text: t.text,
+        sectionText: t.text,
+        review_type: reviewType,
+        reviewType,
+        category: 'review',
+        // Echoed into the finding's anchor by the pipeline write-back, so the comment lands
+        // pinned to the same thing the reviewer read.
+        scope_level: t.scopeLevel,
+        scope_ref: t.scopeRef,
+        scope_label: t.label,
+      },
+    });
+    if (taskId) {
+      enqueued++;
+      landed = { level: t.scopeLevel, label: t.label, sectionId: t.sectionId, pages: t.pages };
+    }
+  }
+  return { enqueued, scope: landed };
 }
 
 export async function requestAiReview(p: RequestAiReviewParams): Promise<RequestAiReviewResult> {
   const reviewType: ReviewType = p.reviewType ?? 'red_team';
+
+  // ── SCOPED: one reviewer, one rung ───────────────────────────────────────────────────────────
+  // Returns before the fan-out below ever runs. The unscoped path is therefore not merely
+  // unchanged in behaviour — it is unchanged code on an unchanged branch, which is a stronger
+  // guarantee than "I checked and it still works".
+  if (p.scope) {
+    const scoped = await queueScopedReview(p, reviewType);
+    const enqueued = scoped?.enqueued ?? 0;
+    const payload = {
+      proposalId: p.proposalId, proposal_id: p.proposalId, tenant_id: p.tenantId,
+      reviewType, enqueued, source: p.source,
+      scopeLevel: scoped?.scope?.level ?? null, scopeLabel: scoped?.scope?.label ?? null,
+    };
+    const startId = await emitEventStart({
+      namespace: 'proposal', type: 'ai_review.requested',
+      actor: userActor(p.actorId, p.actorEmail ?? undefined), tenantId: p.tenantId, payload,
+    });
+    await emitEventEnd(startId, { result: payload });
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role, activity_type, details)
+        VALUES (${p.proposalId}::uuid, ${p.tenantId}::uuid, ${p.actorId}::uuid,
+                ${p.actorEmail ?? null}, ${p.role}, 'ai_review_requested',
+                ${sql.json({ reviewType, enqueued, source: p.source, scope: scoped?.scope ?? null })})`;
+    } catch (logErr) {
+      console.error('[requestAiReview] scoped activity log failed', logErr);
+    }
+    return { enqueued, ...(scoped?.scope ? { scope: scoped.scope } : {}) };
+  }
 
   // Every section with content — a manual review can run pre-lock (unlike on-advance, which
   // reviews the accepted/locked content). Empty canvases are skipped after text extraction.

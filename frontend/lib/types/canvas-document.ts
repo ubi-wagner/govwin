@@ -1317,9 +1317,30 @@ export interface SectionPageInfo {
   overBudget: boolean;
 }
 
+/**
+ * Which page a single node landed on — the ruler's answer to the question it always knew and never
+ * wrote down.
+ *
+ * `perSection` cannot answer it for the documents the product actually STORES. Every stored section
+ * canvas and every assembled proposal document is FLAT (`nodes`, no `sections` — verified against
+ * the live schema), so `toSections()` synthesises sections whose ids are `crypto.randomUUID()`:
+ * freshly minted on every call, matching nothing in the document. Anything trying to resolve "what
+ * is on pages 3–5" through `perSection` therefore matched nothing at all, silently.
+ *
+ * A node that outgrows a page reports a RANGE, and every node inside a `keep_together` group or
+ * section reports the whole block's range — because that is what happens to them on the page.
+ */
+export interface NodePageInfo {
+  id: string;
+  startPage: number;
+  endPage: number;
+}
+
 export interface LayoutResult {
   totalPages: number;
   perSection: SectionPageInfo[];
+  /** Page span of every node, in document order. Additive — no measurement depends on it. */
+  perNode: NodePageInfo[];
   /** the frame's max_pages cap and whether the layout exceeds it. */
   vsMaxPages: { max: number | null; over: boolean };
 }
@@ -1379,6 +1400,10 @@ export function paginate(doc: CanvasDocument): LayoutResult {
   const usableH = m.usableH;
   const sections = toSections(doc);
   const perSection: SectionPageInfo[] = [];
+  const perNode: NodePageInfo[] = [];
+  /** Record a node's span. Called at every point a node's page is decided; never influences one. */
+  const mark = (node: CanvasNode, startPage: number) =>
+    perNode.push({ id: node.id, startPage, endPage: page });
 
   let page = 1;
   let y = 0; // points consumed on the current page
@@ -1412,9 +1437,13 @@ export function paginate(doc: CanvasDocument): LayoutResult {
   // rather than filled in behind the prose. Under the old guard the ruler read 2 for both — so any
   // volume with a long table under a paragraph, which is most of them, was under-counted at the
   // exact gate meant to catch it.
+  // Returns the page the block STARTED on. The return value is new; the behaviour is not — the
+  // relocate-then-flow decision below is byte-for-byte what it was, and `perNode` only reads it.
   const fitKeep = (h: number) => {
     if (y > 0 && y + h > usableH) newPage();
+    const from = page;
     advance(h);
+    return from;
   };
 
   sections.forEach((section, i) => {
@@ -1423,16 +1452,19 @@ export function paginate(doc: CanvasDocument): LayoutResult {
     if (section.layout?.mode === 'keep_together') {
       // stackHeightPt collapses within the block; the pending margin from before it is spent here.
       advance(prevBottom); prevBottom = 0;
-      fitKeep((section.groups ?? []).reduce((s, g) => s + stackHeightPt(g.nodes ?? [], m), 0));
+      const from = fitKeep((section.groups ?? []).reduce((s, g) => s + stackHeightPt(g.nodes ?? [], m), 0));
+      // The whole section moved as one block, so every node in it shares the block's span.
+      for (const g of section.groups ?? []) for (const nd of g.nodes ?? []) mark(nd, from);
     } else {
       for (const group of section.groups ?? []) {
         if (group.keep_together) {
           advance(prevBottom); prevBottom = 0;
-          fitKeep(stackHeightPt(group.nodes ?? [], m));
+          const from = fitKeep(stackHeightPt(group.nodes ?? [], m));
+          for (const nd of group.nodes ?? []) mark(nd, from);
           continue;
         }
         for (const node of group.nodes ?? []) {
-          if (node.type === 'page_break') { if (y > 0) newPage(); prevBottom = 0; continue; }
+          if (node.type === 'page_break') { if (y > 0) newPage(); prevBottom = 0; mark(node, page); continue; }
           // The gap above this node: its own top margin COLLAPSED with the previous node's bottom
           // one, not the sum of the two. Spent before the fit decision, because a figure that no
           // longer fits once the gap is on the page is a figure the renderer relocates.
@@ -1453,8 +1485,10 @@ export function paginate(doc: CanvasDocument): LayoutResult {
           // This is the third time the same class of defect has surfaced (a flat height for every
           // image; a footer token nothing substituted; captions borrowed from alt text) and the
           // shape is always the same — a model of the page that quietly disagrees with the page.
-          if (ATOMIC_NODES.has(node.type)) { fitKeep(nodeStackHeightPt(node, m)); continue; }
+          if (ATOMIC_NODES.has(node.type)) { mark(node, fitKeep(nodeStackHeightPt(node, m))); continue; }
+          const from = page;
           advance(nodeStackHeightPt(node, m));
+          mark(node, from);
         }
       }
     }
@@ -1468,7 +1502,7 @@ export function paginate(doc: CanvasDocument): LayoutResult {
   });
 
   const max = doc.canvas?.max_pages ?? null;
-  return { totalPages: page, perSection, vsMaxPages: { max, over: max != null && page > max } };
+  return { totalPages: page, perSection, perNode, vsMaxPages: { max, over: max != null && page > max } };
 }
 
 /**
