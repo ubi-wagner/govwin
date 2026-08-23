@@ -720,15 +720,77 @@ function flowMetrics(raw: CanvasDocument['canvas']) {
   // volume, had not. A local workaround repeated four times is the shape of a fact that belongs
   // one level up; those four are now no-ops and left in place as documentation.
   const bodyLineH = fs * Math.max(c.line_spacing, 1.28);
-  const CHAR_W = 0.45; // avg proportional glyph width as a fraction of font size (calibrated to the exporter)
-  const cpl = Math.max(1, Math.floor(usableW / (fs * CHAR_W)));
+  // ONE CONSTANT CANNOT STAND IN FOR A FONT WHOSE ADVANCE DEPENDS ON THE WORDS.
+  //
+  // `CHAR_W` was 0.45 for every text in the product. Measured against Chromium on 40-line
+  // paragraphs at two font sizes (scripts/measure-char-width.mts and the uppercase sweep behind
+  // B76), Times New Roman's average advance is very nearly linear in the UPPERCASE FRACTION of the
+  // text and independent of size:
+  //
+  //     upper   0.00   0.08   0.24   0.44   0.64   0.79   1.00
+  //     CHAR_W  0.414  0.427  0.455  0.488  0.526  0.552  0.588
+  //
+  // So a single 0.45 ran ~8% CONSERVATIVE on lowercase narrative — the mold over-counts — and
+  // ~20% OPTIMISTIC on acronym-dense text, which is an UNDER-count, the direction that clears a
+  // volume the printer rejects. A cover sheet or compliance matrix full of agency acronyms is
+  // exactly that text, and nothing had ever measured it.
+  //
+  // `glyphAdvance` is that line with a uniform ~3% safety margin on top, so every register is
+  // slightly conservative instead of one being conservative and another optimistic.
+  const cpl = cplFor(getUpperFraction(''), usableW, fs);   // the all-lowercase default, for callers with no text
   // tocRows is filled in by paginate(), which can see the whole document; a per-node ruler cannot.
   // See the 'toc' case in nodeStackHeightPt.
-  return { usableW, usableH, fs, bodyLineH, CHAR_W, cpl, tocRows: undefined as TocRow[] | undefined };
+  return { usableW, usableH, fs, bodyLineH, cpl, tocRows: undefined as TocRow[] | undefined };
+}
+
+/** Fraction of the letters in `s` that are uppercase — the one feature the advance depends on. */
+function getUpperFraction(s: string): number {
+  let letters = 0, upper = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 65 && c <= 90) { letters++; upper++; }
+    else if (c >= 97 && c <= 122) letters++;
+  }
+  return letters ? upper / letters : 0;
+}
+
+/**
+ * Average glyph advance for a text, as a fraction of the font size (B76).
+ *
+ * Fitted to the measured sweep above — 0.414 at all-lowercase, 0.588 at all-caps — times a margin.
+ *
+ * THE MARGIN IS 8% AND THAT NUMBER IS THE FINDING. A paragraph's realised advance sits above the
+ * 40-line average often enough to matter: at 3% the authored NILOC corpus produced an UNDER-count
+ * (cadence-technical, 5 modelled against 6 printed) and the gate refused the change. 6% cleared all
+ * eight, 8% clears them with room that is not tuned to those eight documents.
+ *
+ * What that means is worth stating plainly, because it refutes the reason this model was written:
+ * at 8%, all-lowercase lands on 0.451 — the SAME value as the single constant it replaces. The mold
+ * over-counts therefore CANNOT be closed this way; the headroom that keeps real prose safe is
+ * exactly what makes a bracket-heavy template read long. What the model does close is the other
+ * end: acronym-dense text is now ~33% more conservative than the constant, which was UNDER-counting
+ * it — a cover sheet or compliance matrix full of agency identifiers is precisely that text, and
+ * nothing had ever measured it.
+ *
+ * Never lower the intercept or the margin without re-running the sweep AND both under-count gates.
+ * Below the measured value the ruler under-counts, and an under-count at the export gate clears a
+ * volume that is over its agency page limit.
+ */
+function glyphAdvance(text: string): number {
+  const SAFETY = 1.08;
+  return (0.414 + 0.174 * getUpperFraction(text)) * SAFETY;
+}
+
+/** Characters that fit on one line of `text` at `fs`, across `widthPt`. */
+function cplFor(textOrUpper: string | number, widthPt: number, fs: number): number {
+  const adv = typeof textOrUpper === 'number'
+    ? (0.414 + 0.174 * textOrUpper) * 1.03
+    : glyphAdvance(textOrUpper);
+  return Math.max(1, Math.floor(widthPt / (fs * adv)));
 }
 
 /** One rendered contents-list entry: its indent level and the length of its label. */
-interface TocRow { level: number; len: number }
+interface TocRow { level: number; len: number; upper: number }
 
 /** The headings a `toc` node will render, in document order (mirrors canvas-html::buildTocHtml). */
 function collectTocRows(doc: CanvasDocument): TocRow[] {
@@ -738,7 +800,8 @@ function collectTocRows(doc: CanvasDocument): TocRow[] {
       if (n.type !== 'heading') continue;
       const c = n.content as HeadingContent | undefined;
       const num = c?.numbering ? `${c.numbering} ` : '';
-      rows.push({ level: c?.level ?? 1, len: (num + (c?.text ?? '')).length });
+      const label = num + (c?.text ?? '');
+      rows.push({ level: c?.level ?? 1, len: label.length, upper: getUpperFraction(label) });
     }
   };
   if (doc.sections?.length) {
@@ -804,7 +867,7 @@ function nodeMarginsPt(node: CanvasNode): { top: number; bottom: number } {
 
 /** nodeStackHeightPt returns the node's BOX — margins are `nodeMarginsPt`, collapsed by the caller. */
 function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>): number {
-  const { usableW, fs, bodyLineH, CHAR_W, cpl } = m;
+  const { usableW, fs, bodyLineH, cpl } = m;
   const linesFor = (chars: number, per: number) => Math.max(1, Math.ceil(chars / per));
   switch (node.type) {
     case 'page_break':
@@ -837,8 +900,7 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       let h = TOC_LABEL_PT;          // the <nav>'s 4pt/14pt margins are nodeMarginsPt's
       for (const r of rows) {
         const w = Math.max(1, usableW - (r.level - 1) * 20);
-        const per = Math.max(1, Math.floor(w / (fs * CHAR_W)));
-        h += linesFor(r.len, per) * line + TOC_ENTRY_PAD_PT;
+        h += linesFor(r.len, cplFor(r.upper, w, fs)) * line + TOC_ENTRY_PAD_PT;
       }
       return h;
     }
@@ -861,11 +923,12 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       const level = (node.content as HeadingContent).level ?? 1;
       const scale = level <= 1 ? 1.34 : level === 2 ? 1.14 : 1.02;
       const hfs = fs * scale;
-      const hcpl = Math.max(1, Math.floor(usableW / (hfs * CHAR_W)));
+      const htext = getNodeText(node);
+      const hcpl = cplFor(htext, usableW, hfs);
       // The 20/5 · 14/4 · 11/3 margins live in nodeMarginsPt so they can COLLAPSE against the
       // paragraph above. Charged here they were added to that paragraph's own bottom margin, which
       // is not what the page does.
-      return linesFor(getNodeText(node).length, hcpl) * hfs * 1.22;
+      return linesFor(htext.length, hcpl) * hfs * 1.22;
     }
     case 'image':
     case 'chart': {
@@ -934,7 +997,8 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
         const declaredWpt = typeof c?.width === 'number' && c.width > 0 ? c.width * 0.75 : usableW;
         const textW = Math.max(1, declaredWpt - PAD_PT);
         const alt = typeof (c as { alt_text?: unknown })?.alt_text === 'string' ? (c as { alt_text: string }).alt_text : '';
-        const lines = linesFor((alt || 'Image').length, Math.max(1, Math.floor(textW / (fs * CHAR_W))));
+        const altText = alt || 'Image';
+        const lines = linesFor(altText.length, cplFor(altText, textW, fs));
         const natural = PAD_PT + BORDER_PT + lines * bodyLineH;
         // A declared height is a `max-height` on this box, so it can only make it SHORTER.
         const capped = typeof c?.height === 'number' && c.height > 0 ? Math.min(natural, c.height * 0.75) : natural;
@@ -1023,7 +1087,9 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       const maxChars = Array.from({ length: cols }, (_, i) =>
         Math.max(1, ...allRows.map((r) => cellText(r?.[i]).length)));
       const textWidth = Math.max(1, usableW - cols * CELL_SIDE_PAD_PT);
-      const capacity = textWidth / (TABLE_FS * CHAR_W);           // the whole row, in characters
+      // The table's own register: a milestone table of prose wraps differently from one of acronyms.
+      const tableText = allRows.map((r) => (r ?? []).map(cellText).join(' ')).join(' ');
+      const capacity = textWidth / (TABLE_FS * glyphAdvance(tableText));   // the whole row, in characters
       const sumMin = minChars.reduce((a, b) => a + b, 0);
       const sumMax = maxChars.reduce((a, b) => a + b, 0);
       const cplPerCol = sumMax <= capacity
@@ -1095,18 +1161,21 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       const lineH = fs * Math.max(m.bodyLineH / fs, 1.28);
       const walk = (list: ListContent['items'], depth: number): number => {
         const w = Math.max(1, usableW - LIST_INDENT_PT * (depth + 1));
-        const per = Math.max(1, Math.floor(w / (fs * CHAR_W)));
         let h = 0;
         for (const it of list ?? []) {
-          h += linesFor((it?.text ?? '').length, per) * lineH + ITEM_GAP_PT;
+          const itText = it?.text ?? '';
+          h += linesFor(itText.length, cplFor(itText, w, fs)) * lineH + ITEM_GAP_PT;
           if (it?.children?.length) h += walk(it.children, depth + 1);
         }
         return h;
       };
       return items.length ? walk(items, 0) : bodyLineH;   // the ul/ol 8pt bottom is nodeMarginsPt's
     }
-    default:
-      return linesFor(getNodeText(node).length, cpl) * bodyLineH; // flow text
+    default: {
+      // Flow text measured at ITS OWN advance, not one constant for the whole product (B76).
+      const t = getNodeText(node);
+      return linesFor(t.length, t ? cplFor(t, usableW, fs) : cpl) * bodyLineH;
+    }
   }
 }
 
