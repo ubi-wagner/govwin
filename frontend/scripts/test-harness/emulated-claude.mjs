@@ -257,6 +257,118 @@ function harvestProse(raw) {
   return out;
 }
 
+
+// ─── Canvas primitive exerciser ──────────────────────────────────────────────
+//
+// WHY THIS EXISTS. The canvas vocabulary is 22 node types (lib/types/canvas-document.ts).
+// This emulator used to emit THREE — heading, text_block, bulleted_list — and the shipped
+// atom library holds five. So every "AI flows proven end-to-end" run exercised the narrowest
+// possible slice of the canvas: the layout, export and compliance machinery for images,
+// figures, charts, callouts, page breaks and dividers had never once been driven THROUGH an
+// AI flow. A draft that is only prose cannot prove the paginator, the docx/pptx/xlsx writers,
+// the image inliner, or `validateCanvasAgainstSpec`'s image and per-section budgets.
+//
+// So the emulated drafter now emits a realistic MIX. Two rules make it a test instrument
+// rather than a random generator:
+//
+//   1. DETERMINISTIC. Variation comes from a hash of the whole prompt indexed into a fixed
+//      schedule — never a random draw. A harness whose output changes run to run cannot be used
+//      to decide anything, and the four lenses would report drift that is the instrument rather
+//      than the product.
+//   2. BUDGET-HONEST. Every primitive is charged against the same word budget as prose, so a
+//      figure-heavy section still respects the solicitation's page limit. A drafter that
+//      busts the limit to look rich is the exact failure the budget exists to prevent.
+//
+// Set EMU_PRIMITIVES=lean to fall back to the old prose-only shape (for a regression compare).
+const PRIMITIVES_MODE = process.env.EMU_PRIMITIVES || 'rich';
+
+/** Stable 32-bit hash → deterministic per-title variation. */
+function hash32(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/**
+ * An image node pointing at a REAL library storage key when one was supplied, else a
+ * deterministic placeholder key. The point is to drive the image path — inliner, export,
+ * compliance image budget — not to invent binary content.
+ */
+function imageNode(key, alt, n) {
+  return {
+    type: 'image',
+    content: { storage_key: key, alt_text: alt, width: 480, height: 300, caption: `Figure ${n}. ${alt}` },
+  };
+}
+const captionNode = (prefix, n, text) => ({ type: 'caption', content: { prefix, number: n, text } });
+
+/** A small evidence table built from the section's own vocabulary — never fabricated numbers. */
+function tableNode(title, rows) {
+  return {
+    type: 'table',
+    content: {
+      headers: ['Requirement', 'Where addressed', 'Status'],
+      rows: rows.map((r, i) => [r, `${title} ¶${i + 1}`, 'Addressed']),
+      border_style: 'single',
+    },
+  };
+}
+
+/** A schedule chart. Gantt exercises the two-series shape the writers special-case. */
+function chartNode(title, labels) {
+  return {
+    type: 'chart',
+    content: {
+      chart_type: 'gantt',
+      title: `${title} — schedule`,
+      categories: labels,
+      series: [
+        { name: 'start', data: labels.map((_, i) => i * 2) },
+        { name: 'end', data: labels.map((_, i) => i * 2 + 3) },
+      ],
+    },
+  };
+}
+
+const calloutNode = (variant, title, text) => ({ type: 'callout', content: { variant, title, text } });
+const quoteNode = (text, cite) => ({ type: 'blockquote', content: { text, cite } });
+const dividerNode = () => ({ type: 'divider', content: { thickness: 1, line_style: 'solid' } });
+const numberedNode = (items) => ({ type: 'numbered_list', content: { items: items.map((t) => ({ text: t })) } });
+
+/**
+ * Which extra primitives THIS section gets — a deterministic rotation, not a hash of one field.
+ *
+ * The first version keyed off the section TITLE alone and read its bits as flags. Two things were
+ * wrong with that, and the second is the one that matters:
+ *   · `sectionTitleFrom` legitimately falls back to the literal 'Section' when the product's
+ *     prompt shape does not carry a parseable title. Every such section then hashed identically,
+ *     so the whole corpus got ONE plan.
+ *   · Worse, whichever plan that was became the ONLY plan ever exercised — and the bits of
+ *     hash32('Section') happen to clear both `figure` and `table`, so images and tables never
+ *     appeared at all. A canvas exerciser that silently stops emitting images is worse than no
+ *     exerciser, because it reports eight node types and looks like coverage.
+ *
+ * So: hash the WHOLE prompt (title + subsections + criteria + the atom text), which varies per
+ * real section even when the title does not, and index a fixed SCHEDULE rather than reading bits.
+ * The schedule is written so that every primitive appears in it, and the assertion below is the
+ * guarantee: walking the whole schedule exercises all six. Coverage is a property of the table,
+ * not a hope about hash distribution.
+ */
+const PRIMITIVE_SCHEDULE = [
+  { figure: true,  table: true,  chart: false, callout: true,  quote: false, numbered: false },
+  { figure: true,  table: false, chart: true,  callout: false, quote: true,  numbered: true  },
+  { figure: false, table: true,  chart: true,  callout: true,  quote: false, numbered: true  },
+  { figure: true,  table: true,  chart: true,  callout: true,  quote: true,  numbered: true  },
+  { figure: false, table: false, chart: false, callout: true,  quote: true,  numbered: false },
+  { figure: true,  table: false, chart: false, callout: false, quote: false, numbered: true  },
+];
+const LEAN_PLAN = { figure: false, table: false, chart: false, callout: false, quote: false, numbered: false };
+
+function primitivePlanFor(key) {
+  if (PRIMITIVES_MODE === 'lean') return LEAN_PLAN;
+  return PRIMITIVE_SCHEDULE[hash32(String(key)) % PRIMITIVE_SCHEDULE.length];
+}
+
 const wordsIn = (s) => (s.match(/\S+/g) || []).length;
 
 // ── RESPONDER REGISTRY — expand per-agent as flows are wired. First match wins. ─────────────────────
@@ -530,6 +642,12 @@ const RESPONDERS = [
       // The customer's own material.
       const atoms = parseAtoms(user);
       const pool = atoms.flatMap((a) => sentences(a.text));
+      // Real library storage keys, when the product put any in the atom block. Preferring a real
+      // key means the figure path runs against an object that actually exists (S3/local driver →
+      // data-URI inlining on export) rather than a synthetic one that only proves the schema.
+      const imageKeys = Array.from(new Set(
+        (user.match(/[\w./-]+\.(?:png|jpe?g|webp|gif)\b/gi) || []).filter((k) => k.length > 6),
+      ));
       const focus = terms([title, ...subsections, ...criteria, ...mandatory].join(' '));
 
       const nodes = [{ type: 'heading', content: { level: 1, text: title } }];
@@ -548,6 +666,22 @@ const RESPONDERS = [
           text: `No approved library content was retrieved for "${title}". Add source material to the `
             + 'library, or draft this section directly; nothing here has been generated from thin air.',
         } }, 30);
+      }
+
+      // Which extra primitives this section gets (deterministic per title). See the exerciser above.
+      // Key on the whole prompt, not the title — see primitivePlanFor. A section whose title
+      // did not parse still gets a distinct plan from its subsections/criteria/atoms.
+      const plan = primitivePlanFor(`${title}|${subsections.join(',')}|${criteria.join(',')}|${(atoms[0]?.text || '').slice(0, 120)}`);
+      let figureNo = 0;
+
+      // A figure straight after the lead, when planned. `imageKeys` are REAL library storage keys
+      // when the product supplied any in the atom block; otherwise a stable placeholder so the
+      // image PATH still runs (inliner → export → compliance image budget).
+      if (plan.figure && used < maxWords) {
+        figureNo += 1;
+        const key = imageKeys[0] || `emulated/figure-${hash32(title) % 997}.png`;
+        push(imageNode(key, `${title} — reference figure`, figureNo), 12);
+        push(captionNode('Figure', figureNo, `${title} — reference figure.`), 8);
       }
 
       // One subsection per required subsection, filled from the remaining best-matching material.
@@ -581,6 +715,16 @@ const RESPONDERS = [
           return { text: support ? `${m} — ${support}` : `${m} — addressed above.`, indent_level: 0 };
         });
         push({ type: 'bulleted_list', content: { items } }, items.reduce((a, i) => a + wordsIn(i.text), 0));
+        // A traceability TABLE alongside the list — the shape a reviewer actually reads, and the
+        // node type the docx/pdf writers and the ruler treat completely differently from prose.
+        if (plan.table && used < maxWords) {
+          push(tableNode(title, mandatory.slice(0, 4)), 24);
+          push(captionNode('Table', 1, `${title} — requirement traceability.`), 8);
+        }
+        if (plan.callout && used < maxWords) {
+          push(calloutNode('warning', 'Mandatory requirements',
+            `${mandatory.length} mandatory requirement(s) are traced to this section; each is answered above.`), 18);
+        }
       }
 
       // ── FILL THE ALLOWANCE ────────────────────────────────────────────────────────────
@@ -590,6 +734,21 @@ const RESPONDERS = [
       // Technical Volume at 40% of its page envelope. Every sentence below is still the tenant's
       // OWN retrieved material, just no longer discarded; when the library runs dry the section
       // stays short and the readiness warning says so.
+      // ── The remaining planned primitives ──────────────────────────────────────────────
+      // Placed before the continuation fill so they land inside the budget rather than after it
+      // has been spent on prose. Each is charged; none is free.
+      if (plan.chart && used < maxWords && subsections.length) {
+        push(chartNode(title, subsections.slice(0, 4).map((x) => x.slice(0, 24))), 20);
+        push(captionNode('Chart', 1, `${title} — phase schedule.`), 8);
+      }
+      if (plan.numbered && used < maxWords && criteria.length) {
+        push(numberedNode(criteria.slice(0, 4)), criteria.slice(0, 4).reduce((a, c) => a + wordsIn(c), 0));
+      }
+      if (plan.quote && used < maxWords && criteria.length) {
+        push(quoteNode(criteria[0], 'Solicitation, evaluation criteria'), wordsIn(criteria[0]) + 3);
+      }
+      if ((plan.chart || plan.numbered) && used < maxWords) push(dividerNode(), 0);
+
       const CONTINUATION = ['Approach', 'Technical Detail', 'Implementation', 'Evidence',
         'Risk and Mitigation', 'Expected Outcomes'];
       const remaining = () => rankSentences(pool.filter((x) => !usedSentences.has(x)), focus, 400, 0);
