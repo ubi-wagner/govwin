@@ -25,6 +25,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import postgres from 'postgres';
+import { countErrorSurfaces } from './lib/error-surface.mjs';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -101,7 +102,23 @@ async function bindings() {
   const [src] = await sql`SELECT id FROM source_profiles ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   const [contract] = await sql`SELECT id FROM contracts ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   const [vault] = await sql`SELECT id FROM proposals WHERE archived_at IS NULL ORDER BY id ASC LIMIT 1`;
-  const [found] = await sql`SELECT id FROM library_atoms WHERE archived_at IS NULL ORDER BY id ASC LIMIT 1`;
+  // THE PAGE'S OWN PREDICATE, copied from its source, not a version of it I believe equivalent:
+  //   WHERE id = $1 AND tenant_id = $2 AND grain = 'foundation'
+  //
+  // The previous binding was `SELECT id FROM library_atoms ORDER BY id ASC LIMIT 1` — no tenant,
+  // no grain. On this fixture that is an **immobileyes primitive**, handed to a route driven as
+  // foundation's tenant_admin. The product refused it correctly ("Not found — this item doesn't
+  // exist, or you don't have access to it"), and the lens scored it a clean pass, because the
+  // boundary matcher of the day did not recognise that text. So the lens was manufacturing a
+  // cross-tenant probe, getting the RIGHT answer, and reporting it as a rendered page.
+  //
+  // Two rules broken at once: copy the predicate from the source, and bind ids from the tenant the
+  // harness actually signs in as. A tenant route bound from another tenant's row tests isolation by
+  // accident and coverage not at all.
+  const [found] = await sql`
+    SELECT a.id FROM library_atoms a JOIN tenants t ON t.id = a.tenant_id
+    WHERE t.slug = 'foundation' AND a.grain = 'foundation' AND a.archived_at IS NULL
+    ORDER BY a.id ASC LIMIT 1`;
   return {
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, solId: sol?.id,
     topicId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
@@ -119,6 +136,9 @@ async function bindings() {
  */
 const UNBINDABLE_REASON = {
   contractId: 'the `contracts` table is empty — seed one to cover this route',
+  foundationId: "the 'foundation' tenant holds no grain='foundation' atom — upload a document and "
+    + 'atomize it to cover this route (a primitive or another tenant\'s atom is NOT a substitute: '
+    + 'the page requires both, and binding one anyway drives a refusal and calls it a render)',
 };
 
 /**
@@ -153,9 +173,10 @@ async function drive(page, url) {
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.waitForTimeout(1400);
     rec.landed = page.url().replace(BASE, '');
-    const boundary = await page.locator(
-      'text=/Application error|Unhandled Runtime Error|Something went wrong|failed to load|500 —|This page could not be found/i',
-    ).count();
+    // From the ONE shared definition (scripts/lib/error-surface.mjs). This lens and the guide
+    // capture each kept a private copy, the copies drifted, and the guide's copy missed a bare
+    // "Document not found" — shooting an error page into the admin guide as a working screen.
+    const boundary = await countErrorSurfaces(page);
     rec.ok = (rec.status ?? 200) < 400 && boundary === 0 && errs.length === 0;
     if (boundary) rec.note = 'error boundary';
     if (errs.length) rec.note = (rec.note ? rec.note + ' — ' : '') + errs[0];

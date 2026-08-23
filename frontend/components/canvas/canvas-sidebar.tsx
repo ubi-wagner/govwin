@@ -88,6 +88,20 @@ interface Props {
   sectionId?: string;
 }
 
+/**
+ * Margins for a read-out: points → inches, 2dp, and "all" only when it is true.
+ *
+ * Trailing zeros are trimmed so a plain 1" margin reads `1"` rather than `1.00"`, and a slide's
+ * 40pt reads `0.56"` rather than the raw `0.5555555555555556` this replaced.
+ */
+export function marginLabel(m: { top: number; right: number; bottom: number; left: number }): string {
+  const inch = (pt: number) => String(Number((pt / 72).toFixed(2)));
+  const same = m.top === m.right && m.right === m.bottom && m.bottom === m.left;
+  return same
+    ? `${inch(m.left)}" all`
+    : `${inch(m.top)} · ${inch(m.right)} · ${inch(m.bottom)} · ${inch(m.left)}"`;
+}
+
 // ─── Self-contained comments section with data fetching ─────────────
 
 function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: { nodeId: string; proposalId: string; tenantSlug: string; canComment?: boolean }) {
@@ -585,7 +599,13 @@ export function CanvasSidebar({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Margins</span>
-                  <span className="font-medium text-xs">{doc.canvas.margins.left / 72}&quot; all</span>
+                  {/* Rounded, and honest about "all".
+                      Margins are stored in POINTS; a 40pt slide margin divided by 72 rendered as
+                      `0.5555555555555556" all` — a raw float in a customer-facing read-out, next to
+                      a claim that was also wrong whenever the four sides differ. Two decimals is the
+                      precision an inches control with a 0.25 step can express; "all" now appears
+                      only when the four sides really are equal. */}
+                  <span className="font-medium text-xs">{marginLabel(doc.canvas.margins)}</span>
                 </div>
               </div>
             </div>

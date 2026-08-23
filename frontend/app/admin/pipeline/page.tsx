@@ -176,12 +176,20 @@ export default async function PipelinePage() {
                       {s.lastRunAt ? relativeTime(s.lastRunAt) : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {/* PINNED TO UTC, AND SAID SO.
+                          Without `timeZone` this formats in whatever zone the renderer is in — the
+                          container's, here — and prints no zone at all, so an operator reading
+                          "Aug 24, 06:00" cannot tell whether that is their 06:00 or the server's.
+                          Cron schedules are defined in UTC, so UTC is the honest thing to show;
+                          labelling it removes the ambiguity rather than hiding it. */}
                       {s.nextRunAt
                         ? new Date(s.nextRunAt).toLocaleString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
+                            timeZone: 'UTC',
+                            timeZoneName: 'short',
                           })
                         : '—'}
                     </td>

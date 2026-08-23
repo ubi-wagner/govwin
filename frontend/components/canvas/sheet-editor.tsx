@@ -612,7 +612,16 @@ export function SheetEditor({
         e.preventDefault();
         startEdit(row, col, '');
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Start typing into cell
+        // Start typing into cell.
+        //
+        // `preventDefault` is REQUIRED here, and its absence was the one branch missing it.
+        // `startEdit` seeds the editor with this keystroke, and React flushes the state update
+        // synchronously (a keydown is a discrete event), so the <input autoFocus> is mounted and
+        // focused before the browser applies this same keystroke's DEFAULT text insertion — which
+        // then lands in the freshly focused input. The character arrives twice: typing "Direct
+        // labor" into an empty cell produced "DDirect labor", and 184500 became 1184500. Caught by
+        // driving the grid for the guide captures (docs/assets/guides/customer/24-canvas-sheet).
+        e.preventDefault();
         startEdit(row, col, e.key);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
