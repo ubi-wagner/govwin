@@ -57,7 +57,7 @@ DATABASE_URL_OWNER="$DBURL" node "$ROOT/scripts/sandbox-reset-passwords.mjs" 2>&
 ATOMS=$(psql -h localhost -U govtech -d govtech_intel -tAc "select count(*) from library_atoms la join tenants t on t.id=la.tenant_id where t.slug='foundation'" 2>/dev/null || echo '?')
 say "foundation atoms: $ATOMS"
 say "logins — tenant: kate.ulepic@foundation3dp.com / DemoPass123!"
-say "         admin:  eric@rfppipeline.com / \${SANDBOX_PASSWORD:-SandboxDrive2026!}"
+say "         admin:  eric@rfppipeline.com / ${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 
 # 5) build if missing
 if [ ! -f "$STANDALONE/server.js" ]; then
