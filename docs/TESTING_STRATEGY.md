@@ -281,6 +281,42 @@ before it is called done. Each gate must pass before the next is meaningful:
 **Sandbox DB coordinates:** `postgres://claude:claude@127.0.0.1:5433/govtech_intel` (local PG16, trust
 auth). This is the target for steps 3, 5, and the SQL lane of step 6.
 
+### The canvas measurement harnesses (steps 2 and 5, for anything touching layout or export)
+
+These are not unit tests — each one runs the product's real writer and compares against the artifact
+that comes out. Any change to `lib/types/canvas-document.ts`, `lib/export/*`, or a template body
+should be driven through all four; each exits non-zero on drift.
+
+| harness | what it measures |
+|---|---|
+| `scripts/verify-ruler-on-proposals.mts` | the ruler against 8 REAL authored proposals — the safety gate: it must never UNDER-count |
+| `scripts/calibrate-page-ruler.mts` | 36 synthetic cases, one variable each, against Chromium's printed page count |
+| `scripts/calibrate-slide-ruler.mts` | 7 deck cases against a real rendered `.pptx` |
+| `scripts/sweep-mold-quality.mts` | all 39 shipped templates: rendered pages, compliance violations, page furniture, token leaks |
+
+When one of them disagrees, `scripts/diagnose-mold-ruler.mts` says WHY: `--nodes` charges every node
+against the height Chromium gives that same node in place, `--segments` does it per page-break
+segment, `--pages` replays the ruler's own placement. Prefer it over amplifying one node type ×N —
+that method lies about anything carrying a vertical margin, because a long run of them collapses
+margins a real document does not.
+
+**Two rules these harnesses exist to enforce**, both learned by violating them (bug log B66-B72):
+
+- *A default that switches off the thing under test is not coverage.* Every page-ruler case once used
+  the one preset declaring `header: null, footer: null`, so the running-header path — which every
+  agency mold uses — had no measurement at all, and carried an 11%-per-page error for as long as it
+  existed. Two other cases passed override keys that were not fields of `CanvasRules`, so they
+  silently re-ran a case that already existed.
+- *Synthetic filler must break like the real thing.* The prose filler was one lowercase sentence
+  repeated. Measured against Chromium (`scripts/measure-char-width.mts`), Times New Roman averages
+  0.41 of the font size on lowercase prose and 0.58 on acronym-dense text, so a lowercase-only corpus
+  was exercising the ruler in the single register where its constant has the most slack.
+
+`__tests__/node-vocabulary-coverage.test.ts` is the cheap always-on companion: every member of the
+`NodeType` union, through all four writers, asserting each type comes out as text or as the raster
+it deliberately became. `VOCAB` is typed `Record<NodeType, …>`, so adding a node type without adding
+a case is a compile error rather than an uncovered type.
+
 ---
 
 ## Coverage targets
