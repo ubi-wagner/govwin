@@ -1317,8 +1317,49 @@ export interface LayoutResult {
   vsMaxPages: { max: number | null; over: boolean };
 }
 
-/** Node types the exporters refuse to break across a page (canvas-html: page-break-inside: avoid). */
-const ATOMIC_NODES: ReadonlySet<CanvasNode['type']> = new Set<CanvasNode['type']>(['image', 'chart', 'table']);
+/**
+ * Node types the exporters refuse to break across a page (canvas-html: page-break-inside: avoid).
+ *
+ * EXHAUSTIVE BY CONSTRUCTION. This was a hand-written `new Set(['image','chart','table'])`, which
+ * means a node type added to the union silently defaulted to "splittable" — and break-affinity is
+ * not cosmetic: the paginator moves an atomic node wholesale when it would straddle the page edge,
+ * so getting it wrong changes the page COUNT, and the page count is the compliance gate. A ruler
+ * that under-counts clears a volume that is over its agency page limit.
+ *
+ * `Record<NodeType, boolean>` makes the decision mandatory: add a member to the union without a
+ * line here and it is a compile error, not a silent default. This mirrors the discipline
+ * `__tests__/node-vocabulary-coverage.test.ts` already enforces across the four writers — the
+ * ruler was the lane that guard did not cover.
+ *
+ * Values below preserve the previous behaviour exactly: only image, chart and table are atomic.
+ */
+const ATOMIC_BY_TYPE: Record<NodeType, boolean> = {
+  heading: false,
+  text_block: false,
+  bulleted_list: false,
+  numbered_list: false,
+  image: true,
+  table: true,
+  caption: false,
+  footnote: false,
+  toc: false,
+  page_break: false,
+  url: false,
+  spacer: false,
+  shape: false,
+  text_box: false,
+  callout: false,
+  code_block: false,
+  blockquote: false,
+  chart: true,
+  equation: false,
+  divider: false,
+  video: false,
+  signature: false,
+};
+const ATOMIC_NODES: ReadonlySet<CanvasNode['type']> = new Set(
+  (Object.keys(ATOMIC_BY_TYPE) as NodeType[]).filter((t) => ATOMIC_BY_TYPE[t]),
+);
 
 export function paginate(doc: CanvasDocument): LayoutResult {
   const m = flowMetrics(doc.canvas ?? CANVAS_PRESETS.letter_standard);
