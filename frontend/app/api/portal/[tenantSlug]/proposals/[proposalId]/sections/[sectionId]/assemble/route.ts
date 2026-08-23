@@ -28,17 +28,19 @@
  * builder needs — a section assembled from three of eleven atoms looks identical to one assembled
  * from three, and only one of those is worth investigating.
  *
- * Auth: tenant_user+ with access to THIS proposal. Assembling from a library is ordinary authoring.
+ * Auth: tenant_user+ (the tenant library is team-only) AND edit access to THIS section. Both
+ * gates are load-bearing and neither implies the other — see the comments at each.
  * Returns: { data: { versionNumber, groups, pagesUsed, charactersUsed, skipped, atoms } }
  *        | { error, code }
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { selectForSection, viewerFromRole } from '@/lib/atoms';
 import { assembleSectionFromAtoms } from '@/lib/canvas/assemble-from-atoms';
 import { CANVAS_PRESETS, type CanvasDocument, type CanvasRules } from '@/lib/types/canvas-document';
@@ -72,6 +74,22 @@ export async function POST(request: Request, { params }: Ctx) {
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
 
+    // ── GATE 1 · THE LIBRARY IS TENANT STAFF ONLY ───────────────────────────────────────────────
+    // This route READS the tenant's library — every atom the company owns: past proposals, cost
+    // models, personnel bios, pricing — and returns the ids of what it used. Every other library
+    // route gates at `tenant_user` for exactly that reason, and this one must match them.
+    //
+    // Found by driving it: a `partner_user` subcontractor granted ONE narrative section assembled
+    // into the COST VOLUME from 12 library atoms and got their ids back. `verifyProposalAccess`
+    // alone could never have stopped it — it answers "can this actor reach this proposal", and an
+    // accepted collaborator can, by design. It is not a section-level or a library-level check and
+    // was never meant to be one.
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({
+        error: 'The tenant library is available to team members only.', code: 'FORBIDDEN',
+      }, { status: 403 });
+    }
+
     // Never query by proposal id alone — the section must belong to a proposal this actor can reach
     // in THIS tenant. Two independent checks, because RLS scoping and app-layer authorisation
     // answer different questions and a route that relies on only one is a route with one lock.
@@ -79,6 +97,20 @@ export async function POST(request: Request, { params }: Ctx) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
     enterTenant(tenantId);
+
+    // ── GATE 2 · AND THIS SECTION SPECIFICALLY ──────────────────────────────────────────────────
+    // Role rank is not enough on its own. A `tenant_user` who is only a per-proposal CONTRIBUTOR
+    // holds edit rights on some sections and not others, and assembling proposes a new version of
+    // whichever section is named. Gate on the resolved section grant, so this route can never write
+    // somewhere the section save route would refuse.
+    const access = await resolveUserAccess(u.id, proposalId, tenantId);
+    const mayEditThisSection = access.role === 'admin'
+      || access.editableSections.includes(sectionId);
+    if (!mayEditThisSection) {
+      return NextResponse.json({
+        error: 'You do not have edit access to this section.', code: 'FORBIDDEN',
+      }, { status: 403 });
+    }
 
     let body: Record<string, unknown> = {};
     try { body = (await request.json()) as Record<string, unknown>; } catch { /* defaults below */ }

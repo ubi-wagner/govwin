@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect } from 'react';
 import type {
   ActiveProcess,
@@ -10,6 +11,11 @@ import type {
   TenantActivity,
 } from './page';
 
+// The relative-time helpers that used to live here read the clock
+// DURING RENDER — the server wrote one number, the client hydrated a beat later and wrote
+// another, and React #418 took the whole page to its error boundary while the route kept
+// answering 200. They are now <TimeAgo> / <Elapsed>, which own their own mount state.
+// Bug log B82; the shared component is components/ui/time-ago.tsx.
 const NAMESPACE_COLORS: Record<string, { badge: string; card: string }> = {
   identity: {
     badge: 'text-blue-600 bg-blue-50',
@@ -93,32 +99,6 @@ function formatDuration(ms: number | null): string {
   const minutes = Math.floor(ms / 60_000);
   const seconds = Math.floor((ms % 60_000) / 1000);
   return `${minutes}m ${seconds}s`;
-}
-
-function formatElapsed(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  if (diff < 0) return '0s';
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${secs}s`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours}h ${mins}m`;
-}
-
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
 }
 
 function actorLabel(actorType: string | null, actorEmail: string | null): string {
@@ -279,7 +259,7 @@ export function ProcessMonitorClient({
 
                 {/* Elapsed time */}
                 <span className="text-xs font-mono text-blue-600 flex-shrink-0 min-w-[60px] text-right">
-                  {formatElapsed(p.createdAt)}
+                  <Elapsed iso={p.createdAt} />
                 </span>
               </div>
             ))}
@@ -336,7 +316,7 @@ export function ProcessMonitorClient({
 
                     {/* Time */}
                     <span className="text-xs text-gray-400 flex-shrink-0 min-w-[60px] text-right">
-                      {relativeTime(c.createdAt)}
+                      <TimeAgo iso={c.createdAt} />
                     </span>
 
                     {/* Expand button */}
@@ -411,7 +391,7 @@ export function ProcessMonitorClient({
                         </span>
                       )}
                       <span className="text-xs text-gray-400 ml-auto">
-                        {relativeTime(err.createdAt)}
+                        <TimeAgo iso={err.createdAt} />
                       </span>
                     </div>
                     {err.error && (

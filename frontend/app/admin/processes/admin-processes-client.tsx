@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useRouter } from 'next/navigation';
 import {
   filterAndSortProcesses,
@@ -22,6 +23,11 @@ export interface AdminProcessRow {
   openTasks: number;
 }
 
+// The relative-time helpers that used to live here read the clock
+// DURING RENDER — the server wrote one number, the client hydrated a beat later and wrote
+// another, and React #418 took the whole page to its error boundary while the route kept
+// answering 200. They are now <TimeAgo> / <Elapsed>, which own their own mount state.
+// Bug log B82; the shared component is components/ui/time-ago.tsx.
 const HEALTH_STYLE: Record<ProcessHealth, { dot: string; chip: string; label: string }> = {
   failing: { dot: 'bg-red-500', chip: 'bg-red-50 text-red-700 border-red-200', label: 'Failing' },
   stalled: { dot: 'bg-orange-500', chip: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Stalled' },
@@ -36,15 +42,6 @@ function fmtWorkflow(n: string) {
 function fmtStep(n: string | null) {
   return n ? n.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—';
 }
-function rel(iso: string | null) {
-  if (!iso) return '—';
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (d < 60) return `${d}s`;
-  if (d < 3600) return `${Math.floor(d / 60)}m`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h`;
-  return `${Math.floor(d / 86400)}d`;
-}
-
 const HEALTH_OPTIONS: Array<ProcessHealth | 'all'> = ['all', 'failing', 'stalled', 'waiting', 'running'];
 
 export function AdminProcessesClient({
@@ -189,7 +186,7 @@ export function AdminProcessesClient({
                     <td className="px-3 py-2 font-medium text-gray-900">{fmtWorkflow(r.workflowName)}</td>
                     <td className="px-3 py-2 font-mono text-xs text-gray-500">{fmtStep(r.currentStep)}</td>
                     <td className="px-3 py-2 text-gray-600">{r.openTasks > 0 ? r.openTasks : '—'}</td>
-                    <td className="px-3 py-2 text-xs text-gray-400">{rel(r.updatedAt)} ago</td>
+                    <td className="px-3 py-2 text-xs text-gray-400"><TimeAgo iso={r.updatedAt} /> ago</td>
                     <td className="px-3 py-2 text-right">
                       {r.status === 'paused' && (
                         <button
