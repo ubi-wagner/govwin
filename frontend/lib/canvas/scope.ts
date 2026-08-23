@@ -100,7 +100,22 @@ const scopeOf = (
  * case. Levels that do not apply are simply absent — a node in a flat document has no group or
  * section above it, and saying so honestly is better than synthesising an empty one.
  */
-export function resolveScope(doc: CanvasDocument, sel: Selection): Scope[] {
+export function resolveScope(
+  doc: CanvasDocument,
+  sel: Selection,
+  opts: {
+    /**
+     * node id → the section that owns it, for a FLAT document that cannot name its own sections.
+     *
+     * The fluid proposal surface renders `assembleProposalDocument`'s output: one flat node list,
+     * because that is what reading a continuous document needs. Without this the ladder there would
+     * jump straight from `node` to `document` — and the section rung is the one the compliance
+     * matrix, the mold and the review queue all address, so losing it makes the ladder useless on
+     * the surface a customer spends the most time in.
+     */
+    sectionOf?: Record<string, { id: string; title: string }>;
+  } = {},
+): Scope[] {
   const layout = paginate(doc);
   const canvas = doc.canvas;
   const { node, group, section } = locate(doc, sel);
@@ -136,6 +151,23 @@ export function resolveScope(doc: CanvasDocument, sel: Selection): Scope[] {
     const nodes = (section.groups ?? []).flatMap((g) => g.nodes ?? []);
     ladder.push(scopeOf('section', section.id, section.title ?? 'Section', nodes,
       pagesForSection(section), section.source_atom_ids ?? []));
+  } else if (opts.sectionOf) {
+    // Flat document: the caller's map names the section. Its nodes are every node the map assigns
+    // to the same section — which is exactly what assembly produced, in document order.
+    const owner = node ? opts.sectionOf[node.id]
+      : sel.sectionId ? { id: sel.sectionId, title: '' } : undefined;
+    if (owner) {
+      const nodes = docNodes(doc).filter((nd) => opts.sectionOf![nd.id]?.id === owner.id);
+      if (nodes.length) {
+        const spans = nodes.map((nd) => layout.perNode.find((p) => p.id === nd.id)).filter(Boolean);
+        ladder.push(scopeOf('section', owner.id,
+          owner.title || opts.sectionOf[nodes[0].id]?.title || 'Section', nodes,
+          spans.length
+            ? { start: Math.min(...spans.map((s) => s!.startPage)), end: Math.max(...spans.map((s) => s!.endPage)) }
+            : null,
+          []));
+      }
+    }
   }
 
   // An explicit page range resolves to whatever falls inside it — the unit the AGENCY addresses.
