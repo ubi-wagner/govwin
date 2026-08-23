@@ -13,7 +13,7 @@ Every single commit must pass all of these. No exceptions for "fix later" commit
 ### Build gates
 
 - [ ] `cd frontend && npx tsc --noEmit` → exit 0
-- [ ] `cd frontend && npx vitest run` → all green (full unit + integration suite; 1129/1129 at migration head 185)
+- [ ] `cd frontend && npx vitest run` → all green (full unit + integration suite; 1129/1129 at migration head 205)
 - [ ] `cd frontend && npx next build` → exit 0 (catches ESLint rules + page data collection + edge-runtime errors that `tsc` misses)
 - [ ] `python3 -m py_compile <changed pipeline files>` → exit 0 for any pipeline change
 - [ ] `bash -n <changed shell scripts>` → exit 0 for any shell change

@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1129 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1670 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **188**; migs 186–188 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **205**; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
 merges three layers PER FIELD — `pattern_match` (`lib/ingest/pattern-extract.ts`, a deterministic, DB-free,
@@ -255,9 +255,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1129 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1670 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **Anything touching layout or export** additionally runs the six canvas measurement harnesses, which
+  compare the product's own writers against the artifact that comes out (docs/TESTING_STRATEGY.md):
+  `verify-ruler-on-proposals` and `verify-ruler-on-stored-artifacts` are the SAFETY GATES — the ruler
+  may over-count but must never UNDER-count, because an under-count at the export gate clears a volume
+  that is over its agency page limit; `verify-exports-on-stored-artifacts` proves every stored volume
+  still downloads in every format; `calibrate-page-ruler` (36), `calibrate-slide-ruler` (7) and
+  `sweep-mold-quality` (39 molds) are the regression net. `diagnose-mold-ruler --nodes/--segments/--pages`
+  says WHY when one disagrees. Bug log B64–B76 is the record of what they have caught.
   ⚠️ **Serving the built app: `next start` is BROKEN here** (`output:'standalone'`) — run
   `node .next/standalone/server.js` after staging `.next/static`+`public`; auth flows must hit
   `localhost:3000` not `127.0.0.1`. Full sandbox/PDF-tooling recipes: **docs/CONTINUATION.md §2**.

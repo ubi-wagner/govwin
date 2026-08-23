@@ -2,7 +2,7 @@
 
 A faithful, current status of every major launch effort. Legend: **✅ shipped + proven** ·
 **🔵 built, intentionally inert** (ships off until a one-op flip / first tenant edit) · **⏳ descoped**.
-Backbone this cycle: **`tsc` 0 · `vitest` 1129 pass · migration head 185 · `next build` clean**,
+Backbone this cycle: **`tsc` 0 · `vitest` 1670 pass · migration head 205 · `next build` clean**,
 plus the live proofs cited below.
 
 ## A. The customer spine (canonical surface)

@@ -1,6 +1,10 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-06-23 (Phase 4 reconcile — as-built baseline from ARCHITECTURE_V9.md)
+**Last updated:** the sections are dated INDIVIDUALLY, and that is deliberate — §1's baseline is
+2026-06-23 and its supersession notice is 2026-08-22, while §4b's bug classes are amended whenever one
+is caught. A single file-level date on a document this size is the mechanism that produced the §1
+failure: it read "current" while 135 migrations went by underneath it. Trust a section's own stamp,
+and trust `docs/SCHEMA_MAP.md` over any schema text here.
 **Architecture reference:** `ARCHITECTURE_V10.md` is the authoritative as-built master (supersedes V5–V8).
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
@@ -140,7 +144,7 @@ deliberately re-capturing the guides (in which case rebuild them: `python3 docs/
 > ## ⛔ SUPERSEDED — use **`docs/SCHEMA_MAP.md`**
 > 
 > Measured 2026-08-22: this section described **72 tables frozen at migration 067** against a live
-> schema of **113 tables at migration 202** — 135 migrations and 41 tables stale, while instructing
+> schema of **113 tables at migration 205** — 138 migrations and 41 tables stale, while instructing
 > "Do NOT guess column names. Look them up here." Following that instruction would have MISLED you.
 > It cost six schema mistakes in one session (`opportunities.status`, `tenant_opportunity_cards.status`,
 > `proposal_sections.status = 'locked'`, the direction of the solicitation↔opportunity link, the
