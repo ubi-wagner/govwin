@@ -424,6 +424,12 @@ view and `/admin/analytics` for the roll-ups. *(Corrected: the old text pointed 
 
 ![The event stream](./assets/guides/admin/10-events.png)
 
+Filter by **namespace**, **phase**, free-text **type**, and a time window (1h / 6h / 24h / 7d / 30d);
+**Live** polls. The **phase** column is the start/end bracket in the data: a `tool.invoke` writes one
+`start` row and one `end` row of the *same type*, and the `end` carries the duration (`12ms`, `32ms`
+in the shot above). A one-shot event like `identity.user.logged_in` is `single`. Every row's payload
+carries a `correlationId` so a whole operation can be pulled back together.
+
 ![System state](./assets/guides/admin/10c-system-state.png)
 
 The event stream shows all system activity:
