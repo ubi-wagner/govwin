@@ -78,9 +78,23 @@ for fp in walk(os.path.join(ROOT, "pipeline", "src"), (".py",)):
         window = txt[m.end():m.end() + 400]
         ns = re.search(r"namespace\s*=\s*[\"']([^\"']+)[\"']", window)
         ty = re.search(r"(?:type|event_type)\s*=\s*[\"']([^\"']+)[\"']", window)
+        # POSITIONAL EMITS ARE STILL EMITS. `self._emit_event(conn, "finder", "ingest.run.start", …)`
+        # passes namespace and type positionally, so a keyword-only scan files it as <dynamic> — and
+        # that is exactly where the one phase-in-name violation in the codebase lives
+        # (pipeline/src/ingest/base.py:236,431). A scanner blind to a call shape reports the
+        # convention as clean in the one place it is broken.
+        if not ns or not ty:
+            pos = re.match(r"\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*[\"']([a-z_]+)[\"']\s*,\s*[\"']([a-z0-9_.]+)[\"']", window)
+            if pos:
+                ns = ns or re.match(r"(?P<g>x)", "x") and None
+                ns_pos, ty_pos = pos.group(1), pos.group(2)
+            else:
+                ns_pos = ty_pos = None
+        else:
+            ns_pos = ty_pos = None
         loc = f"{rel}:{txt[:m.start()].count(chr(10)) + 1}"
-        ns_v = ns.group(1) if ns else "<dynamic>"
-        catalog[ns_v][ty.group(1) if ty else "<dynamic>"].append(f"{loc}:py")
+        ns_v = ns.group(1) if ns else (ns_pos or "<dynamic>")
+        catalog[ns_v][ty.group(1) if ty else (ty_pos or "<dynamic>")].append(f"{loc}:py")
         if ns_v not in ("<dynamic>",) and ns_v in FORBIDDEN:
             violations.append(f"FORBIDDEN ns '{ns_v}' at {loc}")
         elif ns_v not in ("<dynamic>",) and ns_v not in REGISTRY:
@@ -100,6 +114,34 @@ for ns in allns:
         kinds = sorted(set(x.split(':')[-1] for x in catalog[ns][t]))
         print(f"    {t}   [{','.join(kinds)}]")
 print(f"\n=== TOTALS: {len(allns)} namespaces, {total} distinct literal types ===")
+# PHASE BELONGS IN THE COLUMN, NOT THE TYPE NAME. `tool:invoke` with phase=start/end is the
+# sanctioned shape; `ingest.run.start` + `ingest.run.end` as two type names is not — a consumer
+# grouping by type sees two operations where there is one, and the pair reads as cross-type to any
+# correlation check. TYPE_RE accepts it (it is valid snake_case with dots) and the per-file
+# start/end COUNT balances, so neither existing guard can see it.
+PHASE_IN_NAME_ALLOWED = {
+    "finder:ingest.run.start": "pipeline/src/ingest/base.py:236 — predates the convention; renaming "
+                               "orphans historical rows and breaks lib/tools/ingest-list-recent-runs.ts",
+    "finder:ingest.run.end":   "pipeline/src/ingest/base.py:431 — same pair",
+    "finder:rfp.shredding.start": "pipeline/src/shredder/runner.py:280 — same generation as the ingest "
+                                  "pair; three end-emitters (452, 496, 554) share the name",
+    "finder:rfp.shredding.end":   "pipeline/src/shredder/runner.py:452,496,554 — same pair",
+}
+phase_in_name = []
+for ns in sorted(catalog):
+    if ns == "<dynamic>":
+        continue
+    for t in catalog[ns]:
+        if t != "<dynamic>" and (t.endswith(".start") or t.endswith(".end")):
+            key = f"{ns}:{t}"
+            if key not in PHASE_IN_NAME_ALLOWED:
+                violations.append(f"PHASE-IN-NAME '{key}' — put the phase in the `phase` column "
+                                  f"(bare action as the type), or allowlist it with a reason")
+            else:
+                phase_in_name.append(key)
+
+print(f"\n=== PHASE-IN-NAME types, allowlisted ({len(phase_in_name)}) ===")
+print("\n".join(f"  ~ {k}  ({PHASE_IN_NAME_ALLOWED[k]})" for k in phase_in_name) or "  none")
 print(f"\n=== VIOLATIONS ({len(violations)}) ===")
 print("\n".join("  ✗ " + v for v in violations) or "  none")
 print(f"\n=== START-WITHOUT-END files ({len(pairing)}) ===")
@@ -136,9 +178,13 @@ if "--write" in sys.argv:
         types = sorted(t for t in catalog[ns] if t != "<dynamic>")
         if not types:
             continue
-        listed = ", ".join(
-            "`" + t + "`" + ("[py]" if catalog[ns][t] and all(x.endswith(":py") for x in catalog[ns][t]) else "")
-            for t in types)
+        # Carry the PHASE KINDS through. The console report has always printed [start]/[end]/
+        # [single]/[py] per type, and the first generated version of §8 dropped everything but
+        # [py] — which erased exactly the start/end patterning this section exists to describe.
+        def mark(t):
+            kinds = sorted(set(x.split(':')[-1] for x in catalog[ns][t]))
+            return "`" + t + "`" + ("[" + ",".join(kinds) + "]" if kinds else "")
+        listed = ", ".join(mark(t) for t in types)
         out.append("")
         out.append(f"**{ns}** ({len(types)}): {listed}.")
     out.append("")
