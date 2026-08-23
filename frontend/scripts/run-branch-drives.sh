@@ -81,6 +81,18 @@ fi
 # It does not abort the suite: the non-isolation drives still measure real things. What it does is
 # refuse to let the isolation drives report a verdict they cannot earn — they are marked CANT-RUN,
 # which is uncovered rather than passing, and the banner says why.
+# The cross-tenant invariant: nothing reads or writes cross-tenant, ever. Checked here rather than
+# when someone remembers, because the one violation that existed (303 atom_lineage edges) sat
+# unnoticed for months in a link table no tenant-column sweep could see.
+if node scripts/check-tenant-isolation-invariant.mjs > "$OUT/tenant-invariant.log" 2>&1; then
+  echo "tenant isolation: no cross-tenant references"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ CROSS-TENANT REFERENCES EXIST — data must move by inward COPY, never by reference.    ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/tenant-invariant.log" | tail -12
+fi
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"
