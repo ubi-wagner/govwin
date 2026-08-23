@@ -47,7 +47,17 @@ function routesUnder(root, prefix) {
   return out.sort();
 }
 
-/** Fill `[param]` segments from real rows — a route we cannot address is reported, not skipped. */
+/**
+ * Fill `[param]` segments from real rows — a route we cannot address is reported, not skipped.
+ *
+ * The first version guessed at table names, and the guesses were the coverage gap: it queried a
+ * `documents` table that does not exist, and never looked for a page key or a content slug at all.
+ * Five routes came back "no row in the sandbox to address them" when four of them had rows the
+ * whole time. Every lookup below now targets what the PAGE itself reads.
+ *
+ * A binding that genuinely cannot be made carries a REASON, so the report distinguishes "the
+ * sandbox has no such row" from "this route is addressed by something other than a table row".
+ */
 async function bindings() {
   const [prop] = await sql`
     SELECT p.id, t.slug FROM proposals p JOIN tenants t ON t.id = p.tenant_id
@@ -62,7 +72,16 @@ async function bindings() {
   const [topic] = sol ? await sql`SELECT id FROM opportunities WHERE solicitation_id = ${sol.id} LIMIT 1` : [];
   const [portal] = await sql`SELECT id FROM proposal_portals ORDER BY created_at DESC LIMIT 1`;
   const [tenant] = await sql`SELECT id FROM tenants WHERE slug = 'foundation'`;
-  const [doc] = await sql`SELECT id FROM documents ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
+  // A tenant document lives in `tenant_documents` — there is no `documents` table.
+  const [tdoc] = await sql`SELECT id FROM tenant_documents ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
+  // `/admin/site/[pageKey]` takes a SEED PAGE KEY, not a row id — the page redirects anything else.
+  const [pageRow] = await sql`
+    SELECT page_key FROM content_pages WHERE content_type = 'page' AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
+  // `/admin/site/docs/[type]/[slug]` is a content DOCUMENT — its type and its page_key.
+  const [docPage] = await sql`
+    SELECT content_type, page_key FROM content_pages
+    WHERE content_type <> 'page' ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
   const [tmpl] = await sql`SELECT id FROM document_templates ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
   const [src] = await sql`SELECT id FROM source_profiles ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
   const [contract] = await sql`SELECT id FROM contracts ORDER BY created_at DESC LIMIT 1`.catch(() => [undefined]);
@@ -70,11 +89,40 @@ async function bindings() {
   const [found] = await sql`SELECT id FROM library_atoms WHERE archived_at IS NULL LIMIT 1`;
   return {
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, solId: sol?.id,
-    topicId: topic?.id, portalId: portal?.id, tenantId: tenant?.id, documentId: doc?.id,
+    topicId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
+    documentId: tdoc?.id, pageKey: pageRow?.page_key,
+    type: docPage?.content_type, slug: docPage?.page_key,
     templateId: tmpl?.id, profileId: src?.id, contractId: contract?.id, vaultId: vault?.id,
-    foundationId: found?.id, spotlightId: topic?.id, proposalIdAlias: prop?.id,
+    foundationId: found?.id, spotlightId: topic?.id,
   };
 }
+
+/**
+ * Why a segment could not be bound. Without this the report says "no row in the sandbox" for a
+ * route that is not addressed by a row at all, which sends the next reader looking for a seed that
+ * would not help.
+ */
+const UNBINDABLE_REASON = {
+  contractId: 'the `contracts` table is empty — seed one to cover this route',
+};
+
+/**
+ * Routes whose parameter is NOT a row id, so the shared per-name binding would address them with
+ * something wrong and drive a page that legitimately errors.
+ *
+ * `/admin/documents/[documentId]` is backed by OBJECT STORAGE (`reference/documents/_index.json`),
+ * not a table. Handing it a `tenant_documents.id` because both routes happen to call the segment
+ * `documentId` would produce a red "not found" page and report it as a broken surface — a harness
+ * inventing a failure is no better than one inventing a pass.
+ */
+const ROUTE_NOT_BY_ROW = {
+  '/admin/documents/[documentId]':
+    'addressed by the object-storage document index, not a table row — the sandbox store is empty',
+};
+const reasonFor = (route) => ROUTE_NOT_BY_ROW[route]
+  ?? (route.match(/\[(\w+)\]/g) ?? [])
+    .map((seg) => seg.slice(1, -1)).filter((k) => !B[k])
+    .map((k) => UNBINDABLE_REASON[k] ?? `no value for [${k}]`).join('; ');
 
 const results = [];
 async function drive(page, url) {
@@ -129,7 +177,8 @@ const bind = (route) => route.replace(/\[(\w+)\]/g, (_, k) => B[k] ?? '');
  * that happens to exist, and got reported as a clean pass for a page that was never driven. Test
  * the bindings, not the string.
  */
-const addressable = (route) => (route.match(/\[(\w+)\]/g) ?? []).every((seg) => !!B[seg.slice(1, -1)]);
+const addressable = (route) => !ROUTE_NOT_BY_ROW[route]
+  && (route.match(/\[(\w+)\]/g) ?? []).every((seg) => !!B[seg.slice(1, -1)]);
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 const V = { width: 1440, height: 900 };
@@ -159,8 +208,8 @@ console.log(`\n${results.length} surface(s) driven · ${results.length - bad.len
 if (unbound.length) {
   // NOT a silent skip: a route with no row to address it is a coverage gap, and saying so is the
   // difference between "all clean" and "all clean, of the ones I could reach".
-  console.log(`\n${unbound.length} route(s) NOT driven — no row in the sandbox to address them:`);
-  console.log(unbound.map((r) => `  · ${r}`).join('\n'));
+  console.log(`\n${unbound.length} route(s) NOT driven:`);
+  console.log(unbound.map((r) => `  · ${r} — ${reasonFor(r)}`).join('\n'));
 }
 if (bad.length) {
   console.log('\n✗ broken surfaces:');
