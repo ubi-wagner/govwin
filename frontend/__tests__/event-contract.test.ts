@@ -58,20 +58,28 @@ function walk(dir: string): string[] {
 
 const EMIT = /emitEvent(Single|Start|End)\s*\(/g;
 
+/** What the last scan actually READ — so "no violations" can be told apart from "nothing scanned". */
+let lastScan = { sites: 0, literal: 0, files: 0 };
+
 function scan(): string[] {
   const violations: string[] = [];
+  lastScan = { sites: 0, literal: 0, files: 0 };
   for (const base of SCAN_DIRS) {
     for (const fp of walk(base)) {
       const txt = fs.readFileSync(fp, 'utf8');
       const rel = path.relative(FRONTEND, fp);
       let starts = 0, ends = 0;
-      for (const m of txt.matchAll(EMIT)) {
+      const hits = [...txt.matchAll(EMIT)];
+      if (hits.length) lastScan.files += 1;
+      lastScan.sites += hits.length;
+      for (const m of hits) {
         const kind = m[1];
         if (kind === 'End') { ends++; continue; }
         if (kind === 'Start') starts++;
         const win = txt.slice(m.index! + m[0].length, m.index! + m[0].length + 600);
         const ns = /namespace:\s*'([^']+)'/.exec(win)?.[1];
         const ty = /type:\s*'([^']+)'/.exec(win)?.[1];
+        if (ns) lastScan.literal += 1;
         const line = txt.slice(0, m.index!).split('\n').length;
         const loc = `${rel}:${line}`;
         if (ns) {
@@ -98,5 +106,20 @@ describe('event contract — namespace registry · type format · start/end pair
   it('every literal emit call site is contract-compliant', () => {
     const v = scan();
     expect(v, v.length ? `\nEvent-contract violations (see docs/EVENT_CONTRACT.md):\n  ${v.join('\n  ')}\n` : '').toEqual([]);
+  });
+
+  it('actually READ the emit surface — silence is not a pass', () => {
+    // This guard asserts `violations === []` and, until now, never asserted it had found anything.
+    // Rename the helpers, move a directory, or land a codemod that changes the call shape, and it
+    // goes green having validated ZERO call sites — the failure mode that let `schema-check` clear
+    // a nonexistent column after reading none of a file's queries (bug log B74).
+    //
+    // The floors sit well under the real numbers (409 call sites in 195 files, 274 with a literal
+    // namespace at the time of writing), so ordinary churn never trips them and a collapse always
+    // does. If a refactor genuinely shrinks the emit surface, move these DELIBERATELY.
+    scan();
+    expect(lastScan.sites, `only ${lastScan.sites} emitEvent* call sites found — the scan is not reading the codebase`).toBeGreaterThan(250);
+    expect(lastScan.literal, `only ${lastScan.literal} call sites had a literal namespace to validate`).toBeGreaterThan(150);
+    expect(lastScan.files).toBeGreaterThan(100);
   });
 });

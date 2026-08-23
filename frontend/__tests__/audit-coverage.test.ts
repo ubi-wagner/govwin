@@ -94,18 +94,25 @@ function hasBusinessWrite(text: string): boolean {
   return false;
 }
 
+/** What the last scan actually EXAMINED — so "no violations" can be told apart from "no routes". */
+let lastScan = { routes: 0, mutating: 0, withWrites: 0 };
+
 function scan(): { route: string; writePath: string[] }[] {
   const violations: { route: string; writePath: string[] }[] = [];
+  lastScan = { routes: 0, mutating: 0, withWrites: 0 };
   for (const route of walk(API_DIR)) {
+    lastScan.routes += 1;
     const rel = path.relative(FRONTEND, route);
     const content = fs.readFileSync(route, 'utf8');
     if (!WRITE_VERB.test(content)) continue; // read-only route (GET etc.)
+    lastScan.mutating += 1;
 
     const files = [route, ...localImports(content, route)];
     const texts = files.map((f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } });
 
     const writers = files.filter((_f, i) => hasBusinessWrite(texts[i]));
     if (writers.length === 0) continue; // no business mutation on the 1-hop write path
+    lastScan.withWrites += 1;
 
     // AUDIT FIX (PATTERN_AUDIT HIGH-5): auth.ts carries its own session-bookkeeping
     // system_events INSERT, and EVERY authenticated route imports @/auth — counting it as
@@ -157,5 +164,20 @@ describe('audit coverage — no business write without a domain event', () => {
             `with a reason in __tests__/audit-coverage.test.ts:\n${msg}\n`
         : '',
     ).toEqual([]);
+  });
+
+  it('actually EXAMINED the route surface — silence is not a pass', () => {
+    // This moat asserts `violations === []` and never asserted it had looked at anything. Move
+    // `app/api`, rename a route file convention, or break `walk`, and it goes green having examined
+    // ZERO routes — while claiming that no business write is unaudited, which is a
+    // government-compliance claim, not a style preference. Same failure that let `schema-check`
+    // clear a nonexistent column after reading none of a file's queries (bug log B74).
+    //
+    // Floors sit well under the real numbers so ordinary churn never trips them and a collapse
+    // always does. If a refactor genuinely shrinks the surface, move these DELIBERATELY.
+    scan();
+    expect(lastScan.routes, `only ${lastScan.routes} route files walked — the scan is not reading app/api`).toBeGreaterThan(200);
+    expect(lastScan.mutating, `only ${lastScan.mutating} routes carried a write verb`).toBeGreaterThan(80);
+    expect(lastScan.withWrites, `only ${lastScan.withWrites} routes had a business write on the path`).toBeGreaterThan(40);
   });
 });
