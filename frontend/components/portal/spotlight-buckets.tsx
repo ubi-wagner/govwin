@@ -175,7 +175,28 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
             </div>
           ))}
           {err && <p className="text-xs text-rose-600">{err}</p>}
-          {buckets.length === 0 && !err && <p className="text-xs text-gray-400">{loading ? 'Loading buckets…' : 'No buckets yet.'}</p>}
+          {/* Since #189 no buckets are seeded on tenant creation, so this is a NEW CUSTOMER'S FIRST
+              VIEW, not a rare edge — it has to say what a bucket is and what to do, rather than
+              report an absence. It also states the fallback, because "no buckets" must not read as
+              "your opportunities are missing": the pipeline is there, just ordered by recency. */}
+          {buckets.length === 0 && !err && (
+            loading
+              ? <p className="text-xs text-gray-400">Loading buckets…</p>
+              : (
+                <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50/60">
+                  <p className="text-sm font-medium text-gray-700">No ranking lenses yet</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    A bucket is your own lens on the opportunity pipeline — name the keywords,
+                    agencies or program types you care about, and every opportunity gets scored
+                    against it as it arrives.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                    Until you add one, your opportunities are listed newest first.
+                    {canEdit ? ' Create your first lens above.' : ' An admin on your team can add one.'}
+                  </p>
+                </div>
+              )
+          )}
         </div>
       </div>
 

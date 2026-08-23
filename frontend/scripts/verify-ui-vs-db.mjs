@@ -118,6 +118,28 @@ try {
         uiBuilds === expected, `ui=${uiBuilds} db=${expected}`);
     }
   }
+
+  // ══ 1b · BUCKETS — the slot counter vs the rows and the configured cap ═══
+  //
+  // Flagged as UNCOVERED during the tri-lens audit and left that way, which by the rule in
+  // TESTING_STRATEGY means it was not passing — it was unmeasured. #189 made it matter: with no
+  // seeded buckets the counter starts at 0/N for every new tenant, and the cap moved 10 → 25.
+  // Source: components/portal/spotlight-buckets.tsx renders `{buckets.length}/{cap} used`, where
+  // cap comes from the buckets GET route (automation_framework.max_buckets_per_tenant).
+  console.log('\n══ 1b · the bucket slot counter vs the rows and the cap ══');
+  {
+    const body = await text(p, '/portal/foundation/buckets');
+    const m = body.match(/(\d+)\s*\/\s*(\d+) used/);
+    const [uiUsed, uiCap] = m ? [Number(m[1]), Number(m[2])] : [null, null];
+    const [{ n: dbUsed }] = await sql`
+      SELECT count(*)::int AS n FROM tenant_spotlight_buckets
+      WHERE tenant_id = ${tid} AND is_active`;
+    const [{ cap: dbCap } = { cap: null }] = await sql`
+      SELECT max_buckets_per_tenant::int AS cap FROM automation_framework WHERE id = 1`;
+    A('the page found a slot counter to read', m !== null, m ? m[0] : 'no "N/M used" on the page');
+    A('slots used equals the active bucket rows', uiUsed === dbUsed, `ui=${uiUsed} db=${dbUsed}`);
+    A('the cap shown is the configured cap', uiCap === dbCap, `ui=${uiCap} db=${dbCap}`);
+  }
   await ctx.close();
 
   // ══ 2 · ADMIN TENANT TABLE — three counts per row ════════════════════════

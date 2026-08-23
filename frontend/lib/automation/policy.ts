@@ -25,7 +25,6 @@
  */
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
-import { DEFAULT_BUCKETS } from '@/lib/spotlight/default-buckets';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('automation-policy');
@@ -87,23 +86,30 @@ interface TenantPolicyRow {
 
 /**
  * The platform cap on spotlight buckets per tenant (automation_framework
- * .max_buckets_per_tenant, mig 126; mig 181 moved the default 12→6). rfp_admin tunes it
- * globally at /admin/automation-framework. Framework-HARD: a tenant may not exceed it.
- * Falls back to DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
+ * .max_buckets_per_tenant, mig 126). rfp_admin tunes it globally at
+ * /admin/automation-framework. Framework-HARD: a tenant may not exceed it. Falls back to
+ * DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
  *
- * AUTHORING HEADROOM IS PART OF THE CAP (bug log B62). Every tenant-creation path seeds
- * DEFAULT_BUCKETS so cards rank on arrival, and mig 181 set the cap to 6 — exactly the
- * number seeded. RANKING_SPINE.md §15 asks for both in one breath ("12 → 6; keep all 6
- * seeded defaults"), and the arithmetic of that pairing is a closed door: a brand-new
- * tenant opens at 100% of cap, so the spine's own headline act — a customer authoring
- * their own scoring lens — answers 409 BUCKET_LIMIT before they have authored anything.
- * The floor below keeps the two numbers in a relationship instead of leaving them as
- * independent constants that silently collide again the next time either one moves.
+ * THE CAP IS AN AUTHORING BUDGET, and nothing is spent before the customer spends it.
+ * It used to be `DEFAULT_BUCKETS.length + headroom`, because every tenant-creation path
+ * seeded six starter buckets and mig 181 then set the cap to exactly six — so a brand-new
+ * tenant opened at 100% of cap and got 409 BUCKET_LIMIT before authoring anything (B62).
+ * Mig 203 patched that by adding headroom, which kept the two numbers entangled: move
+ * either and they collide again.
+ *
+ * Seeding is gone from the product path entirely (see lib/spotlight/default-buckets.ts),
+ * so the entanglement has no reason to exist. A bucket is now purely the customer's own
+ * lens — a 1:n they open empty and fill — and the cap is a single honest number.
+ *
+ * On the size of it: a bucket costs one pass over the tenant's own opportunity cards at
+ * creation and O(1) per card on arrival (`rankBucket` / the card-arrival rescore — plain
+ * deterministic SQL, no model call), plus O(buckets × cards) rows in tenant_bucket_scores.
+ * That is cheap, so the cap exists to bound STORAGE and to give an operator a lever, not
+ * because ranking is expensive. 25 is room to work in, not a rationing device.
  */
-export const BUCKET_AUTHORING_HEADROOM = 4;
-export const DEFAULT_MAX_BUCKETS = DEFAULT_BUCKETS.length + BUCKET_AUTHORING_HEADROOM;
-/** No configured cap may leave a freshly-seeded tenant unable to author a lens of its own. */
-export const MIN_MAX_BUCKETS = DEFAULT_BUCKETS.length + 1;
+export const DEFAULT_MAX_BUCKETS = 25;
+/** A cap below this would leave a tenant unable to author any lens at all. */
+export const MIN_MAX_BUCKETS = 1;
 export async function getMaxBucketsPerTenant(): Promise<number> {
   try {
     // camelCase off toCamel: max_buckets_per_tenant → maxBucketsPerTenant (declare + read camelCase).

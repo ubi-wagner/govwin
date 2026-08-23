@@ -11,7 +11,6 @@
  * provisioning fails.
  */
 import { sqlBypass } from '@/lib/db';
-import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
@@ -37,7 +36,10 @@ export async function ensurePartnerOwnOrgProvisioned(
     return false;
   }
 
-  try { await seedDefaultBuckets(tenantId, userId); } catch (e) { console.error('[partner/own-org] seed buckets failed:', e); }
+  // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
+  // they open empty and fill — so the product imposes none, and the cap is a pure authoring
+  // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
+  // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
   try { await backfillTenant(tenantId); } catch (e) { console.error('[partner/own-org] backfill failed:', e); }
   try { await scoreTenantCards(tenantId); } catch (e) { console.error('[partner/own-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(tenantId, { id: userId }); } catch (e) { console.error('[partner/own-org] starter-set copy failed:', e); }

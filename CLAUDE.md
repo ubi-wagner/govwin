@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1670 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1692 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **205**; migs 186–188 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **206**; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
 merges three layers PER FIELD — `pattern_match` (`lib/ingest/pattern-extract.ts`, a deterministic, DB-free,
@@ -72,10 +72,11 @@ it instead of racing the async shred), with an explicit `allowDefaultSkeleton` o
 hitl > verified > override > pattern_match > ai > default. Mig 186 gave `episodic_memories` PLATFORM scope
 (`tenant_id IS NULL`) so curation memory actually persists; migs 183–185 add section-comment anchors + the
 per-command RLS backstop closing shared writes on `document_templates` then `tasks`/`process_instances` — mig 180 the bucket-score
-integrity floor, mig 181 the **opportunity ranking spine** (bucket cap→6 · designee `can_manage_buckets` · admin
+integrity floor, mig 181 the **opportunity ranking spine** (designee `can_manage_buckets` · admin
 OPP `update_watch` · start-nudge watermark), canonical **docs/RANKING_SPINE.md**; mig 182 the master OPP
 `build_complete` flag behind the provisioning cockpit (above): customer-admin/designee bucket
-authoring → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
+authoring (a **1:n the customer opens EMPTY** — mig 206/#189 removed seeded defaults and made the cap a
+plain rfp-admin-settable authoring budget of 25, no longer `seeded + headroom`) → cap → OPP-push rescore + new-bucket reshuffle → one mirror-OPP list re-rankable by any bucket lens →
 admin pin-for-updates (holder fan-out, pre-purchase) → notify/nudge (the hot-closing-soon start-nudge) → provision;
 mig **179** the **Command Center** watermark (`command_seen_state` — the tenant · admin · partner "new since you
 looked" cockpits, docs/COMMAND_CENTER_DESIGN.md); mig **183** span/node-anchored comments — the rebuilt

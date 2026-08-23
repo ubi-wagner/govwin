@@ -1,11 +1,21 @@
 /**
- * Default spotlight buckets (#104).
+ * Starter spotlight buckets — a FIXTURE catalog, no longer a production path (#104, then #189).
  *
- * A new tenant had ZERO spotlight buckets, so the scorer (rankBucket / rescore) had nothing to
- * score against and every fanned card ranked null — the Opportunity Pipeline never
- * ordered itself. This seeds a sound STARTER set of theme + program buckets on
- * tenant creation (idempotent) so cards rank the moment they arrive; the tenant
- * then customizes from there.
+ * ⚠️ `seedDefaultBuckets` is NOT called on tenant creation any more. It was, from all four
+ * creation paths, and that is what entangled the bucket cap with the number seeded: mig 181 set
+ * the cap to exactly the six that were seeded, so a brand-new tenant opened at 100% of cap and
+ * was refused 409 BUCKET_LIMIT before authoring anything (B62). Mig 203 papered over it with
+ * headroom; #189 removed the seeding instead, which is the root.
+ *
+ * A spotlight bucket is the CUSTOMER's own ranking lens — a 1:n they open empty and fill. The
+ * product imposes none. Until a tenant authors one, /cards falls back to `is_pinned` then
+ * `updated_at DESC`: recency-ordered, not blank.
+ *
+ * What this module is FOR now:
+ *   · test fixtures — a realistic multi-bucket tenant without hand-writing criteria
+ *   · the sandbox/demo seed — so the demo box and the guide screenshots show a RANKED pipeline
+ * Both are deliberate callers that want buckets. Production tenant creation is not one of them.
+ * If you are adding a third caller, check you are not re-introducing the entanglement above.
  *
  * Criteria match `scoreCard` (lib/bucket-ranking.ts): keyword hits over the card's
  * title + spotlight summary + description + office, exact program-type match, and

@@ -7,7 +7,6 @@ import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { scoreTenantCards } from '@/lib/cards/score-tenant';
-import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { backfillTenantTemplates } from '@/lib/template-bridge';
@@ -248,13 +247,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     //    Post-commit + best-effort: a backfill failure must NEVER fail the accept.
     //    Awaited (not fire-and-forget) so serverless doesn't kill it mid-replay; if
     //    the river grows large, move this to an out-of-band job keyed on the event.
-    // Seed the default spotlight buckets FIRST so the backfilled cards below rank
-    // on arrival (a fresh customer lands with a ranked pipeline, not a flat list).
-    try {
-      await seedDefaultBuckets(tenantId, newUserId);
-    } catch (bucketErr) {
-      console.error('[api/admin/applications/accept] default-bucket seed failed (non-fatal):', bucketErr);
-    }
+    // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
+    // they open empty and fill — so the product imposes none, and the cap is a pure authoring
+    // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
+    // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
 
     // The question this application asked has been answered, so the ToDos that asked it are moot
     // (bug log B51 — three accepted applications still carrying six open "review this" ToDos).
