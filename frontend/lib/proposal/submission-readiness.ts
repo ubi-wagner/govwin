@@ -17,6 +17,7 @@
  *
  * Read-only + advisory: it computes and reports; it never locks, submits, or writes business tables.
  */
+import { readFindings, checklistFor } from '@/lib/proposal/scoped-findings';
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
@@ -46,7 +47,9 @@ export type BlockerCategory =
   | 'work_split'
   | 'format_floor'
   /** Compliant but obviously unfinished — an unused page envelope, no figures, no emphasis. */
-  | 'underfilled';
+  | 'underfilled'
+  /** A colour-team finding nobody has resolved yet. ALWAYS a warning — see below. */
+  | 'open_finding';
 
 export interface ReadinessBlocker {
   category: BlockerCategory;
@@ -173,6 +176,7 @@ const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   format_floor: 7,
   // Last: never let a polish warning sit above a real submission blocker in the list.
   underfilled: 8,
+  open_finding: 9,
 };
 
 /**
@@ -521,6 +525,33 @@ export async function computeSubmissionReadiness(
           + 'came from the program default list, not from this solicitation — confirm whether it applies.'
         : `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
     });
+  }
+
+  // ── OPEN REVIEW FINDINGS (Phase E) ──────────────────────────────────────────────────────────
+  // What the gate could never say before: not "reviewed / not reviewed", but WHICH pieces of
+  // outstanding review work remain, and about what. Grouped by scope so the list names a figure, a
+  // group, a page range or a section rather than repeating the proposal's name N times.
+  //
+  // SEVERITY IS ALWAYS 'warning', never 'blocker', and that is a rule rather than a default. An
+  // unresolved finding is an AI's recommendation; the agent invariants say agent output never
+  // advances a gate, and letting it REFUSE a submission would break the same rule from the other
+  // side. A human decides; the gate makes sure they decide with the list in front of them.
+  //
+  // Best-effort: a proposal nobody has reviewed contributes nothing, and a read failure must not
+  // turn a submittable proposal into an unsubmittable one.
+  try {
+    const findings = await readFindings(proposalId);
+    const checklist = checklistFor(findings, { level: 'document' });
+    for (const g of checklist.byScope) {
+      blockers.push({
+        category: 'open_finding',
+        severity: 'warning',
+        message: `${g.open} unresolved review finding${g.open === 1 ? '' : 's'} on ${g.label}`
+          + `${g.total > g.open ? ` (${g.total - g.open} already resolved)` : ''}.`,
+      });
+    }
+  } catch (e) {
+    console.error('[readiness] open-finding roll-up failed (non-fatal)', e);
   }
 
   blockers.sort((a, b) => CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category]);
