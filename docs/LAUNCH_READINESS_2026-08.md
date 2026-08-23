@@ -187,3 +187,56 @@ already carry a "no-longer-authoritative / historical snapshot" header.
 **(1)** `DATABASE_URL_OWNER` on frontend → **(2)** `ANTHROPIC_API_KEY` on the pipeline → **(3)** `PROD_SMOKE_TEST`
 on live prod → **(4)** confirm comp-code for cohort #1. Then fast-follow the lying-button fix and
 `AGENT_GATE_SWEEP_URL`. Everything else is deliberate scope or non-blocking polish.
+
+---
+
+## 8. Addendum 2026-08-23 — the verification arc (migs 186–205, B68–B76)
+
+**The punch list in §4.A is unchanged: still CONFIG · PROVE · DECIDE, still zero new code.** What changed
+is how much of the claim "internally proven" is now backed by measurement rather than by passing tests.
+
+**Backbone now:** migration head **205** (was 185) · `tsc` 0 · `vitest` **1670** (was 1129) · `next build`
+exit 0 · bug log 76 entries, **0 open**, 2 deferred (B30, B33).
+
+### What the arc actually established
+
+Seven defects closed (B68–B76). The one that matters most for launch judgement is **B73**, because it was
+not a test failing — it was **HTTP 500 to a tenant_admin opening her own volume**, on rows that exist in the
+database today, while that same volume downloaded as a correct PDF. Three stored TVSF artifacts carry a
+partial canvas spec (`{width,height,margins}`, no `font_default`); the exporters default every field they
+read and the ruler did not. Reproduced live before the fix and 200 after.
+
+**That is the launch lesson, and it generalises past the ruler:** every fixture in this repo is built by
+`CANVAS_PRESETS`, which is complete by construction. Customer rows are not. Nothing in the suite had ever
+handed the product a partial one.
+
+### Six instruments now exist that did not
+
+| harness | standing today |
+|---|---|
+| `verify-ruler-on-proposals.mts` | 8 authored volumes — **8/8 exact, 0 under-counts** |
+| `verify-ruler-on-stored-artifacts.mts` | every artifact row in the DB — **37: 36 exact, 1 over, 0 under** |
+| `verify-exports-on-stored-artifacts.mts` | **41 volumes · 78 exports · 0 failures** — every stored volume downloads in every format offered |
+| `calibrate-page-ruler.mts` | 36 synthetic cases vs Chromium (4 within a stated ±1) |
+| `calibrate-slide-ruler.mts` | 7 deck cases vs a rendered `.pptx` |
+| `sweep-mold-quality.mts` | 39 shipped molds — 39 clean, 0 needing a look |
+
+Plus `__tests__/node-vocabulary-coverage.test.ts` (all 22 `NodeType`s through all four writers, compile-enforced)
+and a corrected `scripts/schema-check.mjs` — which had been reading **767 of 2,174** SQL blocks and clearing
+files it never opened; it now verifies **2,560 references across 683 files with 0 findings** (B74).
+
+### What this does and does not license
+
+- **Does:** the claim "a customer can build a proposal and download it" is now measured on real rows in every
+  offered format, not inferred. The compliance gate never under-counts on any corpus tested.
+- **Does not:** none of it exercises the real model. §4.A item 2 (`ANTHROPIC_API_KEY`) and item 3 (the live
+  smoke test) are exactly as load-bearing as they were, and the visual reviewer's vision half remains
+  unproven by design — the emulator cannot see images and returns `[]` rather than inventing findings.
+- **One amendment to §4.A item 3:** run `PROD_SMOKE_TEST.md` against data shaped like a real customer's,
+  not only a freshly-seeded build. B73 was invisible to every fixture and obvious on the first stored row.
+
+### Known residual, stated so it is not rediscovered as a bug
+
+Five molds' page estimates read 1–2 pages long. B76 established this is **structural, not a defect**:
+the ~8% headroom the ruler needs so real prose never under-counts is exactly what makes a bracket-heavy
+template read long. Measured, written up, and deliberately not tuned away.
