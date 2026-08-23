@@ -661,7 +661,36 @@ export function createNode(opts: {
  * Proportional-font average glyph width ≈ 0.45 × font size (Times New Roman body).
  */
 /** Per-format usable geometry + flow metrics (points) — shared by the page, slide, and section rulers. */
-function flowMetrics(c: CanvasDocument['canvas']) {
+/**
+ * A PARTIAL canvas spec is a real shape in the database, and the ruler used to die on it.
+ *
+ * `paginate` guards a MISSING canvas (`doc.canvas ?? CANVAS_PRESETS.letter_standard`) and nothing
+ * guarded a partial one. Three stored TVSF volumes carry `{width, height, margins}` and no
+ * `font_default`, so `c.font_default.size` threw `Cannot read properties of undefined (reading
+ * 'size')` — on real customer rows, today. The EXPORTERS never noticed: `canvasBaseCss` defaults
+ * every field it reads (`font_default ?? { family: 'Times New Roman', size: 12 }`), so the same
+ * volume downloads as a correct PDF while the page gauge, the layout route, the readiness verdict
+ * and the compliance floor all throw on it.
+ *
+ * That asymmetry is the defect — one half of the system tolerant, the other half brittle, over the
+ * same data. These defaults are canvas-html's, deliberately, so the ruler measures the document the
+ * exporter will actually draw rather than refusing to measure at all.
+ */
+const FRAME_DEFAULTS = {
+  width: 612, height: 792,
+  margins: { top: 72, right: 72, bottom: 72, left: 72 },
+  font_default: { family: 'Times New Roman', size: 12 },
+  line_spacing: 1.15,
+} as const;
+
+function flowMetrics(raw: CanvasDocument['canvas']) {
+  const c = {
+    width: raw?.width ?? FRAME_DEFAULTS.width,
+    height: raw?.height ?? FRAME_DEFAULTS.height,
+    margins: { ...FRAME_DEFAULTS.margins, ...(raw?.margins ?? {}) },
+    font_default: { ...FRAME_DEFAULTS.font_default, ...(raw?.font_default ?? {}) },
+    line_spacing: raw?.line_spacing ?? FRAME_DEFAULTS.line_spacing,
+  };
   const usableW = Math.max(1, c.width - c.margins.left - c.margins.right);
   // A RUNNING HEADER TAKES NOTHING FROM THE CONTENT BOX — it lives IN the margin (B69).
   //

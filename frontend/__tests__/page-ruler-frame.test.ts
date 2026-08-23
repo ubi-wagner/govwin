@@ -58,6 +58,47 @@ describe('page frame — running header and footer live in the margin', () => {
   });
 });
 
+describe('a PARTIAL canvas spec — the shape that is actually in the database', () => {
+  // Found by measuring the ruler against stored `proposal_artifacts` rather than synthetic
+  // documents. Three TVSF volumes carry `{width, height, margins}` and no `font_default`, and
+  // `flowMetrics` read `c.font_default.size` — so the page gauge, the layout route, the readiness
+  // verdict and the compliance floor all threw `Cannot read properties of undefined (reading
+  // 'size')` on rows that exist today, while the SAME volume downloaded as a correct PDF because
+  // `canvasBaseCss` defaults every field it reads. One half of the system tolerant, the other
+  // brittle, over the same data.
+  const frameOnly = { width: 612, height: 792, margins: { top: 72, right: 72, bottom: 72, left: 72 } };
+
+  it('measures a canvas with no font_default instead of throwing', () => {
+    const d = { version: 1, canvas: frameOnly, nodes: [text(30)] } as unknown as CanvasDocument;
+    expect(() => paginate(d)).not.toThrow();
+    expect(paginate(d).totalPages).toBeGreaterThan(0);
+  });
+
+  it('measures a canvas with no margins, and one with no dimensions', () => {
+    const noMargins = { version: 1, canvas: { width: 612, height: 792 }, nodes: [text(30)] } as unknown as CanvasDocument;
+    const noDims = { version: 1, canvas: { margins: { top: 72, right: 72, bottom: 72, left: 72 } }, nodes: [text(30)] } as unknown as CanvasDocument;
+    expect(() => paginate(noMargins)).not.toThrow();
+    expect(() => paginate(noDims)).not.toThrow();
+  });
+
+  it('falls back to what the EXPORTER would draw, not to an invented frame', () => {
+    // The defaults must be canvas-html's, or the ruler measures a document the exporter will not
+    // produce — which is the defect class the whole calibration exists to prevent. A frame-only
+    // canvas therefore has to agree with letter_standard at 12pt, which is what canvasBaseCss
+    // substitutes for a missing font_default.
+    const partial = { version: 1, canvas: frameOnly, nodes: [text(62)] } as unknown as CanvasDocument;
+    const explicit = doc([text(62)]);
+    expect(paginate(partial).totalPages).toBe(paginate(explicit).totalPages);
+  });
+
+  it('still honours the fields a partial canvas DOES declare', () => {
+    // The guard against over-correcting into "ignore the canvas": narrower margins must still
+    // change the answer.
+    const wide = { version: 1, canvas: { ...frameOnly, margins: { top: 144, right: 72, bottom: 144, left: 72 } }, nodes: [text(62)] } as unknown as CanvasDocument;
+    expect(paginate(wide).totalPages).toBeGreaterThan(paginate({ version: 1, canvas: frameOnly, nodes: [text(62)] } as unknown as CanvasDocument).totalPages);
+  });
+});
+
 describe('figure slot — an image with an empty storage_key is a dashed box, not a figure', () => {
   const slot = (extra: Record<string, unknown> = {}) => node('image', {
     storage_key: '', alt_text: 'Figure 1. System architecture', ...extra,
