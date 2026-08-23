@@ -59,6 +59,24 @@ different products:
 **I have assumed (a).** If you want (b), say so and Phase F is re-planned as its own programme —
 it is not a variation, it is a different piece of work.
 
+> **DECIDED 2026-08-23 — (a), and section level is the floor.** The grant is
+> `collaborators.assigned_sections`, full stop. `collaborator_stage_access.artifact_types` stays
+> **deliberately unwired**: it is `SELECT`ed in `lib/proposal-access.ts:200` and carried in three
+> component prop types, and it is read by **no filter, no gate and no rendered element** — a column
+> the product does not act on.
+>
+> That is the safe state, not an oversight, and the reason is worth writing down because the column
+> *looks* like a second gate. It isn't one, and wiring it would make isolation depend on TWO
+> predicates that can disagree. A `cost` artifact type carries no section ids; `assigned_sections`
+> carries no artifact types; the cost volume is reachable or not according to whether its sections
+> are in the grant. One predicate, one answer. B83 was exactly what happens when a second, weaker
+> check is mistaken for the real one.
+>
+> The concrete rule for anyone extending this: **a new surface that returns proposal content gates
+> on `resolveUserAccess(...).{editable,commentable,viewable}Sections`.** If you find yourself
+> reaching for `artifactTypes`, the answer you want is already in those three arrays. Do not
+> re-litigate this without a product reason that section ids genuinely cannot express.
+
 ## One thing that makes Phase E smaller than it looks
 
 There is **no findings table, and none is needed**. A colour-team finding IS a `proposal_comments`
@@ -192,7 +210,8 @@ narrative of what actually happened with the numbers — not a green tick.
 
 1. **`image`** — suppressed demand or absent. The measurement cannot resolve it (the library holds
    only what the pipeline could emit, which is the thing under investigation).
-2. **Collaborator granularity** — assumption (a) or (b).
+2. ~~**Collaborator granularity** — assumption (a) or (b).~~ **CLOSED 2026-08-23: (a),
+   section-level, `artifact_types` unwired.** See the decision box above.
 3. **`assembleSections().totalPages`** — currently a documented upper bound (sections can share a
    page). A true document total means routing through `paginate`; that is a decision about what the
    number is *for*.
