@@ -69,7 +69,7 @@ DRIVES=(
 )
 
 pass=0; fail=0; missing=0; cantrun=0
-declare -a FAILED
+declare -a FAILED=()   # initialised: `${#FAILED[@]}` on a declared-but-unset array trips `set -u`
 
 printf '%-24s %-8s %s\n' "DRIVE" "RESULT" "DETAIL"
 printf '%-24s %-8s %s\n' "------------------------" "--------" "------"
@@ -115,9 +115,11 @@ done
 echo
 echo "── ${pass} passed · ${fail} failed · ${cantrun} could-not-run · ${missing} missing ──"
 echo "   (could-not-run measured NOTHING — it is uncovered, not passing, and not a finding)"
-if [ ${#FAILED[@]} -gt 0 ]; then
+# Decide on the COUNTERS, not on the array — an empty array expansion is exactly what tripped
+# `set -u` here and made a fully green run exit with a shell error.
+if [ $((fail + cantrun + missing)) -gt 0 ]; then
   echo "logs for the failures:"
-  for f in "${FAILED[@]}"; do echo "  $OUT/${f%% *}.log"; done
+  for f in ${FAILED[@]+"${FAILED[@]}"}; do echo "  $OUT/${f%% *}.log"; done
   exit 1
 fi
 exit 0

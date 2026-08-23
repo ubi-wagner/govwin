@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 interface Params { params: Promise<{ tenantSlug: string; proposalId: string }> }
 
-/** GET — fetch the active seed job for a proposal (rfp_admin / master_admin only). */
+/** GET — fetch the active seed job for a proposal (tenant_admin+ of the owning tenant; W3.1 made reuse self-serve). */
 export async function GET(_req: Request, { params }: Params) {
   const { tenantSlug, proposalId } = await params;
 
