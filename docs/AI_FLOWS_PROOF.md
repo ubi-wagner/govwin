@@ -164,3 +164,43 @@ is the remaining Track A work, and it is now a mechanical list rather than an op
 `OnIngestAssessmentRequested` appears here even though the register above records assess-ingest
 firing: those runs predate this database. Uncovered means no evidence *here*, which is exactly the
 staleness the lens is designed to make visible rather than paper over.)
+
+### Coverage run — 15 uncovered down to 9, MISS still none
+
+Two scripts fire the domain emitters, and the split between them is not cosmetic:
+
+- `frontend/scripts/fire-uncovered-triggers.mjs` — route-backed emitters, driven through a real
+  signed-in `master_admin` session.
+- `frontend/scripts/fire-uncovered-lib-triggers.mts` — emitters that are domain functions with no
+  route in front of them, called directly (as `verify-studio-voice.mts` calls `requestReviewPhase`).
+
+**Neither may use `POST /api/admin/workflows`.** That launcher emits the trigger with the operator's
+overlay AS the payload, so clearing an UNCOVERED through it would compare my own typing to the
+`input_map` — a tautology that turns every uncovered workflow into a false pass. A direct lib call is
+different in exactly the way that matters: I supply DOMAIN arguments, and the lib decides which keys
+the event carries. Those keys are the thing under test, and they come from the product.
+
+Cleared so far (6): `OnIngestAssessmentRequested` · `OnIngestPhaseRequested{Extract,Matrix,Molds,
+Review}` · `OnOpportunitiesDetected`. All clean — no MISS. Their `guidance` shows as WEAK, correctly:
+it is only populated on a `regenerate`.
+
+Still uncovered (9), each with the reason it was not cleared:
+
+| workflow | emitter | why not yet |
+|---|---|---|
+| `OnRfpUploaded` | `admin/rfp-upload` route | needs a real file upload |
+| `OnApplicationAccepted` | `admin/applications/[id]/accept` | `applications` is empty — needs one to accept |
+| `OnCollaboratorInvited` | portal collaborators route | needs an invite against a live proposal |
+| `OnProposalCreated` | `provisionProposalForPortal` | provisions a whole build; needs setup + teardown |
+| `OnProposalOutcomeRecorded` | `lib/proposal/outcome-todo.ts` | needs a proposal at outcome stage |
+| `OnPortalStageReviewRequested` | `lib/portal-workflow.ts` | needs a portal stage advance |
+| `OnSolicitationReviewRequested` | `lib/tools/solicitation-request-review.ts` | an agent TOOL, not a route (my first probe hit 404 — reported not-tried, not refused) |
+| `OnSourceChangeDetected` | `lib/tools/source-scout.ts` | an agent TOOL; needs a source profile with a real change |
+| `OnCmsContentRequested` | **none** | see below |
+
+**`OnCmsContentRequested` has no domain emitter at all.** Not in the frontend, the pipeline, or the
+CRM service. The agent roster states it plainly: *"Admin-launched via LaunchContentClient; no
+automatic emitter (that stays post-V1)"* — and `LaunchContentClient` posts to the generic workflow
+launcher. So its only producer is the launcher, which by the rule above is not evidence. This one
+cannot be cleared by firing; it needs a decision — give it a real emitter, or document it as
+launcher-only. Recorded rather than counted as covered.
