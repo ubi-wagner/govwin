@@ -99,6 +99,16 @@
 > a list, failing on a rendered error surface OR a client throw, and **reporting** (never skipping)
 > any route it cannot address from sandbox data.
 >
+> **Standing after both fixes: 76 surfaces driven · 76 clean · 0 broken.** Five routes are NOT
+> driven and are named in the run — `/admin/documents/[documentId]`, `/admin/site/[pageKey]`,
+> `/admin/site/docs/[type]/[slug]`, `/portal/[slug]/contracts/[contractId]`,
+> `/portal/[slug]/documents/[documentId]` — because the sandbox has no row to address them. That is
+> a real coverage gap (seed those five and it closes), not a pass. The sweep itself had the same
+> defect it exists to catch: `addressable()` tested the bound STRING for a leftover `[…]`, and an
+> empty substitution passes, so `/admin/documents/` — a different route that happens to exist — was
+> counted as a clean drive of a page never visited. Five routes were reported that way before it was
+> fixed to test the bindings.
+>
 > ### B68–B74 — the ruler, the vocabulary, and the tool that was clearing SQL it never read
 >
 > **The page ruler now agrees with the page on every authored proposal, and the safety property is
