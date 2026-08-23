@@ -80,7 +80,17 @@ on `canvas.format` into three bespoke surfaces over the same `CanvasNode[]`:**
 - **The fluid document view is the DEFAULT surface, not an admin-only tab.** `proposal-workspace.tsx:177`
   opens tenant-wide members on `document` and scopes non-tenant-wide collaborators to `my-sections` — which
   is simultaneously "fluid as default" (§7.5) and the collaboration lens (§3). The earlier "behind the
-  admin-only Document tab" line described a state the product left behind.
+  admin-only Document tab" line described a state the product left behind. The tab row as rendered is
+  **Document · All Sections · My Sections · Timeline** (`:228-230`; the `workspace` key is labelled
+  "All Sections"), and the fluid view carries the §3 slim action bar — overlay chips left, save state right,
+  with the comment at `fluid-document-view.tsx:437` recording that "the Manage tab-row dissolves into this."
+
+> **A method note, because it cost a wrong statement in this very file.** The first pass of this review
+> read the `OVERLAYS` **array** and concluded "Compliance + Budget do not exist." The screenshot of the
+> running page showed five chips. Both layers were there, hand-rolled next to the shared bar. Reading a
+> definition is not reading a surface — the same confusion that let a 200 stand in for a rendered page
+> (bug log B78/B79). **For any claim in this document about what a user sees, look at the capture:**
+> `docs/assets/guides/customer/09b-fluid-document.png`.
 - **Export** (`lib/export/*`, `renderCanvas` dispatcher): docx (`docx`) · pptx (`pptxgenjs`, one section =
   one slide) · xlsx (`exceljs`, one table = one worksheet, real formulas) · pdf (Chromium). Whole-proposal
   package `?format=json|docx|pdf|zip`. Uploaded S3 images now inline to data-URIs across all four (W4.3).
@@ -178,7 +188,7 @@ From the Phase-1 baseline (G1–G17), updated to current reality:
 | # | Phase | Status | Evidence |
 |---|---|---|---|
 | 0 | Revert nav-sectioning (compartment drift) | ✅ **DONE** | — |
-| 1 | Shared **`OverlayLayer`** | ✅ **SHIPPED, 3 of 5 layers** | `canvas-overlays.tsx:19-21` defines exactly `sections · atoms · provenance`. Mounted on the fluid view (`:437`), the section editor, **and the sheet grid** (`sheet-editor.tsx:692`). **Compliance + Budget layers do not exist.** |
+| 1 | Shared **`OverlayLayer`** | ✅ **all 5 layers on the default surface — but only 3 are SHARED** | `canvas-overlays.tsx:19-21` defines `sections · atoms · provenance`, mounted on the fluid view (`:437`), the section editor **and the sheet grid** (`sheet-editor.tsx:692`). **Compliance + Budget also ship** — but as hand-rolled buttons with their own `showCompliance`/`showBudget` state in `fluid-document-view.tsx:440-450`, reading real data (the compliance matrix `:100`, the page budget `:109`). So a reader of the fluid view sees all five chips; the editor and the sheet can never get the last two, because they are not in `OVERLAYS`. The gap is **not unbuilt layers — it is two layers built outside the shared abstraction.** |
 | 2 | Unify **`ActOnSelection`** | 🟡 **BUILT, UNEVENLY MOUNTED** | All five verbs are props on `SelectionToolbar` (`:18-22`); the fluid view wires 4, the editor 3, the sheet 0. Nothing left to *build* — only to mount. |
 | 3 | **Sheets into the shell** | 🟡 **PART-DONE — overlays only** | The sheet got `CanvasOverlayBar`, but `canvas-editor.tsx:191` still early-returns to `SheetEditor` *before* `CanvasEditorInner`, so it has no selection verbs, no sidebar, no AI. No ribbon. `sheet-media-strip.tsx:33` filters `image \| shape` → **no chart-from-range**. |
 | 4 | **Slides finish** | ❌ **NOT DONE** | `slide-editor.tsx:35` still splits the flat node list on `page_break`; section=slide is not canonical. No `position` handling → no on-slide direct placement. |

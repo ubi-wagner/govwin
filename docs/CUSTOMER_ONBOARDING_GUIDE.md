@@ -383,6 +383,34 @@ a due date re-arms its reminders rather than leaving stale ones behind.
 
 ![The proposal workspace](./assets/guides/customer/09-proposal-workspace.png)
 
+### The four tabs — and which one you land on
+
+Under the header the workspace offers **Document · All Sections · My Sections · Timeline**, and where you
+land depends on your access:
+
+| You are | You open on | Why |
+|---|---|---|
+| A **tenant-wide** member (`tenant_admin` or staff with whole-workspace access) | **Document** | The whole proposal as one continuous canvas — the normal place to work |
+| A **scoped collaborator** (assigned to specific sections) | **My Sections** | You see only what is yours; the rest of the build is not your concern |
+
+**Document is the main surface.** It is the whole proposal as one flowing canvas, with the outline down
+the left, and a chip row that summons five overlays over your own content — **Sections · Atoms ·
+Provenance · Compliance · Budget**. They are all off by default; turn one on when you want to see that
+layer, and off again when it's in the way. Select a span and you get **Atomize · Annotate · Reuse ·
+Compliance-check**. Edits autosave, and the bar tells you what's unsaved.
+
+![The Document tab — the whole proposal as one canvas, with the overlay chips](./assets/guides/customer/09b-fluid-document.png)
+
+The **Proposal Studio** panel sits above it — three gated loops (Draft → Refine → Compliance) you can
+step through or **Run all 3 automatically**. It is advisory: drafts land in review, and nothing locks or
+submits on its own. When the build is submitted, **Record the outcome** (Won · Lost · Withdrawn) — a win
+starts the contract and drops a kickoff task in your queue, and every outcome tunes your library atom
+scores for future drafts.
+
+**My Sections** is the same canvas, filtered to your assignments:
+
+![My Sections — a collaborator's scoped view](./assets/guides/customer/09c-my-sections.png)
+
 ---
 
 ## Step 9: AI Drafts Your Sections
@@ -416,7 +444,9 @@ Click into any section to review the AI's work in the canvas editor.
 
 ## Step 10: Review and Revise in the Canvas Editor
 
-Click any section from the workspace to open the **WYSIWYG Canvas Editor**.
+Click any section from the workspace to open the **WYSIWYG Canvas Editor** — the per-section surface,
+for when you want to work on one piece with the full node-level toolset rather than on the whole
+document. (The Document tab in Step 9 is where most work happens; this is the close-up.)
 
 ![The canvas editor — the page at real dimensions, with the compliance sidebar](./assets/guides/customer/10-canvas-editor.png)
 

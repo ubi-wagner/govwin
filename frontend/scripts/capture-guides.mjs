@@ -215,6 +215,15 @@ try {
     }
     if (ID.proposalId) {
       await target(p, OUT, { name: '09-proposal-workspace', url: `${S}/proposals/${ID.proposalId}` });
+      // THE SURFACE THE PRODUCT ACTUALLY OPENS ON, which the guides did not illustrate.
+      //
+      // `proposal-workspace.tsx:177` opens a tenant-wide member on the `document` tab — the fluid,
+      // whole-proposal canvas — and scopes a non-tenant-wide collaborator to `my-sections`. The
+      // canvas review (docs/CANVAS_ARCHITECTURE.md §2, re-verified 2026-08-23) found the guides
+      // describing the per-section editor as *the* working surface, which is the tab a reader
+      // reaches second. Capture the default, with its overlay bar and its four selection verbs.
+      await tabShot(p, OUT, '09b-fluid-document', 'Document');
+      await tabShot(p, OUT, '09c-my-sections', 'My Sections');
       if (ID.sectionId) {
         // The canvas is a fixed-viewport surface: a fullPage shot of a paginated editor is a
         // 12,000px strip nobody can read in a guide.
