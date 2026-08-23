@@ -270,6 +270,22 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   because the first three were all green while the dashboard told a customer with 8 builds they had
   6 (B80). Its rule: the expectation must be the page's **own query, copied from its source** — a
   predicate you believe is equivalent manufactures confident, wrong findings.
+- **Run all four on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
+  where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
+  survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.
+- **Four verification rules, each learned by breaking it** (full write-up: docs/TESTING_STRATEGY.md):
+  (1) **Red first** — a check that has never failed proves nothing; show it failing on the unfixed
+  code, then fix, then show it passing on the same build. (2) **The instrument before the finding** —
+  a new harness's first output describes the HARNESS; validate against a known answer before
+  reporting (the contract lens's first run reported 38 violations, all phantom, from truncating the
+  body before `JSON.parse`). (3) **Copy the predicate from the source**, never re-type one you
+  believe equivalent. (4) **Assert the contract the system HAS** — `DELETE` on a bucket is a
+  deactivation by design, so asserting "the row is gone" is a harness bug, not a finding.
+- **Cross-check when it matters.** The four lenses share a stack (Playwright + one postgres.js client
+  + assertions written in one sitting), so a green lens shows the lens and the product AGREE — weaker
+  than showing the product is right. `scripts/crosscheck-shipped-fixes.sh` (curl + psql, no browser)
+  and `scripts/crosscheck-canvas-normalize.mts` (the shipped normalizer over every stored canvas)
+  share nothing with them. Not a fifth lens: a cross-check that cannot dissent is decoration.
 - **Anything touching layout or export** additionally runs the six canvas measurement harnesses, which
   compare the product's own writers against the artifact that comes out (docs/TESTING_STRATEGY.md):
   `verify-ruler-on-proposals` and `verify-ruler-on-stored-artifacts` are the SAFETY GATES — the ruler

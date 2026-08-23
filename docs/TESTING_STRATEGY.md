@@ -259,8 +259,10 @@ The test pyramid above is *what* to write; this is the ordered sequence every ch
 before it is called done. Each gate must pass before the next is meaningful:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. First gate, always.
-2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1129/1129** at migration
-   head 185). Run on every change, not only schema changes.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1680/1680**, 173 files,
+   at migration head 205). Run on every change, not only schema changes. In a resource-constrained
+   sandbox the default worker pool can collapse with `Cannot find package '@/...'` across ~all files —
+   that is worker exhaustion, not a code fault; confirm with `--no-file-parallelism` before chasing it.
 3. **Migration (schema changes only)** — apply the new migration through the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner tracks
    applied files in `_migration_history`, so re-running must be a clean no-op (idempotency proof).
@@ -277,9 +279,75 @@ before it is called done. Each gate must pass before the next is meaningful:
    in its lane. Every reported finding must be **PROVEN** — reproduced against the running app or the
    sandbox DB — before it is filed. An unproven "possible bug" is discarded, not reported; the sweep's
    value is that it lands only defects it can demonstrate.
+7. **The four lenses (any UI/API/DB change, and any backward review)** — `verify-surfaces` ·
+   `verify-api-contract` · `verify-db-crud` · `verify-ui-vs-db`, against a running box. Detailed below;
+   the fourth is not optional, because the other three were all green through B80.
 
-**Sandbox DB coordinates:** `postgres://claude:claude@127.0.0.1:5433/govtech_intel` (local PG16, trust
-auth). This is the target for steps 3, 5, and the SQL lane of step 6.
+**Sandbox DB coordinates:** `postgresql://govtech:changeme@localhost:5432/govtech_intel` (local PG16).
+This is the target for steps 3, 5, 7 and the SQL lane of step 6.
+
+> ⚠️ This line used to name `postgres://claude:claude@127.0.0.1:5433/govtech_intel`, and it stayed wrong
+> for a long time after the sandbox moved. That is not a cosmetic doc rot: `verify-surfaces.mjs` carried
+> the same stale default and spent several runs **binding row ids from a database the server was not
+> reading** (B81). Ids that existed in both clusters rendered 200 and the sweep reported "clean". If you
+> change where the sandbox lives, change it *here and in every script default in the same commit*, and
+> make the tools print the DSN they used.
+
+### The four lenses (step 7) — and the reconciliation they exist for
+
+Steps 1–6 answer "does the code compile, pass its tests, and not crash". They do not answer *is the
+product telling the customer the truth*. These four do, each driven against a running box as a real
+signed-in actor, each reporting what it could **not** reach rather than skipping it silently:
+
+| lens | question | blind to |
+|---|---|---|
+| `scripts/verify-surfaces.mjs` | does every page RENDER (no boundary, no client throw)? | a page that renders a wrong value perfectly |
+| `scripts/verify-api-contract.mjs` | does every addressable GET honour `{data}` / `{error,code}`? | the *value* inside the envelope |
+| `scripts/verify-db-crud.mjs` | do writes LAND — and do the guards refuse what they promise to? | what the customer is shown afterwards |
+| `scripts/verify-ui-vs-db.mjs` | is the number the page STATES the number the table HOLDS? | anything it has no expectation for |
+
+The fourth is the reconciliation lens and it exists because the first three were **all green** while the
+tenant dashboard told a customer with 8 active builds that they had 6 (B80). Three green lenses are not
+three independent confirmations — they are three answers to three questions, none of which was "is this
+number right".
+
+**Apply all four to backward review too.** A retrospective audit of existing code is exactly where
+"it's been in production for months" substitutes for evidence. B80 had shipped and survived every prior
+sweep. When reviewing code you did not just write, run the lenses against it before forming an opinion,
+and treat a lens that has no expectation for a surface as *uncovered*, not *passing*.
+
+### Four rules, each learned by breaking it
+
+1. **Red first.** A check that has never failed proves nothing. Show it failing against the unfixed
+   code, then fix, then show it passing — on the same build. `verify-ui-vs-db` creates scratch
+   proposals to push past the dashboard's 6-card cap for precisely this reason: below the cap a correct
+   and a broken implementation return the same answer, so a check that stays under it is decoration.
+2. **The instrument before the finding.** A new harness's first output describes the *harness*, not the
+   system. Validate it against a known answer before reporting anything from it. The contract lens's
+   first run reported **38 envelope violations**; every one was a well-formed `{data:…}` that had been
+   truncated to 2000 chars before `JSON.parse`.
+3. **The expectation is the page's own query, copied from source.** Never a predicate you believe is
+   equivalent. Re-typing a filter from memory manufactures confident, wrong findings — and the failure
+   mode is symmetric: it invents defects that aren't there *and* blesses ones that are.
+4. **Assert the contract the system has.** `DELETE` on a bucket is a *deactivation* — the Archivable
+   contract says nothing is hard-deleted, the route says "deactivate", the response says
+   `{deactivated:true}`. Asserting "the row is gone" against that is a harness bug, not a finding. Read
+   the route before writing the assertion.
+
+### Cross-checking a lens (when "the harness said so" isn't enough)
+
+The four lenses share a stack — Playwright, one postgres.js client, assertion code written in one
+sitting — so a green lens is evidence that *the lens and the product agree*, which is weaker than
+evidence that the product is right. When a result matters enough, confirm it by a method that shares
+nothing with the lens that produced it:
+
+- `scripts/crosscheck-shipped-fixes.sh` — raw HTTP via `curl` against the server's own bytes, with
+  expectations from `psql`. No browser, no Node, no shared helper.
+- `scripts/crosscheck-canvas-normalize.mts` — calls the shipped normalizer directly over every canvas
+  the database actually holds. Stronger than the unit tests, which assert against shapes we invented.
+
+These are **not** a fifth lens and must not grow into one. A cross-check that cannot dissent from the
+lens it checks is decoration.
 
 ### The canvas measurement harnesses (steps 2 and 5, for anything touching layout or export)
 
