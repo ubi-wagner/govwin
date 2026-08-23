@@ -75,7 +75,9 @@ fi
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
   "award-to-contract|scripts/drive-award-to-contract.mjs"
-  "amendment|scripts/drive-amendment.mjs"
+  # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
+  # table reported as a failing amendment flow rather than a missing argument. Resolved below.
+  "amendment|scripts/drive-amendment.mjs|SOLICITATION"
   "provisioning-cockpit|scripts/drive-provisioning-cockpit.mts"
   "tenant-workflow-setup|scripts/drive-tenant-workflow-setup.mts"
   "scout-intake|scripts/drive-scout-intake.mts"
@@ -110,7 +112,21 @@ printf '%-24s %-8s %s\n' "DRIVE" "RESULT" "DETAIL"
 printf '%-24s %-8s %s\n' "------------------------" "--------" "------"
 
 for entry in "${DRIVES[@]}"; do
-  label="${entry%%|*}"; script="${entry##*|}"
+  label="${entry%%|*}"; rest="${entry#*|}"; script="${rest%%|*}"; argspec="${rest#*|}"
+  [ "$argspec" = "$script" ] && argspec=""
+  # Resolve a positional argument the drive needs. A drive that wants one and gets none prints its
+  # usage and exits 1, which is indistinguishable in a table from the flow being broken.
+  drive_args=""
+  if [ "$argspec" = "SOLICITATION" ]; then
+    drive_args=$(psql "$DATABASE_URL" -tAc "
+      SELECT cs.id FROM curated_solicitations cs
+      WHERE EXISTS (SELECT 1 FROM solicitation_volumes v WHERE v.solicitation_id = cs.id)
+      ORDER BY cs.created_at DESC LIMIT 1" 2>/dev/null | tr -d ' ')
+    if [ -z "$drive_args" ]; then
+      printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no curated solicitation with volumes to drive against"
+      cantrun=$((cantrun+1)); FAILED+=("$label"); continue
+    fi
+  fi
   [ -n "$FILTER" ] && [[ "$label" != *"$FILTER"* ]] && continue
 
   if [ ! -f "$script" ]; then
@@ -120,9 +136,9 @@ for entry in "${DRIVES[@]}"; do
 
   log="$OUT/$label.log"
   if [[ "$script" == *.mts ]]; then
-    timeout 900 node --import tsx "$script" > "$log" 2>&1
+    timeout 900 node --import tsx "$script" $drive_args > "$log" 2>&1
   else
-    timeout 900 node "$script" > "$log" 2>&1
+    timeout 900 node "$script" $drive_args > "$log" 2>&1
   fi
   code=$?
 

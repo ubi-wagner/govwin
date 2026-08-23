@@ -8,12 +8,14 @@
  */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
-import { resolveActor, loginOrDie, dieWell, CannotRun } from './lib/drive-actor.mjs';
+import { resolveActor, loginOrDie, dieWell, CannotRun, harnessDbUrl } from './lib/drive-actor.mjs';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const DB = process.env.DATABASE_URL;
 if (!DB) { console.error('DATABASE_URL required'); process.exit(2); }
-const sql = postgres(DB, { max: 2 });
+// The harness's OWN reads go through the owner — see harnessDbUrl(). The app under
+// test stays on the scoped role; only this bookkeeping is cross-tenant.
+const sql = postgres(harnessDbUrl(), { max: 2 });
 /**
  * NOTHING HERE IS PINNED ANY MORE.
  *

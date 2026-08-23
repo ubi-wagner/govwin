@@ -41,13 +41,34 @@ async function login(page, email, pw) {
   ]);
 }
 
-const A = { slug: 'foundation', email: 'kate.ulepic@foundation3dp.com', pw: process.env.FOUNDATION_PW || 'DemoPass123!' };
-const B = { slug: 'lighthouse', email: 'eric@lighthouse.com', pw: process.env.LIGHTHOUSE_PW || 'LighthouseAdmin' };
-for (const t of [A, B]) {
-  const [row] = await sql`SELECT id FROM tenants WHERE slug = ${t.slug} AND archived_at IS NULL`;
-  if (!row) { console.log(`! tenant ${t.slug} missing`); process.exit(1); }
-  t.tenantId = row.id;
+/**
+ * TWO tenants, both RESOLVED — this drive proves the bridge fans a card to every holder AND that
+ * each tenant sees only its own, so it genuinely needs a second tenant. It used to pin
+ * `lighthouse` / eric@lighthouse.com, which does not exist on a rebuilt database: the drive exited
+ * 1 with "tenant lighthouse missing", which the suite counted as a failure of the BRIDGE.
+ *
+ * Resolved by "has an active tenant_admin", newest-first, so a re-seed cannot rot it. Fewer than
+ * two such tenants means the isolation half cannot be tested at all — that is CANNOT-RUN (exit 2),
+ * not a pass and not a finding.
+ */
+const candidates = await sql`
+  SELECT t.slug, t.id, u.email
+  FROM tenants t
+  JOIN users u ON u.tenant_id = t.id AND u.is_active AND u.role = 'tenant_admin'
+  WHERE t.archived_at IS NULL AND t.slug NOT IN ('rfp-pipeline')
+  ORDER BY t.created_at`;
+const seen = new Set();
+const picks = candidates.filter((c) => (seen.has(c.slug) ? false : seen.add(c.slug)));
+if (picks.length < 2) {
+  console.error('\n⛔ CANNOT RUN — this is not a finding and not a pass.');
+  console.error(`   the bridge isolation half needs TWO tenants with an active tenant_admin; this box has ${picks.length}`);
+  console.error(`   (found: ${picks.map((p) => p.slug).join(', ') || 'none'})`);
+  process.exit(2);
 }
+const TPW = process.env.TENANT_PW || 'DemoPass123!';
+const A = { slug: picks[0].slug, email: picks[0].email, pw: process.env.FOUNDATION_PW || TPW, tenantId: picks[0].id };
+const B = { slug: picks[1].slug, email: picks[1].email, pw: TPW, tenantId: picks[1].id };
+console.log(`tenants: A=${A.slug} (${A.email})  B=${B.slug} (${B.email})`);
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 const pageA = await (await browser.newContext()).newPage();
@@ -91,7 +112,7 @@ const orphanCards = await sql`
   SELECT t.slug, count(*)::int AS n
   FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
   WHERE NOT EXISTS (SELECT 1 FROM opportunity_bridge b WHERE b.opportunity_id = c.opportunity_id)
-    AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator', 'lighthouse')
+    AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator')
   GROUP BY t.slug`;
 check(orphanCards.length === 0, 'no product-made card exists without a bridge event behind it',
   orphanCards.map((o) => `${o.slug}=${o.n}`).join(' ') || '');
@@ -110,7 +131,7 @@ const gaps = await sql`
   CROSS JOIN (SELECT DISTINCT opportunity_id FROM opportunity_bridge) b
   WHERE t.archived_at IS NULL
     AND EXISTS (SELECT 1 FROM tenant_opportunity_cards c2 WHERE c2.tenant_id = t.id)
-    AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator', 'lighthouse')
+    AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator')
     AND NOT EXISTS (
       SELECT 1 FROM tenant_opportunity_cards c
       WHERE c.tenant_id = t.id AND c.opportunity_id = b.opportunity_id)

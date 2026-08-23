@@ -24,6 +24,25 @@
  * `run-branch-drives.sh` prints the two differently so a reader can tell them apart at a glance.
  */
 
+/**
+ * The connection a HARNESS should use for its own bookkeeping — the OWNER, not the app role.
+ *
+ * Once the rig serves as `govtech_app` (NOBYPASSRLS, the production posture), a harness that
+ * computes its expectations through the same connection sees nothing: it has no tenant context, so
+ * RLS correctly denies it, and the drive concludes the fixture is empty. That is what happened the
+ * first time these ran under real RLS — `drive-rls-app` refused to run, reporting "no tenant has
+ * any rows", against a database holding thousands.
+ *
+ * The separation is the point, and CLAUDE.md already states it: the owner role exists for bootstrap
+ * and "legitimate cross-tenant reads". Working out what a tenant SHOULD see is exactly such a read.
+ * The APP stays scoped; only the harness's own arithmetic uses the owner.
+ *
+ * Falls back to DATABASE_URL so a box that has not split the roles still runs.
+ */
+export function harnessDbUrl() {
+  return process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+}
+
 /** Thrown when the rig cannot be driven at all. Exit 2 — not a finding, not a pass. */
 export class CannotRun extends Error {
   constructor(message) {
