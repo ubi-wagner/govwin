@@ -37,6 +37,41 @@ export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"
 export ATOM_EMBED="${ATOM_EMBED:-local}"
 export STORAGE_DRIVER="${STORAGE_DRIVER:-local}"
 
+# ── RESOLVE THE FIXTURE ONCE, AND HAND IT TO EVERY DRIVE ────────────────────────────────────────
+#
+# Several drives already read TEST_TENANT_ID / TEST_TENANT_SLUG and fall back to a hardcoded uuid
+# when they are unset. That fallback is a dead tenant on any rebuilt database, and the drives fail
+# with an FK violation on tenant_id — which looks nothing like "your fixture moved", so it reads as
+# a product bug. Exporting a resolved value makes the fallback unreachable.
+#
+# The tenant chosen is the one with the most to lose: driving isolation against an empty tenant
+# proves nothing, because every check would pass on nothing.
+if [ -z "${TEST_TENANT_ID:-}" ]; then
+  read -r _tid _tslug <<<"$(psql "$DATABASE_URL" -tAF' ' -c "
+    SELECT x.id, x.slug FROM (
+      SELECT t.id, t.slug,
+             (SELECT count(*) FROM proposals p WHERE p.tenant_id = t.id) AS n1,
+             (SELECT count(*) FROM tenant_opportunity_cards c WHERE c.tenant_id = t.id) AS n2
+      FROM tenants t
+      WHERE EXISTS (SELECT 1 FROM users u
+                    WHERE u.tenant_id = t.id AND u.is_active AND u.role = 'tenant_admin')
+    ) x ORDER BY x.n1 + x.n2 DESC LIMIT 1" 2>/dev/null)"
+  if [ -n "${_tid:-}" ]; then
+    export TEST_TENANT_ID="$_tid" TEST_TENANT_SLUG="$_tslug"
+    # The ACTOR is pinned in several drives too — `owner_user_id` FK violations are the same rot,
+    # one field further in. Resolve a real tenant_admin of the chosen tenant.
+    _aid=$(psql "$DATABASE_URL" -tAc "
+      SELECT u.id FROM users u
+      WHERE u.tenant_id = '$_tid' AND u.is_active AND u.role = 'tenant_admin'
+      ORDER BY u.created_at LIMIT 1" 2>/dev/null | tr -d ' ')
+    [ -n "$_aid" ] && export TEST_ACTOR_ID="$_aid"
+    echo "fixture: tenant=$_tslug ($_tid) actor=${_aid:-UNRESOLVED}"
+    echo
+  else
+    echo "WARNING: could not resolve a tenant — drives that need one will report CANT-RUN" >&2
+  fi
+fi
+
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
   "award-to-contract|scripts/drive-award-to-contract.mjs"

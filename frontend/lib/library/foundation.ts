@@ -261,10 +261,27 @@ async function orderedMembers(containerId: string): Promise<string[]> {
 }
 
 /**
- * Copy a foundation's whole grain tree into targetTenant as the tenant's OWN atoms,
- * each linked back to its source via derived_from lineage (createAtom parentAtomIds).
+ * Copy a foundation's whole grain tree into targetTenant as the tenant's OWN atoms.
  * This is the "copy-on-use" that materializes a per-tenant copy from the shared/system
  * scaffold — so onboarding doesn't deep-copy every template into every tenant.
+ *
+ * NO LINEAGE EDGE SURVIVES THIS COPY, and the previous version of this comment said the
+ * opposite. `parentAtomIds: [srcId]` is still passed below, but `createAtom` accepts a parent
+ * ONLY when it belongs to the same tenant as the child (lib/atoms.ts — defence against a
+ * caller forging a foreign parent to inflate a victim atom's child_count, since `atom_lineage`
+ * has no RLS). The source here is by definition in another tenant, so every requested edge is
+ * dropped. Measured: 0 of 31 grains recorded lineage on a live copy.
+ *
+ * That is the RIGHT outcome for copy-inward — a `derived_from` edge pointing at another
+ * tenant's atom is precisely the cross-tenant object reference the guardrail forbids — but it
+ * left this docstring asserting a behaviour that cannot happen, and left the argument being
+ * passed and silently discarded. Provenance survives only as `source: 'download_derivative'`,
+ * a KIND rather than a link.
+ *
+ * NOTE, and it is an open question rather than a settled one: the OTHER copy-forward path (the
+ * eager system_starter copy, task #71) does write house→tenant `derived_from` edges — 303 of
+ * them on this box, every one cross-tenant. So the two copy paths disagree about provenance.
+ * Recorded as B85; the decision belongs with the #118 copy-inward guardrail work.
  */
 export async function copyFoundationToTenant(
   sourceFoundationId: string,

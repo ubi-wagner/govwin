@@ -10,7 +10,10 @@ import {
 
 const HOUSE = 'db20bc0f-6322-4fed-8b99-f45c9b4d7d08';   // owner A; eric is tenant_admin here
 const IMMOBI = 'dd831b77-2d6b-4b53-bb18-4d48569a2258';  // owner B
-const ERIC = 'c9703126-dbb4-42f6-8e13-88b3333bc35d';    // tenant_admin @ HOUSE
+// Resolved by run-branch-drives.sh; the literal is a last resort and is DEAD on any
+// rebuilt database — it used to FK-violate on owner_user_id, which reads as a product
+// bug rather than a moved fixture.
+const ERIC = process.env.TEST_ACTOR_ID ?? 'c9703126-dbb4-42f6-8e13-88b3333bc35d';    // tenant_admin @ HOUSE
 const EMAIL_A = 'partner-a@ext.test';
 const EMAIL_B = 'partner-b@ext.test';
 const uid = () => crypto.randomUUID();
