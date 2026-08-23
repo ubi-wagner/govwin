@@ -15,9 +15,46 @@ const sql = postgres(DB, { max: 4 });
 let ok = true;
 const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
 
-// A real admin actor (FK targets for built_by / reviewed_by).
-const ACTOR = { actorId: '3667ead2-3b5e-4cc8-97f7-b2ab1cfa907d', actorEmail: 'eric@rfppipeline.com', role: 'master_admin' as const };
+/**
+ * A real admin actor, RESOLVED — not pinned.
+ *
+ * This uuid used to be hardcoded. A pinned id is correct exactly until the database is rebuilt,
+ * and then the drive fails on an FK violation that reads like a product bug rather than a moved
+ * fixture (docs/E2E_SWEEP_2026-08-23.md §3). Resolved from the role the drive actually needs; if
+ * there is no such user the drive exits 2 — CANNOT RUN — which the suite reports as uncovered
+ * rather than as a finding.
+ */
+async function resolveActor() {
+  const [u] = await sql<{ id: string; email: string }[]>`
+    SELECT id, email FROM users
+    WHERE role IN ('master_admin', 'rfp_admin') AND is_active
+    ORDER BY (role = 'master_admin') DESC, created_at ASC LIMIT 1`;
+  if (!u) {
+    console.error('CANNOT RUN\n  no active master_admin/rfp_admin exists — this drive needs one as '
+      + 'the FK target for reviewed_by/built_by. Seed an admin and re-run.');
+    await sql.end();
+    process.exit(2);
+  }
+  return { actorId: u.id, actorEmail: u.email, role: 'master_admin' as const };
+}
+
 const UPDATE_SOL_NUMBER = 'TVSF-R45-818079'; // the live opp we expect the UPDATE finding to match
+
+/**
+ * A RUN-UNIQUE solicitation number for the "genuinely new" finding.
+ *
+ * THE BUG THIS FIXES, and it was in the drive rather than the product. The NEW finding used a fixed
+ * `DARPA-QTUN-27`. The first run released it, creating an opportunity with that number — so every
+ * run after that, the classifier correctly answered **update** ("same solicitation number") and
+ * `stageIntake` correctly refused the duplicate content hash. The drive then failed two assertions
+ * and reported the scout-intake flow broken, when the flow had worked perfectly and the drive had
+ * destroyed its own precondition by succeeding.
+ *
+ * A NEW finding has to actually be new. Anything else is asserting that a solicitation you already
+ * hold should be treated as unseen, which is the opposite of what this queue is for.
+ */
+const RUN = randomUUID().slice(0, 8).toUpperCase();
+const NEW_SOL_NUMBER = `DARPA-QTUN-${RUN}`;
 
 function seedFinding(title: string, raw: Record<string, unknown>, tag: string) {
   const id = randomUUID();
@@ -40,15 +77,28 @@ async function eventsFor(findingId: string): Promise<string[]> {
   return rows.map((r) => r.type);
 }
 
+const ACTOR = await resolveActor();
+
+/**
+ * Everything THIS RUN created, so the finally block can put the fixture back.
+ *
+ * Only ids the run produced go in here. A drive that deletes by predicate ("all DARPA findings")
+ * eventually deletes something a person seeded — the discipline `verify-db-crud` uses, applied to
+ * a drive that writes into the admin triage queue and logs an amendment on a live opportunity.
+ */
+const created = { findingIds: [] as string[], opportunityIds: [] as string[], amendmentIds: [] as string[] };
+
 try {
   console.log('\n── SCOUT-INTAKE #176 · live end-to-end ──\n');
+  console.log(`actor=${ACTOR.actorEmail} · new-finding solicitation=${NEW_SOL_NUMBER}\n`);
 
   // ── Seed three findings ──────────────────────────────────────────────
   const newId = await seedFinding(
-    'Quantum Timing for GPS-Denied Undersea Navigation',
-    { agency: 'DARPA', solicitation_number: 'DARPA-QTUN-27', source: 'sam_gov', source_id: 'DARPA-QTUN-27',
-      description: 'DARPA seeks chip-scale atomic clocks for undersea PNT.', url: 'https://sam.gov/opp/qtun27' },
-    'new');
+    `Quantum Timing for GPS-Denied Undersea Navigation (${RUN})`,
+    { agency: 'DARPA', solicitation_number: NEW_SOL_NUMBER, source: 'sam_gov', source_id: NEW_SOL_NUMBER,
+      description: 'DARPA seeks chip-scale atomic clocks for undersea PNT.',
+      url: `https://sam.gov/opp/qtun-${RUN.toLowerCase()}` },
+    `new-${RUN}`);
   const updId = await seedFinding(
     'TVSF Round 45 — Amendment 2: submission deadline extended 30 days',
     { agency: 'Ohio Third Frontier', solicitation_number: UPDATE_SOL_NUMBER,
@@ -59,6 +109,7 @@ try {
     { agency: '', description: 'General program news, no actionable solicitation.', url: 'https://example.gov/news' },
     'noise');
   A('seeded 3 findings (new / update / noise)', !!(newId && updId && noiseId));
+  created.findingIds.push(newId, updId, noiseId);
 
   // ── Classify all three ───────────────────────────────────────────────
   const rNew = await classifyFinding(newId, ACTOR);
@@ -79,6 +130,7 @@ try {
   const relNew = await releaseAsNew(newId, ACTOR);
   A('releaseAsNew succeeded', !('error' in relNew), 'error' in relNew ? relNew.error : `opp=${relNew.opportunityId}`);
   if (!('error' in relNew)) {
+    created.opportunityIds.push(relNew.opportunityId);
     const [cs] = await sql<{ status: string }[]>`SELECT status FROM curated_solicitations WHERE opportunity_id=${relNew.opportunityId}::uuid`;
     A('  → a curated_solicitation (status=new) landed in the RFP Triage Queue', cs?.status === 'new', cs?.status);
     const [opp] = await sql<{ isActive: boolean; source: string }[]>`SELECT is_active AS "isActive", source FROM opportunities WHERE id=${relNew.opportunityId}::uuid`;
@@ -91,6 +143,7 @@ try {
   const relUpd = await releaseAsUpdate(updId, ACTOR, {});
   A('releaseAsUpdate succeeded', !('error' in relUpd), 'error' in relUpd ? relUpd.error : `amendment=${relUpd.amendmentId}`);
   if (!('error' in relUpd)) {
+    created.amendmentIds.push(relUpd.amendmentId);
     const [am] = await sql<{ status: string; label: string; solicitationId: string }[]>`SELECT status, label, solicitation_id AS "solicitationId" FROM solicitation_amendments WHERE id=${relUpd.amendmentId}::uuid`;
     A('  → a solicitation_amendment (status=detected) logged on the matched solicitation', am?.status === 'detected' && am?.solicitationId === relUpd.solicitationId, am?.label);
     const [f] = await sql<{ status: string; releasedKind: string }[]>`SELECT status, released_kind AS "releasedKind" FROM scout_findings WHERE id=${updId}::uuid`;
@@ -123,6 +176,33 @@ try {
   console.error('DRIVE ERROR', e);
   ok = false;
 } finally {
+  // ── PUT THE FIXTURE BACK ────────────────────────────────────────────────────────────────────
+  //
+  // BY ID, never by predicate, and only ids this run produced. Left alone, each run added a
+  // staged opportunity to the admin triage queue and another amendment to a live opportunity —
+  // residue that the next drive, and the next screenshot, then reads as real state.
+  //
+  // In the `finally` so a failed assertion cleans up too: a drive that only tidies on success
+  // leaves its worst mess exactly when something went wrong.
+  try {
+    let removed = 0;
+    for (const id of created.amendmentIds) {
+      removed += (await sql`DELETE FROM proposal_amendment_flags WHERE amendment_id = ${id}::uuid`).count;
+      removed += (await sql`DELETE FROM solicitation_amendments WHERE id = ${id}::uuid`).count;
+    }
+    for (const id of created.opportunityIds) {
+      removed += (await sql`DELETE FROM curated_solicitations WHERE opportunity_id = ${id}::uuid`).count;
+      removed += (await sql`DELETE FROM opportunities WHERE id = ${id}::uuid`).count;
+    }
+    for (const id of created.findingIds) {
+      removed += (await sql`DELETE FROM scout_findings WHERE id = ${id}::uuid`).count;
+    }
+    console.log(`cleanup: ${removed} row(s) this run created removed — fixture restored`);
+  } catch (e) {
+    // Reported, not swallowed: residue left behind is a fact the next run needs to know.
+    console.error(`cleanup FAILED — this run left rows behind: ${String(e).slice(0, 200)}`);
+    console.error(`  findings=${created.findingIds.join(',')} opportunities=${created.opportunityIds.join(',')} amendments=${created.amendmentIds.join(',')}`);
+  }
   await sql.end();
   process.exit(ok ? 0 : 1);
 }
