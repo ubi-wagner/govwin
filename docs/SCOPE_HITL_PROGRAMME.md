@@ -1,7 +1,19 @@
 # Multi-granular scope → assist · review · HITL resolution
 
-**Status: PLAN, awaiting sign-off.** Nothing in this document is built beyond the two pure
-libraries named in "Already true" below.
+**Status: BUILT — A through G, all green on a running box.** This document was the plan; the
+sections below are kept as written so the reasoning behind each phase survives, with a build log at
+the end recording what was actually done, what the harnesses found, and where the plan turned out
+to be wrong.
+
+| Phase | Landed as | Proven by |
+|---|---|---|
+| A · review queue learns scope | mig 207 · `planReviewTargets` · `_scope_anchor` | `verify-scoped-review.mjs` |
+| B · assist bar as a function of scope | `components/canvas/scope-bar.tsx` | `verify-scope-bar.mjs` |
+| C · groups overlay | `ov-groups` + `groupMapOf` | `verify-groups-overlay.mjs` |
+| D · assemble-from-library, wired | `POST …/sections/[s]/assemble` | `verify-assemble-from-library.mjs` |
+| E · scope-aware gates | `lib/proposal/scoped-findings.ts` · `GET …/findings` | `verify-scoped-gates.mjs` |
+| F · collaborators resolve in-grant | (no new code — proven, not built) | `verify-scoped-gates.mjs` |
+| G · end-to-end | — | `verify-scope-end-to-end.mjs` |
 
 The end state: a proposal can be drafted **100% by agents**, then **collaboratively resolved** by
 the tenant's people and their external collaborators — with every assist, every review and every
@@ -193,3 +205,77 @@ earning its keep sooner. E depends on A. F depends on E. G depends on all of the
 
 I would not attempt E before A and B are green on a real build, because a scope-aware gate whose
 scope resolution is untested is a gate that blocks the wrong things.
+
+---
+
+# Build log
+
+## The end-to-end run, in numbers
+
+One scratch build, driven start to finish by `frontend/scripts/verify-scope-end-to-end.mjs`:
+
+```
+build a787b67e · 3 sections, all empty, no human has written a word
+drafted: 21 library atoms → 21 groups → 9 pages (15 atom(s) dropped for budget)
+Mode C full-draft doorbell: status 200 — {"requested":true,"mode":"c","adversarial":false}
+5 finding(s) landed across 4 distinct scope level(s)
+resolution split: 2 by the tenant, 1 by the external collaborator
+gate: "2 of 5 findings still open."
+readiness: 4 blocker(s), 2 warning(s) — ready=false
+advanced draft → submitted, locked, over 4 acknowledged blocker(s)
+package: docx 47,271 bytes · 0 compliance violation(s)
+```
+
+Every number is read back from Postgres or from the response — never from a toast.
+
+## What the plan got wrong
+
+Worth recording, because each was found by driving the thing rather than reading it.
+
+**The ladder could silently widen.** `resolveScope` always ends at `document` so a UI can offer
+"widen to the whole volume". When nothing else resolved, that made `document` the INNERMOST rung —
+so `{groupId:'g-method'}` and `{nodeId:'no-such-node'}` both queued a review of the ENTIRE proposal
+and returned 200. A typo would have spent a tenant's whole hourly agent budget. Now a selection that
+names something must resolve to it or to nothing; only an empty selection means the document.
+
+**Page-scoping could not work on any document the product stores.** It resolved through
+`paginate().perSection`, whose ids for a FLAT canvas come from `toSections()` and are
+`crypto.randomUUID()` — minted fresh per call, matching nothing. Every stored section canvas and
+every assembled proposal is flat. The ruler already knew which page each node lands on and never
+wrote it down; `perNode` writes it down.
+
+**Scoping cannot resolve against the RENDER document.** `assembleProposalDocument` flattens sections
+into one node list because that is what reading a continuous document needs — and flattening
+destroys exactly what scoping addresses. `buildScopeDocument` preserves sections and groups.
+
+**The editor throws the group layer away on purpose.** `toEditableFlat` sets `sections: undefined`;
+the editable surface is one flat node list. So the group map is derived from the document as LOADED
+and carried alongside as provenance, keyed by node id — which stays correct across edits, because a
+group records which atom a node came from and editing does not change that.
+
+**Phase F needed almost no code.** The resolve route has always been section-gated. What was missing
+was not a feature but a PROOF, and the plan was right that an unproven isolation claim is worth
+nothing: a real signed-in `partner_user` with a one-section grant sees 2 findings where the author
+sees 5, is refused 403 outside the grant with nothing written, and succeeds inside it.
+
+## Two rules the harnesses re-taught
+
+**Assert the contract the system HAS.** Three separate blocks asserted a flow the product does not
+have: that `selectForSection` filters (it ranks); that the stage ladder is draft → review → final
+(this proposal's `gate_config` goes draft → final directly); that packaging needs a separate lock
+(the advance to final locks and submits in one move). Each looked like a product failure and was a
+wrong expectation.
+
+**Copy the fixture from the source.** Both canvas fixtures invented `{width_in, body_font}` instead
+of the stored `{width, margins, font_default}`, and one omitted `metadata.status`. Each rendered an
+error boundary and briefly looked like a defect in the work under test.
+
+## What is still open
+
+The two decisions from the plan that remain the user's — `image` (suppressed vs absent demand) and
+`assembleSections().totalPages` (documented upper bound vs routing through `paginate`) — are
+untouched. Collaborator granularity was settled by building assumption (a).
+
+The scope bar is mounted on the fluid document surface only. The per-section editor still has the
+overlay chips and the group rail but not the ladder; adding it there is a small follow-on, not a
+gap in the spine.
