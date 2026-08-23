@@ -32,7 +32,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'fs
 import { execFileSync } from 'child_process';
 import { join } from 'path';
 
-const BASE = 'http://localhost:3000';
+// The rig's port is not fixed: the heartbeat pins :3000, so a hand-started server usually sits on
+// :3001, and every sibling harness already reads GUIDE_BASE. Hardcoding it here meant this arc
+// silently drove whatever happened to be on :3000 — including a STALE build, which is worse than
+// not running at all. Same default, now overridable.
+const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const RUN_DIR = process.env.GOVWIN_RUN_DIR || `${process.env.HOME}/.govwin/run`;
 const JOURNAL = join(RUN_DIR, 'e2e-arc.json');

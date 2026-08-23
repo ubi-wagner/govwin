@@ -40,11 +40,22 @@ const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
  * with a reason, which is visible in the report.
  */
 async function ids() {
+  // AN IN-FLIGHT BUILD FIRST, then the richest one.
+  //
+  // These guides illustrate the surface a customer WORKS in, and the working surface of a locked,
+  // submitted build is not the working surface — "My Sections" has no editable section to open, so
+  // the tab never resolves and the capture times out. Ordering purely by section count picked the
+  // biggest build, which on a mature fixture is always a finished one.
+  //
+  // Unlocked first (a real in-flight build), richest within that, so the screenshots show the
+  // editor as a reader will meet it. Falls back to a locked build when nothing is in flight — the
+  // capture still runs and the failing target reports itself, which is the honest outcome.
   const [rich] = await sql`
     SELECT p.id, p.tenant_id, t.slug
     FROM proposals p JOIN tenants t ON t.id = p.tenant_id
     WHERE p.archived_at IS NULL AND t.slug = 'foundation'
-    ORDER BY (SELECT count(*) FROM proposal_sections s WHERE s.proposal_id = p.id) DESC
+    ORDER BY COALESCE(p.is_locked, false) ASC,
+             (SELECT count(*) FROM proposal_sections s WHERE s.proposal_id = p.id) DESC
     LIMIT 1`;
   const [sect] = rich ? await sql`
     SELECT id FROM proposal_sections WHERE proposal_id = ${rich.id}
@@ -196,9 +207,18 @@ try {
     // The three routes the guide names for the library are all RETIRED redirects onto the one
     // unified `/atoms` surface, where upload / review / browse are TABS. Probed (not shot) so the
     // redirect is on the record; the tabs below are what a reader is actually looking at.
-    await target(p, OUT, { name: '04-library-upload(probe)', url: `${S}/library/upload`, shoot: false });
-    await target(p, OUT, { name: '05-library-review(probe)', url: `${S}/library/review`, shoot: false });
-    await target(p, OUT, { name: '06-library(probe)', url: `${S}/library`, shoot: false });
+    // The three retired library routes. Upload, review and browse are TABS on `/atoms` now, and
+    // CUSTOMER_ONBOARDING_GUIDE.md §"Route correction" already tells the reader so.
+    //
+    // These carry `expect` for the same reason the spotlights probe below does: without it a
+    // documented, deliberate redirect reports as "did not land where the guide says" on every run —
+    // three permanent lines of noise that train a reader to skim the drift section, which is where
+    // the REAL drift will appear. With `expect` they become assertions: the day one of these stops
+    // redirecting, or lands somewhere new, that is a finding rather than more of the usual.
+    const ATOMS = `${S}/atoms`;
+    await target(p, OUT, { name: '04-library-upload(probe)', url: `${S}/library/upload`, expect: ATOMS, shoot: false });
+    await target(p, OUT, { name: '05-library-review(probe)', url: `${S}/library/review`, expect: ATOMS, shoot: false });
+    await target(p, OUT, { name: '06-library(probe)', url: `${S}/library`, expect: ATOMS, shoot: false });
     await target(p, OUT, { name: '06-library', url: `${S}/atoms` });
     await tabShot(p, OUT, '04-library-upload', 'Upload package');
     await tabShot(p, OUT, '04b-library-atomize', 'Atomize');
