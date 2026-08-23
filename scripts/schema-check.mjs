@@ -27,7 +27,7 @@
  * no checker.
  */
 import postgres from 'postgres';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
 
 const sql = postgres(process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL, { max: 4 });
@@ -52,6 +52,34 @@ if (files[0] === '--changed') {
   files = [...new Set(files)];
 }
 if (!files.length) { console.log('usage: schema-check.mjs <file…> | --changed'); process.exit(0); }
+
+// ── is the "live truth" actually live? ─────────────────────────────────────
+//
+// This tool compares code against a database, and says so with confidence. If that database is
+// behind the repo's migrations, every column a recent migration added reads as MISSING — and the
+// output is a list of confident accusations against correct code. Measured, not hypothetical: a
+// sandbox sitting at migration 163 against a repo at 205 produced 24 findings, all of them
+// phantom (`curated_solicitations.build_complete` from mig 182, `opportunities.update_watch` from
+// mig 181, the whole promo-code issuance set from mig 200). After migrating, the same sweep over
+// the same 683 files returned ZERO.
+//
+// A wrong accusation is the one failure this tool cannot survive, so the premise gets checked
+// before the conclusions do.
+try {
+  const applied = new Set((await sql`SELECT filename FROM _migration_history`).map((r) => r.filename));
+  const onDisk = readdirSync(new URL('../db/migrations/', import.meta.url))
+    .filter((f) => /^\d{3}_.*\.sql$/.test(f) && !f.startsWith('000_'));
+  const behind = onDisk.filter((f) => !applied.has(f)).sort();
+  if (behind.length) {
+    console.log(`⚠ THE DATABASE IS ${behind.length} MIGRATION(S) BEHIND THE REPO — findings below may be phantom.`);
+    console.log(`  first missing: ${behind[0]}   latest missing: ${behind[behind.length - 1]}`);
+    console.log('  run: node db/migrations/migrate.mjs   (then re-run this)\n');
+  }
+} catch {
+  // No _migration_history (a bare or non-project database). Not fatal — but say so, because
+  // "checked against the live schema" means less when nobody knows which schema that is.
+  console.log('⚠ could not read _migration_history — cannot tell whether this database matches the repo.\n');
+}
 
 // ── live truth ─────────────────────────────────────────────────────────────
 const colRows = await sql`
@@ -103,6 +131,8 @@ for (const r of candidates) {
 // ── scan ───────────────────────────────────────────────────────────────────
 let findings = 0, checked = 0, unresolved = 0, hintCount = 0, ambiguous = 0;
 const hints = [];
+/** Files this run READ NOTHING in — reported, because a silent skip is what let a bad column pass. */
+const silent = [];
 for (const file of files) {
   let raw;
   try { raw = readFileSync(file, 'utf8'); } catch { continue; }
@@ -123,11 +153,40 @@ for (const file of files) {
   // `tenants` in one query and leak into a later `FROM atom_tags t`, reporting tenants.dimension —
   // a third false alarm. An alias is scoped to the query that declares it, so the checker must be
   // too.
-  const sqlBlocks = [...raw.matchAll(/sql(?:Bypass)?\s*`([^`]*)`/g)]
+  //
+  // THE TAG CAN CARRY A TYPE ARGUMENT, AND IT USUALLY DOES.
+  //
+  // This matched `sql\`` and `sqlBypass\`` and nothing else, so the dominant style in this
+  // codebase — `sql<Array<{ id: string }>>\`…\``, the form CLAUDE.md's own SOP writes — never
+  // matched, and neither did the `tx\`` inside every `sql.begin` transaction. Measured across
+  // frontend/{lib,app,scripts}: 767 of 2,174 SQL blocks were visible. 213 files containing SQL
+  // were skipped ENTIRELY and still reported as clean.
+  //
+  // That is this tool's own failure mode, aimed at itself: `schema-check` cleared
+  // `pa.sort_index` — a column `proposal_artifacts` does not have — with the line "nothing
+  // contradicts the live schema", because it had read none of the file's three queries. A checker
+  // that says nothing is wrong after checking nothing is worse than no checker.
+  //
+  // `<[^`]*?>` is lazy and cannot cross a backtick, so it expands only as far as the type argument
+  // (`<Array<{ n: number }>>` needs three tries) and never swallows a template literal.
+  //
+  // COMMENTS COME OUT FIRST, because prose in this repo is full of backticks. The extractor used
+  // to strip comments INSIDE a matched block, which is too late: a docblock reading "the legitimate
+  // `sqlBypass` uses" opens a backtick in the comment, and `[^`]*` then runs from there to the next
+  // backtick in the file — swallowing the comment tail and the code after it, and reporting English
+  // prose as a query. That is the failure this file's own header warns about, and the fixed
+  // extractor walked straight into it on its first run.
+  //
+  // `//` is only a comment when it is not `://`, so a URL in a string survives.
+  const code = raw
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const sqlBlocks = [...code.matchAll(/\b(?:sql|sqlBypass|tx)\s*(?:<[^`]*?>)?\s*`([^`]*)`/g)]
     .map((m) => m[1].replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' '))
     .filter((b) => b.trim());
-  if (!sqlBlocks.length) continue;
+  if (!sqlBlocks.length) { silent.push(file); continue; }
 
+  const before = checked;
   for (const src of sqlBlocks) {
     // Aliases declared in THIS query only.
     // An alias bound to MORE THAN ONE table inside a single statement is AMBIGUOUS and is not
@@ -238,7 +297,9 @@ for (const file of files) {
     }
   }
 
+  const checkedHere = checked - before;
   if (hits.length) { findings += hits.length; console.log(hits.join('\n')); }
+  if (!checkedHere) silent.push(file);
 }
 
 console.log(`\nschema-check: ${files.length} file(s) · ${checked} reference(s) verified · `
@@ -248,6 +309,17 @@ if (hints.length) {
   console.log(`\n${hintCount} hint(s) — no CHECK constraint, value absent from live data. Not findings:`);
   console.log(hints.slice(0, 10).join('\n'));
 }
-if (!findings) console.log('\nnothing contradicts the live schema.');
+// SILENCE IS NOT A PASS. Say which files this run verified nothing in, so "clean" cannot be read
+// as "checked" — the exact confusion that let a nonexistent column through with a green line.
+if (silent.length) {
+  console.log(`\n${silent.length} file(s) had NO reference this run could verify — not evidence they are correct:`);
+  console.log(silent.slice(0, 12).map((f) => `  · ${f}`).join('\n')
+    + (silent.length > 12 ? `\n  … and ${silent.length - 12} more` : ''));
+}
+if (!findings) {
+  console.log(checked > 0
+    ? `\nnothing contradicts the live schema, across ${checked} verified reference(s).`
+    : '\nNOTHING WAS VERIFIED — this run checked no references at all. Not a pass.');
+}
 await sql.end();
 process.exit(findings ? 1 : 0);
