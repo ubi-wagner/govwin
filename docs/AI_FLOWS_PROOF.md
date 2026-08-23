@@ -106,3 +106,61 @@ produce (`__tests__/visual-review-parse.test.ts`, 15 cases).
 
 **What is not:** whether the model sees what a person would. One pass with a live key against the
 T3CP volumes closes it; until then this line stays here rather than in the Verdict above.
+
+---
+
+## Addendum 2026-08-23 — the inventory was the stale part, and it hid a live defect
+
+Re-opened by rebuilding this register's **inventory** from source rather than re-reading its
+conclusions. The conclusions held. The inventory did not.
+
+### What the register claimed, and what it actually proved
+
+The Verdict above says "the **entire** event-triggered agent fabric" drives end-to-end, on the
+grounds that every triggered flow routes through the same trigger → worker → cohort → emulator path.
+That is true of the **mechanism**, and it is an argument, not a measurement. Counted from the
+registry: **29 workflows carry 65 `AI_INVOKE` steps across 22 distinct triggers.** This register
+individually fired three.
+
+The gap that argument leaves is specific and it is not hypothetical: every template builds its step
+**inputs** differently, and **a degraded `AI_INVOKE` is a safe skip by design** — the engine must
+never dead-end a workflow. So a broken input contract and a working one are indistinguishable from
+the workflow's own point of view. Shared code path, unshared input contract.
+
+### The defect that was sitting in it (B84)
+
+Both Proposal Studio phases read `payload.voice`; `requestReviewPhase`, the one canonical emitter for
+their trigger, never wrote it. Every Studio draft ran in the house voice while the full-draft button
+— same proposal, same persisted `proposals.voice` — ran in the tenant's. Full write-up: bug log B84.
+
+### The standing lens
+
+`pipeline/scripts/check_ai_invoke_contract.py`. Compares every `payload.*` key an `AI_INVOKE` step
+reads against the keys real emitters really wrote, taken from `system_events` rather than regexed out
+of TypeScript — evidence, not inference. Run it after touching any emitter or any `input_map`:
+
+```
+PYTHONPATH=src DATABASE_URL=… python3 pipeline/scripts/check_ai_invoke_contract.py
+```
+
+It reports MISS (a read key no payload carries), WEAK (present but always null), and **UNCOVERED**.
+A MISS is a **lead, not a verdict** — the evidence is historical, so it prints when each trigger was
+last fired, and confirmation means reading the emitter and resolving a stored payload through
+`resolve_inputs`, which is how B84 was confirmed.
+
+### The honest coverage number
+
+**15 of 29** AI-carrying workflows have a trigger that has never been emitted on this box:
+
+```
+OnApplicationAccepted · OnCmsContentRequested · OnCollaboratorInvited · OnIngestAssessmentRequested
+OnIngestPhaseRequested{Extract,Matrix,Molds,Review} · OnOpportunitiesDetected
+OnPortalStageReviewRequested · OnProposalCreated · OnProposalOutcomeRecorded · OnRfpUploaded
+OnSolicitationReviewRequested · OnSourceChangeDetected
+```
+
+These are **unmeasured, not passing** — the same rule the four lenses use, applied here. Firing them
+is the remaining Track A work, and it is now a mechanical list rather than an open question. (Note
+`OnIngestAssessmentRequested` appears here even though the register above records assess-ingest
+firing: those runs predate this database. Uncovered means no evidence *here*, which is exactly the
+staleness the lens is designed to make visible rather than paper over.)
