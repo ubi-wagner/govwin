@@ -1156,8 +1156,15 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       }
       return h;
     }
-    case 'caption':
-      return bodyLineH;
+    case 'caption': {
+      // A caption is USUALLY one line, and used to be modelled as exactly one — but it is prose,
+      // and a long one wraps like any other. A constant under-counts it, and under-count is the
+      // direction the size gates forbid. Measured with the body advance (a caption renders
+      // smaller, so body metrics fit FEWER characters per line and therefore over-estimate — the
+      // safe side), floored at one line so the common short caption is unchanged.
+      const t = getNodeText(node);
+      return Math.max(1, linesFor(t.length, t ? cplFor(t, usableW, fs) : cpl)) * bodyLineH;
+    }
     case 'code_block': {
       // A CODE BLOCK PRESERVES ITS NEWLINES. It renders inside
       // `<pre style="white-space:pre-wrap; padding:12pt; font-size:9pt; font-family:Courier New">`,
@@ -1531,6 +1538,24 @@ export function getNodeText(node: CanvasNode): string {
     case 'caption': return (node.content as CaptionContent).text;
     case 'footnote': return (node.content as FootnoteContent).text;
     case 'url': return (node.content as UrlContent).display_text;
+    // TEXT-BEARING TYPES THAT USED TO FALL THROUGH TO ''.
+    //
+    // The default arm returns '', which is correct for a divider or an image and wrong for
+    // anything carrying prose. callout / blockquote / code_block all carry prose and all three
+    // landed on the default — so the ruler measured them as ONE EMPTY LINE (a callout holding two
+    // lines of text read 15pt against the 31pt the same words cost in a text_block),
+    // `countCharacters` omitted them from the agency character cap, and search could not find
+    // them. This function's own contract says "any node type"; it covered eight.
+    //
+    // Under-counting is the one direction the size gates forbid — it clears a volume that is over
+    // its page limit. Theoretical until markdown_to_canvas learned to emit callouts; live now
+    // that AI drafts contain them.
+    case 'callout': {
+      const c = node.content as CalloutContent;
+      return [c.title, c.text].filter(Boolean).join(' ');
+    }
+    case 'blockquote': return (node.content as BlockquoteContent).text;
+    case 'code_block': return (node.content as CodeBlockContent).code;
     case 'table': {
       const t = node.content as TableContent;
       const cellText = (c: string | TableCell): string => typeof c === 'string' ? c : c.text;

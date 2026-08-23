@@ -46,6 +46,12 @@ _FENCE = re.compile(r"^\s*```\s*(\w+)?\s*$")
 # A rule, NOT a bullet: `---` alone. `_BULLET` would otherwise never see it (it needs text after
 # the dash), but `***` would match the italic scanner, so match rules before anything else.
 _RULE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
+# GitHub alert marker opening a blockquote: `> [!WARNING]`.
+_ALERT = re.compile(r"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$", re.I)
+# Any HTML comment on its own line, and the page-break directive specifically.
+_COMMENT = re.compile(r"^<!--.*-->$")
+_PAGEBREAK = re.compile(r"^<!--\s*page[\s_-]?break\s*-->$", re.I)
+
 # A table row: at least one pipe, and pipes are not all at the very ends of an empty line.
 _TABLE_ROW = re.compile(r"^\s*\|(.+)\|\s*$")
 # The separator under a table header: | --- | :---: | ---: |
@@ -204,15 +210,36 @@ def markdown_to_nodes(
             nodes.append(_node("numbered_list", {"items": [{"text": n} for n in numbers]}, actor_id=actor_id, actor_name=actor_name, source=source))
         numbers = []
 
+    # GitHub's alert syntax — `> [!WARNING]` on the first line of a blockquote. A de-facto
+    # standard rather than an invented directive, and it is what the shipped molds use a `callout`
+    # node for. Without this the marker LEAKED: the quote became a blockquote whose visible text
+    # began "[!WARNING]", so the reader saw the markup.
+    _ALERT_VARIANT = {
+        "note": "note", "tip": "tip", "important": "info",
+        "warning": "warning", "caution": "warning",
+    }
+
     def flush_quote() -> None:
         nonlocal quote
         if quote:
-            text, runs = parse_inline(" ".join(quote).strip())
+            lines_ = list(quote)
+            variant: str | None = None
+            m_alert = _ALERT.match(lines_[0]) if lines_ else None
+            if m_alert:
+                variant = _ALERT_VARIANT.get(m_alert.group(1).lower())
+                lines_ = lines_[1:]                     # drop the marker line itself
+            text, runs = parse_inline(" ".join(lines_).strip())
             if text:
                 content: dict[str, Any] = {"text": text}
                 if runs:
                     content["inline_formats"] = runs
-                nodes.append(_node("blockquote", content, actor_id=actor_id, actor_name=actor_name, source=source))
+                if variant:
+                    # A callout carries its severity; a blockquote does not.
+                    nodes.append(_node("callout", {"variant": variant, **content},
+                                       actor_id=actor_id, actor_name=actor_name, source=source))
+                else:
+                    nodes.append(_node("blockquote", content,
+                                       actor_id=actor_id, actor_name=actor_name, source=source))
         quote = []
 
     def flush_table() -> None:
@@ -295,6 +322,18 @@ def markdown_to_nodes(
             continue
         if table:
             flush_table()
+
+        # ── HTML comments ─────────────────────────────────────────────────────────────────
+        # Markdown has no page break, so `<!-- pagebreak -->` is the directive. Everything else in
+        # comment syntax is DROPPED rather than rendered: a comment that reaches the page as
+        # visible text is markup leaking into the customer's proposal, which is how
+        # `<!-- pagebreak -->` used to arrive — as a literal text_block a reviewer would read.
+        m_comment = _COMMENT.match(line)
+        if m_comment:
+            flush_all()
+            if _PAGEBREAK.match(line):
+                nodes.append(_node("page_break", {}, actor_id=actor_id, actor_name=actor_name, source=source))
+            continue
 
         # ── blockquote ────────────────────────────────────────────────────────────────────
         q = _QUOTE.match(line)

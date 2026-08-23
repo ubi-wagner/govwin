@@ -902,8 +902,15 @@ const RESPONDERS = [
       const take = (n) => ranked.slice(i, (i += n));
       lines.push(bolded(take(4).join(' ')), '');
 
+      // STRUCTURE BEFORE BUDGET. This loop used to run only `while length < target`, so when the
+      // retrieved material was dense the 4-sentence lead alone met the target and the subheads,
+      // bullets and table below never ran — the responder emitted one heading and one paragraph
+      // and looked like a converter ceiling when it was a gating bug. Guarantee a minimum of two
+      // subsections, THEN fill to target.
+      const MIN_SUBS = 2;
       let sub = 0;
-      while (i < ranked.length && lines.join('\n').length < target && sub < SUBHEADS.length) {
+      while (sub < SUBHEADS.length && i < ranked.length
+             && (sub < MIN_SUBS || lines.join('\n').length < target)) {
         const para = take(4);
         if (para.length === 0) break;
         lines.push(`## ${SUBHEADS[sub]}`, '', bolded(para.join(' ')), '');
@@ -938,6 +945,25 @@ const RESPONDERS = [
           ...reqs.slice(0, 8).map((r, n) => `| ${r.replace(/\|/g, '\\|')} | §${n + 1} above |`),
           '');
       }
+      // ── The three primitives the shipped MOLDS use and markdown cannot yet say ──────────
+      // Measured demand (scripts/analyze-node-demand.mjs): page_break, callout and divider each
+      // appear in a shipped mold, and none survives the markdown round-trip today. Emitting them
+      // here is the RED half — until markdown_to_canvas parses them these are dropped, which is
+      // the drop this harness exists to demonstrate.
+      //
+      // Syntax choices, deliberately conventional rather than invented:
+      //   callout  → GitHub's `> [!WARNING]` alert, a de-facto standard
+      //   divider  → `***`, standard markdown thematic break. NOT `---`, which collides with the
+      //              table separator row and with frontmatter (the footgun called out in review).
+      //   page_break → `<!-- pagebreak -->`, since markdown has no notion of one. An HTML comment
+      //              degrades to nothing visible in any renderer that does not know it, which is
+      //              the property that makes markdown safe to extend at all.
+      if (reqs.length >= 2) {
+        lines.push('> [!WARNING]', `> ${reqs.length} mandatory requirement(s) are traced to this section.`, '');
+      }
+      lines.push('***', '');
+      lines.push('<!-- pagebreak -->', '');
+
       return textMsg(req.model, lines.join('\n'));
     },
   },
