@@ -7,7 +7,11 @@
  *   3) surfaces → the offer shows up in the tenant_admin's open-task queue
  * NODE_ENV=test so the emit path doesn't fire live automation rules. Self-cleaning.
  */
-import { sql } from '@/lib/db';
+// Owner client for this drive's OWN bookkeeping: under the production posture (govtech_app, RLS
+// on) a script has no app.tenant_id, so the scoped client sees nothing and every assertion below
+// reads zero against rows that exist. The product paths under test still run scoped. Same split as
+// harnessDbUrl() for the .mjs drives; see B86.
+import { sqlBypass as sql } from '@/lib/db';
 import { offerStarterSet, STARTER_OFFER_TASK_TYPE } from '@/lib/library/starter-offer';
 import { listOpenTasksForActor } from '@/lib/tasks/tasks';
 

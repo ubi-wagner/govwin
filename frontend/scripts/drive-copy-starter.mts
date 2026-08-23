@@ -23,13 +23,28 @@
  * disagree. Recorded as B85 rather than silently normalised in either direction.
  */
 import { sql } from '@/lib/db';
+import { sqlBypass } from '@/lib/db';
 import { listSystemFoundations, copyFoundationToTenant } from '@/lib/library/foundation';
 
 const TENANT = process.env.TEST_TENANT_ID ?? 'dd831b77-2d6b-4b53-bb18-4d48569a2258'; // immobileyes
 const ACTOR = process.env.TEST_ACTOR_ID ?? 'c9703126-dbb4-42f6-8e13-88b3333bc35d';   // eric
 
+/**
+ * VERIFICATION READS GO THROUGH THE OWNER, and that is not a shortcut.
+ *
+ * Under the production posture (serve as govtech_app, RLS on) the scoped `sql` client has no
+ * `app.tenant_id` set inside a script, so every check below returned zero against rows that had
+ * just been written — the drive reported "copied grain tree: {}" and "0 / 31 tenant-owned" while
+ * the copy had in fact succeeded, and its cleanup silently deleted nothing, leaking 62 probe atoms
+ * across two runs. Same shape as the harness half of B86.
+ *
+ * The WRITE under test still goes through the real product path (copyFoundationToTenant →
+ * createAtom → withTenant(target)), which is what isolation has to hold for. Only this file's own
+ * arithmetic uses the owner — a legitimate cross-tenant read, and the same split
+ * `harnessDbUrl()` makes for the .mjs drives.
+ */
 async function grainCounts(ids: string[]) {
-  const rows = await sql<Array<{ grain: string; n: number }>>`
+  const rows = await sqlBypass<Array<{ grain: string; n: number }>>`
     SELECT grain, count(*)::int AS n FROM library_atoms WHERE id = ANY(${ids}::uuid[]) GROUP BY grain ORDER BY grain`;
   return Object.fromEntries(rows.map((r) => [r.grain, r.n]));
 }
@@ -46,7 +61,7 @@ async function main() {
   // THE GUARDRAIL: copy-inward must not leave a lineage edge pointing at another tenant's atom.
   // Counted across every relation, not just derived_from — the property is "no cross-tenant edge",
   // and narrowing it to one relation would let a differently-labelled edge through.
-  const [{ crossTenant }] = await sql<Array<{ crossTenant: number }>>`
+  const [{ crossTenant }] = await sqlBypass<Array<{ crossTenant: number }>>`
     SELECT count(*)::int AS cross_tenant
     FROM atom_lineage l
     JOIN library_atoms p ON p.id = l.parent_atom_id
@@ -54,15 +69,15 @@ async function main() {
     WHERE l.child_atom_id = ANY(${all}::uuid[])
       AND p.tenant_id IS DISTINCT FROM c.tenant_id`;
   // And the copies really are the target tenant's own rows — the other half of copy-inward.
-  const [{ owned }] = await sql<Array<{ owned: number }>>`
+  const [{ owned }] = await sqlBypass<Array<{ owned: number }>>`
     SELECT count(*)::int AS owned FROM library_atoms
     WHERE id = ANY(${all}::uuid[]) AND tenant_id = ${TENANT}::uuid`;
   // Every copied primitive keeps its canvas node (canvas-ready) + full taxonomy.
   // NB: the db client transform.toCamel rewrites snake aliases → camelCase on read.
-  const [{ primOk }] = await sql<Array<{ primOk: number }>>`
+  const [{ primOk }] = await sqlBypass<Array<{ primOk: number }>>`
     SELECT count(*)::int AS prim_ok FROM library_atoms
     WHERE id = ANY(${d.atomIds}::uuid[]) AND jsonb_array_length(canvas_nodes) >= 1`;
-  const [{ tagMin }] = await sql<Array<{ tagMin: number }>>`
+  const [{ tagMin }] = await sqlBypass<Array<{ tagMin: number }>>`
     SELECT COALESCE(min(c),0)::int AS tag_min FROM (
       SELECT count(*) c FROM atom_tags WHERE atom_id = ANY(${d.atomIds}::uuid[]) GROUP BY atom_id) q`;
 
@@ -79,7 +94,7 @@ async function main() {
   console.log(pass ? '✅ COPY-ON-USE PROOF PASS' : '❌ FAIL');
 
   // Clean up the probe copies (leave the tenant library as we found it).
-  await sql`DELETE FROM library_atoms WHERE id = ANY(${all}::uuid[]) AND tenant_id = ${TENANT}::uuid`;
+  await sqlBypass`DELETE FROM library_atoms WHERE id = ANY(${all}::uuid[]) AND tenant_id = ${TENANT}::uuid`;
   console.log(`cleaned up ${all.length} probe atoms`);
   if (!pass) process.exit(1);
 }
