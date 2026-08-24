@@ -30,6 +30,14 @@ interface Props {
   readOnly?: boolean;
 }
 
+/**
+ * The two ends of the stack, either side of the default 5 that canvas-renderer and canvas-html
+ * both use when `z` is absent. Kept well clear of it so repeated "bring to front" on different
+ * nodes does not collide, and so an untouched node keeps landing between them.
+ */
+const Z_TOP = 900;
+const Z_BOTTOM = 1;
+
 const label = 'text-[10px] text-gray-400 block mb-1';
 const field = 'w-full text-xs border rounded px-1.5 py-1';
 const H3 = ({ children }: { children: React.ReactNode }) => (
@@ -181,6 +189,55 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
             <select data-control="wrap" value={p.wrap ?? 'inline'} onChange={(e) => onPosition({ wrap: e.target.value as NonNullable<NodePosition['wrap']> })} className={field}>
               {WRAP_MODES.map((w) => <option key={w} value={w}>{w === 'inline' ? 'In line with text' : w === 'float' ? 'Float (wrap text)' : w === 'front' ? 'In front of text' : 'Behind text'}</option>)}
             </select>
+          </div>
+
+          {/* ── LAYERING ──────────────────────────────────────────────────────────────────────
+              `position.z` has always existed in the model and has always been honoured by the
+              editor and the HTML/PDF path — with no way for a person to set it. The only way to
+              change stacking was to reorder the document, which is the wrong lever: on a dense
+              slide the order things are READ in and the order they are DRAWN in are different
+              intentions.
+
+              Named the way the two applications people arrive from name them, because this is
+              precisely where a familiar verb is worth more than an accurate one: "bring to front"
+              rather than "increase z-index".
+
+              Z_TOP/Z_BOTTOM sit either side of the default 5 used by canvas-renderer and
+              canvas-html, so a node that has never been touched keeps landing in the middle. */}
+          <label className={label}>Layer</label>
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              data-control="layer-front"
+              onClick={() => onPosition({ z: Z_TOP, wrap: p.wrap === 'behind' ? 'front' : p.wrap })}
+              disabled={readOnly}
+              className={`${toggle} ${off}`}
+              title="Bring to front"
+            >⬆ Front</button>
+            <button
+              data-control="layer-back"
+              onClick={() => onPosition({ z: Z_BOTTOM })}
+              disabled={readOnly}
+              className={`${toggle} ${off}`}
+              title="Send to back"
+            >⬇ Back</button>
+            <button
+              data-control="layer-behind"
+              onClick={() => onPosition({ wrap: 'behind', z: Z_BOTTOM })}
+              disabled={readOnly}
+              className={`${toggle} ${p.wrap === 'behind' ? on : off}`}
+              title="Send behind text"
+            >Behind text</button>
+            {(p.z !== undefined || p.wrap === 'behind') && (
+              <button
+                data-control="layer-reset"
+                onClick={() => onPosition({ z: undefined, wrap: p.wrap === 'behind' ? 'inline' : p.wrap })}
+                disabled={readOnly}
+                className="text-[10px] text-rose-500 hover:underline ml-1"
+              >reset</button>
+            )}
+            <span className="ml-1 text-[10px] text-gray-400 tabular-nums">
+              {p.wrap === 'behind' ? 'behind' : `z ${p.z ?? 5}`}
+            </span>
           </div>
         </>
       )}

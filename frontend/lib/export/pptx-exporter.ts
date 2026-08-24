@@ -233,9 +233,30 @@ export async function exportToPptx(
     }
 
     // ── body flow ──
+    //
+    // IN POWERPOINT, Z-ORDER IS EMISSION ORDER. There is no z attribute on a shape: whatever is
+    // added last sits on top. So a deck that honours `position.z` has to SORT before it writes,
+    // and this writer did not — it emitted in document order and the author's stacking was
+    // silently dropped on the way out.
+    //
+    // That matters precisely on the decks this product is for. A dense slide overlaps things on
+    // purpose — a callout over a chart, a label over an image — and the editor and the PDF path
+    // both already honour z (canvas-renderer, canvas-html). The .pptx was the one artifact where
+    // the layering a person arranged came back rearranged.
+    //
+    // STABLE, and that word is doing work: nodes without a `z` must keep their document order
+    // relative to each other, or a deck with no layering at all would be reshuffled by the very
+    // fix meant to preserve arrangement. `Array.prototype.sort` is stable in modern V8, and the
+    // comparator returns 0 for equal z so it leans on that guarantee deliberately.
+    //
+    // `wrap: 'behind'` is the floor — content explicitly sent behind the text goes out first, which
+    // matches how the other two surfaces already draw it.
+    const zOf = (n: CanvasNode) => (n.position?.wrap === 'behind' ? -1 : (n.position?.z ?? 5));
+    const ordered = [...bodyNodes].sort((a, b) => zOf(a) - zOf(b));
+
     let curY = BODY_TOP;
     const bodyBottom = dims.h - 0.5;
-    for (const node of bodyNodes) {
+    for (const node of ordered) {
       const added = addNodeToSlide(slide, node, canvas, MARGIN, curY, bodyW, Math.max(0.3, bodyBottom - curY), sub, nodes, raster, accent);
       curY += added;
     }
