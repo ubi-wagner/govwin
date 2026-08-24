@@ -875,7 +875,50 @@ Use it when a layout is not doing what you expect. A spacer that should be a qua
 it doesn't. The grid does not change your document — it is a transparent layer, and nothing on it
 can be clicked.
 
-## 8.6 Things worth knowing
+## 8.6 Page breaks, and why content jumps
+
+With **Grid** on you also get the two things that explain the most confusing thing about editing a
+long document.
+
+**A dashed teal line marks where each page actually breaks**, with the page number beside it. Not
+where a page *would* break if text simply flowed — where your export will really break it.
+
+**A hatched band marks whitespace you are about to print.** When a block will not fit in the space
+left on a page — a table, a figure, a group held together — it is not split. It is moved whole to
+the next page, and the rest of the previous page stays blank. That is why an image seems to *jump*
+a page when you add a sentence above it: you did not push it a line, you pushed it past the edge,
+and the whole thing relocated.
+
+The band is that blank space, shown while you can still do something about it, and the boundary
+label reads **“pushed”** so you can tell a natural break from a relocation at a glance.
+
+What to do when you see a large hatched band:
+
+- **Shorten what is above it.** A few lines can be the difference between the block fitting and
+  being moved.
+- **Move the block earlier**, so it starts a page on purpose rather than by accident.
+- **Split it** — a long table divided into two shorter ones can flow, where one long one cannot.
+- **Or leave it.** A figure that starts its own page often reads better. The point is that it is now
+  your decision instead of a surprise.
+
+## 8.7 Rulers
+
+Gradations run along the top and left edges, in the same steps as the grid, so you can read an
+absolute position rather than counting cells. They sit outside the page rather than on it — a ruler
+printed across your document would cover the thing you are measuring.
+
+## 8.8 Group boxes
+
+If your document has content grouped — a run that came from one library item, or blocks marked to
+stay together — the grid outlines each group and puts its height beside it.
+
+Usually you will see one number. If you see two (**“drawn”** and **“ruler”**), the page and the
+page-count model disagree about that block's height, and the difference is shown. That is worth a
+look before you rely on a page count: it is the one place the product will tell you its own gauge
+and its own rendering are not saying the same thing.
+
+## 8.9 Things worth knowing
+
 
 
 - **Save and export are separate.** Export sends what is on your screen, so you can export a draft

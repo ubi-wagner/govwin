@@ -313,6 +313,44 @@ types in all four formats.** The drive's table therefore names its instrument an
 decisive per-node assertions live in `scripts/probe-structural-nodes.mts`, where each type is
 measured by the effect it actually has. Both are registered in `run-branch-drives.sh`.
 
+## 8c. The ruler system (2026-08-24)
+
+Four layers over the page, sharing ONE geometry — `gridGeometry` is called once, so a ruler
+gradation, a grid line and a page boundary are the same number by construction rather than three
+functions that happen to agree today.
+
+| layer | what it answers | source | cost |
+|---|---|---|---|
+| **Grid** | spacing — how far is that? | `CanvasRules` | pure |
+| **Rulers** | absolute position, in the gutter | same geometry | pure |
+| **Boundaries** | where the page actually breaks | `paginate().perNode` + DOM | measured |
+| **Group boxes** | how tall is this run, and do the page and the ruler agree? | DOM + `nodesHeightPt` | measured |
+
+**The step ladder is 72 · 36 · 18 · 12 · 6pt.** Every step divides 72, because a step that does not
+puts its lines off the inch marks that make a grid readable as a ruler — 72/5 = 14.4, which is why
+6pt and not 5pt is the floor. It is deliberately NOT a pure halving: 72/36/18 are inch fractions and
+12/6 are picas, and 12pt is a body line, the measurement an author reaches for most.
+
+**Boundaries follow the PAGINATOR, never arithmetic (B112).** `fitKeep` relocates a block that will
+not fit — table, figure, `keep_together` group — wholesale to the next page. A line at
+`marginTop + k × usableHeight` therefore falls *inside* a block that actually begins the page. The
+hatched band shows the whitespace a relocation leaves behind, which is the thing an author
+experiences as "the image jumped a page" and which a continuous editor otherwise shows nowhere.
+
+**Only two layers measure.** The grid and rulers are pure geometry. Boundaries and group boxes read
+the DOM, on a rAF-batched pass **after paint** — `offsetHeight` forces a synchronous reflow, and
+doing that per keystroke is jank where a writer notices it. `offsetTop`/`offsetHeight`, never
+`getBoundingClientRect`, because client rects are post-transform.
+
+**What building it found.** Four defects, each invisible because the page *looked* right: a spacer
+with five readers and four heights (B109), the ruler and renderer disagreeing about it, the page
+scaling itself twice (B111), and boundaries drawn from a model the product does not use (B112). A
+measurement layer earns its keep by being impossible to build without pinning down what everything
+else only assumed.
+
+Driven end to end by `scripts/drive-ruler-overlays.mts`; geometry by `probe-measure-grid.mts` (all
+10 presets) and `__tests__/measure-grid.test.ts`; the page-scale class by `probe-page-scale.mts`.
+
 ## 9. Canvas doc map — the single source → everything else
 
 This file is authoritative. The rest, classified:

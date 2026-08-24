@@ -166,7 +166,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -217,6 +217,15 @@ DRIVES=(
   "canvas-authoring|scripts/drive-canvas-authoring.mts"
   # The four structural primitives, each measured by the effect it actually has. No server needed.
   "canvas-structural|scripts/probe-structural-nodes.mts"
+  # The ruler system on the case that motivates it: prose above a table that cannot fit behind it.
+  # Asserts the fixture really relocates BEFORE looking at the UI, so a pass cannot come from a
+  # document that never triggered the behaviour.
+  "ruler-overlays|scripts/drive-ruler-overlays.mts"
+  # The page renders at the size it computes — offsetWidth vs getBoundingClientRect across four
+  # viewports. The only instrument that can see a uniformly-too-small page, which LOOKS correct.
+  "page-scale|scripts/probe-page-scale.mts"
+  # Grid geometry against all 10 shipped presets. No server needed.
+  "measure-grid|scripts/probe-measure-grid.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0
