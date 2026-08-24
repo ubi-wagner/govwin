@@ -56,6 +56,29 @@ try {
     await sqlBypass`DELETE FROM proposal_artifacts WHERE proposal_id=${proposalId}::uuid`;
     await sqlBypass`DELETE FROM tasks WHERE entity_id=${proposalId}::uuid`;
     await sqlBypass`DELETE FROM library_seed_jobs WHERE proposal_id=${proposalId}::uuid`;
+    // WHAT THE ENGINE MADE OF THEM, before the events themselves.
+    //
+    // This drive emits real events, and on a box with a live worker the engine CONSUMES them: a
+    // `process_instances` row is created carrying `trigger_event_id`. Deleting the event then
+    // fails on the foreign key —
+    //     Key (id)=(953c0a67…) is still referenced from table "process_instances"
+    // — and the whole teardown aborts, leaving the proposal and everything under it behind. The
+    // drive had been passing only because the worker had not gotten to the event in time; that is
+    // a race, and it resolves the wrong way as often as the right one.
+    //
+    // Scoped through `trigger_event_id` rather than by proposal or by time: an instance is removed
+    // only if the event that CAUSED it is one this run is deleting. A tidier-looking predicate
+    // (everything recent, everything for this opportunity) would reach instances the drive never
+    // caused — and this is the workflow engine's own table.
+    //
+    // Same class as B119: a teardown that removes what it INSERTED rather than what it CAUSED.
+    await sqlBypass`
+      DELETE FROM process_instance_transitions WHERE instance_id IN (
+        SELECT id FROM process_instances WHERE trigger_event_id IN (
+          SELECT id FROM system_events WHERE payload->>'proposalId' = ${proposalId}))`;
+    await sqlBypass`
+      DELETE FROM process_instances WHERE trigger_event_id IN (
+        SELECT id FROM system_events WHERE payload->>'proposalId' = ${proposalId})`;
     await sqlBypass`DELETE FROM system_events WHERE payload->>'proposalId'=${proposalId}`;
     await sqlBypass`DELETE FROM proposals WHERE id=${proposalId}::uuid`;
   }
