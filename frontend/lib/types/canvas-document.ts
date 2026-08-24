@@ -1283,6 +1283,22 @@ export function spacerHeightPt(node: CanvasNode, fallbackPt = 12): number {
   return fallbackPt;
 }
 
+/**
+ * The modelled height of a run of nodes, in points — what the RULER thinks a group occupies.
+ *
+ * Exported so the editor can put a number on a bounding box. It is deliberately the same
+ * `nodeStackHeightPt` the paginator and the export gate use, not a second estimate: a group's height
+ * shown in the UI must be the height the compliance floor will judge it by, or the box is decoration.
+ *
+ * This is the MODEL's answer. The page's answer is whatever the browser lays out, and the two
+ * disagreeing is the defect class B64/B65/B73/B109 all belong to — which is precisely why the
+ * overlay shows both rather than picking one to trust.
+ */
+export function nodesHeightPt(nodes: CanvasNode[], canvas: CanvasDocument['canvas']): number {
+  const m = flowMetrics(canvas);
+  return nodes.reduce((sum, n) => sum + nodeStackHeightPt(n, m), 0);
+}
+
 export function estimatePageCount(doc: CanvasDocument): number {
   const c = doc.canvas;
   if (!c) return 1;

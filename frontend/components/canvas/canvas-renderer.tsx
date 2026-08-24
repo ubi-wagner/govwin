@@ -42,6 +42,7 @@ import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeri
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 import { MeasureGridOverlay } from './measure-grid-overlay';
+import { BoundingBox, measureBox, runsFromGroupMap } from './bounding-box-overlay';
 import { defaultGridStep, isGridStep, type GridStepPt } from '@/lib/canvas/measure-grid';
 
 interface Props {
@@ -174,6 +175,7 @@ export function CanvasRenderer({
   // any viewport — including a Chrome split-screen half — instead of overflowing
   // a hardcoded 750px reference. Never upscale past 1; floor so it stays legible.
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const [availWidth, setAvailWidth] = useState(750);
   useEffect(() => {
     const el = containerRef.current;
@@ -188,6 +190,60 @@ export function CanvasRenderer({
   const contentWidth = canvas.width - canvas.margins.left - canvas.margins.right;
   const scale = Math.min(1, Math.max(0.25, (availWidth - 32) / canvas.width));
 
+  // ── measured group boxes ─────────────────────────────────────────────────────────────────────
+  //
+  // LAYOUT pixels, not client rects. The page carries `transform: scale()`, so
+  // getBoundingClientRect returns TRANSFORMED pixels — every measurement would have the transform
+  // baked in and would need dividing back out, which is a second place to get the scale wrong.
+  // offsetTop/offsetHeight are pre-transform, in the same space the grid and the page padding use,
+  // so `px / scale` is points and nothing else has to know.
+  const [groupBoxes, setGroupBoxes] = useState<Array<{
+    key: string; label: string; topPx: number; heightPx: number; nodes: CanvasNode[];
+  }>>([]);
+
+  useEffect(() => {
+    if (!grid) { setGroupBoxes([]); return; }
+    const page = pageRef.current;
+    if (!page) return;
+
+    /** Offset of `el` from `ancestor`, summing offsetParents — a positioned wrapper would otherwise
+     *  make offsetTop relative to the wrong thing and slide every box up the page. */
+    const offsetWithin = (el: HTMLElement, ancestor: HTMLElement): number => {
+      let y = 0;
+      let cur: HTMLElement | null = el;
+      while (cur && cur !== ancestor) { y += cur.offsetTop; cur = cur.offsetParent as HTMLElement | null; }
+      return cur === ancestor ? y : el.offsetTop;
+    };
+
+    const measure = () => {
+      const runs = runsFromGroupMap(nodes, groupOf);
+      const boxes = runs.map((run, i) => {
+        const els = run.nodes
+          .map((n) => page.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`))
+          .filter((e): e is HTMLElement => !!e);
+        if (els.length === 0) return null;
+        const tops = els.map((e) => offsetWithin(e, page));
+        const top = Math.min(...tops);
+        const bottom = Math.max(...tops.map((t, j) => t + els[j].offsetHeight));
+        return {
+          key: `${run.id}-${i}`,
+          label: run.label ?? `Group ${i + 1}`,
+          topPx: top,
+          heightPx: Math.max(0, bottom - top),
+          nodes: run.nodes,
+        };
+      }).filter((b): b is NonNullable<typeof b> => b !== null);
+      setGroupBoxes(boxes);
+    };
+
+    // Measure after paint, and again whenever the page resizes — a box drawn from a stale layout is
+    // a confident wrong number, which is the one thing a measurement tool must never produce.
+    const raf = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(page);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [grid, nodes, groupOf, scale, canvas]);
+
   const fontStyle = {
     fontFamily: canvas.font_default.family,
     fontSize: `${canvas.font_default.size}pt`,
@@ -199,6 +255,7 @@ export function CanvasRenderer({
       {/* Page — honors canvas.background (deck/page fill) so what you see == what exports
           (pptx slide.background + the html/pdf page); falls back to the bg-white class. */}
       <div
+        ref={pageRef}
         className="bg-white shadow-lg relative"
         style={{
           width: canvas.width * scale,
@@ -218,6 +275,20 @@ export function CanvasRenderer({
             scale={scale}
           />
         )}
+
+        {/* Measured group boxes — drawn ABOVE the grid so their edges read against its lines. */}
+        {grid !== false && groupBoxes.map((b) => (
+          <BoundingBox
+            key={b.key}
+            topPx={b.topPx}
+            heightPx={b.heightPx}
+            leftPt={canvas.margins.left}
+            widthPt={canvas.width - canvas.margins.left - canvas.margins.right}
+            scale={scale}
+            kind="group"
+            measurement={measureBox({ label: b.label, drawnPx: b.heightPx, scale, nodes: b.nodes, canvas })}
+          />
+        ))}
 
         {/* Watermark overlay — behind content */}
         {statusToWatermark(metadata.status) && (
