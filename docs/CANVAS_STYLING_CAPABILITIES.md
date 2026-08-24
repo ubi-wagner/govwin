@@ -12,6 +12,8 @@ Two instruments back it:
 | instrument | question it answers |
 |---|---|
 | `scripts/probe-style-matrix.mts` | does a style the model carries reach each exported format |
+| `scripts/probe-deck-overlap.mts` | does a slide node's declared frame actually hold its content |
+| `scripts/render-artifact-pages.mts` | what the customer sees — .pdf/.pptx/.docx/.xlsx → page images |
 | `scripts/drive-control-reachability.mts` | can a person actually click it *(⚠️ incomplete — see Gaps)* |
 
 ---
@@ -107,6 +109,19 @@ by the mechanism meant to preserve arrangement. Locked by
 *last* to the back — the only shape of test that can distinguish a writer that sorts from one that
 does not.
 
+### A slide node is sized from its text — since 2026-08-24
+
+Until B121 the deck writer sized six node types without reading their text: a table was
+`rows × 0.36in`, a list `items × 0.42in`, a paragraph `length / 95`. Each describes a single line at
+one assumed width and font size, so a wrapping cell was taller than the frame it was given — **and
+PowerPoint clips rather than spilling.** A three-row risk register was delivered with its third row
+absent; a three-bullet list was delivered with its third bullet painted underneath an opaque
+callout. Heights now come from `wrappedLines`, the page ruler's own model, so a deck and a document
+cannot disagree about the same paragraph.
+
+**This is why authoring dense is safe and why the checks above were not enough.** The bytes were
+always complete — every row is in the slide XML. Only a rendered page shows the loss.
+
 ### Off-frame content is supported, not a defect
 
 A proposal deck is authored dense. Primitives and groups may sit partly or wholly off the frame on
@@ -165,6 +180,10 @@ ruler, one answer. If the numbers must be exact, the fix is to make the ruler ex
 
 **Built but unmeasured:**
 
+* **a boxed slide node's height.** `probe-deck-overlap.mts` measures a node's declared frame against
+  what an independent engine renders — but a node that paints its own fill or border (callout, text
+  box) defeats it: the ink span *is* the box, so declared and realised agree by construction. Those
+  are reported INDETERMINATE rather than green.
 * **inline-run survival through the writers.** The matrix covers node style. Whether a
   superscript run inside a paragraph reaches `.docx` is not proven.
 * **control reachability per surface.** `drive-control-reachability.mts` exists and is instrumented
@@ -194,8 +213,18 @@ tell honoured from hardcoded reports the writer's defaults back as the customer'
 change touching only pptx. OOXML stamps `docProps/core.xml` with `dcterms:created`, so two exports
 of the same document differ across a second boundary — the probe was reading the clock.
 
-The rule that survives all three: **the first output of a new instrument describes the instrument.**
-Validate it against a known answer before believing a finding.
+**Measuring the wrong slide.** The slide-balance test built every case with a level-1 heading and
+`text_block` siblings — which is exactly the condition that routes to the HERO layout, a path with
+its own fixed constants that never reads the code under test. Three assertions passed and one
+failed, all four about a hardcoded subtitle and an accent rule.
+
+**Three instruments for one defect, each convincing, each wrong** (B121). Declared geometry: always
+clean, because the writer leaves a tidy gap under the frame it believes in. Ink position: caught the
+table, passed the list. Text presence: found every authored phrase *including the invisible one*,
+because occluded text is still painted into the PDF.
+
+The rule that survives all of them: **the first output of a new instrument describes the
+instrument.** Validate it against a known answer — in both directions — before believing a finding.
 
 ---
 

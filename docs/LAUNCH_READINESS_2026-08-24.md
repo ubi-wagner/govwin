@@ -1,8 +1,8 @@
 # LAUNCH_READINESS_2026-08-24.md — the current go/no-go
 
 **Date:** 2026-08-24 · **Migration head:** 213 · **Branch:** `claude/nice-hamilton-kBqtD` (282 commits ahead of `main`)
-**Backbone:** `tsc` 0 · `vitest` **1905** · `next build` clean · branch drives **38/38** · four lenses **4/4** ·
-full journey **33/33** · bug log **119 entries, 0 open**
+**Backbone:** `tsc` 0 · `vitest` **1915** · `next build` clean · branch drives **38/38** · four lenses **4/4** ·
+full journey **33/33** · canvas measurement harnesses **6/6, zero under-counts** · bug log **121 entries, 0 open**
 
 > **This supersedes `LAUNCH_READINESS_2026-08.md`, which is dated at migration head 185 — twenty-eight
 > migrations of drift.** Its §4 punch list is still substantially correct and is carried forward below;
@@ -99,28 +99,39 @@ intended launch path.
 | **The canvas, end to end** | 22/22 node types survive every writer; every styling capability reaches every format that has the concept; layering honoured in the deck exporter (PowerPoint z-order is emission order — the writer never sorted); equations typeset rather than printed as LaTeX source. |
 | **The full arc** | 33/33 steps: real BAA ingest (773,877 characters extracted), the admin intake route, the public application route, admin accept provisioning a real tenant, buckets, cards, provisioning cockpit, three volume shapes, downloads measured from the files. Box unchanged after the run. |
 | **The rig itself** | A hydration gate now precedes every lens run. `verify-surfaces` once reported **80/80 clean against a box where no JavaScript executed** — it gates on client throws, and code that never runs never throws. |
+| **Decks open in a real PowerPoint engine** | NEW, and it had never been checked: every `.pptx` claim to date was XML-level. Converting one with LibreOffice Impress found **B121 — delivered decks were missing table rows and bullets the author wrote**, because six node types sized their frames without reading the text and PowerPoint clips rather than spills. Fixed against the page ruler's own wrapping model; `probe-deck-overlap.mts` measures each node against an engine that shares no code with ours. |
 
 ---
 
 ## 3. Known-open, non-blocking
 
-* **TOC has no page numbers or leaders**, and lists the document title as its own first entry.
-* **Slides are top-anchored** — a two-line title slide sits in the top fifth of the frame.
 * **13 tenant-owned tables are structurally protected but behaviourally unmeasured** (empty on this box).
   The posture checker reports them as unmeasured rather than passing, which is the honest state.
 * **~10 business-entity rows per suite run** accumulate from drives whose scenarios later drives read.
   Bounded, identifiable, named in B119.
-* **Ten of thirty-nine molds over-count** by a page or two — the safe direction (B64: the ruler may
-  over-count, never under).
+* **Five of thirty-nine molds over-count** by a page or two — the safe direction (B64: the ruler may
+  over-count, never under). Zero under-count across molds, 18 stored volumes and 8 authored proposals.
+* **The contents page inherits the ruler's over-count bias** — a late entry in a long document can
+  read one page high. Stated in `CANVAS_STYLING_CAPABILITIES.md §5`; fixing it properly means making
+  the ruler exact, not giving the TOC a second opinion.
+* **A boxed slide node's height is unverified end-to-end.** `probe-deck-overlap.mts` reports callouts
+  and text boxes INDETERMINATE rather than green, because their own fill is what the ink measures.
 
 ---
 
 ## 4. The pattern worth carrying into the deploy
 
-Six times on 2026-08-24 something was **green for the wrong reason**: a posture checker that proved one
+Repeatedly on 2026-08-24 something was **green for the wrong reason**: a posture checker that proved one
 table, a preflight that failed open on its own broken read, a `pgrep` that knew one of two spellings so two
 workers ran different code, a surface sweep passing against a box with no JavaScript, a corpus that could not
 contain the bug it was meant to catch, and a drive whose pass depended on the engine being slow.
+
+B121 added four more in a single afternoon, and they are the sharpest examples yet because each one
+was *measuring something real* — just not the thing its sentence named. A slide-balance test that
+measured the hero layout instead of the code under test. An overlap check reading declared geometry
+that is clean by construction. An ink check that passed a slide which had lost a third of its
+content. A text-presence check that found the missing bullet, because occluded text is still painted
+into the PDF.
 
 Different mechanisms, one shape: **the check ran, and its scope was narrower than the sentence it printed.**
 
