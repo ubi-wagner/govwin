@@ -155,6 +155,11 @@ PER_CALL_CEILING_USD = 0.50  # mid-loop cost ceiling for a single invocation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
+# Whether the installed SDK still takes `temperature` — see src/sdk_compat.py for what this cost
+# when it was assumed rather than asked. Imported, not re-derived: two copies of a capability check
+# is how the fabric got fixed while the CMS generator stayed broken.
+from sdk_compat import sampling_kwargs
+
 # Sonnet pricing: $3/M input, $15/M output (kept for backwards-compat).
 INPUT_COST_PER_TOKEN = 3.0 / 1_000_000
 OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000
@@ -585,9 +590,12 @@ class AgentFabric:
             api_kwargs: dict = {
                 "model": model,
                 "max_tokens": max_tokens,
-                "temperature": temperature,
                 "system": system_prompt,
                 "messages": list(messages),
+                # Only where the installed SDK still takes it. Omitting the argument costs the
+                # archetype its sampling preference; passing one the SDK dropped costs it the
+                # entire call.
+                **sampling_kwargs(temperature),
             }
             if merged_tools:
                 api_kwargs["tools"] = merged_tools

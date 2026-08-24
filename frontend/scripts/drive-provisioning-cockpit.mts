@@ -17,12 +17,71 @@ import { provisionAndReleasePortal } from '@/lib/provisioning/release-portal';
 
 const OPP = 'd53a22e4-792d-4fe7-8253-a42270fd9981';       // TVSF Round 45 (2 vols, 13 items, has compliance)
 const SOL = 'b356a211-9448-4025-8626-27d149088da7';
-const BUYER = 'eb90abbc-198b-4452-96c0-5c5ecff1fdf4';     // Entrepreneurs' Center — holds the card, no portal
-const BUYER_NAME = "Entrepreneurs' Center";
-const BUYER_SLUG = 'entrepreneurs-center';
-const OTHER = '17780cad-76c0-4cef-95ec-2a536bcf5c8f';     // Foundation — also holds the card (the broadcast must reach it)
-const ADMIN = '3667ead2-3b5e-4cc8-97f7-b2ab1cfa907d';
-const ADMIN_EMAIL = 'eric@rfppipeline.com';
+
+/**
+ * THE CAST IS RESOLVED, NOT PINNED.
+ *
+ * This drive used to hold `BUYER` and `ADMIN` as literal UUIDs. Both stopped existing when the box
+ * was rehydrated — the tenant and the admin were RECREATED under new ids — and the drive then died
+ * on a foreign-key violation ("Key (tenant_id)=(eb90abbc…) is not present in table \"tenants\""),
+ * which reads like a broken product and is actually a broken fixture. It had been failing that way
+ * for long enough to be treated as a known-bad drive.
+ *
+ * A pinned id asserts something the drive does not actually care about. What it needs is a tenant
+ * with a PROPERTY: one that holds this opportunity's card and has no portal for it yet, so there
+ * is a purchase to release. Asking for the property finds it on any seed; asking for the id finds
+ * it only on the seed it was written against.
+ *
+ * The original cast is still PREFERRED (the `ORDER BY … DESC` puts it first when present) so the
+ * narrative in the log stays the one this drive was written to tell — but preference is not
+ * requirement, and a reseed changes the names in the output rather than the result.
+ */
+const [buyerRow] = await sqlBypass<Array<{ id: string; name: string; slug: string }>>`
+  SELECT t.id, t.name, t.slug
+  FROM tenant_opportunity_cards c
+  JOIN tenants t ON t.id = c.tenant_id
+  WHERE c.opportunity_id = ${OPP}::uuid
+    AND NOT EXISTS (
+      SELECT 1 FROM proposal_portals p
+      WHERE p.tenant_id = t.id AND p.opportunity_id = ${OPP}::uuid
+    )
+  ORDER BY (t.slug = 'entrepreneurs-center') DESC, t.slug
+  LIMIT 1`;
+if (!buyerRow) {
+  console.error('CANT-RUN no tenant holds this opportunity card without already having a portal for '
+    + 'it — there is no purchase to release. That is a missing fixture, not a product failure.');
+  process.exit(1);
+}
+
+// The broadcast half of the proof needs a SECOND card-holder, so "reached everyone" is a claim with
+// more than one witness in it.
+const [otherRow] = await sqlBypass<Array<{ id: string; slug: string }>>`
+  SELECT t.id, t.slug
+  FROM tenant_opportunity_cards c
+  JOIN tenants t ON t.id = c.tenant_id
+  WHERE c.opportunity_id = ${OPP}::uuid AND t.id <> ${buyerRow.id}::uuid
+  ORDER BY (t.slug = 'foundation') DESC, t.slug
+  LIMIT 1`;
+if (!otherRow) {
+  console.error('CANT-RUN only one tenant holds this card, so a fan-out to "everyone" cannot be '
+    + 'distinguished from a fan-out to the buyer. Seed a second card-holder.');
+  process.exit(1);
+}
+
+const [adminRow] = await sqlBypass<Array<{ id: string; email: string }>>`
+  SELECT id, email FROM users
+  WHERE role IN ('rfp_admin', 'master_admin') AND is_active
+  ORDER BY (email = 'eric@rfppipeline.com') DESC, created_at
+  LIMIT 1`;
+if (!adminRow) { console.error('CANT-RUN no active rfp_admin to act as.'); process.exit(1); }
+
+const BUYER = buyerRow.id;
+const BUYER_NAME = buyerRow.name;
+const BUYER_SLUG = buyerRow.slug;
+const OTHER = otherRow.id;
+const ADMIN = adminRow.id;
+const ADMIN_EMAIL = adminRow.email;
+console.log(`cast: buyer=${BUYER_SLUG} · other=${otherRow.slug} · admin=${ADMIN_EMAIL}`);
 
 let pass = 0, fail = 0;
 const ok = (b: boolean) => (b ? '✅' : '❌');

@@ -10,7 +10,28 @@ import { stageIntake } from '@/lib/intake';
 // rig and a hardcoded one silently stops existing — see `emuLines`.
 const EMU_LOG = process.env.EMULATOR_LOG || '/tmp/govwin-sandbox/emulated-claude.log.jsonl';
 const sql = postgres(process.env.DATABASE_URL || 'postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 4 });
-const ADMIN = '3667ead2-3b5e-4cc8-97f7-b2ab1cfa907d';
+/**
+ * Resolved, not pinned — the same fixture rot that killed drive-provisioning-cockpit.
+ *
+ * This was a literal UUID. The box was rehydrated, the admin was recreated under a new id, and
+ * every run since died inside `stageIntake` on
+ *     insert or update on "opportunities" violates "opportunities_built_by_fkey"
+ *     Key (built_by)=(3667ead2…) is not present in table "users"
+ * which looks like the intake producer is broken. It is not: the drive was asserting an id that
+ * nothing needs. What it actually needs is SOME active rfp_admin to attribute the intake to.
+ */
+const [adminRow] = await sql<Array<{ id: string; email: string }>>`
+  SELECT id, email FROM users
+  WHERE role IN ('rfp_admin', 'master_admin') AND is_active
+  ORDER BY (email = 'eric@rfppipeline.com') DESC, created_at
+  LIMIT 1`;
+if (!adminRow) {
+  console.error('CANT-RUN no active rfp_admin exists to stage an intake as — a missing fixture, '
+    + 'not a failure of the producer under test.');
+  process.exit(1);
+}
+const ADMIN = adminRow.id;
+console.log(`cast: admin=${adminRow.email}`);
 let ok = true;
 const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
 /**
