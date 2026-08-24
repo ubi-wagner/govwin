@@ -167,6 +167,13 @@ As of the last run — 7 passed · 0 failed · 0 could-not-run · 11 not driven,
 | **S17** archive — portal · atom · tenant, every row still present and stamped | |
 | **S18** isolation — 403/403/404 foreign, 200 own (isolation, not deny-all) | |
 
+**Note on the branch drives this matrix borrows from.** Since the run above, every drive in
+`run-branch-drives.sh` that needs a situation now BUILDS it and disposes it — the same factory this
+matrix uses (`scripts/lib/scenario.mts`). That closed nine drives that had been failing or
+unrunnable on rotted fixtures, and the suite reads **27 passed · 0 failed · 0 could-not-run**.
+The rule and what it cost to learn are in `TESTING_STRATEGY.md` § "Live drives: build the scenario,
+then take it away"; the specific defects are B98–B101 in the bug log.
+
 Five of the eleven are already covered by existing branch drives (S05, S06 by `drive-full-draft`;
 S09 by `drive-atomization`; S12 by the reuse-past drives; S16 by `drive-amendment`) — they are
 listed as NOT DRIVEN *here* because being covered somewhere else is not the same as being covered

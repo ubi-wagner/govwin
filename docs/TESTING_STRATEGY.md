@@ -234,6 +234,60 @@ Scenarios are the closest thing we have to production-like tests without full E2
 
 ---
 
+## Live drives: build the scenario, then take it away
+
+The drive estate (`frontend/scripts/drive-*.mts`, run together by
+`scripts/run-branch-drives.sh`) exercises the product over HTTP as real signed-in people. Every one
+of those drives needs a situation to exist — two companies and a person who belongs to both, a
+submitted build with no contract yet, a master with undecided required items. **The drive builds
+that situation itself and disposes it.** It does not look for one and it does not assume one.
+
+`frontend/scripts/lib/scenario.mts` is the factory: `s.tenant()`, `s.user()`, `s.partnerOrg()`,
+`s.build()`, `s.admin()`, and `s.track()` for anything the caller creates itself. `runScenario(name,
+fn)` wraps a drive so disposal happens on every exit path, including a throw, and reports what it
+removed. Teardown reads the catalog rather than a maintained list of tables, and retries until a
+pass makes no progress, so it stays correct when the next migration adds a foreign key.
+
+**Why this is not merely tidier.** A drive that borrows a fixture rots the day the database is
+rebuilt, and it rots *invisibly* — the failure looks like a regression in the thing the drive tests.
+Every one of these was a live example:
+
+| what was pinned | what the drive reported |
+|---|---|
+| a tenant slug that had been rebuilt away | `Cannot read properties of undefined (reading 'id')` |
+| four uuids from a proposal that had moved on | ten assertions saying the section-ToDo spine was broken |
+| a `.test` account, deactivated on purpose by mig 124 | a 30-second `waitForURL` timeout in the isolation half |
+| a demo tenant's submitted build | CANNOT-RUN, and for a while a false pass |
+
+Three further properties fall out, and they are the reason this is a rule rather than a preference:
+
+- **A drive can run twice.** Anything a drive stages must carry a per-run identifier, because the
+  schema's unique keys are real: a fixed intake notice collides on `opportunities.content_hash`, a
+  fixed portal label collides on `(tenant_id, opportunity_id, label)`. A drive that stages a fixed
+  identifier is green the day it is written and red forever after, and the redness looks exactly
+  like a regression.
+- **A crashed run cannot poison the next one.** If a drive mutates shared state to establish a
+  precondition, it must ESTABLISH both sides rather than read one off ambient state, and restore
+  exactly what it found. A readiness check that read "not ready" from the fixture stopped being able
+  to observe a refusal the first time a run died before its restore — and then reported a failure
+  caused by its own earlier crash.
+- **A mutating drive stops constraining the other harnesses.** `award-to-contract` used to carry
+  "⚠️ RUN THIS BEFORE `capture-guides.mjs`, NEVER AFTER", because winning a demo company's build
+  archived it out of the dashboard the guide screenshots show. Winning inside a company that is
+  disposed at the end of the run removes the constraint rather than documenting it.
+
+**Two connections, because the suite genuinely needs both.** Isolation drives must run with
+`DATABASE_URL` = the scoped `govtech_app` role — under the owner, RLS is bypassed and "no
+cross-tenant rows visible" is unfalsifiable (B86). Scenario drives must run with the OWNER, because
+creating a company is a platform-plane act and the product's own helpers use the context-aware
+`sql`; under a scoped role with no tenant context those writes are half-applied (tenant yes,
+membership no) and the drive then fails on assertions that have nothing to do with the product. The
+runner hands each group the connection its job requires, `DATABASE_URL_APP` always names the scoped
+role for checks that need it regardless, and the factory refuses loudly rather than half-working if
+it is ever handed the wrong one.
+
+---
+
 ## Running tests
 
 Commands (defined in `frontend/package.json`):
