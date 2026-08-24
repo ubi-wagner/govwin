@@ -137,15 +137,34 @@ async function main() {
 
   // The summary is the point: which molds need a person to look at them.
   const failing = rows.filter((r) => r.error || r.violations.length || r.leaks.length || furnitureGap(r).length);
-  const drifted = rows.filter((r) => r.rendered != null && r.rendered !== r.estimated);
+
+  // DIRECTION IS THE WHOLE FINDING. The two ways the estimator can disagree with Chromium are not
+  // two instances of one thing: over-counting is the ruler being conservative (B64 requires it), and
+  // under-counting is the ruler clearing a volume the agency will receive over its page limit. A
+  // single `drifted` count printed them in the same grey line and the exit code ignored both, so
+  // this sweep could have reported the fatal direction as a footnote and still exited 0.
+  const measured = rows.filter((r) => r.rendered != null);
+  const over = measured.filter((r) => r.estimated > r.rendered!);
+  const under = measured.filter((r) => r.estimated < r.rendered!);
+  const list = (rs: Row[]) => rs.map((r) => `${r.key} (est ${r.estimated} → drew ${r.rendered})`).join(', ');
 
   console.log(`\n── summary ──`);
   console.log(`molds measured:        ${rows.length}`);
   console.log(`clean:                 ${rows.length - failing.length}`);
   console.log(`need a look:           ${failing.length}${failing.length ? ` → ${failing.map((r) => r.key).join(', ')}` : ''}`);
-  console.log(`estimator disagreed:   ${drifted.length}${drifted.length ? ` → ${drifted.map((r) => `${r.key} (${r.estimated}→${r.rendered})`).join(', ')}` : ''}`);
+  console.log(`ruler over-counts:     ${over.length} (safe — conservative by design)${over.length ? ` → ${list(over)}` : ''}`);
+  console.log(`ruler UNDER-counts:    ${under.length}${under.length ? ` ✗ FATAL → ${list(under)}` : ' ✓'}`);
   console.log(`molds with a figure:   ${rows.filter((r) => r.figures > 0).length}`);
-  process.exit(failing.length ? 1 : 0);
+
+  if (under.length) {
+    console.log(
+      `\n✗ the ruler reads SHORT on ${under.length} mold(s). This is the direction that costs a bid:\n` +
+      `  the export gate would clear a volume as within its page limit that Chromium prints over it.`,
+    );
+  }
+  // An under-count fails the sweep. A mold that renders longer than the model predicts is a defect
+  // in the model, not a note about it.
+  process.exit(failing.length || under.length ? 1 : 0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
