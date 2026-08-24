@@ -136,6 +136,29 @@ function runStyle(style: NodeStyle, font: string, fontSize: number, fallbackColo
   if (style.strikethrough) o.strike = 'sngStrike';
   const hl = hex(style.highlight); if (hl) o.highlight = hl;
   if (style.alignment) o.align = style.alignment;
+
+  // ── PARAGRAPH GEOMETRY — indent and spacing ──────────────────────────────────────────────────
+  //
+  // These were the only three keys in the whole common ribbon that the deck writer dropped. A
+  // difference-based style probe caught them: exporting the same deck with and without
+  // `space_after` produced BYTE-IDENTICAL .pptx files, which is the one signal that cannot be
+  // argued with — the writer was not reading them at all. docx and the HTML/PDF path honour all
+  // three, so an author moved a paragraph apart on screen, saw it hold in the Word and PDF
+  // versions, and got the slides back unchanged.
+  //
+  // Spacing maps directly: pptxgenjs `paraSpaceBefore` / `paraSpaceAfter` are points, which is
+  // exactly what NodeStyle stores.
+  //
+  // Indent does NOT map directly, and the honest thing is to say so rather than invent precision.
+  // DrawingML paragraphs indent by LEVEL, not by an arbitrary measure, and pptxgenjs exposes only
+  // `indentLevel`. A level is a half-inch (36pt) by convention, so the indent is converted to the
+  // nearest level and clamped to the 0–8 range PowerPoint accepts. A 40pt indent therefore renders
+  // as one level, not as 40pt — closer than ignoring it, and not pretending to be exact.
+  if (typeof style.space_before === 'number') o.paraSpaceBefore = style.space_before;
+  if (typeof style.space_after === 'number') o.paraSpaceAfter = style.space_after;
+  if (typeof style.indent === 'number' && style.indent > 0) {
+    o.indentLevel = Math.min(8, Math.max(0, Math.round(style.indent / 36)));
+  }
   return o;
 }
 
