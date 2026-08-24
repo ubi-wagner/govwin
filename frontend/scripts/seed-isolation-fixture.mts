@@ -107,6 +107,24 @@ async function undo() {
   // the row is removed keeps the numbering invariant true in BOTH directions — an undo that
   // deleted the row and left the counter advanced would leave a gap that the next save fills,
   // which is a different silent-collision shape than the one the seed avoids.
+  // The access-grant / content / booking set. Children before parents, and the availability block
+  // goes with its booking — seeding a parent and orphaning it on undo is how a "clean" box ends up
+  // with a block nobody can explain.
+  const [{ n: bookings }] = await sqlBypass<Array<{ n: number }>>`
+    WITH gone AS (DELETE FROM expert_time_bookings WHERE note LIKE ${MARK + '%'} RETURNING block_id)
+    SELECT count(*)::int AS n FROM gone`;
+  await sqlBypass`
+    DELETE FROM expert_availability_blocks b
+    WHERE NOT EXISTS (SELECT 1 FROM expert_time_bookings t WHERE t.block_id = b.id)
+      AND b.status = 'booked'`;
+  await sqlBypass`
+    DELETE FROM vault_members WHERE vault_id IN (
+      SELECT id FROM collaboration_vaults WHERE partner_name LIKE ${MARK + '%'})`;
+  const [{ n: vaults }] = await sqlBypass<Array<{ n: number }>>`
+    WITH gone AS (DELETE FROM collaboration_vaults WHERE partner_name LIKE ${MARK + '%'} RETURNING 1)
+    SELECT count(*)::int AS n FROM gone`;
+  void bookings; void vaults;
+
   const stray = await sqlBypass<Array<{ sectionId: string }>>`
     SELECT section_id AS "sectionId" FROM canvas_versions WHERE snapshot_reason = ${'seed:' + MARK}`;
   for (const s of stray) {
@@ -130,7 +148,7 @@ async function undo() {
       rows += n;
     }
     for (const t of ['proposal_comments', 'proposal_stage_history', 'proposal_compliance_matrix',
-                     'proposal_sections', 'proposal_artifacts'] as const) {
+                     'proposal_supporting_docs', 'proposal_sections', 'proposal_artifacts'] as const) {
       const [{ n }] = await sqlBypass<Array<{ n: number }>>`
         WITH gone AS (DELETE FROM ${sqlBypass(t)} WHERE proposal_id = ${prop.id}::uuid RETURNING 1)
         SELECT count(*)::int AS n FROM gone`;
@@ -173,6 +191,10 @@ async function main() {
   const [author] = await sqlBypass<Array<{ id: string }>>`
     SELECT u.id FROM users u JOIN user_memberships m ON m.user_id = u.id
     WHERE m.tenant_id = ${owner.id}::uuid AND u.is_active ORDER BY u.created_at LIMIT 1`;
+  // The platform-side expert an availability block belongs to.
+  const [adminUser] = await sqlBypass<Array<{ id: string }>>`
+    SELECT id FROM users WHERE role IN ('rfp_admin', 'master_admin') AND is_active
+    ORDER BY created_at LIMIT 1`;
 
   info(`owner: ${owner.slug} (${owner.name})`);
 
@@ -308,6 +330,76 @@ async function main() {
   }
   ok(`contract for each owner (${[owner.slug, incumbentTenant?.slug].filter(Boolean).join(', ')})`
     + ' — covers the portal surface verify-surfaces could not address');
+
+  // ── THE ACCESS-GRANT AND CUSTOMER-CONTENT TABLES ─────────────────────────────────────────────
+  //
+  // Four of the thirteen tenant-owned tables that were still empty. Not all thirteen, deliberately.
+  //
+  // The structural rule in check-rls-posture already guarantees every one of them CARRIES a policy,
+  // so behavioural coverage no longer catches a MISSING policy — only a WRONG one. That is a
+  // genuinely narrower risk, and it changes the question from "seed everything" to "seed where
+  // wrong is expensive". These four are where it is:
+  //
+  //   collaboration_vaults + vault_members   WHO CAN SEE WHAT. A wrong policy here shows one
+  //                                          tenant the membership of another's vault — the access
+  //                                          graph itself, which is worse than leaking a document.
+  //   proposal_supporting_docs               customer content and its storage keys.
+  //   expert_time_bookings                   personal data: who met whom, when.
+  //
+  // The nine skipped are agent bookkeeping (agent_performance, procedural_memories,
+  // tenant_agent_config), library plumbing (atom_lineage, library_seed_jobs), per-user watermarks
+  // (notification_read_state), and two — stage_completion_snapshots, stage_gate_requirements —
+  // that use the identical one-hop `proposal_id` policy already proven on six sibling tables, so
+  // the marginal information is near zero. tenant_automation_policies is skipped for a different
+  // reason: that layer ships inert until a tenant edits a policy, so it will populate itself once
+  // the feature is used, and inventing a shape the product has not settled would model a state it
+  // may never produce.
+  //
+  // Literals below were read off the live CHECK constraints first — the rule this script broke on
+  // its first run:
+  //   collaboration_vaults.status  active | closed
+  //   vault_members.role           partner_user (the ONLY accepted value)
+  //   vault_members.status         invited | active | revoked
+  //   proposal_supporting_docs.category  supporting_document | proposal_input | other
+  //   proposal_supporting_docs.status    missing | uploaded | reviewed | approved | waived
+  //   expert_availability_blocks.status  open | booked | cancelled
+  //   expert_time_bookings.status        booked | cancelled   (and minutes > 0)
+  const [vault] = await sqlBypass<Array<{ id: string }>>`
+    INSERT INTO collaboration_vaults (tenant_id, partner_name, partner_org, status, created_by)
+    VALUES (${owner.id}::uuid, ${MARK + ' Kestrel Composites'}, 'Kestrel Composites LLC', 'active',
+            ${author?.id ?? null})
+    RETURNING id`;
+  await sqlBypass`
+    INSERT INTO vault_members (vault_id, tenant_id, email, role, status, invited_by)
+    VALUES (${vault.id}::uuid, ${owner.id}::uuid, 'materials.lead@kestrel-composites.test',
+            'partner_user', 'active', ${author?.id ?? null})`;
+  ok('collaboration vault + member — the access graph, now measurable');
+
+  await sqlBypass`
+    INSERT INTO proposal_supporting_docs
+      (proposal_id, tenant_id, requirement_label, requirement_source, category, is_required, status)
+    VALUES (${proposal.id}::uuid, ${owner.id}::uuid,
+            'SF-LLL Disclosure of Lobbying Activities', 'solicitation §5.2',
+            'supporting_document', true, 'missing')`;
+  ok('supporting-document requirement — customer content');
+
+  // A booking needs a block: expert_time_bookings.block_id is NOT NULL with a real FK, and
+  // expert_availability_blocks is empty on this box. Seed the parent, then the child.
+  if (adminUser) {
+    const [block] = await sqlBypass<Array<{ id: string }>>`
+      INSERT INTO expert_availability_blocks (admin_user_id, start_at, end_at, status)
+      VALUES (${adminUser.id}::uuid, now() + interval '7 days', now() + interval '7 days 1 hour', 'booked')
+      RETURNING id`;
+    await sqlBypass`
+      INSERT INTO expert_time_bookings
+        (tenant_id, block_id, booked_by_user_id, admin_user_id, start_at, end_at, minutes, status, note)
+      VALUES (${owner.id}::uuid, ${block.id}::uuid, ${author?.id ?? adminUser.id}::uuid,
+              ${adminUser.id}::uuid, now() + interval '7 days', now() + interval '7 days 1 hour',
+              60, 'booked', ${MARK + ' cost-volume review'})`;
+    ok('expert booking + its availability block — personal data');
+  } else {
+    note('no rfp_admin to book against — expert_time_bookings left empty (reported, not skipped)');
+  }
 
   // ── assert what was actually produced, rather than trusting the inserts ────────────────────
   console.log(`\n── what the box now holds ──`);
