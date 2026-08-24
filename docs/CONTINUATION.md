@@ -1,7 +1,69 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-23 (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
+**Last updated:** 2026-08-24 (migration head **213** — see "The isolation pass" immediately below: migs
+212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
+was found 100% inert and fixed, and five instruments were found reporting green over a scope smaller
+than their claim. Earlier context from 2026-08-23 at head **205** follows.) (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
 **Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
+
+---
+
+## 📍 The isolation pass (2026-08-24, migration head **213**) — READ THIS BEFORE DEPLOYING
+
+> **⚠️ TWO MIGRATIONS NEED A PRODUCTION RUN, AND ONE PRECONDITION CHECKED.** Migs 212 and 213 are
+> proven on the sandbox only. They `FORCE` row-level security on eleven tables, and FORCE applies
+> policies to the table OWNER too — so **production's owner role must be superuser or `BYPASSRLS`
+> or every `sqlBypass` read breaks.** That is already true of the forced `proposals`, so it is
+> almost certainly fine, but check it before merging rather than after.
+>
+> **B113 — eleven proposal-spine tables had NO row-level security at all.** `relrowsecurity=false`,
+> zero policies, so every row was readable by any connection on the NOBYPASSRLS `govtech_app` pool
+> whatever `app.tenant_id` held. Measured with the context set to a UUID owning nothing:
+> `proposal_artifacts` 17/17 rows visible, `proposal_compliance_matrix` 64/64,
+> `collaborator_stage_access` 8/8, `proposal_collaborators` 4/4 — 100% of every table that had rows.
+> `canvas_versions` is the consequential one: the stored content of every version of every section,
+> plus the `ai_instruction` that produced it.
+>
+> **Why it was invisible:** none of them has a `tenant_id` COLUMN. Their tenancy is FK lineage up to
+> `proposals.tenant_id`, and every audit here looked for the column. **A tenant_id-shaped instrument
+> cannot see a lineage-shaped table.** Fixed by one `FOR ALL tenant_isolation` policy each, EXISTS up
+> the chain. The two mig-213 children INHERIT the parent's predicate via a bare EXISTS rather than
+> restating it — measured: 444 rows across 5 contexts against 300 total = 264 owned seen once + 36
+> platform-scope seen five times; unfiltered would have been 1500.
+>
+> **B115 — the ENTIRE agent workforce was inert, 100% failure, twelve archetypes.** anthropic 1.0.0
+> removed `temperature` from `messages.create()`; passing it raises `TypeError` **client-side, before
+> any HTTP request**. Every archetype recorded `start` then `error` with zero tokens. Nothing
+> surfaced it because the fabric safe-skips rather than dead-ending a workflow (a deliberate
+> invariant), so from outside every flow completed. `pipeline/src/sdk_compat.py` answers the
+> capability ONCE by introspecting the installed SDK. **Known consequence:** archetypes no longer get
+> their requested sampling (several set 0.2–0.3 for deterministic output). Logged at import, not
+> silent. Whether they want `output_config.effort` instead is an open decision.
+>
+> **B118 — the isolation proofs were unfalsifiable.** Every proposal belonged to ONE tenant and every
+> section was locked, so "no foreign rows visible" could not be distinguished from "there was no
+> foreign tenant to see them". `scripts/seed-isolation-fixture.mts` (idempotent, `--undo`) adds a
+> second owner with an UNLOCKED in-flight build, version history, a comment, a stage transition, and
+> a contract per owner. Measured: owners 1→2, unlocked sections 0→3, posture tables measured 36→40,
+> stored volumes 17→18. **Run it on a fresh box** — without it a third of the isolation surface has
+> no behavioural coverage.
+>
+> **Instruments fixed, all the same class — reporting over a scope smaller than the claim:**
+> `check-rls-posture.mjs` proved ONE table (`tenant_opportunity_cards`) and called it the posture of
+> the database; it now enforces a STRUCTURAL rule (every tenant-owned table must carry a policy —
+> needs no fixture data, so it holds on a fresh box) plus a partition check whose expected value is
+> `owned + shared × N`, not `total`. The pipeline's `db_role_preflight.py` probed one table and would
+> log "OK — table owner" for a worker that then cannot write `canvas_versions`. `sandbox-up.sh`'s
+> start guard knew one of the **two spellings** that launch the worker (`python3 src/main.py` vs
+> `python3 -m main`), so two workers ran holding different code and the same drive passed or failed
+> at random. Four id bindings in `verify-surfaces` ignored the tenant they were driven as. And the
+> four lenses defaulted to **port 3001** while everything else serves on 3000 — `GUIDE_BASE` is now
+> exported once from `sandbox-env.sh`.
+>
+> **Current green state:** branch suite **37/37 · 0 could-not-run**, four lenses green (surfaces
+> **80 driven / 80 clean**), `tsc` 0, `vitest` 1887/1887, bug log **118 entries · 0 open · 5
+> deferred**. New drives: `deck-ruler` (the slide ruler had never measured a deck out of the
+> database — all 64 stored sections are `letter`).
 
 ---
 
