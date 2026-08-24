@@ -25,7 +25,30 @@ const sql = postgres(
 );
 const ADMIN = { email: 'eric@rfppipeline.com', pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const SLUG = 'what-is-a-baa';
-const shot = async (p, n) => { await p.screenshot({ path: path.join(OUT, n + '.png'), fullPage: true }); console.log('  ✓ shot', n); };
+/**
+ * Documentation captures — written ONLY when asked for, via `CAPTURE_DOCS=1`.
+ *
+ * These land in a TRACKED directory (`docs/assets/close-e2e`), and this drive is part of the branch
+ * suite, so every suite run rewrote them and left the working tree dirty. The pixels genuinely
+ * differ run to run — the pages show live counts and dates — so it is not noise that can be
+ * squeezed out; it is a real screenshot of a moving system.
+ *
+ * The cost is not the bytes, it is what a permanently-dirty tree does to a person: `git status`
+ * stops meaning "you have uncommitted work" and starts meaning "the suite ran", and a signal that
+ * fires every time is one you learn to scroll past. That is how a real uncommitted change gets
+ * lost, and this session already spent two commits re-committing these files for no content change.
+ *
+ * So the default is to VERIFY without rewriting the docs: the assertions around each call are what
+ * the drive is for, and they run either way. Refresh the images deliberately with
+ *     CAPTURE_DOCS=1 node scripts/close-e2e-cms.mjs
+ * and commit them as the documentation change they are.
+ */
+const CAPTURE = process.env.CAPTURE_DOCS === '1';
+const shot = async (p, n) => {
+  if (!CAPTURE) return;
+  await p.screenshot({ path: path.join(OUT, n + '.png'), fullPage: true });
+  console.log('  ✓ shot', n);
+};
 const settle = async (p, ms = 2000) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };
 let ok = true; const A = (l, c, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
 
@@ -120,7 +143,10 @@ try {
   console.log(`\n${ok ? '✅ CMS E2E PASS — draft reviewed → published → live on the public site' : '❌ see failures'}\n`);
 } catch (e) {
   console.error('CMS E2E ERROR', e.message);
-  await p.screenshot({ path: path.join(OUT, 'cms-error.png') }).catch(() => {});
+  // The failure shot is DIAGNOSTIC, not documentation, so it always fires but goes to a scratch
+  // path — a crash should never be the thing that commits a file into docs/.
+  const errPath = path.join(process.env.GOVWIN_RUN_DIR || '/tmp', 'cms-error.png');
+  await p.screenshot({ path: errPath }).then(() => console.error('  failure screenshot →', errPath)).catch(() => {});
   ok = false;
 } finally {
   await browser.close(); await sql.end();

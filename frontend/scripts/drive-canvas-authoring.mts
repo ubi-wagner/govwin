@@ -42,6 +42,10 @@ import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode, type NodeType } f
 import { vocabularyDoc, VOCABULARY, VOCAB, mark } from '@/scripts/probe-node-vocabulary.mts';
 import { createRequire } from 'module';
 import { BASE, launch, signIn } from './lib/cross-company.mts';
+import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot } from './lib/harness-residue.mts';
+
+/** The id sets present before this drive writes anything — see the `finally` block. */
+let residueBefore: ResidueSnapshot | null = null;
 
 const OUT = process.env.CANVAS_OUT || '/tmp/canvas-sweep';
 fs.mkdirSync(OUT, { recursive: true });
@@ -176,6 +180,9 @@ try {
   };
 
   const created: Array<{ id: string; title: string }> = [];
+
+  // Before the first write, so the delta in `finally` is exactly what this run caused.
+  residueBefore = await snapshotResidue();
 
   /** create → save → export(each format), asserting content survived each hop. */
   async function authorAndExport(opts: {
@@ -588,6 +595,24 @@ try {
   console.error('DRIVE ERROR', e);
   ok = false;
 } finally {
+  // PUT THE TENANT BACK. This drive authored five documents through the real save route, and each
+  // save mints library atoms as a side effect — one per primitive in the vocabulary matrix. It
+  // inserted none of them, so there was nothing to "delete what I created": measured over one full
+  // suite run, this left +49 library_atoms, +294 atom_tags and +5 tenant_documents behind, every
+  // run, in the tenant library that verify-db-crud and the atom lenses read.
+  //
+  // Reclaimed by ID DELTA against the snapshot taken before the first write — see
+  // lib/harness-residue.mts for why that rather than a title match.
+  if (residueBefore) {
+    try {
+      const r = await reclaimResidue(residueBefore);
+      console.log(`  ${describeResidue(r)}`);
+      if (!r.clean) ok = false;
+    } catch (e) {
+      console.error('  cleanup failed:', e);
+      ok = false;
+    }
+  }
   await browser.close();
   await sql.end({ timeout: 5 });
   process.exit(ok ? 0 : 1);

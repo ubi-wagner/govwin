@@ -38,6 +38,7 @@
  */
 import JSZip from 'jszip';
 import { sql, sqlBypass } from '@/lib/db';
+import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot } from './lib/harness-residue.mts';
 import { BASE, launch, signIn } from './lib/cross-company.mts';
 import {
   CANVAS_PRESETS, estimateSlideCount, overflowingSlides, nodesHeightPt, docNodes,
@@ -189,30 +190,10 @@ function overflowingDeck(): CanvasDocument {
  * already holds a legitimate `p7 · Introduction and Summary: Counter-UAS…` from an upload seed.
  * Deleting by identity cannot reach a row this run did not cause.
  */
-async function cleanup(created: string[], atomsBefore: Set<string>) {
-  let removedDocs = 0;
-  if (created.length) {
-    const [{ n }] = await sqlBypass<Array<{ n: number }>>`
-      WITH gone AS (DELETE FROM tenant_documents WHERE id = ANY(${created}::uuid[]) RETURNING 1)
-      SELECT count(*)::int AS n FROM gone`;
-    removedDocs = n;
-  }
-
-  const after = await sqlBypass<Array<{ id: string }>>`SELECT id FROM library_atoms`;
-  const minted = after.map((r) => r.id).filter((id) => !atomsBefore.has(id));
-  let removedAtoms = 0;
-  if (minted.length) {
-    const [{ n }] = await sqlBypass<Array<{ n: number }>>`
-      WITH gone AS (DELETE FROM library_atoms WHERE id = ANY(${minted}::uuid[]) RETURNING 1)
-      SELECT count(*)::int AS n FROM gone`;
-    removedAtoms = n;
-  }
-
-  note(`\ncleanup: ${removedDocs}/${created.length} deck(s), ${removedAtoms} atom(s) minted by saving them`);
-  if (removedDocs !== created.length || removedAtoms !== minted.length) {
-    ok(false, 'cleanup removed everything this run caused',
-      `docs ${removedDocs}/${created.length} · atoms ${removedAtoms}/${minted.length}`);
-  }
+async function cleanup(before: ResidueSnapshot) {
+  const r = await reclaimResidue(before);
+  note(`\n${describeResidue(r)}`);
+  if (!r.clean) ok(false, 'cleanup removed everything this run caused', JSON.stringify(r.stuck));
 }
 
 async function main() {
@@ -236,8 +217,7 @@ async function main() {
   // The BEFORE set, captured before a single row is written. Saving a deck mints library atoms as
   // a side effect, and the only way to remove exactly those is to know which ids did not exist
   // beforehand.
-  const atomsBefore = new Set(
-    (await sqlBypass<Array<{ id: string }>>`SELECT id FROM library_atoms`).map((r) => r.id));
+  const residueBefore = await snapshotResidue();
 
   const cases: Array<{ title: string; doc: CanvasDocument; mustOverflow: boolean }> = [
     { title: 'Program review deck', doc: cleanDeck(), mustOverflow: false },
@@ -349,7 +329,7 @@ async function main() {
     // ALWAYS. A teardown that only runs on the happy path is not a teardown — the run that threw
     // on a schema error left its document in the tenant's list permanently, and five later runs
     // built a pile of atoms on top of it.
-    await cleanup(created, atomsBefore);
+    await cleanup(residueBefore);
   }
 
   await browser.close();
