@@ -28,6 +28,32 @@ async function safeSum(query: Promise<{ total: string }[]>): Promise<number> {
   }
 }
 
+/**
+ * A `YYYY-MM-DD` day label, formatted the SAME WAY everywhere.
+ *
+ * `new Date('2026-08-24T00:00:00')` — no trailing `Z` — is parsed as LOCAL time, and
+ * `toLocaleDateString` with no `timeZone` formats in the ambient zone. Both are properties of
+ * whichever machine runs the line, so a server in one zone and a browser in another produce
+ * different STRINGS from the same database row. When that string is rendered on both sides, React
+ * hydration fails with error #418 ("text content did not match") and Next serves the error
+ * boundary — the class B79/B82 records, and the reason `verify-surfaces` gates on client throws
+ * rather than status codes.
+ *
+ * `day` here is a calendar date from `DATE(created_at)::text`, not an instant. Pinning both the
+ * parse and the format to UTC makes the output a function of the row alone, which is what a
+ * calendar date should be.
+ *
+ * Observed once as a real error boundary on /admin/analytics during a surface sweep; three
+ * subsequent loads rendered clean, so the mismatch is environment-dependent rather than constant —
+ * which is exactly what a timezone-difference bug looks like and exactly why it should not be left
+ * to chance.
+ */
+function dayLabel(day: string): string {
+  return new Date(day + 'T00:00:00Z').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
+}
+
 export default async function AnalyticsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
@@ -219,7 +245,7 @@ export default async function AnalyticsPage() {
   const eventsPreview: StatPreview = {
     title: 'Events / day (7d)',
     items: [...eventsByDay].reverse().slice(0, 6).map((d) => ({
-      left: new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      left: dayLabel(d.day),
       right: String(d.count),
     })),
     emptyText: 'No events recorded',
@@ -317,7 +343,7 @@ export default async function AnalyticsPage() {
                 return (
                   <div key={d.day} className="flex items-center gap-3">
                     <span className="text-xs text-gray-500 w-20 flex-shrink-0">
-                      {new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {dayLabel(d.day)}
                     </span>
                     <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
                       <div

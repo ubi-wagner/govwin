@@ -86,10 +86,14 @@ async function bindings() {
     SELECT id FROM curated_solicitations WHERE solicitation_title IS NOT NULL
     ORDER BY (SELECT count(*) FROM opportunities o WHERE o.solicitation_id = curated_solicitations.id) DESC LIMIT 1`;
   const [topic] = sol ? await sql`SELECT id FROM opportunities WHERE solicitation_id = ${sol.id} ORDER BY id ASC LIMIT 1` : [];
-  const [portal] = await sql`SELECT id FROM proposal_portals ORDER BY created_at DESC, id ASC LIMIT 1`;
+  const [portal] = await sql`
+    SELECT pp.id FROM proposal_portals pp JOIN tenants t ON t.id = pp.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY pp.created_at DESC, pp.id ASC LIMIT 1`;
   const [tenant] = await sql`SELECT id FROM tenants WHERE slug = 'foundation'`;
   // A tenant document lives in `tenant_documents` — there is no `documents` table.
-  const [tdoc] = await sql`SELECT id FROM tenant_documents ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
+  const [tdoc] = await sql`
+    SELECT d.id FROM tenant_documents d JOIN tenants t ON t.id = d.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY d.created_at DESC, d.id ASC LIMIT 1`.catch(() => [undefined]);
   // `/admin/site/[pageKey]` takes a SEED PAGE KEY, not a row id — the page redirects anything else.
   const [pageRow] = await sql`
     SELECT page_key FROM content_pages WHERE content_type = 'page' AND status = 'active'
@@ -100,8 +104,21 @@ async function bindings() {
     WHERE content_type <> 'page' ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   const [tmpl] = await sql`SELECT id FROM document_templates ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
   const [src] = await sql`SELECT id FROM source_profiles ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
-  const [contract] = await sql`SELECT id FROM contracts ORDER BY created_at DESC, id ASC LIMIT 1`.catch(() => [undefined]);
-  const [vault] = await sql`SELECT id FROM proposals WHERE archived_at IS NULL ORDER BY id ASC LIMIT 1`;
+  // TENANT-SCOPED, like `found` below and for the same reason — see the note there. These four
+  // bindings kept the un-scoped form long after that lesson was written down, and stayed harmless
+  // only because the tables were empty or single-owner. The moment a second tenant owned a
+  // contract, `ORDER BY created_at DESC LIMIT 1` picked ITS row, handed it to a route driven as
+  // foundation's tenant_admin, and the lens reported the product's CORRECT refusal as
+  //     ✗ /portal/foundation/contracts/<immobileyes-id> — error boundary
+  // A cross-tenant probe getting the right answer, scored as a broken page. The same trap as the
+  // library_atoms binding, in the opposite direction: there it manufactured a false pass, here a
+  // false failure. Both come from binding an id without regard to the tenant being driven.
+  const [contract] = await sql`
+    SELECT c.id FROM contracts c JOIN tenants t ON t.id = c.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY c.created_at DESC, c.id ASC LIMIT 1`.catch(() => [undefined]);
+  const [vault] = await sql`
+    SELECT p.id FROM proposals p JOIN tenants t ON t.id = p.tenant_id
+    WHERE t.slug = 'foundation' AND p.archived_at IS NULL ORDER BY p.id ASC LIMIT 1`;
   // THE PAGE'S OWN PREDICATE, copied from its source, not a version of it I believe equivalent:
   //   WHERE id = $1 AND tenant_id = $2 AND grain = 'foundation'
   //

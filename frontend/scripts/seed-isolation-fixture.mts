@@ -286,10 +286,28 @@ async function main() {
   }
   ok(`${reqs.length} compliance requirement(s)`);
 
-  await sqlBypass`
-    INSERT INTO contracts (tenant_id, opportunity_id, title, status)
-    VALUES (${owner.id}::uuid, ${opp.id}::uuid, ${CONTRACT_TITLE}, 'active')`;
-  ok('contract created — covers the portal surface verify-surfaces could not address');
+  // ONE CONTRACT PER OWNER, and the second one is not padding.
+  //
+  // Seeding only the new tenant's contract left `contracts` non-empty but foundation-less, and
+  // verify-surfaces drives the portal as foundation. It binds ids for the tenant it signs in as
+  // (correctly — a route bound from another tenant's row tests isolation by accident and coverage
+  // not at all), so a single immobileyes contract leaves /portal/[slug]/contracts/[contractId]
+  // exactly as uncovered as an empty table did, just less obviously.
+  //
+  // Two contracts also make the table two-sided for the isolation check, the same reason the
+  // incumbent gets version history above.
+  const [incumbentTenant] = await sqlBypass<Array<{ id: string; slug: string }>>`
+    SELECT t.id, t.slug FROM tenants t
+    JOIN proposals p ON p.tenant_id = t.id
+    WHERE t.id <> ${owner.id}::uuid
+    GROUP BY t.id, t.slug ORDER BY count(*) DESC LIMIT 1`;
+  for (const t of [{ id: owner.id, slug: owner.slug }, ...(incumbentTenant ? [incumbentTenant] : [])]) {
+    await sqlBypass`
+      INSERT INTO contracts (tenant_id, opportunity_id, title, status)
+      VALUES (${t.id}::uuid, ${opp.id}::uuid, ${CONTRACT_TITLE + ' · ' + t.slug}, 'active')`;
+  }
+  ok(`contract for each owner (${[owner.slug, incumbentTenant?.slug].filter(Boolean).join(', ')})`
+    + ' — covers the portal surface verify-surfaces could not address');
 
   // ── assert what was actually produced, rather than trusting the inserts ────────────────────
   console.log(`\n── what the box now holds ──`);
