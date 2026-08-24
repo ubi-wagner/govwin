@@ -11,6 +11,7 @@
  * consistent with the section export route. PDF needs Chromium (infra dep); a
  * 503 with a clear message is returned when it is unavailable.
  */
+import { blockingViolations } from '@/lib/types/canvas-document';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
@@ -176,7 +177,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         actor: userActor(su.id, su.email ?? undefined), tenantId,
         payload: {
           proposalId, artifactId, format, title,
-          compliant: violations.length === 0,
+          // BLOCKING only. A dense deck raises the advisory `slide_overflow`, which is a design
+          // choice rather than a rule the agency enforces — counting it here reported a deck
+          // built exactly as intended as non-compliant. The full code list is still emitted
+          // below, so nothing is hidden; only the verdict is narrowed to what can lose a bid.
+          compliant: blockingViolations(violations).length === 0,
           complianceViolations: violations.map((v) => v.code),
         },
       });

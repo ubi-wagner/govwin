@@ -42,6 +42,7 @@ import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot 
 import { BASE, launch, signIn } from './lib/cross-company.mts';
 import {
   CANVAS_PRESETS, estimateSlideCount, overflowingSlides, nodesHeightPt, docNodes,
+  validateStandaloneCanvas, blockingViolations,
   type CanvasDocument, type CanvasNode,
 } from '@/lib/types/canvas-document';
 import { pageBoundaries } from '@/lib/canvas/measure-grid';
@@ -150,17 +151,33 @@ function cleanDeck(): CanvasDocument {
 }
 
 /**
- * A deck built to OVERFLOW its frame, so the harness has a case that must be caught.
+ * A deck built DENSE ON PURPOSE — the way a real proposal deck is authored.
  *
  * A slide does not reflow: 30 bullets on one slide do not become two slides, they become one slide
- * whose bottom shapes sit past the frame and are cut off in the delivered file. That is the failure
- * this whole path exists to catch, so it has to appear in the corpus deliberately.
+ * whose lower content sits past the frame and is cropped in the delivered file. That is a SUPPORTED
+ * way to work, not a defect. Proposal decks are packed, primitives and groups may sit partly or
+ * wholly off the frame on the canvas, and the crop at export is the author's accepted trade.
+ *
+ * So this case carries two assertions that pull in opposite directions, and both matter:
+ *   · the ruler must SEE it — an author must never discover a crop in the delivered deck;
+ *   · it must not be BLOCKING — a deck built exactly as intended cannot report as non-compliant,
+ *     or the warning that actually saves a bid (a volume over its agency page limit) is buried
+ *     beside notes about deliberate choices and stops being read.
  */
-function overflowingDeck(): CanvasDocument {
-  return deck('Overflow probe — deliberately over-stuffed', [
+function denseDeck(): CanvasDocument {
+  return deck('Dense deck — packed on purpose', [
     heading('Qualification evidence'),
     bullets(Array.from({ length: 30 }, (_, i) =>
       `Qualification milestone ${i + 1} — coupons sectioned, tested and dispositioned against AMS spec`)),
+    brk(),
+    // A genuinely dense working slide: table + list + prose together, the shape a status deck takes.
+    heading('Program status — every workstream on one slide'),
+    node('table', {
+      headers: ['WBS', 'Owner', 'Status', 'Risk'],
+      rows: Array.from({ length: 14 }, (_, i) => [`1.${i + 1}`, 'Integration', 'On track', 'Low']),
+    }),
+    bullets(Array.from({ length: 12 }, (_, i) => `Acceptance criterion ${i + 1} closed`)),
+    para('Detail continues past the frame by design; the export crops it.'),
     brk(),
     heading('A slide that fits'),
     bullets(['One point', 'Two points']),
@@ -221,7 +238,7 @@ async function main() {
 
   const cases: Array<{ title: string; doc: CanvasDocument; mustOverflow: boolean }> = [
     { title: 'Program review deck', doc: cleanDeck(), mustOverflow: false },
-    { title: 'Overflow probe deck', doc: overflowingDeck(), mustOverflow: true },
+    { title: 'Dense deck probe', doc: denseDeck(), mustOverflow: true },
   ];
 
   try {
@@ -290,10 +307,22 @@ async function main() {
     note(`ruler flags slide(s) [${flagged.join(', ') || 'none'}] · shapes past frame on [${past.join(', ') || 'none'}]`);
 
     if (c.mustOverflow) {
-      // THE RED CASE. This deck is over-stuffed on purpose; a harness that never sees a failure
-      // is not evidence the check works.
-      ok(flagged.length > 0, 'the deliberate overflow IS flagged by the ruler',
-        flagged.length ? `slide ${flagged.join(', ')}` : 'NOT FLAGGED — content would be cut off silently');
+      // THE RED CASE. Dense on purpose; a harness that never sees the condition is not evidence
+      // the check works.
+      ok(flagged.length > 0, 'the density IS seen by the ruler',
+        flagged.length ? `slide ${flagged.join(', ')}` : 'NOT SEEN — content would be cropped silently');
+
+      // AND IT MUST NOT BLOCK. Off-frame content on a deck is a design decision, so it is reported
+      // as `advisory` and must leave the deck compliant. If this ever flips to blocking, a deck
+      // built exactly as intended starts failing its own export gate.
+      const v = validateStandaloneCanvas(storedDoc);
+      const codes = v.map((x) => x.code);
+      const blocking = blockingViolations(v).map((x) => x.code);
+      ok(codes.includes('slide_overflow'), 'reported as slide_overflow — the author is told', codes.join(', ') || 'none');
+      ok(!blocking.includes('slide_overflow'), 'slide_overflow is ADVISORY, not blocking',
+        blocking.length ? `blocking: ${blocking.join(', ')}` : 'no blocking violations');
+      ok(blocking.length === 0, 'a deliberately dense deck still reports COMPLIANT',
+        blocking.length ? blocking.join(', ') : 'clean');
     } else {
       ok(flagged.length === 0, 'a well-formed deck is not falsely flagged',
         flagged.length ? `false positive on ${flagged.join(', ')}` : 'clean');

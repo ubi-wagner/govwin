@@ -1718,10 +1718,31 @@ export interface ComplianceViolation {
     | 'missing_footer'
     | 'foreign_solicitation';
   message: string;
+  /**
+   * Whether this is a rule the AGENCY will enforce, or a note about the author's own choice.
+   *
+   * WHY THE DISTINCTION EXISTS. Every code in this union used to weigh the same, so a deck with a
+   * deliberately dense slide was reported exactly as severely as a technical volume three pages
+   * over its limit. Those are not the same event: one gets the bid rejected at the door, the other
+   * is a designer packing a slide and accepting that the frame crops it.
+   *
+   * A gate that cannot tell them apart teaches people to ignore it, which costs far more than the
+   * false alarm — the page-limit warning is the one that actually saves a bid, and it is only
+   * credible if it does not sit beside notes about intentional choices.
+   *
+   * Absent ⇒ `blocking`. Agency rules are the default; being advisory is the exception a code has
+   * to earn.
+   */
+  severity?: 'blocking' | 'advisory';
   limit?: number | null;
   actual?: number;
   /** foreign_solicitation: the identifiers found that belong to another solicitation. */
   found?: string[];
+}
+
+/** Violations the agency will actually enforce — advisory notes filtered out. */
+export function blockingViolations(v: ComplianceViolation[]): ComplianceViolation[] {
+  return v.filter((x) => (x.severity ?? 'blocking') === 'blocking');
 }
 
 /**
@@ -1822,13 +1843,27 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
     }
   }
 
-  // Slide overflow — a slide too tall for its frame is cut off on export, regardless of any cap.
+  // Slide overflow — ADVISORY, because on a deck it is a design decision rather than a rule break.
+  //
+  // A proposal deck is authored dense on purpose: primitives and groups may sit partly or wholly
+  // off the frame on the canvas and be cropped when the .pptx is written, and that is a supported
+  // way to work, not a defect to correct. The old message ended "split them", which is advice that
+  // is simply wrong when the density was the point — and it counted toward `compliant`, so a deck
+  // built exactly as intended reported as non-compliant.
+  //
+  // It is still REPORTED, because the one thing an author must not do is discover the crop in the
+  // delivered file. The wording now says what will happen and leaves the judgement where it
+  // belongs: the writer already clamps oversize blocks to keep them visible (see the `spacer` case
+  // in pptx-exporter), so nothing is lost silently.
   if (doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3') {
     const over = overflowingSlides(doc);
     if (over.length) {
       out.push({
         code: 'slide_overflow',
-        message: `${over.length} slide(s) overflow the frame (slide ${over.map((i) => i + 1).join(', ')}) — content will be cut off; split them.`,
+        severity: 'advisory',
+        message: `${over.length} slide(s) hold more than the frame shows (slide ${over.map((i) => i + 1).join(', ')}) — `
+          + `content past the edge is cropped in the exported deck. Intentional on a dense slide; `
+          + `split the slide if it is not.`,
         actual: over.length,
       });
     }
