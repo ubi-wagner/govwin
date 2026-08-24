@@ -44,7 +44,14 @@ export DATABASE_URL="${DATABASE_URL:-postgresql://govtech_app:changeme@localhost
 export DATABASE_URL_OWNER="${DATABASE_URL_OWNER:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
 # The SCOPED role by name, always — a scenario drive is handed the owner as DATABASE_URL, so a
 # check whose meaning is "RLS denied it" needs a way to reach the app role regardless.
-export DATABASE_URL_APP="${DATABASE_URL_APP:-postgresql://govtech_app:changeme@localhost:5432/govtech_intel}"
+# DERIVED, not a second literal. This is "the scoped role, by name" — and after sourcing
+# sandbox-env.sh, DATABASE_URL already IS the scoped role. Repeating the credential here is what
+# left `atomization` and `vault-isolation` still failing on
+#   ✗ RLS probe failed — password authentication failed for user "govtech_app"
+# after the first copy of the same literal was fixed. One credential, one place: a value written
+# twice is a value that will disagree with itself eventually, which is the whole lesson of B109,
+# B111 and the sandbox-env drift above.
+export DATABASE_URL_APP="${DATABASE_URL_APP:-$DATABASE_URL}"
 export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
 # The harness's OWN bookkeeping reads across tenants, so it uses the owner regardless of posture.
 export GUIDE_DB="${GUIDE_DB:-$DATABASE_URL_OWNER}"
