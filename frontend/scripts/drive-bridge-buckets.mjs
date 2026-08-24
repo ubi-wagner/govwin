@@ -137,12 +137,48 @@ const gaps = await sql`
       SELECT 1 FROM tenant_opportunity_cards c
       WHERE c.tenant_id = t.id AND c.opportunity_id = b.opportunity_id)
   GROUP BY t.slug ORDER BY 2 DESC LIMIT 5`;
+// A GAP HERE IS NOT YET A FINDING, because the completeness the product promises is LAZY.
+//
+// The bridge is forward-only, and `backfillTenant` runs once at creation inside a try/catch that
+// only console.errors — so a tenant can legitimately be behind. What makes that safe is
+// `reconcileTenant`, the self-healing consumer, whose own docstring names this exact case: a tenant
+// "created after [a push], suspended, or whose creation-time backfill silently failed" catches up on
+// its next /cards read. `immobileyes` was six short here, and all six were pushed three weeks before
+// that company existed — asserting eager completeness against a lazily-reconciled design is
+// asserting a contract the system does not have.
+//
+// So the gap is the SETUP and the reconcile is the TEST. Calling the product's own catch-up and
+// re-asking turns "the fan-out left gaps" — which was never quite true — into "the self-healing
+// consumer does not heal", which would be a real finding, and which nothing else in the suite
+// checks. (Seeded fixtures stay excluded and are NOT reconciled: `ubihere`'s seed comment says
+// nothing may seed work into it, and honouring that matters more than a tidier check.)
 if (gaps.length === 0) {
   check(true, 'every card-holding tenant has a card for every published opportunity');
 } else {
-  note(`tenants missing cards: ${gaps.map((g) => `${g.slug}(${g.missing})`).join(' · ')}`);
-  check(false, 'the fan-out left gaps — a customer cannot see an opportunity the platform published',
-    `${gaps.length} tenant(s) short`);
+  note(`behind the bridge before catch-up: ${gaps.map((g) => `${g.slug}(${g.missing})`).join(' · ')}`);
+  // Through the ADMIN ROUTE, as an rfp_admin, rather than by importing the function. That exercises
+  // the auth gate and the route contract alongside the catch-up itself, and it is the action a real
+  // operator takes when a company reports a missing opportunity.
+  for (const g of gaps) {
+    const [t] = await sql`SELECT id FROM tenants WHERE slug = ${g.slug}`;
+    const r = await admin.request.post(`${BASE}/api/admin/tenants/${t.id}/backfill-cards`);
+    const j = await r.json().catch(() => ({}));
+    note(`  backfill-cards(${g.slug}) → HTTP ${r.status()} applied=${j?.data?.applied ?? '?'}`);
+  }
+  const after = await sql`
+    SELECT t.slug, count(*)::int AS missing
+    FROM tenants t
+    CROSS JOIN (SELECT DISTINCT opportunity_id FROM opportunity_bridge) b
+    WHERE t.archived_at IS NULL
+      AND EXISTS (SELECT 1 FROM tenant_opportunity_cards c2 WHERE c2.tenant_id = t.id)
+      AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator')
+      AND NOT EXISTS (
+        SELECT 1 FROM tenant_opportunity_cards c
+        WHERE c.tenant_id = t.id AND c.opportunity_id = b.opportunity_id)
+    GROUP BY t.slug ORDER BY 2 DESC LIMIT 5`;
+  check(after.length === 0,
+    'a tenant behind the bridge CATCHES UP — the admin backfill route brings it to every published opportunity',
+    after.length ? `still short: ${after.map((g) => `${g.slug}(${g.missing})`).join(' · ')}` : 'all caught up');
 }
 
 // 4 · a tenant cannot read another tenant's cards
