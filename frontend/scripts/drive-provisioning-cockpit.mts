@@ -39,8 +39,18 @@ async function bridgeMax() {
   return r?.v ?? 0;
 }
 
+// A LABEL UNIQUE TO THIS RUN. `proposal_portals` has a unique key on
+// (tenant_id, opportunity_id, label), and this drive used the fixed label 'pv-proof' — so a single
+// run that died before its cleanup left a row that made EVERY later run fail at line 56 with a
+// duplicate-key error, on a fixture the drive itself had created. One crash poisoned the drive
+// permanently. A per-run tag makes a leftover row inert instead of fatal.
+const RUN = crypto.randomUUID().slice(0, 8);
+const LABEL = `pv-proof-${RUN}`;
+
 let portalId = '';
 let proposalId: string | null = null;
+/** Every required item's metadata as this drive FOUND it, so the finally block restores exactly. */
+let originalItemMeta: Array<{ id: string; metadata: Record<string, unknown> }> = [];
 try {
   // Bare-ish start: clear the master's build_complete so we prove the flag FLIPS.
   await sqlBypass`UPDATE curated_solicitations SET build_complete=false, build_completed_at=NULL, build_completed_by=NULL WHERE id=${SOL}::uuid`;
@@ -53,14 +63,60 @@ try {
   // Simulate the purchase: a curation_pending portal for the buyer (72h SLA), no proposal yet.
   const [pp] = await sqlBypass<Array<{ id: string }>>`
     INSERT INTO proposal_portals (tenant_id, opportunity_id, proposal_id, label, status, curation_due_at, created_by)
-    VALUES (${BUYER}::uuid, ${OPP}::uuid, NULL, 'pv-proof', 'curation_pending', now() + interval '72 hours', ${ADMIN}::uuid)
+    VALUES (${BUYER}::uuid, ${OPP}::uuid, NULL, ${LABEL}, 'curation_pending', now() + interval '72 hours', ${ADMIN}::uuid)
     RETURNING id`;
   portalId = pp.id;
-  console.log(`setup: throwaway curation_pending portal ${portalId} for ${BUYER_NAME}\n`);
+  console.log(`setup: throwaway curation_pending portal ${portalId} (${LABEL}) for ${BUYER_NAME}\n`);
+  // Sweep any portal a PREVIOUS run left behind — same tenant + opportunity, a pv-proof label, and
+  // not this run's. Cheap, and it means one crashed run cannot accumulate clutter forever.
+  await sqlBypass`
+    DELETE FROM proposal_portals
+    WHERE tenant_id = ${BUYER}::uuid AND opportunity_id = ${OPP}::uuid
+      AND label LIKE 'pv-proof%' AND label <> ${LABEL} AND proposal_id IS NULL`;
 
-  // Readiness bar (advisory) — TVSF has compliance + 2 vols + 13 items ⇒ ready.
+  // ── the readiness bar, BOTH WAYS ──────────────────────────────────────────────────────────────
+  //
+  // This used to be one line asserting `ready === true`, labelled "compliance + N vols + N items".
+  // The bar has FIVE terms, not three: it also requires that no required item and no volume is
+  // still waiting on a person (`itemsUndecided`/`volumesUndecided` — an item is decided when it has
+  // a mold, or is explicitly marked completed-elsewhere). Those two terms were added after this
+  // master was authored, so all 13 of its items were undecided and the check failed — correctly,
+  // as it turns out, but under a label that named none of the reasons and read as a cockpit fault.
+  //
+  // So it now proves the bar in BOTH directions, on state it sets itself and puts back: not ready
+  // while items are undecided, ready once they are decided, with the deciding done through the same
+  // field the product reads.
+  //
+  // And it ESTABLISHES both sides rather than trusting what it finds — which matters, because
+  // reading the "not ready" side off ambient state is exactly how the first version of this became
+  // untestable within an hour: a run crashed after marking the items decided and before its
+  // restore, the master stayed permanently ready, the refusal could never be observed again, and
+  // the check then reported a failure caused by its own earlier crash. The prior metadata is
+  // captured per item so the restore puts back what was actually there.
+  const items = await sqlBypass<Array<{ id: string; metadata: Record<string, unknown> | null }>>`
+    SELECT vri.id, vri.metadata FROM volume_required_items vri
+    JOIN solicitation_volumes sv ON sv.id = vri.volume_id
+    WHERE sv.solicitation_id = ${SOL}::uuid`;
+  originalItemMeta = items.map((i) => ({ id: i.id, metadata: i.metadata ?? {} }));
+  const itemIds = items.map((i) => i.id);
+
+  const readinessLine = (r: Awaited<ReturnType<typeof getBuildReadiness>>) =>
+    `compliance=${r.hasCompliance} vols=${r.volumeCount} items=${r.requiredItemCount} `
+    + `itemsUndecided=${r.itemsUndecided} volsUndecided=${r.volumesUndecided}`;
+
+  // (a) UNDECIDED — strip the key (absent means "nobody ruled"; false is a different, explicit state)
+  await sqlBypass`UPDATE volume_required_items SET metadata = COALESCE(metadata, '{}'::jsonb) - 'dsipOnly'
+                  WHERE id = ANY(${itemIds}::uuid[])`;
   const r0 = await getBuildReadiness(SOL);
-  check(`readiness meets the bar (compliance + ${r0.volumeCount} vols + ${r0.requiredItemCount} items)`, r0.ready === true);
+  check(`the bar REFUSES a master with undecided items — ${readinessLine(r0)}`,
+    r0.ready === false && r0.itemsUndecided > 0);
+
+  // (b) DECIDED — through the same field the product reads
+  await sqlBypass`UPDATE volume_required_items
+                  SET metadata = COALESCE(metadata, '{}'::jsonb) || ${sqlBypass.json({ dsipOnly: true })}
+                  WHERE id = ANY(${itemIds}::uuid[])`;
+  const r1 = await getBuildReadiness(SOL);
+  check(`the bar PASSES once every item is decided — ${readinessLine(r1)}`, r1.ready === true);
   check('build_complete starts false', r0.buildComplete === false);
 
   // ── OUTCOME 1: complete the master build-out + broadcast to ALL mirror cards ──
@@ -141,7 +197,16 @@ try {
     }
     if (portalId) await sqlBypass`DELETE FROM tasks WHERE entity_type='portal' AND entity_id=${portalId}::uuid`;
     if (portalId) await sqlBypass`DELETE FROM proposal_portals WHERE id=${portalId}::uuid`;
-    console.log('cleanup: throwaway portal + proposal + tasks removed');
+    // Undecide exactly the items this run decided — the master is shared, and leaving it "built out"
+    // would quietly make the next run's first assertion untestable (a bar that cannot refuse cannot
+    // be shown to refuse). Removing the KEY, not setting it false: false is the admin's explicit
+    // "authored here" override and would be a different state than the one we found.
+    for (const it of originalItemMeta) {
+      await sqlBypass`UPDATE volume_required_items SET metadata = ${sqlBypass.json(it.metadata)}
+                      WHERE id = ${it.id}::uuid`;
+    }
+    console.log('cleanup: throwaway portal + proposal + tasks removed'
+      + (originalItemMeta.length ? `; ${originalItemMeta.length} required item(s) restored to their prior metadata` : ''));
   } catch (ce) { console.error('cleanup warning (non-fatal)', ce); }
   await sqlBypass.end({ timeout: 5 });
   process.exit(fail === 0 ? 0 : 1);
