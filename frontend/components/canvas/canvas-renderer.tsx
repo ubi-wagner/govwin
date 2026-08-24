@@ -41,7 +41,7 @@ import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
-import { MeasureGridOverlay } from './measure-grid-overlay';
+import { MeasureGridOverlay, MeasureRulers } from './measure-grid-overlay';
 import { BoundingBox, measureBox, runsFromGroupMap } from './bounding-box-overlay';
 import { defaultGridStep, isGridStep, type GridStepPt } from '@/lib/canvas/measure-grid';
 
@@ -190,6 +190,23 @@ export function CanvasRenderer({
   const contentWidth = canvas.width - canvas.margins.left - canvas.margins.right;
   const scale = Math.min(1, Math.max(0.25, (availWidth - 32) / canvas.width));
 
+  // ── the live unit count, shared by the boundary lines and the status gauge ───────────────────
+  //
+  // REALTIME, AND FREE. `estimatePageCount` was already being called on every render for the status
+  // bar, so drawing the boundaries costs one memo and no measurement: the count is arithmetic over
+  // the node model, not a reading off the DOM. That is the whole reason the boundaries can update
+  // as fast as you type while the GROUP BOXES — the one layer that genuinely needs layout — are
+  // deferred to a post-paint pass below.
+  const gridStep = isGridStep(grid) ? grid : defaultGridStep(canvas);
+  // A deck is measured in SLIDES, and the discriminator is the canvas format — 'slide_16_9' or
+  // 'slide_4_3', not a single 'ppt'. Guessing that name would have compiled against a union that
+  // does not contain it, which is exactly what tsc caught.
+  const isDeck = canvas.format === 'slide_16_9' || canvas.format === 'slide_4_3';
+  const liveUnits = React.useMemo(
+    () => (isDeck ? estimateSlideCount(doc) : estimatePageCount(doc)),
+    [doc, isDeck],
+  );
+
   // ── measured group boxes ─────────────────────────────────────────────────────────────────────
   //
   // LAYOUT pixels, not client rects. The page carries `transform: scale()`, so
@@ -269,11 +286,16 @@ export function CanvasRenderer({
         {/* The measurement grid — ABOVE the page background, BELOW the content, so it reads as
             paper ruling rather than as an annotation drawn on top of the text. */}
         {grid !== false && (
-          <MeasureGridOverlay
-            canvas={canvas}
-            step={isGridStep(grid) ? grid : defaultGridStep(canvas)}
-            scale={scale}
-          />
+          <>
+            <MeasureGridOverlay
+              canvas={canvas}
+              step={gridStep}
+              scale={scale}
+              pageCount={liveUnits}
+              unit={isDeck ? 'slide' : 'page'}
+            />
+            <MeasureRulers canvas={canvas} step={gridStep} scale={scale} />
+          </>
         )}
 
         {/* Measured group boxes — drawn ABOVE the grid so their edges read against its lines. */}

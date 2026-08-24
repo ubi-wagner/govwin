@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  gridGeometry, defaultGridStep, gridStepLabel, describePt, isGridStep,
+  gridGeometry, defaultGridStep, gridStepLabel, describePt, isGridStep, pageBoundaries,
   GRID_STEPS_PT, MIN_GRID_STEP_PT, PT_PER_INCH,
 } from '@/lib/canvas/measure-grid';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
@@ -117,5 +117,42 @@ describe('the readout speaks in units a person uses', () => {
   it('describes a distance in both points and inches', () => {
     expect(describePt(72)).toBe('72pt (1.00 in)');
     expect(describePt(78)).toBe('78pt (1.08 in)');
+  });
+});
+
+describe('page boundaries — where the break actually falls', () => {
+  it('draws no boundary for a single-page document', () => {
+    expect(pageBoundaries(letter, 1)).toEqual([]);
+  });
+
+  it('draws interior boundaries only — never at the top or after the last page', () => {
+    const b = pageBoundaries(letter, 3);
+    expect(b).toHaveLength(2);                    // 3 pages → 2 breaks between them
+    expect(b[0]).toBeGreaterThan(0);
+  });
+
+  it('puts the first break one usable height below the top margin', () => {
+    const usable = letter.height - letter.margins.top - letter.margins.bottom;
+    expect(pageBoundaries(letter, 2)[0]).toBe(letter.margins.top + usable);
+  });
+
+  it('spaces every subsequent break by exactly one usable height', () => {
+    const usable = letter.height - letter.margins.top - letter.margins.bottom;
+    const b = pageBoundaries(letter, 5);
+    for (let i = 1; i < b.length; i++) expect(b[i] - b[i - 1]).toBe(usable);
+  });
+
+  it('agrees with the margin box the grid draws — one usable height, one definition', () => {
+    const g = gridGeometry(letter, 12);
+    expect(pageBoundaries(letter, 2)[0]).toBe(g.margin.top + g.margin.height);
+  });
+
+  it('returns nothing rather than dividing by a nonsense page', () => {
+    expect(pageBoundaries({ ...letter, margins: { top: 500, bottom: 500, left: 72, right: 72 } }, 3)).toEqual([]);
+    expect(pageBoundaries(letter, Number.NaN)).toEqual([]);
+  });
+
+  it('handles a fractional page count by rounding up — 1.2 pages IS two pages', () => {
+    expect(pageBoundaries(letter, 1.2)).toHaveLength(1);
   });
 });

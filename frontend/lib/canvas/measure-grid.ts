@@ -136,6 +136,34 @@ export function defaultGridStep(canvas: CanvasRules, maxLines = 60): GridStepPt 
 }
 
 /**
+ * Where each page (or slide) boundary falls in the rendered flow, in points from the page top.
+ *
+ * THE MISSING LANDMARK. The editor computes "~11 of 10 pages — over" and shows it as text, while
+ * nothing on the page says WHICH content crossed. An author over a limit is told they are over and
+ * left to guess. These are the lines that answer it.
+ *
+ * PURE GEOMETRY, deliberately — no DOM, no measurement. The canvas renders as one continuous
+ * page-shaped element that grows past `canvas.height`, with the margins as padding, so content that
+ * would print on page k begins at `marginTop + (k-1) × usableHeight`. That is the SAME arithmetic
+ * `flowMetrics`/`paginate` use to decide the page count, which is what makes the line trustworthy:
+ * a boundary drawn from a second model would be a second opinion about where page 2 starts.
+ *
+ * Costs nothing to keep current. `estimatePageCount` is already called on every render, so a
+ * boundary needs no measurement pass and no debounce — it is arithmetic over numbers already known.
+ */
+export function pageBoundaries(canvas: CanvasRules, pageCount: number): number[] {
+  const usable = canvas.height - canvas.margins.top - canvas.margins.bottom;
+  if (!(usable > 0) || !Number.isFinite(pageCount)) return [];
+  const out: number[] = [];
+  // Interior boundaries only: page 1 starts at the top of the page and the last page ends at the
+  // end of the content, and drawing a "boundary" at either would be a line where nothing breaks.
+  for (let k = 1; k < Math.max(1, Math.ceil(pageCount)); k++) {
+    out.push(canvas.margins.top + k * usable);
+  }
+  return out;
+}
+
+/**
  * Describe a measured distance the way a person would say it — for a readout beside the grid.
  * 78pt is "78pt · 1⅟12 in" to nobody; it is "78pt (1.08 in)".
  */

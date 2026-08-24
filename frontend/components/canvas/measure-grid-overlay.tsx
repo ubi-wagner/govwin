@@ -14,11 +14,18 @@
  */
 import React from 'react';
 import type { CanvasRules } from '@/lib/types/canvas-document';
-import { gridGeometry, describePt, type GridStepPt } from '@/lib/canvas/measure-grid';
+import { gridGeometry, describePt, pageBoundaries, type GridStepPt } from '@/lib/canvas/measure-grid';
 
 interface Props {
   canvas: CanvasRules;
   step: GridStepPt;
+  /**
+   * How many pages (or slides) the ruler says this document is. Drives the boundary lines — the
+   * landmark that tells an author WHICH content crossed a page limit, rather than only that it did.
+   */
+  pageCount?: number;
+  /** 'slide' for a deck, so the boundary reads "Slide 2" and not "Page 2". */
+  unit?: 'page' | 'slide';
   /** The same scale the page container applies, so the two cannot drift apart. */
   scale: number;
   /** Show the inch labels down the left and across the top. */
@@ -33,7 +40,9 @@ const MEDIUM = 'rgba(37, 99, 235, 0.20)';
 const MINOR = 'rgba(37, 99, 235, 0.10)';
 const MARGIN_LINE = 'rgba(220, 38, 38, 0.45)';
 
-export function MeasureGridOverlay({ canvas, step, scale, labels = true }: Props) {
+const BOUNDARY = 'rgba(15, 118, 110, 0.75)';
+
+export function MeasureGridOverlay({ canvas, step, scale, labels = true, pageCount = 1, unit = 'page' }: Props) {
   const g = React.useMemo(() => gridGeometry(canvas, step), [canvas, step]);
   const px = (pt: number) => pt * scale;
 
@@ -77,6 +86,30 @@ export function MeasureGridOverlay({ canvas, step, scale, labels = true }: Props
         }}
       />
 
+      {/* PAGE / SLIDE BOUNDARIES — where the break actually falls.
+          Drawn last of the lines so they read above the grid, and solid-teal so they are plainly a
+          different KIND of thing from a grid gradation: a grid line is a measurement, this is an
+          edge the export will enforce. */}
+      {pageBoundaries(canvas, pageCount).map((pt, i) => (
+        <React.Fragment key={`b${pt}`}>
+          <div
+            style={{
+              position: 'absolute', left: 0, right: 0, top: px(pt), height: 0,
+              borderTop: `1px dashed ${BOUNDARY}`,
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute', right: 2, top: px(pt) + 2,
+              fontSize: 8, lineHeight: '8px', color: BOUNDARY,
+              fontFamily: 'ui-monospace, monospace', fontWeight: 600,
+            }}
+          >
+            {unit === 'slide' ? 'slide' : 'page'} {i + 2}
+          </span>
+        </React.Fragment>
+      ))}
+
       {labels && (
         <>
           {/* inch labels across the top and down the left, on the inch lines only — labelling every
@@ -105,6 +138,66 @@ export function MeasureGridOverlay({ canvas, step, scale, labels = true }: Props
           ))}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The rulers — gradations along the top and left edges, in the grid's own step.
+ *
+ * IN THE GUTTER, NOT ON THE PAGE. A ruler printed over the document measures the thing it obscures,
+ * which is the failure mode of a busy overlay. These sit outside the page edge, so the grid stays
+ * the thing you read *through* and the ruler is the thing you read *against*.
+ *
+ * Same geometry as the grid — `gridGeometry` is called once for both — so a gradation and its grid
+ * line are the same number by construction. Two independent sources for "where is 2 inches" is how
+ * a ruler ends up disagreeing with its own page.
+ */
+export function MeasureRulers({ canvas, step, scale, thickness = 14 }: Props & { thickness?: number }) {
+  const g = React.useMemo(() => gridGeometry(canvas, step), [canvas, step]);
+  const px = (pt: number) => pt * scale;
+  const tick = (l: { pt: number; major: boolean; medium: boolean }) =>
+    l.major ? thickness : l.medium ? thickness * 0.6 : thickness * 0.3;
+
+  return (
+    <div style={{ pointerEvents: 'none' }} aria-hidden="true">
+      {/* top ruler */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: -thickness, height: thickness,
+        borderBottom: `1px solid ${MAJOR}`,
+      }}>
+        {g.vertical.map((l) => (
+          <div key={`rt${l.pt}`} style={{
+            position: 'absolute', bottom: 0, left: px(l.pt), width: 1, height: tick(l),
+            background: l.major ? MAJOR : l.medium ? MEDIUM : MINOR,
+          }} />
+        ))}
+        {g.vertical.filter((l) => l.major && l.pt > 0).map((l) => (
+          <span key={`rtl${l.pt}`} style={{
+            position: 'absolute', bottom: thickness * 0.55, left: px(l.pt) + 2,
+            fontSize: 8, lineHeight: '8px', color: MAJOR, fontFamily: 'ui-monospace, monospace',
+          }}>{l.pt / 72}</span>
+        ))}
+      </div>
+
+      {/* left ruler */}
+      <div style={{
+        position: 'absolute', top: 0, bottom: 0, left: -thickness, width: thickness,
+        borderRight: `1px solid ${MAJOR}`,
+      }}>
+        {g.horizontal.map((l) => (
+          <div key={`rl${l.pt}`} style={{
+            position: 'absolute', right: 0, top: px(l.pt), height: 1, width: tick(l),
+            background: l.major ? MAJOR : l.medium ? MEDIUM : MINOR,
+          }} />
+        ))}
+        {g.horizontal.filter((l) => l.major && l.pt > 0).map((l) => (
+          <span key={`rll${l.pt}`} style={{
+            position: 'absolute', right: thickness * 0.55, top: px(l.pt) + 2,
+            fontSize: 8, lineHeight: '8px', color: MAJOR, fontFamily: 'ui-monospace, monospace',
+          }}>{l.pt / 72}</span>
+        ))}
+      </div>
     </div>
   );
 }
