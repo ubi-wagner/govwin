@@ -10,7 +10,19 @@ const BASE = 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const OUT = '/home/user/govwin/docs/assets/close-e2e';
 fs.mkdirSync(OUT, { recursive: true });
-const sql = postgres(process.env.DATABASE_URL || 'postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 3 });
+// THE OWNER, deliberately, and not DATABASE_URL. This script's DB work is its own bookkeeping:
+// forcing a precondition and then reading the result. Both touch a content_publish ToDo, which is
+// PLATFORM scope (tenant_id IS NULL) — and mig 185 made `tasks` UPDATE tenant-equality, which NULL
+// never satisfies. Run under the scoped `govtech_app` role that run-branch-drives.sh exports as
+// DATABASE_URL, the reopen UPDATE matches zero rows and raises no error, so the precondition
+// silently does not happen. That is exactly the defect this drive exists to catch (B105), one
+// layer out: the harness hit it too, and its own new precondition check is what noticed.
+// GUIDE_DB / DATABASE_URL_OWNER are what the runner already exports for harness bookkeeping.
+const sql = postgres(
+  process.env.DATABASE_URL_OWNER || process.env.GUIDE_DB
+    || 'postgresql://govtech:changeme@localhost:5432/govtech_intel',
+  { max: 3 },
+);
 const ADMIN = { email: 'eric@rfppipeline.com', pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const SLUG = 'what-is-a-baa';
 const shot = async (p, n) => { await p.screenshot({ path: path.join(OUT, n + '.png'), fullPage: true }); console.log('  ✓ shot', n); };
