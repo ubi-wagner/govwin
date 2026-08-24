@@ -14,7 +14,7 @@
 import { useCallback, useState } from 'react';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
-export type OverlayKey = 'sections' | 'atoms' | 'groups' | 'provenance';
+export type OverlayKey = 'sections' | 'atoms' | 'groups' | 'provenance' | 'grid';
 
 export const OVERLAYS: { key: OverlayKey; label: string; dot: string; hint: string }[] = [
   { key: 'sections',   label: 'Sections',   dot: '#6d5ef0', hint: 'Dotted boundary + label at each section start' },
@@ -24,6 +24,9 @@ export const OVERLAYS: { key: OverlayKey; label: string; dot: string; hint: stri
   // it, so the layer the assembler populates and a scoped review addresses was invisible.
   { key: 'groups',     label: 'Groups',     dot: '#c2410c', hint: 'Runs from one library atom — solid rail = moves as one block' },
   { key: 'provenance', label: 'Provenance', dot: '#7c5cf0', hint: 'Source gutter — AI · Library · Reuse' },
+  // The measurement grid belongs with the other overlays rather than beside them: it is the same
+  // kind of thing — a togglable transparent layer that reads existing data and never edits.
+  { key: 'grid',       label: 'Grid',       dot: '#2563eb', hint: 'Measurement grid in points — inch lines, margin box, page ruler' },
 ];
 
 /**

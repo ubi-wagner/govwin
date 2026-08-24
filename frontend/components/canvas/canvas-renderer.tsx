@@ -41,6 +41,8 @@ import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
+import { MeasureGridOverlay } from './measure-grid-overlay';
+import { defaultGridStep, isGridStep, type GridStepPt } from '@/lib/canvas/measure-grid';
 
 interface Props {
   document: CanvasDocument;
@@ -57,6 +59,11 @@ interface Props {
    * `document.sections` instead.
    */
   groups?: GroupMap;
+  /**
+   * Draw the measurement grid over the page. `true` picks a step that keeps the grid legible for
+   * this canvas size; a number pins one. Off by default — a ruler you did not ask for is clutter.
+   */
+  grid?: boolean | GridStepPt;
 }
 
 /** What the `groups` overlay needs to know about one node. */
@@ -130,6 +137,7 @@ export function CanvasRenderer({
   readOnly = false,
   onMoveNodeToIndex,
   groups,
+  grid = false,
 }: Props) {
   // A stored canvas may be PARTIAL — `{width, height, margins}` with no `font_default` is a shape
   // that exists in the database today (four TVSF sections carry it). Reading `.font_default.family`
@@ -201,6 +209,16 @@ export function CanvasRenderer({
           background: canvas.background || undefined,
         }}
       >
+        {/* The measurement grid — ABOVE the page background, BELOW the content, so it reads as
+            paper ruling rather than as an annotation drawn on top of the text. */}
+        {grid !== false && (
+          <MeasureGridOverlay
+            canvas={canvas}
+            step={isGridStep(grid) ? grid : defaultGridStep(canvas)}
+            scale={scale}
+          />
+        )}
+
         {/* Watermark overlay — behind content */}
         {statusToWatermark(metadata.status) && (
           <WatermarkOverlay text={statusToWatermark(metadata.status)!} />

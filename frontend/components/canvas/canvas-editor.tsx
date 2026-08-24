@@ -1181,6 +1181,7 @@ function CanvasEditorInner({
             readOnly={readOnly}
             onMoveNodeToIndex={handleMoveNodeToIndex}
             groups={groups}
+            grid={overlays.has('grid')}
           />
         )}
         {/* Fluid-canvas F0: highlight a span → floating Atomize / Regenerate menu. Only in the

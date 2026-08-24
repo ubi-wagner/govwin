@@ -854,7 +854,29 @@ as text, which is a rendering choice and not a loss:
 Two deliberate exceptions in **.xlsx**: a **page break** and a **spacer** do nothing, because a grid
 has no pages and no vertical whitespace to place. Everything else carries over.
 
-## 8.5 Things worth knowing
+## 8.5 The measurement grid
+
+Turn on **Grid** in the overlay bar and the page gets a ruler, drawn in the document's own units.
+
+- **Inch lines** are heaviest and labelled down the left and across the top; **half-inch** lines are
+  mid-weight; the chosen step is a hint.
+- **The red dashed box is your margin** — the usable area. Anything crossing it will cross it in the
+  export too, so a block that overhangs here is the visible form of the overflow the compliance
+  check reports as a number.
+- **Steps go 1 in · ½ in · ¼ in · 1 pica (12pt) · ½ pica (6pt).** 6pt is the finest offered, and the
+  reason is worth knowing: there are 72 points to an inch, so a step has to divide 72 for its lines
+  to land on the inch marks. A 5pt grid drifts against every inch — it looks precise while being
+  unaligned, which is worse than no grid.
+- It starts at whatever step keeps the page legible rather than a grey wash, so a slide opens finer
+  than a poster. Change it whenever you like.
+
+Use it when a layout is not doing what you expect. A spacer that should be a quarter inch is three
+¼-inch cells or it isn't; a block you think is inside the margin either sits inside the red box or
+it doesn't. The grid does not change your document — it is a transparent layer, and nothing on it
+can be clicked.
+
+## 8.6 Things worth knowing
+
 
 - **Save and export are separate.** Export sends what is on your screen, so you can export a draft
   you have not saved. If you want the version in your workspace, save first.
