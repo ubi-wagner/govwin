@@ -4,6 +4,13 @@
 build log, the data-model reference, or a superseded design that has been folded into this file — the full
 map is §9. Read this first; when the canvas changes, change this.
 
+> **For "what can an author actually DO today, and does it survive export" → `docs/CANVAS_STYLING_CAPABILITIES.md`.**
+> That file is the measured capability map: every styling control against every writer (docx · pptx ·
+> xlsx · pdf), which controls apply to which node type, layering, and — stated as plainly as the
+> capabilities — what is absent from the model and what is built but unmeasured. It is generated from
+> two instruments rather than read off the source, because this question was answered from source three
+> times and answered wrong twice; §6 there records how, since the failure mode is reusable.
+
 _Last realigned: **2026-08-23** — a full design-vs-as-built re-verification against the code (the previous
 realignment, 2026-08-13, had gone stale in BOTH directions: it understated two shipped phases and
 overstated one gap). Every status in §2 and §7 below was re-read from source this pass; line refs marked
