@@ -77,21 +77,23 @@ async def check_workflow_write_role(conn) -> bool:
     correct exactly until someone adds a table and does not think of this file.
     """
     try:
+        # The QUERY reports the catalog; the DECISION is made below, in Python. Deliberately: the
+        # first version of this pushed "does RLS apply to me here" into the WHERE clause, which
+        # made the only interesting logic in this file reachable solely by a live database. A unit
+        # test could then supply rows but not exercise the rule, and the rule is the whole point.
         rows = await conn.fetch(
             """
-            SELECT current_user AS role,
-                   c.relname    AS table_name,
-                   (SELECT rolsuper      FROM pg_roles WHERE rolname = current_user) AS super,
-                   (SELECT rolbypassrls  FROM pg_roles WHERE rolname = current_user) AS bypasses
+            SELECT current_user                               AS role,
+                   c.relname                                  AS table_name,
+                   c.relforcerowsecurity                      AS rls_forced,
+                   pg_get_userbyid(c.relowner) = current_user  AS is_owner,
+                   (SELECT rolsuper     FROM pg_roles WHERE rolname = current_user) AS super,
+                   (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user) AS bypasses
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE n.nspname = 'public'
                AND c.relkind = 'r'
                AND c.relrowsecurity
-               -- RLS applies to a non-owner whenever it is enabled, and to the owner only when the
-               -- table is FORCEd. Superuser and BYPASSRLS are handled outside this predicate
-               -- because they are properties of the ROLE, not of any one table.
-               AND (pg_get_userbyid(c.relowner) <> current_user OR c.relforcerowsecurity)
              ORDER BY c.relname
             """
         )
@@ -100,16 +102,26 @@ async def check_workflow_write_role(conn) -> bool:
         return True
 
     if not rows:
-        log.info("workflow-write preflight: OK — row-level security applies to no table for this role")
+        log.info("workflow-write preflight: OK — row-level security is enabled on no table")
         return True
 
     role = rows[0]["role"]
+    # Role-level exemptions first: superuser and BYPASSRLS are properties of the ROLE, so they
+    # settle every table at once and no per-table reasoning is needed.
     if rows[0]["super"] or rows[0]["bypasses"]:
         why = "superuser" if rows[0]["super"] else "BYPASSRLS"
         log.info("workflow-write preflight: OK — role=%s (%s)", role, why)
         return True
 
-    exposed = [r["table_name"] for r in rows]
+    # Per table: RLS applies to a non-owner whenever it is enabled, and to the OWNER only when the
+    # table is FORCEd. That second half is the one that gets forgotten — mig 212/213 FORCE eleven
+    # tables, and an owner is not exempt from those.
+    exposed = [r["table_name"] for r in rows if (not r["is_owner"]) or r["rls_forced"]]
+    if not exposed:
+        log.info(
+            "workflow-write preflight: OK — role=%s owns every RLS table and none is FORCEd", role
+        )
+        return True
     # Lead with the tables the worker is known to write: those are the ones that will actually fail,
     # and burying them in an alphabetical list of everything is how a real warning gets skimmed.
     writes = [t for t in _WORKER_WRITES if t in exposed]
