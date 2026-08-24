@@ -31,7 +31,7 @@ const sql = postgres(harnessDbUrl(), { max: 2 });
  * cannot drift, and it fails for the right reason. If the tenant has no such row, the check is
  * SKIPPED and said so — a page with nothing to render proves nothing either way.
  */
-let S, PROP, TENANT_ID, TOK_PROPOSAL, TOK_BUCKET, TOK_ATOM, TOK_TENANT_NAME;
+let S, PROP, TENANT_ID, TOK_PROPOSAL, TOK_BUCKET, TOK_ATOM, TOK_ATOM_FACET, TOK_TENANT_NAME;
 
 /** A distinctive, renderable fragment — long enough not to match by accident. */
 const tokenOf = (v) => {
@@ -61,13 +61,26 @@ async function resolveFixture() {
     WHERE tenant_id=${t.id}::uuid AND is_active ORDER BY created_at LIMIT 1`;
   const [atom] = await sql`SELECT title FROM library_atoms
     WHERE tenant_id=${t.id}::uuid AND archived_at IS NULL ORDER BY created_at LIMIT 1`;
+  // The atoms page renders FACETS — tag counts — so the token that proves it is showing real
+  // tenant-scoped data is the tenant's most common TAG, not an atom title. This line used to be a
+  // hardcoded 'commercialization', which is the one thing on this page the neighbouring checks had
+  // already learned not to do: Foundation has exactly 1 commercialization tag out of 866 atoms, so
+  // the facet never reaches the rendered list and the drive reported a DENY-ALL that was not one.
+  // Resolve, don't pin (#207) — the whole point is a non-zero forced-table read, and any real facet
+  // demonstrates that on any fixture.
+  const [facet] = await sql`
+    SELECT at.value, count(*)::int AS n FROM atom_tags at
+    JOIN library_atoms la ON la.id = at.atom_id
+    WHERE la.tenant_id = ${t.id}::uuid AND la.archived_at IS NULL
+    GROUP BY at.value ORDER BY n DESC LIMIT 1`;
 
   PROP = prop?.id ?? null;
   TOK_PROPOSAL = tokenOf(prop?.title);
   TOK_BUCKET = tokenOf(bucket?.name);
   TOK_ATOM = tokenOf(atom?.title);
+  TOK_ATOM_FACET = tokenOf(facet?.value) ?? TOK_ATOM;
   console.log(`tenant ${S}`);
-  console.log(`tokens  proposal=${TOK_PROPOSAL ?? 'NONE'} · bucket=${TOK_BUCKET ?? 'NONE'} · atom=${TOK_ATOM ?? 'NONE'} · tenant=${TOK_TENANT_NAME ?? 'NONE'}`);
+  console.log(`tokens  proposal=${TOK_PROPOSAL ?? 'NONE'} · bucket=${TOK_BUCKET ?? 'NONE'} · atom=${TOK_ATOM ?? 'NONE'} · facet=${TOK_ATOM_FACET ?? 'NONE'} · tenant=${TOK_TENANT_NAME ?? 'NONE'}`);
   return t;
 }
 
@@ -80,7 +93,7 @@ const portalPages = () => [
   ['cards', `/portal/${S}/cards`, TOK_BUCKET],
   // atoms + manage are counts/facets rendered from forced tables (client-lib / server console),
   // so assert a NON-ZERO forced-data string (a DENY-ALL would show 0 / no facets), not a title.
-  ['atoms (library facets)', `/portal/${S}/atoms`, 'commercialization'],
+  ['atoms (library facets)', `/portal/${S}/atoms`, TOK_ATOM_FACET],
   // `/manage` is the account page: its forced-table reads are COUNTS, not names, so a bucket name
   // never appears there. Its original token was '8 OPPs' — a count that drifted. The company name
   // is what this page actually renders from tenant-scoped data, so that is what to assert.
