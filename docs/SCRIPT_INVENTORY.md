@@ -30,7 +30,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
-| `close-e2e-cms.mjs` | — | 2026-08-21 |
+| `close-e2e-cms.mjs` | — | 2026-08-24 |
 | `drive-atomization.mts` | — | 2026-08-24 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-24 |
@@ -137,7 +137,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 66
+## DOCUMENTED — 67
 
 No code references it, but a document tells someone to run it.
 
@@ -147,6 +147,7 @@ No code references it, but a document tells someone to run it.
 | `bug-log-status.mjs` | — | 2026-08-22 |
 | `capture-guides.mjs` | — | 2026-08-23 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
+| `capture-templates.mts` | — | 2026-08-24 |
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
 | `close-e2e-marketing.mjs` | — | 2026-08-13 |
 | `close-e2e-proposal.mjs` | — | 2026-08-13 |
@@ -167,7 +168,7 @@ No code references it, but a document tells someone to run it.
 | `embed-atoms.mts` | — | 2026-08-11 |
 | `fire-uncovered-lib-triggers.mts` | — | 2026-08-23 |
 | `fire-uncovered-triggers.mjs` | — | 2026-08-23 |
-| `gen-guide-queue-seed.mts` | — | — |
+| `gen-guide-queue-seed.mts` | — | 2026-08-24 |
 | `gen-navy-sttr-proposal.mts` | — | 2026-07-19 |
 | `gen-sample-proposal.mts` | — | 2026-07-19 |
 | `gen-starter-set-seed.mts` | — | 2026-08-04 |
@@ -187,9 +188,9 @@ No code references it, but a document tells someone to run it.
 | `sandbox-heartbeat.sh` | — | 2026-08-19 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-dsip-opps.mts` | — | 2026-07-19 |
-| `seed-followon-guides.mts` | — | 2026-08-19 |
-| `seed-practice-guides.mts` | — | — |
-| `seed-program-guides.mts` | — | 2026-08-13 |
+| `seed-followon-guides.mts` | — | 2026-08-24 |
+| `seed-practice-guides.mts` | — | 2026-08-24 |
+| `seed-program-guides.mts` | — | 2026-08-24 |
 | `seed-template-masters.mts` | — | 2026-08-14 |
 | `seed-vault-demo.mts` | 3 | 2026-07-25 |
 | `shot-provisioning-cockpit.mjs` | — | 2026-08-21 |
@@ -385,7 +386,7 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | LIBRARY | 5 |
 | CALLED-BY-ANOTHER | 15 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 66 |
+| DOCUMENTED | 67 |
 | UNREFERENCED | 84 |
 | CANNOT-RUN | 41 |
-| **total** | **255** |
+| **total** | **256** |

@@ -45,21 +45,28 @@ try {
     SELECT category, count(*)::int AS n FROM master_templates WHERE status='active' GROUP BY 1 ORDER BY 2 DESC`;
   note(`master stable: ${masters} active molds — ${byCategory.map((r) => `${r.category}=${r.n}`).join(' · ')}`);
 
-  // The tenant with the most template cards — driving this against an empty tenant would prove
-  // nothing, because every check would pass on nothing.
+  // A tenant with template cards AND a member who can sign in — driving this against an empty
+  // tenant would prove nothing, because every check would pass on nothing. The house tenant
+  // (`rfp-pipeline`) is excluded: it is the platform's own source shelf, not a customer, and a
+  // walkthrough shot of it would show a reader a page no customer has.
   const [target] = await sql<Array<{ slug: string; name: string; tenantId: string; cards: number }>>`
-    SELECT t.slug, t.name, t.id AS "tenantId", count(c.id)::int AS cards
-    FROM tenants t JOIN tenant_template_cards c ON c.tenant_id = t.id
-    GROUP BY t.slug, t.name, t.id ORDER BY cards DESC LIMIT 1`;
-  if (!target) throw new Error('no tenant has template cards — run the template bridge first');
+    SELECT t.slug, t.name, t.id AS "tenantId", count(DISTINCT c.id)::int AS cards
+    FROM tenants t
+    JOIN tenant_template_cards c ON c.tenant_id = t.id
+    JOIN user_memberships m ON m.tenant_id = t.id AND m.status = 'active'
+    JOIN users u ON u.id = m.user_id AND u.is_active AND u.role IN ('tenant_admin','tenant_user')
+    WHERE t.slug <> 'rfp-pipeline'
+    GROUP BY t.slug, t.name, t.id ORDER BY cards DESC, t.slug LIMIT 1`;
+  if (!target) throw new Error('no customer tenant has template cards AND an active member');
   note(`driving tenant "${target.slug}" (${target.cards} template cards)`);
 
   const [admin] = await sql<Array<{ email: string }>>`
     SELECT email FROM users WHERE role IN ('rfp_admin','master_admin') AND is_active
     ORDER BY created_at LIMIT 1`;
-  const [member] = await sql<Array<{ email: string }>>`
-    SELECT u.email FROM users u
-    JOIN tenant_memberships m ON m.user_id = u.id AND m.tenant_id = ${target.tenantId}::uuid
+  const [member] = await sql<Array<{ email: string; role: string }>>`
+    SELECT u.email, u.role FROM users u
+    JOIN user_memberships m ON m.user_id = u.id AND m.tenant_id = ${target.tenantId}::uuid
+                           AND m.status = 'active'
     WHERE u.is_active AND u.role IN ('tenant_admin','tenant_user')
     ORDER BY CASE WHEN u.role = 'tenant_admin' THEN 0 ELSE 1 END, u.created_at LIMIT 1`;
   if (!admin) throw new Error('no active platform admin');
@@ -124,18 +131,27 @@ try {
   A("the gallery lists this tenant's own cards", cardsShown.length === cardSample.length,
     `${cardsShown.length}/${cardSample.length} sampled card titles present`);
 
-  // NEGATIVE SPACE. The gallery is tenant-OWNED by design (copy-inward, no live shared object), so
-  // another tenant's card titles must NOT appear. Asserting only what IS shown would pass equally
-  // well on a page that shows everyone's.
-  const foreign = await sql<Array<{ title: string }>>`
-    SELECT DISTINCT title FROM tenant_template_cards
-    WHERE tenant_id <> ${target.tenantId}::uuid
-      AND title NOT IN (SELECT title FROM tenant_template_cards WHERE tenant_id = ${target.tenantId}::uuid)
-    LIMIT 6`;
-  const leaked = foreign.filter((f) => galleryBody.includes(f.title));
-  A('no other tenant\'s cards appear on it', leaked.length === 0,
-    foreign.length === 0 ? 'no distinct foreign titles exist to test with — UNCOVERED, not passing'
-                         : `checked ${foreign.length} foreign titles, ${leaked.length} leaked`);
+  // NEGATIVE SPACE, and the FIRST version of this check could not fail.
+  //
+  // The gallery is tenant-OWNED by design (copy-inward, no live shared object), so another
+  // tenant's cards must not appear on it. The obvious way to test that is to look for a foreign
+  // card TITLE — and there are none, because every tenant's cards are copies of the same 39
+  // masters, so the titles are identical everywhere. That check reported "no foreign titles to
+  // test with" and printed a tick beside it, which is the exact failure mode this file argues
+  // against: a check that cannot fail is not a pass, it is decoration.
+  //
+  // What a leak would ACTUALLY look like, given identical titles, is DUPLICATION — one title
+  // appearing once per tenant that holds it instead of once. That is observable, and it fails if
+  // the scoping is ever dropped.
+  const [{ n: holders }] = await sql<Array<{ n: number }>>`
+    SELECT count(DISTINCT tenant_id)::int AS n FROM tenant_template_cards
+    WHERE title = ${cardSample[0].title}`;
+  const occurrences = galleryBody.split(cardSample[0].title).length - 1;
+  A('the gallery shows each card ONCE, not once per tenant holding it',
+    holders > 1 && occurrences === 1,
+    holders > 1
+      ? `"${cardSample[0].title.slice(0, 40)}" held by ${holders} tenants, appears ${occurrences}× on the page`
+      : `only ${holders} tenant holds this card — CANNOT RUN, the duplication a leak would cause is unobservable`);
 
   await capture(tp, `${BASE}/portal/${target.slug}/documents/new`, '04-tenant-new-document',
     [/document/i], 'tenant New Document chooser');
