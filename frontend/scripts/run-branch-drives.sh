@@ -122,7 +122,12 @@ fi
 echo
 
 # Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
-ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collaborator-boundary"
+# Drives whose entire value is an isolation claim MADE THROUGH THE DATABASE. Meaningless in the
+# wrong posture, so the runner marks them CANT-RUN rather than letting them report a verdict.
+# `vault-isolation` left this list when it moved onto the factory: six of its seven checks are
+# APP-layer (resolveVaultAccess), which the posture does not affect, and its one RLS check now
+# gates itself on the role it lands on and reports NOT MEASURED when that role can bypass.
+ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 
 # ── TWO ROLES, BECAUSE THE SUITE GENUINELY NEEDS BOTH ────────────────────────────────────────────
 #
@@ -140,7 +145,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collabo
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
