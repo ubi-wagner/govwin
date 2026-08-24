@@ -957,6 +957,21 @@ on `127.0.0.1` + browsing `localhost` is correct and consistent.
   - **Present:** `soffice`/`libreoffice`; `sharp` (SVG→PNG works — the docx figure path);
     `@napi-rs/canvas`; `pdfjs-dist` **v5** (ESM at `node_modules/pdfjs-dist/legacy/build/pdf.mjs`);
     Chromium at `/opt/pw-browsers`.
+  - ⚠️ **`soffice` is present but ships with NO DOCUMENT FILTERS** — `libreoffice-core` and
+    `-common` only. It fails on *everything*, including a plain `.txt`, with
+    `Error: source file could not be loaded`. **Install them first:**
+    ```
+    apt-get update -qq && apt-get install -y --no-install-recommends libreoffice-impress
+    ```
+    (`libreoffice-writer` / `-calc` for docx / xlsx.) This matters far beyond convenience: the
+    bare failure was previously read as *"LibreOffice cannot open the .pptx this product
+    writes"* and written into a script header as fact. It can. That wrong note stood long enough
+    to keep B121 — decks delivered with table rows and bullets missing — invisible, because it
+    ruled out the only instrument that could see it. **Before concluding anything about our
+    output from a converter failure, convert a plain text file.** If that fails, the tool is
+    broken, not the artifact.
+    Needed by `scripts/probe-deck-overlap.mts` and by `render-artifact-pages.mts` on
+    `.pptx`/`.docx`/`.xlsx`; both report UNMEASURED rather than passing when it is absent.
   - **Look at a PDF** (no poppler): rasterize with pdfjs + `@napi-rs/canvas` (custom
     `canvasFactory` with create/reset/destroy → `page.render` → `canvas.toBuffer('image/png')`),
     then Read the PNGs. **Verify PDF text/pages/order** with pdfjs `getTextContent`.
