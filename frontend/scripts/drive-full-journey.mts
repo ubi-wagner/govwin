@@ -25,6 +25,7 @@ import { purgeTenantSteps, deleteUntilStable } from './lib/scenario.mts';
 import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot } from './lib/harness-residue.mts';
 import { CANVAS_PRESETS, estimatePageCount, estimateSlideCount, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import JSZip from 'jszip';
 
 const OUT = process.env.DEMO_OUT || '/tmp/journey';
@@ -161,8 +162,8 @@ async function main() {
   await A.setViewportSize({ width: 1680, height: 1050 });
   await T.setViewportSize({ width: 1680, height: 1050 });
 
-  const made: { docs: string[]; opps: string[]; apps: string[]; buckets: string[]; tenants: string[] } =
-    { docs: [], opps: [], apps: [], buckets: [], tenants: [] };
+  const made: { docs: string[]; opps: string[]; apps: string[]; buckets: string[]; tenants: string[]; sols: string[] } =
+    { docs: [], opps: [], apps: [], buckets: [], tenants: [], sols: [] };
 
   // Saving a document MINTS LIBRARY ATOMS — 88 of them across these three volumes, none inserted
   // by this drive. Delete-what-I-created cannot see them (B119), so the box is reconciled on an ID
@@ -183,8 +184,49 @@ async function main() {
     const [{ n: oppsBefore }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM opportunities`;
     step('2a', 'intake surface renders', await visit(A, '/admin/intake', 'admin-intake'));
     step('2b', 'curation queue renders', await visit(A, '/admin/rfp-curation', 'admin-curation'));
-    // DRIVEN, not merely shown. stageIntake is the real producer behind the admin intake form and
-    // the scout release path — the same function, not a SQL insert dressed up as one.
+    // ── 2b · A REAL DOCUMENT, INGESTED ────────────────────────────────────────────────────────
+    //
+    // stageIntake (below) is structured intake — it creates the opportunity from fields. That is a
+    // real producer, but it is NOT what "ingestion" means to anyone reading this: no document is
+    // read, nothing is shredded, no text is extracted. So the arc drives the actual upload form and
+    // its async shred first, on a 2.3MB government BAA the repository owns, and reports what came
+    // out of the PDF rather than what was typed into a form.
+    const ingestTitle = `JOURNEY INGEST ${Date.now().toString(36)}`;
+    let ingestSol: string | null = null;
+    try {
+      const out = execFileSync('node',
+        ['scripts/drive-ingest-scenario.mjs', ingestTitle, 'baa', '2026-12-15',
+         'docs/DoD 25.2 SBIR BAA FULL_04212025.pdf'],
+        { encoding: 'utf8', timeout: 600_000, env: process.env }).toString();
+      ingestSol = (out.match(/SCENARIO SOL=([0-9a-f-]{36})/) || [])[1] ?? null;
+    } catch (e) {
+      gap(`2b: the ingest drive did not complete — ${String(e).slice(0, 110)}`);
+    }
+    if (ingestSol) made.sols.push(ingestSol);
+    step('2b-ingest', 'a real 2.3MB BAA is uploaded and SHREDDED', !!ingestSol,
+      ingestSol ? `solicitation ${ingestSol.slice(0, 8)}` : 'no solicitation id returned');
+
+    // TRACK THE OPPORTUNITY BY THE TITLE THIS RUN GENERATED, not by its FK.
+    //
+    // The ingest leaves the opportunity with `solicitation_id` NULL, so a teardown that removes
+    // "opportunities belonging to this solicitation" cannot see it — the first version of this
+    // stage left exactly one opportunity behind every run for that reason. The title carries a
+    // per-run timestamp suffix, so matching it reaches this run's rows and nothing else.
+    const ingestOpps = await sqlBypass<Array<{ id: string }>>`
+      SELECT id FROM opportunities WHERE title LIKE ${ingestTitle + '%'}`;
+    made.opps.push(...ingestOpps.map((o) => o.id));
+
+    if (ingestSol) {
+      const [ex] = await sqlBypass<Array<{ chars: number; pages: number | null }>>`
+        SELECT length(cs.full_text)::int AS chars,
+               (SELECT page_count FROM solicitation_documents d WHERE d.solicitation_id = cs.id LIMIT 1) AS pages
+        FROM curated_solicitations cs WHERE cs.id = ${ingestSol}::uuid`;
+      // The number that proves a document was READ rather than a row inserted.
+      step('2b-text', 'real text was extracted from the PDF', (ex?.chars ?? 0) > 100_000,
+        `${(ex?.chars ?? 0).toLocaleString()} characters · page_count=${ex?.pages ?? 'NULL'}`);
+    }
+
+    // ── 2c · structured intake, the other producer ────────────────────────────────────────────
     const probeTitle = `JOURNEY OPP ${Date.now().toString(36)} — Directed Energy Counter-UAS`;
     const staged = await stageIntake({
       title: probeTitle, agency: 'Department of the Air Force',
@@ -200,9 +242,14 @@ async function main() {
     step('2c', 'a NEW opportunity is INGESTED through the real producer', !!newOppId,
       newOppId ? `opp ${newOppId.slice(0, 8)}` : `stageIntake returned ${JSON.stringify(staged).slice(0, 90)}`);
 
+    // The expected delta is DERIVED from what actually succeeded — one opportunity per producer that
+    // ran. Hardcoding +1 was correct until the ingest stage was added beside stageIntake, and then
+    // it failed a run in which BOTH producers had worked. An assertion that does not move with the
+    // drive reports the drive's own growth as a regression.
+    const expected = (ingestOpps.length) + (newOppId ? 1 : 0);
     const [{ n: oppsAfter }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM opportunities`;
-    step('2d', 'the opportunity count actually moved', oppsAfter === oppsBefore + 1,
-      `${oppsBefore} → ${oppsAfter}`);
+    step('2d', 'the opportunity count moved by exactly what the producers created',
+      oppsAfter === oppsBefore + expected, `${oppsBefore} → ${oppsAfter} (expected +${expected})`);
     step('2e', 'opportunities list renders with it', await visit(A, '/admin/opportunities', 'admin-opportunities', true),
       `${oppsAfter} opportunities · ${solsBefore} solicitations`);
 
@@ -363,27 +410,77 @@ async function main() {
     // Each step now records its own failure and the run continues. Anything that genuinely could
     // not be removed lands in GAPS and is printed, so residue is named rather than discovered later
     // by another harness.
-    const step_ = async (what: string, fn: () => Promise<unknown>) => {
-      try { await fn(); } catch (e) { GAPS.push(`teardown: ${what} — ${String(e).slice(0, 90)}`); }
+    // RETRIED, because the thing being cleaned up is still being WRITTEN.
+    //
+    // Stage 2 uploads a real BAA and the shred is ASYNCHRONOUS: the pipeline keeps creating rows
+    // that reference the solicitation and its opportunity for a few seconds after the drive's own
+    // work is done. A single-shot delete hits a foreign key that will not exist a moment later —
+    // measured directly, by listing every FK pointing at the surviving opportunity after the fact
+    // and finding NONE. The blocker was real when the delete ran and gone by the time I looked.
+    //
+    // So each step gets a few attempts with a pause. Only a failure that survives all of them is a
+    // gap worth reporting; one that clears on the second try was never a defect, just impatience.
+    const step_ = async (what: string, fn: () => Promise<unknown>, tries = 4) => {
+      for (let i = 1; i <= tries; i++) {
+        try { await fn(); return; } catch (e) {
+          if (i === tries) { GAPS.push(`teardown: ${what} — ${String(e).slice(0, 90)}`); return; }
+          await new Promise((r) => setTimeout(r, 1500 * i));
+        }
+      }
     };
 
     if (made.docs.length) await step_('documents', () => sqlBypass`DELETE FROM tenant_documents WHERE id = ANY(${made.docs}::uuid[])`);
     if (made.apps.length) await step_('applications', () => sqlBypass`DELETE FROM applications WHERE id = ANY(${made.apps}::uuid[])`);
+    // DELETE UNTIL STABLE, not once and not on a timer.
+    //
+    // Stage 2's shred is asynchronous and the workflow engine keeps creating rows that reference
+    // the opportunity — a process instance, a card, a bridge row — for a while after the drive's
+    // own work finishes. A single delete hits a foreign key; a fixed retry window is a guess about
+    // how long the engine takes, and mine guessed 9 seconds when it needed longer. Proven by
+    // reproducing the exact delete afterwards by hand: it succeeded immediately, so nothing was
+    // permanently stuck, only still arriving.
+    //
+    // `deleteUntilStable` (scenario.mts) runs the whole set repeatedly until a pass removes
+    // nothing, which converges regardless of ordering AND regardless of how slow the producer is.
+    // It is the mechanism the scenario factory already uses for exactly this, so this drive is not
+    // inventing a second answer to a solved problem.
+    const oppSteps: Array<() => Promise<number>> = [];
     for (const o of made.opps) {
-      await step_('instance transitions', () => sqlBypass`DELETE FROM process_instance_transitions WHERE instance_id IN (
-        SELECT id FROM process_instances WHERE trigger_event_id IN (
-          SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o}))`);
-      await step_('process instances', () => sqlBypass`DELETE FROM process_instances WHERE trigger_event_id IN (
-        SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o})`);
-      await step_('tasks', () => sqlBypass`DELETE FROM tasks WHERE entity_id = ${o}::uuid`);
-      await step_('events', () => sqlBypass`DELETE FROM system_events WHERE payload->>'opportunityId' = ${o}`);
-      await step_('cards', () => sqlBypass`DELETE FROM tenant_opportunity_cards WHERE opportunity_id = ${o}::uuid`);
-      await step_('bridge', () => sqlBypass`DELETE FROM opportunity_bridge WHERE opportunity_id = ${o}::uuid`);
-      await step_('scout findings', () => sqlBypass`DELETE FROM scout_findings WHERE match_opportunity_id = ${o}::uuid`);
-      // stageIntake creates the SOLICITATION as well as the opportunity, and it holds the FK.
-      await step_('curated solicitation', () => sqlBypass`DELETE FROM curated_solicitations WHERE opportunity_id = ${o}::uuid`);
-      await step_('opportunity', () => sqlBypass`DELETE FROM opportunities WHERE id = ${o}::uuid`);
+      oppSteps.push(
+        async () => (await sqlBypass`DELETE FROM process_instance_transitions WHERE instance_id IN (
+          SELECT id FROM process_instances WHERE trigger_event_id IN (
+            SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o}))`).count,
+        async () => (await sqlBypass`DELETE FROM process_instances WHERE trigger_event_id IN (
+          SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o})`).count,
+        async () => (await sqlBypass`DELETE FROM tasks WHERE entity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM system_events WHERE payload->>'opportunityId' = ${o}`).count,
+        async () => (await sqlBypass`DELETE FROM tenant_opportunity_cards WHERE opportunity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM opportunity_bridge WHERE opportunity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM opportunity_lifecycle_actions WHERE opportunity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM scout_findings WHERE match_opportunity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM curated_solicitations WHERE opportunity_id = ${o}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM opportunities WHERE id = ${o}::uuid`).count,
+      );
     }
+    for (const so of made.sols) {
+      oppSteps.push(
+        async () => (await sqlBypass`DELETE FROM solicitation_documents WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM solicitation_compliance WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM solicitation_volumes WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM solicitation_outlines WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM curation_notes WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM curation_revisions WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM opportunities WHERE solicitation_id = ${so}::uuid`).count,
+        async () => (await sqlBypass`DELETE FROM curated_solicitations WHERE id = ${so}::uuid`).count,
+      );
+    }
+    if (oppSteps.length) {
+      await step_('ingest + intake rows', async () => {
+        const { stuck } = await deleteUntilStable(oppSteps);
+        if (stuck.length) throw new Error(`${stuck.length} step(s) never converged`);
+      }, 1);
+    }
+
     for (const b of made.buckets) {
       await step_('bucket scores', () => sqlBypass`DELETE FROM tenant_bucket_scores WHERE bucket_id = ${b}::uuid`);
       await step_('bucket', () => sqlBypass`DELETE FROM tenant_spotlight_buckets WHERE id = ${b}::uuid`);
