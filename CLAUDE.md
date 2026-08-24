@@ -250,6 +250,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - EVERY error response MUST include both `error` and `code` fields
 - EVERY `await sql` call MUST be inside try/catch
 - Portal routes MUST verify tenant access — never query by ID alone
+- **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
+  the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
+  the 251 scripts and whether it still drives identifiers that exist. 27 are the branch suite, 4 the
+  lenses, 2 the cross-checks, 7 the canvas rulers; **41 cannot run** (unreferenced + rotted) and
+  **12 are documented-but-rotted** — a doc points at them and they will fail confusingly. Nothing is
+  marked deprecated there: that is a decision, and the doc collects candidates rather than making it.
 - Before writing SQL, verify against **docs/SCHEMA_MAP.md** (generated from the live DB — columns,
   value vocabularies, and which direction of each FK is actually populated). Check your file with
   `node scripts/schema-check.mjs <file>` before running it. CLAUDE_CLIFFNOTES §1 is SUPERSEDED —
