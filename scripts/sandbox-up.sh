@@ -111,13 +111,36 @@ fi
 # Runs as the OWNER role: the workflow engine's instances are platform-scope (tenant_id IS NULL) and
 # the tenant policies are tenant-equality, so under govtech_app it cannot claim its own instance.
 # rfp_agent is still deploy-gated (docs/RLS_CUTOVER.md:6).
-if pgrep -f "python3 src/main.py" >/dev/null 2>&1; then
-  say "worker      already up"
+# MATCH THE WORKER BY WHAT IT IS, NOT BY HOW IT WAS SPELLED.
+#
+# This guard used to be `pgrep -f "python3 src/main.py"`, which is one of two spellings that start
+# the same program: `python3 -m main` from pipeline/src is the other, and it does not match. So a
+# worker already running under the second spelling was invisible here, a SECOND one started
+# alongside it, and both polled agent_task_queue against the same database.
+#
+# That is worse than a wasted process. The two are different CHECKOUT MOMENTS: a long-lived worker
+# keeps whatever code it imported at start. One that had been up for an hour kept invoking agents
+# through the pre-fix Anthropic call and writing `AsyncMessages.create() got an unexpected keyword
+# argument 'temperature'` into system_events, while the freshly restarted one succeeded. A drive
+# reading "the latest invocation" then saw whichever worker answered last — so the same drive
+# passed run-to-run at random, and the fix looked unreliable when it was not.
+#
+# `pgrep -af` over both spellings is the whole fix. Kept as a function so the start and the
+# post-start confirmation ask the identical question — two different patterns is how this started.
+worker_pids() {
+  pgrep -af "main" 2>/dev/null | awk '$2 ~ /python3?$/ && $0 ~ /(src\/main\.py|-m +main)/ {print $1}'
+}
+_existing="$(worker_pids | tr '\n' ' ')"
+if [ -n "${_existing// /}" ]; then
+  say "worker      already up (pid${_existing% })"
+  # More than one is the condition described above; say so rather than leave it to a confusing
+  # drive result later.
+  [ "$(worker_pids | wc -l)" -gt 1 ] && say "worker      ⚠ MORE THAN ONE worker is running (${_existing% }) — they may hold different code; kill all but one"
 else
   ( cd "$ROOT/pipeline" && DATABASE_URL="$DATABASE_URL_OWNER" PYTHONPATH=src \
       nohup python3 src/main.py > "$GOVWIN_RUN_DIR/worker.log" 2>&1 & )
   sleep 3
-  pgrep -f "python3 src/main.py" >/dev/null 2>&1 && say "worker      started" || say "worker      FAILED"
+  [ -n "$(worker_pids)" ] && say "worker      started" || say "worker      FAILED"
 fi
 
 # ── Stale build ─────────────────────────────────────────────────────────────
