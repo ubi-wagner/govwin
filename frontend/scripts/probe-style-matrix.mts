@@ -228,13 +228,25 @@ function docFor(style: NodeStyle, format: 'letter' | 'slide' | 'sheet'): CanvasD
 async function zipText(buf: Buffer): Promise<string> {
   try {
     const zip = await JSZip.loadAsync(buf);
-    const parts = await Promise.all(
-      Object.keys(zip.files)
-        .filter((f) => /\.(xml|rels)$/.test(f))
-        .filter((f) => !f.startsWith('docProps/'))   // metadata, and where the clock lives
-        .sort()                                       // zip order is not guaranteed stable
-        .map((f) => zip.files[f].async('string')));
-    return parts.join('\n').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z?/g, 'TIMESTAMP');
+    const names = Object.keys(zip.files)
+      .filter((f) => !f.startsWith('docProps/'))     // metadata, and where the clock lives
+      .sort();                                       // zip order is not guaranteed stable
+
+    const xml = await Promise.all(
+      names.filter((f) => /\.(xml|rels)$/.test(f)).map((f) => zip.files[f].async('string')));
+
+    // MEDIA COUNTS TOO. Some writers express a style by DRAWING it: a shape placed in a worksheet
+    // is rasterised, so its fill and border live in the pixels of xl/media/image1.png and nowhere
+    // in the XML. Reading only markup, the probe saw no difference and reported `shape fill → xlsx`
+    // as ignored — against a writer that applies it correctly. Verified by comparing the media
+    // parts directly: the raster DOES change when the fill is set.
+    //
+    // Included as base64 rather than decoded: this is a difference test, and identity of bytes is
+    // the whole question.
+    const media = await Promise.all(
+      names.filter((f) => /media\/.+\.\w+$/.test(f)).map((f) => zip.files[f].async('base64')));
+
+    return [...xml, ...media].join('\n').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z?/g, 'TIMESTAMP');
   } catch { return ''; }
 }
 
