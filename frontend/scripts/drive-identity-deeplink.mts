@@ -26,7 +26,7 @@
 import type { Page } from 'playwright';
 import { sqlBypass as sql } from '@/lib/db';
 import { runScenario } from './lib/scenario.mts';
-import { BASE, buildCrossCompany, launch, signIn, session } from './lib/cross-company.mts';
+import { BASE, buildCrossCompany, launch, newDriveContext, signIn, session, settledSession, waitForLanding } from './lib/cross-company.mts';
 
 await runScenario('identity-deeplink', async (s) => {
   let ok = true;
@@ -55,25 +55,56 @@ await runScenario('identity-deeplink', async (s) => {
       await page.fill('#email', email);
       await page.fill('#password', password);
       await page.click('button[type="submit"]');
-      await page.waitForTimeout(2600);
+      // Wait for the login to LAND, not for a guessed number of milliseconds and not merely for the
+      // URL to stop being /login — `/portal` is a dispatcher and reading it as a destination is what
+      // made this drive report six failures it never observed. See `waitForLanding`.
+      await waitForLanding(page);
+      await settledSession(page.context());
     };
     // BY NAME, NOT SLUG. The company selector renders the DISPLAY name ("Scenario host 1a2b3c4d");
     // matching on the slug ("scenario-host-1a2b3c4d") finds no form, the click never happens, and
     // the session stays on whatever the page defaulted to — which then fails four downstream
     // assertions for a reason that has nothing to do with deep links.
-    const pick = async (page: Page, name: string) => {
+    //
+    // AND VERIFY THE POSTCONDITION. A click is an action, not an outcome. Each company on that page
+    // is its own `<form action={selectCompanyAction}>` — a React server action — and a click that
+    // lands before the form is wired leaves the person exactly where they were. Returning `true`
+    // for "I clicked something" is what let this drive assert "picked the host company" while the
+    // session was still sitting, unpinned, at their own company; every case after it then measured
+    // the wrong session. So the pick is only a pick once the SESSION says so, and if the first
+    // click did not take we click once more and say out loud that it was needed — because a
+    // selector that ignores the first click is a product problem, not a harness inconvenience.
+    const pick = async (page: Page, name: string, slug: string) => {
       const btn = page.locator(`form:has-text("${name}") button[type="submit"]`).first();
-      if (await btn.count() === 0) return false;
-      await btn.click();
-      await page.waitForTimeout(2600);
-      return true;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (await btn.count() === 0) return false;
+        await btn.click();
+        await waitForLanding(page);
+        // THE POSTCONDITION IS "PINNED THERE", not "the session mentions that slug". An unpinned
+        // session already carries the person's HOME slug, so `tenantSlug === slug` is satisfied
+        // before `pickHome` clicks anything — the check passes, the pick never happens, and CASE 4
+        // then measures an unpinned session. Picking a company IS pinning it; assert that.
+        const took = (x: Record<string, unknown>) => x.tenantSlug === slug && x.membershipPinned === true;
+        const after = await settledSession(page.context(), took, 6, 700);
+        if (took(after)) {
+          if (attempt > 1) console.error(`  ⚠ picking "${name}" needed ${attempt} clicks to take`);
+          return true;
+        }
+        console.error(`  ⚠ click ${attempt} on "${name}" did not take — at `
+          + `${page.url().replace(BASE, '')}, session tenant=${after.tenantSlug} `
+          + `pinned=${after.membershipPinned}`);
+        if (!page.url().includes('/select-company')) {
+          await page.goto(`${BASE}/select-company`, { waitUntil: 'domcontentloaded' });
+        }
+      }
+      return false;
     };
-    const pickHost = (page: Page) => pick(page, xc.host.name);
-    const pickHome = (page: Page) => pick(page, xc.home.name);
+    const pickHost = (page: Page) => pick(page, xc.host.name, xc.host.slug);
+    const pickHome = (page: Page) => pick(page, xc.home.name, xc.home.slug);
 
     // ── CASE 1 · pinned here, deep-linked there → the switch gate ──────────────────────────────
     console.log('\n== CASE 1: pinned to the host, deep link to their home ==');
-    let bc = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    let bc = await newDriveContext(browser);
     let page = await bc.newPage();
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await loginHere(page, xc.multiEmail, xc.multiPassword);
@@ -102,7 +133,7 @@ await runScenario('identity-deeplink', async (s) => {
       A('  → and says so on the login page',
         await page.locator('text=/signed out/i').count() > 0);
       await loginHere(page, xc.multiEmail, xc.multiPassword);
-      sess = await session(bc);
+      sess = await settledSession(bc, (x) => x.tenantSlug === xc.home.slug);
       A('  → re-login lands PINNED to the target company',
         sess.membershipPinned === true && sess.tenantSlug === xc.home.slug,
         `tenant=${sess.tenantSlug} pinned=${sess.membershipPinned}`);
@@ -115,14 +146,14 @@ await runScenario('identity-deeplink', async (s) => {
 
     // ── CASE 2 · an unauthenticated deep link keeps its target through login ───────────────────
     console.log('\n== CASE 2: unauthenticated deep link to the non-home company ==');
-    bc = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    bc = await newDriveContext(browser);
     page = await bc.newPage();
     await page.goto(`${BASE}/go?tenant=${xc.host.slug}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1400);
     A('an unauthenticated deep link sends them to login', page.url().includes('/login'),
       page.url().replace(BASE, ''));
     await loginHere(page, xc.multiEmail, xc.multiPassword);
-    sess = await session(bc);
+    sess = await settledSession(bc, (x) => x.tenantSlug === xc.host.slug);
     A('  → and login honours the TARGET, not their own company',
       sess.tenantSlug === xc.host.slug, `tenant=${sess.tenantSlug}`);
     A('  → pinned there, in the role they hold there',
@@ -145,7 +176,7 @@ await runScenario('identity-deeplink', async (s) => {
 
     // ── CASE 4 · a dead link acknowledges itself instead of breaking ───────────────────────────
     console.log('\n== CASE 4: a link to an already-completed task ==');
-    bc = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    bc = await newDriveContext(browser);
     page = await bc.newPage();
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await loginHere(page, xc.multiEmail, xc.multiPassword);
@@ -158,7 +189,7 @@ await runScenario('identity-deeplink', async (s) => {
     // silently not achieved it. Pinning through the picker is both faithful and unambiguous, and
     // it leaves /api/enter's own semantics to CASE 5, which is where they belong.
     await pickHome(page);
-    const pinnedHome = await session(bc);
+    const pinnedHome = await settledSession(bc, (x) => x.tenantSlug === xc.home.slug);
     A('pinned to the company the task belongs to',
       pinnedHome.membershipPinned === true && pinnedHome.tenantSlug === xc.home.slug,
       `tenant=${pinnedHome.tenantSlug} pinned=${pinnedHome.membershipPinned}`);
@@ -172,7 +203,7 @@ await runScenario('identity-deeplink', async (s) => {
     // ── CASE 5 · /api/enter cannot silently re-pin ─────────────────────────────────────────────
     console.log('\n== CASE 5: /api/enter hit directly while pinned elsewhere ==');
     await bc.close();
-    bc = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    bc = await newDriveContext(browser);
     page = await bc.newPage();
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await loginHere(page, xc.multiEmail, xc.multiPassword);
@@ -181,7 +212,7 @@ await runScenario('identity-deeplink', async (s) => {
     await page.waitForTimeout(1800);
     A('/api/enter to a different company hands off to the switch gate',
       await page.locator('text=/Switching companies/i').count() > 0, page.url().replace(BASE, ''));
-    sess = await session(bc);
+    sess = await settledSession(bc, (x) => !!x.tenantSlug);
     A('  → the session is STILL pinned where it was — no silent re-pin',
       sess.tenantSlug === xc.host.slug && sess.membershipPinned === true, `tenant=${sess.tenantSlug}`);
     await bc.close();

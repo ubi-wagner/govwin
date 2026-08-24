@@ -24,7 +24,7 @@
  */
 import type { Page } from 'playwright';
 import { runScenario } from './lib/scenario.mts';
-import { BASE, buildCrossCompany, launch, signIn, session } from './lib/cross-company.mts';
+import { BASE, buildCrossCompany, launch, newDriveContext, signIn, session, settledSession, waitForLanding } from './lib/cross-company.mts';
 
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
 
@@ -43,17 +43,17 @@ await runScenario('pin', async (s) => {
     //
     // Signed in WITHOUT the shared helper's "must not still be on /login" check, because landing on
     // /select-company is the expected outcome here and the helper would be happy either way.
-    const bc = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const bc = await newDriveContext(browser);
     const page: Page = await bc.newPage();
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('#email', xc.multiEmail);
     await page.fill('#password', xc.multiPassword);
     await page.click('button[type="submit"]');
-    await page.waitForTimeout(2800);
+    await waitForLanding(page);
     A('two memberships + not pinned → login lands on the company selector',
       page.url().includes('/select-company'), page.url().replace(BASE, ''));
 
-    const pre = await session(bc);
+    const pre = await settledSession(bc);
     A('  → and the session is NOT yet pinned', pre.membershipPinned !== true, `pinned=${pre.membershipPinned}`);
 
     // ── 2 · pick the HOST company, where they are only a collaborator ───────────────────────────
@@ -65,8 +65,12 @@ await runScenario('pin', async (s) => {
       A('the selector offers the host company', false, 'no form matched the host company');
     } else {
       await hostBtn.click();
-      await page.waitForTimeout(2800);
-      const post = await session(bc);
+      await waitForLanding(page);
+      // Wait for the pick to have TAKEN — pinned, at the host — not merely for the slug to appear.
+      // Picking a company IS pinning it, and waiting on the weaker condition reintroduces the race
+      // that made `identity-deeplink` assert against a session the click had not yet rewritten.
+      const post = await settledSession(bc,
+        (x) => x.tenantSlug === xc.host.slug && x.membershipPinned === true);
       A('picking the host company rewrites the ACTIVE ROLE to the collaborator role',
         post.role === 'partner_user', `role=${post.role}`);
       A('  → and the active tenant to the host', post.tenantSlug === xc.host.slug, `tenant=${post.tenantSlug}`);
@@ -94,7 +98,7 @@ await runScenario('pin', async (s) => {
     const soloPage = solo.pages()[0];
     A('one membership skips the selector entirely',
       !soloPage.url().includes('/select-company'), soloPage.url().replace(BASE, ''));
-    const soloSess = await session(solo);
+    const soloSess = await settledSession(solo, (x) => !!x.tenantSlug);
     A('  → landing in its own company', soloSess.tenantSlug === xc.host.slug, `tenant=${soloSess.tenantSlug}`);
     A('  → keeping its own role', soloSess.role === 'tenant_user', `role=${soloSess.role}`);
     await solo.close();

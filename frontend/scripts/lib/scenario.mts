@@ -45,7 +45,7 @@
  *   }
  */
 import { randomUUID } from 'crypto';
-import { sqlBypass as sql } from '@/lib/db';
+import { sqlBypass as sql, sql as scopedSql } from '@/lib/db';
 import { createTenantWithAdmin } from '@/lib/tenants/create-tenant';
 import { createPartnerOrg } from '@/lib/partner/create-partner-org';
 import { createPortal } from '@/lib/portal-launch';
@@ -249,7 +249,40 @@ export interface Scenario {
   dispose(): Promise<void>;
 }
 
+/**
+ * BUILDING A SCENARIO IS A PLATFORM-PLANE ACT, so the process doing it needs the owner connection.
+ *
+ * The factory calls the product's own helpers — `createTenantWithAdmin`, `createPortal`,
+ * `provisionProposalForPortal` — and those use the CONTEXT-AWARE `sql`, bound to `DATABASE_URL`.
+ * Point that at the NOBYPASSRLS app role with no tenant context and the writes are half-applied:
+ * the tenant appears, the membership does not, and the drive above then fails on assertions about
+ * sessions and roles that look for all the world like product bugs. Two session drives did exactly
+ * that — green under the owner, seven and nine failures under the app role.
+ *
+ * This is B86's lesson pointed the other way. The PRODUCT under test stays on the scoped role (the
+ * server has its own connection, and that is what the drives exercise over HTTP). The HARNESS
+ * building the fixture needs the owner, which is precisely the documented bootstrap case.
+ *
+ * Checked once, up front, so the failure is one clear line instead of a scatter of confusing
+ * assertion failures further down.
+ */
+async function requireOwnerConnection(): Promise<void> {
+  const [me] = await scopedSql<{ who: string; rolsuper: boolean; rolbypassrls: boolean }[]>`
+    SELECT current_user AS who, r.rolsuper, r.rolbypassrls
+    FROM pg_roles r WHERE r.rolname = current_user`;
+  if (!me || (!me.rolsuper && !me.rolbypassrls)) {
+    throw new CannotRun(
+      `DATABASE_URL points at '${me?.who ?? 'an unknown role'}', which cannot bypass RLS. The `
+      + 'scenario factory CREATES tenants, which is a platform-plane act — under a scoped role its '
+      + 'setup writes are half-applied (tenant yes, membership no) and every assertion above it '
+      + 'fails for a reason that has nothing to do with the product. Run scenario drives with '
+      + 'DATABASE_URL=<owner>; the product under test still runs on the scoped role, because that '
+      + 'is the server\'s own connection.');
+  }
+}
+
 export async function scenario(name: string): Promise<Scenario> {
+  await requireOwnerConnection();
   const tag = randomUUID().slice(0, 8);
   const traces: Trace[] = [];
   let cachedAdmin: { id: string; email: string; role: string } | null = null;

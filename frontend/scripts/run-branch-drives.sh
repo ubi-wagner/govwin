@@ -110,6 +110,24 @@ echo
 # Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
 ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collaborator-boundary"
 
+# ── TWO ROLES, BECAUSE THE SUITE GENUINELY NEEDS BOTH ────────────────────────────────────────────
+#
+# This is not a preference, it is a conflict of requirements that only became visible once the
+# scenario drives existed:
+#
+#   ISOLATION drives must run with DATABASE_URL = the SCOPED app role. That is the whole point —
+#   under the owner, RLS is bypassed and "no cross-tenant rows visible" is unfalsifiable (B86).
+#
+#   SCENARIO drives must run with DATABASE_URL = the OWNER. They CREATE tenants through the
+#   product's own helpers, and those helpers use the context-aware `sql`; under a scoped role with
+#   no tenant context the writes are half-applied — tenant yes, membership no — and the drive then
+#   fails on session assertions that have nothing to do with the product.
+#
+# Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
+# connection its job requires, and the scenario factory refuses loudly if it is ever handed the
+# wrong one rather than half-working.
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix"
+
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
   "award-to-contract|scripts/drive-award-to-contract.mjs"
@@ -178,10 +196,13 @@ for entry in "${DRIVES[@]}"; do
   fi
 
   log="$OUT/$label.log"
+  # Hand this drive the connection its job needs (see SCENARIO_DRIVES above).
+  drive_db="$DATABASE_URL"
+  if [[ " $SCENARIO_DRIVES " == *" $label "* ]]; then drive_db="$DATABASE_URL_OWNER"; fi
   if [[ "$script" == *.mts ]]; then
-    timeout 900 node --import tsx "$script" $drive_args > "$log" 2>&1
+    DATABASE_URL="$drive_db" timeout 900 node --import tsx "$script" $drive_args > "$log" 2>&1
   else
-    timeout 900 node "$script" $drive_args > "$log" 2>&1
+    DATABASE_URL="$drive_db" timeout 900 node "$script" $drive_args > "$log" 2>&1
   fi
   code=$?
 

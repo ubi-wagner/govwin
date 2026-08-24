@@ -56,9 +56,18 @@ const [target] = process.argv[2]
       ORDER BY p.created_at LIMIT 1`;
 
 if (!target) {
-  console.log('No eligible proposal (submitted · has opportunity_id · no contract yet).');
+  // EXIT 2, NOT 0 — this measured NOTHING.
+  //
+  // Exiting 0 here reported a clean pass for a run that never recorded a win, never looked for a
+  // contract, and never touched the awarded path at all. In the suite table it was indistinguishable
+  // from a real pass, and the whole point of that table's CANT-RUN column is to keep those apart:
+  // uncovered is not passing. The suite reads exit 2 as CANNOT-RUN and prints the reason below.
+  console.error('CANNOT RUN');
+  console.error(`  no eligible proposal at "${SLUG}" — the awarded path needs one that is`);
+  console.error('  submitted, carries an opportunity_id, and has no contract yet. Provision and');
+  console.error('  submit a build (or pass a proposal id as argv[2]) and re-run.');
   await sql.end();
-  process.exit(0);
+  process.exit(2);
 }
 console.log(`\n── recording a WIN on "${target.title.slice(0, 46)}" ──\n`);
 
