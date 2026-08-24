@@ -828,6 +828,32 @@ function cplFor(textOrUpper: string | number, widthPt: number, fs: number): numb
   return Math.max(1, Math.floor(widthPt / (fs * adv)));
 }
 
+/**
+ * How many lines `text` wraps to at `fs` pt across `widthPt`, honouring explicit newlines.
+ *
+ * Exported so the DECK writer can ask the same question the page ruler asks. It could not before,
+ * and the consequence was not cosmetic: the .pptx writer estimated a table at `rows × 0.36in` and a
+ * list at `items × 0.42in`, both of which assume every row and every bullet is exactly one line. A
+ * cell that wrapped was taller than the writer believed, so the frame it declared was too short —
+ * and PowerPoint does not spill a table onto the next slide, it CLIPS. A three-row risk register
+ * lost its third row and half of its second on the way out, with no warning anywhere.
+ *
+ * That is an UNDER-count, the one direction this ruler is not allowed to err in (see glyphAdvance).
+ * On a page an under-count clears a volume that is over its limit; on a slide it deletes content
+ * from the file the agency receives.
+ *
+ * One ruler, one answer — a second wrapping model in the deck writer would be free to disagree with
+ * the editor gauge and the export gate, which is the cost B112 records.
+ */
+export function wrappedLines(text: string, widthPt: number, fs: number): number {
+  if (!text) return 1;
+  let lines = 0;
+  for (const para of String(text).split('\n')) {
+    lines += para.length ? Math.ceil(para.length / cplFor(para, widthPt, fs)) : 1;
+  }
+  return Math.max(1, lines);
+}
+
 /** One rendered contents-list entry: its indent level and the length of its label. */
 interface TocRow { level: number; len: number; upper: number }
 

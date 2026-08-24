@@ -40,7 +40,7 @@ import type {
 } from '@/lib/types/canvas-document';
 import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, resolveImageDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
-import { docNodes, sectionsToNodes, nodesHeightPt } from '@/lib/types/canvas-document';
+import { docNodes, sectionsToNodes, nodesHeightPt, wrappedLines } from '@/lib/types/canvas-document';
 
 // ─── Layout constants (inches) ────────────────────────────────────────
 const SLIDE_LAYOUTS: Record<string, { w: number; h: number }> = {
@@ -365,6 +365,23 @@ function cellBg(cell: string | CanvasTableCell): string | undefined {
   return typeof cell === 'string' ? undefined : hex(cell.style?.bg) ?? undefined;
 }
 
+/**
+ * Lines a run of `text` wraps to inside a box `wIn` inches wide at `fs` pt.
+ *
+ * Replaces four hardcoded divisors — `length / 95`, `/ 60`, `/ 60`, `/ 65` — each of which was a
+ * characters-per-line guess for one assumed width at one assumed font size. Set a node to 20pt or
+ * put it in a narrow column and every one of them under-counted, which on a slide means the next
+ * node is drawn over this one.
+ */
+function linesIn(text: string, wIn: number, fs: number, insetIn = 0.16): number {
+  return wrappedLines(text, Math.max(24, (wIn - insetIn) * 72), fs);
+}
+
+/** Height of one line box at `fs` pt, in inches — leans long, as the ruler is required to. */
+function lineIn(fs: number): number {
+  return (fs * 1.25) / 72;
+}
+
 /** Add a body node; returns estimated vertical inches consumed. */
 function addNodeToSlide(
   slide: PptxGenJS.Slide,
@@ -393,8 +410,8 @@ function addNodeToSlide(
     case 'text_block': {
       const c = node.content as TextBlockContent;
       if (!c.text) return 0.1;
-      const lineCount = Math.ceil(sub(c.text).length / 95);
-      const h = Math.min(Math.max(0.35, lineCount * 0.28), maxH);
+      const lineCount = linesIn(sub(c.text), w, fontSize, 0);
+      const h = Math.min(Math.max(0.35, lineCount * lineIn(fontSize)), maxH);
       const formats = c.inline_formats ?? [];
       if (formats.length === 0) {
         slide.addText(sub(c.text), { x, y, w, h, ...runStyle(node.style, font, fontSize, INK), valign: 'top', wrap: true });
@@ -434,7 +451,14 @@ function addNodeToSlide(
           paraSpaceAfter: 8, breakLine: true,
         },
       }));
-      const h = Math.min(Math.max(0.4, c.items.length * 0.42), maxH);
+      // Same under-count as the table: `items * 0.42` is a one-line bullet. A wrapping bullet
+      // overran the box and the node after it was drawn on top — on the repro slide the third
+      // bullet vanished entirely. Measured per item, with the bullet indent taken off the width.
+      const bulletWpt = (w - 0.3) * 72;
+      const lineIn = (fontSize * 1.22) / 72;
+      const lines = c.items.reduce(
+        (n, item) => n + wrappedLines(sub(item.text), bulletWpt - (item.indent_level ?? 0) * 18, fontSize), 0);
+      const h = Math.min(Math.max(0.4, lines * lineIn + c.items.length * 0.11), maxH);
       slide.addText(items, { x, y, w, h, valign: 'top', lineSpacingMultiple: 1.05 });
       return h + 0.12;
     }
@@ -451,9 +475,39 @@ function addNodeToSlide(
         })),
       );
       const colCount = c.headers.length || (c.rows[0]?.length ?? 1);
-      const rowCount = 1 + c.rows.length;
-      const h = Math.min(Math.max(0.5, rowCount * 0.36), maxH);
-      slide.addTable([headerRow, ...dataRows], { x, y, w, h, colW: w / colCount, fontSize: Math.max(10, fontSize - 4), fontFace: font, valign: 'middle' });
+      const cellFs = Math.max(10, fontSize - 4);
+
+      // ── MEASURE THE ROWS. DO NOT ASSUME THEY ARE ONE LINE EACH. ──
+      //
+      // This was `rowCount * 0.36`, and the 0.36 is a single-line row. A cell that wraps is taller
+      // than that, so the frame came out short — and PowerPoint does not spill a table onto the
+      // next slide, it CLIPS at the frame. A three-row risk register exported with its third row
+      // missing and its second cut mid-word, and the callout beneath it was drawn over the gap.
+      // Nothing caught it: the row text is all present in the XML, so a byte-level or vocabulary
+      // check sees a complete table. It is only absent from the RENDERED page.
+      //
+      // Each row is as tall as its tallest cell. Width per column is the frame width shared out,
+      // less the cell insets pptxgenjs applies, converted to points because that is what the ruler
+      // speaks. `wrappedLines` is the page ruler's own model, so a deck and a document cannot
+      // disagree about how tall the same paragraph is.
+      const CELL_PAD_IN = 0.14;                     // pptxgenjs cell insets, top+bottom
+      const colWpt = ((w / colCount) - 0.16) * 72;  // less left+right inset
+      const lineIn = (cellFs * 1.22) / 72;          // a line box at this size
+      const rowHeight = (cells: Array<string | CanvasTableCell>): number => {
+        const lines = Math.max(1, ...cells.map((cell) => wrappedLines(sub(cellText(cell)), colWpt, cellFs)));
+        return Math.max(0.36, lines * lineIn + CELL_PAD_IN);
+      };
+      const rowH = [rowHeight(c.headers), ...c.rows.map(rowHeight)];
+      const natural = rowH.reduce((a, b) => a + b, 0);
+
+      // Declaring the per-row heights is what makes the frame honest: the renderer no longer has to
+      // grow rows past a total it was never told about. If the table genuinely does not fit the
+      // slide it is still capped at maxH — that is the author's overflow to resolve, and it is
+      // reported by the advisory rather than silently swallowed here.
+      const h = Math.min(natural, maxH);
+      slide.addTable([headerRow, ...dataRows], {
+        x, y, w, h, colW: w / colCount, rowH, fontSize: cellFs, fontFace: font, valign: 'middle',
+      });
       return h + 0.2;
     }
     case 'image': {
@@ -528,8 +582,8 @@ function addNodeToSlide(
     }
     case 'text_box': {
       const c = node.content as TextBoxContent;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60));
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * 0.3 + 0.15), maxH), maxH);
+      const lines = linesIn(sub(c.text), w, fontSize);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * lineIn(fontSize) + 0.15), maxH), maxH);
       slide.addText(sub(c.text), {
         x: b.x, y: b.y, w: b.w, h: b.h,
         ...runStyle(node.style, font, fontSize, INK),
@@ -543,8 +597,8 @@ function addNodeToSlide(
     case 'callout': {
       const c = node.content as CalloutContent;
       const pal = CALLOUT_COLORS[c.variant] ?? CALLOUT_COLORS.note;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60)) + (c.title ? 1 : 0);
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.6, lines * 0.3 + 0.2), maxH), maxH);
+      const lines = linesIn(sub(c.text), w, fontSize, 0.24) + (c.title ? 1 : 0);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.6, lines * lineIn(fontSize) + 0.2), maxH), maxH);
       slide.addText([
         ...(c.title ? [{ text: sub(c.title), options: { bold: true, color: pal.fg, fontFace: font, fontSize, breakLine: true } }] : []),
         { text: sub(c.text), options: { color: INK, fontFace: font, fontSize } },
@@ -568,8 +622,8 @@ function addNodeToSlide(
     }
     case 'blockquote': {
       const c = node.content as BlockquoteContent;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 65));
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.5, lines * 0.32 + 0.2), maxH), maxH);
+      const lines = linesIn(sub(c.text), w - 0.26, fontSize);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.5, lines * lineIn(fontSize) + 0.2), maxH), maxH);
       slide.addShape('rect', { x: b.x, y: b.y, w: 0.06, h: b.h, fill: { color: accent }, line: { type: 'none' } });
       slide.addText([
         { text: sub(c.text), options: { italic: true, color: INK, fontFace: font, fontSize, breakLine: true } },

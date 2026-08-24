@@ -45,6 +45,8 @@ export interface CapturedPage {
   png: Buffer;
   width: number;
   height: number;
+  /** Text extracted from the page's text layer — what a reader can actually read off it. */
+  text: string;
 }
 
 /** One figure lifted off a page, with where it sat. `bbox` is in rendered page pixels. */
@@ -133,12 +135,22 @@ async function render(scale, pages) {
       }
     } catch { /* an operator walk that fails costs us the boxes, never the page */ }
 
+    // The WORDS on the page, as the reader sees them. Distinct from anything readable out of the
+    // source file: a .pptx contains every row of a table it clipped, so only the rendered text can
+    // answer "did this reach the customer".
+    let text = '';
+    try {
+      const tc = await page.getTextContent();
+      text = tc.items.map((i) => (i && typeof i.str === 'string' ? i.str : '')).join(' ');
+    } catch { /* no text layer is a fact about the page, not a failure of the render */ }
+
     out.push({
       pageNumber: n,
       width: canvas.width,
       height: canvas.height,
       png: canvas.toDataURL('image/png'),
       boxes,
+      text,
     });
   }
   return out;
@@ -192,7 +204,7 @@ async function launchBrowser() {
 }
 
 interface RawPage {
-  pageNumber: number; width: number; height: number; png: string;
+  pageNumber: number; width: number; height: number; png: string; text?: string;
   boxes: Array<{ x: number; y: number; w: number; h: number }>;
 }
 
@@ -240,6 +252,7 @@ export async function capturePdfPages(pdf: Buffer, opts: CaptureOptions = {}): P
   const raw = await renderPages(pdf, opts);
   return raw.map((r) => ({
     pageNumber: r.pageNumber, width: r.width, height: r.height, png: fromDataUrl(r.png),
+    text: r.text ?? '',
   }));
 }
 
@@ -295,7 +308,8 @@ export async function extractPdfFigures(pdf: Buffer, opts: FigureOptions = {}): 
       if (frac < minFrac || frac > maxFrac) continue;
       try {
         const png = await sharp(pagePng).extract({ left: x, top: y, width: w, height: h }).png().toBuffer();
-        out.push({ pageNumber: r.pageNumber, png, width: w, height: h, bbox: { x, y, w, h }, pageFraction: frac });
+        // A cropped figure carries the page's text, not its own — a raster has none to give.
+        out.push({ pageNumber: r.pageNumber, png, width: w, height: h, text: r.text ?? '', bbox: { x, y, w, h }, pageFraction: frac });
       } catch (e) {
         console.error('[pdf/page-capture] crop failed:', e instanceof Error ? e.message : e);
       }
