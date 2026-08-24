@@ -51,6 +51,22 @@ export AUTH_TRUST_HOST="true"
 export NEXTAUTH_URL="http://localhost:3000"
 export AUTH_URL="http://localhost:3000"
 
+# WHERE THE APP IS — stated ONCE, because it was stated twice and the two disagreed.
+#
+# The four lenses (verify-surfaces / -api-contract / -db-crud / -ui-vs-db) each defaulted to
+# http://localhost:3001, while every other harness — scripts/lib/cross-company.mts,
+# capture-guides.mjs — and NEXTAUTH_URL/AUTH_URL above all say 3000, which is the port the sandbox
+# actually serves on. So on a standard box the entire four-lens backbone died on
+# `net::ERR_CONNECTION_REFUSED at http://localhost:3001/login` before it measured one surface.
+#
+# That is the worst shape a rig failure can take: the lenses are what CLAUDE.md points at for "does
+# the customer-facing surface actually render", and a connection refused at the login page looks
+# like a broken box rather than an unrunnable check. Exporting it here gives the value one
+# definition that every harness reads, instead of six defaults to keep in agreement.
+#
+# Override for a box serving elsewhere: GUIDE_BASE=http://localhost:3001 <cmd>
+export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
+
 # Emulated Claude: EMULATE=1 points the SDK at the local test harness so every AI-gated flow runs
 # end to end with no live key, mirroring the production wiring exactly (docs/AI_FLOWS_PROOF.md).
 export EMULATE="1"

@@ -28,7 +28,7 @@ import fs from 'fs';
 import path from 'path';
 import postgres from 'postgres';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
+const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const DB = process.env.GUIDE_DB || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const APP = '/home/user/govwin/frontend/app/api';

@@ -27,7 +27,7 @@ import path from 'path';
 import postgres from 'postgres';
 import { countErrorSurfaces } from './lib/error-surface.mjs';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
+const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 // MUST be the database the SERVER under test is reading. This defaulted to the retired
 // :5433/claude cluster long after the sandbox moved to :5432, so every dynamic route was addressed
