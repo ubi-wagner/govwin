@@ -145,11 +145,11 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
-  "award-to-contract|scripts/drive-award-to-contract.mjs"
+  "award-to-contract|scripts/drive-award-to-contract.mts"
   # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
   # table reported as a failing amendment flow rather than a missing argument. Resolved below.
   "amendment|scripts/drive-amendment.mjs|SOLICITATION"
