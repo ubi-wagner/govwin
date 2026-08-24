@@ -166,7 +166,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -205,6 +205,9 @@ DRIVES=(
   "spine-section-todo|scripts/drive-spine-t1-section-todo.mts"
   "spine-buildout|scripts/drive-spine-t4-buildout.mts"
   "spine-anchor|scripts/drive-spine-t7-anchor.mts"
+  # Fires the domain emitters the AI_INVOKE contract lens has never observed. Runs LAST because
+  # it deliberately leaves its audit events behind — they ARE the coverage evidence (B103).
+  "uncovered-triggers|scripts/drive-uncovered-triggers.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0

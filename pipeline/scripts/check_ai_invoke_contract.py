@@ -54,6 +54,7 @@ Exit: 0 clean, 1 at least one MISS, 2 could not run.
 """
 from __future__ import annotations
 
+"""(constant defined below the imports)"""
 import asyncio
 import json
 import logging
@@ -62,6 +63,21 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+
+
+# ── Triggers that will stay UNCOVERED on purpose, with the reason ────────────────────────────────
+#
+# This does NOT exclude them from the count — an unmeasured contract stays unmeasured, and hiding it
+# behind an allowlist is how a lens starts lying. It only prints WHY, so a permanent entry reads as
+# a decision on the record rather than as a task nobody got round to.
+LAUNCHER_ONLY = {
+    "OnCmsContentRequested":
+        "LAUNCHER-ONLY BY DESIGN. `library:content.requested` has no domain emitter: the roster "
+        "records it as 'Admin-launched via LaunchContentClient; no automatic emitter (that stays "
+        "post-V1)', and LaunchContentClient posts to /api/admin/workflows. Firing it there would "
+        "emit the operator's overlay AS the payload — the tautology this lens exists to refuse — "
+        "so it CANNOT be legitimately covered until a real emitter exists. Uncovered on purpose.",
+}
 
 async def main() -> int:
     try:
@@ -192,6 +208,8 @@ async def main() -> int:
             print(f"  {name:36s} {trig}")
             if keys:
                 print(f"      would read: {', '.join(keys)}")
+            if name in LAUNCHER_ONLY:
+                print(f"      ↳ {LAUNCHER_ONLY[name]}")
         print()
 
     return 1 if misses else 0
