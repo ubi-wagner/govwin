@@ -4,9 +4,10 @@
 **Backbone:** `tsc` 0 · `vitest` **1915** · `next build` clean · branch drives **38/38** · four lenses **4/4** ·
 full journey **33/33** · canvas measurement harnesses **6/6, zero under-counts** · bug log **121 entries, 0 open**
 
-> **This supersedes `LAUNCH_READINESS_2026-08.md`, which is dated at migration head 185 — twenty-eight
-> migrations of drift.** Its §4 punch list is still substantially correct and is carried forward below;
-> its *verdict* is not current, because three things have been found since that change the answer.
+> **This supersedes `LAUNCH_READINESS_2026-08.md`** (head 185 — twenty-eight migrations of drift) **and
+> `LAUNCH_STATUS_2026-08-24.md`** (head 211, same date, written earlier in the day). Their punch lists
+> are still substantially correct and are carried forward below; their *verdicts* are not current,
+> because three things have been found since that change the answer.
 
 ---
 
@@ -96,7 +97,7 @@ intended launch path.
 | Area | Evidence |
 |---|---|
 | **Cross-tenant isolation** | Eleven proposal-spine tables closed (migs 212/213). Posture checker rewritten: it proved ONE table and reported a database-wide verdict, and passed green with all of B113 open. Now enforces a structural rule (every tenant-owned table carries a policy — needs no fixture data) plus a partition check whose expected value is `owned + shared × N`. |
-| **The canvas, end to end** | 22/22 node types survive every writer; every styling capability reaches every format that has the concept; layering honoured in the deck exporter (PowerPoint z-order is emission order — the writer never sorted); equations typeset rather than printed as LaTeX source. |
+| **The canvas, end to end** | 22/22 node types survive every writer; every styling capability reaches every format that has the concept; layering honoured in the deck exporter (PowerPoint z-order is emission order — the writer never sorted); equations typeset rather than printed as LaTeX source. ⚠️ **Read "survive" precisely: present in the emitted file.** B121 is a case where all 22 survived and the customer still received a deck with rows missing, because the loss was at render. Presence in the bytes and visibility on the page are different claims. |
 | **The full arc** | 33/33 steps: real BAA ingest (773,877 characters extracted), the admin intake route, the public application route, admin accept provisioning a real tenant, buckets, cards, provisioning cockpit, three volume shapes, downloads measured from the files. Box unchanged after the run. |
 | **The rig itself** | A hydration gate now precedes every lens run. `verify-surfaces` once reported **80/80 clean against a box where no JavaScript executed** — it gates on client throws, and code that never runs never throws. |
 | **Decks open in a real PowerPoint engine** | NEW, and it had never been checked: every `.pptx` claim to date was XML-level. Converting one with LibreOffice Impress found **B121 — delivered decks were missing table rows and bullets the author wrote**, because six node types sized their frames without reading the text and PowerPoint clips rather than spills. Fixed against the page ruler's own wrapping model; `probe-deck-overlap.mts` measures each node against an engine that shares no code with ours. |

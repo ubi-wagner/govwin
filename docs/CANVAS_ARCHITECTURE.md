@@ -102,6 +102,22 @@ on `canvas.format` into three bespoke surfaces over the same `CanvasNode[]`:**
   one slide) · xlsx (`exceljs`, one table = one worksheet, real formulas) · pdf (Chromium). Whole-proposal
   package `?format=json|docx|pdf|zip`. Uploaded S3 images now inline to data-URIs across all four (W4.3).
 
+> **The deck writer is the one that PLACES rather than FLOWS, and that changes what a mistake costs.**
+> docx and pdf reflow, so a wrong height estimate shows up as untidy spacing. A `.pptx` gives every
+> node an absolute frame, and **PowerPoint clips rather than spilling** — so a frame that is too short
+> deletes content from the delivered file. Six node types used to size themselves without reading their
+> text (`rows × 0.36`, `items × 0.42`, `length / 95`); a wrapping cell overran its frame and a
+> three-row risk register exported with its third row absent (B121).
+>
+> Since 2026-08-24 the deck writer measures with `wrappedLines`, exported from `canvas-document.ts` —
+> **the page ruler's own character-advance model**, so a deck and a document cannot disagree about how
+> tall the same paragraph is (B112: one ruler, one answer). Tables additionally declare per-row heights
+> via `rowH`. Body content is also optically balanced where genuine slack exists, and left alone where
+> it does not, since nudging a full slide down would push content off the frame.
+>
+> **None of this is checkable from the bytes** — the row text is emitted faithfully either way. It
+> needs an engine that did not write the file: `scripts/probe-deck-overlap.mts`.
+
 ## 3. The direction — one canvas, three surfaces, ONE interaction layer
 
 **Signed off 2026-08-13.** Keep the three surfaces (they match how a person works in each modality); factor

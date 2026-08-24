@@ -46,9 +46,23 @@ system code path, not a side script.
 
 ## Gaps encountered and how they were overcome (sandbox, not the product)
 
-1. **LibreOffice cannot load any file in this sandbox** (a VCL/init failure — fails on the
-   known-good samples too). *Overcome:* the docx exporter is `docx-js` (Node, no LibreOffice), so the
-   system export is unaffected; for the cost workbook, cached values are injected into the XML
+1. ~~**LibreOffice cannot load any file in this sandbox** (a VCL/init failure).~~
+   **CORRECTED 2026-08-24 — the symptom was right, the diagnosis was wrong, and the wrong half
+   was expensive.** It is not a VCL/init failure: the image carries `libreoffice-core` and
+   `-common` with **no document filter packages at all**, so `soffice` has nothing to open any
+   format with. `apt-get install -y --no-install-recommends libreoffice-impress` (plus
+   `-writer` / `-calc`) fixes it, and our `.pptx` then converts cleanly.
+
+   Worth keeping because the reasoning went wrong at exactly one step. The control here was
+   **right** — "fails on the known-good samples too" is precisely the check that separates a
+   broken tool from a broken artifact, and it was run. What followed was a guess at the
+   mechanism, stated as fact, and it hardened into "LibreOffice will not open the .pptx this
+   product writes." That ruled out the only instrument that could see whether a delivered deck
+   matches what the author wrote — and B121 (rows and bullets missing from exported decks) sat
+   behind it undetected until the tool was actually tried again.
+
+   *Overcome (still true):* the docx exporter is `docx-js` (Node, no LibreOffice), so the system
+   export is unaffected; for the cost workbook, cached values are injected into the XML
    (`inject_values.py`) while formulas are preserved (they recompute in Excel/Sheets); page-count +
    visual verification uses **Chromium** print-to-PDF (`render-tv-preview.mjs`).
 2. **No pipeline `ANTHROPIC_API_KEY`** in the sandbox, so the autonomous `section_drafter` worker

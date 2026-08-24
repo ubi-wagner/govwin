@@ -407,7 +407,7 @@ lens it checks is decoration.
 
 These are not unit tests — each one runs the product's real writer and compares against the artifact
 that comes out. Any change to `lib/types/canvas-document.ts`, `lib/export/*`, or a template body
-should be driven through all four; each exits non-zero on drift.
+should be driven through all of them; each exits non-zero on drift.
 
 | harness | what it measures |
 |---|---|
@@ -417,6 +417,8 @@ should be driven through all four; each exits non-zero on drift.
 | `scripts/sweep-mold-quality.mts` | all 39 shipped templates: rendered pages, compliance violations, page furniture, token leaks |
 | `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
 | `scripts/verify-exports-on-stored-artifacts.mts` | the question under the ruler: does the file come out AT ALL, in every format offered for its shape |
+| `scripts/probe-deck-overlap.mts` | the question under THAT: does a slide node's declared frame actually HOLD its content, measured against an engine that shares no code with ours (B121) |
+| `scripts/render-artifact-pages.mts` | no pass/fail — renders `.pdf`/`.pptx`/`.docx`/`.xlsx` to page images so a person can look at what the customer receives |
 | `scripts/verify-surfaces.mjs` | **every** `page.tsx` under `app/admin` and `app/portal/[tenantSlug]`, driven as the right actor: does the page RENDER — no error boundary, no client throw (B78 · B79) |
 | `scripts/capture-guides.mjs` | the ~35 surfaces the two front-door guides document, captured as evidence and gated the same way |
 
@@ -425,6 +427,45 @@ against the height Chromium gives that same node in place, `--segments` does it 
 segment, `--pages` replays the ruler's own placement. Prefer it over amplifying one node type ×N —
 that method lies about anything carrying a vertical margin, because a long run of them collapses
 margins a real document does not.
+
+### The measurement gap these did not cover, and how it was found (B121)
+
+Every harness above measures OUR writer against OUR ruler, or against Chromium rendering OUR HTML.
+None of them opened an Office artifact with an Office engine. That gap hid a defect for as long as it
+existed: six slide node types sized their frames without reading their text, so a wrapping table was
+CLIPPED and a wrapping list was painted underneath the callout below it. **Delivered decks were
+missing rows and bullets the author wrote.**
+
+Every check above passed it, correctly. The row text is all present in the slide XML, so the bytes
+are complete, the vocabulary probe finds all 22 node types, the export gate reports no violations and
+the ruler counts the slides right. The loss happens at RENDER, and nothing rendered.
+
+Two rules come out of it:
+
+- *An artifact is not verified until an engine that did not write it has opened it.* `.docx` and
+  `.pdf` flow, so a bad height estimate shows up as untidy spacing; `.pptx` places absolutely and
+  PowerPoint **clips rather than spilling**, so the same class of error deletes content silently.
+- *Check that the converter works before concluding anything about the file.* This box ships
+  `libreoffice-core` with no filter packages, so `soffice` fails on **everything** — including a
+  plain `.txt`. That bare failure was once written up as "LibreOffice cannot open the .pptx this
+  product writes," which blamed the artifact for a broken tool and ruled out the only instrument
+  that could see B121. Convert a plain text file first. Install line in `CONTINUATION.md §2`.
+
+**Four instruments for one defect, three of them wrong.** Each was plausible, and each would have
+been reported as a clean result:
+
+| instrument | why it failed |
+|---|---|
+| declared geometry (`<a:off>`/`<a:ext>`) | always clean — the writer leaves a tidy gap under the frame it believes in. The frame is the lie. |
+| ink position on the rendered page | caught the table (grew past its frame), passed the list (stayed inside one). A tick on a slide that had lost a third of its content. |
+| text presence in the page's text layer | found every authored phrase *including the invisible one* — occluded text is still painted into the PDF |
+| **node height measured in isolation** | works: export the node ALONE with the whole body band free, render it, compare the ink SPAN to the declared height |
+
+The fourth was wrong on its first run too — it computed `inkBottom − BODY_TOP`, which charges the
+vertical-balance offset to the node as if it were content, and reported every node type
+under-declared including pages that were visibly perfect. And a node that paints its own fill is
+reported INDETERMINATE, never green: there the ink measures the box, so declared and realised agree
+by construction and a tick would mean nothing.
 
 **Two rules these harnesses exist to enforce**, both learned by violating them (bug log B66-B72):
 

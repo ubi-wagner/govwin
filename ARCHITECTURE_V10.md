@@ -8,7 +8,9 @@ not the current suite). Read the newest layer for current state and the older on
 how it got here. A single file-level date on a document that grows this way is the mechanism that
 produced CLAUDE_CLIFFNOTES §1's failure.
 
-**Current state — 2026-08-23 · migration head 205 · `tsc` 0 · `vitest` 1670 · `next build` exit 0.**
+**Current state — 2026-08-24 · migration head 213 · `tsc` 0 · `vitest` 1915 · `next build` exit 0.**
+(Migs 212/213 close the proposal-spine RLS gap — eleven FK-tenanted tables that carried no policy at
+all, four of them measured leaking every row to a foreign tenant context. B113.)
 
 **Layer 2026-08-23 (migs 186–205).** The ingest-provenance spine lands first — **186** gives
 `episodic_memories` PLATFORM scope (`tenant_id IS NULL`) so curation memory persists; **187–188** add

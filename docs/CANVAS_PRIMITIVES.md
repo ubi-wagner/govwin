@@ -85,3 +85,15 @@ Adding a primitive is a bounded, five-touch change — keep all formats in locks
 
 A primitive that renders in every format and survives export is "done." Anything less is a picture,
 not a primitive.
+
+> **"Survives export" means VISIBLE ON THE PAGE, not present in the file.** The two came apart in
+> B121: six node types passed every check on this list — emitted by all four writers, tested, page
+> counts correct — and were still delivered to the customer with content missing, because the deck
+> writer under-declared their frames and PowerPoint **clips rather than spilling.** Every row of the
+> clipped table is in the slide XML, so an exporter test asserting "it renders with labels/content"
+> is satisfied by a file nobody can read the content in.
+>
+> So step 4 has a corollary for anything that flows on a slide: a node must report a height measured
+> from its TEXT (use `wrappedLines` — the page ruler's own model, so surfaces cannot disagree), and
+> the check is `scripts/probe-deck-overlap.mts`, which compares that height against a render by an
+> engine that shares no code with ours. Over-declaring is untidy; **under-declaring deletes content.**

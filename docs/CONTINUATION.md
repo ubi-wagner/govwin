@@ -60,10 +60,16 @@ than their claim. Earlier context from 2026-08-23 at head **205** follows.) (mig
 > four lenses defaulted to **port 3001** while everything else serves on 3000 — `GUIDE_BASE` is now
 > exported once from `sandbox-env.sh`.
 >
-> **Current green state:** branch suite **37/37 · 0 could-not-run**, four lenses green (surfaces
-> **80 driven / 80 clean**), `tsc` 0, `vitest` 1887/1887, bug log **118 entries · 0 open · 5
-> deferred**. New drives: `deck-ruler` (the slide ruler had never measured a deck out of the
-> database — all 64 stored sections are `letter`).
+> **Current green state:** branch suite **38/38 · 0 could-not-run**, four lenses green (surfaces
+> **80 driven / 80 clean**), `tsc` 0, `vitest` 1915/1915, canvas measurement harnesses **6/6 with
+> zero under-counts**, bug log **121 entries · 0 open · 5 deferred**. New drives: `deck-ruler` (the
+> slide ruler had never measured a deck out of the database — all 64 stored sections are `letter`).
+>
+> **Newest instrument — `probe-deck-overlap.mts` (B121).** Nothing had ever opened one of our
+> `.pptx` files with a PowerPoint engine; every claim about decks was XML-level. Doing it found
+> **decks delivered with table rows and bullets missing** — six node types sized their frames
+> without reading their text, and PowerPoint clips rather than spilling. Needs
+> `libreoffice-impress` (§2 — `soffice` ships here with no document filters at all).
 
 ---
 

@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1692 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1915 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +58,8 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **206**; migs 186–188 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **213** — migs 212/213 the
+proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
 merges three layers PER FIELD — `pattern_match` (`lib/ingest/pattern-extract.ts`, a deterministic, DB-free,
@@ -252,9 +253,11 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Portal routes MUST verify tenant access — never query by ID alone
 - **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
-  the 251 scripts and whether it still drives identifiers that exist. 27 are the branch suite, 4 the
-  lenses, 2 the cross-checks, 7 the canvas rulers; **41 cannot run** (unreferenced + rotted) and
-  **12 are documented-but-rotted** — a doc points at them and they will fail confusingly. Nothing is
+  the 271 scripts and whether it still drives identifiers that exist. 37 classify as branch suite, 4 the
+  lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
+  `run-branch-drives.sh` registers **38 drives**, because one of them is filed under RULER; both
+  numbers are right and they measure different things. **41 cannot run** (unreferenced + rotted) and
+  **16 are documented-but-rotted** — a doc points at them and they will fail confusingly. Nothing is
   marked deprecated there: that is a decision, and the doc collects candidates rather than making it.
 - Before writing SQL, verify against **docs/SCHEMA_MAP.md** (generated from the live DB — columns,
   value vocabularies, and which direction of each FK is actually populated). Check your file with
@@ -262,7 +265,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1670 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1915 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **Four lenses on a running box** (`frontend/scripts/verify-*.mjs`, each driven as a real signed-in
@@ -293,7 +296,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   than showing the product is right. `scripts/crosscheck-shipped-fixes.sh` (curl + psql, no browser)
   and `scripts/crosscheck-canvas-normalize.mts` (the shipped normalizer over every stored canvas)
   share nothing with them. Not a fifth lens: a cross-check that cannot dissent is decoration.
-- **Anything touching layout or export** additionally runs the six canvas measurement harnesses, which
+- **Anything touching layout or export** additionally runs the canvas measurement harnesses, which
   compare the product's own writers against the artifact that comes out (docs/TESTING_STRATEGY.md):
   `verify-ruler-on-proposals` and `verify-ruler-on-stored-artifacts` are the SAFETY GATES — the ruler
   may over-count but must never UNDER-count, because an under-count at the export gate clears a volume
@@ -301,6 +304,19 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   still downloads in every format; `calibrate-page-ruler` (36), `calibrate-slide-ruler` (7) and
   `sweep-mold-quality` (39 molds) are the regression net. `diagnose-mold-ruler --nodes/--segments/--pages`
   says WHY when one disagrees. Bug log B64–B76 is the record of what they have caught.
+- **AN ARTIFACT IS NOT VERIFIED UNTIL AN ENGINE THAT DID NOT WRITE IT HAS OPENED IT** (B121). Every
+  harness above measures our writer against our ruler, or Chromium against our HTML — none opened an
+  Office file with an Office engine, and that gap hid **decks delivered with table rows and bullets
+  missing.** `.docx`/`.pdf` reflow, so a bad height estimate is untidy spacing; **`.pptx` places
+  absolutely and PowerPoint CLIPS rather than spilling**, so the same error deletes content silently
+  while the bytes stay complete — the row text is all in the slide XML, so the export gate, the
+  vocabulary probe and the ruler are all correct and all blind. Run `probe-deck-overlap` (declared vs.
+  realised node height, via LibreOffice) after touching `pptx-exporter`, and `render-artifact-pages`
+  (`.pdf`/`.pptx`/`.docx`/`.xlsx` → page images) before calling any artifact finished. ⚠️ `soffice` is
+  installed here **with no document filters** — it fails on everything including a plain `.txt`; see
+  docs/CONTINUATION.md §2 for the one-line install. *Convert a plain text file before concluding
+  anything about ours:* that missing control turned a broken tool into a documented claim that our
+  `.pptx` was unopenable, and kept B121 invisible.
 - **A 200 IS NOT EVIDENCE THAT A PAGE RENDERED** (bug log B78 · B79). Next serves a client-side
   error boundary and a failed hydration with **status 200**, and a throw inside a client component
   never reaches the server log — so a harness gating on `resp.status() < 400` is structurally

@@ -7,6 +7,25 @@
 Supersedes the readiness picture in `LAUNCH_READINESS_2026-08.md` (2026-08-16, head 185) and its
 2026-08-23 addendum (head 205). **~340 commits** and **26 migrations** since.
 
+> ### ⚠️ SUPERSEDED, later the same day, by `LAUNCH_READINESS_2026-08-24.md`
+>
+> Two documents carry this date and they do not agree; that one is current. Read this as a
+> point-in-time record of the #157 effort, not as the go/no-go.
+>
+> | | this doc | `LAUNCH_READINESS_2026-08-24.md` |
+> |---|---|---|
+> | migration head | 211 | **213** (212/213 close the proposal-spine RLS gap, B113) |
+> | `vitest` | 1844 | **1915** |
+> | branch drives | 30 | **38** |
+> | bug log | 80 entries | **121 entries, 0 open** |
+> | must-clear items | "one of four now settled" | **three remain, and one is NEW and can cause an outage** |
+>
+> The verdict below — *"the gate is CONFIG · PROVE · DECIDE, not code"* — still holds in shape.
+> What it does not carry is item **1.0**: migs 212/213 use `FORCE` row-level security, so if the
+> production owner role is neither `SUPERUSER` nor `BYPASSRLS`, every admin cross-tenant read on
+> eleven tables returns zero rows after the migration. That is an outage, not a degradation, and it
+> was found after this was written.
+
 ---
 
 ## 0. Verdict

@@ -24,13 +24,14 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 36
+## SUITE — 37
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
 | `close-e2e-cms.mjs` | — | 2026-08-24 |
+| `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-atomization.mts` | — | 2026-08-24 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-24 |
@@ -55,7 +56,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-scout-intake.mts` | — | 2026-08-23 |
 | `drive-shadow-tenant-admin.mts` | — | 2026-08-24 |
 | `drive-spine-t1-section-todo.mts` | — | 2026-08-24 |
-| `drive-spine-t4-buildout.mts` | — | 2026-08-15 |
+| `drive-spine-t4-buildout.mts` | — | 2026-08-24 |
 | `drive-spine-t7-anchor.mts` | — | 2026-08-15 |
 | `drive-starter-offer.mts` | — | 2026-08-24 |
 | `drive-submit-gate.mts` | — | 2026-08-15 |
@@ -114,7 +115,7 @@ Imported by other scripts; never run directly.
 | `lib/harness-residue.mts` | — | 2026-08-24 |
 | `lib/scenario.mts` | — | 2026-08-24 |
 
-## CALLED-BY-ANOTHER — 16
+## CALLED-BY-ANOTHER — 17
 
 Invoked by another script rather than by a person.
 
@@ -122,13 +123,14 @@ Invoked by another script rather than by a person.
 |---|---|---|---|
 | `analyze-node-demand.mjs` | — | 2026-08-23 | verify-ruler-composition.mts |
 | `audit-pinned-fixtures.mjs` | — | 2026-08-24 | run-branch-drives.sh |
+| `check-rig-hydration.mjs` | — | 2026-08-24 | run-branch-drives.sh |
 | `check-rls-posture.mjs` | — | 2026-08-24 | run-branch-drives.sh |
 | `check-tenant-isolation-invariant.mjs` | — | 2026-08-23 | run-branch-drives.sh |
 | `drive-amendment.mjs` | — | 2026-08-21 | run-branch-drives.sh |
 | `drive-baa-forward.mjs` | — | 2026-08-22 | drive-end-to-end.mjs |
 | `drive-buy-and-build.mjs` | — | 2026-08-22 | drive-end-to-end.mjs |
 | `drive-finish-build.mjs` | — | 2026-08-21 | drive-end-to-end.mjs |
-| `drive-ingest-scenario.mjs` | — | 2026-08-21 | drive-end-to-end.mjs |
+| `drive-ingest-scenario.mjs` | — | 2026-08-21 | drive-end-to-end.mjs, drive-full-journey.mts |
 | `health-manager.sh` | — | 2026-08-11 | rehydrate-sandbox.sh |
 | `immo-content.mts` | — | 2026-08-19 | immo-author.mts |
 | `measure-char-width.mts` | — | 2026-08-23 | calibrate-page-ruler.mts |
@@ -145,7 +147,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 68
+## DOCUMENTED — 72
 
 No code references it, but a document tells someone to run it.
 
@@ -159,6 +161,7 @@ No code references it, but a document tells someone to run it.
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
 | `close-e2e-marketing.mjs` | — | 2026-08-13 |
 | `close-e2e-proposal.mjs` | — | 2026-08-13 |
+| `drive-control-reachability.mts` | — | 2026-08-24 |
 | `drive-corpus-verbatim.mts` | — | 2026-08-19 |
 | `drive-end-to-end.mjs` | — | 2026-08-23 |
 | `drive-foundation-tvsf.mts` | — | 2026-08-19 |
@@ -190,14 +193,17 @@ No code references it, but a document tells someone to run it.
 | `navy-sttr-e2e.mts` | 2 | 2026-07-19 |
 | `probe-bucket-rerank.mjs` | — | 2026-08-20 |
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
+| `probe-deck-overlap.mts` | — | 2026-08-24 |
 | `probe-pattern-extract.mts` | — | 2026-08-22 |
+| `probe-style-matrix.mts` | — | 2026-08-24 |
 | `prove-pdf-export.mts` | — | 2026-08-15 |
+| `render-artifact-pages.mts` | — | 2026-08-24 |
 | `render-tv-preview.mjs` | — | 2026-07-20 |
 | `sandbox-heartbeat.sh` | — | 2026-08-19 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-dsip-opps.mts` | — | 2026-07-19 |
 | `seed-followon-guides.mts` | 1 | 2026-08-24 |
-| `seed-isolation-fixture.mts` | — | 2026-08-24 |
+| `seed-isolation-fixture.mts` | 1 | 2026-08-24 |
 | `seed-practice-guides.mts` | 1 | 2026-08-24 |
 | `seed-program-guides.mts` | 1 | 2026-08-24 |
 | `seed-template-masters.mts` | — | 2026-08-14 |
@@ -220,7 +226,7 @@ No code references it, but a document tells someone to run it.
 | `verify-storage-server.mts` | — | 2026-08-11 |
 | `verify-studio-voice.mts` | — | 2026-08-23 |
 
-## UNREFERENCED — 82
+## UNREFERENCED — 84
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
@@ -237,6 +243,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `drive-enrich-prod.mts` | — | 2026-08-11 |
 | `drive-f1-fluid.mts` | — | 2026-08-11 |
 | `drive-f2-annotate.mts` | — | 2026-08-11 |
+| `drive-full-journey.mts` | — | 2026-08-24 |
 | `drive-immobileyes.mts` | — | 2026-07-19 |
 | `drive-leakage.mts` | — | 2026-08-11 |
 | `drive-librarian-review.mts` | — | 2026-08-11 |
@@ -259,6 +266,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `probe-bucket-merge.mjs` | — | 2026-08-20 |
 | `probe-comp-codes.mjs` | — | 2026-08-20 |
 | `probe-disposition-ui.mjs` | — | 2026-08-20 |
+| `probe-mobile-overflow.mjs` | — | 2026-08-20 |
 | `probe-partner-multi.mjs` | — | 2026-08-20 |
 | `probe-portal-forms.mjs` | — | 2026-08-20 |
 | `probe-preview-download.mjs` | — | 2026-08-20 |
@@ -309,7 +317,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `verify-studio-voice-route.mjs` | — | 2026-08-23 |
 | `verify-unextractable.mts` | — | 2026-08-11 |
 
-## CANNOT-RUN — 42
+## CANNOT-RUN — 41
 
 Nothing references it AND it drives an identifier the database no longer has. It cannot do what it says. **Needs a call.**
 
@@ -337,7 +345,6 @@ Nothing references it AND it drives an identifier the database no longer has. It
 | `immo-volumes.mts` | 7 | 2026-08-19 |
 | `inspect-rls-pages.mjs` | 1 | 2026-07-25 |
 | `j1b-new-customer.mjs` | 1 | 2026-08-20 |
-| `probe-mobile-overflow.mjs` | 1 | 2026-08-20 |
 | `rm-option-item.mjs` | 1 | 2026-08-21 |
 | `seed-demo-atoms.mts` | 2 | 2026-07-19 |
 | `seed-demo-processes.mts` | 1 | 2026-07-19 |
@@ -360,7 +367,7 @@ Nothing references it AND it drives an identifier the database no longer has. It
 
 ---
 
-## ⚠ Documented but rotted — 15
+## ⚠ Documented but rotted — 16
 
 A document tells someone to run these, and each drives at least one identifier the database no
 longer has. They will fail confusingly rather than loudly. Either the script needs the
@@ -381,6 +388,7 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-followon-guides.mts` | 1 | 2026-08-24 |
+| `seed-isolation-fixture.mts` | 1 | 2026-08-24 |
 | `seed-practice-guides.mts` | 1 | 2026-08-24 |
 | `seed-program-guides.mts` | 1 | 2026-08-24 |
 
@@ -390,14 +398,14 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 36 |
+| SUITE | 37 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
 | LIBRARY | 6 |
-| CALLED-BY-ANOTHER | 16 |
+| CALLED-BY-ANOTHER | 17 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 68 |
-| UNREFERENCED | 82 |
-| CANNOT-RUN | 42 |
-| **total** | **264** |
+| DOCUMENTED | 72 |
+| UNREFERENCED | 84 |
+| CANNOT-RUN | 41 |
+| **total** | **271** |
