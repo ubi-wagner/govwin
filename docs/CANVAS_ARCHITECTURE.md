@@ -279,6 +279,40 @@ sees only their sections. **Machine:** one model, one `canvas.format` discrimina
 compliance floor, one ruler, one export dispatcher; overlays read existing data; verbs route through
 `sectionOf`; permissions in `proposal-access.ts`. No data migration, no new discriminator.
 
+## 8b. Measured, not asserted — the 88-cell matrix (2026-08-24)
+
+`__tests__/node-vocabulary-coverage.test.ts` proved all 22 primitives survive all four writers, by
+building a `CanvasDocument` in memory and calling `exportToDocx(doc)` directly. It never touched the
+create route, the save route (`validateStandaloneCanvas` + the compare-and-swap), the export route
+(gate, `X-Compliance-Violations`, audit event), or an authenticated actor with RLS on. The claim was
+true of a function call.
+
+`frontend/scripts/drive-canvas-authoring.mts` now authors from a **blank canvas** as both a
+`tenant_admin` and an `rfp_admin`, saves, **reads the row back from the database**, and exports —
+because the export route takes the document in its request BODY, so exporting proves nothing about
+what was persisted.
+
+**22 primitives × 4 formats = 88 cells · 0 silent drops.** Three arrive as an embedded raster by
+design (`chart`→docx, `chart`/`shape`→xlsx), each with a media part to show for it. Two are
+deliberate no-ops in xlsx (`page_break`, `spacer` — a grid has no pages and no whitespace to place;
+`xlsx-exporter.ts:120`).
+
+**One number per node.** B109: a `spacer` had five readers and four different heights, none of them
+the author's — the ruler read `content.height`, canvas-html read `style.space_after` and fell back to
+a hardcoded 12pt, docx hardcoded 200 twips, pptx 0.3in, the editor `h-8`. `spacerHeightPt()` is now
+the one answer for all five. The single remaining asymmetry is deliberate and documented at the call
+site: with no author height the writers use 12pt and the ruler a body line, because §8's ruler may
+over-count and must never under-count.
+
+**On instruments.** The structural primitives (`toc`, `page_break`, `spacer`, `divider`) carry no
+text, so the marker search that proves the other 18 cannot see them. The differential built for them
+was wrong five times before it was right — measuring them alone (a `toc` with no headings correctly
+renders nothing), byte-comparing a zip (the same input does not always compress to the same length),
+and page-counting a `toc` (which adds content, not a page). **No single metric answers for all four
+types in all four formats.** The drive's table therefore names its instrument and REPORTS; the
+decisive per-node assertions live in `scripts/probe-structural-nodes.mts`, where each type is
+measured by the effect it actually has. Both are registered in `run-branch-drives.sh`.
+
 ## 9. Canvas doc map — the single source → everything else
 
 This file is authoritative. The rest, classified:
