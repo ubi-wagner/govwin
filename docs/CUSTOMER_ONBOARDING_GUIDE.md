@@ -785,6 +785,88 @@ opens on **My Sections**, sees those two, and cannot reach the library or the re
 
 ---
 
+# 8. Documents that are not proposals
+
+Not everything you build here is a bid. The same canvas makes a marketing sheet, a schedule, a
+capability deck or a one-page flier, and takes it out as **.docx, .pptx, .xlsx or .pdf**. Nothing
+about this path involves a solicitation, a compliance matrix or a cost volume.
+
+## 8.1 Start one
+
+**Documents → New document.** You pick a starting shape, and the shape sets the page rules:
+
+| Start from | What you get | Typical use |
+|---|---|---|
+| **Flier** | Letter rules, capped at one page | A single-page leave-behind |
+| **Letter** | Letter rules, no page cap | A two-page product sheet, a memo, a white paper |
+| **Deck** | Slide canvas, one section per slide | A capability brief, a pitch |
+| **Sheet** | A grid | A schedule, a tracker, a milestone plan |
+| **A template** | Any of your saved skeletons, or one from your template shelf | Anything you do more than once |
+
+You can also start from your **Templates** shelf, where the molds your account carries are already
+laid out — see §5.
+
+## 8.2 A worked example: a two-page product sheet
+
+The pieces that make a marketing sheet read like one are all canvas primitives:
+
+- a **heading** and a short **text block** for the promise;
+- a **callout** for the at-a-glance numbers, which is what a skimmer reads;
+- a **bulleted list** for the reasons to believe;
+- a **table** comparing this generation to the last — specifications belong in a table, not in prose;
+- a **caption** under it stating test conditions, because an unqualified number invites a question;
+- a **page break** where page two starts;
+- an **image** with a caption, a **blockquote** for the customer's own words, a **numbered list** for
+  what ships in the box, and a **footnote** for the export-classification small print.
+
+Export it as **.docx** to keep editing in Word, or **.pdf** to send. The PDF is laid out by a real
+browser, so what you see in the canvas is what prints — including where your page break falls.
+
+## 8.3 A worked example: a project schedule
+
+A schedule is a **sheet**, and a gantt is a table whose month columns are filled in:
+
+- a **table** with one row per milestone and a column per month, marking the working span and the
+  milestone month;
+- a second **table** for the payment profile — invoiced, cumulative, percent of total;
+- a **chart** for the spend curve;
+- a **callout** naming the schedule risk, so it is visible rather than implied.
+
+Export as **.xlsx** and it opens as a working spreadsheet.
+
+> **This is not a cost volume.** A proposal's cost volume is *computed* — you enter labour, rates and
+> materials, and the burden engine builds the totals in the form the agency requires (§6). A schedule
+> like this is something you author freely. Keep them apart: a milestone-payment plan is not a
+> burdened price, and a reviewer will treat a document that confuses the two as neither.
+
+## 8.4 What survives which format
+
+Every canvas primitive comes out of every format. Three arrive as an embedded **image** rather than
+as text, which is a rendering choice and not a loss:
+
+| | .docx | .pptx | .xlsx | .pdf |
+|---|---|---|---|---|
+| Headings, text, lists, tables, captions, footnotes, links, callouts, code, quotes, equations, images, videos, signatures, text boxes | text | text | text | text |
+| **Charts** | image | text | image | text |
+| **Shapes** | text | text | image | text |
+| Page breaks, spacers, dividers, contents lists | structure | structure | see below | structure |
+
+Two deliberate exceptions in **.xlsx**: a **page break** and a **spacer** do nothing, because a grid
+has no pages and no vertical whitespace to place. Everything else carries over.
+
+## 8.5 Things worth knowing
+
+- **Save and export are separate.** Export sends what is on your screen, so you can export a draft
+  you have not saved. If you want the version in your workspace, save first.
+- **Two people editing at once.** The save is guarded: if someone else saved while you were working,
+  you are told rather than silently overwritten.
+- **Size rules still apply.** A flier is capped at one page and a deck warns when a slide overflows —
+  the same ruler the proposal side uses, so the gauge and the file always agree.
+- **Spacer height is yours.** Set it and every format honours it, including the page count you are
+  shown.
+
+---
+
 ## Tips
 
 1. **Upload your best past proposals first.** Winning content is the strongest signal the drafter has.

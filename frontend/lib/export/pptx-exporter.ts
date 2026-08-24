@@ -38,6 +38,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, resolveImageDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
 import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
 
@@ -568,7 +569,8 @@ function addNodeToSlide(
       return b.consumed;
     }
     case 'spacer':
-      return 0.3;
+      // 72 points to the inch. Was a hardcoded 0.3in (21.6pt) regardless of the author's height.
+      return spacerHeightPt(node) / 72;
     case 'toc': {
       const headings = allNodes.filter((n) => n.type === 'heading').map((n) => n.content as HeadingContent);
       const tocText = headings.map((hh) => `${'  '.repeat(hh.level - 1)}${hh.numbering ? `${hh.numbering} ` : ''}${hh.text}`).join('\n');

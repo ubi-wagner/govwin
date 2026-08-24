@@ -43,6 +43,7 @@ const app = postgres(APP, { max: 1 });
 const owner = postgres(OWNER, { max: 1 });
 
 let bad = 0;
+let unmeasured = 0;
 const ok = (m) => console.log(`  ok    ${m}`);
 const no = (m) => { console.error(`  WRONG ${m}`); bad++; };
 
@@ -72,14 +73,33 @@ async function main() {
   // Read the fixture through the OWNER: working out what a tenant SHOULD see is a legitimate
   // cross-tenant read, and doing it on the scoped connection would return nothing and look like
   // an empty box (that mistake is recorded in B86 too).
+  // BOTH tenants must HAVE rows, and the reason is the pair of assertions below, which need
+  // different things of each: A supplies rows that must be hidden, and B — the tenant whose context
+  // is set — must own rows of its own, or "own === 0" is indistinguishable from a deny-all.
+  //
+  // This used to select the top two by card count and then guard on `pair[0].cards === 0` — the
+  // count belonging to A, while the own-rows assertion is made against B. On a freshly migrated box
+  // exactly one tenant has cards, so A passed the guard, B had none, and the check reported
+  // "'<B>' cannot see its OWN cards either — that is a deny-all" against a database whose RLS was
+  // perfectly correct. Verified by hand at the time: context=foundation saw its own 9,
+  // context=immobileyes saw 0 of foundation's — both halves holding, while this said WRONG.
+  //
+  // It fails SAFE (a false alarm, not a false pass) and `run-branch-drives.sh` marks every isolation
+  // drive CANT-RUN off it, so the cost is a suite that refuses to measure anything on a healthy box.
   const pair = await owner`
     SELECT t.id, t.slug,
            (SELECT count(*)::int FROM tenant_opportunity_cards c WHERE c.tenant_id = t.id) AS cards
-    FROM tenants t ORDER BY cards DESC LIMIT 2`;
-  if (pair.length < 2 || pair[0].cards === 0) {
-    console.error('  SKIP  behaviour check needs two tenants and rows to hide — this box has neither');
-    console.error('        (that is NOT a pass: the strongest assertion did not run)');
-    bad++;
+    FROM tenants t
+    WHERE (SELECT count(*) FROM tenant_opportunity_cards c WHERE c.tenant_id = t.id) > 0
+    ORDER BY cards DESC LIMIT 2`;
+  if (pair.length < 2) {
+    // CANNOT-RUN, not WRONG. The distinction is the house rule: a check that did not run measured
+    // nothing, and reporting that as a failure of the DATABASE sends the next reader hunting for a
+    // policy bug that is not there. It still counts against the run — uncovered is not passing.
+    console.error(`  CANT-RUN behaviour check needs TWO tenants that each own rows; this box has `
+      + `${pair.length} (${pair.map((p) => `${p.slug}=${p.cards}`).join(', ') || 'none'})`);
+    console.error('        The posture is UNMEASURED here — not wrong. Seed a second tenant to measure it.');
+    bad++; unmeasured++;
   } else {
     const [A, B] = pair;
     const [seen] = await app`
@@ -107,6 +127,14 @@ async function main() {
   console.log();
   if (bad === 0) {
     console.log('✓ RLS posture correct — isolation results from this box mean what they say.');
+  } else if (bad === unmeasured) {
+    // Everything that RAN passed; what stopped this being a pass is an assertion that could not be
+    // made. Saying "WRONG" here would send the next reader looking for a policy bug that is not
+    // there — the same unearned-verdict failure the rest of this file exists to prevent.
+    console.error('✗ RLS POSTURE UNMEASURED. Every check that could run PASSED — the role is right,');
+    console.error('  the policies are in place — but the one assertion that cannot be faked did not');
+    console.error('  run for want of fixture data. Isolation results from this box are UNCOVERED,');
+    console.error('  not wrong. Seed a second tenant that owns rows, then re-run.');
   } else {
     console.error('✗ RLS POSTURE WRONG. Any isolation result measured here is meaningless — not');
     console.error('  wrong, MEANINGLESS: a bypassed database layer produces the same output as a');

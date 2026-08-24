@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes, spacerHeightPt } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -681,7 +681,10 @@ function NodeRenderer({
       {node.type === 'footnote' && <FootnoteNode content={node.content as FootnoteContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
-      {node.type === 'spacer' && <div className="h-8" />}
+      {/* The editor is the fifth reader of a spacer's height and was the fourth different answer:
+          a fixed h-8 (≈24pt) regardless of what the author set. Showing the real height is the
+          whole point of a WYSIWYG canvas — otherwise the page you see is not the page you get. */}
+      {node.type === 'spacer' && <div style={{ height: `${spacerHeightPt(node)}pt` }} />}
       {EXTENDED_TYPES.has(node.type) && <ExtendedNodePreview node={node} />}
       {/* toc nodes are rendered by TocRenderer at the parent level */}
     </div>

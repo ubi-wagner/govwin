@@ -943,10 +943,8 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       }
       return h;
     }
-    case 'spacer': {
-      const h = (node.content as { height?: number } | undefined)?.height;
-      return typeof h === 'number' && h > 0 ? h : bodyLineH;
-    }
+    case 'spacer':
+      return spacerHeightPt(node, bodyLineH);
     case 'heading': {
       // THE SCALE HERE MUST BE THE STYLESHEET'S SCALE. canvas-html tightened headings — its own
       // comment says "a tighter scale than 1.6/1.3/1.1" — and this ruler was never moved with it,
@@ -1251,6 +1249,34 @@ function stackHeightPt(nodes: CanvasNode[], m: ReturnType<typeof flowMetrics>): 
  * calibrated number — a document can never say "6 pages" in the editor and "7
  * pages" at the export gate. A spreadsheet is measured in tabs, not flow pages.
  */
+/**
+ * How tall a `spacer` is, in points — the ONE answer, for every reader.
+ *
+ * A spacer had five readers and four different heights, none of which was the author's:
+ *
+ *   ruler   `content.height`            · the only one that read the node at all
+ *   html/pdf `style.space_after` ?? 12pt · so `content.height = 600` emitted `height:12pt`
+ *   docx    hardcoded `after: 200` twips (10pt)
+ *   pptx    hardcoded `0.3` in (21.6pt)
+ *   editor  hardcoded `h-8` (≈24pt)
+ *   xlsx    filtered out — correct; a grid has no vertical whitespace to place
+ *
+ * So an author who set a spacer's height saw four different numbers in four artifacts and the one
+ * they typed in none of them, while the ruler measured a height no writer would produce. Nothing is
+ * lost — it is whitespace — but it is the same defect class as B64/B65/B73: several readers of one
+ * node model, disagreeing silently, with the ruler modelling something the renderers do not.
+ *
+ * `content.height` is canonical because it is spacer-specific; `style.space_after` is honoured as a
+ * fallback because canvas-html already read it and stored documents may carry it.
+ */
+export function spacerHeightPt(node: CanvasNode, fallbackPt = 12): number {
+  const h = (node.content as { height?: number } | undefined)?.height;
+  if (typeof h === 'number' && h > 0) return h;
+  const s = node.style?.space_after;
+  if (typeof s === 'number' && s > 0) return s;
+  return fallbackPt;
+}
+
 export function estimatePageCount(doc: CanvasDocument): number {
   const c = doc.canvas;
   if (!c) return 1;

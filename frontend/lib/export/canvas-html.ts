@@ -35,6 +35,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { formatByCode } from '@/lib/numeric-cell';
 
 function esc(s: unknown): string {
@@ -469,7 +470,8 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'page_break':
       return `<div style="page-break-after:always"></div>`;
     case 'spacer':
-      return `<div style="height:${(node.style?.space_after ?? 12)}pt"></div>`;
+      // spacerHeightPt, not `style.space_after` alone: this read `content.height = 600` as 12pt.
+      return `<div style="height:${spacerHeightPt(node)}pt"></div>`;
     case 'toc':
       // The document's TOC — a heading-list assembled once in renderCanvasBodyHtml
       // and threaded through `vars` (mirrors the editor's TOC; was silently dropped).

@@ -120,3 +120,55 @@ describe('node vocabulary — every type survives every exporter', () => {
     expect(html([VOCAB.toc.node, VOCAB.heading.node])).toContain(mark('heading'));
   });
 });
+
+/**
+ * A spacer's height has ONE answer, and every reader gives it (B109).
+ *
+ * There were five readers and four different heights, none of them the author's: the ruler read
+ * `content.height`; canvas-html read `style.space_after` and fell back to a hardcoded 12pt, so
+ * `content.height = 600` rendered as 12; docx hardcoded 200 twips; pptx hardcoded 0.3in; the editor
+ * hardcoded `h-8`. Nothing was lost — it is whitespace — but the page RULER measured a height no
+ * writer would produce, which is the B64/B65 divergence in miniature: the gauge and the artifact
+ * disagreeing about the same node.
+ */
+describe('spacer height is one number, honoured by every reader (B109)', () => {
+  const spacerDoc = (content: unknown, style: unknown = {}): CanvasDocument => ({
+    version: 2, document_id: 'sp', canvas: { ...CANVAS_PRESETS.letter_standard }, nodes: [],
+    sections: [{ id: 's', title: 'sp', layout: { mode: 'flow' }, groups: [{ id: 'g', nodes: [{
+      id: 'n1', type: 'spacer', content, style,
+      provenance: { source: 'manual' }, history: [], library_eligible: false,
+    } as unknown as CanvasNode] }] }],
+    metadata: { title: 'sp', status: 'in_progress' },
+  } as unknown as CanvasDocument);
+
+  it('renders the height the author set in content.height', () => {
+    expect(renderCanvasToHtml(spacerDoc({ height: 600 }), {})).toContain('height:600pt');
+  });
+
+  it('still honours style.space_after, which stored documents may carry', () => {
+    expect(renderCanvasToHtml(spacerDoc({}, { space_after: 480 }), {})).toContain('height:480pt');
+  });
+
+  it('prefers content.height when both are present — it is the spacer-specific field', () => {
+    expect(renderCanvasToHtml(spacerDoc({ height: 300 }, { space_after: 99 }), {})).toContain('height:300pt');
+  });
+
+  it('falls back to a sane default when the author set neither', () => {
+    expect(renderCanvasToHtml(spacerDoc({}), {})).toContain('height:12pt');
+  });
+
+  it('the RULER and the rendered page agree — a tall spacer pushes both to a second page', async () => {
+    const { estimatePageCount } = await import('@/lib/types/canvas-document');
+    expect(estimatePageCount(spacerDoc({ height: 900 }))).toBeGreaterThan(1);
+    expect(renderCanvasToHtml(spacerDoc({ height: 900 }), {})).toContain('height:900pt');
+  });
+
+  it('docx scales the author height into twips rather than hardcoding 200', async () => {
+    const [small, large] = await Promise.all([
+      exportToDocx(spacerDoc({ height: 12 }), {}).then(zipText),
+      exportToDocx(spacerDoc({ height: 600 }), {}).then(zipText),
+    ]);
+    expect(small).toContain('w:after="240"');    // 12pt × 20
+    expect(large).toContain('w:after="12000"');  // 600pt × 20
+  });
+});
