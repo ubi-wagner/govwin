@@ -107,6 +107,27 @@ else
   sed 's/^/  /' "$OUT/tenant-invariant.log" | tail -12
 fi
 
+# ── PREFLIGHT: does anything in this suite still point at a row that no longer exists? ──────────
+#
+# Fixture rot is silent by construction: a drive that pins a uuid keeps reporting a verdict after
+# the row is gone, and the verdict looks like a regression in whatever the drive tests. Eight
+# confident, wrong findings came out of exactly that this week (B98-B101). This asks the live
+# database about every uuid and email literal in the suite, the four lenses and the guide capture,
+# and names any that are dead and REACHABLE (a literal behind an env-var fallback the runner
+# already resolves is not reachable; one a script is about to CREATE is not rot).
+#
+# It does not abort — the drives still measure real things — but a non-zero count here means some
+# green below may be green about nothing, so it is said loudly and first.
+if node scripts/audit-pinned-fixtures.mjs > "$OUT/pinned-fixtures.log" 2>&1; then
+  echo "fixtures: nothing in the suite points at a row that no longer exists"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ FIXTURE ROT — a drive below can drive an identifier that is GONE. Its verdict may be  ║"
+  echo "║ about nothing at all. Resolve it or build it; see TESTING_STRATEGY.md.                ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed -n '/LIVE SAFETY NET/,/^$/p' "$OUT/pinned-fixtures.log" | sed 's/^/  /'
+fi
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"

@@ -15,7 +15,6 @@ if (!DB) { console.error('DATABASE_URL required'); process.exit(2); }
 const sql = postgres(DB, { max: 2 });
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
-const IMMO = 'dd831b77-2d6b-4b53-bb18-4d48569a2258';
 
 // mode: 'multi' expect 200 + ≥2 tenants (cross-tenant proof); 'data' expect 200 + non-empty; 'ok' expect 200 (not 500)
 /**

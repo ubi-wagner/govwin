@@ -38,7 +38,17 @@ const taskCount = async (): Promise<number> => {
 
 async function main() {
   await cleanup();
-  const actor = { id: ADMIN, email: 'eric@immobileyes.com', role: 'rfp_admin' as const, tenantId: null };
+  // The actor's EMAIL is resolved alongside its id. It used to be the literal
+  // 'eric@immobileyes.com' sitting next to a resolved `ADMIN` uuid — so every event this drive
+  // emitted was attributed to a person who does not exist on this database, which is a small lie
+  // in exactly the place (`system_events.actor_email`) an audit trail is supposed to be read from.
+  const [who] = await sql<Array<{ email: string }>>`SELECT email FROM users WHERE id = ${ADMIN}::uuid`;
+  if (!who) {
+    console.error(`CANNOT RUN — no user ${ADMIN} (set TEST_ACTOR_ID). Uncovered, not a finding.`);
+    await sql.end();
+    process.exit(2);
+  }
+  const actor = { id: ADMIN, email: who.email, role: 'rfp_admin' as const, tenantId: null };
 
   // 1) fresh offer
   const r1 = await offerStarterSet({ tenantId: TENANT, tenantSlug: SLUG, adminUserId: ADMIN, actor });
