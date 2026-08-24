@@ -40,7 +40,7 @@ import type {
 } from '@/lib/types/canvas-document';
 import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, resolveImageDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
-import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
+import { docNodes, sectionsToNodes, nodesHeightPt } from '@/lib/types/canvas-document';
 
 // ─── Layout constants (inches) ────────────────────────────────────────
 const SLIDE_LAYOUTS: Record<string, { w: number; h: number }> = {
@@ -254,8 +254,30 @@ export async function exportToPptx(
     const zOf = (n: CanvasNode) => (n.position?.wrap === 'behind' ? -1 : (n.position?.z ?? 5));
     const ordered = [...bodyNodes].sort((a, b) => zOf(a) - zOf(b));
 
-    let curY = BODY_TOP;
     const bodyBottom = dims.h - 0.5;
+
+    // OPTICAL CENTRING FOR A SHORT SLIDE, top-anchored for a full one.
+    //
+    // Body content always began at BODY_TOP regardless of how much there was, so a title slide with
+    // two lines sat on top of five inches of white and the deck read as unfinished even where the
+    // content was right. Every slide in a rendered deck looked like a draft.
+    //
+    // A dense slide must still start at the top — it needs every inch, and nudging it down would
+    // push content off the frame that currently fits. So the offset applies only where there is
+    // genuine slack, and it is capped: a slide two-thirds full moves barely at all.
+    //
+    // 0.38 rather than 0.5 is deliberate. Content centred by true arithmetic reads as LOW, because
+    // the eye weights the space above a block more heavily than the space below it — the same
+    // reason a picture is hung above the geometric centre of a wall. Slightly-above-centre is what
+    // "centred" looks like.
+    //
+    // Measured with the same ruler the rest of the canvas uses, so a slide's idea of how tall its
+    // content is cannot disagree with the gauge in the editor or the overflow advisory.
+    const bandIn = Math.max(0, bodyBottom - BODY_TOP);
+    const contentIn = nodesHeightPt(ordered, canvas) / 72;
+    const slackIn = Math.max(0, bandIn - contentIn);
+    let curY = BODY_TOP + slackIn * 0.38;
+
     for (const node of ordered) {
       const added = addNodeToSlide(slide, node, canvas, MARGIN, curY, bodyW, Math.max(0.3, bodyBottom - curY), sub, nodes, raster, accent);
       curY += added;
