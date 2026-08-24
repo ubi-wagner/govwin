@@ -170,6 +170,12 @@ SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
+  # FIRST, because nine of the drives below now stand on it. The factory is load-bearing: one that
+  # silently builds half a scenario, or disposes incompletely, would make every drive above it
+  # report confidently about a situation that was never constructed — and the leak would accumulate
+  # under every future run. Its self-test counts the world, builds, asserts each piece is real and
+  # usable, disposes, and asserts the world is identical again. Validate the instrument, then use it.
+  "scenario-factory|scripts/drive-scenario-factory.mts"
   "award-to-contract|scripts/drive-award-to-contract.mts"
   # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
   # table reported as a failing amendment flow rather than a missing argument. Resolved below.
