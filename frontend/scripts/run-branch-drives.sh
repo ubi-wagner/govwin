@@ -146,6 +146,25 @@ else
   sed -n '/LIVE SAFETY NET/,/^$/p' "$OUT/pinned-fixtures.log" | sed 's/^/  /'
 fi
 
+# ── Is the box serving the build we think it is, and does its client half run? ─────────────────
+# Ordered BEFORE the RLS gate on purpose: a broken rig makes every browser drive below meaningless,
+# and unlike the RLS posture it fails SILENTLY GREEN. A surface sweep gates on client throws, and
+# code that never executes never throws — an unhydrated box reports every page clean.
+HYDRATION_OK=1
+if node scripts/check-rig-hydration.mjs > "$OUT/rig-hydration.log" 2>&1; then
+  echo "Rig: serving this build, client half runs"
+else
+  HYDRATION_OK=0
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ RIG NOT TRUSTWORTHY — the server and the staged assets are from different builds, or  ║"
+  echo "║ the client bundle does not execute. EVERY browser drive below is meaningless: a page  ║"
+  echo "║ that never hydrates cannot throw, so a surface sweep reports it CLEAN.                ║"
+  echo "║ Fix the rig before believing anything in this run.                                    ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/rig-hydration.log" | head -8
+fi
+echo
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"
