@@ -59,60 +59,453 @@ async function visit(page: import('playwright').Page, url: string, name: string,
 }
 
 let seq = 0;
-const N = (type: string, content: unknown, style: unknown = {}): CanvasNode => ({
-  id: `j${++seq}`, type, content, style, provenance: { source: 'manual' }, history: [],
+const N = (type: string, content: unknown, style: unknown = {}, position?: unknown): CanvasNode => ({
+  id: `j${++seq}`, type, content, style, position, provenance: { source: 'manual' }, history: [],
   library_eligible: true,
 } as unknown as CanvasNode);
 
-/** A technical volume long enough to be a real 10-page volume, not a stub. */
-function tenPageVolume(): CanvasDocument {
-  const para = (i: number) =>
-    `${i}. The additive construction cell maintains a controlled thermal profile across the full `
-    + `build volume, holding layer adhesion within specification through the qualification matrix. `
-    + `Coupons are sectioned at each milestone and dispositioned against the AMS specification, with `
-    + `results fed back into the process model so the next build starts from measured behaviour `
-    + `rather than nominal. The approach removes the dependency on operator judgement that has `
-    + `historically limited repeatability in expeditionary conditions, and it is the reason the `
-    + `programme can commit to a transition package at month twelve rather than a further study.`;
-  const nodes: CanvasNode[] = [
-    N('heading', { level: 1, text: 'Technical Volume — Additive Construction for Expeditionary Basing' },
-      { size: 18, weight: 'bold', alignment: 'center' }),
-    N('text_block', { text: 'Immobileyes Inc. · N261-EXP01 · Phase I' }, { style: 'italic', alignment: 'center' }),
-  ];
-  for (let s = 1; s <= 12; s++) {
-    nodes.push(N('heading', { level: 2, text: `${s}.0 Section ${s}` }, { size: 13, weight: 'bold' }));
-    for (let p = 1; p <= 5; p++) nodes.push(N('text_block', { text: para(p) }, {}));
-    if (s === 3 || s === 9) nodes.push(N('table', {
-      headers: ['WBS', 'Deliverable', 'Month', 'Status'],
-      rows: Array.from({ length: 8 }, (_, i) => [`1.${i + 1}`, 'Qualification build', String(i + 2), 'On track']),
-    }, {}));
-    if (s === 5 || s === 11) nodes.push(N('bulleted_list', {
-      items: Array.from({ length: 10 }, (_, i) => ({ text: `Acceptance criterion ${i + 1} closed against the test plan` })),
-    }, {}));
-  }
+/**
+ * A REAL DoD SBIR Phase I technical volume — the section structure the BAA actually requires, with
+ * distinct substantive content under each heading.
+ *
+ * The first version of this was padding: one paragraph repeated sixty times with an index stuck on
+ * the front, headings that read "1.0 Section 1" through "12.0 Section 12", and the same eight-row
+ * table twice with every row identical. It hit thirteen pages and proved nothing except that the
+ * paginator counts filler. A demonstration document that nobody could stand to read is not a
+ * demonstration — it is a page-count test wearing a proposal's clothes.
+ */
+function technicalVolume(): CanvasDocument {
+  const h1 = (text: string) => N('heading', { level: 1, text }, { size: 17, weight: 'bold', alignment: 'center' });
+  const h2 = (text: string) => N('heading', { level: 2, text }, { size: 13, weight: 'bold', space_before: 10 });
+  const h3 = (text: string) => N('heading', { level: 3, text }, { size: 11.5, weight: 'bold' });
+  const p_ = (text: string) => N('text_block', { text }, {});
+  const bl = (items: string[]) => N('bulleted_list', { items: items.map((text) => ({ text })) }, {});
+
   return { version: 1, canvas: { ...CANVAS_PRESETS.letter_standard },
-    metadata: { title: 'Technical Volume', status: 'draft' }, nodes } as unknown as CanvasDocument;
+    metadata: { title: 'Technical Volume — N261-EXP01', status: 'draft' }, nodes: [
+
+    h1('Additive Construction for Expeditionary Basing'),
+    N('text_block', { text: 'Immobileyes Inc. · Topic N261-EXP01 · SBIR Phase I · Proposal N261-EXP01-0417' },
+      { style: 'italic', alignment: 'center', space_after: 6 }),
+    N('divider', { line_style: 'solid' }, {}),
+    N('spacer', { height: 8 }, {}),
+    N('toc', { max_depth: 2 }, {}),
+    N('page_break', {}, {}),
+
+    h2('1.0  Identification and Significance of the Problem'),
+    p_('A Marine Expeditionary Unit ashore consumes roughly 40 percent of its lift capacity moving '
+      + 'construction materials that are, by mass, mostly aggregate and water — both of which are '
+      + 'already present at almost every site where a structure is needed. Concrete masonry units, '
+      + 'timber and prefabricated shelter panels are shipped thousands of miles so that they can be '
+      + 'assembled into forms that could have been printed in place. Every ton moved is a ton not '
+      + 'available for ordnance, fuel or medical materiel, and every convoy that carries it is an '
+      + 'exposure the force did not have to accept.'),
+    p_('Additive construction removes most of that mass from the manifest. A cementitious printer '
+      + 'operating on locally sourced aggregate needs to import only the binder, typically 8 to 12 '
+      + 'percent of finished structure mass. The technology is not speculative: USACE ERDC has '
+      + 'printed barracks huts at Camp Pendleton, and commercial systems have delivered permanent '
+      + 'residential structures at scale. What has not been solved is qualification. A structure '
+      + 'printed from an aggregate nobody has characterised, by a crew who cannot run a materials '
+      + 'lab, cannot currently be certified for occupancy — so the capability stalls at the '
+      + 'demonstration stage and never reaches a unit.'),
+    p_('The binding constraint is therefore not the printer. It is the absence of a closed-loop '
+      + 'process that can qualify an unknown feedstock in the field, in hours rather than weeks, '
+      + 'without a materials engineer standing over it.'),
+    N('chart', { chart_type: 'bar', title: 'Delivered mass per 32-person barracks hut',
+      categories: ['Conventional', 'Printed \u2014 binder only'],
+      series: [{ name: 'Tons delivered', data: [40, 4] }] }, {}),
+    N('caption', { prefix: 'Figure', number: 1,
+      text: 'An order of magnitude, repeated for every structure on every site.' },
+      { style: 'italic', size: 9, color: '#64748B' }),
+
+    p_('The scale of the opportunity follows directly from the mass argument. A 32-person barracks '
+      + 'hut in conventional construction is roughly 40 tons of delivered material. Printed from '
+      + 'local aggregate it is closer to four tons of imported binder — an order of magnitude, '
+      + 'repeated for every structure on every site. For a MEU establishing a forward site with '
+      + 'twenty structures, the difference is approximately 700 tons of lift, which is not a '
+      + 'marginal logistics improvement but a change in what the unit can carry instead.'),
+    p_('The same arithmetic explains why the capability has attracted sustained investment and still '
+      + 'has not fielded. Every programme that has demonstrated printing has done so with a mix '
+      + 'designed in advance and delivered to site, which preserves the supply chain the technology '
+      + 'was supposed to remove. The demonstrations are real; the logistics benefit is largely '
+      + 'notional, because the aggregate saved in transit is offset by the graded material that had '
+      + 'to be shipped to make the print certifiable.'),
+
+    h2('2.0  Phase I Technical Objectives'),
+    p_('Phase I establishes whether closed-loop feedstock qualification can be performed on-platform '
+      + 'with sensors that survive expeditionary use. Four objectives, each with a measurable exit '
+      + 'criterion:'),
+    N('table', {
+      headers: ['#', 'Objective', 'Exit criterion'],
+      rows: [
+        ['O1', 'Characterise aggregate variability across representative sites',
+         '≥ 6 aggregate profiles spanning the CONUS/OCONUS envelope, gradation and fines content measured'],
+        ['O2', 'Correlate in-line rheology to 28-day compressive strength',
+         'R² ≥ 0.85 against lab cylinders across the O1 profiles'],
+        ['O3', 'Demonstrate closed-loop binder correction from in-line signal alone',
+         'Strength within ±15% of target with no operator intervention'],
+        ['O4', 'Define the certification data package a NAVFAC reviewer needs',
+         'Draft package reviewed by a licensed PE, gaps enumerated'],
+      ],
+    }, {}),
+    N('caption', { prefix: 'Table', number: 1, text: 'Phase I objectives and their exit criteria.' },
+      { style: 'italic', size: 9, color: '#64748B' }),
+
+    h2('3.0  Technical Approach'),
+    h3('3.1  In-line rheology as a strength proxy'),
+    p_('Compressive strength is conventionally established at 28 days by breaking cylinders, which is '
+      + 'useless as a control signal — the structure is finished long before the number arrives. Our '
+      + 'approach instruments the print head itself. Extrusion pressure, screw torque and a '
+      + 'vibrating-element viscometer in the delivery line give a continuous rheological signature, '
+      + 'sampled at 50 Hz, which prior work in the ready-mix industry has correlated to early-age '
+      + 'strength development. We are not the first to observe the correlation; what is unproven is '
+      + 'whether it holds across the aggregate variability an expeditionary site imposes, where the '
+      + 'feedstock is whatever the site provides rather than a graded commercial supply.'),
+    h3('3.2  Closed-loop binder correction'),
+    p_('Where the correlation holds, the loop closes: the controller trims binder and water ratio '
+      + 'against the measured signature rather than a nominal mix design. This is the step that '
+      + 'removes the materials engineer from the critical path. The control law is a constrained '
+      + 'model-predictive controller operating on a two-state model — one state for workability, one '
+      + 'for early strength — with hard limits on water-cement ratio so the loop can never trade '
+      + 'durability for printability.'),
+    h3('3.3  Why in-line measurement and not a field lab'),
+    p_('The obvious alternative is to put a small materials laboratory in the kit: gradation sieves, '
+      + 'a slump cone, cylinder moulds and a portable compression frame. It is a real option and it '
+      + 'has been tried. It fails on three counts, and enumerating them is how we arrived at the '
+      + 'in-line approach rather than the other way round.'),
+    p_('First, latency. A slump test characterises the batch in front of you, but the print head '
+      + 'consumes a batch every few minutes and the properties drift within a single structure as '
+      + 'the aggregate pile is worked down through its stratification. A discrete test cannot chase '
+      + 'a continuous process; by the time the operator reacts, several courses have been laid.'),
+    p_('Second, skill. ASTM C143 and C39 both assume a technician who runs them regularly. The '
+      + 'failure mode of an infrequently-performed manual test is not a wrong number, it is a number '
+      + 'nobody trusts, which in practice means the crew stops taking it and prints to the nominal '
+      + 'mix anyway.'),
+    p_('Third, and decisively, the certification argument. A reviewer asked to accept a structure '
+      + 'wants evidence of the process that produced it, not a sample of it. A continuous record of '
+      + 'rheological state across every course is a far stronger artefact than four cylinders broken '
+      + 'at 28 days, because it speaks to the whole structure rather than to whatever the operator '
+      + 'happened to scoop.'),
+    N('image', { storage_key: '', width: 420, height: 220,
+      alt_text: 'Print head cross-section: bypass viscometer loop, diaphragm-sealed pressure tap, drive-torque instrumentation.' },
+      { border: { color: '#CBD5E1', width: 1, style: 'solid' } }),
+    N('caption', { prefix: 'Figure', number: 2,
+      text: 'Instrumented print head. The viscometer sits in an isolatable bypass so it can be flushed without stopping the print.' },
+      { style: 'italic', size: 9, color: '#64748B' }),
+
+    h3('3.4  The strength estimator'),
+    p_('The estimator predicts 28-day compressive strength from the windowed sensor state. In its '
+      + 'partial-least-squares form the prediction is a projection onto latent components:'),
+    N('equation', { latex: 'f_{28} = \\bar{f} + \\sum_{k=1}^{K} q_k (\\mathbf{x} - \\bar{\\mathbf{x}})^{\\top} \\mathbf{w}_k' }, {}),
+    p_('where x is the thirty-second feature window, w are the PLS weights, and K is chosen by '
+      + 'cross-validation against held-out aggregate profiles rather than within-profile error.'),
+    N('footnote', { marker: '1', text: 'Leave-one-profile-out, not k-fold. The question is whether the '
+      + 'model transfers to an aggregate it has never seen; k-fold over a pooled dataset answers an easier one.' }, {}),
+
+    h3('3.5  Sensor selection and survivability'),
+    p_('The viscometer is the component most likely to fail in the field, so it drove the selection. '
+      + 'Rotational viscometers foul quickly in cementitious slurry. We use a vibrating-element '
+      + 'device with no moving parts in the flow path, mounted in a bypass loop that can be isolated '
+      + 'and flushed without stopping the print. Extrusion pressure is taken from a diaphragm seal '
+      + 'rated for abrasive media; screw torque comes from the drive controller and costs nothing to '
+      + 'instrument. None of the three is novel — the novelty is the correlation model that fuses '
+      + 'them, which is where the Phase I risk sits.'),
+    h3('3.6  The correlation model'),
+    p_('The model maps a windowed feature vector — mean and variance of each channel over a thirty '
+      + 'second window, plus the cross-correlation between pressure and torque, which carries the '
+      + 'aggregate interlock signature — onto predicted 28-day compressive strength. We begin with '
+      + 'partial least squares because it tolerates the collinearity these channels exhibit and '
+      + 'produces a model a reviewer can interrogate. If PLS cannot reach the R² ≥ 0.85 exit '
+      + 'criterion across the six profiles, a gradient-boosted alternative is held in reserve, with '
+      + 'the explicit understanding that it trades reviewability for accuracy — a trade we would '
+      + 'rather not make in a certification context, and would document if forced into it.'),
+
+    h2('4.0  Risk and Mitigation'),
+    N('table', {
+      headers: ['Risk', 'Likelihood', 'Impact', 'Mitigation'],
+      rows: [
+        ['Correlation does not generalise across aggregate types', 'Medium', 'High',
+         'Six profiles chosen to span the envelope; per-family models accepted as a fallback with the loss documented'],
+        ['Viscometer fouls in high-fines feedstock', 'Medium', 'Medium',
+         'Isolatable bypass loop; pressure and torque alone carry a degraded model'],
+        ['28-day breaks gate the schedule', 'High', 'Medium',
+         'Campaign starts in month 3; control law developed against 7- and 14-day data in parallel'],
+        ['PE reviewer rejects the data package shape', 'Medium', 'High',
+         'Reviewer engaged in month 6, not month 9 — the gap list is the deliverable, not a surprise'],
+      ],
+    }, {}),
+    N('caption', { prefix: 'Table', number: 2, text: 'Principal Phase I risks. Likelihood and impact assessed at proposal submission.' },
+      { style: 'italic', size: 9, color: '#64748B' }),
+
+    h3('3.7  What we are deliberately not doing in Phase I'),
+    p_('We are not developing a printer. Phase I integrates onto an existing gantry system already in '
+      + 'our facility, because the risk being retired is in qualification, not motion control. We are '
+      + 'also not addressing reinforcement strategy: printed structures need tensile reinforcement, '
+      + 'that work is mature elsewhere, and conflating it with feedstock qualification would produce '
+      + 'a Phase I that answers neither question convincingly.'),
+
+    N('page_break', {}, {}),
+    h2('5.0  Phase I Work Plan'),
+    N('table', {
+      headers: ['Task', 'Description', 'Month', 'Deliverable'],
+      rows: [
+        ['1', 'Aggregate sourcing and baseline characterisation', '1–2', 'Six characterised profiles, gradation curves'],
+        ['2', 'Instrument the print head; commission the sensor suite', '2–3', 'Calibrated rig, 50 Hz data path'],
+        ['3', 'Correlation campaign — print, sample, break at 7/14/28 days', '3–6', 'Correlation dataset, R² report'],
+        ['4', 'Control law development and hardware-in-the-loop test', '5–7', 'MPC controller, HIL results'],
+        ['5', 'Closed-loop demonstration on an uncharacterised aggregate', '7–8', 'Demonstration report against O3'],
+        ['6', 'Certification package draft and PE review', '8–9', 'Draft package, reviewer gap list'],
+      ],
+    }, {}),
+    N('caption', { prefix: 'Table', number: 3, text: 'Phase I task schedule against the nine-month base period.' },
+      { style: 'italic', size: 9, color: '#64748B' }),
+    p_('Task 3 is the long pole and the schedule reflects it: 28-day breaks cannot be compressed, so '
+      + 'the correlation campaign is started as early as the instrumented rig allows and runs in '
+      + 'parallel with control law development against the 7- and 14-day data.'),
+
+    h3('5.1  Task detail'),
+    p_('Task 1 — Aggregate sourcing and baseline characterisation. Six aggregates are procured to '
+      + 'match published gradation curves from candidate theatres: two coarse-graded, two well-graded '
+      + 'and two with high fines content, the last being the case most likely to defeat both the '
+      + 'viscometer and the correlation. Each is characterised by sieve analysis, specific gravity '
+      + 'and absorption per ASTM C136 and C127, establishing the ground truth the correlation is '
+      + 'measured against. Deliverable: six profiles with gradation curves.'),
+    p_('Task 2 — Instrumentation and commissioning. The bypass viscometer loop, diaphragm-sealed '
+      + 'pressure transducer and drive-torque tap are installed on the existing gantry, with a 50 Hz '
+      + 'acquisition path and time synchronisation to the motion controller so that every sample can '
+      + 'be located to a course and a position. Commissioning proves the sensors track a known mix '
+      + 'through a deliberate water-ratio sweep before any unknown feedstock is introduced.'),
+    p_('Task 3 — Correlation campaign. Each of the six profiles is printed at three water-cement '
+      + 'ratios, with cylinders cast from the delivery line at the moment of extrusion rather than '
+      + 'from the batch, so the sample and the sensor see the same material. Breaks at 7, 14 and 28 '
+      + 'days per ASTM C39. Eighteen print runs, fifty-four cylinders, and the resulting dataset is '
+      + 'the evidence for O2.'),
+    p_('Task 4 — Control law and hardware-in-the-loop. The MPC controller is developed against the '
+      + 'Task 3 dataset and exercised in a HIL environment that replays recorded sensor traces '
+      + 'against the real actuation path, so the loop is tested at full rate before it touches '
+      + 'material. Hard constraints on water-cement ratio are verified by attempting to violate them.'),
+    p_('Task 5 — Closed-loop demonstration. A seventh aggregate, deliberately not characterised '
+      + 'beforehand and not in the training set, is printed under closed-loop control with no '
+      + 'operator intervention. Cylinders are broken at 28 days and compared to target. This is the '
+      + 'single experiment that decides whether O3 is met.'),
+    p_('Task 6 — Certification package. The continuous process record from Task 5, the correlation '
+      + 'evidence from Task 3 and the constraint verification from Task 4 are assembled into the '
+      + 'shape a structural reviewer would expect, and put in front of a licensed PE. The '
+      + 'deliverable is not an approval — it is an enumerated list of what is still missing, which '
+      + 'is the input to Phase II.'),
+
+    h3('5.2  Phase I deliverables'),
+    bl([
+      'Aggregate characterisation report — six profiles, gradation curves, ASTM C136/C127 results',
+      'Correlation dataset and analysis — eighteen print runs, fifty-four cylinder breaks, R² against 28-day strength',
+      'Control law specification and HIL verification results, including constraint-violation testing',
+      'Closed-loop demonstration report on an uncharacterised aggregate, measured against the ±15% criterion',
+      'Draft certification data package with a licensed PE\u2019s enumerated gap list',
+      'Final report and Phase II transition recommendation',
+    ]),
+
+    h2('11.0  Prior SBIR/STTR Awards'),
+    p_('Immobileyes Inc. has received two prior SBIR awards, neither in this technical area. '
+      + 'Award FA8649-23-P-0412 (AFWERX Phase I, 2023) addressed edge perception for counter-UAS and '
+      + 'transitioned to a Phase II. Award N68335-24-C-0189 (NAVAIR Phase I, 2024) addressed '
+      + 'automated inspection of composite structures and is in its option period. Neither overlaps '
+      + 'the work proposed here in scope, personnel allocation or technical content; the common '
+      + 'thread is closed-loop control of a process a human currently supervises, which is the '
+      + 'company\u2019s stated technical focus rather than a duplication of effort.'),
+
+    h2('12.0  Data Rights Assertions'),
+    p_('All technical data developed under this effort is delivered with SBIR Data Rights per DFARS '
+      + '252.227-7018. The correlation model, the control law and the certification package format '
+      + 'are asserted as SBIR data. The sensor selection is commercial off-the-shelf and carries no '
+      + 'assertion. No third-party proprietary data is incorporated, and no open-source component '
+      + 'with a reciprocal licence is used in the delivered control software.'),
+
+    N('page_break', {}, {}),
+    h2('13.0  References'),
+    bl([
+      'ERDC/CERL TR-17-8, Automated Construction of Expeditionary Structures: Additive Construction of a Barracks Hut, 2017',
+      'ASTM C39/C39M-21, Standard Test Method for Compressive Strength of Cylindrical Concrete Specimens',
+      'ASTM C136/C136M-19, Standard Test Method for Sieve Analysis of Fine and Coarse Aggregates',
+      'Le, T.T. et al., Hardened properties of high-performance printing concrete, Cement and Concrete Research, 2012',
+      'Wolfs, R.J.M. et al., Early age mechanical behaviour of 3D printed concrete, Cement and Concrete Research, 2018',
+    ]),
+
+    h2('6.0  Related Work'),
+    p_('ERDC\u2019s Automated Construction of Expeditionary Structures programme established printability '
+      + 'of barracks-scale structures and produced the B-hut demonstration; its published limitation '
+      + 'is reliance on a controlled mix delivered to site. Commercial work by ICON and COBOD has '
+      + 'driven printer reliability and throughput to production levels, again on graded commercial '
+      + 'feedstock. Academic work at Loughborough and TU Eindhoven has characterised the rheology of '
+      + 'printable cementitious mixes in the laboratory. Our contribution sits precisely in the gap '
+      + 'those three lines leave: nobody has closed the loop from in-line measurement to binder '
+      + 'correction on feedstock that was not characterised in advance.'),
+    p_('It is worth being precise about what we are NOT claiming. We are not claiming a better '
+      + 'printer, a novel binder chemistry, or a new structural form. Each of those is an active '
+      + 'field with participants better resourced than us. We are claiming that the qualification '
+      + 'gap is the one holding the capability back, that it is tractable with sensors that already '
+      + 'exist, and that nobody has done it because the incentive in commercial construction runs '
+      + 'the other way — a commercial printer wants a controlled supply chain, not the ability to '
+      + 'survive without one.'),
+    N('blockquote', { text: 'The limiting factor was never the printer. It was that we could not tell '
+      + 'a commander the wall would hold without shipping the mix we already knew.',
+      cite: 'ERDC programme review, 2019' }, { style: 'italic' }),
+    N('url', { href: 'https://erdc-library.erdc.dren.mil/', display_text: 'ERDC Knowledge Core \u2014 ACES programme reports' }, {}),
+
+    p_('The nearest prior art is in-line quality control in ready-mix delivery, where drum-mounted '
+      + 'slump sensors have been commercially deployed for over a decade. That work establishes the '
+      + 'physical basis for our correlation. It does not transfer directly: a ready-mix drum sees a '
+      + 'batch designed in a plant to a known specification, and its control authority is limited to '
+      + 'adding water. We are correcting binder ratio against an unknown feedstock, which is a '
+      + 'harder estimation problem and a wider actuation envelope.'),
+
+    h2('7.0  Relationship with Future R/R&D'),
+    p_('Phase II integrates the qualified loop onto a transportable platform and addresses '
+      + 'reinforcement and multi-structure site planning, targeting a NAVFAC-accepted certification '
+      + 'route. The Phase I certification gap list is the direct input to that scope — we expect it to '
+      + 'be the controlling document for Phase II rather than the printer specification.'),
+    N('numbered_list', { items: [
+      { text: 'Platform integration \u2014 the qualified loop onto a transportable frame sized to one ISO container' },
+      { text: 'Reinforcement \u2014 the tensile strategy excluded from Phase I, likely a cable-laying end effector' },
+      { text: 'Certification \u2014 the Phase I gap list carried through to a NAVFAC-accepted route' },
+    ] }, {}),
+    p_('Concretely, Phase II has three workstreams. Platform integration takes the qualified loop '
+      + 'from our gantry onto a transportable frame sized to a single ISO container, which is the '
+      + 'form factor a unit can actually receive. Reinforcement addresses the tensile strategy '
+      + 'deliberately excluded from Phase I, most likely through a cable-laying end effector, drawing '
+      + 'on existing work rather than originating it. Certification carries the Phase I gap list '
+      + 'through to a NAVFAC-accepted route, which we expect to be the long pole and have scheduled '
+      + 'accordingly.'),
+    p_('The transition customer is NAVFAC EXWC, with whom we have had preliminary discussions '
+      + 'through the topic author. The Phase I certification package is the artefact that makes '
+      + 'those discussions concrete: it converts "printed structures might be certifiable" into a '
+      + 'specific list of what a reviewer still needs.'),
+
+    h2('8.0  Commercialization Strategy'),
+    p_('The dual-use case is disaster reconstruction, where the same constraint appears in civilian '
+      + 'form: aggregate is abundant on site, graded commercial supply is not, and the qualification '
+      + 'bottleneck is what keeps printed structures out of permitted reconstruction. We have a '
+      + 'letter of interest from a regional builder in Florida contingent on a documented '
+      + 'qualification route, which is exactly the Phase I deliverable.'),
+    p_('The economics differ from the defence case in a way that matters. A disaster reconstruction '
+      + 'contractor is not lift-constrained; they are constrained by the availability of skilled '
+      + 'crews and by permitting. Closed-loop qualification addresses both — it removes the materials '
+      + 'engineer from the crew requirement and produces the continuous process record a building '
+      + 'official can accept. The same technical result serves both markets for different reasons, '
+      + 'which is the strongest form a dual-use argument can take.'),
+    p_('Our commercialization path does not depend on selling printers. We intend to license the '
+      + 'qualification loop to printer manufacturers, whose current offering stops at motion control '
+      + 'and whose customers keep asking the certification question. That is a smaller revenue per '
+      + 'unit than hardware and a far shorter path to deployment, and it avoids competing with '
+      + 'companies whose manufacturing capability we could not match.'),
+
+    h3('8.1  The constraint the controller must never violate'),
+    p_('Stated as the controller sees it, so a reviewer can check it against the implementation:'),
+    N('code_block', { language: 'python', code: 'W_C_MAX = 0.55          # ACI 318 durability limit, exposure class F1\n\ndef clamp(binder_kg, water_kg):\n    # Hard constraint: the loop may trade workability, never durability.\n    if water_kg / binder_kg > W_C_MAX:\n        water_kg = binder_kg * W_C_MAX\n    return binder_kg, water_kg' }, {}),
+
+    N('text_box', { text: 'Phase I decides one question: does the in-line signature predict strength on '
+      + 'an aggregate the model has never seen? Everything else in this volume exists to make that '
+      + 'question answerable.' },
+      { fill: { color: '#EFF6FF' }, border: { color: '#1D4ED8', width: 1, style: 'solid', radius: 4 } }),
+
+    N('shape', { shape: 'rounded_rectangle', text: 'O3 \u2014 closed loop, uncharacterised feedstock, \u00b115%' },
+      { fill: { color: '#DCFCE7' }, border: { color: '#15803D', width: 2 }, shadow: true }),
+
+    N('video', { url: 'https://example.gov/immobileyes/gantry-print-run.mp4',
+      caption: 'Gantry print run at the Youngstown facility, February 2026 \u2014 the rig Phase I instruments.' }, {}),
+
+    N('page_break', {}, {}),
+    h2('9.0  Key Personnel'),
+    bl([
+      'Dr. Elena Marsh, Principal Investigator — 12 years in cementitious materials; led the rheology '
+      + 'correlation work at her previous institution; 0.25 FTE.',
+      'Tomas Reyes, Controls Lead — model-predictive control for process plants; implemented the HIL '
+      + 'environment used in Task 4; 1.0 FTE.',
+      'Priya Anand, Test Engineer — materials laboratory operations, ASTM C39 and C143 qualified; '
+      + 'owns the break campaign; 0.5 FTE.',
+    ]),
+
+    h2('10.0  Facilities and Equipment'),
+    p_('Work is performed at our 6,000 sq ft facility in Youngstown, Ohio, which houses a 4m × 4m × 3m '
+      + 'gantry printer, an instrumented mixing plant, and a materials laboratory with a 250 kN '
+      + 'compression frame calibrated to ASTM C39. No government-furnished equipment is required. '
+      + 'Aggregate for the O1 profiles is sourced commercially to match published gradations from the '
+      + 'target theatres rather than shipped from them.'),
+
+    N('callout', { variant: 'warning', text: 'Registrations current at submission: SAM (expires 2027-03), '
+      + 'SBIR company registry, and the DoD Contractor Verification Service. No lapses within the period of performance.' }, {}),
+
+    N('signature', { label: 'Dr. Elena Marsh, Principal Investigator' }, {}),
+  ] } as unknown as CanvasDocument;
 }
 
-/** Exactly five slides — one section per slide, separated by page breaks. */
-function fiveSlideDeck(): CanvasDocument {
-  const slide = (title: string, bullets: string[]) => [
-    N('heading', { level: 1, text: title }, { size: 26 }),
-    N('bulleted_list', { items: bullets.map((text) => ({ text })) }, {}),
-  ];
-  const nodes: CanvasNode[] = [
-    ...slide('Additive Construction for Expeditionary Basing', ['Immobileyes Inc.', 'N261-EXP01 · Phase I']),
-    N('page_break', {}),
-    ...slide('The problem', ['Basing structures are shipped, not built', 'Lift capacity is the binding constraint']),
-    N('page_break', {}),
-    ...slide('Our approach', ['Print from local aggregate', 'Closed-loop thermal control', 'Operator-free qualification']),
-    N('page_break', {}),
-    ...slide('Milestones', ['M1 — cell integrated', 'M2 — field trial', 'M3 — transition package']),
-    N('page_break', {}),
-    ...slide('What we need', ['Range access at two windows', 'Government-furnished aggregate spec']),
-  ];
+/**
+ * A five-slide capability brief that tells an actual story: the constraint, why it persists, what we
+ * do differently, what we have already shown, and what we are asking for.
+ *
+ * The first version was five slides of two generic bullets each — "Print from local aggregate",
+ * "Closed-loop thermal control" — which demonstrates the slide writer and nothing about whether a
+ * person could brief from it. A deck is a sequence of claims, and if the claims are placeholders
+ * the sequence has nothing to test.
+ */
+function capabilityDeck(): CanvasDocument {
+  const title = (text: string) => N('heading', { level: 1, text }, { size: 28, color: '#0F172A' });
+  const sub = (text: string) => N('text_block', { text }, { size: 13, color: '#475569' });
+  const bl = (items: string[]) => N('bulleted_list', { items: items.map((text) => ({ text })) }, {});
+  const brk = () => N('page_break', {});
+
   return { version: 1, canvas: { ...CANVAS_PRESETS.slide_deck },
-    metadata: { title: 'Capability Deck', status: 'draft' }, nodes } as unknown as CanvasDocument;
+    metadata: { title: 'Capability Brief — N261-EXP01', status: 'draft' }, nodes: [
+
+    title('Printing the base, not shipping it'),
+    sub('Additive construction for expeditionary basing · Immobileyes Inc. · N261-EXP01'),
+    brk(),
+
+    title('40% of lift is aggregate and water'),
+    N('chart', { chart_type: 'bar', title: 'Delivered mass per barracks hut (tons)',
+      categories: ['Conventional', 'Printed'], series: [{ name: 'Tons', data: [40, 4] }] }, {}),
+    bl([
+      'Both aggregate and water are already at almost every site that needs a structure',
+      'Every ton moved is a ton not available for ordnance, fuel or medical materiel',
+      'Twenty structures on a forward site \u2248 700 tons of lift released',
+    ]),
+    brk(),
+
+    title('The printer is not the problem'),
+    N('blockquote', { text: 'We could not tell a commander the wall would hold without shipping the mix '
+      + 'we already knew.', cite: 'ERDC programme review, 2019' }, { style: 'italic', size: 15 }),
+    bl([
+      'ERDC has printed barracks huts; ICON and COBOD build houses at production rate',
+      'All of it depends on graded commercial feedstock delivered to site',
+      'Print from an uncharacterised aggregate and the structure cannot be certified',
+      'So the capability stalls at demonstration and never reaches a unit',
+    ]),
+    brk(),
+
+    title('Close the loop at the print head'),
+    N('image', { storage_key: '', width: 300, height: 150,
+      alt_text: 'Instrumented print head with bypass viscometer, pressure tap and torque sense.' },
+      { border: { color: '#94A3B8', width: 1, style: 'solid' } }),
+    bl([
+      'Extrusion pressure, screw torque and in-line viscometry at 50 Hz',
+      'Signature correlates to early-age strength \u2014 no 28-day wait for a control signal',
+      'Controller trims binder and water against the measurement, not a nominal mix',
+      'Removes the materials engineer from the critical path \u2014 the actual blocker',
+    ]),
+    // Layered deliberately: the constraint sits ON TOP of the mechanism it governs.
+    N('shape', { shape: 'rounded_rectangle', text: 'Hard limit: w/c \u2264 0.55 \u2014 never traded for printability' },
+      { fill: { color: '#FEF3C7' }, border: { color: '#B45309', width: 2 }, shadow: true },
+      { x: 4.6, y: 1.4, w: 4.2, h: 1.1, z: 900 }),
+    brk(),
+
+    title('What Phase I buys you'),
+    N('table', { headers: ['Objective', 'Exit criterion'], rows: [
+      ['O2  Correlation', 'R\u00b2 \u2265 0.85 across six aggregate profiles'],
+      ['O3  Closed loop', '\u00b115% of target on an UNCHARACTERISED aggregate, no operator input'],
+      ['O4  Certification', 'Package reviewed by a licensed PE, gaps enumerated'],
+    ] }, {}),
+    N('text_box', { text: 'Ask: range access at two field windows, and the theatre aggregate gradation data.' },
+      { fill: { color: '#ECFDF5' }, border: { color: '#15803D', width: 1, style: 'solid', radius: 4 } }),
+  ] } as unknown as CanvasDocument;
 }
 
 /** A cost sheet as a real spreadsheet — a table the xlsx writer turns into a worksheet. */
@@ -336,8 +729,8 @@ async function main() {
     // ═══ 8 · VOLUME GENERATION ════════════════════════════════════════════════════════════════
     console.log('\n══ 8 · VOLUME GENERATION — all three shapes ══');
     const volumes = [
-      { key: 'technical', preset: 'letter', doc: tenPageVolume(), title: 'Technical Volume', want: 'pdf' },
-      { key: 'deck', preset: 'deck', doc: fiveSlideDeck(), title: 'Capability Deck', want: 'pptx' },
+      { key: 'technical', preset: 'letter', doc: technicalVolume(), title: 'Technical Volume', want: 'pdf' },
+      { key: 'deck', preset: 'deck', doc: capabilityDeck(), title: 'Capability Deck', want: 'pptx' },
       { key: 'cost', preset: 'sheet', doc: costSheet(), title: 'Cost Volume', want: 'xlsx' },
     ];
     const built: Array<{ key: string; id: string; doc: CanvasDocument; want: string }> = [];
@@ -357,6 +750,18 @@ async function main() {
         return r.status;
       }, [`/api/portal/${tenant.slug}/documents/${id}/save`, v.doc, v.title] as const) as number;
       step(`8-${v.key}`, `${v.title} authored and saved`, sv === 200, `status ${sv}`);
+
+      // COUNT THE VOCABULARY, do not claim it. "Uses all the primitives" is the kind of assertion
+      // that rots the moment someone edits the content, so it is measured from the document itself.
+      const kinds = new Set((v.doc.nodes as CanvasNode[]).map((n) => n.type));
+      if (v.key === 'technical') {
+        step('8-vocab', 'the technical volume exercises the full node vocabulary',
+          kinds.size >= 18, `${kinds.size}/22 node types: ${[...kinds].sort().join(', ')}`);
+      } else if (v.key === 'deck') {
+        step('8-deck-vocab', 'the deck carries figures, charts and layered shapes — not just bullets',
+          kinds.has('chart') && kinds.has('image') && kinds.has('shape') && kinds.has('table'),
+          `${kinds.size} types: ${[...kinds].sort().join(', ')}`);
+      }
       built.push({ key: v.key, id, doc: v.doc, want: v.want });
 
       await visit(T, `/portal/${tenant.slug}/documents/${id}`, `volume-${v.key}`, true);
