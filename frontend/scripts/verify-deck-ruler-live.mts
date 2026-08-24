@@ -166,6 +166,55 @@ function overflowingDeck(): CanvasDocument {
   ]);
 }
 
+/**
+ * Put the tenant back exactly as it was found — INCLUDING what saving caused downstream.
+ *
+ * The first version deleted the `tenant_documents` rows it created and printed
+ * "cleanup: 2 of 2 probe deck(s) removed". It was still wrong twice over, and the evidence was a
+ * later run of verify-db-crud reporting `restored atom "Overflow probe — deliberately over-stuff"`
+ * — another lens finding this harness's litter in the tenant library.
+ *
+ *   1. SAVING A DOCUMENT ALSO MINTS LIBRARY ATOMS. Two per deck here — the document title and the
+ *      heading node — none of which this script inserted directly, so a delete-what-I-created
+ *      cleanup never touched them. Five runs left 20 atoms in Foundation's library, which is the
+ *      corpus the atom lenses and verify-db-crud measure. A harness that pollutes the data other
+ *      instruments read is worse than one that cleans up nothing, because the mess looks like data.
+ *
+ *   2. A THROW SKIPPED CLEANUP ENTIRELY. The teardown sat at the end of main(), so the run that
+ *      died on a schema error left its document behind for good. Hence the `finally` below.
+ *
+ * Atoms are reconciled by ID DELTA — the set present before the run subtracted from the set present
+ * after — never by title. A title match is a predicate about content, and these titles
+ * ("Counter-UAS Edge Autonomy") are plausible enough that a real atom could share one: the box
+ * already holds a legitimate `p7 · Introduction and Summary: Counter-UAS…` from an upload seed.
+ * Deleting by identity cannot reach a row this run did not cause.
+ */
+async function cleanup(created: string[], atomsBefore: Set<string>) {
+  let removedDocs = 0;
+  if (created.length) {
+    const [{ n }] = await sqlBypass<Array<{ n: number }>>`
+      WITH gone AS (DELETE FROM tenant_documents WHERE id = ANY(${created}::uuid[]) RETURNING 1)
+      SELECT count(*)::int AS n FROM gone`;
+    removedDocs = n;
+  }
+
+  const after = await sqlBypass<Array<{ id: string }>>`SELECT id FROM library_atoms`;
+  const minted = after.map((r) => r.id).filter((id) => !atomsBefore.has(id));
+  let removedAtoms = 0;
+  if (minted.length) {
+    const [{ n }] = await sqlBypass<Array<{ n: number }>>`
+      WITH gone AS (DELETE FROM library_atoms WHERE id = ANY(${minted}::uuid[]) RETURNING 1)
+      SELECT count(*)::int AS n FROM gone`;
+    removedAtoms = n;
+  }
+
+  note(`\ncleanup: ${removedDocs}/${created.length} deck(s), ${removedAtoms} atom(s) minted by saving them`);
+  if (removedDocs !== created.length || removedAtoms !== minted.length) {
+    ok(false, 'cleanup removed everything this run caused',
+      `docs ${removedDocs}/${created.length} · atoms ${removedAtoms}/${minted.length}`);
+  }
+}
+
 async function main() {
   const [target] = await sql<Array<{ slug: string; tenantId: string; name: string }>>`
     SELECT t.slug, t.id AS "tenantId", t.name FROM tenants t
@@ -184,11 +233,18 @@ async function main() {
   const s: Session = { ctx: await signIn(browser, member.email, process.env.TENANT_PW || 'DemoPass123!') };
   const created: string[] = [];
 
+  // The BEFORE set, captured before a single row is written. Saving a deck mints library atoms as
+  // a side effect, and the only way to remove exactly those is to know which ids did not exist
+  // beforehand.
+  const atomsBefore = new Set(
+    (await sqlBypass<Array<{ id: string }>>`SELECT id FROM library_atoms`).map((r) => r.id));
+
   const cases: Array<{ title: string; doc: CanvasDocument; mustOverflow: boolean }> = [
     { title: 'Program review deck', doc: cleanDeck(), mustOverflow: false },
     { title: 'Overflow probe deck', doc: overflowingDeck(), mustOverflow: true },
   ];
 
+  try {
   for (const c of cases) {
     console.log(`\n══ ${c.title} ══`);
 
@@ -289,27 +345,16 @@ async function main() {
       `${Math.round(pdf.buf.length / 1024)}KB`);
   }
 
-  // Clean up: this harness authors real rows through the real routes, and leaving probe decks in a
-  // tenant's document list is how a corpus quietly fills with test data.
-  //
-  // Torn down on the owner pool, as the other harnesses do (lib/scenario.mts): there is no archive
-  // route for a tenant document, and a cleanup that quietly 404s leaves the mess it claims to have
-  // removed. Deleting only the ids THIS run created — never a title match, which would reach rows
-  // a person authored.
-  let removed = 0;
-  if (created.length) {
-    const [{ n }] = await sqlBypass<Array<{ n: number }>>`
-      WITH gone AS (DELETE FROM tenant_documents WHERE id = ANY(${created}::uuid[]) RETURNING 1)
-      SELECT count(*)::int AS n FROM gone`;
-    removed = n;
-  }
-  note(`\ncleanup: ${removed} of ${created.length} probe deck(s) removed`);
-  if (removed !== created.length) {
-    ok(false, 'cleanup removed every probe deck it created', `${removed}/${created.length}`);
+  } finally {
+    // ALWAYS. A teardown that only runs on the happy path is not a teardown — the run that threw
+    // on a schema error left its document in the tenant's list permanently, and five later runs
+    // built a pile of atoms on top of it.
+    await cleanup(created, atomsBefore);
   }
 
   await browser.close();
   await sql.end();
+  await sqlBypass.end();
   console.log(`\n${fail === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }

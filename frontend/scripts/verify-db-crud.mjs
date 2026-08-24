@@ -139,10 +139,25 @@ try {
   const [fx] = await sql`
     SELECT count(*)::int AS total, count(*) FILTER (WHERE is_locked)::int AS locked
     FROM proposals WHERE tenant_id = ${foundation.id} AND archived_at IS NULL`;
+  // SAY WHAT WAS MEASURED, not something larger. This note used to read "the fixture holds no
+  // in-flight build", inferred from Foundation alone — the only tenant this lens signs in as. Once
+  // a second tenant got an unlocked build (B118) that sentence became simply false while the
+  // measurement behind it stayed correct, which is the worst kind of stale claim: an instrument
+  // reporting a fact about the box that the box stopped containing.
+  //
+  // The distinction matters to whoever reads it. "Foundation has none" is a reason to unlock one
+  // HERE; "the box has none" is a reason to seed one anywhere. They call for different actions, so
+  // the note has to know which it is.
+  const [elsewhere] = await sql`
+    SELECT count(*)::int AS n FROM proposals p
+    WHERE p.archived_at IS NULL AND p.is_locked = false AND p.tenant_id <> ${foundation.id}`;
   if (fx && fx.total > 0 && fx.locked === fx.total) {
-    notes.push(`all ${fx.total} Foundation proposals are LOCKED — the fixture holds no in-flight `
-      + 'build, so the primary customer action (editing a section) cannot be demonstrated on it '
-      + 'without an admin unlock');
+    notes.push(`all ${fx.total} Foundation proposals are LOCKED, and this lens signs in only as `
+      + `Foundation — so editing a section cannot be demonstrated here without an admin unlock. `
+      + (elsewhere?.n > 0
+        ? `${elsewhere.n} unlocked build(s) DO exist on other tenants, so this is a gap in this `
+          + `lens's reach, not in the fixture.`
+        : `No unlocked build exists on any tenant either — the fixture genuinely holds none.`));
   }
 
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
