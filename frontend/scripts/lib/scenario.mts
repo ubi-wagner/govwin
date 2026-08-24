@@ -409,7 +409,24 @@ export async function scenario(name: string): Promise<Scenario> {
       // one — a tenant's atoms reference its users, and a build's matrix references its sections —
       // so the whole scenario is disposed as one order-independent set rather than trace by trace.
       const all = traces.flatMap((t) => t.steps);
-      const { removed, stuck } = await deleteUntilStable(all);
+      let { removed, stuck } = await deleteUntilStable(all);
+
+      // ONE DELAYED SWEEP, for writes that land AFTER teardown starts.
+      //
+      // Provisioning kicks off agent work, and an agent writes its episodic memory when it finishes
+      // — which can be after dispose has already deleted that tenant's memories and moved on to the
+      // tenant row. The symptom is a lone `episodic_memories_tenant_id_fkey` violation on a purge
+      // that was otherwise complete, and it is intermittent, because it is a race.
+      //
+      // Retrying immediately does not help: the write has not happened yet. Waiting once and
+      // re-running only the failing deletes does. If it is still stuck after that, it is reported —
+      // a race that keeps losing is a fact, not something to paper over with a longer sleep.
+      if (stuck.length) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const again = await deleteUntilStable(all);
+        removed += again.removed;
+        stuck = again.stuck;
+      }
       // TWO KINDS OF FAILING DELETE, and calling them the same thing is its own defect.
       //
       // A statement naming a column or table that does not exist is a BUG IN THIS FILE — it deleted
