@@ -42,6 +42,20 @@ try {
   A('precondition: BAA guide is NOT live (0 active)', before[0].n === 0);
   A('precondition: there IS a draft to publish', draftN[0].n > 0, `drafts=${draftN[0].n}`);
 
+  // Reopen the review ToDo, because that is what the precondition MEANS. Un-publishing the guide
+  // puts the review back in front of a human; leaving its ToDo completed would model a state the
+  // product never produces, and the assertion at the end would then be checking a row this script
+  // had already set. Matched by page_key — a publish rewrites rows, so the id the ToDo holds is
+  // routinely stale (the same reason publishDocument matches that way).
+  await sql`UPDATE tasks SET status='open', completed_at=NULL
+            WHERE task_type='content_publish'
+              AND entity_id IN (SELECT id FROM content_pages WHERE page_key=${SLUG} AND content_type='guide')`;
+  const todoBefore = await sql`
+    SELECT count(*)::int AS n FROM tasks
+    WHERE task_type='content_publish' AND status='open'
+      AND entity_id IN (SELECT id FROM content_pages WHERE page_key=${SLUG} AND content_type='guide')`;
+  A('precondition: the review ToDo is OPEN', todoBefore[0].n > 0, `open=${todoBefore[0].n}`);
+
   await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#email', { timeout: 20000 });
   await p.fill('#email', ADMIN.email); await p.fill('#password', ADMIN.pw);
@@ -67,6 +81,20 @@ try {
   // Reading `versionNo` here printed "vundefined" — the same class of silent miss the SOP warns
   // about, harmless in a label and not harmless anywhere that branches on the value.
   A('the guide is now LIVE (active version exists)', after.length > 0, after[0] ? `v${after[0].version_no}` : 'none');
+
+  // …and the publish DRAINED the review queue. Publishing IS the work the ToDo asked for, so an
+  // item left open is a queue that can only grow, and a review list that only grows is one people
+  // stop reading. Nothing closed these until 2026-08: the BAA guide was live on the marketing site
+  // with its "Review & publish" ToDo still open, pointing at a version the publish had archived.
+  const todoAfter = await sql`
+    SELECT status, count(*)::int AS n FROM tasks
+    WHERE task_type='content_publish'
+      AND entity_id IN (SELECT id FROM content_pages WHERE page_key=${SLUG} AND content_type='guide')
+    GROUP BY status`;
+  const stillOpen = todoAfter.find((r) => r.status === 'open')?.n ?? 0;
+  const closed = todoAfter.find((r) => r.status === 'completed')?.n ?? 0;
+  A('publishing CLOSED the review ToDo that asked for it', stillOpen === 0 && closed > 0,
+    `open=${stillOpen} completed=${closed}`);
 
   // Verify it renders on the PUBLIC marketing site (the resources/guides surface projects HTML).
   const pubUrl = `${BASE}/resources/${SLUG}`;

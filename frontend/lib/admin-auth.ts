@@ -9,7 +9,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-type AdminOk = { ok: true; userId: string; email?: string };
+type AdminOk = { ok: true; userId: string; email?: string; role: 'rfp_admin' | 'master_admin' };
 type AdminErr = { ok: false; res: NextResponse };
 
 export async function requireAdmin(): Promise<AdminOk | AdminErr> {
@@ -31,5 +31,7 @@ export async function requireAdmin(): Promise<AdminOk | AdminErr> {
   if (!userId) {
     return { ok: false, res: NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   }
-  return { ok: true, userId, email: (session.user as { email?: string }).email };
+  // `role` is returned because the guard has already established it, and a caller that needs to act
+  // as this admin downstream (completing a platform-scope task, say) would otherwise have to guess.
+  return { ok: true, userId, email: (session.user as { email?: string }).email, role };
 }

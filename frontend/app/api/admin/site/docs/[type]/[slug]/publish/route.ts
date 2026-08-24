@@ -26,7 +26,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ type: 
     payload: { slug, contentType: type },
   });
   try {
-    const result = await publishDocument(slug, type);
+    const result = await publishDocument(slug, type, { id: a.userId, email: a.email, role: a.role });
     if (result.published) {
       try {
         const list = LIST_PATH[type];

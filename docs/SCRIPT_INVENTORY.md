@@ -24,15 +24,17 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 27
+## SUITE — 30
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
+| `close-e2e-cms.mjs` | — | 2026-08-21 |
 | `drive-atomization.mts` | — | 2026-08-24 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-24 |
+| `drive-cms-generate.mts` | — | 2026-08-24 |
 | `drive-collaborator-boundary.mts` | — | 2026-08-24 |
 | `drive-copy-starter.mts` | — | 2026-08-23 |
 | `drive-full-draft.mts` | — | 2026-08-24 |
@@ -56,6 +58,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-starter-offer.mts` | — | 2026-08-24 |
 | `drive-submit-gate.mts` | — | 2026-08-14 |
 | `drive-tenant-workflow-setup.mts` | — | 2026-08-15 |
+| `drive-uncovered-triggers.mts` | — | 2026-08-24 |
 | `drive-vault-isolation.mts` | — | 2026-08-24 |
 
 ## LENS — 4
@@ -134,7 +137,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 63
+## DOCUMENTED — 66
 
 No code references it, but a document tells someone to run it.
 
@@ -145,7 +148,6 @@ No code references it, but a document tells someone to run it.
 | `capture-guides.mjs` | — | 2026-08-23 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
-| `close-e2e-cms.mjs` | — | 2026-08-21 |
 | `close-e2e-marketing.mjs` | — | 2026-08-13 |
 | `close-e2e-proposal.mjs` | — | 2026-08-13 |
 | `drive-corpus-verbatim.mts` | — | 2026-08-19 |
@@ -165,11 +167,13 @@ No code references it, but a document tells someone to run it.
 | `embed-atoms.mts` | — | 2026-08-11 |
 | `fire-uncovered-lib-triggers.mts` | — | 2026-08-23 |
 | `fire-uncovered-triggers.mjs` | — | 2026-08-23 |
+| `gen-guide-queue-seed.mts` | — | — |
 | `gen-navy-sttr-proposal.mts` | — | 2026-07-19 |
 | `gen-sample-proposal.mts` | — | 2026-07-19 |
 | `gen-starter-set-seed.mts` | — | 2026-08-04 |
 | `hitl-setup.mts` | 1 | 2026-07-19 |
 | `ingest-assist-e2e.mts` | — | 2026-07-19 |
+| `inventory-scripts.mjs` | — | 2026-08-24 |
 | `measure-canvas-flow.mts` | — | 2026-07-19 |
 | `measure-image-placeholder.mts` | — | 2026-08-23 |
 | `measure-table-row-height.mts` | — | 2026-08-22 |
@@ -183,6 +187,8 @@ No code references it, but a document tells someone to run it.
 | `sandbox-heartbeat.sh` | — | 2026-08-19 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-dsip-opps.mts` | — | 2026-07-19 |
+| `seed-followon-guides.mts` | — | 2026-08-19 |
+| `seed-practice-guides.mts` | — | — |
 | `seed-program-guides.mts` | — | 2026-08-13 |
 | `seed-template-masters.mts` | — | 2026-08-14 |
 | `seed-vault-demo.mts` | 3 | 2026-07-25 |
@@ -204,7 +210,7 @@ No code references it, but a document tells someone to run it.
 | `verify-storage-server.mts` | — | 2026-08-11 |
 | `verify-studio-voice.mts` | — | 2026-08-23 |
 
-## UNREFERENCED — 86
+## UNREFERENCED — 84
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
@@ -236,7 +242,6 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `dsip-plan-check.mts` | — | 2026-08-18 |
 | `gen-immobileyes-seed.mts` | — | 2026-08-18 |
 | `immo-ingest-drive.mts` | — | 2026-08-18 |
-| `inventory-scripts.mjs` | — | — |
 | `j1-cold-start.mjs` | — | 2026-08-20 |
 | `make-dsip-fixture.mts` | — | 2026-08-18 |
 | `measure-volumes.mts` | — | 2026-08-19 |
@@ -254,7 +259,6 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `repair-section-page-caps.mts` | — | 2026-08-19 |
 | `repair-truncated-source-text.mts` | — | 2026-08-20 |
 | `seed-demo-automation.mts` | — | 2026-07-19 |
-| `seed-followon-guides.mts` | — | 2026-08-19 |
 | `seed-house-library.mts` | — | 2026-07-23 |
 | `seed-librarian-catalog.mjs` | — | 2026-08-11 |
 | `seed-review-junk.mjs` | — | 2026-08-11 |
@@ -374,14 +378,14 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 27 |
+| SUITE | 30 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
 | LIBRARY | 5 |
 | CALLED-BY-ANOTHER | 15 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 63 |
-| UNREFERENCED | 86 |
+| DOCUMENTED | 66 |
+| UNREFERENCED | 84 |
 | CANNOT-RUN | 41 |
-| **total** | **251** |
+| **total** | **255** |

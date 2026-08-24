@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ pageKey
     payload: { pageKey, note },
   });
   try {
-    const result = await publishPage(pageKey);
+    const result = await publishPage(pageKey, { id: a.userId, email: a.email, role: a.role });
     if (result.published) {
       const path = PAGE_PATHS[pageKey];
       if (path) {

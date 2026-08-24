@@ -199,22 +199,39 @@ What it will not do is have the conversations for you. The transition customer, 
   },
 ];
 
-/** The canvas renderer carries its own emphasis; markdown markers would print literally. */
-const stripMd = (s: string): string =>
-  s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1');
-
 let ok = true;
 const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
 
 try {
   console.log('\n── #168 CONTENT-QUEUE · follow-on guides (cost volume · compliance · Phase II) ──\n');
+
+  // Sweep ORPHANS first: a content_publish ToDo whose entity_id names a content_pages row that no
+  // longer exists. Earlier runs of this script left three behind (the delete below used to match
+  // on the id it had just created), and an orphan is not a harmless stray row — it is an item in
+  // a human's review queue whose "open it in the Studio" link resolves to nothing.
+  const orphans = await sql`
+    DELETE FROM tasks WHERE task_type = 'content_publish' AND status = 'open'
+      AND entity_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM content_pages cp WHERE cp.id = tasks.entity_id)
+    RETURNING id`;
+  if (orphans.length) console.log(`  · swept ${orphans.length} orphaned review ToDo(s) pointing at deleted pages`);
+
   for (const g of GUIDES) {
     // Canvas-native: the CanvasDocument is the source of truth; the public HTML body is projected
-    // from it on save (docs/CONTENT_STUDIO_DESIGN.md).
-    const canvas = canvasFromDocBody(g.title, stripMd(g.body));
+    // from it on save (docs/CONTENT_STUDIO_DESIGN.md). This used to strip `**` before parsing,
+    // because the seed parser copied the markers through literally; it now reads them as
+    // inline_formats, so the emphasis these bodies were written with actually survives to the page.
+    const canvas = canvasFromDocBody(g.title, g.body);
     const nodeCount = (canvas.sections?.[0]?.groups?.[0]?.nodes ?? []).length;
 
-    // Re-runs replace rather than stack.
+    // Re-runs replace rather than stack — and the ORDER here is the whole point. The prior run's
+    // ToDo names the prior run's draft row by id, so it has to be deleted WHILE that row still
+    // exists. Dropping the page first orphans the ToDo, and no page_key lookup afterwards can find
+    // it again: the id it holds no longer resolves to anything. Page-first is exactly how three
+    // dead items accumulated in the review queue.
+    await sql`DELETE FROM tasks WHERE task_type = 'content_publish' AND status = 'open'
+              AND entity_id IN (SELECT id FROM content_pages
+                                WHERE page_key = ${g.slug} AND content_type = 'guide')`;
     await sql`DELETE FROM content_pages WHERE page_key = ${g.slug} AND content_type = 'guide' AND status = 'draft'`;
 
     const draft = await saveDocumentDraft(
@@ -227,7 +244,6 @@ try {
     A(`${g.slug}: draft v${draft.versionNo} (${nodeCount} nodes, ${bodyLen}B html, canvas=${!!draft.metadata?.canvas})`,
       draft.status === 'draft' && bodyLen > 200 && !!draft.metadata?.canvas);
 
-    await sql`DELETE FROM tasks WHERE task_type = 'content_publish' AND entity_id = ${draft.id}::uuid AND status = 'open'`;
     const task = await createTask({
       actor: { id: USER.id, email: USER.email, role: 'master_admin', tenantId: null },
       taskType: 'content_publish',
