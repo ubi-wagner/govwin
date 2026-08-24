@@ -218,6 +218,9 @@ export async function publishPage(
       WHERE id = ${draft.id}
     `;
     return { published: true, versionNo: draft.versionNo };
+  }).then(async (r: { published: boolean; versionNo?: number; reason?: string }) => {
+    if (r.published) await closePublishTodos(pageKey, 'page');
+    return r;
   });
 }
 
@@ -406,6 +409,39 @@ export async function saveDocumentDraft(
 }
 
 /** Publish a document: promote its latest draft, archive prior active + drafts. */
+/**
+ * Close the review ToDo that asked for this publish.
+ *
+ * A `content_publish` ToDo means "a human still has to look at this and publish it". Publishing IS
+ * that work, so leaving the ToDo open is a queue that can never be emptied — and an admin whose
+ * content-review list only ever grows stops reading it, which is how the next real review gets
+ * missed. Nothing completed these before: a published BAA guide sat with an open "Review & publish"
+ * ToDo whose entity pointed at a version the publish had since archived.
+ *
+ * MATCHED BY page_key, NOT by the entity id. The ToDo names a specific `content_pages` ROW, and a
+ * publish rewrites rows — the draft is promoted and the prior active is archived — so an id that
+ * was right when the ToDo was raised can be stale by the time anyone acts on it. The page_key is
+ * the thing that stays the same across versions, which makes it the honest join.
+ *
+ * Best-effort by design: it runs after the publish transaction has committed and never throws. A
+ * publish that succeeded must not be reported as failed because a bookkeeping update did not.
+ */
+async function closePublishTodos(pageKey: string, contentType: string): Promise<number> {
+  try {
+    const res = await sql`
+      UPDATE tasks SET status = 'completed', completed_at = now()
+      WHERE task_type = 'content_publish'
+        AND status = 'open'
+        AND entity_id IN (
+          SELECT id FROM content_pages WHERE page_key = ${pageKey} AND content_type = ${contentType}
+        )`;
+    return res.count ?? 0;
+  } catch (e) {
+    console.error('[content-admin] closePublishTodos failed', e);
+    return 0;
+  }
+}
+
 export async function publishDocument(
   slug: string,
   contentType: string,
@@ -426,5 +462,8 @@ export async function publishDocument(
     `;
     await tx`UPDATE content_pages SET status = 'active', published_at = now() WHERE id = ${draft.id}`;
     return { published: true, versionNo: draft.versionNo };
+  }).then(async (r: { published: boolean; versionNo?: number; reason?: string }) => {
+    if (r.published) await closePublishTodos(slug, contentType);
+    return r;
   });
 }
