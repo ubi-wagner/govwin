@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// `sqlBypass`, deliberately, for the TARGET LOOKUP ONLY — see the comment at the query.
+import { sql, sqlBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { getActiveMemberships } from '@/lib/memberships';
 import { DeepLinkGate } from '@/components/portal/deep-link-gate';
@@ -37,7 +38,25 @@ export default async function GoPage({
 
   if (taskId && UUID_RE.test(taskId)) {
     try {
-      const [row] = await sql<
+      // ── THE LOOKUP THAT DECIDES WHICH TENANT TO ENTER CANNOT ITSELF BE TENANT-SCOPED ──────
+      //
+      // `tasks` has row-level security, so under the request's (as yet unset) tenant context the
+      // context-aware `sql` cannot see a TENANT-SCOPED task at all. And it cannot be set: working
+      // out which tenant to enter is the entire job of this query. The result was that every
+      // notification deep-link to a tenant task — section review, draft, acknowledge, every
+      // workflow to-do — fell through `!targetSlug` to `redirect('/portal')` and dropped the
+      // recipient on a dashboard instead of the work the email pointed at.
+      //
+      // It survived because PLATFORM-scope tasks (`tenant_id IS NULL`) ARE visible without a
+      // context, via the `OR (tenant_id IS NULL)` arm — so every admin-facing deep link worked,
+      // and the broken half was the customer-facing half. Measured, not guessed: the same query
+      // as `govtech_app` returns nothing for a tenant task and the slug for a platform one.
+      //
+      // This read is the platform plane doing dispatch, which is the documented `sqlBypass` case.
+      // It grants NOTHING: authorisation is still `getActiveMemberships` below, unchanged — a
+      // person who is not a member of the resolved tenant is sent to the dispatcher exactly as
+      // before. All this restores is the ability to READ which tenant the link refers to.
+      const [row] = await sqlBypass<
         {
           status: string;
           entityType: string | null;

@@ -64,6 +64,10 @@ export class CannotRun extends Error {
 export interface ScenarioTenant {
   tenantId: string;
   slug: string;
+  /** The DISPLAY name. The company selector and most UI show this, not the slug — matching a
+   *  picker form on the slug finds nothing, silently picks the wrong company, and every downstream
+   *  assertion then fails for a reason that has nothing to do with what is being tested. */
+  name: string;
   adminUserId: string;
   adminEmail: string;
   password: string;
@@ -281,7 +285,7 @@ export async function scenario(name: string): Promise<Scenario> {
       // Undo in dependency order INSIDE one trace: a tenant's rows must go before the tenant.
       track(`tenant ${r.slug}`, await purgeTenantSteps(r.tenantId));
       return {
-        tenantId: r.tenantId, slug: r.slug, adminUserId: r.adminUserId,
+        tenantId: r.tenantId, slug: r.slug, name, adminUserId: r.adminUserId,
         adminEmail, password: SCENARIO_PW,
       };
     },
@@ -322,7 +326,7 @@ export async function scenario(name: string): Promise<Scenario> {
       const hash = await bcrypt.hash(SCENARIO_PW, 12);
       await sql`UPDATE users SET password_hash = ${hash}, temp_password = false WHERE id = ${r.userId}::uuid`;
       return {
-        tenantId: r.tenantId, slug: r.slug, adminUserId: r.userId,
+        tenantId: r.tenantId, slug: r.slug, name: `Scenario ${label} ${tag}`, adminUserId: r.userId,
         adminEmail: `${label}.${tag}@scenario.test`, password: SCENARIO_PW,
       };
     },
