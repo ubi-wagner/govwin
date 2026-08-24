@@ -1,5 +1,11 @@
 # LAUNCH_READINESS_2026-08.md — retrospective, cracks, and the launch punch list
 
+> ⚠️ **SUPERSEDED by `docs/LAUNCH_READINESS_2026-08-24.md`.** This pass is dated at migration head **185**;
+> the tree is at **213**. Its §4 punch list is still substantially correct and is carried forward there, but
+> its VERDICT is stale — three things found since change the answer, one of which (migs 212/213 FORCE row-level
+> security on eleven tables, owner included) can take the admin surface down rather than degrade it. Read the
+> newer doc for go/no-go; keep this one for the head-185 retrospective and the crack register.
+
 **Date:** 2026-08-16 · **Migration head:** 185 · **Branch:** `claude/nice-hamilton-kBqtD`
 **Backbone:** frontend `tsc` 0 · `vitest` 1129 · `next build` clean; pipeline workflow-invariant suite green
 (the no-deadend CI failure fixed this session). **Method:** four parallel code sweeps (doc-currency,
