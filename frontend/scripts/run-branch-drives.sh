@@ -166,7 +166,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -210,6 +210,13 @@ DRIVES=(
   "uncovered-triggers|scripts/drive-uncovered-triggers.mts"
   "cms-generate|scripts/drive-cms-generate.mts"
   "cms-publish|scripts/close-e2e-cms.mjs"
+  # Authors NEW documents from a blank canvas as both actors and takes them out in all four formats.
+  # It needs the OWNER for its own bookkeeping (reading back the saved row), which the runner already
+  # exports; it creates tenant_documents rows and leaves them, deliberately — they are a customer's
+  # own documents, not fixture, and a tenant with a few extra drafts is the realistic state.
+  "canvas-authoring|scripts/drive-canvas-authoring.mts"
+  # The four structural primitives, each measured by the effect it actually has. No server needed.
+  "canvas-structural|scripts/probe-structural-nodes.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0

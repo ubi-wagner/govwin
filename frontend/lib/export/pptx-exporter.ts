@@ -570,7 +570,13 @@ function addNodeToSlide(
     }
     case 'spacer':
       // 72 points to the inch. Was a hardcoded 0.3in (21.6pt) regardless of the author's height.
-      return spacerHeightPt(node) / 72;
+      //
+      // CLAMPED TO WHAT IS LEFT. This loop is `curY += added` with no slide-advance, so a height
+      // the author meant as "push the rest down a page" would push it off the slide entirely — a
+      // 900pt spacer asks for 12.5in on a 7.5in slide. Honouring the intent as far as the slide
+      // allows keeps the content visible, and the compliance floor still raises slide_overflow so
+      // the author is told rather than left to discover it in the deck.
+      return Math.min(spacerHeightPt(node) / 72, maxH);
     case 'toc': {
       const headings = allNodes.filter((n) => n.type === 'heading').map((n) => n.content as HeadingContent);
       const tocText = headings.map((hh) => `${'  '.repeat(hh.level - 1)}${hh.numbering ? `${hh.numbering} ` : ''}${hh.text}`).join('\n');

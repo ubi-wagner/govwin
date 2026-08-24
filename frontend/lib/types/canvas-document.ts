@@ -944,6 +944,12 @@ function nodeStackHeightPt(node: CanvasNode, m: ReturnType<typeof flowMetrics>):
       return h;
     }
     case 'spacer':
+      // A DELIBERATELY DIFFERENT FALLBACK, and the only asymmetry left in this node.
+      // When the author set no height at all, the writers use 12pt and the ruler uses a body line
+      // (~14pt). That is not the divergence B109 was about — it is the ruler's standing rule from
+      // B64: it may over-count and must never UNDER-count, because an over-count warns about a page
+      // limit that is not breached while an under-count clears a volume the printer rejects. Stated
+      // here so it reads as the choice it is rather than as the bug it resembles.
       return spacerHeightPt(node, bodyLineH);
     case 'heading': {
       // THE SCALE HERE MUST BE THE STYLESHEET'S SCALE. canvas-html tightened headings — its own
