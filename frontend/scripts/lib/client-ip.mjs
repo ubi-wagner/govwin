@@ -36,12 +36,12 @@ let seq = 0;
  * The next simulated client address. Wraps at 250 rather than running off the end of the octet —
  * a drive making 250 browser contexts has a different problem than rate limiting.
  */
-export function nextClientIp(): string {
+export function nextClientIp() {
   seq = (seq % 250) + 1;
   return `10.${OCTET_B}.${OCTET_C}.${seq}`;
 }
 
 /** Headers declaring a fresh simulated client. Spread into `browser.newContext({...})`. */
-export function clientHeaders(): Record<string, string> {
+export function clientHeaders() {
   return { 'x-real-ip': nextClientIp() };
 }

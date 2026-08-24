@@ -23,10 +23,17 @@ OUT="${OUT_DIR:-/tmp/branch-drives}"
 mkdir -p "$OUT"
 FILTER="${1:-}"
 
-export DATABASE_URL="${DATABASE_URL:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
-export DATABASE_URL_OWNER="${DATABASE_URL_OWNER:-$DATABASE_URL}"
+# THE DEFAULTS ARE THE TWO ROLES, not one role twice. Defaulting both to the owner made every
+# isolation drive refuse ("RLS posture wrong") on the plainest possible invocation — safe, since a
+# bypassed layer makes an isolation verdict meaningless rather than merely wrong, but it meant the
+# obvious command measured nothing. Defaulting both to the app role would flip the problem onto the
+# scenario drives, which create companies and need the owner. Each default is now the role its own
+# group requires; either can still be overridden from the environment.
+export DATABASE_URL="${DATABASE_URL:-postgresql://govtech_app:changeme@localhost:5432/govtech_intel}"
+export DATABASE_URL_OWNER="${DATABASE_URL_OWNER:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
 export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
-export GUIDE_DB="${GUIDE_DB:-$DATABASE_URL}"
+# The harness's OWN bookkeeping reads across tenants, so it uses the owner regardless of posture.
+export GUIDE_DB="${GUIDE_DB:-$DATABASE_URL_OWNER}"
 export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 export RFP_ADMIN_PW="${RFP_ADMIN_PW:-$SANDBOX_PASSWORD}"
 export TENANT_PW="${TENANT_PW:-DemoPass123!}"
@@ -46,8 +53,12 @@ export STORAGE_DRIVER="${STORAGE_DRIVER:-local}"
 #
 # The tenant chosen is the one with the most to lose: driving isolation against an empty tenant
 # proves nothing, because every check would pass on nothing.
+# These three lookups are the RUNNER's own bookkeeping and read ACROSS tenants, so they use the
+# owner. Run as the scoped app role with no tenant context they would not error — they would
+# silently count zero proposals and zero cards for every tenant and pick the "busiest" one at
+# random, which is the worst of both worlds: a fixture chosen by nothing, reported as chosen.
 if [ -z "${TEST_TENANT_ID:-}" ]; then
-  read -r _tid _tslug <<<"$(psql "$DATABASE_URL" -tAF' ' -c "
+  read -r _tid _tslug <<<"$(psql "$DATABASE_URL_OWNER" -tAF' ' -c "
     SELECT x.id, x.slug FROM (
       SELECT t.id, t.slug,
              (SELECT count(*) FROM proposals p WHERE p.tenant_id = t.id) AS n1,
@@ -60,7 +71,7 @@ if [ -z "${TEST_TENANT_ID:-}" ]; then
     export TEST_TENANT_ID="$_tid" TEST_TENANT_SLUG="$_tslug"
     # The ACTOR is pinned in several drives too — `owner_user_id` FK violations are the same rot,
     # one field further in. Resolve a real tenant_admin of the chosen tenant.
-    _aid=$(psql "$DATABASE_URL" -tAc "
+    _aid=$(psql "$DATABASE_URL_OWNER" -tAc "
       SELECT u.id FROM users u
       WHERE u.tenant_id = '$_tid' AND u.is_active AND u.role = 'tenant_admin'
       ORDER BY u.created_at LIMIT 1" 2>/dev/null | tr -d ' ')
@@ -126,7 +137,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collabo
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -174,7 +185,7 @@ for entry in "${DRIVES[@]}"; do
   # usage and exits 1, which is indistinguishable in a table from the flow being broken.
   drive_args=""
   if [ "$argspec" = "SOLICITATION" ]; then
-    drive_args=$(psql "$DATABASE_URL" -tAc "
+    drive_args=$(psql "$DATABASE_URL_OWNER" -tAc "
       SELECT cs.id FROM curated_solicitations cs
       WHERE EXISTS (SELECT 1 FROM solicitation_volumes v WHERE v.solicitation_id = cs.id)
       ORDER BY cs.created_at DESC LIMIT 1" 2>/dev/null | tr -d ' ')

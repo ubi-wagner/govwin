@@ -9,6 +9,7 @@
  *  cd frontend && node --import tsx scripts/drive-collaborator-boundary.mts */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
+import { clientHeaders } from './lib/client-ip.mjs';
 
 const BASE = process.env.BASE || 'http://localhost:3000';
 const sql = postgres('postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 2 });
@@ -19,7 +20,7 @@ let tempId = '';
 async function loginAndProbe(email: string, password: string, routes: string[]) {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
   try {
-    const p = await (await b.newContext()).newPage();
+    const p = await (await b.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
     await p.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
     await p.fill('input[name=email]', email);
     await p.fill('input[name=password]', password);

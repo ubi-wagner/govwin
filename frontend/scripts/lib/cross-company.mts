@@ -25,7 +25,7 @@
  */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { CannotRun, type Scenario, type ScenarioTenant, type ScenarioBuild } from './scenario.mts';
-import { clientHeaders } from './client-ip.mts';
+import { clientHeaders } from './client-ip.mjs';
 
 export const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';

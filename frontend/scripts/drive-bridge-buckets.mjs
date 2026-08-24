@@ -19,6 +19,7 @@
  */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
+import { clientHeaders } from './lib/client-ip.mjs';
 
 const BASE = 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -71,9 +72,9 @@ const B = { slug: picks[1].slug, email: picks[1].email, pw: TPW, tenantId: picks
 console.log(`tenants: A=${A.slug} (${A.email})  B=${B.slug} (${B.email})`);
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-const pageA = await (await browser.newContext()).newPage();
-const pageB = await (await browser.newContext()).newPage();
-const admin = await (await browser.newContext()).newPage();
+const pageA = await (await browser.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
+const pageB = await (await browser.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
+const admin = await (await browser.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
 await login(pageA, A.email, A.pw);
 await login(pageB, B.email, B.pw);
 await login(admin, 'eric@rfppipeline.com', process.env.RFP_ADMIN_PW || 'RFPAdmin2026!');

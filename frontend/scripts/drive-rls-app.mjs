@@ -31,6 +31,7 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { resolveActor, loginOrDie, CannotRun, dieWell, harnessDbUrl } from './lib/drive-actor.mjs';
+import { clientHeaders } from './lib/client-ip.mjs';
 
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
@@ -94,7 +95,7 @@ async function main() {
   const b = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const results = [];
   try {
-    const tctx = await b.newContext();
+    const tctx = await b.newContext({ extraHTTPHeaders: clientHeaders() });
     // Throws CannotRun (exit 2) rather than returning a logged-out page.
     const tp = await loginOrDie(tctx, BASE, actor);
     console.log(`signed in → ${tp.url()}\n`);

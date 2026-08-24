@@ -30,6 +30,7 @@
  */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
+import { clientHeaders } from './lib/client-ip.mjs';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -73,7 +74,7 @@ console.log(`\n── recording a WIN on "${target.title.slice(0, 46)}" ──\n
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 try {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, extraHTTPHeaders: clientHeaders() });
   const p = await ctx.newPage();
   await p.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#email', { timeout: 20000 });

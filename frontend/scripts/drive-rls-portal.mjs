@@ -9,6 +9,7 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { resolveActor, loginOrDie, dieWell, CannotRun, harnessDbUrl } from './lib/drive-actor.mjs';
+import { clientHeaders } from './lib/client-ip.mjs';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const DB = process.env.DATABASE_URL;
@@ -122,7 +123,7 @@ async function main() {
   const actor = await resolveActor(sql, { role: 'tenant_admin', tenantSlug: tenant.slug });
   const ROUTES = routesFor();
   const b = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
-  const ctx = await b.newContext();
+  const ctx = await b.newContext({ extraHTTPHeaders: clientHeaders() });
   const p = await loginOrDie(ctx, BASE, actor);
   console.log(`signed in as ${actor.email} → ${p.url()}`);
   const fails = [];

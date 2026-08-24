@@ -22,6 +22,7 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { chromium } from 'playwright';
 import postgres from 'postgres';
+import { clientHeaders } from './lib/client-ip.mjs';
 
 const BASE = 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -85,7 +86,7 @@ console.log(`\ntenant A: ${A.slug}  (${A.email})`);
 console.log(`tenant B: ${B.slug}  (${B.email})`);
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-const pageA = await (await browser.newContext()).newPage();
+const pageA = await (await browser.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
 await login(pageA, A.email, A.pw);
 
 // Clear any prior run's uploads so "new atoms" means this run's. Keyed on the reference atoms'
@@ -208,7 +209,7 @@ if (process.env.ATOM_EMBED || process.env.VOYAGE_API_KEY) {
 
 // ── 5 · another tenant cannot see any of it ─────────────────────────────────
 console.log('\n5. isolation');
-const pageB = await (await browser.newContext()).newPage();
+const pageB = await (await browser.newContext({ extraHTTPHeaders: clientHeaders() })).newPage();
 await login(pageB, B.email, B.pw);
 const crossApi = await pageB.request.get(`${BASE}/api/portal/${A.slug}/atoms?limit=5`);
 check([403, 404].includes(crossApi.status()), 'tenant B is refused tenant A\'s atom list', `HTTP ${crossApi.status()}`);

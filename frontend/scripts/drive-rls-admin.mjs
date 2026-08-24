@@ -9,6 +9,7 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { resolveActor, loginOrDie, dieWell, CannotRun } from './lib/drive-actor.mjs';
+import { clientHeaders } from './lib/client-ip.mjs';
 const DB = process.env.DATABASE_URL;
 if (!DB) { console.error('DATABASE_URL required'); process.exit(2); }
 const sql = postgres(DB, { max: 2 });
@@ -69,7 +70,7 @@ async function main() {
   const ROUTES = routesFor(anyTenant.id);
   console.log(`cross-tenant target: ${anyTenant.slug}`);
   const b = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
-  const ctx = await b.newContext();
+  const ctx = await b.newContext({ extraHTTPHeaders: clientHeaders() });
   const p = await loginOrDie(ctx, BASE, admin);
   console.log(`admin ${admin.email} → ${p.url()}`);
   const rows = [];
