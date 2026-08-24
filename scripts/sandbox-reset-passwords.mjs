@@ -29,30 +29,46 @@ if (!/localhost|127\.0\.0\.1/.test(DB)) {
 }
 
 const sql = postgres(DB, { max: 2 });
-const PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
+// TWO PASSWORDS, because the drives use two. An admin account is driven with SANDBOX_PASSWORD and a
+// tenant account with TENANT_PW, and this script used to set every target to the admin one —
+// including a tenant_admin, directly under a comment claiming tenant users were left alone. The
+// result was one account with a password no drive expects: drive-bridge-buckets logged in as tenant
+// B with TENANT_PW and got `/login?error=invalid`, on a box where everything else was correct.
+const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
+const TENANT_PW = process.env.TENANT_PW || 'DemoPass123!';
 
-/** Only accounts the run needs to drive. Tenant users already have a known seeded password. */
+/** Accounts the run needs to drive, each with the password its drives actually use. */
 const TARGETS = [
-  'eric@rfppipeline.com',        // master_admin — rotated by 198
-  'eric.c.wagner@gmail.com',     // master_admin — rotated by 124
-  'pjackson@ecinnovates.com',    // partner_admin (Entrepreneurs' Center)
-  'sgaffney@ybi.org',            // partner_admin (Youngstown Business Incubator)
+  { email: 'eric@rfppipeline.com', pw: ADMIN_PW },      // master_admin — rotated by 198
+  { email: 'eric.c.wagner@gmail.com', pw: ADMIN_PW },   // master_admin — rotated by 124
+  { email: 'pjackson@ecinnovates.com', pw: ADMIN_PW },  // partner_admin (Entrepreneurs' Center)
+  { email: 'sgaffney@ybi.org', pw: ADMIN_PW },          // partner_admin (Youngstown Business Incubator)
   // A SECOND tenant_admin, in a different tenant from Foundation. Every isolation drive needs one:
   // proving "tenant B cannot see tenant A's rows" requires B to have a real login, or the check
   // degrades into asserting that an anonymous request is refused — which proves nothing about
   // tenant scoping. drive-atomization.mjs used to name a `lighthouse` tenant that does not exist
   // here and bailed before its first assertion.
-  'admin@immobileyes.test',      // tenant_admin (Immobileyes Inc.)
+  // A TENANT account, so it gets the TENANT password — this is the one that was wrong.
+  { email: 'admin@immobileyes.test', pw: TENANT_PW },   // tenant_admin (Immobileyes Inc.)
 ];
 
-const hash = await bcrypt.hash(PW, 12);
+const hashes = new Map();
+for (const t of TARGETS) {
+  if (!hashes.has(t.pw)) hashes.set(t.pw, await bcrypt.hash(t.pw, 12));
+}
 let n = 0;
-for (const email of TARGETS) {
+for (const { email, pw } of TARGETS) {
+  const hash = hashes.get(pw);
   const rows = await sql`
     UPDATE users SET password_hash = ${hash}, temp_password = false, updated_at = now()
     WHERE email = ${email} RETURNING email, role`;
-  if (rows.length) { console.log(`  ✓ ${rows[0].email.padEnd(28)} [${rows[0].role}]`); n += 1; }
+  if (rows.length) {
+    const which = pw === ADMIN_PW ? 'admin pw' : 'tenant pw';
+    console.log(`  ✓ ${rows[0].email.padEnd(28)} [${String(rows[0].role).padEnd(13)}] ${which}`);
+    n += 1;
+  }
   else console.log(`  – ${email.padEnd(28)} (no such account)`);
 }
-console.log(`\n${n} account(s) reset to the sandbox password. This is a local box only.`);
+console.log(`\n${n} account(s) reset — admin accounts to SANDBOX_PASSWORD, tenant accounts to `
+  + 'TENANT_PW, matching what the drives actually send. This is a local box only.');
 await sql.end();

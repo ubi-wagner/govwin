@@ -29,6 +29,17 @@ FILTER="${1:-}"
 # obvious command measured nothing. Defaulting both to the app role would flip the problem onto the
 # scenario drives, which create companies and need the owner. Each default is now the role its own
 # group requires; either can still be overridden from the environment.
+# ONE SOURCE OF TRUTH FOR CREDENTIALS. scripts/sandbox-env.sh is where the box's roles and
+# passwords are defined; this file used to carry its own defaults and they drifted — sandbox-env
+# said the app role's password was `apppass` and the default below said `changeme`, so on a
+# rehydrated box every scoped-connection drive died with
+#   PostgresError: password authentication failed for user "govtech_app"
+# which reads as a broken database and is actually two files disagreeing about one value. Sourcing
+# it means the runner cannot disagree with the environment the box was set up with.
+SANDBOX_ENV="$(dirname "$0")/../../scripts/sandbox-env.sh"
+# shellcheck disable=SC1090
+[ -f "$SANDBOX_ENV" ] && . "$SANDBOX_ENV"
+
 export DATABASE_URL="${DATABASE_URL:-postgresql://govtech_app:changeme@localhost:5432/govtech_intel}"
 export DATABASE_URL_OWNER="${DATABASE_URL_OWNER:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
 # The SCOPED role by name, always — a scenario drive is handed the owner as DATABASE_URL, so a
