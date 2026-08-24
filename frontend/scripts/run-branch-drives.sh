@@ -31,6 +31,9 @@ FILTER="${1:-}"
 # group requires; either can still be overridden from the environment.
 export DATABASE_URL="${DATABASE_URL:-postgresql://govtech_app:changeme@localhost:5432/govtech_intel}"
 export DATABASE_URL_OWNER="${DATABASE_URL_OWNER:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
+# The SCOPED role by name, always — a scenario drive is handed the owner as DATABASE_URL, so a
+# check whose meaning is "RLS denied it" needs a way to reach the app role regardless.
+export DATABASE_URL_APP="${DATABASE_URL_APP:-postgresql://govtech_app:changeme@localhost:5432/govtech_intel}"
 export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
 # The harness's OWN bookkeeping reads across tenants, so it uses the owner regardless of posture.
 export GUIDE_DB="${GUIDE_DB:-$DATABASE_URL_OWNER}"
@@ -137,7 +140,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages vault-isolation collabo
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -162,7 +165,7 @@ DRIVES=(
   "rls-admin|scripts/drive-rls-admin.mjs"
   "rls-portal|scripts/drive-rls-portal.mjs"
   "rls-pages|scripts/drive-rls-pages.mjs"
-  "atomization|scripts/drive-atomization.mjs"
+  "atomization|scripts/drive-atomization.mts"
   "bridge-buckets|scripts/drive-bridge-buckets.mjs"
   "pin|scripts/drive-pin.mts"
   "identity-deeplink|scripts/drive-identity-deeplink.mts"

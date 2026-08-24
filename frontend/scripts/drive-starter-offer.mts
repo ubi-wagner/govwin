@@ -12,6 +12,7 @@
 // reads zero against rows that exist. The product paths under test still run scoped. Same split as
 // harnessDbUrl() for the .mjs drives; see B86.
 import { sqlBypass as sql } from '@/lib/db';
+import { runInTenant } from '@/lib/tenant-context';
 import { offerStarterSet, STARTER_OFFER_TASK_TYPE } from '@/lib/library/starter-offer';
 import { listOpenTasksForActor } from '@/lib/tasks/tasks';
 
@@ -55,7 +56,15 @@ async function main() {
   console.log(`2 idempotent: alreadyOffered=${r2.alreadyOffered} sameTask=${r2.taskId === r1.taskId} tasks=${await taskCount()} events=${await eventCount()}  ${s2 ? '✅' : '❌'}`);
 
   // 3) surfaces to the tenant_admin's queue
-  const queue = await listOpenTasksForActor({ id: ADMIN, role: 'tenant_admin', tenantId: TENANT });
+  //
+  // INSIDE A TENANT CONTEXT, because that is the only way this call is ever made for real.
+  // `listOpenTasksForActor` reads through the CONTEXT-AWARE `sql`; a request sets `app.tenant_id`
+  // before calling it, a script does not. Run bare under the scoped role, RLS correctly returns
+  // nothing and the check reported "the offer never reached the queue" — a product finding invented
+  // by the harness skipping the one step the server always takes. It passed only while the suite
+  // happened to be running as the owner, which is exactly the posture B86 says proves nothing.
+  const queue = await runInTenant(TENANT, () =>
+    listOpenTasksForActor({ id: ADMIN, role: 'tenant_admin', tenantId: TENANT }));
   const mine = queue.find((t) => t.id === r1.taskId);
   const s3 = !!mine && mine.taskType === STARTER_OFFER_TASK_TYPE && mine.title.includes('starter set');
   console.log(`3 surfaces  : inQueue=${!!mine} title="${mine?.title ?? ''}"  ${s3 ? '✅' : '❌'}`);
