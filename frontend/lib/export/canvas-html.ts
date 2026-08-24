@@ -10,6 +10,7 @@
  * links, page breaks, spacers. Header/footer are handled by the PDF exporter's
  * running templates (canvas.header/footer), not the body.
  */
+import { latexToHtml } from '@/lib/export/latex-html';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -450,7 +451,23 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'equation': {
       const eq = c as EquationContent;
       const tex = eq.latex ?? eq.mathml ?? '';
-      return `<div data-latex="${esc(tex)}" style="text-align:center;font-family:'Cambria Math','Times New Roman',serif;font-style:italic;margin:8pt 0">${esc(tex)}</div>`;
+      // TYPESET IT, or say plainly that it could not be. This used to escape the source into the
+      // page, so a volume printed `\sum_{k=1}^{K}` where the formula belonged — markup in a
+      // document a government reviewer reads. `data-latex` was left for a client-side typesetter
+      // that never existed and could not have run here anyway: the PDF is written by a headless
+      // Chromium with no such library loaded.
+      //
+      // On anything the converter cannot render faithfully it returns the SOURCE, visibly marked.
+      // A renderer that silently produces plausible maths saying something other than what the
+      // author wrote is worse than one that admits it — in a document where a number is a
+      // commitment, a wrong formula is a wrong promise.
+      const rendered = latexToHtml(tex);
+      const base = `text-align:center;font-family:'Cambria Math','Times New Roman',serif;margin:8pt 0`;
+      if (!rendered.complete) {
+        return `<div data-latex="${esc(tex)}" data-unrendered="true" style="${base};font-style:italic;color:#b45309" `
+          + `title="This expression could not be typeset and is shown as written.">${esc(tex)}</div>`;
+      }
+      return `<div data-latex="${esc(tex)}" style="${base};font-style:italic">${rendered.html}</div>`;
     }
     case 'divider': {
       const dv = c as DividerContent;

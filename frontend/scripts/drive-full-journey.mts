@@ -219,6 +219,13 @@ function technicalVolume(): CanvasDocument {
       + 'the explicit understanding that it trades reviewability for accuracy — a trade we would '
       + 'rather not make in a certification context, and would document if forced into it.'),
 
+    h3('3.7  What we are deliberately not doing in Phase I'),
+    p_('We are not developing a printer. Phase I integrates onto an existing gantry system already in '
+      + 'our facility, because the risk being retired is in qualification, not motion control. We are '
+      + 'also not addressing reinforcement strategy: printed structures need tensile reinforcement, '
+      + 'that work is mature elsewhere, and conflating it with feedstock qualification would produce '
+      + 'a Phase I that answers neither question convincingly.'),
+
     h2('4.0  Risk and Mitigation'),
     N('table', {
       headers: ['Risk', 'Likelihood', 'Impact', 'Mitigation'],
@@ -235,13 +242,6 @@ function technicalVolume(): CanvasDocument {
     }, {}),
     N('caption', { prefix: 'Table', number: 2, text: 'Principal Phase I risks. Likelihood and impact assessed at proposal submission.' },
       { style: 'italic', size: 9, color: '#64748B' }),
-
-    h3('3.7  What we are deliberately not doing in Phase I'),
-    p_('We are not developing a printer. Phase I integrates onto an existing gantry system already in '
-      + 'our facility, because the risk being retired is in qualification, not motion control. We are '
-      + 'also not addressing reinforcement strategy: printed structures need tensile reinforcement, '
-      + 'that work is mature elsewhere, and conflating it with feedstock qualification would produce '
-      + 'a Phase I that answers neither question convincingly.'),
 
     N('page_break', {}, {}),
     h2('5.0  Phase I Work Plan'),
@@ -301,32 +301,6 @@ function technicalVolume(): CanvasDocument {
       'Closed-loop demonstration report on an uncharacterised aggregate, measured against the ±15% criterion',
       'Draft certification data package with a licensed PE\u2019s enumerated gap list',
       'Final report and Phase II transition recommendation',
-    ]),
-
-    h2('11.0  Prior SBIR/STTR Awards'),
-    p_('Immobileyes Inc. has received two prior SBIR awards, neither in this technical area. '
-      + 'Award FA8649-23-P-0412 (AFWERX Phase I, 2023) addressed edge perception for counter-UAS and '
-      + 'transitioned to a Phase II. Award N68335-24-C-0189 (NAVAIR Phase I, 2024) addressed '
-      + 'automated inspection of composite structures and is in its option period. Neither overlaps '
-      + 'the work proposed here in scope, personnel allocation or technical content; the common '
-      + 'thread is closed-loop control of a process a human currently supervises, which is the '
-      + 'company\u2019s stated technical focus rather than a duplication of effort.'),
-
-    h2('12.0  Data Rights Assertions'),
-    p_('All technical data developed under this effort is delivered with SBIR Data Rights per DFARS '
-      + '252.227-7018. The correlation model, the control law and the certification package format '
-      + 'are asserted as SBIR data. The sensor selection is commercial off-the-shelf and carries no '
-      + 'assertion. No third-party proprietary data is incorporated, and no open-source component '
-      + 'with a reciprocal licence is used in the delivered control software.'),
-
-    N('page_break', {}, {}),
-    h2('13.0  References'),
-    bl([
-      'ERDC/CERL TR-17-8, Automated Construction of Expeditionary Structures: Additive Construction of a Barracks Hut, 2017',
-      'ASTM C39/C39M-21, Standard Test Method for Compressive Strength of Cylindrical Concrete Specimens',
-      'ASTM C136/C136M-19, Standard Test Method for Sieve Analysis of Fine and Coarse Aggregates',
-      'Le, T.T. et al., Hardened properties of high-performance printing concrete, Cement and Concrete Research, 2012',
-      'Wolfs, R.J.M. et al., Early age mechanical behaviour of 3D printed concrete, Cement and Concrete Research, 2018',
     ]),
 
     h2('6.0  Related Work'),
@@ -412,6 +386,11 @@ function technicalVolume(): CanvasDocument {
     N('video', { url: 'https://example.gov/immobileyes/gantry-print-run.mp4',
       caption: 'Gantry print run at the Youngstown facility, February 2026 \u2014 the rig Phase I instruments.' }, {}),
 
+    N('callout', { variant: 'warning', text: 'Registrations current at submission: SAM (expires 2027-03), '
+      + 'SBIR company registry, and the DoD Contractor Verification Service. No lapses within the period of performance.' }, {}),
+
+    N('signature', { label: 'Dr. Elena Marsh, Principal Investigator' }, {}),
+
     N('page_break', {}, {}),
     h2('9.0  Key Personnel'),
     bl([
@@ -430,10 +409,32 @@ function technicalVolume(): CanvasDocument {
       + 'Aggregate for the O1 profiles is sourced commercially to match published gradations from the '
       + 'target theatres rather than shipped from them.'),
 
-    N('callout', { variant: 'warning', text: 'Registrations current at submission: SAM (expires 2027-03), '
-      + 'SBIR company registry, and the DoD Contractor Verification Service. No lapses within the period of performance.' }, {}),
+    N('page_break', {}, {}),
+    h2('11.0  Prior SBIR/STTR Awards'),
+    p_('Immobileyes Inc. has received two prior SBIR awards, neither in this technical area. '
+      + 'Award FA8649-23-P-0412 (AFWERX Phase I, 2023) addressed edge perception for counter-UAS and '
+      + 'transitioned to a Phase II. Award N68335-24-C-0189 (NAVAIR Phase I, 2024) addressed '
+      + 'automated inspection of composite structures and is in its option period. Neither overlaps '
+      + 'the work proposed here in scope, personnel allocation or technical content; the common '
+      + 'thread is closed-loop control of a process a human currently supervises, which is the '
+      + 'company\u2019s stated technical focus rather than a duplication of effort.'),
 
-    N('signature', { label: 'Dr. Elena Marsh, Principal Investigator' }, {}),
+    h2('12.0  Data Rights Assertions'),
+    p_('All technical data developed under this effort is delivered with SBIR Data Rights per DFARS '
+      + '252.227-7018. The correlation model, the control law and the certification package format '
+      + 'are asserted as SBIR data. The sensor selection is commercial off-the-shelf and carries no '
+      + 'assertion. No third-party proprietary data is incorporated, and no open-source component '
+      + 'with a reciprocal licence is used in the delivered control software.'),
+
+    N('page_break', {}, {}),
+    h2('13.0  References'),
+    bl([
+      'ERDC/CERL TR-17-8, Automated Construction of Expeditionary Structures: Additive Construction of a Barracks Hut, 2017',
+      'ASTM C39/C39M-21, Standard Test Method for Compressive Strength of Cylindrical Concrete Specimens',
+      'ASTM C136/C136M-19, Standard Test Method for Sieve Analysis of Fine and Coarse Aggregates',
+      'Le, T.T. et al., Hardened properties of high-performance printing concrete, Cement and Concrete Research, 2012',
+      'Wolfs, R.J.M. et al., Early age mechanical behaviour of 3D printed concrete, Cement and Concrete Research, 2018',
+    ]),
   ] } as unknown as CanvasDocument;
 }
 
