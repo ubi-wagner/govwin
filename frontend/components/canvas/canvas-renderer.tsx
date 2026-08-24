@@ -278,8 +278,19 @@ export function CanvasRenderer({
           width: canvas.width * scale,
           minHeight: canvas.height * scale,
           padding: `${canvas.margins.top * scale}px ${canvas.margins.right * scale}px ${canvas.margins.bottom * scale}px ${canvas.margins.left * scale}px`,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top center',
+          // NO `transform: scale()` HERE. Every dimension above is ALREADY multiplied by `scale` —
+          // width, height, padding, and the font sizes below — so a transform scaled the page a
+          // SECOND time and it rendered at scale². Invisible at full width, where scale clamps to 1;
+          // measurably wrong as the viewport narrows, and invisible to the eye even then because
+          // everything inside shrinks together, so the page looks right and is simply too small.
+          //
+          //   viewport 1100  layout 460px · visual 346px   ratio 0.752
+          //   viewport  600  layout 536px · visual 469px   ratio 0.875
+          //
+          // Centring is unaffected: the outer container is `flex ... items-center`, which is what
+          // was actually centring the page — `transformOrigin: 'top center'` only decided where the
+          // redundant shrink pulled towards. Found by writing a grid overlay and needing to know,
+          // exactly, what coordinate space the page was in.
           background: canvas.background || undefined,
         }}
       >
