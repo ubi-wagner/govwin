@@ -313,19 +313,32 @@ function renderTitleSlide(
     x: MARGIN, y: 0.7, w: bodyW, h: 1.2,
     fontSize: 40, fontFace: canvas.font_default.family, bold: true, color: 'FFFFFF', valign: 'middle',
   });
-  // subtitle lines below the band
-  let y = 3.0;
-  for (const n of bodyNodes) {
-    if (n.type !== 'text_block') continue;
+  // ── SUBTITLE STACK, OPTICALLY CENTRED IN THE WHITE BELOW THE BAND ──
+  //
+  // These lines were pinned to y=3.0 whatever they were, so a one-line subtitle sat just under the
+  // band with four inches of nothing beneath it and the deck's FIRST slide — the one thing every
+  // reviewer sees — read as unfinished. The content slides already centre their short content;
+  // this path returns before that code and kept its own constants.
+  //
+  // Same rule, same reason: 0.38 of the slack rather than 0.5, because the eye weights the space
+  // above a block more heavily than the space below it, so arithmetic centring reads as low.
+  const lines = bodyNodes.filter((n) => n.type === 'text_block' && (n.content as TextBlockContent).text);
+  const stackH = lines.reduce((h, _n, i) => h + (i === 0 ? 0.7 : 0.45), 0);
+  const bandBottom = 2.5;
+  const footerTop = dims.h - 0.28;
+  const slack = Math.max(0, (footerTop - bandBottom) - stackH);
+  let y = bandBottom + Math.max(0.5, slack * 0.38);
+
+  let first = true;
+  for (const n of lines) {
     const c = n.content as TextBlockContent;
-    if (!c.text) continue;
-    const first = y === 3.0;
     slide.addText(sub(c.text), {
       x: MARGIN, y, w: bodyW, h: 0.5,
       fontSize: first ? 22 : 16, fontFace: canvas.font_default.family,
       color: first ? INK : MUTED, bold: first, valign: 'top', wrap: true,
     });
     y += first ? 0.7 : 0.45;
+    first = false;
   }
   // accent footer rule
   slide.addShape((slide as unknown as { _shapeType?: never }, 'rect') as unknown as PptxGenJS.ShapeType, { x: 0, y: dims.h - 0.28, w: dims.w, h: 0.28, fill: { color: accent }, line: { type: 'none' } } as PptxGenJS.ShapeProps);
