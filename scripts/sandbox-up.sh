@@ -19,6 +19,23 @@ mkdir -p "$GOVWIN_RUN_DIR"
 
 say() { printf '  %s\n' "$*"; }
 
+# ── Module resolution for the scripts that live OUTSIDE frontend/ ───────────
+#
+# Node resolves a bare import from the importing FILE's directory upward, not from the cwd. Only
+# frontend/ has a node_modules, so `db/migrations/migrate.mjs` and `scripts/seed_dev_accounts.mjs`
+# both die with ERR_MODULE_NOT_FOUND on `postgres` no matter where they are invoked from.
+#
+# That is not a cosmetic gap. It silently disabled two steps of THIS script: the schema said
+# "DRIFT: db at 211, disk at 213 — migrating forward" and then printed a stack trace, and the
+# fixtures said "seed FAILED" — so a rebuilt box came up two migrations behind with unseeded
+# accounts while still reporting "✓ stack up". Both were recorded as B108 and worked around by hand
+# for as long as they have existed.
+#
+# A symlink is the whole fix: one node_modules, resolvable from anywhere in the tree. Recreated on
+# every run because the container restores the repo from a snapshot and it does not survive.
+[ -e "$ROOT/node_modules" ] || ln -sfn frontend/node_modules "$ROOT/node_modules" 2>/dev/null
+if [ -e "$ROOT/node_modules" ]; then say "modules     resolvable from the repo root"; else say "modules     SYMLINK FAILED — migrate + seed will not run"; fi
+
 # ── Postgres ────────────────────────────────────────────────────────────────
 if pg_isready -q 2>/dev/null; then
   say "postgres    already up"
