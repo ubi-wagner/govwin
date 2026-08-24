@@ -143,6 +143,17 @@ emitted, so nothing is hidden.
 
 Stated plainly, because a capability document that lists only what works is a sales sheet.
 
+**A stated bias, not a bug.** The table of contents now carries page numbers with leader dots,
+resolved from `paginate().perNode` — the same ruler the export gate judges the document by, so an
+entry points at the page a heading ACTUALLY prints on rather than where a naive height division
+would put it. That ruler is deliberately tuned to over-count rather than under-count (B64), and the
+contents page inherits the bias: on a long document a late entry can read **one page high**.
+Measured — a twelve-page volume whose References section prints on page 12 is listed at 13.
+
+Calibrating the TOC against a rendered PDF would fix the number and create a second opinion about
+pagination, disagreeing with the editor gauge and the export gate; B112 records what that costs. One
+ruler, one answer. If the numbers must be exact, the fix is to make the ruler exact.
+
 **Absent from the model entirely** — these cannot be authored at all:
 
 * **per-node line spacing** (there is a document-level `line_spacing`, but no per-node override)
