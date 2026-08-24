@@ -19,7 +19,6 @@
  *   DEMO_OUT=/tmp/journey  where the screen grabs land
  */
 import { sql, sqlBypass } from '@/lib/db';
-import { stageIntake } from '@/lib/intake';
 import { BASE, launch, signIn } from './lib/cross-company.mts';
 import { purgeTenantSteps, deleteUntilStable } from './lib/scenario.mts';
 import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot } from './lib/harness-residue.mts';
@@ -621,19 +620,27 @@ async function main() {
 
     // ── 2c · structured intake, the other producer ────────────────────────────────────────────
     const probeTitle = `JOURNEY OPP ${Date.now().toString(36)} — Directed Energy Counter-UAS`;
-    const staged = await stageIntake({
+    // THROUGH THE ROUTE, not the library function underneath it.
+    //
+    // This called `stageIntake(...)` directly — the same function /api/admin/intake calls, so the
+    // producer was real, but the AUTH, the role gate and the request validation in front of it were
+    // never exercised. That is the difference between "the code path works" and "an rfp_admin can
+    // do this", and only the second is worth a screen grab.
+    const intakeRes = await A.evaluate(async ([u, b]) => {
+      const r = await fetch(u as string, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(b) });
+      return { status: r.status, json: await r.json().catch(() => null) };
+    }, ['/api/admin/intake', {
       title: probeTitle, agency: 'Department of the Air Force',
       solicitationNumber: `JRN-${Date.now().toString(36).toUpperCase()}`,
       dueDate: '2026-12-15', description: 'Created by the full-journey drive.',
-    } as Parameters<typeof stageIntake>[0], admin.id);
-    // `stageIntake` returns { opportunityId, solicitationId }. My first version read `.opportunity.id`
-    // and `.id`, found neither, and reported the PRODUCER as broken — while the payload printed in
-    // the failure message plainly contained the id. The step failed and, worse, the cleanup then had
-    // nothing to remove, so a working stage left residue and blamed the product for it.
-    const newOppId = (staged as { opportunityId?: string })?.opportunityId ?? null;
+    }] as const) as { status: number; json: any };
+    step('2c-route', 'the admin intake ROUTE accepts it (auth + validation exercised)',
+      intakeRes.status === 200 || intakeRes.status === 201, `status ${intakeRes.status}`);
+    const newOppId = intakeRes.json?.data?.opportunityId ?? intakeRes.json?.opportunityId ?? null;
     made.opps.push(...(newOppId ? [newOppId] : []));
     step('2c', 'a NEW opportunity is INGESTED through the real producer', !!newOppId,
-      newOppId ? `opp ${newOppId.slice(0, 8)}` : `stageIntake returned ${JSON.stringify(staged).slice(0, 90)}`);
+      newOppId ? `opp ${newOppId.slice(0, 8)}` : `route returned ${JSON.stringify(intakeRes.json).slice(0, 90)}`);
 
     // The expected delta is DERIVED from what actually succeeded — one opportunity per producer that
     // ran. Hardcoding +1 was correct until the ingest stage was added beside stageIntake, and then
@@ -649,14 +656,33 @@ async function main() {
     // ═══ 3 · CUSTOMER APPLICATION + ONBOARDING ════════════════════════════════════════════════
     console.log('\n══ 3 · CUSTOMER APPLICATION + ONBOARDING ══');
     // A real application row, the shape the public form posts, then ACCEPTED through the admin API.
+    // THROUGH THE PUBLIC FORM'S ROUTE, not a SQL insert.
+    //
+    // This used INSERT INTO applications, which produced a row of the right shape and proved nothing
+    // about what a customer actually touches: the zod schema, the terms literal, the minimum lengths
+    // on motivation and tech summary. A fixture shaped like the product's output is not the product.
     const co = `Journey Robotics ${Date.now().toString(36)}`;
+    const email = `dana.${Date.now().toString(36)}@journey.test`;
+    const appRes = await T.evaluate(async ([u, b]) => {
+      const r = await fetch(u as string, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(b) });
+      return { status: r.status, json: await r.json().catch(() => null) };
+    }, ['/api/applications', {
+      contactEmail: email, contactName: 'Dana Reyes', companyName: co,
+      techSummary: 'Autonomous perception payloads for contested airspace, with on-board inference '
+        + 'and deterministic operator hand-off when track confidence falls below threshold.',
+      motivation: 'We have the technology and no route into the SBIR process.',
+      referralSource: 'Referred by a programme manager at NAVAIR',
+      termsAccepted: true, termsSignature: email,
+    }] as const) as { status: number; json: any };
+    step('3a', 'the PUBLIC application route accepts a real submission',
+      appRes.status === 200 || appRes.status === 201, `status ${appRes.status}`);
+
     const [app] = await sqlBypass<Array<{ id: string }>>`
-      INSERT INTO applications (company_name, contact_name, contact_email, tech_summary, terms_accepted_at, status)
-      VALUES (${co}, 'Dana Reyes', ${`dana.${Date.now().toString(36)}@journey.test`},
-              'Autonomous perception payloads for contested airspace.', now(), 'pending')
-      RETURNING id`;
-    made.apps.push(app.id);
-    step('3a', 'a customer application exists in the queue', !!app?.id, co);
+      SELECT id FROM applications WHERE company_name = ${co} ORDER BY created_at DESC LIMIT 1`;
+    if (app) made.apps.push(app.id);
+    step('3a-row', 'it landed in the admin queue', !!app?.id, co);
+
     step('3b', 'applications queue renders', await visit(A, '/admin/applications', 'admin-applications'));
 
     const acc = await A.evaluate(async (u) => {
