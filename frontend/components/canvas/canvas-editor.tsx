@@ -1006,7 +1006,12 @@ function CanvasEditorInner({
               doc.metadata.status === 'ai_drafted' ? 'bg-indigo-100 text-indigo-700' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {doc.metadata.status.replace('_', ' ')}
+              {/* `?? 'draft'` — see canvas-renderer's page-info bar. `status` is OPTIONAL on
+              CanvasDocument.metadata, so a canvas authored through the API has none, and an
+              unguarded read here threw `Cannot read properties of undefined (reading 'replace')`
+              during render. React unmounted the tree and the customer got "Something went wrong"
+              on a document whose content was intact — the same canvas exported fine throughout. */}
+              {(doc.metadata.status ?? 'draft').replace('_', ' ')}
             </span>
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>

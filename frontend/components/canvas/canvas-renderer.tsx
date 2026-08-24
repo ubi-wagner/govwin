@@ -521,7 +521,19 @@ export function CanvasRenderer({
 
       {/* Page info bar */}
       <div className="flex items-center gap-4 text-xs text-gray-500">
-        <span>{metadata.status.replace('_', ' ')}</span>
+        {/* `?? 'draft'` — and it is not defensive noise, it is the whole document opening.
+            `status` is OPTIONAL on CanvasDocument.metadata, and a canvas authored through the API
+            (`{ metadata: { title } }`) simply has none. This read had no fallback, so the moment a
+            document like that was opened the renderer threw
+                TypeError: Cannot read properties of undefined (reading 'replace')
+            React unmounted the tree, and the customer got "Something went wrong — this page failed
+            to load" on a document whose content was perfectly intact: the same canvas exported to
+            .docx and .pdf without complaint the entire time.
+
+            Every sibling read in this file already guarded — `(node.provenance?.source ?? 'manual')`
+            on line ~863, and canvas-sidebar does `(doc.metadata?.status ?? 'draft')` for this exact
+            field. This was the one that did not, and it sat behind a status line nobody looks at. */}
+        <span>{(metadata.status ?? 'draft').replace('_', ' ')}</span>
         <span>&middot;</span>
         <span>{nodes.length} atom{nodes.length !== 1 ? 's' : ''}</span>
         {/* Size gauge — show the REAL estimate (unclamped, so an over-limit doc reads
