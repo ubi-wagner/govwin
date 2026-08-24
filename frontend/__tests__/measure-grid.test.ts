@@ -6,7 +6,7 @@ import {
   gridGeometry, defaultGridStep, gridStepLabel, describePt, isGridStep, pageBoundaries,
   GRID_STEPS_PT, MIN_GRID_STEP_PT, PT_PER_INCH,
 } from '@/lib/canvas/measure-grid';
-import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
+import { CANVAS_PRESETS, paginate, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 
 const letter = CANVAS_PRESETS.letter_standard;
 
@@ -154,5 +154,56 @@ describe('page boundaries — where the break actually falls', () => {
 
   it('handles a fractional page count by rounding up — 1.2 pages IS two pages', () => {
     expect(pageBoundaries(letter, 1.2)).toHaveLength(1);
+  });
+});
+
+/**
+ * RELOCATION — why a geometric boundary is not enough (B112).
+ *
+ * `fitKeep` pushes a block that will not fit wholesale to the next page rather than filling in
+ * behind what precedes it. The paginator's own comment records the measurement: a 40-row table
+ * alone is 2 pages; ONE sentence of prose plus that table is 3. So a boundary computed as
+ * `marginTop + k × usableHeight` can land in the MIDDLE of a block that actually begins the page.
+ */
+describe('a geometric boundary disagrees with the paginator when a block relocates', () => {
+  const tallTable = (rows: number): CanvasNode => ({
+    id: 'tbl', type: 'table', style: {},
+    content: { headers: ['A', 'B'], rows: Array.from({ length: rows }, (_, i) => [`r${i}`, 'x']) },
+    provenance: { source: 'manual' }, history: [], library_eligible: false,
+  } as unknown as CanvasNode);
+  const prose = (id: string): CanvasNode => ({
+    id, type: 'text_block', content: { text: 'One sentence of prose.' }, style: {},
+    provenance: { source: 'manual' }, history: [], library_eligible: false,
+  } as unknown as CanvasNode);
+  const docOf = (nodes: CanvasNode[]): CanvasDocument => ({
+    version: 2, document_id: 'd', canvas: { ...letter }, nodes: [],
+    sections: [{ id: 's', title: 's', layout: { mode: 'flow' }, groups: [{ id: 'g', nodes }] }],
+    metadata: { title: 'd', status: 'in_progress' },
+  } as unknown as CanvasDocument);
+
+  it('one sentence of prose moves a tall table a whole page — the relocation is real', () => {
+    const alone = paginate(docOf([tallTable(40)])).totalPages;
+    const withProse = paginate(docOf([prose('p'), tallTable(40)])).totalPages;
+    expect(withProse).toBeGreaterThan(alone);
+  });
+
+  it('the table BEGINS the page it was pushed to, so the geometric line falls inside it', () => {
+    const layout = paginate(docOf([prose('p'), tallTable(40)]));
+    const table = layout.perNode.find((n) => n.id === 'tbl')!;
+    const proseNode = layout.perNode.find((n) => n.id === 'p')!;
+    // The prose stays on page 1; the table starts page 2 — it did not fill in behind the prose.
+    expect(proseNode.startPage).toBe(1);
+    expect(table.startPage).toBe(2);
+    // …and the table is TALLER than a page, so a geometric page-2 line would cut through it rather
+    // than sit at its top. That is the case a measured boundary exists to get right.
+    expect(table.endPage).toBeGreaterThan(table.startPage);
+  });
+
+  it('leaves the previous page part-empty — the whitespace the overlay shades', () => {
+    const layout = paginate(docOf([prose('p'), tallTable(40)]));
+    // Page 1 holds only the prose. Everything else on it is the gap a relocation leaves behind,
+    // which a continuous editor shows nowhere.
+    const onPageOne = layout.perNode.filter((n) => n.startPage === 1);
+    expect(onPageOne.map((n) => n.id)).toEqual(['p']);
   });
 });

@@ -36,7 +36,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes, spacerHeightPt } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes, spacerHeightPt, paginate } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
@@ -218,10 +218,28 @@ export function CanvasRenderer({
     key: string; label: string; topPx: number; heightPx: number; nodes: CanvasNode[];
   }>>([]);
 
+  // WHERE EACH PAGE ACTUALLY STARTS — measured, not computed.
+  //
+  // A geometric boundary at `marginTop + k × usableHeight` is only right when content flows
+  // continuously. It does not: `fitKeep` RELOCATES a block that will not fit — a table, a figure, a
+  // keep_together group — wholesale to the next page, and the paginator's own comment records the
+  // measurement (a 40-row table alone is 2 pages; ONE sentence of prose plus that table is 3).
+  //
+  // So with prose then a tall table, the printed page 2 begins AT THE TABLE, while a geometric line
+  // would fall in the middle of it and claim the break was there. That is worse than no line: it
+  // asserts a break where none happens and hides the one that does.
+  //
+  // This is also the "images pop between pages" the author feels while editing — one sentence added
+  // above a figure moves the whole figure a page down. Showing the real boundary makes that visible
+  // instead of mysterious, and the relocation gap below shows the whitespace it leaves behind.
+  const [pageStarts, setPageStarts] = useState<Array<{ page: number; topPx: number; relocated: boolean }>>([]);
+
   useEffect(() => {
     if (!grid) { setGroupBoxes([]); return; }
     const page = pageRef.current;
     if (!page) return;
+
+    const usableHeightPt = canvas.height - canvas.margins.top - canvas.margins.bottom;
 
     /** Offset of `el` from `ancestor`, summing offsetParents — a positioned wrapper would otherwise
      *  make offsetTop relative to the wrong thing and slide every box up the page. */
@@ -233,6 +251,29 @@ export function CanvasRenderer({
     };
 
     const measure = () => {
+      // ── page starts, from the PAGINATOR's own per-node assignment ──
+      // paginate() models fitKeep, so its `startPage` already accounts for relocation. Reading the
+      // DOM position of the first node on each page turns that model into a line on this page.
+      try {
+        const layout = paginate(doc);
+        const seen = new Set<number>();
+        const starts: Array<{ page: number; topPx: number; relocated: boolean }> = [];
+        for (const info of layout.perNode) {
+          if (info.startPage <= 1 || seen.has(info.startPage)) continue;
+          seen.add(info.startPage);
+          const el = page.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(info.id)}"]`);
+          if (!el) continue;
+          const top = offsetWithin(el, page);
+          // RELOCATED when the node begins a page further down the flow than a continuous break
+          // would have put it — i.e. it was pushed rather than filled in behind what precedes it.
+          const geometric = canvas.margins.top + (info.startPage - 1) * usableHeightPt;
+          starts.push({ page: info.startPage, topPx: top, relocated: top * (1 / (scale || 1)) < geometric - 2 });
+        }
+        setPageStarts(starts);
+      } catch {
+        setPageStarts([]);   // a malformed canvas must not take the editor down with it
+      }
+
       const runs = runsFromGroupMap(nodes, groupOf);
       const boxes = runs.map((run, i) => {
         const els = run.nodes
@@ -259,7 +300,7 @@ export function CanvasRenderer({
     const ro = new ResizeObserver(measure);
     ro.observe(page);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [grid, nodes, groupOf, scale, canvas]);
+  }, [grid, nodes, groupOf, scale, canvas, doc]);
 
   const fontStyle = {
     fontFamily: canvas.font_default.family,
@@ -302,9 +343,50 @@ export function CanvasRenderer({
               canvas={canvas}
               step={gridStep}
               scale={scale}
-              pageCount={liveUnits}
+              // Only fall back to the GEOMETRIC boundary before the first measurement lands. Once
+              // pageStarts is populated it supersedes it — a measured start accounts for relocation
+              // and a computed one cannot.
+              pageCount={pageStarts.length > 0 ? 1 : liveUnits}
               unit={isDeck ? 'slide' : 'page'}
             />
+
+            {/* MEASURED page starts, and the whitespace a relocation leaves behind.
+                The band is the point: a block pushed to the next page leaves that much of the
+                previous one blank in print, and nothing in a continuous editor shows it. This is
+                the "image popped to the next page" made visible while it is still editable. */}
+            {pageStarts.map((p) => (
+              <React.Fragment key={`ps${p.page}`}>
+                {p.relocated && (
+                  <div
+                    style={{
+                      position: 'absolute', left: 0, right: 0,
+                      top: (canvas.margins.top + (p.page - 2) * (canvas.height - canvas.margins.top - canvas.margins.bottom)) * scale,
+                      height: Math.max(0, p.topPx - (canvas.margins.top + (p.page - 2) * (canvas.height - canvas.margins.top - canvas.margins.bottom)) * scale),
+                      background: 'repeating-linear-gradient(45deg, rgba(15,118,110,0.07) 0 6px, transparent 6px 12px)',
+                      pointerEvents: 'none',
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+                <div
+                  style={{
+                    position: 'absolute', left: 0, right: 0, top: p.topPx, height: 0,
+                    borderTop: '1px dashed rgba(15, 118, 110, 0.75)', pointerEvents: 'none',
+                  }}
+                  aria-hidden="true"
+                />
+                <span
+                  style={{
+                    position: 'absolute', right: 2, top: p.topPx + 2,
+                    fontSize: 8, lineHeight: '8px', fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 600, color: 'rgba(15, 118, 110, 0.9)', pointerEvents: 'none',
+                  }}
+                  aria-hidden="true"
+                >
+                  {isDeck ? 'slide' : 'page'} {p.page}{p.relocated ? ' · pushed' : ''}
+                </span>
+              </React.Fragment>
+            ))}
             <MeasureRulers canvas={canvas} step={gridStep} scale={scale} />
           </>
         )}
