@@ -184,7 +184,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -244,6 +244,12 @@ DRIVES=(
   "page-scale|scripts/probe-page-scale.mts"
   # Grid geometry against all 10 shipped presets. No server needed.
   "measure-grid|scripts/probe-measure-grid.mts"
+  # The ruler on REAL STORED DECKS, authored through the portal routes as a tenant_admin.
+  # Every one of the 64 stored proposal sections is `letter`, so the slide half of the canvas had
+  # only ever been checked against 7 synthetic in-memory decks and 5 bracket-only molds — the
+  # stored-artifact ruler had never measured a deck out of the database. Carries a deliberate
+  # over-stuffed deck so the overflow check has a case that fails when the product is wrong.
+  "deck-ruler|scripts/verify-deck-ruler-live.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0
