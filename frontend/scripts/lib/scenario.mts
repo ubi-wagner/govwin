@@ -107,7 +107,7 @@ interface Trace { what: string; steps: Array<() => Promise<number>> }
  * schema change. What it cannot do is hide a genuine failure: anything still failing after the
  * passes run out is REPORTED, with the error.
  */
-async function deleteUntilStable(steps: Array<() => Promise<number>>): Promise<{ removed: number; stuck: string[] }> {
+export async function deleteUntilStable(steps: Array<() => Promise<number>>): Promise<{ removed: number; stuck: string[] }> {
   let remaining = steps;
   let removed = 0;
   const lastError = new Map<() => Promise<number>, string>();
@@ -186,7 +186,13 @@ async function foreignKeyGraph(): Promise<Map<string, Array<{ table: string; col
 }
 
 /** Every DELETE needed to remove one tenant's entire footprint, by walking the FK graph. */
-async function purgeTenantSteps(tenantId: string): Promise<Array<() => Promise<number>>> {
+/**
+ * EXPORTED so a drive that CREATES a tenant can remove it with the same graph-descent the scenario
+ * factory uses. The full-journey drive accepts a customer application, which provisions a real
+ * tenant — leaving it behind would grow the box by one company per run, and hand-writing a second
+ * cascade would be a second opinion about the schema that drifts from this one.
+ */
+export async function purgeTenantSteps(tenantId: string): Promise<Array<() => Promise<number>>> {
   const tables = await tenantTables();
   const graph = await foreignKeyGraph();
   const steps: Array<() => Promise<number>> = [];

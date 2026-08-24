@@ -19,7 +19,10 @@
  *   DEMO_OUT=/tmp/journey  where the screen grabs land
  */
 import { sql, sqlBypass } from '@/lib/db';
+import { stageIntake } from '@/lib/intake';
 import { BASE, launch, signIn } from './lib/cross-company.mts';
+import { purgeTenantSteps, deleteUntilStable } from './lib/scenario.mts';
+import { snapshotResidue, reclaimResidue, describeResidue, type ResidueSnapshot } from './lib/harness-residue.mts';
 import { CANVAS_PRESETS, estimatePageCount, estimateSlideCount, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import JSZip from 'jszip';
@@ -158,9 +161,17 @@ async function main() {
   await A.setViewportSize({ width: 1680, height: 1050 });
   await T.setViewportSize({ width: 1680, height: 1050 });
 
-  const made: { docs: string[] } = { docs: [] };
+  const made: { docs: string[]; opps: string[]; apps: string[]; buckets: string[]; tenants: string[] } =
+    { docs: [], opps: [], apps: [], buckets: [], tenants: [] };
+
+  // Saving a document MINTS LIBRARY ATOMS — 88 of them across these three volumes, none inserted
+  // by this drive. Delete-what-I-created cannot see them (B119), so the box is reconciled on an ID
+  // delta taken before a single row is written.
+  let residueBefore: ResidueSnapshot | null = null;
 
   try {
+    residueBefore = await snapshotResidue();
+
     // ═══ 1 · RFP ADMIN ════════════════════════════════════════════════════════════════════════
     console.log('══ 1 · RFP ADMIN ══');
     step('1a', 'admin command center renders', await visit(A, '/admin/command', 'admin-command'), admin.email);
@@ -172,14 +183,63 @@ async function main() {
     const [{ n: oppsBefore }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM opportunities`;
     step('2a', 'intake surface renders', await visit(A, '/admin/intake', 'admin-intake'));
     step('2b', 'curation queue renders', await visit(A, '/admin/rfp-curation', 'admin-curation'));
-    step('2c', 'opportunities list renders', await visit(A, '/admin/opportunities', 'admin-opportunities', true),
-      `${oppsBefore} opportunities · ${solsBefore} solicitations`);
+    // DRIVEN, not merely shown. stageIntake is the real producer behind the admin intake form and
+    // the scout release path — the same function, not a SQL insert dressed up as one.
+    const probeTitle = `JOURNEY OPP ${Date.now().toString(36)} — Directed Energy Counter-UAS`;
+    const staged = await stageIntake({
+      title: probeTitle, agency: 'Department of the Air Force',
+      solicitationNumber: `JRN-${Date.now().toString(36).toUpperCase()}`,
+      dueDate: '2026-12-15', description: 'Created by the full-journey drive.',
+    } as Parameters<typeof stageIntake>[0], admin.id);
+    // `stageIntake` returns { opportunityId, solicitationId }. My first version read `.opportunity.id`
+    // and `.id`, found neither, and reported the PRODUCER as broken — while the payload printed in
+    // the failure message plainly contained the id. The step failed and, worse, the cleanup then had
+    // nothing to remove, so a working stage left residue and blamed the product for it.
+    const newOppId = (staged as { opportunityId?: string })?.opportunityId ?? null;
+    made.opps.push(...(newOppId ? [newOppId] : []));
+    step('2c', 'a NEW opportunity is INGESTED through the real producer', !!newOppId,
+      newOppId ? `opp ${newOppId.slice(0, 8)}` : `stageIntake returned ${JSON.stringify(staged).slice(0, 90)}`);
+
+    const [{ n: oppsAfter }] = await sqlBypass<Array<{ n: number }>>`SELECT count(*)::int AS n FROM opportunities`;
+    step('2d', 'the opportunity count actually moved', oppsAfter === oppsBefore + 1,
+      `${oppsBefore} → ${oppsAfter}`);
+    step('2e', 'opportunities list renders with it', await visit(A, '/admin/opportunities', 'admin-opportunities', true),
+      `${oppsAfter} opportunities · ${solsBefore} solicitations`);
 
     // ═══ 3 · CUSTOMER APPLICATION + ONBOARDING ════════════════════════════════════════════════
     console.log('\n══ 3 · CUSTOMER APPLICATION + ONBOARDING ══');
-    step('3a', 'applications queue renders', await visit(A, '/admin/applications', 'admin-applications'));
-    step('3b', 'tenants list renders', await visit(A, '/admin/tenants', 'admin-tenants', true));
-    step('3c', 'the onboarded customer’s portal renders', await visit(T, `/portal/${tenant.slug}`, 'portal-home'),
+    // A real application row, the shape the public form posts, then ACCEPTED through the admin API.
+    const co = `Journey Robotics ${Date.now().toString(36)}`;
+    const [app] = await sqlBypass<Array<{ id: string }>>`
+      INSERT INTO applications (company_name, contact_name, contact_email, tech_summary, terms_accepted_at, status)
+      VALUES (${co}, 'Dana Reyes', ${`dana.${Date.now().toString(36)}@journey.test`},
+              'Autonomous perception payloads for contested airspace.', now(), 'pending')
+      RETURNING id`;
+    made.apps.push(app.id);
+    step('3a', 'a customer application exists in the queue', !!app?.id, co);
+    step('3b', 'applications queue renders', await visit(A, '/admin/applications', 'admin-applications'));
+
+    const acc = await A.evaluate(async (u) => {
+      const r = await fetch(u as string, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      return { status: r.status, body: (await r.text()).slice(0, 160) };
+    }, `/api/admin/applications/${app.id}/accept`) as { status: number; body: string };
+    step('3c', 'the application is ACCEPTED through the real admin route',
+      acc.status === 200 || acc.status === 201, `status ${acc.status} ${acc.body.slice(0, 70)}`);
+    // Accepting an application PROVISIONS A REAL TENANT. Recorded so the teardown can remove it —
+    // otherwise this drive grows the box by one company every time it runs.
+    try {
+      const born = JSON.parse(acc.body.replace(/\.\.\.$/, '') + (acc.body.trim().endsWith('}') ? '' : '}}'));
+      const tid = born?.data?.tenantId; if (tid) made.tenants.push(String(tid));
+    } catch { /* recovered from the DB below instead */ }
+    if (!made.tenants.length) {
+      const [t2] = await sqlBypass<Array<{ id: string }>>`
+        SELECT id FROM tenants WHERE name = ${co} ORDER BY created_at DESC LIMIT 1`;
+      if (t2) made.tenants.push(t2.id);
+    }
+    const [after] = await sqlBypass<Array<{ status: string }>>`SELECT status FROM applications WHERE id=${app.id}::uuid`;
+    step('3d', 'the application row records the decision', after?.status !== 'pending', `status=${after?.status}`);
+    step('3e', 'tenants list renders', await visit(A, '/admin/tenants', 'admin-tenants', true));
+    step('3f', 'the onboarded customer’s portal renders', await visit(T, `/portal/${tenant.slug}`, 'portal-home'),
       `${tenant.name}`);
 
     // ═══ 4 · LIBRARY ══════════════════════════════════════════════════════════════════════════
@@ -200,6 +260,7 @@ async function main() {
       return { status: r.status, json: await r.json().catch(() => null) };
     }, [`/api/portal/${tenant.slug}/buckets`, bucketName] as const) as { status: number; json: any };
     const bucketId = mk.json?.data?.id ?? mk.json?.data?.bucket?.id;
+    if (bucketId) made.buckets.push(String(bucketId));
     step('5b', 'a NEW bucket is created through the real route', mk.status === 200 || mk.status === 201,
       `status ${mk.status}${bucketId ? ` · id ${String(bucketId).slice(0, 8)}` : ''}`);
     step('5c', 'the new bucket appears on the page',
@@ -291,10 +352,54 @@ async function main() {
       console.log(`     ${b.key}.${b.want} · ${Math.round(buf.length / 1024)}KB → ${OUT}/${b.key}.${b.want}`);
     }
   } finally {
-    if (made.docs.length) {
-      await sqlBypass`DELETE FROM tenant_documents WHERE id = ANY(${made.docs}::uuid[])`;
-      console.log(`\n  cleanup: ${made.docs.length} journey document(s) removed`);
+    // EVERY STEP INDEPENDENTLY, so one failure cannot strand the rest.
+    //
+    // The first version ran these as a straight sequence and aborted on the first FK it hit —
+    // `curated_solicitations` still referencing the opportunity — which meant the buckets and the
+    // provisioned TENANT below it were never removed at all. A teardown that gives up halfway is
+    // worse than one that never ran: it leaves a partial state nobody can reason about, and it
+    // reports the abort as the drive failing rather than as litter.
+    //
+    // Each step now records its own failure and the run continues. Anything that genuinely could
+    // not be removed lands in GAPS and is printed, so residue is named rather than discovered later
+    // by another harness.
+    const step_ = async (what: string, fn: () => Promise<unknown>) => {
+      try { await fn(); } catch (e) { GAPS.push(`teardown: ${what} — ${String(e).slice(0, 90)}`); }
+    };
+
+    if (made.docs.length) await step_('documents', () => sqlBypass`DELETE FROM tenant_documents WHERE id = ANY(${made.docs}::uuid[])`);
+    if (made.apps.length) await step_('applications', () => sqlBypass`DELETE FROM applications WHERE id = ANY(${made.apps}::uuid[])`);
+    for (const o of made.opps) {
+      await step_('instance transitions', () => sqlBypass`DELETE FROM process_instance_transitions WHERE instance_id IN (
+        SELECT id FROM process_instances WHERE trigger_event_id IN (
+          SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o}))`);
+      await step_('process instances', () => sqlBypass`DELETE FROM process_instances WHERE trigger_event_id IN (
+        SELECT id FROM system_events WHERE payload->>'opportunityId' = ${o})`);
+      await step_('tasks', () => sqlBypass`DELETE FROM tasks WHERE entity_id = ${o}::uuid`);
+      await step_('events', () => sqlBypass`DELETE FROM system_events WHERE payload->>'opportunityId' = ${o}`);
+      await step_('cards', () => sqlBypass`DELETE FROM tenant_opportunity_cards WHERE opportunity_id = ${o}::uuid`);
+      await step_('bridge', () => sqlBypass`DELETE FROM opportunity_bridge WHERE opportunity_id = ${o}::uuid`);
+      await step_('scout findings', () => sqlBypass`DELETE FROM scout_findings WHERE match_opportunity_id = ${o}::uuid`);
+      // stageIntake creates the SOLICITATION as well as the opportunity, and it holds the FK.
+      await step_('curated solicitation', () => sqlBypass`DELETE FROM curated_solicitations WHERE opportunity_id = ${o}::uuid`);
+      await step_('opportunity', () => sqlBypass`DELETE FROM opportunities WHERE id = ${o}::uuid`);
     }
+    for (const b of made.buckets) {
+      await step_('bucket scores', () => sqlBypass`DELETE FROM tenant_bucket_scores WHERE bucket_id = ${b}::uuid`);
+      await step_('bucket', () => sqlBypass`DELETE FROM tenant_spotlight_buckets WHERE id = ${b}::uuid`);
+    }
+    // The tenant the accept provisioned, removed with the SAME graph-descent the scenario factory
+    // uses — a second hand-written cascade would be a second opinion about the schema.
+    for (const t of made.tenants) {
+      await step_(`tenant ${t.slice(0, 8)}`, async () => {
+        const { stuck } = await deleteUntilStable(await purgeTenantSteps(t));
+        if (stuck.length) GAPS.push(`teardown: tenant ${t.slice(0, 8)} left ${stuck.length} table(s) stuck`);
+      });
+    }
+    console.log(`\n  cleanup: ${made.docs.length} document(s), ${made.opps.length} opportunity(s), `
+      + `${made.apps.length} application(s), ${made.buckets.length} bucket(s), ${made.tenants.length} tenant(s)`);
+    if (residueBefore) await step_('minted atoms', async () =>
+      console.log(`  ${describeResidue(await reclaimResidue(residueBefore!))}`));
     await browser.close();
     await sql.end().catch(() => {}); await sqlBypass.end().catch(() => {});
   }
