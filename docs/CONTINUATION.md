@@ -855,6 +855,28 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 
 ## 2. Spin up the sandbox (exact commands + gotchas)
 
+> ### ⚠️ Running the PIPELINE tests: `python3 -m pytest`, with the env sourced
+>
+> Two traps, and each one manufactures failures that look like real regressions.
+>
+> **1. The `pytest` on `PATH` is a uv-managed tool with its own isolated site-packages**, so it
+> cannot see `asyncpg` (or anything else installed for the system interpreter) and reports
+> **66 collection errors** — every test module that imports it. Run the tests through the same
+> interpreter the dependencies live in:
+>
+> ```bash
+> python3 -m pip install --break-system-packages -q pytest pytest-asyncio   # once
+> cd pipeline && python3 -m pytest tests/ -q
+> ```
+>
+> **2. Source `scripts/sandbox-env.sh` first.** Roughly 22 tests connect to the live sandbox DB and
+> are guarded by `skipif(not DATABASE_URL)`. If `DATABASE_URL` is set in the container but the
+> sandbox env is not sourced, they do not skip — they run and fail at `asyncpg.connect`, which reads
+> exactly like 22 broken tests. With the env sourced: **1319 passed, 9 skipped, 0 failed.**
+>
+> Both were hit in one sitting while auditing the automation spine, and the first pass through them
+> looked like a broken pipeline rather than a broken invocation.
+
 > ### 🆕 FROM ABSOLUTELY NOTHING — a container with no cluster, no roles, no node_modules
 >
 > The recipe below assumes a box that has run this before. On a genuinely fresh container

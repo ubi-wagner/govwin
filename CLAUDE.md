@@ -327,8 +327,15 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `pipeline_schedules.source` (the shared cron) and `process_templates.trigger_key` (the generic
   `launchTemplate` overlay, which makes every registered single-phase trigger launchable with no
   code) — so a source-only scan reports working scheduled and launchable workflows as dead (B140).
-  Canonical: **docs/AUTOMATION_SPINE_AUDIT.md**, which also carries the recipe for attaching a new
-  automation and the 66 free `end` events to attach it to.
+  It also joins each step's INTERIOR: every `action` resolved the way `_execute_action` will at
+  runtime (**all 117 land**) and every NOTIFY step's template against the CRM's renderers — where
+  **8 of 15 named a template that existed nowhere**, so the mail emitted `notification.failed`
+  instead of sending (B141, the second occurrence of that exact gap). Canonical:
+  **docs/AUTOMATION_SPINE_AUDIT.md**, which also carries the recipe for attaching a new automation
+  and the 66 free `end` events to attach it to.
+  ⚠️ Run the pipeline tests as `python3 -m pytest` **with `scripts/sandbox-env.sh` sourced** — the
+  `pytest` on PATH is a uv tool that cannot see `asyncpg` (66 collection errors) and an unsourced
+  `DATABASE_URL` makes ~22 live-DB tests fail at connect instead of skipping (docs/CONTINUATION.md §2).
 - **The lenses cannot see what was never surfaced.** Every instrument above asks whether what the
   product does, it does correctly — none can find a feature with no way in, because no page renders
   it, no route is called, and nobody writes a test for something unreachable. That question needs the

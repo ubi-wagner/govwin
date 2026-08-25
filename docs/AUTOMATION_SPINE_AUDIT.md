@@ -15,7 +15,8 @@ node scripts/fix-open-event-brackets.mjs --dry                  # the codemod's 
 
 ## The answer
 
-**The trigger side is airtight. The bracket side had one systematic hole, now closed.**
+**The trigger side and every step's interior are airtight. Two holes were found and closed:
+the event bracket a throw walked out of, and eight notifications with no renderer.**
 
 | Join | Question | Result |
 |---|---|---|
@@ -24,6 +25,12 @@ node scripts/fix-open-event-brackets.mjs --dry                  # the codemod's 
 | 3 | every `emitEventStart` ↔ an `end` on every exit path | **31 open brackets — fixed** |
 | 4 | what is declared ↔ what the corpus has recorded | 394 emittable · 130 exercised here |
 | 5 | `end` events ↔ triggers that consume them | 66 attachment points free |
+| 6 | every step's `action` ↔ an implementation that exists | **0 unresolvable** — all 117 steps land |
+| 7 | every NOTIFY step ↔ a renderer that exists | **8 with no renderer — written** |
+
+Joins 1–5 cover the *edges* of a workflow — what starts it and what it emits. Joins 6 and 7 cover
+its *interior*: whether each step can actually do the thing it declares. A workflow can have a live
+trigger, a closed bracket, and a step that resolves to nothing.
 
 Nothing in this audit is inference: the trigger side comes from `discover_workflows()` — the same
 call the engine makes at boot — and the emitting side from the AST, the two languages, and the two
@@ -139,6 +146,61 @@ dropped `end` is a broken link between two automations.
 
 ---
 
+## Join 6 — every step resolves
+
+`_execute_action()` resolves a dotted `module.function` with `importlib` **at execution time**. A
+typo passes `validate()`, registers cleanly, and raises mid-instance the first time the workflow
+runs for real. `validate()` gates unmapped `AI_INVOKE` actions at boot for exactly this reason; the
+`ACTION` case had no equivalent, so the audit now resolves all of them the same way the engine will.
+
+**All 117 steps land**: 65 `ai_invoke` (all mapped in `TOOL_ACTION_TO_ARCHETYPE`), 26 `action` (all
+importable), 16 `notify`, 9 `todo`, 1 `hitl_wait`. Zero unresolvable.
+
+Two dispatcher branches say "not implemented in V1" and are worth knowing about:
+
+- **`API_CALL` steps are skipped.** There are none, so it is moot — but a new one would silently
+  no-op, and `validate()` would not object. The audit reports any that appear.
+- **`HITL_WAIT` steps are skipped** *in the dispatcher* — and never reach it. `manager.py:539`
+  intercepts `TODO` and `HITL_WAIT` alike and parks the instance, so the one `hitl_wait` step
+  (`OnApplicationAccepted.schedule_login_reminder`, waiting on `identity:user.logged_in`) gates
+  correctly. The dispatcher branch is unreachable defence, exactly as its comment claims.
+
+## Join 7 — the notification that never sends
+
+A NOTIFY step names a template as a **string**; the CRM, a different service with a different
+database, defines one. Nothing compared them.
+
+**Eight of the fifteen named templates existed nowhere.** `render_template()` returned None and
+`_handle_notification_requested` emitted `system:notification.failed` instead of an email — loudly,
+to its credit, but no mail. Six of the eight had already been requested in this sandbox: 13 of its
+30 notification requests.
+
+| workflow step | template |
+|---|---|
+| `OnCmsContentRequested.notify_author` | `content_published` |
+| `OnCollaboratorInvited.notify_admin_partner_draft` | `partner_onboarding_ready` |
+| `OnContentResurfaceRequested.email_curation` | `content_reshare_ready` |
+| `OnIngestAssessmentRequested.notify_admin` | `ingest_assessment_ready` |
+| `OnOpsDigestRequested.notify_master_admin` | `ops_digest_ready` |
+| `OnSocialScheduleRequested.email_social_queue` | `social_queue_ready` |
+| `OnSolicitationReviewRequested.notify_reviewer` | `curation_qa_ready` |
+| `OnSolicitationUpdateScan.notify_admin` | `amendment_delta_ready` |
+
+**This is the second time.** The `TEMPLATES.update({...})` block in `services/cms/src/templates.py`
+carries the note from the first: *"absence meant rfp_admin stopped being notified (the 052
+regression)"*. It recurs because neither side fails at boot — the workflow registers fine, the CRM
+starts fine, and the only symptom is mail that never arrives.
+
+All eight are written, following the existing `_layout` / `_button` / defensive-`p.get()` pattern,
+with payload fields taken from each step's own `input_map` (which `_execute_notify` spreads into the
+event payload verbatim). Each renders from an **empty** payload as well as a populated one — a
+template that raises returns None and drops the mail exactly like a missing one.
+
+`pipeline/tests/test_notify_templates_exist.py` is the guard, proven red on the eight before the
+fix. It reads the registry with the **AST**, because it is assembled in two pieces (`TEMPLATES = {}`
+then `TEMPLATES.update({})`) and a regex over `'name': lambda` catches both today only by luck — it
+would silently miss a third piece.
+
 ## The extension surface
 
 66 bracketed operations emit an `end` that no workflow consumes yet. Every one is an attachment
@@ -232,5 +294,15 @@ no literal exists anywhere.
 
 ## Verification
 
-`tsc` 0 · `vitest` 1964 pass · 12/12 audit self-tests · joins 1, 2 and 3 all zero · the guard proven
-red on the 28 unfixed files and green on the same build after the codemod.
+`tsc` 0 · `vitest` 1968 pass · `pytest` 1319 pass / 9 skipped / 0 failed · `next build` clean ·
+14/14 audit self-tests · joins 1, 2, 3, 6 and 7 all zero, and the audit exits non-zero if any of
+them is not.
+
+Both fixes proven **red first** on the same build: check 4 reported all 31 open brackets against the
+28 unfixed files, and `test_notify_templates_exist.py` reported all 8 missing templates before they
+were written.
+
+⚠️ Run the pipeline tests as `python3 -m pytest` **with `scripts/sandbox-env.sh` sourced**. The
+`pytest` on `PATH` is a uv-managed tool that cannot see `asyncpg` (66 collection errors), and
+without `DATABASE_URL` the ~22 live-DB tests do not skip — they run and fail at connect, which reads
+exactly like a broken pipeline. See docs/CONTINUATION.md §2.

@@ -55,9 +55,33 @@ const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER || 'postgresql
 // here has already passed every gate the engine applies.
 function loadRegistry() {
   const py = `
-import sys, json; sys.path.insert(0, 'src')
-from workflows.base import discover_workflows, all_registered_workflows
+import sys, json, importlib; sys.path.insert(0, 'src')
+from workflows.base import discover_workflows, all_registered_workflows, StepType
+from workflows.processor import TOOL_ACTION_TO_ARCHETYPE
 discover_workflows()
+
+# JOIN 6 · does a step's ACTION actually exist?
+#
+# _execute_action() resolves a dotted 'module.function' with importlib AT EXECUTION TIME. A typo
+# passes validate(), registers cleanly, and raises mid-instance the first time the workflow runs
+# for real. validate() gates unmapped AI_INVOKE actions at boot for exactly this reason and the
+# ACTION case has no equivalent — so resolve every one of them here, the same way the engine will.
+def _resolves(s):
+    t = s.step_type
+    if t == StepType.ACTION:
+        parts = s.action.rsplit('.', 1)
+        if len(parts) != 2:
+            return 'not module.function'
+        mod, fn = parts
+        try:
+            m = importlib.import_module(mod)
+        except Exception as e:
+            return type(e).__name__ + ': ' + str(e)[:80]
+        return True if getattr(m, fn, None) is not None else ("no function '%s' in %s" % (fn, mod))
+    if t == StepType.AI_INVOKE:
+        return True if s.action in TOOL_ACTION_TO_ARCHETYPE else 'unmapped AI_INVOKE'
+    return True
+
 out = []
 for w in all_registered_workflows():
     t = w.trigger
@@ -66,6 +90,8 @@ for w in all_registered_workflows():
       'trigger': {'ns': t.namespace, 'type': t.type, 'phase': t.phase, 'conditional': bool(t.condition)},
       'steps': [{
         'name': s.name, 'action': s.action, 'type': s.step_type.value,
+        'template': (s.input_map or {}).get('template'),
+        'resolves': _resolves(s),
         'wait_for': ({'ns': s.wait_for.namespace, 'type': s.wait_for.type, 'phase': s.wait_for.phase}
                      if s.wait_for else None),
       } for s in w.steps],
@@ -425,6 +451,59 @@ function detectsOpenBracket(source) {
 const detectorSeesBadShape = detectsOpenBracket(BAD_SHAPE);
 const detectorSeesGoodShape = detectsOpenBracket(GOOD_SHAPE);
 
+/**
+ * JOIN 7 · a NOTIFY step's template ↔ a renderer that exists.
+ *
+ * A NOTIFY step names a template STRING; the CRM, in a different service with a different database,
+ * defines one. Nothing compared the two. Eight of the fifteen named templates existed nowhere, so
+ * `render_template()` returned None and the listener emitted `system:notification.failed` instead
+ * of an email — six of them had already been requested in this sandbox.
+ *
+ * The registry is assembled in two pieces (`TEMPLATES = {...}` then `TEMPLATES.update({...})`), and
+ * the `.update` block carries a comment recording the last time this broke: "absence meant
+ * rfp_admin stopped being notified (the 052 regression)". Read via the Python AST rather than a
+ * regex, because a regex over `'name': lambda` counts BOTH pieces and reports 21 where the first
+ * dict alone holds 11 — right answer, wrong reasoning, and it would have been wrong the moment a
+ * third piece appeared.
+ */
+function crmTemplateNames() {
+  const py = `
+import ast, json
+tree = ast.parse(open('services/cms/src/templates.py').read())
+names = set()
+for node in ast.walk(tree):
+    if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
+        for t in node.targets:
+            if isinstance(t, ast.Name) and t.id == 'TEMPLATES':
+                names |= {k.value for k in node.value.keys if isinstance(k, ast.Constant)}
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'update':
+        if isinstance(node.func.value, ast.Name) and node.func.value.id == 'TEMPLATES':
+            for a in node.args:
+                if isinstance(a, ast.Dict):
+                    names |= {k.value for k in a.keys if isinstance(k, ast.Constant)}
+print(json.dumps(sorted(names)))
+`;
+  const raw = execFileSync('python3', ['-c', py], { cwd: REPO, encoding: 'utf8' });
+  return new Set(JSON.parse(raw.slice(raw.indexOf('['))));
+}
+const crmTemplates = crmTemplateNames();
+const notifySteps = registry.flatMap((w) => w.steps
+  .filter((s) => s.type === 'notify')
+  .map((s) => ({ wf: w.wf, step: s.name, template: String(s.template ?? '').replace(/^["']|["']$/g, '') })));
+// A template resolved from the payload at run time cannot be checked statically — reported as such
+// rather than counted either way.
+const dynamicNotify = notifySteps.filter((n) => n.template.startsWith('payload.') || n.template.startsWith('step.'));
+const missingTemplates = notifySteps
+  .filter((n) => n.template && !dynamicNotify.includes(n) && !crmTemplates.has(n.template));
+
+// JOIN 6 · results, computed in the registry loader where the engine's own imports are available.
+const unresolvableSteps = registry.flatMap((w) => w.steps
+  .filter((s) => s.resolves !== true)
+  .map((s) => ({ wf: w.wf, step: s.name, type: s.type, action: s.action, why: s.resolves })));
+const skippedTypes = registry.flatMap((w) => w.steps
+  .filter((s) => s.type === 'api_call')
+  .map((s) => ({ wf: w.wf, step: s.name })));
+
 // ── self-test ────────────────────────────────────────────────────────────────
 // The join is a claim. Each answer below was verified by hand against the source first.
 const T = [
@@ -450,6 +529,10 @@ const T = [
   ['the open-bracket detector catches the shape it exists for', detectorSeesBadShape],
   ['…and stays quiet on the same handler once the catch closes the bracket', !detectorSeesGoodShape],
   ['the live corpus was read', observed.size > 20],
+  ['every step action was resolved, not assumed', registry.flatMap((w) => w.steps).every((s) => s.resolves !== undefined)],
+  // The CRM registry is built in two pieces; reading only the first reports working templates as absent.
+  ['the CRM template registry includes the .update() block',
+    crmTemplates.has('rfp_ready_for_curation') && crmTemplates.size > 20],
   // Each of the five below is an emit MECHANISM the first run did not know about, and each one
   // turned a working, wired, shipping workflow into a false "can never fire". Verified by hand.
   ['a ternary emit registers both branches (rfp-upload)', emitters.has(key('finder', 'rfp.uploaded', 'end'))],
@@ -489,6 +572,21 @@ console.log(`   live corpus — start rows never terminated:`);
 for (const u of unterminated) console.log(`   · ${`${u.namespace}:${u.type}`.padEnd(50)} ${u.n}`);
 if (!unterminated.length) console.log('   · none');
 
+console.log(`\n══ 6 · every step's action ↔ an implementation that exists ══`);
+const stepCount = registry.reduce((a, w) => a + w.steps.length, 0);
+console.log(`   ${stepCount} steps · ${unresolvableSteps.length} whose action cannot be resolved:`);
+for (const u of unresolvableSteps) console.log(`   · ${u.wf}.${u.step} (${u.type}) → ${u.action}  ${u.why}`);
+if (skippedTypes.length) {
+  console.log(`   ⚠ ${skippedTypes.length} api_call step(s) — the dispatcher skips these ("not implemented in V1"):`);
+  for (const k of skippedTypes) console.log(`   · ${k.wf}.${k.step}`);
+}
+
+console.log(`\n══ 7 · every NOTIFY step ↔ a renderer that exists ══`);
+console.log(`   ${notifySteps.length} notify steps · ${crmTemplates.size} templates the CRM can render`);
+console.log(`   ${dynamicNotify.length} resolve their template from the payload (not statically checkable)`);
+console.log(`   ${missingTemplates.length} name a template with NO renderer — these emit notification.failed, not email:`);
+for (const m of missingTemplates) console.log(`   · ${m.wf}.${m.step} → ${m.template}`);
+
 console.log(`\n══ 4 · declared ↔ exercised ══`);
 const neverSeen = [...emitters.keys()].filter((k) => !observed.has(k));
 console.log(`   ${emitters.size} emittable · ${observed.size} distinct (ns,type,phase) in the corpus · ${neverSeen.length} never fired here`);
@@ -503,8 +601,10 @@ console.log(`   ${unconsumedEnds.length} 'end' events nothing consumes — where
 
 fs.writeFileSync(path.join(REPO, 'docs/automation-spine-audit.json'), JSON.stringify({
   workflows: registry.length, steps, deadTriggers, deadWaits, openBrackets,
+  unresolvableSteps, missingTemplates, dynamicNotify, pyOpenBrackets,
   unterminated, emittable: [...emitters.keys()].sort(),
   observed: Object.fromEntries(observed), unconsumedEnds: unconsumedEnds.sort(),
 }, null, 1));
 console.log(`\nwrote docs/automation-spine-audit.json`);
-process.exit(deadTriggers.length || deadWaits.length || openBrackets.length ? 1 : 0);
+process.exit(deadTriggers.length || deadWaits.length || openBrackets.length
+  || unresolvableSteps.length || missingTemplates.length ? 1 : 0);
