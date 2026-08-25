@@ -35,20 +35,62 @@ const APP = '/home/user/govwin/frontend/app/api';
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
 
-/** Every route.ts that actually exports a GET, as an API path. */
-function getRoutes(root, prefix) {
+/**
+ * Every route.ts under app/ that exports a GET, as a URL path.
+ *
+ * TWO THINGS THIS GOT WRONG, both the same class — a scope smaller than the claim:
+ *
+ * 1. **It walked two roots.** `app/api/portal` and `app/api/admin`, called from a hardcoded pair of
+ *    actor lanes. Everything else under `app/api` was never enumerated, never called, and never
+ *    listed as uncalled — so `/api/partner/*` (the whole partner-manager console), `/api/enter`,
+ *    `/api/events`, `/api/invite`, `/api/health` and the public content routes sat outside a lens
+ *    whose closing line reads "every reachable GET honours the response contract." Thirteen routes,
+ *    invisible. The arithmetic gave it away: 104 called + 12 unbound ≠ the 130 GET routes on disk.
+ *
+ * 2. **It matched one export form.** `export const GET = withHandler({…})` is not
+ *    `export function GET`, so `/api/admin/system` — the master_admin-only one — was skipped in
+ *    silence. This is B74 exactly: a matcher that cannot see a construct reports the files
+ *    containing it as clean.
+ *
+ * Now: walk everything, match both forms, and let the CALLER decide the actor lane. Every route
+ * ends in exactly one bucket — called, unbound, or unreachable-by-any-configured-actor — and the
+ * totals are asserted at the end so this cannot silently drift again.
+ */
+function getRoutes(root = path.join(APP, '..'), prefix = '') {
   const out = [];
   const walk = (dir, rel) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p, rel + '/' + e.name);
-      else if (e.name === 'route.ts' && /export\s+(async\s+)?function\s+GET/.test(fs.readFileSync(p, 'utf8'))) {
-        out.push((prefix + rel).replace(/\/\(.*?\)/g, ''));
+      else if (/^route\.tsx?$/.test(e.name)) {
+        const src = fs.readFileSync(p, 'utf8');
+        const hasGet =
+          /export\s+(async\s+)?function\s+GET\b/.test(src) ||
+          /export\s+const\s+GET\s*[:=]/.test(src);
+        if (hasGet) out.push((prefix + rel).replace(/\/\(.*?\)/g, ''));
       }
     }
   };
   walk(root, '');
   return out.sort();
+}
+
+/**
+ * Which signed-in actor (if any) can reach a route, mirroring middleware's PATH_MIN_ROLE plus its
+ * PUBLIC_PATHS list. `null` means "call it with no session" — that is the route's REAL caller, and
+ * grading a public route through a logged-in browser would answer a different question than the one
+ * its users ask. The header's rule ("call it through a real session") is about not grading an AUTHED
+ * route anonymously; it was never an argument for leaving public routes ungraded.
+ */
+const PUBLIC_PREFIXES = ['/api/health', '/api/waitlist', '/api/content', '/api/analytics', '/api/stripe/webhook', '/blog', '/api/uploads', '/api/invite'];
+function laneFor(route) {
+  if (PUBLIC_PREFIXES.some((p) => route === p || route.startsWith(p + '/'))) return 'anon';
+  if (route.startsWith('/api/portal/')) return 'tenant';
+  if (route.startsWith('/api/partner/')) return 'partner';
+  if (route.startsWith('/api/admin/') || route.startsWith('/admin/')) return 'admin';
+  // Authenticated but role-neutral (/api/enter, /api/events, /api/storage/local/…): any session
+  // reaches them, so the tenant lane is a real caller.
+  return 'tenant';
 }
 
 async function bindings() {
@@ -91,6 +133,28 @@ async function bindings() {
 const rows = [];
 
 /**
+ * Routes that are NOT JSON APIs and must not be graded as if they were. Both classes were found by
+ * widening the walk and then checking every new red against the source — the first output of a
+ * widened harness describes the harness, and four of its five findings were this.
+ *
+ *   · NAVIGATION endpoints emit `NextResponse.redirect` and never `NextResponse.json` (verified:
+ *     6/8/4 redirects, 0 json each). `fetch()` from a page context follows the chain into HTML and
+ *     reports "Failed to fetch" — a property of the probe, not of the product.
+ *   · /api/health is THE ONE documented envelope exception (docs/API_CONVENTIONS.md §"Response
+ *     shape", and again in its route-file header): load balancers read a top-level `ok`, so
+ *     wrapping it in `{data}` would break every existing probe.
+ *
+ * Listed with the reason rather than filtered out of the walk, so the count still says what was
+ * measured and what was deliberately not.
+ */
+const NOT_JSON_ROUTES = new Map([
+  ['/api/enter', 'navigation — redirect-only, no JSON body to grade'],
+  ['/api/partner/enter', 'navigation — redirect-only, no JSON body to grade'],
+  ['/api/partner/exit', 'navigation — redirect-only, no JSON body to grade'],
+  ['/api/health', 'the ONE documented envelope exception (docs/API_CONVENTIONS.md) — probes read a top-level `ok`'],
+]);
+
+/**
  * Grade one response against the SOP envelope.
  *
  * Deliberately NOT graded as a failure: a 401/403/404 with a correct `{error, code}` body. Those are
@@ -115,7 +179,11 @@ function grade(status, text, ctype = '') {
   return { ok: false, note: `200 without {data} — ${shape}` };
 }
 
-async function call(page, url) {
+const exempted = [];
+
+async function call(page, url, route) {
+  const why = NOT_JSON_ROUTES.get(route);
+  if (why) { exempted.push({ route, why }); return true; }
   const r = { url, status: null, ok: false, note: '' };
   try {
     // Return the FULL body and the content-type. The first version sliced to 2000 chars BEFORE
@@ -156,19 +224,40 @@ const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[k] ?? `[${k
 const addressable = (r) => !/\[/.test(bind(r));
 const unbound = [];
 
+// One enumeration of the whole tree, partitioned into lanes. Every route lands in exactly one
+// bucket and the arithmetic is asserted below — the check that would have caught the old scope gap.
+const ALL_ROUTES = getRoutes();
+const LANES = [
+  ['anon', 'public · no session', null, null],
+  ['tenant', 'tenant · tenant_admin', 'kate.ulepic@foundation3dp.com', 'DemoPass123!'],
+  ['partner', 'partner · partner_admin', 'pjackson@ecinnovates.com', ADMIN_PW],
+  ['admin', 'admin · master_admin', 'eric@rfppipeline.com', ADMIN_PW],
+];
+const noActor = [];
+
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 try {
-  for (const [label, email, pw, root, prefix] of [
-    ['tenant · tenant_admin', 'kate.ulepic@foundation3dp.com', 'DemoPass123!', path.join(APP, 'portal'), '/api/portal'],
-    ['admin · master_admin', 'eric@rfppipeline.com', ADMIN_PW, path.join(APP, 'admin'), '/api/admin'],
-  ]) {
+  for (const [lane, label, email, pw] of LANES) {
+    const mine = ALL_ROUTES.filter((r) => laneFor(r) === lane);
+    if (!mine.length) continue;
     console.log(`\n── ${label} ──`);
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    const p = await login(ctx, email, pw);
+    let p;
+    try {
+      // The anonymous lane deliberately does NOT log in — a public route's real caller has no
+      // session, and that is the only way its 401/404 envelope is ever graded.
+      p = email ? await login(ctx, email, pw) : await ctx.newPage();
+      if (!email) await p.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
+    } catch (e) {
+      console.log(`  ✗ lane unavailable — ${String(e.message).slice(0, 80)}`);
+      for (const r of mine) noActor.push(`${r} (lane ${lane}: ${String(e.message).slice(0, 40)})`);
+      await ctx.close();
+      continue;
+    }
     let n = 0;
-    for (const route of getRoutes(root, prefix)) {
+    for (const route of mine) {
       if (!addressable(route)) { unbound.push(route); continue; }
-      await call(p, bind(route)); n += 1;
+      await call(p, bind(route), route); n += 1;
     }
     console.log(`  (${n} route(s) called)`);
     await ctx.close();
@@ -184,6 +273,27 @@ if (unbound.length) {
   console.log(`\n${unbound.length} route(s) NOT called — no row to bind their parameters:`);
   for (const r of unbound) console.log(`  · ${r}`);
 }
+if (noActor.length) {
+  console.log(`\n${noActor.length} route(s) NOT called — no actor could be signed in for their lane:`);
+  for (const r of noActor) console.log(`  · ${r}`);
+}
+
+// THE ACCOUNTING. Every GET on disk must end up called, unbound, or actor-less. The previous
+// version could not have failed this, because it never counted what it had enumerated — and that
+// is precisely how thirteen routes stayed outside a lens that reported on "every reachable GET".
+// A coverage claim that does not reconcile against the tree is a claim about the harness.
+const accounted = rows.length + unbound.length + noActor.length + exempted.length;
+console.log(`\ncoverage: ${ALL_ROUTES.length} GET route(s) on disk · ${rows.length} graded · ${exempted.length} exempt · ${unbound.length} unbound · ${noActor.length} no actor`);
+if (exempted.length) {
+  console.log(`\n${exempted.length} route(s) EXEMPT — not JSON APIs, with the reason stated:`);
+  for (const e of exempted) console.log(`  \u00b7 ${e.route} — ${e.why}`);
+}
+if (accounted !== ALL_ROUTES.length) {
+  console.log(`\n✗ HARNESS DEFECT — ${ALL_ROUTES.length - accounted} route(s) enumerated but neither called nor reported.`);
+  console.log('  Fix the lens before believing any verdict it prints.');
+  process.exit(2);
+}
+
 if (bad.length) {
   console.log('\n✗ envelope violations (the SOP: {data} on success · {error,code} on failure):');
   for (const r of bad) console.log(`  · ${r.url} — ${r.note}`);
