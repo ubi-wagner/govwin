@@ -150,6 +150,40 @@ async function overlaySet(page) {
   }, OVERLAY_SEL);
 }
 
+/**
+ * A signature of the page's MAIN content — the half of the interaction surface the first version
+ * threw away.
+ *
+ * A trigger that opens no overlay and raises no toast was skipped outright, and that is most of the
+ * product: a tab switches the panel, a filter re-queries the list, an expander reveals a row's
+ * detail, a card selects and swaps the pane beside it. None of those are overlays and all of them
+ * are states a customer sees. Thirty-nine modals and twenty-three toasts were captured while every
+ * tab in the application went unphotographed.
+ *
+ * Compared as TEXT rather than pixels because a tab switch replaces content wholesale — a cheap,
+ * stable signal that ignores carets, hovers and relative timestamps. `<main>` when the page has one,
+ * body otherwise; the nav rail and chrome sit outside it either way.
+ */
+async function contentSignature(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('main') ?? document.body;
+    const t = (root.innerText || '').replace(/\s+/g, ' ').trim();
+    return { len: t.length, head: t.slice(0, 400), tail: t.slice(-200) };
+  });
+}
+
+/**
+ * Did the panel materially change? A re-render that re-stamps the same text is not a state. A
+ * different opening 400 characters, or 4% of length, is the floor — set so a relative timestamp
+ * ticking over ("2 minutes ago" → "3 minutes ago") does not register as a tab switch.
+ */
+function panelChanged(a, b) {
+  if (!a || !b) return false;
+  if (a.head !== b.head) return true;
+  const d = Math.abs(a.len - b.len);
+  return a.len > 0 && d / a.len > 0.04;
+}
+
 /** Fields inside the newest overlay, filled with values that are valid but obviously synthetic. */
 async function fillOverlay(page) {
   return page.evaluate((sel) => {
@@ -242,6 +276,7 @@ async function driveRoute(page, lane, route, url) {
   const onDialog = async (d) => { confirms.push({ type: d.type(), message: d.message().slice(0, 160) }); await d.dismiss().catch(() => {}); };
   page.on('dialog', onDialog);
   let opened = 0;
+  let panels = 0;
   let navFailed = false;
 
   try {
@@ -292,6 +327,7 @@ async function driveRoute(page, lane, route, url) {
 
     for (const t of triggers.slice(0, LIMIT)) {
       await markExisting(page);
+      const sigBefore = await contentSignature(page);
       const beforeConfirms = confirms.length;
       const el = await page.$(`[data-uistate-probe="${t.idx}"]`);
       if (!el) continue;
@@ -309,7 +345,17 @@ async function driveRoute(page, lane, route, url) {
       const toast = await page.$(TOAST_SEL);
 
       if (!isNew) {
-        if (toast) await shoot(page, lane, route, `toast-${t.text}`, { trigger: t.text, kind: 'toast' });
+        if (toast) { await shoot(page, lane, route, `toast-${t.text}`, { trigger: t.text, kind: 'toast' }); continue; }
+        // No overlay, no toast — but did the PANEL change? Tabs, filters, expanders and card
+        // selections all land here, and all of them are states worth a picture.
+        const sigAfter = await contentSignature(page);
+        if (panelChanged(sigBefore, sigAfter)) {
+          panels++;
+          await shoot(page, lane, route, `panel-${t.text}`, {
+            trigger: t.text, kind: 'panel',
+            chars: `${sigBefore.len}→${sigAfter.len}`,
+          });
+        }
         continue;
       }
 
@@ -349,7 +395,7 @@ async function driveRoute(page, lane, route, url) {
   } finally {
     page.off('dialog', onDialog);
   }
-  return { opened, confirms: confirms.length, navFailed };
+  return { opened, panels, confirms: confirms.length, navFailed };
 }
 
 // ── run ──────────────────────────────────────────────────────────────────────
@@ -366,7 +412,7 @@ const LANES = {
 console.log(`· serving ${BASE} · driving overlays on ${atlas.shots.length} captured route(s), ≤${LIMIT} triggers each`);
 const before = await tableCounts();
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-let totalOpened = 0, totalConfirms = 0, routesDriven = 0;
+let totalOpened = 0, totalConfirms = 0, totalPanels = 0, routesDriven = 0;
 
 try {
   for (const [laneId, lane] of Object.entries(LANES)) {
@@ -390,8 +436,8 @@ try {
           r = await driveRoute(page, laneId, s.route, s.url);
         } catch { /* the lane is genuinely broken; the finding already records it */ }
       }
-      routesDriven++; totalOpened += r.opened; totalConfirms += r.confirms;
-      if (r.opened || r.confirms) console.log(`  ${s.route.padEnd(52)} ${r.opened} overlay(s) · ${r.confirms} confirm(s)`);
+      routesDriven++; totalOpened += r.opened; totalConfirms += r.confirms; totalPanels += r.panels ?? 0;
+      if (r.opened || r.confirms || r.panels) console.log(`  ${s.route.padEnd(52)} ${r.opened} overlay(s) · ${r.panels} panel(s) · ${r.confirms} confirm(s)`);
     }
     await ctx.close();
   }
@@ -408,7 +454,7 @@ for (const s of shots) byKind[s.kind] = (byKind[s.kind] ?? 0) + 1;
 
 console.log(`\n${shots.length} state screenshot(s) across ${routesDriven} route(s)`);
 for (const [k, v] of Object.entries(byKind).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(5)}  ${k}`);
-console.log(`\n  ${totalOpened} overlay(s) opened · ${totalConfirms} native confirm(s) intercepted and dismissed`);
+console.log(`\n  ${totalOpened} overlay(s) opened · ${totalPanels} panel state(s) · ${totalConfirms} native confirm(s) intercepted and dismissed`);
 console.log(`\nmutation footprint: ${drift.length ? drift.length + ' table(s) changed' : 'nothing changed'}`);
 for (const d of drift) console.log(`  · ${d}`);
 
