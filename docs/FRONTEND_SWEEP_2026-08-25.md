@@ -345,3 +345,77 @@ The third is the one worth keeping. The note warning against exactly that mistak
 lines above the bug, **written in the same sitting**. Knowing a rule is not the same as following
 it, which is why the fix is a scoped query and a comment naming the incident rather than a
 resolution to be careful.
+
+
+---
+
+## 8. Phase 3 — the states behind the screens
+
+§7 photographed 116 routes at rest. A page at rest is not the UI: a customer presses "New bucket"
+and a form appears, submits it empty and it complains, presses Delete and a confirm blocks them, and
+a toast reports the result. The interaction surface is **1,479 handlers over 184 components** — 687
+buttons, 458 inputs, 24 forms, 16 overlay implementations, 26 files using native `confirm()`, one
+toast bus with 29 publishers — and no lens in this repo could reach any of it. The write lens calls
+routes over HTTP with no browser; the surface lens loads a URL and looks once.
+
+**152 state captures across 123 routes**, in nine contact sheets grouped by KIND rather than route:
+
+| state | n | |
+|---|---:|---|
+| `open` | 39 | the overlay as it first appears |
+| `filled` | 23 | every field populated (never submitted — that would be a create) |
+| `validation` | 4 | the primary submit pressed with the form EMPTY |
+| `confirm` | 11 | native `confirm()`/`prompt()` intercepted, recorded, **dismissed** |
+| `toast` | 23 | whatever the toast bus published |
+| viewports | 52 | phone · tablet · desktop, incl. the mobile nav drawer as an overlay |
+
+### B133 — the primary navigation was announced as a dialog, on every page
+
+`Drawer` set `role="dialog"` unconditionally, and the nav rail *is* a `Drawer` (`inlineAt="lg"`) —
+above that breakpoint a static 256px column, not an overlay. So a screen-reader user met a **dialog**
+where the site's main navigation should be, and the nav was missing from landmark navigation.
+
+**Found by a harness, not by reading.** An overlay probe kept reporting one persistent
+`role="dialog"` present *before anything was clicked*. Nothing that reads source would flag it: the
+line is unremarkable and the component's header describes both modes correctly. The *rendered*
+semantics were wrong, and only something asking the DOM what it claims to be could see it.
+
+The fix was wrong once in the safe-looking direction — it also dropped `aria-modal` for `inlineAt`
+drawers, which would have demoted the MOBILE nav from a modal to a plain region while it covers the
+page. That case now has its own test.
+
+### Two things recorded rather than changed
+
+**Two admin modals, two clicks apart, validate differently.** "Create New Document" renders a styled
+*"Title is required"*; "Add a company" shows the browser's native unstyled bubble. On inspection
+neither is a bug: one submits via `<form onSubmit>` with `required` inputs, so the browser handles
+empties and its `setErr` is reserved for server failures; the other submits via `onClick` with no
+`<form>`, so native validation cannot run and it must check itself. Each validates the only way its
+mechanism allows. The inconsistency is real and user-visible; the implementations are both coherent,
+so this is a design decision to make, not a drive-by restyle.
+
+**Five native `prompt()` calls**, all in the rfp_admin curation surface. The logic is careful —
+`!notes` vs `notes === null` correctly distinguishes a required reason from an optional one — but
+the medium carries an operational risk: Chrome offers *"prevent this page from creating additional
+dialogs"* after repeated prompts, and triage is precisely where an admin dismisses many items in a
+row. Once ticked, **every later dismissal silently returns and does nothing.**
+
+### The harness was wrong three times first (B132 continued)
+
+An overlay identity keyed on `text|size` — so any content change inside the persistent nav element
+read as a new overlay: **16 "overlay would not close" findings on one lane**, including a time-range
+filter and a `<summary>` disclosure, none real. A trigger filter that pressed immediate-action
+buttons and **littered the corpus** other instruments measure — a content page created, a promo code
+minted, a pipeline job queued: B119, committed by the harness written to avoid it. And one aborted
+navigation that took the rest of a lane with it, 25 findings and half the admin lane unmeasured.
+
+The lasting answer to the second is procedural and is now in CLAUDE.md: this lens is **not
+read-only**, it prints its footprint, and the honest way to run it is `pg_dump` before and restore
+after — which is what was done here, verified by `tenant_bucket_scores` returning to 45 from the 0
+the run had left.
+
+### The responsive pass graded the artifact, not the repository
+
+It reported B133 **red** against the running server while the source was already fixed — the
+deployed build predated the fix. Green at every width after a rebuild, with no sideways scroll
+anywhere. That is the check working: a source fix is not a shipped fix.

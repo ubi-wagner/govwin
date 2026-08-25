@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1939 (1937 pass · 2 env-skipped) · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1943 (1941 pass · 2 env-skipped) · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -266,9 +266,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1939 total: 1937 pass · 2 env-skipped) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1943 total: 1941 pass · 2 env-skipped) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
+  `drive-ui-responsive.mjs`) opens every overlay and walks it — open → validation → filled → close —
+  intercepts every native `confirm()`/`prompt()` (recording the message, always DISMISSING), catches
+  toasts, and captures phone/tablet/desktop including the mobile nav drawer, which the desktop pass
+  cannot reach because the hamburger is `lg:hidden`. It also asserts the invariant nav-shell states
+  outright: the page body never scrolls sideways. ⚠️ It is **not read-only** — it prints its
+  mutation footprint, and the honest way to run it is `pg_dump` before, restore after. Sheets group
+  by KIND, not route: twenty validation messages side by side is what makes the odd one visible.
 - **The UI has its own two documents, and a route sweep is not a UI sweep.** `docs/UI_CATALOG.md`
   (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 116 routes, 184 components,
   **1,479 event handlers**, 328 fetch sites — with the render graph both ways so an orphan is
