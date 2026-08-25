@@ -545,7 +545,7 @@ tree carries far more, listed per component in §2.
 | `POST '/api/admin/storage'` | 1 |
 | `GET '/api/admin/agents/usage?period=30d'` | 1 |
 | `GET '/api/admin/agents/workforce'` | 1 |
-| `GET /api/admin/sbir-data/lookup?company=:p${app.dunsUei ? '&uei=' + encodeURIComponent(` | 1 |
+| `GET /api/admin/sbir-data/lookup?company=:p:p:p` | 1 |
 | `POST /api/admin/applications/:p/accept` | 1 |
 | `POST /api/admin/applications/:p/reject` | 1 |
 | `POST /api/admin/applications/:p/status` | 1 |
@@ -617,10 +617,10 @@ tree carries far more, listed per component in §2.
 | `GET /api/portal/:p/atoms/review` | 1 |
 | `POST /api/portal/:p/atoms/apply-librarian-tags` | 1 |
 | `GET baseUrl` | 1 |
-| `POST :p/select` | 1 |
-| `POST :p/skip` | 1 |
-| `POST :p/decide` | 1 |
-| `POST :p/apply` | 1 |
+| `POST /api/portal/:p/proposals/:p/seed-job/select` | 1 |
+| `POST /api/portal/:p/proposals/:p/seed-job/skip` | 1 |
+| `POST /api/portal/:p/proposals/:p/seed-job/decide` | 1 |
+| `POST /api/portal/:p/proposals/:p/seed-job/apply` | 1 |
 | `DELETE /api/portal/:p/managers/:p` | 1 |
 | `POST /api/portal/:p/manager-requests/:p` | 1 |
 | `PATCH /api/portal/:p/members/:p/scope` | 1 |
@@ -680,7 +680,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/vaults` | 1 |
 | `GET /api/portal/:p/proposals/:p/artifacts/:p/layout` | 1 |
 | `PATCH /api/portal/:p/proposals/:p/sections/:p/assign` | 1 |
-| `POST :p/:p` | 1 |
+| `POST /api/admin/rfp-curation/:p/amendments/:p` | 1 |
 | `GET /api/admin/rfp-curation/:p/annotations` | 1 |
 | `GET /api/admin/section-standards` | 1 |
 | `PATCH /api/admin/rfp-curation/:p/annotations/:p` | 1 |
@@ -689,7 +689,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/admin/rfp-curation/:p/broadcast` | 1 |
 | `POST /api/admin/rfp-curation/:p/assess-ingest` | 1 |
 | `POST /api/admin/rfp-curation/:p/shred-audit` | 1 |
-| `GET /api/admin/compliance-suggest?variableName=:p&namespace=${encodeURIComponent(so` | 1 |
+| `GET /api/admin/compliance-suggest?variableName=:p&namespace=:p` | 1 |
 | `POST /api/admin/rfp-curation/:p/triage` | 1 |
 | `POST /api/admin/sources/:p/expand-topics` | 1 |
 | `POST '/api/admin/extract-topics'` | 1 |

@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1943 (1941 pass · 2 env-skipped) · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1964 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -266,7 +266,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1943 total: 1941 pass · 2 env-skipped) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1964 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
@@ -317,6 +317,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   page that is DEFINITELY broken and requiring its detector to see it, exiting 2 with *"every clean
   below would be unearned"* otherwise. Both guards were added after the thing they guard against had
   already happened (B125, B127).
+- **The lenses cannot see what was never surfaced.** Every instrument above asks whether what the
+  product does, it does correctly — none can find a feature with no way in, because no page renders
+  it, no route is called, and nobody writes a test for something unreachable. That question needs the
+  two inventories side by side: `frontend/scripts/reconcile-capability.mjs` joins API routes ↔ UI
+  callers, tables-with-rows ↔ SQL that reads them, archetypes ↔ invocation paths, templates ↔ the UI,
+  and emitted events ↔ what a person can read. It classifies into **called · external · duplicated ·
+  second door · UNSURFACED** and self-tests against 16 hand-verified answers first. It found billing
+  showing three indistinguishable purchases while the uncalled `…/purchases` route had always joined
+  the titles (B135), and a customer's audit trail reading "Shadow descended" (B136). Canonical:
+  **docs/CAPABILITY_RECONCILIATION.md**, which also records the fifteen ways the join was wrong —
+  most importantly that **a source-literal scan against a dynamically-fetched list cannot pass**.
 - **Run all five on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
   where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
   survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.

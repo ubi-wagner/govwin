@@ -11,6 +11,9 @@ interface Purchase {
   status: string;
   createdAt: string;
   opportunityId: string | null;
+  /** What the purchase was FOR. Null for products that buy no particular thing (consulting hours). */
+  proposalTitle?: string | null;
+  opportunityTitle?: string | null;
 }
 
 interface BillingPanelProps {
@@ -305,6 +308,11 @@ export default function BillingPanel({
                   <tr key={p.id}>
                     <td className="py-2 pr-4 text-gray-700">
                       {formatProductType(p.productType)}
+                      {(p.proposalTitle ?? p.opportunityTitle) && (
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          {p.proposalTitle ?? p.opportunityTitle}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-gray-700">
                       {formatCents(p.amountCents)}

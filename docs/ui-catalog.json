@@ -7085,7 +7085,7 @@
    "fetches": [
     {
      "method": "GET",
-     "url": "`/api/admin/sbir-data/lookup?company=${encodeURIComponent(app.companyName)}${app.dunsUei ? '&uei=' + encodeURIComponent("
+     "url": "`/api/admin/sbir-data/lookup?company=${encodeURIComponent(app.companyName)}${app.dunsUei ? '&uei=' + encodeURIComponent(app.dunsUei) : ''}${domainParam}`"
     },
     {
      "method": "POST",
@@ -9119,7 +9119,7 @@
   },
   {
    "file": "components/canvas/canvas-editor.tsx",
-   "lines": 1283,
+   "lines": 1290,
    "client": true,
    "kind": "component",
    "exports": [
@@ -9161,289 +9161,289 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 992
+     "line": 999
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 993
+     "line": 1000
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1025
+     "line": 1032
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1037
+     "line": 1044
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1053
+     "line": 1060
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1067
+     "line": 1074
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1082
+     "line": 1089
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1090
+     "line": 1097
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1101
+     "line": 1108
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1112
+     "line": 1119
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1122
+     "line": 1129
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1135
+     "line": 1142
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1143
+     "line": 1150
     },
     {
      "on": "onAddNode",
      "element": "CanvasToolbar",
      "binds": false,
-     "line": 1161
+     "line": 1168
     },
     {
      "on": "onUpdateNodeStyle",
      "element": "CanvasToolbar",
      "binds": false,
-     "line": 1162
+     "line": 1169
     },
     {
      "on": "onSelectNode",
      "element": "SlideEditor",
      "binds": false,
-     "line": 1171
+     "line": 1178
     },
     {
      "on": "onUpdateNode",
      "element": "SlideEditor",
      "binds": false,
-     "line": 1172
+     "line": 1179
     },
     {
      "on": "onAddNode",
      "element": "SlideEditor",
      "binds": false,
-     "line": 1173
+     "line": 1180
     },
     {
      "on": "onDeleteNode",
      "element": "SlideEditor",
      "binds": false,
-     "line": 1174
+     "line": 1181
     },
     {
      "on": "onUpdateCanvas",
      "element": "SlideEditor",
      "binds": false,
-     "line": 1175
+     "line": 1182
     },
     {
      "on": "onSelectNode",
      "element": "CanvasRenderer",
      "binds": false,
-     "line": 1183
+     "line": 1190
     },
     {
      "on": "onUpdateNode",
      "element": "CanvasRenderer",
      "binds": false,
-     "line": 1184
+     "line": 1191
     },
     {
      "on": "onMoveNodeToIndex",
      "element": "CanvasRenderer",
      "binds": false,
-     "line": 1187
+     "line": 1194
     },
     {
      "on": "onAtomize",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 1198
+     "line": 1205
     },
     {
      "on": "onRegenerate",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 1199
+     "line": 1206
     },
     {
      "on": "onAnnotate",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 1200
+     "line": 1207
     },
     {
      "on": "onInsert",
      "element": "LibraryInsertPanel",
      "binds": false,
-     "line": 1213
+     "line": 1220
     },
     {
      "on": "onClose",
      "element": "LibraryInsertPanel",
      "binds": false,
-     "line": 1214
+     "line": 1221
     },
     {
      "on": "onClassify",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1225
+     "line": 1232
     },
     {
      "on": "onAccept",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1226
+     "line": 1233
     },
     {
      "on": "onAcceptAll",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1227
+     "line": 1234
     },
     {
      "on": "onAddTag",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1228
+     "line": 1235
     },
     {
      "on": "onRemoveTag",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1229
+     "line": 1236
     },
     {
      "on": "onBubbleClick",
      "element": "AtomBubbleRail",
      "binds": false,
-     "line": 1230
+     "line": 1237
     },
     {
      "on": "onClick",
      "element": "div",
      "binds": true,
-     "line": 1241
+     "line": 1248
     },
     {
      "on": "onToolAction",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1251
+     "line": 1258
     },
     {
      "on": "onAddNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1252
+     "line": 1259
     },
     {
      "on": "onDeleteNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1253
+     "line": 1260
     },
     {
      "on": "onMoveNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1254
+     "line": 1261
     },
     {
      "on": "onAcceptNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1255
+     "line": 1262
     },
     {
      "on": "onRevertNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1256
+     "line": 1263
     },
     {
      "on": "onReplaceFromLibrary",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1257
+     "line": 1264
     },
     {
      "on": "onUpdateNodeStyle",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1258
+     "line": 1265
     },
     {
      "on": "onUpdateNodeContent",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1259
+     "line": 1266
     },
     {
      "on": "onUpdateNodePosition",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1260
+     "line": 1267
     },
     {
      "on": "onUpdateCanvas",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1261
+     "line": 1268
     },
     {
      "on": "onReviseNode",
      "element": "CanvasSidebar",
      "binds": false,
-     "line": 1262
+     "line": 1269
     },
     {
      "on": "onClose",
      "element": "DocumentPreview",
      "binds": false,
-     "line": 1277
+     "line": 1284
     }
    ],
    "fetches": [
@@ -10713,7 +10713,7 @@
   },
   {
    "file": "components/canvas/fluid-document-view.tsx",
-   "lines": 650,
+   "lines": 661,
    "client": true,
    "kind": "component",
    "exports": [
@@ -10778,31 +10778,31 @@
      "on": "onAtomize",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 617
+     "line": 628
     },
     {
      "on": "onAnnotate",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 618
+     "line": 629
     },
     {
      "on": "onReuse",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 619
+     "line": 630
     },
     {
      "on": "onComplianceCheck",
      "element": "SelectionToolbar",
      "binds": false,
-     "line": 620
+     "line": 631
     },
     {
      "on": "onSelectionChange",
      "element": "ScopeBar",
      "binds": false,
-     "line": 639
+     "line": 650
     }
    ],
    "fetches": [
@@ -14644,23 +14644,23 @@
     },
     {
      "method": "POST",
-     "url": "`${baseUrl}/select`"
+     "url": "`/api/portal/${tenantSlug}/proposals/${proposalId}/seed-job/select`"
     },
     {
      "method": "POST",
-     "url": "`${baseUrl}/skip`"
+     "url": "`/api/portal/${tenantSlug}/proposals/${proposalId}/seed-job/skip`"
     },
     {
      "method": "POST",
-     "url": "`${baseUrl}/decide`"
+     "url": "`/api/portal/${tenantSlug}/proposals/${proposalId}/seed-job/decide`"
     },
     {
      "method": "POST",
-     "url": "`${baseUrl}/decide`"
+     "url": "`/api/portal/${tenantSlug}/proposals/${proposalId}/seed-job/decide`"
     },
     {
      "method": "POST",
-     "url": "`${baseUrl}/apply`"
+     "url": "`/api/portal/${tenantSlug}/proposals/${proposalId}/seed-job/apply`"
     }
    ],
    "forms": 0,
@@ -17829,7 +17829,7 @@
     },
     {
      "method": "POST",
-     "url": "`${base}/${id}`"
+     "url": "`/api/admin/rfp-curation/${solId}/amendments/${id}`"
     }
    ],
    "forms": 0,
@@ -18683,7 +18683,7 @@
     },
     {
      "method": "GET",
-     "url": "`/api/admin/compliance-suggest?variableName=${encodeURIComponent(action.variableName)}&namespace=${encodeURIComponent(so"
+     "url": "`/api/admin/compliance-suggest?variableName=${encodeURIComponent(action.variableName)}&namespace=${encodeURIComponent(sol.namespace ?? '')}`"
     },
     {
      "method": "POST",
@@ -20195,7 +20195,7 @@
   },
   {
    "file": "components/ui/drawer.tsx",
-   "lines": 101,
+   "lines": 129,
    "client": true,
    "kind": "component",
    "exports": [
@@ -20207,7 +20207,7 @@
      "on": "onClick",
      "element": "div",
      "binds": true,
-     "line": 78
+     "line": 85
     }
    ],
    "fetches": [],
@@ -20348,7 +20348,7 @@
   },
   {
    "file": "components/ui/nav-shell.tsx",
-   "lines": 67,
+   "lines": 68,
    "client": true,
    "kind": "component",
    "exports": [
@@ -20368,7 +20368,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 50
+     "line": 51
     }
    ],
    "fetches": [],

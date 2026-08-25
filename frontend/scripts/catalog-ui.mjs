@@ -140,7 +140,17 @@ function parse(fullPath, rel) {
 
     // fetch('…', { method }) — what a handler actually calls.
     if (ts.isCallExpression(node) && node.expression.getText(sf) === 'fetch' && node.arguments.length) {
-      const url = node.arguments[0].getText(sf).replace(/\s+/g, ' ').slice(0, 120);
+      let url = node.arguments[0].getText(sf).replace(/\s+/g, ' ').slice(0, 160);
+      // RESOLVE A COMPOSED BASE. Fourteen call sites build the path from a local const —
+      // `const baseUrl = `/api/portal/${t}/proposals/${p}/seed-job`` then `fetch(`${baseUrl}/apply`)`.
+      // Recording the literal argument leaves `${baseUrl}/apply`, which matches no route, so the
+      // capability reconciliation reported four fully-wired seed-job endpoints as unreachable. Only
+      // 4% of sites, and every one of them a real route that would have been named a false finding.
+      const m0 = /^`\$\{(\w+)\}/.exec(url);
+      if (m0) {
+        const base = new RegExp(`(?:const|let)\\s+${m0[1]}\\s*=\\s*\`([^\`]*)\``).exec(text)?.[1];
+        if (base) url = '`' + base + url.slice(m0[0].length);
+      }
       const opts = node.arguments[1]?.getText(sf) ?? '';
       const m = /method:\s*'([A-Z]+)'/.exec(opts)?.[1] ?? 'GET';
       rec.fetches.push({ method: m, url });

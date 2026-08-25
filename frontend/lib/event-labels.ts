@@ -43,6 +43,29 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'proposal.stage_advanced': (p) =>
     `Proposal advanced to ${str(p.targetStage) ?? str(p.toStage) ?? str(p.stage) ?? 'the next stage'}`,
   'proposal.advance_ready': 'All sections locked — ready to advance',
+
+  // ── Internal terms that were reaching a CUSTOMER's Activity feed ────
+  //
+  // `describeEvent` falls back to de-punctuating the raw type, which never looks broken and so
+  // never got noticed: these arrived as "Shadow descended", "Card applied", "Review todos
+  // prestaged", "Workflow instance created". Every one is a term from the system's own vocabulary
+  // — the shadow account, the bridge card, the process instance — shown to the company that bought
+  // a proposal portal. The events are deliberately tenant-scoped (shadow-transition's own comment
+  // says the event "belongs to the customer's audit trail"), so the fix is the wording, not the
+  // scope. Found by joining what the DB has actually emitted under a tenant_id against this map.
+  'shadow.descended': 'An RFP administrator opened your workspace to assist',
+  'shadow.ascended': 'An RFP administrator left your workspace',
+  'card.applied': 'Opportunity added to your board',
+  'card.scored': 'Opportunity ranked against your buckets',
+  'tenant.rescored': 'Opportunities re-ranked against your buckets',
+  'buckets.updated': 'Spotlight buckets updated',
+  'bucket.deactivated': 'Spotlight bucket deactivated',
+  'review_todos.prestaged': 'Review to-dos prepared for this stage',
+  'workflow.instance_created': 'Workflow started',
+  'workspace.released': 'Proposal workspace released to your team',
+  'proposal.advisory_overlay_requested': 'AI review panel requested',
+  'proposal.advisory_overlay_reconciled': 'AI review panel findings reconciled',
+  'proposal.full_draft_requested': 'Full AI draft requested',
   'document.locked': (p) =>
     `Document complete & locked${str(p.volumeName) ? `: ${str(p.volumeName)}` : ''}`,
   'proposal.locked': 'Proposal locked for admin review',
