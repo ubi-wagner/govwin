@@ -980,8 +980,15 @@ function CanvasEditorInner({
             // Gated on the rescued GROUP MAP, not on `doc` — `doc` here is the flattened editable
             // document, whose `sections` is undefined by construction, so `documentHasGroups(doc)`
             // is false for every document and the chip would never appear.
+            // …and no `grid` on a DECK. The measurement grid is a CanvasRenderer capability
+            // (`MeasureGridOverlay`); `SlideEditor` has no concept of it, so on a slide document the
+            // chip toggled, reported aria-pressed="true", and painted nothing — measured at 0.09%
+            // pixel change against 2.02% on a letter, i.e. the chip's own colour and no more. That is
+            // the exact failure this filter already guards against two lines up; `grid` was simply
+            // never added to it.
             items={OVERLAYS.filter((o) => o.key !== 'sections'
-              && (o.key !== 'groups' || Object.keys(groups ?? {}).length > 0))}
+              && (o.key !== 'groups' || Object.keys(groups ?? {}).length > 0)
+              && (o.key !== 'grid' || !isSlideFormat))}
           />
         </div>
         <div className={`flex-1 overflow-y-auto min-h-0 ${overlayClass(overlays)}`}>

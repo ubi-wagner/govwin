@@ -609,6 +609,17 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
             onUpdateNode={onUpdateNode}
             variables={variables}
             readOnly={!anyEditable}
+            // The Grid chip was OFFERED on this surface and wired to nothing. `CanvasRenderer`
+            // takes `grid` and defaults it to false; this view never passed it, and there is no CSS
+            // rule for `ov-grid` either, so the class `overlayClass` adds paints nothing on its own.
+            // The result: on the DEFAULT tab of the proposal workspace — the main authoring surface
+            // — an author toggled Grid, the chip lit up, and no grid appeared. Measured at 0.09%
+            // pixel change (the chip itself) against 2.02% where it works.
+            //
+            // Wiring it is the right fix rather than hiding the chip: this is the assembled
+            // document, where page boundaries across eleven pages are exactly what a measurement
+            // grid is for.
+            grid={overlays.has('grid')}
           />
           {canAct && (
             <SelectionToolbar
