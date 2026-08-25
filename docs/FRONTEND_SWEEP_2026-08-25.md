@@ -5,10 +5,11 @@ run.** Postgres initialised empty, all 213 migrations applied from `001`, depend
 from the lockfile, the app built and served exactly as production serves it (`govtech_app`, RLS
 enforced). Nothing in this report was measured against surviving state.
 
-Six defects found and fixed (**B122–B127**), five of them in code that every green run had already
-passed over, because they lived where no instrument was looking. The sweep's durable output is not
-the fixes — it is the two things that now make that scope visible: a manifest of everything a sweep
-has to touch, and a lens for the 213 write verbs nothing walked.
+Eight defects found and fixed (**B122–B129**). Five were in code that every green run had already
+passed over, because they lived where no instrument was looking; three were in the instruments
+themselves. The sweep's durable output is not the fixes — it is the two things that now make that
+scope visible: a manifest of everything a sweep has to touch, and a lens for the 213 write verbs
+nothing walked.
 
 ---
 
@@ -71,7 +72,7 @@ honest gap, and it is a gap in the unit suite, not in a lens.
 | check | result |
 |---|---|
 | `tsc --noEmit` | **0 errors** |
-| `vitest run` | **1,931 passed · 2 skipped · 192 files** (CLAUDE.md said 1,915 — drift corrected) |
+| `vitest run` | **1,931 tests · 1,929 passed · 2 env-skipped · 192 files** (CLAUDE.md said 1,915 — drift corrected) |
 | `next build` | clean |
 | `check-rls-posture` | correct — isolation, not deny-all; 4 cross-tenant tables each with a stated reason |
 | **Lens 1** `verify-surfaces` | **78 driven · 78 clean · 0 broken** · 3 not driven, each with its reason |
@@ -88,12 +89,34 @@ honest gap, and it is a gap in the unit suite, not in a lens.
 | `crosscheck-shipped-fixes` | B79 + B80 hold under curl+psql, sharing nothing with the lenses |
 | `crosscheck-canvas-normalize` | no stored or partial canvas can reach a renderer incomplete |
 | `schema-check` | **2,586 references verified across app + lib · 0 contradictions** |
+| **branch drive suite** (39 drives) | **39 pass · 0 fail · 0 could-not-run** — after B128/B129; four were red on the first run and **none was a product defect** |
 
-Bug log: **125 entries · 0 open · 5 deferred** (deferred by choice, named in the log).
+Bug log: **128 entries · 0 open · 5 deferred** (deferred by choice, named in the log).
+
+### The drive suite's four reds, and why none was the product
+
+The 39-drive branch suite is the broadest thing here — it drives whole journeys, both spines, as
+real actors. Its first run on the fresh box was **35 pass · 4 fail**, and every failure was
+environment or harness:
+
+| drive | what it was |
+|---|---|
+| `opp-scout` | `anthropic` never installed — the AI half of the product was inert (B128) |
+| `cms-generate` | the same missing module, on the content-generation vertical |
+| `page-scale` | a missing guard + a dependency on state the drive before it deletes (B129) |
+| `canvas-structural` | asserted on the one TOC entry the design deliberately omits (B129) |
+
+**B128 is the one that matters.** With `anthropic` absent the fabric **safe-skips** — a deliberate
+invariant — so every workflow still reported `completed` and **37 of 39 drives passed with the agent
+workforce doing nothing at all.** Only the two drives that assert on AI behaviour specifically
+noticed. That is B115's shape with a different cause, and the reason it is worth a log entry rather
+than a shrug: on this box `pip install -r requirements.txt` **aborts** on a Debian-managed
+`cryptography` and silently skips every line after it, and piping the install into `tail` makes `$?`
+report tail's success instead of pip's failure.
 
 ---
 
-## 4. The six defects
+## 4. The eight defects
 
 ### B122 — the collaborator invite flow was dead
 `/invite/<token>` was public; `/api/invite`, which it depends on, was not. An invitee — who by
@@ -154,6 +177,24 @@ exist yet. After any real failure anywhere in the product they fail forever — 
 permanently red, aimed at the four pages an operator uses to find real problems, because the product
 logged an error it was designed to log. They passed this morning only because the box was hours old.
 
+### B128 — the install lied, and the whole AI half went quiet
+`pip install -r pipeline/requirements.txt` aborted on a Debian-managed `cryptography` and skipped
+every line after it — `anthropic`, `boto3`, `pymupdf4llm`. Piping it into `tail` meant `$?` was
+tail's status, so a failed install exited 0. Then the fabric's safe-skip invariant hid the
+consequence completely: every workflow reported `completed` while no agent ran. Restarting the
+worker after installing (it imports at module load) produced a real tool-loop —
+`rounds=2 · tool_calls=2 · tokens=365`.
+
+### B129 — two drives failing on things the product never promised
+`page-scale` died with a `TypeError` because the only document on a fresh box belongs to the house
+tenant, which has zero tenant_admin memberships **by design**; the `!doc` case was guarded and the
+`!member` case was not. It also could not have run inside the suite at all — `drive-canvas-authoring`
+runs immediately before it and correctly disposes of the documents it authored (**B103's shape**).
+It now authors its own document through the product's own POST, measures, and removes it.
+`canvas-structural` reported the TOC broken; the TOC deliberately omits the first `h1` as the
+document's own title, and the probe counted exactly that heading. Verified against the renderer
+before changing anything — the block reads `Table of Contents · Second Chapter Heading · 1`.
+
 ---
 
 ## 5. What this sweep is really about: the instruments
@@ -170,10 +211,11 @@ Measured, not asserted:
 |---|---|---|
 | the inventory's gate check (regex draft) | 61 "ungated" API routes | **0** — gates reached via helpers and wrapper exports |
 | the inventory's snake_case row-type check | 3 crash-class defects | **0** — the file builds its own client with no `toCamel` |
+| the 39-drive branch suite, on a fresh box | 4 failing journeys | **0** — two missing SDK, two harness assumptions |
 | `verify-api-contract`, widened | 5 envelope violations | **1** — the rest: the one documented exception + three redirect-only routes |
 | `verify-write-contract`, new | 19 write violations | **3** — the rest: routes whose fields are all optional by design |
 
-That is 88 candidate findings, 4 real. Every one of the 84 was killed by the same step — reading the
+That is 92 candidate findings, 4 real. Every one of the 88 was killed by the same step — reading the
 source before believing the tool — and each is now encoded as a stated exception rather than a
 filter, so the counts still say what was measured and what was deliberately not.
 

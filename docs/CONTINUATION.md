@@ -896,9 +896,31 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 > `frontend/scripts/seed-isolation-fixture.mts` (from `frontend/`, so the `@/lib` alias resolves),
 > or a third of the isolation surface has no behavioural coverage (B118).
 >
-> **The pipeline worker needs its own deps** — `pip install -r pipeline/requirements.txt`, or it
-> dies on `ModuleNotFoundError: No module named 'dotenv'` and `sandbox-up.sh` reports
-> `worker FAILED` while everything else comes up green.
+> **The pipeline worker needs its own deps, and the install LIES** (B128). Run it and then CHECK:
+>
+> ```bash
+> pip install -r pipeline/requirements.txt          # do NOT pipe this into `tail` — see below
+> python3 - <<'EOF'
+> import importlib.util as u
+> for m in ['dotenv','anthropic','boto3','pymupdf4llm','docx','pptx','fitz','psycopg2']:
+>     print(f'  {m:14} {"ok" if u.find_spec(m) else "MISSING"}')
+> EOF
+> ```
+>
+> On this container pip **aborts** on `Cannot uninstall cryptography 41.0.7, RECORD file not found —
+> the package was installed by debian`, and everything after that line in `requirements.txt` is
+> silently skipped: `anthropic`, `boto3`, `pymupdf4llm`. Piping the install into `tail` makes it
+> worse, because `$?` is then *tail's* status and a failed install exits 0.
+>
+> **Why this is expensive rather than annoying:** with `anthropic` absent the agent fabric
+> **safe-skips** — a deliberate invariant — so every workflow still reports `completed` and the
+> entire AI half of the product does nothing, quietly. 37 of 39 branch drives pass in that state.
+> Only `opp-scout` and `cms-generate` notice, because they assert on the AI half specifically. This
+> is B115's shape with a different cause. **Restart the worker after installing** — it imports at
+> module load, so a running one keeps the failure.
+>
+> Without any deps at all it dies on `ModuleNotFoundError: No module named 'dotenv'` and
+> `sandbox-up.sh` reports `worker FAILED` while everything else comes up green.
 >
 > **`soffice` ships with no document filters** (see the ⚠️ further down this section) — install
 > `libreoffice-impress` (plus `-writer` / `-calc`) before `probe-deck-overlap` or
