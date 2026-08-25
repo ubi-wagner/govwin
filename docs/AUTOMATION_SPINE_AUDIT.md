@@ -292,6 +292,38 @@ no literal exists anywhere.
 
 ---
 
+## What this still does not cover
+
+"Every action, event and workflow" is the goal; this is the honest edge of it. Each item below was
+looked at and left, with the reason — a surface nobody has an expectation for is **uncovered, not
+passing**.
+
+**Covered, for the record.** All three services emit into the same `system_events` table and all
+three are in the bracket scan: the frontend (`emitEvent*`, 31 open brackets found and closed), the
+pipeline (`emit_event`/`emit_start`/`emit_end`, 0 unbalanced), and the CRM
+(`emit_system_event`, 8 sites, 2 bracketed pairs — `action.{type}` in `event_listener.py` and
+`drip.step_sent` in `drip_engine.py`, both closing on the error path as well as the success one).
+
+**Not covered:**
+
+1. **The engine's own instance lifecycle** — six unpaired `single`s, deliberately. Reasoning and the
+   exact shape of the change are in the section above; the data is authoritative in
+   `process_instances` either way.
+2. **`on_timeout` / `on_failure` handlers.** `validate()` proves they name real steps. Nothing proves
+   the timeout path emits anything, or that a handler step is itself reachable. A step that times out
+   into a handler that also fails is not modelled here.
+3. **Anything resolved at run time.** One NOTIFY step takes its template from `payload.completeTemplate`;
+   `workflow.instance_*` types are built by an f-string; `EventTrigger.condition` and
+   `Step.condition` are Python lambdas over payloads. All are reported as unresolvable rather than
+   silently counted either way — but they are not checked.
+4. **`input_map` semantics.** `validate()` proves a `step.<name>` reference points at a transitive
+   `depends_on` ancestor. It does not prove the referenced field will *exist* in that step's result.
+5. **"Never fired here" is not "unreachable."** Join 4's 267 never-exercised (ns,type,phase)
+   combinations describe this sandbox's history, not the product's capability.
+6. **The audit proves a workflow CAN fire, not that it does the right thing.** Every join here is
+   structural. Whether `OnSolicitationPushed` fans out correctly is a question for the drives and the
+   e2e specs, not for this instrument.
+
 ## Verification
 
 `tsc` 0 · `vitest` 1968 pass · `pytest` 1319 pass / 9 skipped / 0 failed · `next build` clean ·
