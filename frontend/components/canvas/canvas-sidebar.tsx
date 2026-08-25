@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { shouldFocusNodeTab } from '@/lib/canvas/format-controls';
 import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules, NodeType } from '@/lib/types/canvas-document';
 import { getNodeText, docNodes } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
@@ -458,6 +459,27 @@ export function CanvasSidebar({
 }: Props) {
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings' | 'review'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+
+  // ── SELECTING A NODE LANDS YOU WHERE ITS FORMATTING IS ──────────────────────────────────────
+  //
+  // The panel opens on `compliance`, and every shape, arrange and layering control lives under
+  // `Node`. So the full ribbon was two steps from the page — select, then switch tab — and the
+  // capability doc named that as a real friction point rather than a missing feature: the controls
+  // were all built, just not where a person looks after clicking something.
+  //
+  // ONLY FROM THE DEFAULT TAB, which is the whole subtlety. Jumping unconditionally would hijack a
+  // deliberate choice: inserting from the `Add` tab selects the node it just inserted, so an
+  // unconditional rule would throw the author out of the insert panel on every insert — worse than
+  // the friction it fixes. Moving off `compliance` is an expressed preference; sitting on it is
+  // not, so only the untouched default gives way.
+  // The rule itself is `shouldFocusNodeTab` in lib/canvas/format-controls — a pure predicate, so it
+  // is unit-tested rather than only typechecked (vitest runs in `node` here; there is no jsdom).
+  const lastSelId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = selectedNode?.id ?? null;
+    if (shouldFocusNodeTab(lastSelId.current, id, activeTab)) setActiveTab('node');
+    lastSelId.current = id;
+  }, [selectedNode, activeTab]);
 
   const maxPages = doc.canvas.max_pages;
   // Real word-budget fit (the section "mold") — replaces the old ceil(nodeCount/8) guess.

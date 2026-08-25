@@ -100,3 +100,34 @@ export const INSERT_ELEMENTS: ReadonlyArray<{ type: NodeType; label: string; ico
   { type: 'video', label: 'Video', icon: '▶' },
   { type: 'signature', label: 'Signature', icon: '✍' },
 ];
+
+/** The properties-panel tabs, in the order they render. */
+export type PanelTab = 'compliance' | 'node' | 'add' | 'history' | 'settings' | 'review';
+
+/**
+ * Should selecting a node move the properties panel to the `Node` tab?
+ *
+ * The panel opens on `compliance` and every shape, arrange and layering control lives under `Node`,
+ * so the full ribbon sat two steps from the page: select, then switch tab. The controls were all
+ * built — they just were not where a person looks after clicking something.
+ *
+ * THE GUARD IS THE POINT. Jumping on every selection would hijack a deliberate choice: inserting
+ * from the `Add` tab selects the node it just inserted, so an unconditional rule throws the author
+ * out of the insert panel on every single insert — worse than the friction it fixes. Moving off
+ * `compliance` is an expressed preference; sitting on the untouched default is not. So only the
+ * default gives way, and only when the selection actually CHANGES (re-selecting the same node after
+ * deliberately returning to `compliance` must not yank the tab back).
+ *
+ * Extracted as a predicate rather than left inline because this project's vitest runs in the `node`
+ * environment with no jsdom — a rule buried in a component effect could only have been verified by
+ * hand, and "it typechecks" is not evidence about behaviour.
+ */
+export function shouldFocusNodeTab(
+  prevSelectedId: string | null,
+  nextSelectedId: string | null,
+  activeTab: PanelTab,
+): boolean {
+  if (!nextSelectedId) return false;                 // nothing selected → nothing to format
+  if (nextSelectedId === prevSelectedId) return false; // same node → not a new selection
+  return activeTab === 'compliance';                 // only the untouched default gives way
+}

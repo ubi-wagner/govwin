@@ -148,9 +148,14 @@ emitted, so nothing is hidden.
 
 1. The block toolbar's buttons render **disabled until something is selected**. Present and usable
    are different states.
-2. The properties panel is **tabbed and opens on `compliance`**. The shape, arrange and layering
-   groups are under **Node** — so the full ribbon is two steps from the page: select, then switch
-   tab. This is a real friction point and is not yet addressed.
+2. The properties panel is **tabbed and opens on `compliance`**, and the shape, arrange and layering
+   groups live under **Node**. Selecting a node now **moves the panel to Node for you** — but only
+   from that default tab. The guard is the substance of the fix: the `Add` tab selects the node it
+   just inserted, so a rule that fired on every selection would throw the author out of the insert
+   panel on every insert, which is worse than the friction it removes. Moving off `compliance` is an
+   expressed preference; sitting on the untouched default is not. `shouldFocusNodeTab`
+   (`lib/canvas/format-controls.ts`), unit-tested in both directions — the naive unconditional rule
+   fails six of the ten cases.
 
 ---
 
