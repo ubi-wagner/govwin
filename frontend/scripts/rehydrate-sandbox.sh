@@ -28,6 +28,8 @@ if ! psql -h localhost -U govtech -d postgres -tAc 'select 1' >/dev/null 2>&1 \
     || su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/postgresql/16/main -l /var/log/postgresql/postgresql-16-main.log start" >/dev/null 2>&1
   sleep 3
 fi
+TMPLOG="$(mktemp)"
+trap 'rm -f "$TMPLOG"' EXIT
 say "postgres: $(su postgres -c "psql -tAc 'select version()'" 2>/dev/null | head -c 25 || echo UNREACHABLE)"
 
 # 2) role + database
@@ -37,8 +39,33 @@ su postgres -c "psql -tAc \"select 1 from pg_database where datname='govtech_int
   || { say "creating database govtech_intel"; su postgres -c "psql -c \"CREATE DATABASE govtech_intel OWNER govtech;\"" >/dev/null 2>&1; }
 
 # 3) migrations (idempotent; 169/170 self-seed the Foundation demo)
+#
+# ── THIS STEP USED TO FAIL SILENTLY AND THE SCRIPT STILL SAID "state restored". ──
+#
+# It was `node migrate.mjs 2>&1 | tail -1`, which is wrong twice over. `tail -1` throws the error
+# away — a crashed Node prints its stack and the LAST line is the banner "Node.js v22.22.2", so the
+# log showed a version string where the reason should have been. And a pipeline's status is the
+# status of its LAST command, so `$?` was tail's: a migration that never ran could not fail the
+# script. Measured on a wiped box: zero tables in the database, and the script exited 0 announcing
+# a restored sandbox.
+#
+# The failure it hid: migrate.mjs sits at the REPO ROOT and imports `postgres`, which resolves from
+# a root node_modules. This environment reclaims node_modules, so after a reclaim the migrator
+# cannot start at all — and nothing said so.
 say "running migrations…"
-DATABASE_URL="$DBURL" node "$ROOT/db/migrations/migrate.mjs" 2>&1 | tail -1
+if ! DATABASE_URL="$DBURL" node "$ROOT/db/migrations/migrate.mjs" > "$TMPLOG" 2>&1; then
+  say "MIGRATIONS FAILED — the sandbox is NOT restored. Reason:"
+  sed 's/^/    /' "$TMPLOG" | head -20
+  if grep -q "ERR_MODULE_NOT_FOUND" "$TMPLOG"; then
+    # The deps live in frontend/ — there is no package.json at the repo root, so `npm ci` there
+    # does nothing and the next reader loses an hour. migrate.mjs sits at the root and imports
+    # `postgres`, which Node resolves by walking UP from the file: /db/migrations → /db → / . None
+    # of those carry node_modules, so the migrator can only start when the root install exists.
+    say "  (a dependency is missing — run 'cd $FE && npm ci', then re-run this script)"
+  fi
+  exit 1
+fi
+sed 's/^/    /' "$TMPLOG" | tail -3
 
 # 3b) ADMIN PASSWORDS — the step whose absence made every previous rehydrate half a restore.
 #
@@ -51,11 +78,22 @@ DATABASE_URL="$DBURL" node "$ROOT/db/migrations/migrate.mjs" 2>&1 | tail -1
 # real operator does out-of-band after a deploy; it is sandbox-only and the script refuses a
 # non-local DB.
 say "resetting admin passwords…"
-DATABASE_URL_OWNER="$DBURL" node "$ROOT/scripts/sandbox-reset-passwords.mjs" 2>&1 | tail -1
+if ! DATABASE_URL_OWNER="$DBURL" node "$ROOT/scripts/sandbox-reset-passwords.mjs" > "$TMPLOG" 2>&1; then
+  say "PASSWORD RESET FAILED — every /admin driver will die at the login form. Reason:"
+  sed 's/^/    /' "$TMPLOG" | head -12
+  exit 1
+fi
+sed 's/^/    /' "$TMPLOG" | tail -2
 
 # 4) verify seed
+# A '?' here means the query itself failed, which means the schema is not there — the old script
+# printed it and carried on to announce success.
 ATOMS=$(psql -h localhost -U govtech -d govtech_intel -tAc "select count(*) from library_atoms la join tenants t on t.id=la.tenant_id where t.slug='foundation'" 2>/dev/null || echo '?')
 say "foundation atoms: $ATOMS"
+if [ "$ATOMS" = "?" ]; then
+  say "COULD NOT READ THE SEED — the database has no schema. NOT restored."
+  exit 1
+fi
 say "logins — tenant: kate.ulepic@foundation3dp.com / DemoPass123!"
 say "         admin:  eric@rfppipeline.com / ${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 
