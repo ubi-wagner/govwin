@@ -33,6 +33,25 @@
  * Under-declaring is the failure. Over-declaring wastes space and is reported but not failed — the
  * same asymmetry the page ruler carries (B64): too tall is untidy, too short deletes content.
  *
+ * ── AND A FOURTH INSTRUMENT, FOR THE NODES THE THIRD CANNOT SEE ───────────────────────────────
+ *
+ * A node that paints its own fill defeats the ink measurement: the ink IS the box, so declared and
+ * realised agree however much text is crammed inside, and the check can never fail. Those were
+ * reported INDETERMINATE rather than green, which was honest but useless.
+ *
+ * TEXT POSITION answers it. The rendered page carries a baseline for every run, so a run sitting
+ * below the box's bottom edge has escaped the fill drawn for it — in PowerPoint that text is
+ * overlapped by whatever follows, or clipped away. Measured, not eyeballed.
+ *
+ * Getting it to DISCRIMINATE took two corrections worth keeping. First it counted the slide-number
+ * footer as body text and reported "text reaches 7.26in" on a perfectly good callout — a finding
+ * about the harness wearing the costume of a finding about the deck. Then, once fixed, it passed
+ * the old broken estimator too: `length / 60` assumes 60 characters per line, and at 13pt across a
+ * 12-inch slide the real figure is ~146, so the old rule OVER-estimates at ordinary sizes and only
+ * under-counts above ~32pt. The case that discriminates is therefore a callout the author
+ * enlarged — at 36pt the shipped writer declares 1.70in for 3.35in of text and three of five runs
+ * land outside the box. A check that passes the bug it was written for is not a check.
+ *
  *   cd frontend && npx tsx scripts/probe-deck-overlap.mts
  *
  * Exits 1 if any node is under-declared. Reports UNMEASURED — never a pass — without LibreOffice.
@@ -82,6 +101,19 @@ const longParagraph = () => N('text_block', { text:
 
 const wrappingCallout = () => N('callout', { variant: 'info', title: 'Decision',
   text: 'Range access at two field windows is the single dependency that cannot be bought later in the programme, and it is the one thing this proposal asks the government to provide.' });
+
+/**
+ * The case a character-count divisor cannot model: the author enlarged the type.
+ *
+ * `length / 60` assumes one font size at one column width. Bump a callout to 20pt and the same
+ * character count needs far more lines than the divisor believes, so the box comes out short and the
+ * text runs out the bottom of the fill that was drawn for it. This is the case that makes the boxed
+ * check discriminate — with the default size the old rule happened to over-estimate, so it passed
+ * for the wrong reason and proved nothing.
+ */
+const bigCallout = () => N('callout', { variant: 'warning', title: 'Schedule risk',
+  text: 'Range access at two field windows is the single dependency that cannot be bought later in the programme, and it is the one thing this proposal asks the government to provide before the closed-loop demonstration can be scheduled at all.' },
+  { size: 36 });
 
 /** A heading plus one node, alone on a slide — nothing above it, nothing below it to cover it. */
 const isolate = (node: CanvasNode): CanvasDocument => ({
@@ -164,6 +196,62 @@ async function realisedHeight(pptx: Buffer, tag: string): Promise<{ h: number; p
   return { h: ((lowest - highest) / height) * SLIDE_H_IN, png };
 }
 
+/**
+ * Does a boxed node's TEXT stay inside the box drawn for it?
+ *
+ * The ink-span measurement below cannot answer this. A callout paints its own fill, so the ink IS
+ * the box: declared and realised agree no matter how much text is crammed inside, and the check
+ * can never fail. That is why boxed nodes were reported INDETERMINATE rather than green.
+ *
+ * Text POSITION can answer it. The rendered page carries a baseline for every run, so a run whose
+ * baseline sits below the box's bottom edge has escaped the box — which in PowerPoint means it is
+ * either overlapping whatever comes next or clipped away entirely. Same failure as B121, one the
+ * ink measurement is structurally blind to.
+ */
+async function boxedTextEscapes(
+  pptx: Buffer, tag: string,
+): Promise<{ escaped: number; total: number; boxBottomIn: number; lowestIn: number } | null> {
+  const zip = await JSZip.loadAsync(pptx);
+  const xml = await zip.files['ppt/slides/slide1.xml'].async('string');
+
+  // The boxed node is the body shape that declares a solid fill — the callout — not the sidebar
+  // (x=0) and not the title band.
+  let box: { y: number; h: number } | null = null;
+  for (const m of xml.matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)) {
+    const blk = m[1];
+    if (!/<a:solidFill>/.test(blk)) continue;
+    const off = /<a:off x="(-?\d+)" y="(-?\d+)"/.exec(blk);
+    const ext = /<a:ext cx="(\d+)" cy="(\d+)"/.exec(blk);
+    if (!off || !ext) continue;
+    const x = Number(off[1]) / EMU;
+    const y = Number(off[2]) / EMU;
+    if (x < 0.3 || y < BODY_TOP - 0.01 || y > 6.7) continue;   // skip sidebar + title furniture
+    box = { y, h: Number(ext[2]) / EMU };
+  }
+  if (!box) return null;
+
+  const pdf = `${OUT}/${tag}.pdf`;
+  if (!existsSync(pdf)) return null;
+  const pages = await capturePdfPages(readFileSync(pdf), { scale: 1.4 });
+  if (!pages.length) return null;
+  const pxPerIn = pages[0].height / SLIDE_H_IN;
+
+  const bottom = box.y + box.h;
+  // BODY runs only. The slide-number footer sits at ~7.05in by design, so counting it made the
+  // first version of this check report "text reaches 7.26in" and flag a callout that was perfectly
+  // fine — a finding about the harness, dressed as a finding about the deck. Same exclusion the ink
+  // measurement already makes, for the same reason.
+  const runs = pages[0].textItems.filter((t) => {
+    const yIn = t.y / pxPerIn;
+    return yIn > BODY_TOP && yIn < 6.7;
+  });
+  if (!runs.length) return null;
+  const lowest = Math.max(...runs.map((t) => t.y)) / pxPerIn;
+  // A baseline more than a third of a line below the box edge is out, not rounding.
+  const escaped = runs.filter((t) => t.y / pxPerIn > bottom + 0.06).length;
+  return { escaped, total: runs.length, boxBottomIn: bottom, lowestIn: lowest };
+}
+
 async function run(): Promise<void> {
   // `boxed` marks a node that paints its own fill or border. For those the ink span measures the
   // BOX, not the text inside it, so declared and realised agree by construction and a tick would
@@ -174,6 +262,7 @@ async function run(): Promise<void> {
     { tag: 'list', what: 'a list whose bullets wrap', node: wrappingList },
     { tag: 'paragraph', what: 'a paragraph that wraps', node: longParagraph },
     { tag: 'callout', what: 'a callout whose text wraps', node: wrappingCallout, boxed: true },
+    { tag: 'callout-36pt', what: 'a callout the author enlarged to 36pt', node: bigCallout, boxed: true },
   ];
 
   let under = 0, unmeasured = 0;
@@ -193,9 +282,21 @@ async function run(): Promise<void> {
     const slack = declared - real.h;
     console.error(`  writer declared ${declared.toFixed(2)}in · rendered needs ${real.h.toFixed(2)}in → ${real.png}`);
     if (c.boxed) {
-      unmeasured++;
-      console.error('  ? INDETERMINATE — this node paints its own fill/border, so the ink span is the');
-      console.error('    BOX, not the text in it. The two agree by construction. Look at the page.');
+      // Ink cannot judge a node that paints its own box; text position can.
+      const t = await boxedTextEscapes(pptx, c.tag);
+      if (!t) {
+        unmeasured++;
+        console.error('  UNMEASURED — no boxed shape or no text layer found. NOT a pass.');
+        continue;
+      }
+      if (t.escaped > 0) {
+        under++;
+        console.error(`  ✗ ${t.escaped}/${t.total} text run(s) sit BELOW the box that was drawn for them`);
+        console.error(`    box ends at ${t.boxBottomIn.toFixed(2)}in, text reaches ${t.lowestIn.toFixed(2)}in`);
+        console.error('    in PowerPoint that text is overlapped by what follows, or clipped away');
+      } else {
+        console.error(`  ✓ all ${t.total} text run(s) are inside the box (ends ${t.boxBottomIn.toFixed(2)}in, text ${t.lowestIn.toFixed(2)}in)`);
+      }
       continue;
     }
     if (slack < -0.1) {

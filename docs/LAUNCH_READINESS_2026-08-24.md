@@ -121,8 +121,10 @@ intended launch path.
 * **The contents page inherits the ruler's over-count bias** — a late entry in a long document can
   read one page high. Stated in `CANVAS_STYLING_CAPABILITIES.md §5`; fixing it properly means making
   the ruler exact, not giving the TOC a second opinion.
-* **A boxed slide node's height is unverified end-to-end.** `probe-deck-overlap.mts` reports callouts
-  and text boxes INDETERMINATE rather than green, because their own fill is what the ink measures.
+* ~~A boxed slide node's height is unverified end-to-end.~~ **CLOSED** — `probe-deck-overlap.mts`
+  now measures boxed nodes by TEXT POSITION rather than ink: a baseline below the box's bottom edge
+  has escaped the fill drawn for it. Proven red-first on a 36pt callout, where the shipped estimator
+  declares 1.70in for 3.35in of text and three of five runs land outside the box.
 
 ---
 

@@ -47,6 +47,8 @@ export interface CapturedPage {
   height: number;
   /** Text extracted from the page's text layer — what a reader can actually read off it. */
   text: string;
+  /** Each text run and WHERE it sits, in rendered device pixels (y is the baseline). */
+  textItems: Array<{ str: string; x: number; y: number; h: number; w: number }>;
 }
 
 /** One figure lifted off a page, with where it sat. `bbox` is in rendered page pixels. */
@@ -139,9 +141,26 @@ async function render(scale, pages) {
     // source file: a .pptx contains every row of a table it clipped, so only the rendered text can
     // answer "did this reach the customer".
     let text = '';
+    const textItems = [];
     try {
       const tc = await page.getTextContent();
       text = tc.items.map((i) => (i && typeof i.str === 'string' ? i.str : '')).join(' ');
+
+      // WHERE each run sits, in DEVICE pixels. The joined string above can say a word is present;
+      // only a position can say whether it is inside the box that was drawn for it. pdf.js gives a
+      // per-item transform in PDF user space (origin bottom-left), so it is composed with the
+      // viewport transform to land in the same coordinate system as the rendered image.
+      for (const i of tc.items) {
+        if (!i || typeof i.str !== 'string' || !i.str.trim() || !i.transform) continue;
+        const t = pdfjs.Util.transform(viewport.transform, i.transform);
+        textItems.push({
+          str: i.str,
+          x: t[4],
+          y: t[5],                                   // baseline, device space
+          h: Math.hypot(t[1], t[3]) || (i.height ?? 0),
+          w: i.width ?? 0,
+        });
+      }
     } catch { /* no text layer is a fact about the page, not a failure of the render */ }
 
     out.push({
@@ -151,6 +170,7 @@ async function render(scale, pages) {
       png: canvas.toDataURL('image/png'),
       boxes,
       text,
+      textItems,
     });
   }
   return out;
@@ -206,6 +226,7 @@ async function launchBrowser() {
 interface RawPage {
   pageNumber: number; width: number; height: number; png: string; text?: string;
   boxes: Array<{ x: number; y: number; w: number; h: number }>;
+  textItems?: Array<{ str: string; x: number; y: number; h: number; w: number }>;
 }
 
 /** Render pages once and hand back everything the two public entry points need. */
@@ -252,7 +273,7 @@ export async function capturePdfPages(pdf: Buffer, opts: CaptureOptions = {}): P
   const raw = await renderPages(pdf, opts);
   return raw.map((r) => ({
     pageNumber: r.pageNumber, width: r.width, height: r.height, png: fromDataUrl(r.png),
-    text: r.text ?? '',
+    text: r.text ?? '', textItems: r.textItems ?? [],
   }));
 }
 
@@ -309,7 +330,7 @@ export async function extractPdfFigures(pdf: Buffer, opts: FigureOptions = {}): 
       try {
         const png = await sharp(pagePng).extract({ left: x, top: y, width: w, height: h }).png().toBuffer();
         // A cropped figure carries the page's text, not its own — a raster has none to give.
-        out.push({ pageNumber: r.pageNumber, png, width: w, height: h, text: r.text ?? '', bbox: { x, y, w, h }, pageFraction: frac });
+        out.push({ pageNumber: r.pageNumber, png, width: w, height: h, text: r.text ?? '', textItems: r.textItems ?? [], bbox: { x, y, w, h }, pageFraction: frac });
       } catch (e) {
         console.error('[pdf/page-capture] crop failed:', e instanceof Error ? e.message : e);
       }

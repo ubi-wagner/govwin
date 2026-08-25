@@ -180,10 +180,9 @@ ruler, one answer. If the numbers must be exact, the fix is to make the ruler ex
 
 **Built but unmeasured:**
 
-* **a boxed slide node's height.** `probe-deck-overlap.mts` measures a node's declared frame against
-  what an independent engine renders — but a node that paints its own fill or border (callout, text
-  box) defeats it: the ink span *is* the box, so declared and realised agree by construction. Those
-  are reported INDETERMINATE rather than green.
+*(A boxed node's height used to sit here. It is now measured — by text baseline against the box
+rect rather than by ink, since a node that paints its own fill defeats an ink measurement.)*
+
 * **inline-run survival through the writers.** The matrix covers node style. Whether a
   superscript run inside a paragraph reaches `.docx` is not proven.
 * **control reachability per surface.** `drive-control-reachability.mts` exists and is instrumented
