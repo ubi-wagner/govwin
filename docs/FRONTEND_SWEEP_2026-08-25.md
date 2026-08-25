@@ -86,10 +86,11 @@ honest gap, and it is a gap in the unit suite, not in a lens.
 | `calibrate-page-ruler` | 36/36 against Chromium |
 | `calibrate-slide-ruler` | 7/7 against a rendered `.pptx` |
 | `probe-deck-overlap` | **0 under-declared · 0 unmeasured** — with a real Impress filter installed |
+| `verify-exports-on-stored-artifacts` | **18 stored volumes · 36 exports · 0 failures** (1 volume over its soft page budget, recorded not failed) |
 | `crosscheck-shipped-fixes` | B79 + B80 hold under curl+psql, sharing nothing with the lenses |
 | `crosscheck-canvas-normalize` | no stored or partial canvas can reach a renderer incomplete |
 | `schema-check` | **2,586 references verified across app + lib · 0 contradictions** |
-| **branch drive suite** (39 drives) | **39 pass · 0 fail · 0 could-not-run** — after B128/B129; four were red on the first run and **none was a product defect** |
+| **branch drive suite** (39 drives) | first full run **35 pass · 4 fail · 0 could-not-run**; all four causes fixed (B128/B129) and each drive **individually re-verified green**. A confirming full-suite re-run was still in flight when this was written — see the note below. |
 
 Bug log: **128 entries · 0 open · 5 deferred** (deferred by choice, named in the log).
 
@@ -105,6 +106,14 @@ environment or harness:
 | `cms-generate` | the same missing module, on the content-generation vertical |
 | `page-scale` | a missing guard + a dependency on state the drive before it deletes (B129) |
 | `canvas-structural` | asserted on the one TOC entry the design deliberately omits (B129) |
+
+**What has and has not been re-measured.** Each of the four was re-run on its own after its fix and
+passed — `opp-scout` with a real tool-loop recorded, `cms-generate` through draft + review ToDo,
+`page-scale` authoring and disposing of its own document, `canvas-structural` on all five structural
+checks. `opp-scout` also passed inside the confirming suite re-run before this was written. The
+remaining three had not yet been reached by that re-run, so **"39/39" is not claimed here** — four
+individual greens and a partial suite are what was earned, and the distinction is the whole point of
+this document.
 
 **B128 is the one that matters.** With `anthropic` absent the fabric **safe-skips** — a deliberate
 invariant — so every workflow still reported `completed` and **37 of 39 drives passed with the agent
