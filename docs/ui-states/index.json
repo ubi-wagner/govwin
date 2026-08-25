@@ -1,0 +1,882 @@
+{
+ "base": "http://localhost:3000",
+ "routesDriven": 123,
+ "shots": [
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/atoms",
+   "label": "open-＋ Create canvas",
+   "file": "tenant__portal-tenantSlug-atoms__001-open-Create-canvas.jpg",
+   "trigger": "＋ Create canvas",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/atoms",
+   "label": "filled-＋ Create canvas",
+   "file": "tenant__portal-tenantSlug-atoms__002-filled-Create-canvas.jpg",
+   "trigger": "＋ Create canvas",
+   "kind": "filled",
+   "fields": 3
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-✓To-dos",
+   "file": "tenant__portal-tenantSlug-dashboard__003-open-To-dos.jpg",
+   "trigger": "✓To-dos",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-23⬆Library",
+   "file": "tenant__portal-tenantSlug-dashboard__004-open-23-Library.jpg",
+   "trigger": "23⬆Library",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-9◎Opportunities",
+   "file": "tenant__portal-tenantSlug-dashboard__005-open-9-Opportunities.jpg",
+   "trigger": "9◎Opportunities",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "filled-9◎Opportunities",
+   "file": "tenant__portal-tenantSlug-dashboard__006-filled-9-Opportunities.jpg",
+   "trigger": "9◎Opportunities",
+   "kind": "filled",
+   "fields": 3
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-▦Buckets",
+   "file": "tenant__portal-tenantSlug-dashboard__007-open-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "filled-▦Buckets",
+   "file": "tenant__portal-tenantSlug-dashboard__008-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-↻Activity",
+   "file": "tenant__portal-tenantSlug-dashboard__009-open-Activity.jpg",
+   "trigger": "↻Activity",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-1Subscribenone",
+   "file": "tenant__portal-tenantSlug-manage__010-open-1Subscribenone.jpg",
+   "trigger": "1Subscribenone",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-1Subscribenone",
+   "file": "tenant__portal-tenantSlug-manage__011-filled-1Subscribenone.jpg",
+   "trigger": "1Subscribenone",
+   "kind": "filled",
+   "fields": 1
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-2Spotlight0 buckets · 9 OPPs",
+   "file": "tenant__portal-tenantSlug-manage__012-open-2Spotlight0-buckets-9-OPPs.jpg",
+   "trigger": "2Spotlight0 buckets · 9 OPPs",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-2Spotlight0 buckets · 9 OPPs",
+   "file": "tenant__portal-tenantSlug-manage__013-filled-2Spotlight0-buckets-9-OPPs.jpg",
+   "trigger": "2Spotlight0 buckets · 9 OPPs",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-3Buy4 portals",
+   "file": "tenant__portal-tenantSlug-manage__014-open-3Buy4-portals.jpg",
+   "trigger": "3Buy4 portals",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-⚙Account",
+   "file": "tenant__portal-tenantSlug-manage__015-open-Account.jpg",
+   "trigger": "⚙Account",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-⚙Account",
+   "file": "tenant__portal-tenantSlug-manage__016-filled-Account.jpg",
+   "trigger": "⚙Account",
+   "kind": "filled",
+   "fields": 1
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-▦Buckets",
+   "file": "tenant__portal-tenantSlug-manage__017-open-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-▦Buckets",
+   "file": "tenant__portal-tenantSlug-manage__018-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-4👥Users",
+   "file": "tenant__portal-tenantSlug-manage__019-open-4-Users.jpg",
+   "trigger": "4👥Users",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-4👥Users",
+   "file": "tenant__portal-tenantSlug-manage__020-filled-4-Users.jpg",
+   "trigger": "4👥Users",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-4🏗Portals",
+   "file": "tenant__portal-tenantSlug-manage__021-open-4-Portals.jpg",
+   "trigger": "4🏗Portals",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-⚡Automation",
+   "file": "tenant__portal-tenantSlug-manage__022-open-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "validation-⚡Automation",
+   "file": "tenant__portal-tenantSlug-manage__023-validation-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "validation"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-⚡Automation",
+   "file": "tenant__portal-tenantSlug-manage__024-filled-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-🤖AI usage",
+   "file": "tenant__portal-tenantSlug-manage__025-open-AI-usage.jpg",
+   "trigger": "🤖AI usage",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/team",
+   "label": "confirm-Deactivate",
+   "file": "tenant__portal-tenantSlug-team__026-confirm-Deactivate.jpg",
+   "trigger": "Deactivate",
+   "kind": "confirm",
+   "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/team",
+   "label": "confirm-Deactivate",
+   "file": "tenant__portal-tenantSlug-team__027-confirm-Deactivate.jpg",
+   "trigger": "Deactivate",
+   "kind": "confirm",
+   "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/team",
+   "label": "confirm-Deactivate",
+   "file": "tenant__portal-tenantSlug-team__028-confirm-Deactivate.jpg",
+   "trigger": "Deactivate",
+   "kind": "confirm",
+   "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/templates",
+   "label": "toast-Use this template",
+   "file": "tenant__portal-tenantSlug-templates__029-toast-Use-this-template.jpg",
+   "trigger": "Use this template",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/vaults",
+   "label": "open-＋ New nook",
+   "file": "tenant__portal-tenantSlug-vaults__030-open-New-nook.jpg",
+   "trigger": "＋ New nook",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/vaults",
+   "label": "filled-＋ New nook",
+   "file": "tenant__portal-tenantSlug-vaults__031-filled-New-nook.jpg",
+   "trigger": "＋ New nook",
+   "kind": "filled",
+   "fields": 2
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/atoms",
+   "label": "open-＋ Create canvas",
+   "file": "tenant2__portal-tenantSlug-atoms__032-open-Create-canvas.jpg",
+   "trigger": "＋ Create canvas",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/atoms",
+   "label": "filled-＋ Create canvas",
+   "file": "tenant2__portal-tenantSlug-atoms__033-filled-Create-canvas.jpg",
+   "trigger": "＋ Create canvas",
+   "kind": "filled",
+   "fields": 3
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-✓To-dos",
+   "file": "tenant2__portal-tenantSlug-dashboard__034-open-To-dos.jpg",
+   "trigger": "✓To-dos",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-99+⬆Library",
+   "file": "tenant2__portal-tenantSlug-dashboard__035-open-99-Library.jpg",
+   "trigger": "99+⬆Library",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-9◎Opportunities",
+   "file": "tenant2__portal-tenantSlug-dashboard__036-open-9-Opportunities.jpg",
+   "trigger": "9◎Opportunities",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "filled-9◎Opportunities",
+   "file": "tenant2__portal-tenantSlug-dashboard__037-filled-9-Opportunities.jpg",
+   "trigger": "9◎Opportunities",
+   "kind": "filled",
+   "fields": 3
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-▦Buckets",
+   "file": "tenant2__portal-tenantSlug-dashboard__038-open-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "filled-▦Buckets",
+   "file": "tenant2__portal-tenantSlug-dashboard__039-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "label": "open-↻Activity",
+   "file": "tenant2__portal-tenantSlug-dashboard__040-open-Activity.jpg",
+   "trigger": "↻Activity",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-1Subscribenone",
+   "file": "tenant2__portal-tenantSlug-manage__041-open-1Subscribenone.jpg",
+   "trigger": "1Subscribenone",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-1Subscribenone",
+   "file": "tenant2__portal-tenantSlug-manage__042-filled-1Subscribenone.jpg",
+   "trigger": "1Subscribenone",
+   "kind": "filled",
+   "fields": 1
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-2Spotlight0 buckets · 9 OPPs",
+   "file": "tenant2__portal-tenantSlug-manage__043-open-2Spotlight0-buckets-9-OPPs.jpg",
+   "trigger": "2Spotlight0 buckets · 9 OPPs",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-2Spotlight0 buckets · 9 OPPs",
+   "file": "tenant2__portal-tenantSlug-manage__044-filled-2Spotlight0-buckets-9-OPPs.jpg",
+   "trigger": "2Spotlight0 buckets · 9 OPPs",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-3Buy0 portals",
+   "file": "tenant2__portal-tenantSlug-manage__045-open-3Buy0-portals.jpg",
+   "trigger": "3Buy0 portals",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-⚙Account",
+   "file": "tenant2__portal-tenantSlug-manage__046-open-Account.jpg",
+   "trigger": "⚙Account",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-⚙Account",
+   "file": "tenant2__portal-tenantSlug-manage__047-filled-Account.jpg",
+   "trigger": "⚙Account",
+   "kind": "filled",
+   "fields": 1
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-▦Buckets",
+   "file": "tenant2__portal-tenantSlug-manage__048-open-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-▦Buckets",
+   "file": "tenant2__portal-tenantSlug-manage__049-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-1👥Users",
+   "file": "tenant2__portal-tenantSlug-manage__050-open-1-Users.jpg",
+   "trigger": "1👥Users",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-1👥Users",
+   "file": "tenant2__portal-tenantSlug-manage__051-filled-1-Users.jpg",
+   "trigger": "1👥Users",
+   "kind": "filled",
+   "fields": 3
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-🏗Portals",
+   "file": "tenant2__portal-tenantSlug-manage__052-open-Portals.jpg",
+   "trigger": "🏗Portals",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-⚡Automation",
+   "file": "tenant2__portal-tenantSlug-manage__053-open-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "validation-⚡Automation",
+   "file": "tenant2__portal-tenantSlug-manage__054-validation-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "validation"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "filled-⚡Automation",
+   "file": "tenant2__portal-tenantSlug-manage__055-filled-Automation.jpg",
+   "trigger": "⚡Automation",
+   "kind": "filled",
+   "fields": 6
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "label": "open-🤖AI usage",
+   "file": "tenant2__portal-tenantSlug-manage__056-open-AI-usage.jpg",
+   "trigger": "🤖AI usage",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "toast-Check compliance",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__057-toast-Check-compliance.jpg",
+   "trigger": "Check compliance",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "toast-Research this section",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__058-toast-Research-this-section.jpg",
+   "trigger": "Research this section",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "toast-✗Comp 0/1",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__059-toast-Comp-0-1.jpg",
+   "trigger": "✗Comp 0/1",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "toast-✓ Accept & Lock",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__060-toast-Accept-Lock.jpg",
+   "trigger": "✓ Accept & Lock",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "toast-⊟ Panel",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__061-toast-Panel.jpg",
+   "trigger": "⊟ Panel",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/templates",
+   "label": "toast-Use this template",
+   "file": "tenant2__portal-tenantSlug-templates__062-toast-Use-this-template.jpg",
+   "trigger": "Use this template",
+   "kind": "toast"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/vaults",
+   "label": "open-＋ New nook",
+   "file": "tenant2__portal-tenantSlug-vaults__063-open-New-nook.jpg",
+   "trigger": "＋ New nook",
+   "kind": "open"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/vaults",
+   "label": "filled-＋ New nook",
+   "file": "tenant2__portal-tenantSlug-vaults__064-filled-New-nook.jpg",
+   "trigger": "＋ New nook",
+   "kind": "filled",
+   "fields": 2
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/documents",
+   "label": "open-New Document",
+   "file": "admin__admin-documents__065-open-New-Document.jpg",
+   "trigger": "New Document",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/documents",
+   "label": "validation-New Document",
+   "file": "admin__admin-documents__066-validation-New-Document.jpg",
+   "trigger": "New Document",
+   "kind": "validation"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/documents",
+   "label": "filled-New Document",
+   "file": "admin__admin-documents__067-filled-New-Document.jpg",
+   "trigger": "New Document",
+   "kind": "filled",
+   "fields": 7
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__068-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__069-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__070-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-Watch",
+   "file": "admin__admin-opportunities__071-toast-Watch.jpg",
+   "trigger": "Watch",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__072-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__073-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__074-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__075-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__076-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__077-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__078-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__079-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__080-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__081-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__082-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__083-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "confirm-Dismiss",
+   "file": "admin__admin-rfp-curation__084-confirm-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "confirm",
+   "message": "Reason for dismissal (optional):"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "toast-Claim",
+   "file": "admin__admin-rfp-curation__085-toast-Claim.jpg",
+   "trigger": "Claim",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "toast-Claim",
+   "file": "admin__admin-rfp-curation__086-toast-Claim.jpg",
+   "trigger": "Claim",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/[pageKey]",
+   "label": "open-Preview",
+   "file": "admin__admin-site-pageKey__087-open-Preview.jpg",
+   "trigger": "Preview",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "label": "toast-Save draft",
+   "file": "admin__admin-site-docs-type-slug__088-toast-Save-draft.jpg",
+   "trigger": "Save draft",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "label": "toast-Atoms",
+   "file": "admin__admin-site-docs-type-slug__089-toast-Atoms.jpg",
+   "trigger": "Atoms",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "label": "toast-Groups",
+   "file": "admin__admin-site-docs-type-slug__090-toast-Groups.jpg",
+   "trigger": "Groups",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "label": "toast-Provenance",
+   "file": "admin__admin-site-docs-type-slug__091-toast-Provenance.jpg",
+   "trigger": "Provenance",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "label": "toast-Grid",
+   "file": "admin__admin-site-docs-type-slug__092-toast-Grid.jpg",
+   "trigger": "Grid",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "label": "open-Preview",
+   "file": "admin__admin-templates__093-open-Preview.jpg",
+   "trigger": "Preview",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "label": "open-Preview",
+   "file": "admin__admin-templates__094-open-Preview.jpg",
+   "trigger": "Preview",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "label": "open-Preview",
+   "file": "admin__admin-templates__095-open-Preview.jpg",
+   "trigger": "Preview",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "label": "open-+ New partner org",
+   "file": "admin__admin-tenants__096-open-New-partner-org.jpg",
+   "trigger": "+ New partner org",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "label": "filled-+ New partner org",
+   "file": "admin__admin-tenants__097-filled-New-partner-org.jpg",
+   "trigger": "+ New partner org",
+   "kind": "filled",
+   "fields": 5
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "label": "open-+ New Company",
+   "file": "admin__admin-tenants__098-open-New-Company.jpg",
+   "trigger": "+ New Company",
+   "kind": "open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "label": "validation-+ New Company",
+   "file": "admin__admin-tenants__099-validation-New-Company.jpg",
+   "trigger": "+ New Company",
+   "kind": "validation"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "label": "filled-+ New Company",
+   "file": "admin__admin-tenants__100-filled-New-Company.jpg",
+   "trigger": "+ New Company",
+   "kind": "filled",
+   "fields": 5
+  }
+ ],
+ "findings": [
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "what": "drive error: page.goto: net::ERR_ABORTED at http://localhost:3000/portal/immobileyes/manage",
+   "harness": true
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site",
+   "what": "drive error: page.goto: net::ERR_ABORTED at http://localhost:3000/admin/site",
+   "harness": true
+  }
+ ],
+ "drift": [
+  "agent_task_log: 58 → 93",
+  "agent_task_queue: 25 → 50",
+  "agent_task_results: 25 → 50",
+  "atom_embeddings: 303 → 304",
+  "atom_tags: 5794 → 5797",
+  "automation_log: 14 → 26",
+  "canvas_versions: 6 → 7",
+  "content_pages: 71 → 73",
+  "document_cocoons: 5 → 6",
+  "episodic_memories: 59 → 94",
+  "library_atoms: 863 → 864",
+  "page_views: 144 → 165",
+  "pipeline_jobs: 6 → 9",
+  "process_instance_transitions: 573 → 587",
+  "process_instances: 181 → 185",
+  "proposal_activity_log: 10 → 11",
+  "source_visits: 1 → 3",
+  "system_events: 4034 → 4435",
+  "tasks: 39 → 51",
+  "template_bridge: 43 → 57",
+  "tenant_automation_policies: 1 → 2",
+  "tenant_bucket_scores: 9 → 0",
+  "tenant_documents: 4 → 8",
+  "tool_invocation_metrics: 22 → 25",
+  "triage_actions: 9 → 11",
+  "visitor_sessions: 22 → 26"
+ ]
+}

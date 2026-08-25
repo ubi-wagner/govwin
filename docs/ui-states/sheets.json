@@ -1,0 +1,174 @@
+[
+ {
+  "lane": "open",
+  "part": 1,
+  "parts": 3,
+  "file": "states-open-1.png",
+  "routes": [
+   "/admin/documents",
+   "/admin/site/[pageKey]",
+   "/admin/templates",
+   "/admin/templates",
+   "/admin/templates",
+   "/admin/tenants",
+   "/admin/tenants",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard"
+  ]
+ },
+ {
+  "lane": "open",
+  "part": 2,
+  "parts": 3,
+  "file": "states-open-2.png",
+  "routes": [
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage"
+  ]
+ },
+ {
+  "lane": "open",
+  "part": 3,
+  "parts": 3,
+  "file": "states-open-3.png",
+  "routes": [
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/vaults",
+   "/portal/[tenantSlug]/vaults"
+  ]
+ },
+ {
+  "lane": "filled",
+  "part": 1,
+  "parts": 2,
+  "file": "states-filled-1.png",
+  "routes": [
+   "/admin/documents",
+   "/admin/tenants",
+   "/admin/tenants",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage"
+  ]
+ },
+ {
+  "lane": "filled",
+  "part": 2,
+  "parts": 2,
+  "file": "states-filled-2.png",
+  "routes": [
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/vaults",
+   "/portal/[tenantSlug]/vaults"
+  ]
+ },
+ {
+  "lane": "validation",
+  "part": 1,
+  "parts": 1,
+  "file": "states-validation-1.png",
+  "routes": [
+   "/admin/documents",
+   "/admin/tenants",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage"
+  ]
+ },
+ {
+  "lane": "confirm",
+  "part": 1,
+  "parts": 1,
+  "file": "states-confirm-1.png",
+  "routes": [
+   "/admin/processes",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team"
+  ]
+ },
+ {
+  "lane": "toast",
+  "part": 1,
+  "parts": 2,
+  "file": "states-toast-1.png",
+  "routes": [
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/opportunities",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]"
+  ]
+ },
+ {
+  "lane": "toast",
+  "part": 2,
+  "parts": 2,
+  "file": "states-toast-2.png",
+  "routes": [
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/templates",
+   "/portal/[tenantSlug]/templates"
+  ]
+ }
+]
