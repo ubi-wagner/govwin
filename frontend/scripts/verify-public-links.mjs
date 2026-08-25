@@ -21,8 +21,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const APP = path.join(process.cwd(), 'app');
+// Anchored to THIS FILE, not to cwd. A cwd-relative path made the script work from `frontend` and
+// crash from the repo root with a bare readdir stack — a tool that only runs from one directory is
+// a tool the next person runs wrong.
+const FE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const APP = path.join(FE, 'app');
 
 /** Every addressable route in the app, as a matcher. Route groups `(x)` are not URL segments. */
 function routeTable() {
@@ -109,14 +114,14 @@ function filesUnder(dir) {
 const routes = routeTable();
 // The public surface: what a stranger reaches, plus the shared chrome those pages mount.
 const roots = ['(marketing)', '(auth)'].map((r) => path.join(APP, r)).filter(fs.existsSync);
-roots.push(path.join(process.cwd(), 'components', 'marketing'));
+roots.push(path.join(FE, 'components', 'marketing'));
 
 let checked = 0;
 const dead = [];
 const unreadable = [];
 for (const root of roots.filter(fs.existsSync)) {
   for (const f of filesUnder(root)) {
-    const rel = path.relative(process.cwd(), f);
+    const rel = path.relative(FE, f);
     const { found, dynamic } = linksIn(f);
     for (const { href, line } of found) {
       checked++;
