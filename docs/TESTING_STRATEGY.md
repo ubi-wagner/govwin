@@ -417,7 +417,7 @@ should be driven through all of them; each exits non-zero on drift.
 | `scripts/sweep-mold-quality.mts` | all 39 shipped templates: rendered pages, compliance violations, page furniture, token leaks |
 | `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
 | `scripts/verify-exports-on-stored-artifacts.mts` | the question under the ruler: does the file come out AT ALL, in every format offered for its shape |
-| `scripts/probe-deck-overlap.mts` | the question under THAT: does a slide node's declared frame actually HOLD its content, measured against an engine that shares no code with ours (B121) |
+| `scripts/probe-deck-overlap.mts` | the question under THAT: does a slide node's declared frame actually HOLD its content, measured against an engine that shares no code with ours (B121). Registered in the branch suite behind `check-office-filters.mjs`, which converts a deck **pptxgenjs** wrote — not ours, and not a `.txt` (text needs the WRITER filter; the probe needs IMPRESS, so a `.txt` control marks a capable rig broken). No filter → the drive is **CANT-RUN**, never a pass. |
 | `scripts/render-artifact-pages.mts` | no pass/fail — renders `.pdf`/`.pptx`/`.docx`/`.xlsx` to page images so a person can look at what the customer receives |
 | `scripts/verify-surfaces.mjs` | **every** `page.tsx` under `app/admin` and `app/portal/[tenantSlug]`, driven as the right actor: does the page RENDER — no error boundary, no client throw (B78 · B79) |
 | `scripts/capture-guides.mjs` | the ~35 surfaces the two front-door guides document, captured as evidence and gated the same way |

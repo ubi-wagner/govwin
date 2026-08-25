@@ -179,6 +179,23 @@ else
 fi
 echo
 
+OFFICE_OK=1
+if node scripts/check-office-filters.mjs > "$OUT/office-filters.log" 2>&1; then
+  echo "Office filters: LibreOffice can open a deck (the deck probe can measure)"
+else
+  OFFICE_OK=0
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ NO OFFICE FILTERS — the deck probe will be reported as CANT-RUN, not run. It compares ║"
+  echo "║ our writer against an engine that did not write the file; with no engine there is no  ║"
+  echo "║ comparison, and 'UNMEASURED' in a results table reads like a run that happened.       ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/office-filters.log" | head -6
+fi
+echo
+
+# Drives that need a real Office engine to mean anything. Without one they measure nothing.
+OFFICE_DRIVES="deck-overlap"
+
 # Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
 # Drives whose entire value is an isolation claim MADE THROUGH THE DATABASE. Meaningless in the
 # wrong posture, so the runner marks them CANT-RUN rather than letting them report a verdict.
@@ -213,6 +230,11 @@ DRIVES=(
   # under every future run. Its self-test counts the world, builds, asserts each piece is real and
   # usable, disposes, and asserts the world is identical again. Validate the instrument, then use it.
   "scenario-factory|scripts/drive-scenario-factory.mts"
+  # Needs a real Office engine (see OFFICE_DRIVES). Measures the deck writer's declared node
+  # heights against what LibreOffice actually renders — the gap that hid B121, where delivered
+  # decks were missing table rows and bullets because the bytes were complete and only the
+  # rendered page was not.
+  "deck-overlap|scripts/probe-deck-overlap.mts"
   "award-to-contract|scripts/drive-award-to-contract.mts"
   # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
   # table reported as a failing amendment flow rather than a missing argument. Resolved below.
@@ -307,6 +329,11 @@ for entry in "${DRIVES[@]}"; do
 
   if [ "$RLS_OK" -eq 0 ] && [[ " $ISOLATION_DRIVES " == *" $label "* ]]; then
     printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "RLS posture wrong — an isolation verdict here would be meaningless"
+    cantrun=$((cantrun+1)); FAILED+=("$label"); continue
+  fi
+
+  if [ "$OFFICE_OK" -eq 0 ] && [[ " $OFFICE_DRIVES " == *" $label "* ]]; then
+    printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no LibreOffice Impress filter — nothing independent to measure against"
     cantrun=$((cantrun+1)); FAILED+=("$label"); continue
   fi
 

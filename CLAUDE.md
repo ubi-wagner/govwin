@@ -255,7 +255,8 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
   the 271 scripts and whether it still drives identifiers that exist. 37 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **38 drives**, because one of them is filed under RULER; both
+  `run-branch-drives.sh` registers **39 drives**, because two of them are filed elsewhere (RULER,
+  and the deck probe under DOCUMENTED); both
   numbers are right and they measure different things. **41 cannot run** (unreferenced + rotted) and
   **16 are documented-but-rotted** — a doc points at them and they will fail confusingly. Nothing is
   marked deprecated there: that is a decision, and the doc collects candidates rather than making it.
