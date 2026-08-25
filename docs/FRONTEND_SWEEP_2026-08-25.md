@@ -90,7 +90,7 @@ honest gap, and it is a gap in the unit suite, not in a lens.
 | `crosscheck-shipped-fixes` | B79 + B80 hold under curl+psql, sharing nothing with the lenses |
 | `crosscheck-canvas-normalize` | no stored or partial canvas can reach a renderer incomplete |
 | `schema-check` | **2,586 references verified across app + lib · 0 contradictions** |
-| **branch drive suite** (39 drives) | first full run **35 pass · 4 fail · 0 could-not-run**; all four causes fixed (B128/B129) and each drive **individually re-verified green**. A confirming full-suite re-run was still in flight when this was written — see the note below. |
+| **branch drive suite** (39 drives) | first full run **35 pass · 4 fail**; after B128/B129 a confirming full re-run is **39 pass · 0 fail · 0 could-not-run**. None of the four was a product defect. |
 
 Bug log: **128 entries · 0 open · 5 deferred** (deferred by choice, named in the log).
 
@@ -107,13 +107,12 @@ environment or harness:
 | `page-scale` | a missing guard + a dependency on state the drive before it deletes (B129) |
 | `canvas-structural` | asserted on the one TOC entry the design deliberately omits (B129) |
 
-**What has and has not been re-measured.** Each of the four was re-run on its own after its fix and
-passed — `opp-scout` with a real tool-loop recorded, `cms-generate` through draft + review ToDo,
-`page-scale` authoring and disposing of its own document, `canvas-structural` on all five structural
-checks. `opp-scout` also passed inside the confirming suite re-run before this was written. The
-remaining three had not yet been reached by that re-run, so **"39/39" is not claimed here** — four
-individual greens and a partial suite are what was earned, and the distinction is the whole point of
-this document.
+**Re-measured, then confirmed.** Each of the four was re-run on its own after its fix and passed —
+`opp-scout` with a real tool-loop recorded, `cms-generate` through draft + review ToDo, `page-scale`
+authoring and disposing of its own document, `canvas-structural` on all five structural checks. Four
+individual greens are weaker than a suite, so the whole suite was then re-run end to end from a
+clean output directory: **39 passed · 0 failed · 0 could-not-run**. Until that finished this
+document said so and declined to claim 39/39, which is the distinction it exists to make.
 
 **B128 is the one that matters.** With `anthropic` absent the fabric **safe-skips** — a deliberate
 invariant — so every workflow still reported `completed` and **37 of 39 drives passed with the agent
