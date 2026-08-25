@@ -48,7 +48,21 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const formData = await request.formData();
+    // `request.formData()` THROWS on a body that is not multipart — a wrong content-type, a JSON
+    // body, a truncated upload. Unguarded, that reached the outer catch and answered
+    // `500 {code:'STORAGE_ERROR', error:'Image upload failed'}`: the caller is told storage broke
+    // when the caller sent a malformed request, and the ops dashboard records a storage incident
+    // that never happened. Two lines below, a MISSING file is correctly a 422 VALIDATION_ERROR —
+    // an unparseable body is the same class of client mistake and gets the same answer.
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be multipart/form-data with a file field', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
     const file = formData.get('file');
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'File is required', code: 'VALIDATION_ERROR' }, { status: 422 });

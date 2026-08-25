@@ -120,12 +120,26 @@ describe('POST /api/stripe/webhook', () => {
     expect(json.code).toBe('VALIDATION_ERROR');
   });
 
-  it('returns 500 when STRIPE_WEBHOOK_SECRET is not set', async () => {
+  /**
+   * DELIBERATE BEHAVIOUR CHANGE (was 500 / `DB_ERROR`).
+   *
+   * Missing Stripe keys is a DEPLOYMENT condition, not a fault, and nothing on this path touches a
+   * database — so `DB_ERROR` was wrong twice and disagreed with the two sibling routes
+   * (stripe/checkout, stripe/portal), which have always answered `STRIPE_NOT_CONFIGURED` for
+   * exactly this. 503 is the honest status for "not configured yet".
+   *
+   * Safe for the one caller that matters: Stripe retries the whole 5xx class, so 500 → 503 does not
+   * change whether an event is redelivered — the events still replay once the keys are set, rather
+   * than being swallowed by a 200. The assertion now pins the `code`, which is the part a caller
+   * branches on and the part that was actually wrong.
+   */
+  it('returns 503 STRIPE_NOT_CONFIGURED when STRIPE_WEBHOOK_SECRET is not set', async () => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
     const res = await POST(makeRequest('body'));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     const json = await res.json();
     expect(json.error).toMatch(/Webhook secret not configured/i);
+    expect(json.code).toBe('STRIPE_NOT_CONFIGURED');
   });
 
   // ── (b) Valid checkout.session.completed → purchases row + event ────

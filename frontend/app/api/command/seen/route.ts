@@ -21,20 +21,20 @@ export async function POST(req: Request) {
   const su = session?.user as { id?: string; email?: string } | undefined;
   const userId = su?.id;
   if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated', code: 'unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Not authenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   let body: { scope?: unknown; tab?: unknown; hadNew?: unknown };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body', code: 'bad_request' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   const scope = typeof body.scope === 'string' ? body.scope : '';
   const tab = typeof body.tab === 'string' ? body.tab : '';
   if (!isValidScope(scope) || !KNOWN_TABS.has(tab)) {
-    return NextResponse.json({ error: 'Invalid scope or tab', code: 'bad_request' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid scope or tab', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   try {
@@ -55,6 +55,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: { ok: true } });
   } catch (e) {
     console.error('[api/command/seen] failed', e);
-    return NextResponse.json({ error: 'Could not record', code: 'server_error' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not record', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
