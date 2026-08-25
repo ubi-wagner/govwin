@@ -286,7 +286,28 @@ function parseFile(fullPath, rel, kind) {
 // was the last one missing: four routes including the master_admin-only /api/admin/system read as
 // ungated until it was added. Each addition here was a phantom finding first.
 const AUTH_CALLS = ['auth', 'requireAdmin', 'requireRole', 'requireUser', 'getSession', 'resolveVaultAccess', 'verifyTenantAccess', 'requireApiAuth', 'resolveActor', 'withHandler'];
-const TENANT_CALLS = ['verifyTenantAccess', 'withTenant', 'enterTenant', 'runInTenant', 'resolveVaultAccess', 'getTenantBySlug'];
+
+/**
+ * THREE DIFFERENT THINGS, and lumping them together is how a real gap would hide.
+ *
+ *   AUTHORISE  does THIS actor belong to THAT tenant / proposal / vault?
+ *   SCOPE      pin the RLS context so the database enforces it too
+ *   RESOLVE    turn a slug into an id — no authority claim whatsoever
+ *
+ * The first draft counted `getTenantBySlug` as tenant scoping, which made every portal route look
+ * gated: 117 of 117. But resolving `/portal/<slug>/…` to a tenant id says nothing about whether the
+ * caller may read it, and middleware cannot help — it authorises by ROLE prefix, so any
+ * `partner_user` passes `/portal/ANY-SLUG/…`. A route that resolves and never authorises is a
+ * cross-tenant read, and the merged vocabulary could not have reported one.
+ *
+ * Separated, the check becomes the SOP's own sentence: "Always verify tenant access before
+ * returning tenant-specific data." Scoping alone is not enough either — RLS refuses foreign ROWS,
+ * but a 200 with an empty list where a 403 belongs is still the wrong answer.
+ */
+const TENANT_AUTHORISE = ['verifyTenantAccess', 'verifyProposalAccess', 'resolveVaultAccess', 'resolveUserAccess', 'verifyPortalAccess', 'requireTenantMember'];
+const TENANT_SCOPE = ['withTenant', 'enterTenant', 'runInTenant'];
+const TENANT_RESOLVE = ['getTenantBySlug'];
+const TENANT_CALLS = [...TENANT_AUTHORISE, ...TENANT_SCOPE, ...TENANT_RESOLVE];
 
 // The SECOND gate layer, and the reason a page can carry none of the above and still be safe.
 // middleware.ts enforces `requiredRoleForPath` over PATH_MIN_ROLE prefixes for every request its
@@ -329,6 +350,11 @@ function tenantScopeOf(rec) {
   const c = new Set(rec.calls);
   const imported = new Set(rec.imports.flatMap((i) => i.names));
   return TENANT_CALLS.filter((n) => c.has(n) || imported.has(n));
+}
+/** Only the calls that actually decide whether THIS actor may see THAT tenant's data. */
+function tenantAuthOf(rec) {
+  const c = new Set(rec.calls);
+  return TENANT_AUTHORISE.filter((n) => c.has(n));
 }
 
 // ── SELF-TEST — the instrument before the finding ────────────────────────────
@@ -509,8 +535,8 @@ for (const r of apis) {
   if (r.tryCount === 0 && r.sqlTags.length > 0) {
     signals.push({ sig: 'api-sql-without-try', file: r.file, route: r.route, note: `${r.sqlTags.length} sql tag(s), 0 try blocks — SOP requires every await sql inside try/catch` });
   }
-  if (/^\/api\/portal\/\[tenantSlug\]/.test(r.route) && !tenantScopeOf(r).length) {
-    signals.push({ sig: 'portal-route-no-tenant-scope', file: r.file, route: r.route, note: 'portal route with no tenant-scoping call — CLAUDE.md: never query by ID alone' });
+  if (/^\/api\/portal\/\[tenantSlug\]/.test(r.route) && !tenantAuthOf(r).length) {
+    signals.push({ sig: 'portal-route-no-tenant-AUTHORISATION', file: r.file, route: r.route, note: `resolves/scopes (${tenantScopeOf(r).join(', ') || 'nothing'}) but calls no authorisation helper — middleware gates ROLE, never membership` });
   }
 }
 
@@ -524,8 +550,8 @@ for (const r of pages) {
   // So /portal/<other-tenant>/x passes middleware for any partner_user and is refused only by the
   // page's own verifyTenantAccess. A portal page that READS and does not verify is a cross-tenant
   // read. Pure redirects read nothing and are excluded — with the reason stated, not silently.
-  if (/^app\/portal\/\[tenantSlug\]\//.test(r.file) && !tenantScopeOf(r).length && !isPureRedirect(r)) {
-    signals.push({ sig: 'portal-page-no-tenant-scope', file: r.file, route: r.route, note: 'portal page reads without verifyTenantAccess — middleware gates ROLE, never tenant membership' });
+  if (/^app\/portal\/\[tenantSlug\]\//.test(r.file) && !tenantAuthOf(r).length && !isPureRedirect(r)) {
+    signals.push({ sig: 'portal-page-no-tenant-AUTHORISATION', file: r.file, route: r.route, note: `resolves/scopes (${tenantScopeOf(r).join(', ') || 'nothing'}) but calls no authorisation helper — middleware gates ROLE, never membership` });
   }
 }
 

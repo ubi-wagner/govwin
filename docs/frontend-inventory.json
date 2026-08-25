@@ -5,7 +5,7 @@
   {
    "kind": "api-route",
    "files": 250,
-   "lines": 40089
+   "lines": 40143
   },
   {
    "kind": "app-boundary",
@@ -70,7 +70,7 @@
   {
    "kind": "test",
    "files": 192,
-   "lines": 25233
+   "lines": 25301
   }
  ],
  "records": [
@@ -5361,8 +5361,8 @@
   {
    "file": "__tests__/invite.test.ts",
    "kind": "test",
-   "lines": 405,
-   "bytes": 14583,
+   "lines": 459,
+   "bytes": 17152,
    "client": false,
    "exports": [],
    "imports": [
@@ -5436,7 +5436,16 @@
     "GET",
     "expect(json.data.email).toBe",
     "expect(json.data.alreadyAccepted).toBe",
-    "expect(json.data.companyName).toBe"
+    "expect(json.data.companyName).toBe",
+    "vi.clearAllMocks",
+    "encodeURIComponent",
+    "expect(res.status, `GET ${token}`).toBe",
+    "expect((await res.json()).code).toBe",
+    "expect(sqlMock, 'no malformed token should reach the database').not.toHaveBeenCalled",
+    "expect(res.status, `POST ${token}`).toBe",
+    "expect(sqlMock).not.toHaveBeenCalled",
+    "expect(bcryptHashMock).not.toHaveBeenCalled",
+    "expect(sqlMock, 'a valid uuid MUST reach the query').toHaveBeenCalled"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -9276,8 +9285,8 @@
   {
    "file": "__tests__/stripe-webhook.test.ts",
    "kind": "test",
-   "lines": 296,
-   "bytes": 10099,
+   "lines": 310,
+   "bytes": 10959,
    "client": false,
    "exports": [],
    "imports": [
@@ -24507,8 +24516,8 @@
   {
    "file": "app/api/admin/documents/upload-image/route.ts",
    "kind": "api-route",
-   "lines": 57,
-   "bytes": 2171,
+   "lines": 68,
+   "bytes": 2676,
    "client": false,
    "exports": [
     {
@@ -24550,7 +24559,7 @@
      ]
     }
    ],
-   "tryCount": 1,
+   "tryCount": 2,
    "sqlTags": [],
    "calls": [
     "auth",
@@ -24583,29 +24592,34 @@
      "line": 16
     },
     {
+     "arg": "{ error: 'Request body must be multipart/form-data with a file field', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 422 }",
+     "line": 26
+    },
+    {
      "arg": "{ error: 'File is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 22
+     "line": 33
     },
     {
      "arg": "{ error: 'File must be an image (PNG, JPEG, GIF, WebP, SVG)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 28
+     "line": 39
     },
     {
      "arg": "{ error: 'Image must be under 10MB', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 413 }",
-     "line": 33
+     "line": 44
     },
     {
      "arg": "{\n      data: { storageKey, url, size: file.size, contentType: file.type, originalName: file.name }\n    }",
      "opts": "",
-     "line": 49
+     "line": 60
     },
     {
      "arg": "{ error: 'Image upload failed', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 54
+     "line": 65
     }
    ],
    "route": "/api/admin/documents/upload-image",
@@ -38140,8 +38154,8 @@
   {
    "file": "app/api/invite/route.ts",
    "kind": "api-route",
-   "lines": 230,
-   "bytes": 7447,
+   "lines": 253,
+   "bytes": 8853,
    "client": false,
    "exports": [
     {
@@ -38192,21 +38206,22 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 34
+     "line": 52
     },
     {
      "tag": "sql",
-     "line": 123
+     "line": 146
     },
     {
      "tag": "sql",
-     "line": 199
+     "line": 222
     }
    ],
    "calls": [
     "searchParams.get('token').trim",
     "searchParams.get",
     "NextResponse.json",
+    "UUID_RE.test",
     "console.error",
     "request.json",
     "body.token.trim",
@@ -38223,77 +38238,87 @@
     {
      "arg": "{ error: 'Token is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 22
-    },
-    {
-     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 58
+     "line": 37
     },
     {
      "arg": "{ error: 'Invalid invite token', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 62
+     "line": 40
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 76
+    },
+    {
+     "arg": "{ error: 'Invalid invite token', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 80
     },
     {
      "arg": "{\n      data: {\n        email: row.email,\n        inviterName: row.inviterName,\n        inviterEmail: row.inviterEmail,\n        proposalTitle: row.proposalTitle,\n        companyName: row.companyName,\n        alreadyAccepted: !!row.acceptedAt,\n      },\n    }",
      "opts": "",
-     "line": 65
+     "line": 83
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 77
+     "line": 95
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 96
+     "line": 114
     },
     {
      "arg": "{ error: 'Invite token is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 103
-    },
-    {
-     "arg": "{ error: 'Password must be at least 12 characters', code: 'VALIDATION_ERROR' }",
-     "opts": "{ status: 400 }",
-     "line": 107
-    },
-    {
-     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 138
+     "line": 121
     },
     {
      "arg": "{ error: 'Invalid invite token', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 142
+     "line": 126
     },
     {
-     "arg": "{ error: 'This invitation is no longer valid', code: 'NOT_FOUND' }",
-     "opts": "{ status: 404 }",
-     "line": 147
-    },
-    {
-     "arg": "{ error: 'Invite already accepted', code: 'VALIDATION_ERROR' }",
-     "opts": "{ status: 409 }",
-     "line": 151
+     "arg": "{ error: 'Password must be at least 12 characters', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 130
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 177
+     "line": 161
+    },
+    {
+     "arg": "{ error: 'Invalid invite token', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 165
+    },
+    {
+     "arg": "{ error: 'This invitation is no longer valid', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 170
+    },
+    {
+     "arg": "{ error: 'Invite already accepted', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 409 }",
+     "line": 174
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 200
     },
     {
      "arg": "{\n      data: {\n        accepted: true,\n        // Returned so the client can establish a session (sign in) right after\n        // setting the password — otherwise the redirect below bounces to /login.\n        email: collaborator.email,\n        hasAccount: !!collaborator.userId,\n        redirectTo: proposalTenant\n          ? `/portal/${proposalTenant.tenantSlug}/proposals/${collaborator.proposalId",
      "opts": "",
-     "line": 210
+     "line": 233
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 224
+     "line": 247
     }
    ],
    "route": "/api/invite",
@@ -59666,8 +59691,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/uploads/image/route.ts",
    "kind": "api-route",
-   "lines": 80,
-   "bytes": 3619,
+   "lines": 94,
+   "bytes": 4414,
    "client": false,
    "exports": [
     {
@@ -59729,7 +59754,7 @@
      ]
     }
    ],
-   "tryCount": 1,
+   "tryCount": 2,
    "sqlTags": [],
    "calls": [
     "auth",
@@ -59783,29 +59808,34 @@
      "line": 48
     },
     {
+     "arg": "{ error: 'Request body must be multipart/form-data with a file field', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 422 }",
+     "line": 61
+    },
+    {
      "arg": "{ error: 'File is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 54
+     "line": 68
     },
     {
      "arg": "{ error: 'File must be an image (PNG, JPEG, GIF, WebP, SVG)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 57
+     "line": 71
     },
     {
      "arg": "{ error: 'Image must be under 10MB', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 413 }",
-     "line": 63
+     "line": 77
     },
     {
      "arg": "{\n      data: { storageKey, url, size: file.size, contentType: file.type, originalName: file.name },\n    }",
      "opts": "",
-     "line": 72
+     "line": 86
     },
     {
      "arg": "{ error: 'Image upload failed', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 77
+     "line": 91
     }
    ],
    "route": "/api/portal/[tenantSlug]/uploads/image",
@@ -61193,8 +61223,8 @@
   {
    "file": "app/api/stripe/webhook/route.ts",
    "kind": "api-route",
-   "lines": 316,
-   "bytes": 11501,
+   "lines": 322,
+   "bytes": 12079,
    "client": false,
    "exports": [
     {
@@ -61265,23 +61295,23 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 109
+     "line": 115
     },
     {
      "tag": "sql",
-     "line": 243
+     "line": 249
     },
     {
      "tag": "sql",
-     "line": 255
+     "line": 261
     },
     {
      "tag": "sql",
-     "line": 285
+     "line": 291
     },
     {
      "tag": "sql",
-     "line": 296
+     "line": 302
     }
    ],
    "calls": [
@@ -61308,39 +61338,39 @@
    "ownClientSql": 0,
    "jsonResponses": [
     {
-     "arg": "{ error: 'Stripe not configured', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 22
+     "arg": "{ error: 'Stripe not configured', code: 'STRIPE_NOT_CONFIGURED' }",
+     "opts": "{ status: 503 }",
+     "line": 28
     },
     {
-     "arg": "{ error: 'Webhook secret not configured', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 28
+     "arg": "{ error: 'Webhook secret not configured', code: 'STRIPE_NOT_CONFIGURED' }",
+     "opts": "{ status: 503 }",
+     "line": 34
     },
     {
      "arg": "{ error: 'Missing stripe-signature header', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 35
+     "line": 41
     },
     {
      "arg": "{ error: 'Invalid signature', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 43
+     "line": 49
     },
     {
      "arg": "{ error: 'Transient error, please retry', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 82
-    },
-    {
-     "arg": "{ received: true }",
-     "opts": "",
-     "line": 85
-    },
-    {
-     "arg": "{ received: true }",
-     "opts": "",
      "line": 88
+    },
+    {
+     "arg": "{ received: true }",
+     "opts": "",
+     "line": 91
+    },
+    {
+     "arg": "{ received: true }",
+     "opts": "",
+     "line": 94
     }
    ],
    "route": "/api/stripe/webhook",
