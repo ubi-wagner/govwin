@@ -15,9 +15,15 @@ full journey **33/33** · canvas measurement harnesses **6/6, zero under-counts*
 
 **No — and the build is not what is blocking.**
 
-Everything in this branch has been proven on the sandbox. **Nothing in it has touched production.** Three
-items must clear before a paying customer, and the first is new since the last readiness pass: it can take
-the admin surface down rather than degrade it.
+Everything in this branch has been proven on the sandbox. **Nothing in it has touched production.** FIVE
+items must clear before a paying customer (§1), and the first is new since the last readiness pass: it can
+take the admin surface down rather than degrade it. Three of the five are hard blockers that can break or
+silently hollow out the product (1.0 · 1.1 · 1.2); the remaining two are a production proof (1.3) and a
+commercial decision (1.4) that cannot be made from inside the repo.
+
+*(This paragraph said "three" while §1 listed five — a stale count from an earlier pass, repeated forward
+several times before anyone counted the headings. The number of things standing between a branch and a
+paying customer is not a detail to carry loosely.)*
 
 The customer spine itself is in good shape. The canvas, the isolation spine and the end-to-end journey are
 verified harder than they were at head 185 — including a full arc that ingests a real 2.3MB BAA, walks every
