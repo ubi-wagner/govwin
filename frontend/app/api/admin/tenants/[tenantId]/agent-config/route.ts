@@ -158,6 +158,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     }
 
+    let startId: string | null = null;
     try {
       // Verify tenant exists.
       const [existing] = await sql<{ id: string }[]>`SELECT id FROM tenants WHERE id = ${tenantId}::uuid`;
@@ -165,7 +166,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
       }
 
-      const startId = await emitEventStart({
+      startId = await emitEventStart({
         namespace: 'finder',
         type: 'agent_config.updated',
         actor: userActor(adm.userId),
@@ -206,6 +207,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         },
       });
     } catch (dbErr) {
+      if (startId) {
+        await emitEventEnd(startId, { error: { message: dbErr instanceof Error ? dbErr.message : String(dbErr), code: 'HANDLER_THREW' } });
+      }
       console.error('[admin/tenants/agent-config] PATCH DB error:', dbErr);
       return NextResponse.json({ error: 'Failed to update agent config', code: 'DB_ERROR' }, { status: 500 });
     }

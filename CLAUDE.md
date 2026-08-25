@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1964 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1968 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -266,7 +266,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1964 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1968 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
@@ -317,6 +317,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   page that is DEFINITELY broken and requiring its detector to see it, exiting 2 with *"every clean
   below would be unearned"* otherwise. Both guards were added after the thing they guard against had
   already happened (B125, B127).
+- **The automation spine has its own audit, and the emitters are not all in files.**
+  `frontend/scripts/audit-automation-spine.mjs` joins workflow triggers ↔ emitters, step `wait_for`
+  ↔ emitters, `emitEventStart` ↔ an `end` on every exit path, declared ↔ exercised, and `end` events
+  ↔ what consumes them. Result: **0 dead triggers, 0 dead waits** — but it found **31 handlers whose
+  `catch` returned without closing the bracket** (B139), because the existing guard checked orphan
+  brackets *per file* and every file did close it, on the success path. Use `withEventBracket()`
+  (`lib/events.ts`) in new code. **Five emit mechanisms exist and two live in the DATABASE** —
+  `pipeline_schedules.source` (the shared cron) and `process_templates.trigger_key` (the generic
+  `launchTemplate` overlay, which makes every registered single-phase trigger launchable with no
+  code) — so a source-only scan reports working scheduled and launchable workflows as dead (B140).
+  Canonical: **docs/AUTOMATION_SPINE_AUDIT.md**, which also carries the recipe for attaching a new
+  automation and the 66 free `end` events to attach it to.
 - **The lenses cannot see what was never surfaced.** Every instrument above asks whether what the
   product does, it does correctly — none can find a feature with no way in, because no page renders
   it, no route is called, and nobody writes a test for something unreachable. That question needs the

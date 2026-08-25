@@ -9,12 +9,23 @@
  *   1. namespace ∈ REGISTRY (and never a FORBIDDEN one).
  *   2. type = entity.action_past_tense (snake_case, ≥1 dot) — except documented exceptions.
  *   3. per file: an emitEventStart is never left without an emitEventEnd (no orphan brackets).
+ *   4. per TRY: an emitEventStart inside a try whose catch RETURNS must have an end in that catch.
+ *
+ * Check 4 exists because check 3 cannot see the common case. A route emits `start` inside its one
+ * big try, closes the bracket on the success path, and returns 500 from the catch — the file
+ * contains an `emitEventEnd`, the counts balance, and the throw path leaves the `start` row
+ * unterminated forever. Thirty-one handlers had exactly that shape; the sandbox corpus carried the
+ * proof as two `proposal.created` starts with no end. Fixed in one pass by
+ * `scripts/fix-open-event-brackets.mjs`; this check is what stops the next one being written.
+ *
+ * Prefer `withEventBracket()` (lib/events.ts) in new code — it makes the bracket impossible to drop.
  *
  * Only *literal* namespace/type are validated; dynamic (`type: ev.type`) call sites are computed
  * from already-validated sources and are out of static scope.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import ts from 'typescript';
 import path from 'node:path';
 
 const FRONTEND = path.join(__dirname, '..');
@@ -93,6 +104,7 @@ function scan(): string[] {
       // starts > ends means at least one emitEventStart has no emitEventEnd on any path — a real
       // orphan the file-level "ends===0" check would miss when a *different* handler in the file ends.
       if (starts > ends) violations.push(`ORPHAN start (${starts} emitEventStart, ${ends} emitEventEnd) in ${rel}`);
+      violations.push(...unclosedOnThrow(txt, rel));
       // 100%-surface: raw inserts bypass the helpers. Sanctioned ones are allowlisted; a new one fails.
       if (txt.includes('INSERT INTO system_events') && !RAW_INSERT_ALLOWLIST[rel]) {
         violations.push(`RAW insert into system_events in ${rel} — use the emitEvent* helpers, or allowlist it (with a reason) in event-contract.test.ts`);
@@ -100,6 +112,50 @@ function scan(): string[] {
     }
   }
   return violations;
+}
+
+/**
+ * CHECK 4 · a bracket a throw can walk out of.
+ *
+ * Structural, via the TypeScript AST rather than counting: find each `emitEventStart`, walk up to
+ * the innermost enclosing `try` that has a `catch`, and require an `emitEventEnd` in that catch
+ * whenever the catch RETURNS. A catch that rethrows is fine — the bracket is the caller's to close.
+ *
+ * Deliberately narrow: it reports only the shape it can prove from the tree, so a green result is
+ * not a claim that every control-flow path is covered — it is a claim that this specific,
+ * previously-systematic mistake is not present.
+ */
+function unclosedOnThrow(txt: string, rel: string): string[] {
+  if (!txt.includes('emitEventStart')) return [];
+  const sf = ts.createSourceFile(rel, txt, ts.ScriptTarget.Latest, true);
+  const out: string[] = [];
+  const callee = (n: ts.Node) => (ts.isCallExpression(n) ? n.expression.getText(sf).split('.').pop() : null);
+  const has = (n: ts.Node, f: (x: ts.Node) => boolean): boolean => {
+    let hit = false;
+    const go = (x: ts.Node) => { if (hit) return; if (f(x)) { hit = true; return; } ts.forEachChild(x, go); };
+    go(n);
+    return hit;
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && callee(node) === 'emitEventStart') {
+      for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
+        if (!ts.isTryStatement(p) || !p.catchClause) continue;
+        const cc = p.catchClause;
+        if (has(cc, ts.isReturnStatement) && !has(cc, (n) => callee(n) === 'emitEventEnd')) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          out.push(
+            `UNCLOSED-ON-THROW start at ${rel}:${line} — the enclosing catch returns without an ` +
+            `emitEventEnd, so a throw leaves the start row unterminated. Close it in the catch ` +
+            `(hoist the id to \`let x: string | null = null\` above the try), or use withEventBracket().`,
+          );
+        }
+        break; // only the innermost enclosing try can catch it first
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
 }
 
 describe('event contract — namespace registry · type format · start/end pairing', () => {

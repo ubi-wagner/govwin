@@ -61,6 +61,7 @@ function requirementLabels(itemName: string, requiredSections: unknown): string[
  *   7. Emit capture.proposal.created event
  */
 export async function POST(request: Request, ctx: RouteContext) {
+  let eventId: string | null = null;
   try {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
@@ -216,7 +217,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for multi-step proposal creation ──────────────────
-    const eventId = await emitEventStart({
+    eventId = await emitEventStart({
       namespace: 'proposal',
       type: 'proposal.created',
       actor: userActor(userId, sessionUser.email),
@@ -801,6 +802,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (eventId) {
+      await emitEventEnd(eventId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/proposals/create] error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

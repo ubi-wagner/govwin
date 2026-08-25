@@ -172,6 +172,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
  * Body JSON: { status?: string, notes?: string }
  */
 export async function PATCH(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const { tenantSlug, proposalId, docId } = await ctx.params;
     if (!isValidUUID(proposalId) || !isValidUUID(docId)) {
@@ -323,7 +324,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for status change ─────────────────────────
-    const startId = newStatus ? await emitEventStart({
+    startId = newStatus ? await emitEventStart({
       namespace: 'proposal',
       type: 'supporting_doc.status_changed',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -376,6 +377,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { id: docId, status: newStatus ?? 'unchanged' } });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[portal/proposals/supporting-docs/detail] error:', err);
     return NextResponse.json(
       { error: 'Internal error', code: 'DB_ERROR' },

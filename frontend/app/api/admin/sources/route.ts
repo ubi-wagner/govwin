@@ -69,6 +69,7 @@ export async function GET() {
 // ─── POST: create a source profile ───────────────────────────────
 
 export async function POST(request: Request) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     const visitInstructions = typeof body.visitInstructions === 'string' ? body.visitInstructions.trim() || null : null;
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'source.created',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -153,6 +154,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: { id: row.id, name: row.name } });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/sources POST] error:', e);
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }

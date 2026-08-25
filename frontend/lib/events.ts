@@ -268,6 +268,57 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
   }
 }
 
+/**
+ * Bracket an operation so the `end` cannot be lost, whatever happens inside.
+ *
+ * THE PROBLEM THIS EXISTS FOR. `emitEventStart` returns an id the `end` needs, so the natural way
+ * to write it puts `const startId = await emitEventStart(...)` inside the handler's `try` — and
+ * then the binding is not in scope in the `catch`, which makes closing the bracket there a syntax
+ * error rather than an oversight. Thirty-one route handlers had that exact shape, each leaving a
+ * permanently-unterminated `start` row whenever the handler threw.
+ *
+ * That is not only untidy. The workflow engine's `EventTrigger.matches()` is written around the
+ * guarantee that a failed operation still emits a terminal `end` carrying `error` — it inspects
+ * that field to avoid spawning junk instances off failures. A handler that emits nothing gives the
+ * engine no terminal event at all, so anything waiting on the operation waits forever with no
+ * signal that it never will arrive. An unclosed bracket is a broken link in the chain that lets a
+ * small automation nest inside a bigger one.
+ *
+ * Prefer this over hand-pairing start/end in new code:
+ *
+ *     return withEventBracket(
+ *       { namespace: 'finder', type: 'source.created', actor: userActor(userId), payload: { name } },
+ *       async () => {
+ *         const row = await createSource(...);
+ *         return { result: { sourceId: row.id }, value: NextResponse.json({ data: row }) };
+ *       },
+ *     );
+ *
+ * The callback returns the `end` payload and the handler's own return value together, so success
+ * emits `end` with a result and a throw emits `end` with `error` **and rethrows** — the caller's
+ * own `catch` still runs and still shapes the HTTP response. Instrumentation never changes control
+ * flow; it only guarantees the bracket closes first.
+ */
+export async function withEventBracket<T>(
+  params: EmitStartParams,
+  fn: () => Promise<{ result?: Record<string, unknown>; value: T }>,
+): Promise<T> {
+  const startId = await emitEventStart(params);
+  try {
+    const { result, value } = await fn();
+    await emitEventEnd(startId, { result });
+    return value;
+  } catch (err) {
+    await emitEventEnd(startId, {
+      error: {
+        message: err instanceof Error ? err.message : String(err),
+        code: 'HANDLER_THREW',
+      },
+    });
+    throw err;
+  }
+}
+
 // ─── Internal ───────────────────────────────────────────────────────
 
 function serializeError(err: unknown): { message: string; stack?: string } | unknown {

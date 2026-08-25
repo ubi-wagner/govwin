@@ -13,6 +13,7 @@ interface RouteContext {
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -73,7 +74,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'capture',
       type: 'application.rejected',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -140,6 +141,9 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { rejected: true } });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/applications/reject] error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

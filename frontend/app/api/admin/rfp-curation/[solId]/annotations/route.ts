@@ -80,6 +80,7 @@ export async function POST(
   request: Request,
   routeCtx: RouteContext,
 ) {
+  let startId: string | null = null;
   try {
     // ── Auth check ──────────────────────────────────────────────────
     const session = await auth();
@@ -167,7 +168,7 @@ export async function POST(
     }
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'annotation.saved',
       actor: { type: 'user', id: actorId },
@@ -201,6 +202,9 @@ export async function POST(
 
     return NextResponse.json({ data: { annotation } });
   } catch (error) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: error instanceof Error ? error.message : String(error), code: 'HANDLER_THREW' } });
+    }
     console.error('[rfp-curation] POST annotation failed:', error);
     return NextResponse.json(
       { error: 'Failed to save annotation', code: 'INTERNAL_ERROR' },

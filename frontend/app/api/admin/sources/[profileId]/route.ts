@@ -19,6 +19,7 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     // ── Auth ────────────────────────────────────────────────────────
     const session = await auth();
@@ -113,7 +114,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event ──────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'source.updated',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -155,6 +156,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { updated: true } });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/sources/[profileId] PATCH] error:', e);
     return NextResponse.json(
       { error: 'Failed to update source profile', code: 'DB_ERROR' },

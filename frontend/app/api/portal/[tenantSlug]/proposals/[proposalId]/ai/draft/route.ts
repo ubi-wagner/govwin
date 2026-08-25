@@ -23,6 +23,7 @@ interface RouteContext {
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const { tenantSlug, proposalId } = await ctx.params;
 
@@ -87,7 +88,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for AI draft ──────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'proposal',
       type: 'proposal.draft_requested',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -189,6 +190,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[portal/proposals/ai/draft] error:', err);
     return NextResponse.json(
       { error: 'AI draft failed', code: 'AI_ERROR' },

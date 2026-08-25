@@ -195,6 +195,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
  * If category is provided without docId, creates a new doc entry.
  */
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const { tenantSlug, proposalId } = await ctx.params;
     if (!isValidUUID(proposalId)) {
@@ -374,7 +375,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for document upload ────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'proposal',
       type: 'supporting_doc.uploaded',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -491,6 +492,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     }, { status: 201 });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[portal/proposals/supporting-docs] error:', err);
     return NextResponse.json(
       { error: 'Internal error', code: 'DB_ERROR' },

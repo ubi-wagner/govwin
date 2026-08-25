@@ -380,6 +380,7 @@ async function insertAwardBatch(rows: RawRow[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  let eventId: string | null = null;
   try {
     // 1. Auth check
     const session = await auth();
@@ -491,7 +492,7 @@ export async function POST(request: Request) {
     }
 
     // ── Start event for multi-step CSV ingest ──────────────────────
-    const eventId = await emitEventStart({
+    eventId = await emitEventStart({
       namespace: 'finder',
       type: 'sbir_data.ingested',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -564,6 +565,9 @@ export async function POST(request: Request) {
       data: { fileType, rowCount, filename },
     });
   } catch (e) {
+    if (eventId) {
+      await emitEventEnd(eventId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/sbir-data/ingest] POST error:', e);
     return NextResponse.json(
       { error: 'Ingest failed', code: 'INGEST_ERROR' },

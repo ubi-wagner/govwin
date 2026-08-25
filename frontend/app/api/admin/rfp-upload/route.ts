@@ -94,6 +94,7 @@ function slugSafeName(name: string): string {
 }
 
 export async function POST(request: Request) {
+  let eventId: string | null = null;
   try {
   const session = await auth();
   if (!session?.user) {
@@ -274,7 +275,7 @@ export async function POST(request: Request) {
   }
 
   // ── Start event for the multi-step upload operation ────────────────
-  const eventId = await emitEventStart({
+  eventId = await emitEventStart({
     namespace: 'finder',
     type: existingSolId ? 'rfp.attached' : 'rfp.uploaded',
     actor: userActor(userId ?? 'unknown'),
@@ -660,6 +661,9 @@ export async function POST(request: Request) {
     { status: 201 },
   );
   } catch (err) {
+    if (eventId) {
+      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[rfp-upload] unhandled error:', err);
     return NextResponse.json(
       { error: 'Upload failed', code: 'DB_ERROR' },

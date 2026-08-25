@@ -93,6 +93,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
  * Body: { email, name, role }
  */
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -230,7 +231,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for team member invitation ────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'capture',
       type: 'team_member.invited',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -341,6 +342,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/team] POST error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },
