@@ -180,6 +180,94 @@ describe('middleware — public paths', () => {
     expect((res as Response).status).toBe(401);
   });
 
+  /**
+   * THE PASSWORD-RESET PAGES — the same defect as /api/invite, with a bigger blast radius.
+   *
+   * Every user can forget a password; only invited collaborators hit the invite path. And this one
+   * was a closed loop: /login renders a "Forgot password?" link, clicking it redirected to /login,
+   * and a reset EMAIL pointing at /reset-password?token=…&email=… bounced the same way, so the page
+   * that consumes the token never ran.
+   *
+   * Nothing else in the flow was broken — both pages exist and read their query parameters, and
+   * POST /api/auth/forgot-password answers 200 {"data":{"sent":true}} because /api/auth/* is
+   * public. The API was reachable; the UI in front of it was not.
+   *
+   * `/change-password` is deliberately NOT here: it requires a session by design, and middleware
+   * has its own tempPassword branch for it.
+   */
+  it('allows the password-reset pages without auth — they are for people who cannot log in', async () => {
+    for (const p of ['/forgot-password', '/reset-password']) {
+      const req = makeReq(p, { session: null });
+      const res = await middlewareDefault(req as any, {} as any);
+      const location = (res as Response).headers?.get('location') ?? '';
+      expect(location, `${p} must not bounce to /login`).not.toContain('/login');
+    }
+  });
+
+  it('/reset-password stays public WITH its token query — the emailed link is the real caller', async () => {
+    const req = makeReq('/reset-password?token=abc&email=a%40b.com', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    const location = (res as Response).headers?.get('location') ?? '';
+    expect(location).not.toContain('/login');
+  });
+
+  it('/change-password still REQUIRES a session — it is not a reset page', async () => {
+    const req = makeReq('/change-password', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    const location = (res as Response).headers?.get('location') ?? '';
+    expect(location).toContain('/login');
+  });
+
+  /**
+   * THE DRIFT GUARD — enumerate the public trees from DISK and require middleware to agree.
+   *
+   * One sweep found three separate omissions from the public lists: `/api/invite`, the two
+   * password-reset pages, and `/federal-rd-101` (linked from the homepage twice and sitting in the
+   * site nav). Each was found by a different accident. The common cause is structural: a
+   * hand-maintained array lives next to a DIRECTORY of public pages, and nothing compares them, so
+   * every new marketing page is public-by-intent and gated-by-default until someone notices.
+   *
+   * Middleware runs on the Edge and cannot read the filesystem, so the array has to stay
+   * hand-written. This test is the other half: it walks `app/(marketing)` and `app/(auth)`, drives
+   * each route through the real middleware with no session, and fails on any that redirects to
+   * /login. Adding a marketing page without listing it now breaks the suite instead of the site.
+   *
+   * `/change-password` is the one deliberate exception — it is in `(auth)` and legitimately needs a
+   * session, which the test above pins from the other direction.
+   */
+  it('every page under app/(marketing) and app/(auth) is reachable without a session', async () => {
+    const { readdirSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const APP = join(process.cwd(), 'app');
+    const NEEDS_SESSION_BY_DESIGN = new Set(['/change-password']);
+
+    const routes: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(join(dir, e.name), `${rel}/${e.name}`);
+        else if (e.name === 'page.tsx') {
+          const r = rel.replace(/\/\([^)]+\)/g, '') || '/';
+          // A dynamic segment needs a real value; substitute a plausible one.
+          routes.push(r.replace(/\[\w+\]/g, 'sample-slug'));
+        }
+      }
+    };
+    for (const group of ['(marketing)', '(auth)']) {
+      const d = join(APP, group);
+      if (existsSync(d)) walk(d, '');
+    }
+    expect(routes.length, 'the walk found no pages — the test is not testing anything').toBeGreaterThan(15);
+
+    const gated: string[] = [];
+    for (const r of routes) {
+      if (NEEDS_SESSION_BY_DESIGN.has(r)) continue;
+      const res = await middlewareDefault(makeReq(r, { session: null }) as any, {} as any);
+      const location = (res as Response).headers?.get('location') ?? '';
+      if (location.includes('/login')) gated.push(r);
+    }
+    expect(gated, `these public pages redirect anonymous visitors to /login: ${gated.join(', ')}`).toEqual([]);
+  });
+
   it('allows _next static paths without auth', async () => {
     const req = makeReq('/_next/static/chunks/main.js', { session: null });
     const res = await middlewareDefault(req as any, {} as any);

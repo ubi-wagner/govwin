@@ -54,6 +54,18 @@ const PUBLIC_PATHS = [
   '/customers',
   '/get-started',
   '/value',
+  // The newcomer on-ramp — and it required a login, which is the exact audience it cannot have.
+  // The homepage links to it TWICE ("Start here →", and the hero's "New to federal R&D? Start
+  // here"), it sits in the site nav as "Federal R&D 101", and its own content module describes it
+  // as "the newcomer on-ramp: what federal R&D funding is, whether you qualify". Every one of those
+  // entry points led a first-time visitor to /login?from=%2Ffederal-rd-101.
+  //
+  // Third omission from this list found in one sweep (with /api/invite and the two password-reset
+  // pages). A hand-maintained list next to a directory of public pages WILL drift, so
+  // __tests__/middleware.test.ts now enumerates app/(marketing) and app/(auth) from disk and fails
+  // when the two disagree — the list stays hand-written because Edge cannot read the filesystem,
+  // but it can no longer drift silently.
+  '/federal-rd-101',
   '/legal',
   '/api/health',
   '/api/waitlist',
@@ -82,6 +94,23 @@ const PUBLIC_PATHS = [
 const PUBLIC_EXACT_PATHS = [
   '/api/applications',
   '/api/invite',
+  // THE PASSWORD-RESET PAGES. Same defect as /api/invite above, bigger blast radius: these are for
+  // people who CANNOT log in, and they sat behind the login gate.
+  //
+  //   /login renders a "Forgot password?" link → /forgot-password → 307 back to /login.
+  //   A password-reset EMAIL links to /reset-password?token=…&email=… → 307 back to /login,
+  //   and the page that would have consumed the token never runs.
+  //
+  // Everything else in the flow was already built and working: both pages exist and read their
+  // query parameters correctly, and `POST /api/auth/forgot-password` answers
+  // `200 {"data":{"sent":true}}` — because `/api/auth/*` is public a few lines above, so the API
+  // was reachable while the UI in front of it was not. Only this list was missing them.
+  //
+  // Exact, never a prefix: neither page has sub-routes, and a prefix would open anything beneath.
+  // No rate limit needed here — these are renders; the two endpoints they POST to are already in
+  // RATE_LIMITED_PATHS at 5 per 15 minutes, which is where the abuse budget belongs.
+  '/forgot-password',
+  '/reset-password',
 ];
 
 // Static asset extensions that bypass auth. Exhaustive on purpose:
