@@ -1,5 +1,334 @@
 [
  {
+  "lane": "panel",
+  "part": 1,
+  "parts": 14,
+  "file": "states-panel-1.png",
+  "routes": [
+   "/admin/command",
+   "/admin/command",
+   "/admin/command",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard",
+   "/admin/dashboard"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 2,
+  "parts": 14,
+  "file": "states-panel-2.png",
+  "routes": [
+   "/admin/dashboard",
+   "/admin/events",
+   "/admin/events",
+   "/admin/events",
+   "/admin/events",
+   "/admin/events",
+   "/admin/pipeline",
+   "/admin/pipeline",
+   "/admin/pipeline",
+   "/admin/pipeline",
+   "/admin/pipeline",
+   "/admin/pipeline",
+   "/admin/process",
+   "/admin/process",
+   "/admin/process",
+   "/admin/process"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 3,
+  "parts": 14,
+  "file": "states-panel-3.png",
+  "routes": [
+   "/admin/process",
+   "/admin/process",
+   "/admin/process",
+   "/admin/process",
+   "/admin/processes",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 4,
+  "parts": 14,
+  "file": "states-panel-4.png",
+  "routes": [
+   "/admin/rfp-curation/[solId]",
+   "/admin/rfp-curation/[solId]/topic/[topicId]",
+   "/admin/site/[pageKey]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources/[profileId]",
+   "/admin/sources/[profileId]",
+   "/admin/storage",
+   "/admin/storage"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 5,
+  "parts": 14,
+  "file": "states-panel-5.png",
+  "routes": [
+   "/admin/system-state",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/templates"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 6,
+  "parts": 14,
+  "file": "states-panel-6.png",
+  "routes": [
+   "/admin/templates/[templateId]/edit",
+   "/admin/templates/[templateId]/edit",
+   "/admin/workflows",
+   "/partner",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 7,
+  "parts": 14,
+  "file": "states-panel-7.png",
+  "routes": [
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/agents",
+   "/portal/[tenantSlug]/agents",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 8,
+  "parts": 14,
+  "file": "states-panel-8.png",
+  "routes": [
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 9,
+  "parts": 14,
+  "file": "states-panel-9.png",
+  "routes": [
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 10,
+  "parts": 14,
+  "file": "states-panel-10.png",
+  "routes": [
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/documents/new",
+   "/portal/[tenantSlug]/documents/new",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 11,
+  "parts": 14,
+  "file": "states-panel-11.png",
+  "routes": [
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "/portal/[tenantSlug]/portals",
+   "/portal/[tenantSlug]/portals",
+   "/portal/[tenantSlug]/portals",
+   "/portal/[tenantSlug]/portals",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/portals/[portalId]",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 12,
+  "parts": 14,
+  "file": "states-panel-12.png",
+  "routes": [
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 13,
+  "parts": 14,
+  "file": "states-panel-13.png",
+  "routes": [
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]"
+  ]
+ },
+ {
+  "lane": "panel",
+  "part": 14,
+  "parts": 14,
+  "file": "states-panel-14.png",
+  "routes": [
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/templates",
+   "/portal/[tenantSlug]/todos",
+   "/portal/[tenantSlug]/todos",
+   "/portal/[tenantSlug]/vaults/[vaultId]",
+   "/resources",
+   "/resources"
+  ]
+ },
+ {
   "lane": "open",
   "part": 1,
   "parts": 3,
@@ -114,25 +443,6 @@
   ]
  },
  {
-  "lane": "confirm",
-  "part": 1,
-  "parts": 1,
-  "file": "states-confirm-1.png",
-  "routes": [
-   "/admin/processes",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/portal/[tenantSlug]/team",
-   "/portal/[tenantSlug]/team",
-   "/portal/[tenantSlug]/team"
-  ]
- },
- {
   "lane": "toast",
   "part": 1,
   "parts": 2,
@@ -162,6 +472,7 @@
   "parts": 2,
   "file": "states-toast-2.png",
   "routes": [
+   "/portal/[tenantSlug]/portals/[portalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
@@ -169,6 +480,18 @@
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/templates",
    "/portal/[tenantSlug]/templates"
+  ]
+ },
+ {
+  "lane": "confirm",
+  "part": 1,
+  "parts": 1,
+  "file": "states-confirm-1.png",
+  "routes": [
+   "/admin/processes",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team"
   ]
  }
 ]
