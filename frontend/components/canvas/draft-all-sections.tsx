@@ -17,7 +17,20 @@
 
 import { useState } from 'react';
 import { useTool } from '@/lib/hooks/use-tool';
-import { createEmptyCanvas, CANVAS_PRESETS, type CanvasNode } from '@/lib/types/canvas-document';
+import { createEmptyCanvas, CANVAS_PRESETS, getNodeText, type CanvasNode } from '@/lib/types/canvas-document';
+
+/**
+ * An atom's body as text the drafter can read, whether it is prose or structure.
+ *
+ * `content` holds prose; `canvasNodes` holds the real nodes for a table, schedule, figure or list.
+ * Flattening the latter with the canvas's own `getNodeText` keeps ONE definition of "the words in
+ * this node" — a second extractor here would drift from the one the rest of the canvas uses.
+ */
+function atomText(a: { content: string | null; canvasNodes: CanvasNode[] | null }): string {
+  if (a.content && a.content.trim()) return a.content.trim();
+  const fromNodes = (a.canvasNodes ?? []).map(getNodeText).filter((t) => t && t.trim()).join('\n');
+  return fromNodes.trim();
+}
 
 // ─── Section title → unified-taxonomy vol (mig 101/102) ──────────────
 // Map common RFP section titles to a canonical `vol` so the scored atom
@@ -135,10 +148,24 @@ export function DraftAllSections({
           // so the atom return at lock can set lineage back to them.
           const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
           if (res.ok) {
-            const ranked = ((await res.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;
+            const ranked = ((await res.json()).data?.atoms ?? []) as Array<{
+              id: string; content: string | null; canvasNodes: CanvasNode[] | null;
+            }>;
+            // A STRUCTURED ATOM IS NOT AN EMPTY ONE. An atom's body lives in `content` when it is
+            // prose and in `canvasNodes` when it is a table, a schedule, a figure or a list — and
+            // this filtered on `content` alone, so every structured atom was dropped on the way to
+            // the drafter. Measured on this box: 699 of 2,148 approved atoms (30% of one tenant's
+            // library, 69% of another's) carry their body only in canvasNodes.
+            //
+            // The consequence was not "slightly less context." The drafter has no retrieval of its
+            // own — `libraryAtoms` is an INPUT — so a section whose best material is a schedule
+            // table got an empty list and correctly answered "No approved library content was
+            // retrieved", while a dozen relevant atoms sat one field away. The selector already
+            // returns canvasNodes for exactly this reason ("so structured atoms insert
+            // faithfully"); only this bridge ignored them.
             libraryAtoms = ranked
-              .filter((a) => a.content && a.content.trim())
-              .map((a) => ({ id: a.id, content: a.content as string, category: vol }));
+              .map((a) => ({ id: a.id, category: vol, content: atomText(a) }))
+              .filter((a) => a.content.length > 0);
           }
         } catch {
           // Library selection failure is non-fatal — draft without library context
