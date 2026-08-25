@@ -113,6 +113,12 @@ export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 export RFP_ADMIN_PW="${RFP_ADMIN_PW:-$SANDBOX_PASSWORD}"
 # lighthouse is NOT in the reset script's target list, so it keeps its seeded password.
 export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"
+# …and LIGHTHOUSE_PW belongs to `eric@lighthouse.com` ONLY. The lighthouse COLLABORATOR is a
+# different account with a different seeded password (`seed_dev_accounts.mjs`: COLLAB_PW), and this
+# file exported the first without the second — so a harness reaching for "the lighthouse password"
+# found one that does not open the collaborator account and died at the login form. That cost the
+# UI atlas its whole `/vaults` lane, which is the only surface a vault-only partner can see.
+export COLLAB_PW="${COLLAB_PW:-CollabPass1}"
 export TENANT_PW="${TENANT_PW:-DemoPass123!}"
 
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
