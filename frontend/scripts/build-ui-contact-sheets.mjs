@@ -32,15 +32,29 @@ const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const COLS = 4;
 const PER_SHEET = 16;
 
-const index = JSON.parse(fs.readFileSync(path.join(OUT, 'index.json'), 'utf8'));
+/**
+ * Two sources, one sheet format.
+ *
+ *   docs/ui-atlas/index.json    one shot per ROUTE, grouped by actor lane
+ *   docs/ui-states/index.json   one shot per STATE, grouped by KIND — every "validation" together,
+ *                               every "confirm" together — because that is how they are reviewed.
+ *                               Scanning 20 validation messages side by side is what makes the
+ *                               inconsistent one obvious; scattering them by route hides it.
+ *
+ *   node scripts/build-ui-contact-sheets.mjs           # routes
+ *   node scripts/build-ui-contact-sheets.mjs --states  # modal / form / toast / confirm states
+ */
+const STATES = process.argv.includes('--states');
+const SRC = STATES ? path.join(REPO, 'docs/ui-states') : OUT;
+const index = JSON.parse(fs.readFileSync(path.join(SRC, 'index.json'), 'utf8'));
 const byLane = {};
-for (const s of index.shots) (byLane[s.lane] ??= []).push(s);
+for (const s of index.shots) (byLane[STATES ? (s.kind || 'other') : s.lane] ??= []).push(s);
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function sheetHtml(lane, shots, part, parts) {
   const cards = shots.map((s) => {
-    const img = path.join(OUT, s.file);
+    const img = path.join(SRC, s.file);
     const b64 = fs.existsSync(img) ? fs.readFileSync(img).toString('base64') : '';
     const r = s.rendered ?? {};
     // A thumbnail is cropped to the top of a full-page shot: below-the-fold content is in the
@@ -49,9 +63,13 @@ function sheetHtml(lane, shots, part, parts) {
       <div class="shot">${b64 ? `<img src="data:image/png;base64,${b64}">` : '<div class="missing">no image</div>'}</div>
       <figcaption>
         <b>${esc(s.route)}</b>
-        ${s.redirected ? `<span class="redir">→ ${esc(s.finalUrl)}</span>` : ''}
-        <span class="meta">${s.status} · ${r.text ?? 0}ch · b${r.buttons ?? 0} l${r.links ?? 0} i${r.inputs ?? 0} f${r.forms ?? 0}</span>
-        ${r.h1 ? `<span class="h1">“${esc(r.h1)}”</span>` : '<span class="h1 none">no heading</span>'}
+        ${STATES
+          ? `<span class="redir">${esc(s.lane)} · ${esc(s.kind || '')}</span>
+             <span class="meta">${esc(s.trigger ? '“' + s.trigger + '”' : '')}${s.fields ? ` · ${s.fields} field(s) filled` : ''}</span>
+             ${s.message ? `<span class="h1">${esc(String(s.message).slice(0, 90))}</span>` : ''}`
+          : `${s.redirected ? `<span class="redir">→ ${esc(s.finalUrl)}</span>` : ''}
+             <span class="meta">${s.status} · ${r.text ?? 0}ch · b${r.buttons ?? 0} l${r.links ?? 0} i${r.inputs ?? 0} f${r.forms ?? 0}</span>
+             ${r.h1 ? `<span class="h1">“${esc(r.h1)}”</span>` : '<span class="h1 none">no heading</span>'}`}
       </figcaption>
     </figure>`;
   }).join('');
@@ -71,8 +89,8 @@ function sheetHtml(lane, shots, part, parts) {
     .h1{color:#94a3b8;font-size:11px;font-style:italic}
     .h1.none{color:#f87171}
   </style>
-  <h1>UI atlas · ${esc(lane)} · sheet ${part} of ${parts}</h1>
-  <div class="sub">${shots.length} route(s). Caption: HTTP · rendered text length · b=buttons l=links i=inputs f=forms, counted in the LIVE dom. Amber = redirected. Red heading = no h1/h2 found.</div>
+  <h1>UI ${STATES ? 'states' : 'atlas'} · ${esc(lane)} · sheet ${part} of ${parts}</h1>
+  <div class="sub">${shots.length} ${STATES ? 'state(s). Caption: route · lane · kind · the trigger that produced it.' : 'route(s). Caption: HTTP · rendered text length · b=buttons l=links i=inputs f=forms, counted in the LIVE dom. Amber = redirected. Red heading = no h1/h2 found.'}</div>
   <div class="grid">${cards}</div>`;
 }
 
@@ -84,14 +102,14 @@ for (const [lane, shots] of Object.entries(byLane)) {
   const parts = Math.ceil(shots.length / PER_SHEET);
   for (let i = 0; i < parts; i++) {
     const slice = shots.slice(i * PER_SHEET, (i + 1) * PER_SHEET);
-    const file = `sheet-${lane}-${i + 1}.png`;
+    const file = `${STATES ? 'states' : 'sheet'}-${lane}-${i + 1}.png`;
     await page.setContent(sheetHtml(lane, slice, i + 1, parts), { waitUntil: 'load' });
     await page.waitForTimeout(300);
-    await page.screenshot({ path: path.join(OUT, file), fullPage: true });
+    await page.screenshot({ path: path.join(SRC, file), fullPage: true });
     sheets.push({ lane, part: i + 1, parts, file, routes: slice.map((s) => s.route) });
     console.log(`  ✓ ${file} — ${slice.length} route(s)`);
   }
 }
 await browser.close();
-fs.writeFileSync(path.join(OUT, 'sheets.json'), JSON.stringify(sheets, null, 1));
-console.log(`\n${sheets.length} contact sheet(s) in docs/ui-atlas/`);
+fs.writeFileSync(path.join(SRC, 'sheets.json'), JSON.stringify(sheets, null, 1));
+console.log(`\n${sheets.length} contact sheet(s) in ${path.relative(REPO, SRC)}/`);
