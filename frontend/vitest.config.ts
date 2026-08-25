@@ -12,6 +12,11 @@ export default defineConfig({
     // never-queried dummy is inert; a real DATABASE_URL (local/integration runs) is preserved.
     env: { DATABASE_URL: process.env.DATABASE_URL || 'postgresql://vitest:vitest@127.0.0.1:5432/vitest_noop' },
   },
+  // Compile TSX the way Next does. Component files here use the AUTOMATIC JSX runtime (no
+  // `import React`), while esbuild defaults to the classic one — so the first test to render a
+  // component died with `ReferenceError: React is not defined`, which reads like a broken component
+  // rather than a transform mismatch. This aligns the two; it changes no test's scope.
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: { '@': path.resolve(__dirname) },
   },
