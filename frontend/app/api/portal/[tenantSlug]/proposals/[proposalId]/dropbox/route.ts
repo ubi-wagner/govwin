@@ -5,8 +5,10 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject, deleteObject, getSignedGetUrl } from '@/lib/storage/s3-client';
-import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { s3, BUCKET } from '@/lib/storage/s3-client';
+// Through the abstraction only — see the note in app/api/admin/storage/route.ts. This is the
+// CUSTOMER-facing dropbox, so a raw `s3.send` here meant a collaborator on a local/dev deployment
+// saw "Failed to list dropbox files" for a folder that was on disk the whole time.
+import { listObjects } from '@/lib/storage/s3-client';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -88,22 +90,16 @@ export async function GET(request: Request, ctx: RouteContext) {
     const prefix = dropboxPrefix(tenantSlug, proposalId, targetUserId);
 
     try {
-      const command = new ListObjectsV2Command({
-        Bucket: BUCKET,
-        Prefix: prefix,
-        MaxKeys: 100,
-      });
-      const response = await s3.send(command);
-      const files = (response.Contents || []).map((obj) => {
-        const key = obj.Key || '';
-        const filename = key.split('/').pop() || key;
-        return {
-          key,
-          filename,
-          size: obj.Size || 0,
-          lastModified: obj.LastModified?.toISOString() || null,
-        };
-      });
+      // A dropbox is flat — one prefix per (tenant, proposal, user) — so a one-level listing is
+      // the whole of it. `''` for the delimiter would also work; '/' matches how the keys are laid
+      // out and keeps any accidental sub-folder from being flattened into the file list.
+      const listed = await listObjects(prefix, '/');
+      const files = listed.objects.slice(0, 100).map((obj) => ({
+        key: obj.key,
+        filename: obj.key.split('/').pop() || obj.key,
+        size: obj.size,
+        lastModified: obj.lastModified ? obj.lastModified.toISOString() : null,
+      }));
 
       return NextResponse.json({ data: { files, userId: targetUserId } });
     } catch (s3Err) {

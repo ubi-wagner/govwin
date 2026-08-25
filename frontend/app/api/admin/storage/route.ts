@@ -17,12 +17,20 @@
 
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { ListObjectsV2Command, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
 import { getSignedPutUrl } from '@/lib/storage/s3-client';
-import { s3, BUCKET, putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
+// Through the abstraction ONLY. This route used to build raw ListObjectsV2/Head/DeleteObjects
+// commands and call `s3.send` directly, which meant the Storage Manager talked to AWS even when
+// STORAGE_DRIVER=local — and answered "Failed to list storage objects" with `InvalidAccessKeyId`
+// on every local/dev box. The local driver lives in `lib/storage/s3-client.ts` and nowhere else, so
+// reaching around it is exactly how a surface loses it. Found by LOOKING at the page: it returned
+// HTTP 200 with a red banner, so no status check, envelope check or error-text matcher saw it.
+import {
+  BUCKET, putObject, getSignedGetUrl,
+  listObjects, listObjectsDeep, objectStat, deleteObject, deleteObjects,
+} from '@/lib/storage/s3-client';
 
 const ADMIN_PREFIX = 'rfp-admin/';
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB — SBIR award files are 300MB+
@@ -92,25 +100,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const command = new ListObjectsV2Command({
-      Bucket: BUCKET,
-      Prefix: prefix,
-      Delimiter: '/',
-    });
-
-    const response = await s3.send(command);
-
-    const objects = (response.Contents ?? [])
-      .filter((obj) => obj.Key !== prefix) // exclude the folder marker itself
-      .map((obj) => ({
-        key: obj.Key ?? '',
-        size: obj.Size ?? 0,
-        lastModified: obj.LastModified?.toISOString() ?? null,
-      }));
-
-    const prefixes = (response.CommonPrefixes ?? []).map(
-      (cp) => cp.Prefix ?? '',
-    );
+    const listed = await listObjects(prefix, '/');
+    const objects = listed.objects.map((o) => ({
+      key: o.key,
+      size: o.size,
+      lastModified: o.lastModified ? o.lastModified.toISOString() : null,
+    }));
+    const prefixes = listed.prefixes;
 
     return NextResponse.json({ data: { objects, prefixes } });
   } catch (err) {
@@ -354,20 +350,12 @@ export async function PATCH(request: NextRequest) {
 
       const isFolder = oldKey.endsWith('/');
       if (isFolder) {
-        const listCmd = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: oldKey });
-        const listRes = await s3.send(listCmd);
-        const contents = listRes.Contents ?? [];
+        const contents = await listObjectsDeep(oldKey);
         for (const obj of contents) {
-          if (!obj.Key) continue;
-          const suffix = obj.Key.slice(oldKey.length);
-          await copyObject({ sourceKey: obj.Key, destKey: `${newKey}${suffix}` });
+          const suffix = obj.key.slice(oldKey.length);
+          await copyObject({ sourceKey: obj.key, destKey: `${newKey}${suffix}` });
         }
-        if (contents.length > 0) {
-          await s3.send(new DeleteObjectsCommand({
-            Bucket: BUCKET,
-            Delete: { Objects: contents.map(o => ({ Key: o.Key! })), Quiet: true },
-          }));
-        }
+        await deleteObjects(contents.map((o) => o.key));
       } else {
         await copyObject({ sourceKey: oldKey, destKey: newKey });
         await deleteObject(oldKey);
@@ -389,16 +377,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid key or read-only prefix', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    // Verify the object actually exists in S3
-    try {
-      await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.key }));
-    } catch {
+    // Verify the object actually exists, and read its size — one stat, not two heads.
+    const stat = await objectStat(body.key);
+    if (!stat) {
       return NextResponse.json({ error: 'File not found in storage — upload may have failed', code: 'NOT_FOUND' }, { status: 404 });
     }
-
-    // Get file size from head
-    const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.key }));
-    const size = head.ContentLength ?? 0;
+    const size = stat.size;
     const filename = body.key.split('/').pop() ?? body.key;
 
     await emitEventSingle({
@@ -501,23 +485,9 @@ export async function DELETE(request: NextRequest) {
 
     // If deleting a folder, delete all contents first
     if (key.endsWith('/')) {
-      const listCmd = new ListObjectsV2Command({
-        Bucket: BUCKET,
-        Prefix: key,
-      });
-      const listRes = await s3.send(listCmd);
-      const contents = listRes.Contents ?? [];
-      if (contents.length > 0) {
-        await s3.send(new DeleteObjectsCommand({
-          Bucket: BUCKET,
-          Delete: {
-            Objects: contents.map(o => ({ Key: o.Key! })),
-            Quiet: true,
-          },
-        }));
-      }
+      await deleteObjects((await listObjectsDeep(key)).map((o) => o.key));
     } else {
-      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+      await deleteObject(key);
     }
 
     await emitEventSingle({
