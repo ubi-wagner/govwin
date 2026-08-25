@@ -54,11 +54,8 @@ scratchpad/
 frontend/scripts/test-harness/*.log.jsonl
 frontend/scripts/test-harness/*.out
 
-# UI atlas — the 150 per-route screenshots are EVIDENCE FOR A RUN, not source. They are ~37MB and
-# regenerate in one command, so committing them would bloat every clone forever for something a
-# script reproduces:
-#     cd frontend && node scripts/capture-ui-atlas.mjs && node scripts/build-ui-contact-sheets.mjs
-# What IS tracked is the reviewable half — the contact sheets (docs/ui-atlas/sheet-*.png) and the
-# measurements (index.json / sheets.json), which is what docs/UI_ATLAS.md is written against and
-# matches how docs/tvsf-build-guide keeps a curated set rather than a dump.
-docs/ui-atlas/*.jpg
+# NOTE: docs/ui-atlas/*.jpg and docs/ui-states/*.jpg ARE tracked, deliberately. They are the
+# reviewable record of what every screen and every modal state actually looked like, kept as JPEG
+# for that reason. Regenerate with:
+#   cd frontend && node scripts/capture-ui-atlas.mjs && node scripts/drive-ui-states.mjs
+#                  && node scripts/build-ui-contact-sheets.mjs
