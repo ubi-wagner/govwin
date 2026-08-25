@@ -63,9 +63,25 @@ const PUBLIC_PATHS = [
   '/invite',
 ];
 
-/** Paths that are public but must match exactly (no startsWith prefix matching). */
+/**
+ * Paths that are public but must match exactly (no startsWith prefix matching).
+ *
+ * `/api/invite` is here because THE TOKEN IS THE CREDENTIAL. An invited collaborator has no account
+ * yet — that is the entire point of an invite link — so requiring a session to read or accept one
+ * is a contradiction the flow cannot satisfy. `/invite/<token>` (the page) was already public and
+ * its two fetches were not, so the page loaded, `GET /api/invite` answered 401 into a silent catch
+ * (the invitee saw no inviter, no company, no proposal), and `POST /api/invite` answered 401 when
+ * they submitted a password. Proven live on a fresh box before the fix.
+ *
+ * This is the same bug as the cron one documented under CRON_EXACT_PATHS: a handler written to
+ * authenticate by something other than a session, made unreachable by the session gate in front of
+ * it. That one was found and fixed for two routes; nothing swept for the rest, and this was the
+ * rest. The route still validates the token itself and 404s an unknown one, so opening the path
+ * grants nothing the token does not.
+ */
 const PUBLIC_EXACT_PATHS = [
   '/api/applications',
+  '/api/invite',
 ];
 
 // Static asset extensions that bypass auth. Exhaustive on purpose:
@@ -134,6 +150,11 @@ const RATE_LIMITED_PATHS: Record<string, { limit: number; windowMs: number }> = 
   '/api/applications': { limit: 5, windowMs: 15 * 60 * 1000 },
   '/api/auth/forgot-password': { limit: 5, windowMs: 15 * 60 * 1000 },
   '/api/auth/reset-password': { limit: 5, windowMs: 15 * 60 * 1000 },
+  // Opening /api/invite to anonymous callers (above) makes it an unauthenticated endpoint that
+  // accepts a token and SETS A PASSWORD — the same risk class as reset-password, so it gets the
+  // same budget. The limit is what stops the open path from being a token-guessing oracle. A
+  // higher ceiling than the others would be wrong: a real invitee needs two requests, not five.
+  '/api/invite': { limit: 5, windowMs: 15 * 60 * 1000 },
   '/api/waitlist': { limit: 5, windowMs: 15 * 60 * 1000 },
 };
 
@@ -212,7 +233,17 @@ export default auth((req) => {
     // Unauthenticated — redirect HTML requests to /login, return
     // 401 for API routes.
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+      // `code` is not optional. CLAUDE.md: "EVERY error response MUST include both `error` and
+      // `code` fields", and every one of the 250 route handlers behind this middleware obeys it —
+      // 2,525 error responses, all conforming. This layer, which fronts all of them and answers
+      // FIRST for any caller without a session, did not: a client switching on `code` fell through
+      // to its default on the single most common failure in the product. The rate-limit branches
+      // above already carried `RATE_LIMITED`, which is what shows this was an oversight and not a
+      // decision. Codes match the handlers' own vocabulary so a caller needs one branch, not two.
+      return NextResponse.json(
+        { error: 'unauthenticated', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
     }
     const loginUrl = new URL('/login', req.nextUrl);
     // Preserve the full path INCLUDING the query string. A deep-link like
@@ -231,7 +262,7 @@ export default auth((req) => {
   if (tempPassword && !isChangePasswordPath) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
-        { error: 'password change required' },
+        { error: 'password change required', code: 'PASSWORD_CHANGE_REQUIRED' },
         { status: 403 },
       );
     }
@@ -247,7 +278,7 @@ export default auth((req) => {
     }
     if (!hasRoleAtLeast(actorRole as Role, requiredRole)) {
       if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+        return NextResponse.json({ error: 'forbidden', code: 'FORBIDDEN' }, { status: 403 });
       }
       return NextResponse.redirect(new URL('/', req.nextUrl));
     }

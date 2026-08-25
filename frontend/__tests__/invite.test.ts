@@ -402,3 +402,57 @@ describe('GET /api/invite — token lookup', () => {
     expect(json.code).toBe('DB_ERROR');
   });
 });
+
+/**
+ * A MALFORMED token must never reach the query.
+ *
+ * `proposal_collaborators.id` is `uuid`, so `WHERE pc.id = 'abc'` makes Postgres raise
+ * `invalid input syntax for type uuid` before the query runs — which the route's catch turned into
+ * `500 DB_ERROR`. A bad character in a URL is user input, not a server fault.
+ *
+ * It could not be observed until this route became public: middleware answered 401 first, so the
+ * handler never ran for the one caller who would ever send a mistyped token. It was found on the
+ * first anonymous request after opening the path, which is why both changes belong together.
+ *
+ * Answering 404 — the SAME response as an unknown token — is deliberate: on an unauthenticated,
+ * rate-limited endpoint, distinguishing "malformed" from "not found" would confirm which tokens are
+ * well-formed. These tests assert the status AND that no query was attempted.
+ */
+describe('invite — a malformed token is an invalid token, not a server error', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    bcryptHashMock.mockResolvedValue('$2a$12$hashed');
+  });
+
+  const MALFORMED = ['abc', '123', 'not-a-uuid', '../../etc/passwd', "' OR 1=1--", `${COLLABORATOR_ID}x`];
+
+  it('GET returns 404 and never queries', async () => {
+    for (const token of MALFORMED) {
+      const res = await GET(new Request(`http://localhost/api/invite?token=${encodeURIComponent(token)}`));
+      expect(res.status, `GET ${token}`).toBe(404);
+      expect((await res.json()).code).toBe('NOT_FOUND');
+    }
+    expect(sqlMock, 'no malformed token should reach the database').not.toHaveBeenCalled();
+  });
+
+  it('POST returns 404 and never queries or hashes', async () => {
+    for (const token of MALFORMED) {
+      const res = await POST(new Request('http://localhost/api/invite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, password: 'aVeryLongPassword1' }),
+      }));
+      expect(res.status, `POST ${token}`).toBe(404);
+      expect((await res.json()).code).toBe('NOT_FOUND');
+    }
+    expect(sqlMock).not.toHaveBeenCalled();
+    expect(bcryptHashMock).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a well-formed uuid (the guard is not over-broad)', async () => {
+    sqlMock.mockResolvedValueOnce([]); // well-formed but unknown → the route's own 404
+    const res = await GET(new Request(`http://localhost/api/invite?token=${COLLABORATOR_ID}`));
+    expect(res.status).toBe(404);
+    expect(sqlMock, 'a valid uuid MUST reach the query').toHaveBeenCalled();
+  });
+});

@@ -155,6 +155,31 @@ describe('middleware — public paths', () => {
     expect(location).not.toContain('/login');
   });
 
+  /**
+   * The PAGE being public was already asserted above. Nothing asserted the API it depends on, and
+   * it was not — so `/invite/<token>` rendered, its `GET /api/invite` fetch answered 401 into a
+   * silent catch, and the POST that sets the invitee's password answered 401 too. The whole
+   * collaborator-invite flow was dead for exactly the person it exists for: someone with no
+   * account, for whom "log in first" is not a step they can take.
+   *
+   * The reason no test caught it is worth keeping: the page test and the route test each passed in
+   * isolation, and the defect lived only in their COMPOSITION. Assert both halves together.
+   */
+  it('allows /api/invite without auth — the token IS the credential', async () => {
+    for (const method of ['GET', 'POST'] as const) {
+      const req = makeReq('/api/invite', { session: null, method });
+      const res = await middlewareDefault(req as any, {} as any);
+      expect((res as Response).status).not.toBe(401);
+    }
+  });
+
+  it('does NOT open /api/invite as a prefix — only the exact path', async () => {
+    // PUBLIC_EXACT_PATHS, never a prefix: /api/invitations or /api/invite/admin must stay gated.
+    const req = makeReq('/api/invite/anything-else', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    expect((res as Response).status).toBe(401);
+  });
+
   it('allows _next static paths without auth', async () => {
     const req = makeReq('/_next/static/chunks/main.js', { session: null });
     const res = await middlewareDefault(req as any, {} as any);
@@ -175,6 +200,41 @@ describe('middleware — unauthenticated access', () => {
     expect((res as Response).status).toBe(401);
     const json = await (res as Response).json();
     expect(json.error).toBe('unauthenticated');
+    // `code` is half the contract — see the envelope test below for why this line exists.
+    expect(json.code).toBe('UNAUTHENTICATED');
+  });
+
+  /**
+   * THE ENVELOPE, AT THE LAYER THAT ANSWERS FIRST.
+   *
+   * CLAUDE.md: "EVERY error response MUST include both `error` and `code` fields." All 250 route
+   * handlers obey it — 2,525 error responses, every one conforming. This middleware fronts all of
+   * them and answered `{error:'unauthenticated'}` with no `code` to every caller without a session,
+   * which is the most common failure in the product. A client switching on `code` fell through to
+   * its default there and nowhere else.
+   *
+   * It stayed invisible because of WHERE the checks looked: the api-contract lens drives every
+   * route through a real logged-in session (deliberately — grading an authed route anonymously
+   * answers the wrong question), so it never saw a middleware 401; and the assertions here checked
+   * `error` and never `code`. Uncovered, not passing.
+   *
+   * The tell that it was an oversight rather than a decision: the two rate-limit branches in the
+   * same file already carried `code: 'RATE_LIMITED'`.
+   */
+  it('every middleware error response carries BOTH error and code', async () => {
+    const cases: Array<[string, FakeSession | null, number, string]> = [
+      ['/api/portal/acme/proposals', null, 401, 'UNAUTHENTICATED'],
+      ['/api/portal/acme/proposals', { user: { id: 'u1', role: 'tenant_admin', tempPassword: true } }, 403, 'PASSWORD_CHANGE_REQUIRED'],
+      ['/api/admin/tenants', { user: { id: 'u1', role: 'tenant_user' } }, 403, 'FORBIDDEN'],
+    ];
+    for (const [path, session, status, code] of cases) {
+      const req = makeReq(path, { session });
+      const res = await middlewareDefault(req as any, {} as any);
+      expect((res as Response).status).toBe(status);
+      const json = await (res as Response).json();
+      expect(typeof json.error, `${path} → error`).toBe('string');
+      expect(json.code, `${path} → code`).toBe(code);
+    }
   });
 
   it('redirects unauthenticated HTML request to /login with from param', async () => {
