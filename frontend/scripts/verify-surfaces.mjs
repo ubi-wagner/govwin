@@ -238,6 +238,44 @@ const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbo
 const V = { width: 1440, height: 900 };
 const unbound = [];
 
+/**
+ * PREFLIGHT — prove the detector can still SEE a broken page before trusting it to say none are.
+ *
+ * "A check that has never failed proves nothing" (CLAUDE.md, rule 1). Every number this lens prints
+ * rests on `countErrorSurfaces`, and that function has now been wrong in both directions: too NARROW
+ * once (it did not recognise a red "Document not found", so an error page went into the admin guide
+ * captioned as a working screen) and too BROAD once (B127 — it matched `not found` inside a
+ * `system_events` payload and called four healthy monitor pages broken). A detector with that
+ * history should not be taken on trust at the top of a run that reports on 78 surfaces.
+ *
+ * So: drive two routes that are DEFINITELY error surfaces — a real route with a well-formed id that
+ * owns nothing — and require a non-zero count from each. If the detector has been loosened until it
+ * can no longer fail, this run stops here instead of printing 78 confident greens.
+ */
+const RED_CONTROLS = [
+  ['/admin/tenants/00000000-0000-4000-8000-000000000000', 'admin'],
+  ['/portal/foundation/library/foundation/00000000-0000-4000-8000-000000000000', 'tenant'],
+];
+
+async function preflight(page, who) {
+  let checked = 0;
+  for (const [route, lane] of RED_CONTROLS) {
+    if (lane !== who) continue;
+    await page.goto(BASE + route, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(1200);
+    const n = await countErrorSurfaces(page);
+    checked += 1;
+    if (n === 0) {
+      console.log(`\n✗ DETECTOR PREFLIGHT FAILED — ${route} is an error page and countErrorSurfaces() saw nothing.`);
+      console.log('  Every "clean" below would be unearned. Fix scripts/lib/error-surface.mjs first.');
+      await browser.close(); await sql.end();
+      process.exit(2);
+    }
+    console.log(`  ✓ detector sees a known-broken page (${n} surface(s)) — ${route}`);
+  }
+  return checked;
+}
+
 try {
   for (const [label, email, pw, root, prefix] of [
     ['admin · master_admin', 'eric@rfppipeline.com', ADMIN_PW, path.join(APP, 'admin'), '/admin'],
@@ -246,6 +284,7 @@ try {
     console.log(`\n── ${label} ──`);
     const ctx = await browser.newContext({ viewport: V });
     const p = await login(ctx, email, pw);
+    await preflight(p, label.startsWith('admin') ? 'admin' : 'tenant');
     for (const r of routesUnder(root, prefix)) {
       if (!addressable(r)) { unbound.push(r); continue; }
       await drive(p, bind(r));
