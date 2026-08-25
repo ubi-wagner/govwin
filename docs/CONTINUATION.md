@@ -855,6 +855,59 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 
 ## 2. Spin up the sandbox (exact commands + gotchas)
 
+> ### 🆕 FROM ABSOLUTELY NOTHING — a container with no cluster, no roles, no node_modules
+>
+> The recipe below assumes a box that has run this before. On a genuinely fresh container
+> (2026-08-25 was one: empty PG16 cluster, no `govtech` role, `frontend/node_modules` absent,
+> no `.next`), these four things come first and only the first is non-obvious.
+>
+> **1. pgvector, or migration `001` cannot run.** `db/migrations/001_baseline.sql` needs the
+> `vector` extension (`atom_embeddings`, mig 171) and Debian/Ubuntu does not ship it with the
+> server package. The failure is nastier than it sounds: `migrate.mjs` runs `000_drop_all.sql`
+> FIRST, so it drops everything, dies on `001` with `extension "vector" is not available`, and
+> leaves an empty database plus an error naming an extension rather than a missing package.
+>
+> ```bash
+> apt-get update -qq && apt-get install -y --no-install-recommends postgresql-16-pgvector
+> psql "$DATABASE_URL_OWNER" -c 'CREATE EXTENSION IF NOT EXISTS vector'
+> ```
+>
+> **2. The two roles, created before migrating** (the migrations grant to `govtech_app`, so it must
+> exist first, and the owner must be superuser-or-BYPASSRLS because migs 212/213 FORCE row-level
+> security and FORCE applies to the owner too):
+>
+> ```bash
+> su postgres -c "psql -c \"CREATE ROLE govtech LOGIN SUPERUSER PASSWORD 'changeme'\""
+> su postgres -c "psql -c \"CREATE ROLE govtech_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'apppass'\""
+> su postgres -c "createdb -O govtech govtech_intel"
+> su postgres -c "createdb -O govtech govtech_test"     # the DB-dependent pytest suite; see sandbox-env.sh
+> ```
+>
+> Passwords must match `scripts/sandbox-env.sh` exactly. TCP localhost is `scram-sha-256` here, so
+> a role with no password cannot connect even though `peer` works for `postgres`.
+>
+> **3. `npm ci` in `frontend/`, then symlink the root** — `db/migrations/migrate.mjs` and
+> `scripts/seed_dev_accounts.mjs` live outside `frontend/` and Node resolves bare imports upward
+> from the importing FILE (B108). `sandbox-up.sh` recreates the symlink itself; if you migrate by
+> hand before running it, do `ln -sfn frontend/node_modules node_modules` first.
+>
+> **4. Then `scripts/sandbox-up.sh` does the rest** — migrate, reset passwords, seed the e2e
+> fixtures, start the emulator, worker and server. On a fresh box also run
+> `frontend/scripts/seed-isolation-fixture.mts` (from `frontend/`, so the `@/lib` alias resolves),
+> or a third of the isolation surface has no behavioural coverage (B118).
+>
+> **The pipeline worker needs its own deps** — `pip install -r pipeline/requirements.txt`, or it
+> dies on `ModuleNotFoundError: No module named 'dotenv'` and `sandbox-up.sh` reports
+> `worker FAILED` while everything else comes up green.
+>
+> **`soffice` ships with no document filters** (see the ⚠️ further down this section) — install
+> `libreoffice-impress` (plus `-writer` / `-calc`) before `probe-deck-overlap` or
+> `render-artifact-pages`. `node frontend/scripts/check-office-filters.mjs` says which are present
+> and refuses to let a broken tool produce evidence.
+>
+> A full fresh-box run is written up in **docs/FRONTEND_SWEEP_2026-08-25.md** (state reached:
+> migrations 213/213, tsc 0, vitest 1,931, five lenses green, rulers 0 under-counts).
+
 ```bash
 export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
 

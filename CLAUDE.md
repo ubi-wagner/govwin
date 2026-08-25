@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1915 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1931 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -266,10 +266,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1915 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1931 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
-- **Four lenses on a running box** (`frontend/scripts/verify-*.mjs`, each driven as a real signed-in
+- **Start from the MANIFEST, not from a walk you invent.** `docs/FRONTEND_INVENTORY.md`
+  (regenerate: `node frontend/scripts/inventory-frontend.mjs`) is the full set a sweep has to touch —
+  every page, API route, component, lib module and framework surface, with its exports, gates, SQL
+  and the harness that reaches it. It exists because each lens enumerated its own scope, so whatever
+  belonged to neither walk never appeared in a coverage number: 213 write verbs and 13 GET routes
+  were outside every lens while three greens read like a verified API (B125). It parses with the
+  TypeScript compiler API and self-tests against hand-verified answers — `--check`.
+- **FIVE lenses on a running box** (`frontend/scripts/verify-*.mjs`, each driven as a real signed-in
   actor, each `console`-reporting what it could NOT reach rather than skipping it silently):
   `verify-surfaces` — every `page.tsx` under `app/admin` + `app/portal/[tenantSlug]` RENDERS (a 200
   is not evidence: it reads the rendered text and collects `pageerror`/console throws);
@@ -281,7 +288,19 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   because the first three were all green while the dashboard told a customer with 8 builds they had
   6 (B80). Its rule: the expectation must be the page's **own query, copied from its source** — a
   predicate you believe is equivalent manufactures confident, wrong findings.
-- **Run all four on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
+  `verify-write-contract` — the 213 POST/PATCH/PUT/DELETE verbs NO lens walked, because calling
+  every write mutates the box being measured. It binds every `[param]` to a fresh UUID owning
+  nothing and asserts the one property needing no successful write: **a client error answers 4xx
+  with both `error` and `code`, never 500** (a 500 on bad input means validation ran after the DB
+  call). ⚠️ It is NOT read-only — several routes take no required input by design — so it prints its
+  mutation footprint every run. Sandbox, never production.
+- **Two lenses now refuse to report a verdict they cannot earn.** `verify-api-contract` reconciles
+  its coverage against the tree (graded + exempt + unbound + no-actor must equal the routes on disk)
+  and exits **2 as a HARNESS DEFECT** otherwise; `verify-surfaces` opens each actor lane by driving a
+  page that is DEFINITELY broken and requiring its detector to see it, exiting 2 with *"every clean
+  below would be unearned"* otherwise. Both guards were added after the thing they guard against had
+  already happened (B125, B127).
+- **Run all five on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
   where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
   survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.
 - **Four verification rules, each learned by breaking it** (full write-up: docs/TESTING_STRATEGY.md):
@@ -292,7 +311,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   body before `JSON.parse`). (3) **Copy the predicate from the source**, never re-type one you
   believe equivalent. (4) **Assert the contract the system HAS** — `DELETE` on a bucket is a
   deactivation by design, so asserting "the row is gone" is a harness bug, not a finding.
-- **Cross-check when it matters.** The four lenses share a stack (Playwright + one postgres.js client
+- **Cross-check when it matters.** The lenses share a stack (Playwright + one postgres.js client
   + assertions written in one sitting), so a green lens shows the lens and the product AGREE — weaker
   than showing the product is right. `scripts/crosscheck-shipped-fixes.sh` (curl + psql, no browser)
   and `scripts/crosscheck-canvas-normalize.mts` (the shipped normalizer over every stored canvas)

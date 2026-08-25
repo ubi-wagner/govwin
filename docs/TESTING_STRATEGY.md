@@ -347,7 +347,7 @@ This is the target for steps 3, 5, 7 and the SQL lane of step 6.
 > change where the sandbox lives, change it *here and in every script default in the same commit*, and
 > make the tools print the DSN they used.
 
-### The four lenses (step 7) — and the reconciliation they exist for
+### The five lenses (step 7) — and the reconciliation they exist for
 
 Steps 1–6 answer "does the code compile, pass its tests, and not crash". They do not answer *is the
 product telling the customer the truth*. These four do, each driven against a running box as a real
@@ -359,13 +359,45 @@ signed-in actor, each reporting what it could **not** reach rather than skipping
 | `scripts/verify-api-contract.mjs` | does every addressable GET honour `{data}` / `{error,code}`? | the *value* inside the envelope |
 | `scripts/verify-db-crud.mjs` | do writes LAND — and do the guards refuse what they promise to? | what the customer is shown afterwards |
 | `scripts/verify-ui-vs-db.mjs` | is the number the page STATES the number the table HOLDS? | anything it has no expectation for |
+| `scripts/verify-write-contract.mjs` | does every POST/PATCH/PUT/DELETE refuse bad input as 4xx with `{error,code}`, never 500? | whether a *valid* write is correct |
 
 The fourth is the reconciliation lens and it exists because the first three were **all green** while the
 tenant dashboard told a customer with 8 active builds that they had 6 (B80). Three green lenses are not
 three independent confirmations — they are three answers to three questions, none of which was "is this
 number right".
 
-**Apply all four to backward review too.** A retrospective audit of existing code is exactly where
+**Start from `docs/FRONTEND_INVENTORY.md`, not from a walk you invent.** Each lens enumerates its own
+scope, so whatever belongs to no walk has never appeared in a coverage number. The manifest
+(`node frontend/scripts/inventory-frontend.mjs`) is the full set — every page, API route, component,
+lib module and framework surface — with the harness that reaches each one and, more usefully, the ones
+nothing reaches. It was written after `verify-api-contract` was found closing with "every reachable
+GET honours the response contract" over two of the tree's directories (B125), and it is how the 213
+unwalked write verbs were counted.
+
+**The fifth lens exists for a scope that was never written down.** No lens walked a write verb,
+because calling every POST mutates the box being measured — defensible, unstated, and it left 213
+routes outside every walk while three green lenses read like a verified API. It binds every `[param]`
+to a fresh UUID owning nothing and asserts the one property that needs no successful write: a client
+error answers **4xx with both `error` and `code`, never 500** — a 500 on bad input means validation
+ran after the DB call, which is the SOP's ordering rule inverted. ⚠️ It is **not read-only**: several
+routes take no required input by design, so it prints its mutation footprint every run. Sandbox only.
+
+**Two lenses now refuse to report a verdict they cannot earn.** Both guards were added after the thing
+they guard against had already happened:
+
+* `verify-api-contract` **reconciles its coverage against the tree** — graded + exempt + unbound +
+  no-actor must equal the GET routes on disk, or it exits **2 as a HARNESS DEFECT** before printing
+  anything. Its own output had held the contradiction for as long as the gap existed: 104 called + 12
+  unbound against 130 on disk, and nothing compared the two numbers (B125).
+* `verify-surfaces` **proves its detector before believing it** — each actor lane opens by driving a
+  route that is definitely an error surface and requiring a non-zero count, exiting 2 with *"every
+  clean below would be unearned"* otherwise. That detector has been wrong in BOTH directions: too
+  narrow once (a red "Document not found" went into the admin guide captioned as a working screen) and
+  too broad once (B127 — it matched `not found` inside a `system_events` payload and called four
+  healthy monitor pages broken, which would have turned permanently red on any box that had ever
+  logged an error). The vocabulary will be edited again; that is the argument for the preflight.
+
+**Apply all five to backward review too.** A retrospective audit of existing code is exactly where
 "it's been in production for months" substitutes for evidence. B80 had shipped and survived every prior
 sweep. When reviewing code you did not just write, run the lenses against it before forming an opinion,
 and treat a lens that has no expectation for a surface as *uncovered*, not *passing*.
