@@ -5,11 +5,15 @@ run.** Postgres initialised empty, all 213 migrations applied from `001`, depend
 from the lockfile, the app built and served exactly as production serves it (`govtech_app`, RLS
 enforced). Nothing in this report was measured against surviving state.
 
-Eight defects found and fixed (**B122–B129**). Five were in code that every green run had already
-passed over, because they lived where no instrument was looking; three were in the instruments
-themselves. The sweep's durable output is not the fixes — it is the two things that now make that
-scope visible: a manifest of everything a sweep has to touch, and a lens for the 213 write verbs
-nothing walked.
+**Eleven defects found and fixed (B122–B132)**, across two phases. Phase 1 swept the API and data
+layers. **Phase 2 (§7) swept the UI itself** — every route, component, action and callback,
+photographed — after the phase-1 scope was correctly called out as partial: it had driven 78 of 116
+routes and looked at none of them.
+
+Most were in code every green run had already passed over, because they lived where no instrument
+was looking. Three were in the instruments themselves. The durable output is not the fixes — it is
+the four things that now make the scope visible: a manifest of every file a sweep must touch, a lens
+for the 213 write verbs nothing walked, a catalogue of all 1,479 UI handlers, and 150 screenshots.
 
 ---
 
@@ -271,3 +275,73 @@ exact assertion (`expected 401 not to be 401`, `expected undefined to be 'UNAUTH
 - **A deliberate behaviour change:** `stripe/webhook` now answers **503** where it answered 500.
   Safe for the only caller that matters — Stripe retries the whole 5xx class — but it is a contract
   change, and its test carries the reasoning.
+
+
+---
+
+## 7. Phase 2 — the UI, catalogued and photographed
+
+Phase 1 measured routes, envelopes and writes. It never asked *what can a person DO here*, and it
+never **looked**. Those are different questions, and the second one found defects the first could
+not: a page can answer 200, return a textbook error envelope, and carry no text any matcher knows,
+while being visibly broken.
+
+### The catalogue — `docs/UI_CATALOG.md`
+
+| | count |
+|---|---:|
+| addressable routes | 116 |
+| components | 184 |
+| event handlers | **1,479** (1,238 bound to a DOM element · 241 passed as props) |
+| `fetch` call sites | 328 |
+| `<form>` · `<input>` · `<button>` | 24 · 458 · 687 |
+| components no route can reach | **1** — a 6-line barrel re-export, alive |
+
+### The atlas — `docs/UI_ATLAS.md` + 13 contact sheets
+
+**150 screenshots · 113 of 116 routes reached · 0 broken.** Six actor lanes, including two tenants,
+because the fixture's data is not all in one place — the only collaboration vault and the only
+foundation-grain atoms are addressable as immobileyes and not as foundation. 29 routes redirect and
+are documented by **where they land**, not by their own name.
+
+The three unreachable: `/portal/<t>/documents/<id>` and `/admin/documents/<id>` (no customer tenant
+holds a document; the admin one is object-storage-backed, not row-addressable) and `/vaults/<id>`
+(the collaborator's tenant has no vault).
+
+### What only looking could find
+
+| | |
+|---|---|
+| **B130** | `/forgot-password`, `/reset-password` and `/federal-rd-101` bounced anonymous visitors to `/login`. The reset-password URL is what a password-reset **email** points at; `/federal-rd-101` is linked from the homepage twice and sits in the site nav. |
+| **B131** | `/admin/storage` rendered a red *"Failed to list storage objects"*. Two routes — one **customer-facing** — reached around `lib/storage/s3-client.ts` and called `s3.send` directly, so `STORAGE_DRIVER=local` did not apply to them. |
+
+**B131 is the case for screenshots.** The page answered HTTP 200. The failing fetch returned
+`{error:'Failed to list storage objects', code:'STORAGE_ERROR'}` — so the envelope lens was
+*correctly satisfied*. The rendered text says "Failed to **list**", which is not in the
+error-surface vocabulary. Every instrument was right and the page was broken. Nothing but an eye
+was going to catch it.
+
+### The guards that end both classes
+
+* `__tests__/middleware.test.ts` walks `app/(marketing)` and `app/(auth)` **from disk** and fails
+  naming any page that redirects an anonymous visitor to `/login`. Four omissions were found in this
+  sweep by four different accidents; a hand-maintained array next to a directory of public pages
+  will drift, and now it cannot drift silently.
+* `__tests__/storage-abstraction-boundary.test.ts` fails if anything outside `lib/storage/` imports
+  the AWS SDK or calls `s3.send`. The abstraction gained the three operations callers were reaching
+  around it for (`listObjectsDeep`, `objectStat`, `deleteObjects`) — writing them surfaced two more
+  latent bugs: the raw calls were **un-paginated** (a folder rename or delete would have silently
+  processed only the first 1000 objects) and the upload path issued two `HeadObject` calls where one
+  stat does.
+
+### The instruments were wrong first, again (B132)
+
+Four times, before they were right: 250 API routes counted as UI components; layouts missing from
+the render graph, so page chrome read as deprecated (265 "orphans" → 1); an **unscoped portal
+binding** that drove one tenant's portal as another and reported the correct refusal as broken; and
+two wrong password constants that cost the `/vaults` lane twice.
+
+The third is the one worth keeping. The note warning against exactly that mistake (B91) sits thirty
+lines above the bug, **written in the same sitting**. Knowing a rule is not the same as following
+it, which is why the fix is a scoped query and a comment naming the incident rather than a
+resolution to be careful.
