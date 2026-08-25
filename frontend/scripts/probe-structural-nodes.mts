@@ -69,12 +69,31 @@ const noTocDoc = await pages(doc([
   N('heading', { level: 2, text: 'Second Chapter Heading' }),
   N('text_block', { text: 'body' }),
 ]));
-const tocEntries = (tocDoc.text.match(/First Chapter Heading/g) || []).length;
-const plainEntries = (noTocDoc.text.match(/First Chapter Heading/g) || []).length;
-console.log(`   with toc  : heading appears ${tocEntries}× (once in the toc + once in the body = 2)`);
-console.log(`   without   : heading appears ${plainEntries}×`);
+/**
+ * COUNT THE SECOND HEADING, NOT THE FIRST — and the reason is the contract, not a workaround.
+ *
+ * `buildTocHtml` deliberately drops the first level-1 heading: it is the document's own title, and
+ * "every real contents page omits" it (canvas-html.ts). This probe counted exactly that heading, so
+ * it asserted `2×` for the one entry the design guarantees will be `1×`, and reported a working TOC
+ * as broken. CLAUDE.md rule 4: **assert the contract the system HAS** — the same mistake as
+ * expecting a bucket DELETE to remove the row when deactivation is the design.
+ *
+ * Verified against the renderer before changing anything: the TOC block reads
+ * "Table of Contents · Second Chapter Heading · 1" — an entry, indented, with its page number.
+ *
+ * The title omission is now ASSERTED rather than merely avoided, so a future change that starts
+ * listing the title fails here instead of passing quietly.
+ */
+const tocEntries = (tocDoc.text.match(/Second Chapter Heading/g) || []).length;
+const plainEntries = (noTocDoc.text.match(/Second Chapter Heading/g) || []).length;
+const titleInToc = (tocDoc.text.match(/First Chapter Heading/g) || []).length;
+console.log(`   with toc  : the h2 appears ${tocEntries}× (once in the toc + once in the body = 2)`);
+console.log(`   without   : the h2 appears ${plainEntries}×`);
+console.log(`   the h1     : appears ${titleInToc}× — the doc's own title, omitted from the toc by design`);
 A('toc renders its entries in the PDF', tocEntries > plainEntries,
-  `heading appears ${tocEntries}× with a toc vs ${plainEntries}× without`);
+  `the h2 appears ${tocEntries}× with a toc vs ${plainEntries}× without`);
+A('toc omits the document title (the first h1) — by design', titleInToc === 1,
+  `the h1 appears ${titleInToc}× (body only)`);
 
 console.log('\n3 · SPACER in PDF — does vertical space appear?');
 const tall = await pages(doc([
