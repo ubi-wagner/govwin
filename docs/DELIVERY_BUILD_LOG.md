@@ -398,4 +398,66 @@ actions · 0 NOTIFY steps naming a template with no renderer.**
 
 ---
 
-*D7 onward appended as built.*
+## D7 · Rollups — three measures, never blended
+
+**Shipped:** `lib/delivery/rollup.ts`, the rollup route,
+`frontend/scripts/verify-delivery-rollup.mjs` (9 assertions against hand-computed values),
+`__tests__/delivery-rollup-measures.test.ts` (4).
+
+**There is no `percentComplete` in the response and there is not going to be one.** Sixty percent of
+budget against forty percent of schedule is the most useful thing a PM can see; averaging them to
+"50%" destroys exactly that signal while still looking like an answer. The drive asserts the absence
+outright.
+
+### Not measured is not zero
+
+A project with nothing planned is not 0% spent. A CLIN with no deliverables is not 0% delivered.
+`null` says *not measured*; `0` says *measured, and it is zero* — and the UI has to render them
+differently, which is the point. The caught-error path returns an all-null rollup for the same
+reason: zeroes would render as a project with no spend and no progress, which is a claim, and a
+false one.
+
+### The SQL is where the risk lives, so the test is live
+
+Three failure modes, each producing a **plausible number** rather than an error:
+
+| defect | what it reads |
+|---|---|
+| aggregate on the raw `clin_id` instead of the resolved one | children silently dropped from their CLIN's cost |
+| join deliverables into the WBS statement | each cost row multiplied by the deliverables beneath it |
+| unweighted schedule average | a 2-day task and a 200-day task counted equally |
+
+So the drive seeds a fixture whose numbers make each one show up as a *different* wrong answer, and
+asserts against values computed by hand in the comments:
+
+```
+ok  0001 cost% (child inherits the CLIN: 800/2000) = 40
+ok  0001 planned cost is 2000 — no cartesian product with deliverables
+ok  0002 schedule% (duration-weighted 2/202, NOT the 50% an unweighted average gives) = 1
+ok  0002 deliverables% (none exist — NOT MEASURED, not zero) = null
+ok  project cost% from ROWS (800/3000), not the average of CLIN percentages (20%) = 26.7
+```
+
+Red-first: unweighting the schedule produced **50% instead of 1%** — a PM would have read a CLIN
+that has not started as half done. Aggregating on the raw column fired too.
+
+### The harness had no tenant context, and got silence for it
+
+The drive's first run reported all four measures `null` and read like a broken rollup. The rollup was
+fine: the script called it without `enterTenant`, so `sql` ran with `app.tenant_id` unset, **RLS
+matched nothing, and every query returned zero rows with no error.**
+
+That silent-empty is exactly why `verify-delivery-isolation.mjs` asserts own-rows-visible *before*
+foreign-rows-invisible — a deny-all satisfies every "no leak" check trivially, and here it satisfied
+every arithmetic check with a null. Fourth harness defect this session, all four caught before
+reporting.
+
+Work belonging to no CLIN is **reported as its own row**, not folded into the total: an unassigned
+node is usually a plan someone has not finished writing, and hiding it inside a total is how it
+stays unfinished.
+
+`tsc` 0 · vitest **2,111** · rollup drive green.
+
+---
+
+*D8 onward appended as built.*
