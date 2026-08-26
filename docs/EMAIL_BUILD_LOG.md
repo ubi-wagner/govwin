@@ -13,7 +13,7 @@ Build order and task ids are the register in the V1 close-out plan: **E1 … E9*
 **Shipped:** `db/migrations/215_email_send_ledger.sql`, `frontend/scripts/verify-email-ledger-rls.mjs`.
 
 Two tables, both of which have to exist before the first message goes through the new seam.
-`email_sends` carries the correlation contract, and that is the part that cannot be retrofitted:
+`email_send_ledger` carries the correlation contract, and that is the part that cannot be retrofitted:
 you cannot put a token on mail that has already left.
 
 ### Three departures from the design sketch, each with a reason
@@ -29,7 +29,7 @@ The SELECT policy is the **stricter** of the two house shapes, and the choice is
 |---|---|---|
 | `tasks` (mig 185) | `tenant_id = ctx OR tenant_id IS NULL` | a tenant must see platform work assigned to it |
 | `episodic_memories` (mig 186) | `tenant_id = ctx` only | platform curation memory is not a tenant's to read |
-| **`email_sends` (mig 215)** | **`tenant_id = ctx` only** | a platform notification's recipient list is not a tenant's business |
+| **`email_send_ledger` (mig 215)** | **`tenant_id = ctx` only** | a platform notification's recipient list is not a tenant's business |
 
 **2. A `status` column — also not in the sketch, and required by the sketch's own idempotency
 claim.** "A replay cannot double-send" only works if the row is RESERVED before dispatch, and a
@@ -67,7 +67,7 @@ into an error at the write instead of a bounce at the recipient.
 
 | run | state | result |
 |---|---|---|
-| 1 | before mig 215 | `WRONG email_sends does not exist` — exit 1 |
+| 1 | before mig 215 | `WRONG email_send_ledger does not exist` — exit 1 |
 | 2 | after mig 215 | 11 assertions, all ok — exit 0 |
 | 3 | mig 215 applied, then the SELECT policy swapped for the **tasks-style `OR NULL`** arm | `WRONG tenant 'rfp-pipeline' can see the PLATFORM send row` — exit 1 |
 
@@ -228,7 +228,7 @@ scanner with a wrong root reports "no offenders" and looks exactly like a clean 
 
 | probe | result |
 |---|---|
-| a module importing `googleapis` and calling `google.gmail(...)` plus a raw `email_sends` query | **3 rules fired** — transport, googleapis importer, ledger table. Green on removal |
+| a module importing `googleapis` and calling `google.gmail(...)` plus a raw `email_send_ledger` query | **3 rules fired** — transport, googleapis importer, ledger table. Green on removal |
 | `driver.send()` hoisted above `reserve()` in the seam | **5 assertions fired** — the ordering contract, the duplicate refusal, the ledger-unavailable refusal, the throw-still-closes-the-row case, and never-throws. Green on restore |
 
 The second probe is the meaningful one: it leaves the code type-correct and every return value
@@ -240,4 +240,102 @@ run are `skipIf` tests keyed on `ANTHROPIC_API_KEY` / `ATOM_EMBED`, which differ
 
 ---
 
-*E4 onward appended as built.*
+## E4 · The CRM half — `services/cms/src/mailer/`
+
+**Shipped:** `src/mailer/{__init__,types,ledger}.py`, `src/mailer/drivers/gmail.py`, six converted
+call sites in `event_listener.py`, a suppression gate on the campaign queue and the template
+test-send, `tests/test_mailer_seam.py` (17), `tests/test_email_transport_boundary.py` (6).
+
+This is the half that carries the **nudges**. A seam covering only the frontend would leave exactly
+the mail that matters outside the ledger.
+
+### The table had to be renamed, and finding out why was the useful part
+
+`email_sends` **already exists** — in `cms-postgres`, created by `services/cms/db/002_email_engine.sql`,
+and read or written in more than twenty places across `routers/email.py`, `email_sweep.py`,
+`email_queue.py` and `content.py`. It is the campaign / HITL send **queue**: `campaign_id`,
+`template_id`, `gmail_thread_id`, `in_reply_to`, `retry_count`, a six-state status machine.
+
+`rfp-crm` holds pools to **both** databases at once. Two tables of the same name and different shape,
+one mistyped pool variable apart, is not a hazard to document — it is a hazard to remove. An INSERT
+against the wrong one fails on unknown columns, which is survivable. A **SELECT against the wrong one
+returns real rows of the wrong thing**, which is not.
+
+Migration 215's table is now **`email_send_ledger`**. The names should have differed anyway: one is a
+ledger (append, correlate, never dequeue) and the other is a queue. Migration 215 was amended rather
+than followed by a rename migration — it has never been applied anywhere but this sandbox, so a
+rename in the history would be ceremony rather than record.
+
+### The campaign engine keeps its own transport — with an obligation
+
+Two files still call `gmail_client.send_email` directly, and that is deliberate. The campaign / HITL
+engine is a **mailbox client**, not a notification sender: it threads replies (`in_reply_to`,
+`thread_id`), sweeps an inbox, counts per-account daily sends, and keeps its own queue with its own
+status machine. Forcing it through a seam whose driver has no concept of a thread would lose
+threading to buy a ledger row it already has.
+
+But an exemption that only says "these files may" is the shape of a leak that becomes permanent. So
+each exempt file carries an **obligation asserted by the boundary test**: it must consult the shared
+suppression list before dispatch. A hard bounce belongs to the address, the domain reputation is
+shared with the notification stream, and a campaign that ignored it would burn what both depend on.
+`email_queue.py` now marks such a send `failed` with the reason and dequeues it; the template
+test-send returns **409** naming the suppression, which is more use to an admin than a "sent" that
+quietly bounces again.
+
+### The one behaviour change I nearly made by accident
+
+The pre-seam wrapper was `sender or _SEND_AS` — no resolution. My first version of `_identity_for()`
+called `resolve_identity(default=sender, template=template)`, which looks harmless and is not:
+`resolve_sender()` ranks an explicit identity hint and the originating namespace **above** its
+template heuristic, so feeding an already-resolved address back in with the template still attached
+lets the heuristic override a decision made with more context. A message deliberately sent as
+`automation@` whose template name contains "welcome" comes back out as `engagement@` — a silent
+change of sender, on exactly the mail a customer sees.
+
+`identity_from_address()` exists to make that impossible, and
+`test_an_already_resolved_address_is_not_re_resolved` asserts both halves: that the wrapper preserves
+the address, **and** that the resolver really would have moved it. The second assertion is what keeps
+the first from being vacuous.
+
+### One deliberate difference between the two seams
+
+| | ledger unreachable |
+|---|---|
+| frontend `send()` | **REFUSES.** Without the reservation it cannot tell a first send from a replay, and there is no other guard |
+| CRM `mailer.send()` | **DEGRADES** — sends, sets `degraded=True`, logs. `_check_dedup()` on `automation_log` has always been the CRM's replay guard, so a ledger failure costs the new layer, not the only one. Failing closed would let one wrong connection string silence every notification on the platform |
+
+Each behaviour is asserted in its own suite, so a future change that quietly aligns them has to
+delete a test that says why they differ.
+
+**The privilege this needs is not established.** Migration 215 denies writes on `govtech_app`, and
+nothing in the repo records which role `SHARED_DATABASE_URL` carries — the bridge has only ever
+written `system_events` and `cms_content`, neither of which has RLS. So the 42501 branch names the
+remedy explicitly instead of logging "permission denied", and prints once per process rather than
+once per send. **This is an open item for deployment** (see the close-out plan).
+
+### The tests failed, which was the right outcome
+
+Thirteen existing CMS tests broke immediately:
+`TypeError: cap() got an unexpected keyword argument 'template'`. Their `send_email` doubles have
+narrow signatures, so they caught the changed call shape the moment it changed — the opposite of the
+frontend mock, which named an export that no longer existed and went on passing. The doubles now
+accept `**contract` and **record** it rather than swallowing it: a double that quietly accepts
+anything stops the test noticing when a call site drops the correlation id.
+
+### Red first, and the first probe found a weak instrument
+
+| probe | result |
+|---|---|
+| a module importing `gmail_client.send_email` and querying the ledger | **2 rules fired**; green on removal |
+| replace the queue's `from ..mailer.ledger import suppression_for` with `suppression_for = None` | **PASSED — a miss.** The rule scanned for the substring `suppression_for`, which was still present |
+| after strengthening the rule to `await\s+suppression_for\s*\(` — neuter the call, keep the name | **fired**; green on restore |
+| `driver.send()` hoisted above `ledger.reserve()` in the seam | **5 assertions fired**; green on restore |
+
+The second row is the useful one. *A check that a symbol is imported is not a check that it runs* —
+and the only reason it surfaced is that the probe was run at all.
+
+`python -m pytest` **157 passed**, 3 skipped (134 before, +23). Frontend `tsc` 0 · vitest 2003.
+
+---
+
+*E6 onward appended as built.*

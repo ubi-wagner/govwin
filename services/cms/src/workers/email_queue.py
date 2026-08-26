@@ -119,6 +119,24 @@ async def process_queue_batch() -> int:
                 )
                 continue
 
+            # ── The one thing the campaign engine shares with the notification seam ──────
+            # This queue keeps its own transport call on purpose (see the module note below),
+            # but the SUPPRESSION LIST is platform-wide and not negotiable. A hard bounce is a
+            # property of the address, and the whole point of scoping it platform-wide is that
+            # one sender must not keep mailing what already bounced for another. A campaign that
+            # ignored it would burn the same domain reputation the notification stream depends on.
+            from ..mailer.ledger import suppression_for
+            suppressed = await suppression_for(send['recipient_email'])
+            if suppressed:
+                logger.warning('send %s: recipient %s is suppressed (%s) — not sending',
+                               send_id, send['recipient_email'], suppressed)
+                await pool.execute(
+                    "UPDATE email_sends SET status = 'failed', error_message = $2 WHERE id = $1",
+                    send_id, f'suppressed: {suppressed}',
+                )
+                await pool.execute('DELETE FROM email_queue WHERE id = $1', queue_item['id'])
+                continue
+
             # Mark as sending
             await pool.execute(
                 "UPDATE email_sends SET status = 'sending' WHERE id = $1",

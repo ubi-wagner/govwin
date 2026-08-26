@@ -23,6 +23,19 @@
 --      plus-addressing. NOTHING READS THIS YET. It is recorded now because a feature that can only
 --      work for mail sent after it shipped is a feature with a hole in its history.
 --
+-- ── WHY IT IS NOT CALLED `email_sends` ───────────────────────────────────────────────────────
+-- Because that name is TAKEN, in a database the same service also holds a pool to. The CRM's own
+-- `email_sends` (services/cms/db/002_email_engine.sql, in `cms-postgres`) is the campaign / HITL
+-- send QUEUE — campaign_id, template_id, gmail_thread_id, in_reply_to, retry_count — read and
+-- written in more than twenty places across `routers/email.py`, `email_sweep.py`, `email_queue.py`
+-- and `content.py`.
+--
+-- `rfp-crm` connects to BOTH databases at once (`CMS_DATABASE_URL` and `SHARED_DATABASE_URL`), so
+-- two tables of the same name and different shape are one mistyped pool variable apart. An INSERT
+-- against the wrong one fails on unknown columns, which is survivable; a SELECT against the wrong
+-- one returns real rows of the wrong thing, which is not. This is a LEDGER (append, correlate,
+-- never dequeue) and that is a QUEUE, so the names should differ anyway.
+--
 -- ── TENANCY: the column the design sketch omitted ────────────────────────────────────────────
 -- The sketch had no `tenant_id`, and the table holds recipient addresses — a tenant's contact list
 -- by another name. `tenant_id uuid NULL` follows the house platform-scope rule (NULL = platform,
@@ -68,9 +81,9 @@
 -- explicit BEGIN/COMMIT, matching every other migration in this tree.)
 
 -- ═════════════════════════════════════════════════════════════════════════════════════════════
--- email_sends — one row per outbound message
+-- email_send_ledger — one row per outbound message
 -- ═════════════════════════════════════════════════════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS email_sends (
+CREATE TABLE IF NOT EXISTS email_send_ledger (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
   correlation_id       uuid NOT NULL,
@@ -95,54 +108,54 @@ CREATE TABLE IF NOT EXISTS email_sends (
   sent_at              timestamptz
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_email_sends_idempotency
-  ON email_sends (idempotency_key);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_email_send_ledger_idempotency
+  ON email_send_ledger (idempotency_key);
 
-CREATE INDEX IF NOT EXISTS idx_email_sends_correlation
-  ON email_sends (correlation_id);
+CREATE INDEX IF NOT EXISTS idx_email_send_ledger_correlation
+  ON email_send_ledger (correlation_id);
 
 -- Partial: only confirmed sends carry a provider id, and this index exists for the future
 -- In-Reply-To lookup, which will only ever probe non-null values.
-CREATE INDEX IF NOT EXISTS idx_email_sends_provider_message
-  ON email_sends (provider_message_id)
+CREATE INDEX IF NOT EXISTS idx_email_send_ledger_provider_message
+  ON email_send_ledger (provider_message_id)
   WHERE provider_message_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_email_sends_tenant_recent
-  ON email_sends (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_send_ledger_tenant_recent
+  ON email_send_ledger (tenant_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_email_sends_recipient_recent
-  ON email_sends (to_email, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_send_ledger_recipient_recent
+  ON email_send_ledger (to_email, created_at DESC);
 
-COMMENT ON TABLE email_sends IS
+COMMENT ON TABLE email_send_ledger IS
   'Outbound mail ledger: idempotency, webhook correlation, and the Message-ID that lets a future '
   'inbound reply resolve to the nudge that caused it. Written ONLY by the driver seam, through the '
   'owner connection. Read-only on govtech_app by design — see migration 215.';
 
-COMMENT ON COLUMN email_sends.tenant_id IS
+COMMENT ON COLUMN email_send_ledger.tenant_id IS
   'Owning tenant. NULL = PLATFORM scope (a notification owned by no tenant). Readable only via '
   'sqlBypass: the SELECT policy is strict equality with no NULL arm, following episodic_memories '
   '(mig 186) rather than tasks (mig 185).';
 
-COMMENT ON COLUMN email_sends.idempotency_key IS
+COMMENT ON COLUMN email_send_ledger.idempotency_key IS
   'The originating trigger event id. UNIQUE — a replayed event reserves nothing and re-sends '
   'nothing. This is the whole idempotency mechanism; Postmark has none of its own.';
 
-COMMENT ON COLUMN email_sends.status IS
+COMMENT ON COLUMN email_send_ledger.status IS
   'pending = reserved before dispatch · sent = provider accepted · failed = provider refused, '
   'reclaimable by a retry · suppressed = refused before dispatch by email_suppressions, which is '
   'the system working and NOT an error.';
 
-COMMENT ON COLUMN email_sends.provider IS
+COMMENT ON COLUMN email_send_ledger.provider IS
   'Open vocabulary by design — the point of the seam is that transports come and go. Known values: '
   'gmail · postmark · resend · skipped. Deliberately not a CHECK: a constraint that rejects a real '
   'provider turns a working send into a 500.';
 
 -- ── RLS ──────────────────────────────────────────────────────────────────────────────────────
-ALTER TABLE email_sends ENABLE ROW LEVEL SECURITY;
-ALTER TABLE email_sends FORCE ROW LEVEL SECURITY;
+ALTER TABLE email_send_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_send_ledger FORCE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS tenant_isolation_select ON email_sends;
-CREATE POLICY tenant_isolation_select ON email_sends
+DROP POLICY IF EXISTS tenant_isolation_select ON email_send_ledger;
+CREATE POLICY tenant_isolation_select ON email_send_ledger
   FOR SELECT
   USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 

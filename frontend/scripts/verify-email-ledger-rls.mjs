@@ -5,7 +5,7 @@
  * SILENTLY when wrong — a leak returns rows instead of an error, and an over-strict policy returns
  * nothing instead of an error:
  *
- *   1. `email_sends` is READ-ONLY on the application role, scoped to the caller's own tenant, with
+ *   1. `email_send_ledger` is READ-ONLY on the application role, scoped to the caller's own tenant, with
  *      platform rows (tenant_id IS NULL) invisible from every tenant context. The strict shape,
  *      following `episodic_memories` (mig 186) rather than `tasks` (mig 185) — a platform
  *      notification's recipient list is not a tenant's business.
@@ -71,7 +71,7 @@ async function main() {
   ok(`connected as '${me.who}' — not superuser, not BYPASSRLS`);
 
   // ── 1 · structure ───────────────────────────────────────────────────────────────────────────
-  for (const [table, wantPolicies] of [['email_sends', 1], ['email_suppressions', 0]]) {
+  for (const [table, wantPolicies] of [['email_send_ledger', 1], ['email_suppressions', 0]]) {
     const [t] = await owner`
       SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -113,7 +113,7 @@ async function main() {
 
   for (const [label, tenantId] of [['a', A.id], ['b', B.id], ['platform', null]]) {
     const [row] = await owner`
-      INSERT INTO email_sends (correlation_id, idempotency_key, tenant_id, provider, kind, status, to_email)
+      INSERT INTO email_send_ledger (correlation_id, idempotency_key, tenant_id, provider, kind, status, to_email)
       VALUES (gen_random_uuid(), ${`rls-probe-${stamp}-${label}`}, ${tenantId}, 'probe',
               'transactional', 'pending', ${`probe-${label}@example.test`})
       RETURNING id`;
@@ -129,11 +129,11 @@ async function main() {
   const seen = await app.begin(async (tx) => {
     await tx`SELECT set_config('app.tenant_id', ${B.id}, true)`;
     const [own] = await tx`
-      SELECT count(*)::int AS n FROM email_sends WHERE idempotency_key = ${`rls-probe-${stamp}-b`}`;
+      SELECT count(*)::int AS n FROM email_send_ledger WHERE idempotency_key = ${`rls-probe-${stamp}-b`}`;
     const [foreign] = await tx`
-      SELECT count(*)::int AS n FROM email_sends WHERE idempotency_key = ${`rls-probe-${stamp}-a`}`;
+      SELECT count(*)::int AS n FROM email_send_ledger WHERE idempotency_key = ${`rls-probe-${stamp}-a`}`;
     const [platform] = await tx`
-      SELECT count(*)::int AS n FROM email_sends WHERE idempotency_key = ${`rls-probe-${stamp}-platform`}`;
+      SELECT count(*)::int AS n FROM email_send_ledger WHERE idempotency_key = ${`rls-probe-${stamp}-platform`}`;
     const [suppressions] = await tx`SELECT count(*)::int AS n FROM email_suppressions`;
     return { own: own.n, foreign: foreign.n, platform: platform.n, suppressions: suppressions.n };
   });
@@ -171,17 +171,17 @@ async function main() {
   const insertCode = await refusedWith(() => app.begin(async (tx) => {
     await tx`SELECT set_config('app.tenant_id', ${B.id}, true)`;
     await tx`
-      INSERT INTO email_sends (correlation_id, idempotency_key, tenant_id, provider, kind, to_email)
+      INSERT INTO email_send_ledger (correlation_id, idempotency_key, tenant_id, provider, kind, to_email)
       VALUES (gen_random_uuid(), ${`rls-probe-${stamp}-forbidden`}, ${B.id}, 'probe', 'transactional',
               'nope@example.test')`;
   }));
   if (insertCode !== '42501') {
-    no(`an INSERT into email_sends from tenant context ${insertCode === null ? 'SUCCEEDED' : `raised ${insertCode}`}`
+    no(`an INSERT into email_send_ledger from tenant context ${insertCode === null ? 'SUCCEEDED' : `raised ${insertCode}`}`
       + ' — expected 42501 (insufficient_privilege). The ledger must be read-only on the app role.');
     // It succeeded, so it left a row. Reclaim it or the next run trips the unique index.
-    if (insertCode === null) await owner`DELETE FROM email_sends WHERE idempotency_key = ${`rls-probe-${stamp}-forbidden`}`;
+    if (insertCode === null) await owner`DELETE FROM email_send_ledger WHERE idempotency_key = ${`rls-probe-${stamp}-forbidden`}`;
   } else {
-    ok('INSERT into email_sends from tenant context is refused (42501)');
+    ok('INSERT into email_send_ledger from tenant context is refused (42501)');
   }
 
   const supInsertCode = await refusedWith(() => app.begin(async (tx) => {
@@ -203,7 +203,7 @@ async function main() {
   // asserted here rather than trusted to the DDL: a missing unique index double-sends, and a
   // mixed-case suppression row never matches a normalised lookup, so the address gets mailed again.
   const dupCode = await refusedWith(() => owner`
-    INSERT INTO email_sends (correlation_id, idempotency_key, tenant_id, provider, kind, to_email)
+    INSERT INTO email_send_ledger (correlation_id, idempotency_key, tenant_id, provider, kind, to_email)
     VALUES (gen_random_uuid(), ${`rls-probe-${stamp}-b`}, ${B.id}, 'probe', 'transactional', 'dup@example.test')`);
   if (dupCode !== '23505') no(`a replayed idempotency_key ${dupCode === null ? 'INSERTED A SECOND ROW' : `raised ${dupCode}`}`
     + ' — expected 23505 (unique_violation). Without it a replayed event double-sends.');
@@ -229,9 +229,9 @@ async function finish() {
   // about it is the reason the house rule exists.
   if (written.sends.length || written.suppressions.length) {
     console.log();
-    console.log(`  MUTATED ${written.sends.length} email_sends row(s) + ${written.suppressions.length} `
+    console.log(`  MUTATED ${written.sends.length} email_send_ledger row(s) + ${written.suppressions.length} `
       + 'email_suppressions row(s), all fixture-only, now removed.');
-    if (written.sends.length) await owner`DELETE FROM email_sends WHERE id IN ${owner(written.sends)}`;
+    if (written.sends.length) await owner`DELETE FROM email_send_ledger WHERE id IN ${owner(written.sends)}`;
     if (written.suppressions.length) await owner`DELETE FROM email_suppressions WHERE id IN ${owner(written.suppressions)}`;
   }
   console.log();

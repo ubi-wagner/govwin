@@ -1,10 +1,10 @@
 /**
- * The `email_sends` ledger and the suppression list (migration 215).
+ * The `email_send_ledger` table and the suppression list (migration 215).
  *
  * ── WHY THIS WRITES THROUGH `sqlBypass` ──────────────────────────────────────────────────────
  * A send happens from a request, a cron, a queue worker and a webhook. `app.tenant_id` is reliably
  * set in exactly one of those four, so a ledger whose correctness depended on request context would
- * be wrong three times out of four. Migration 215 gives `email_sends` a SELECT policy and no write
+ * be wrong three times out of four. Migration 215 gives `email_send_ledger` a SELECT policy and no write
  * policy at all — the ledger is read-only on `govtech_app` on purpose, and this module is the one
  * place that writes it.
  *
@@ -80,7 +80,7 @@ export async function reserve(params: {
 }): Promise<Reservation> {
   try {
     const inserted = await sqlBypass<{ id: string }[]>`
-      INSERT INTO email_sends
+      INSERT INTO email_send_ledger
         (correlation_id, idempotency_key, tenant_id, provider, kind, status, to_email, subject,
          template, metadata)
       VALUES
@@ -94,7 +94,7 @@ export async function reserve(params: {
     // The key is taken. Reclaim it only if the prior attempt FAILED — compare-and-swap, so two
     // concurrent retries cannot both win the row.
     const reclaimed = await sqlBypass<{ id: string }[]>`
-      UPDATE email_sends
+      UPDATE email_send_ledger
          SET status = 'pending', error = NULL, provider = ${params.provider},
              correlation_id = ${params.correlationId}
        WHERE idempotency_key = ${params.idempotencyKey} AND status = 'failed'
@@ -125,7 +125,7 @@ export async function confirm(params: {
 }): Promise<void> {
   try {
     await sqlBypass`
-      UPDATE email_sends
+      UPDATE email_send_ledger
          SET status = ${params.status},
              provider = ${params.provider},
              provider_message_id = ${params.providerMessageId},
@@ -156,7 +156,7 @@ export async function recordSuppressed(params: {
 }): Promise<string | null> {
   try {
     const rows = await sqlBypass<{ id: string }[]>`
-      INSERT INTO email_sends
+      INSERT INTO email_send_ledger
         (correlation_id, idempotency_key, tenant_id, provider, kind, status, to_email, subject,
          template, error, metadata)
       VALUES

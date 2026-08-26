@@ -221,7 +221,7 @@ against it at send time.** This costs almost nothing now and is *impossible to r
 add a token to mail that has already been sent.
 
 ```sql
-CREATE TABLE email_sends (
+CREATE TABLE email_send_ledger (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   correlation_id       uuid NOT NULL,          -- ours; the originating event
   idempotency_key      text NOT NULL UNIQUE,   -- a replay cannot double-send
@@ -357,7 +357,7 @@ place.
 ## Build order
 
 1. The `send()` seam + `OutboundMessage`/`SendResult` **including `kind`, `correlation_id` and the
-   `email_sends` ledger**, with the Gmail driver behind it and every existing call site converted.
+   `email_send_ledger` ledger**, with the Gmail driver behind it and every existing call site converted.
    **No behaviour change to what is sent** — this step is provably a refactor, and the existing tests
    are the proof. The correlation contract lands here rather than later because mail sent before it
    exists can never be associated with anything.

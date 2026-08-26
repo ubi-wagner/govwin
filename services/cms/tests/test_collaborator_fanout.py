@@ -60,7 +60,7 @@ class TestSendEmailCollaboratorFanout:
         from src.event_listener import _do_action_inner
         sends = []
 
-        async def fake_send(to, subject, html, sender=None):
+        async def fake_send(to, subject, html, sender=None, **contract):
             sends.append(to)
             return {'provider': 'gmail', 'message_id': 'm'}
 
@@ -75,7 +75,7 @@ class TestSendEmailCollaboratorFanout:
         from src.event_listener import _do_action_inner
         sends = []
 
-        async def fake_send(to, subject, html, sender=None):
+        async def fake_send(to, subject, html, sender=None, **contract):
             sends.append(to)
             return {'message_id': 'm'}
 

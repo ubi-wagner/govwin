@@ -2,7 +2,7 @@
  * THE SEND SEAM IS A BOUNDARY, and this test is what makes it one.
  *
  * `lib/email/index.ts` owns four things no transport may reimplement: the suppression check,
- * idempotency, the `email_sends` ledger, and sender resolution. A caller that reaches a transport
+ * idempotency, the `email_send_ledger` table, and sender resolution. A caller that reaches a transport
  * directly gets none of them — it double-sends on replay, mails an address that hard-bounced last
  * week, and leaves no row to answer "why did this notification not go?".
  *
@@ -81,7 +81,7 @@ describe('email transport boundary', () => {
       ["const g = google.gmail({ version: 'v1', auth })", /\bgoogle\.gmail\s*\(/],
       ["fetch('https://api.postmarkapp.com/email')", /api\.postmarkapp\.com/],
       ["fetch('https://api.resend.com/emails')", /api\.resend\.com/],
-      ['INSERT INTO email_sends (id) VALUES (1)', /\bemail_sends\b/],
+      ['INSERT INTO email_send_ledger (id) VALUES (1)', /\bemail_send_ledger\b/],
       ['SELECT * FROM email_suppressions', /\bemail_suppressions\b/],
     ];
     for (const [sample, pattern] of rules) {
@@ -116,13 +116,13 @@ describe('email transport boundary', () => {
   });
 
   it('only lib/email touches the ledger tables', () => {
-    // Migration 215 makes `email_sends` read-only and `email_suppressions` unreadable on the app
+    // Migration 215 makes `email_send_ledger` read-only and `email_suppressions` unreadable on the app
     // role, so a stray query does not silently succeed — it fails at run time, in whatever request
     // happened to reach it. Catching it here is the difference between a failing test and a
     // 500 in production.
     const offenders = outside(SEAM).filter((f) => {
       const src = read(f);
-      return /\bemail_sends\b/.test(src) || /\bemail_suppressions\b/.test(src);
+      return /\bemail_send_ledger\b/.test(src) || /\bemail_suppressions\b/.test(src);
     });
     expect(
       offenders.map(rel),
