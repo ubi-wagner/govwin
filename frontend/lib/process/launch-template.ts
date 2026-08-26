@@ -21,6 +21,8 @@
 import { sql } from '@/lib/db';
 import { type Role } from '@/lib/rbac';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface LaunchActor {
   id: string;
   email: string | null;
@@ -89,6 +91,54 @@ export async function launchTemplate(opts: {
       error: `Template '${workflowName}' has no registered trigger`,
       code: 'TEMPLATE_NO_TRIGGER',
     };
+  }
+
+  /**
+   * ── The overlay must name entities that belong to the tenant it is scoped to ──
+   *
+   * `launchProjectCollaboration` already refuses an INCOMPLETE overlay and a NON-UUID one, with the
+   * reasoning that "a presence-only check would let an operator-influenceable value pass, then
+   * SILENTLY null the entity". Nothing refused an INCONSISTENT one — real ids that exist, pass every
+   * format and existence check, and belong to a different tenant.
+   *
+   * That is the harder case, not the easier one: a fabricated uuid fails the first lookup, while a
+   * real id from the wrong tenant scopes an instance to A and points its agents at B's work. Found
+   * exactly that way — a drive paired `tenantId` from one tenant with `proposalId` from another and
+   * put 18 rows into `agent_task_log` that crossed the boundary, which the copy-inward invariant
+   * checker then reported after the fact.
+   *
+   * Only checked when a tenant is named. A platform launch (`tenantId = null`) is scoped to no
+   * tenant by design and has nothing to be inconsistent with.
+   */
+  if (tenantId) {
+    const OVERLAY_ENTITIES: Array<[string, string]> = [
+      ['proposalId', 'proposals'],
+      ['sectionId', 'proposal_sections'],
+    ];
+    for (const [key, table] of OVERLAY_ENTITIES) {
+      const id = overlay?.[key];
+      if (typeof id !== 'string' || !UUID_RE.test(id)) continue;
+      try {
+        const [row] = table === 'proposals'
+          ? await sql<{ tenantId: string | null }[]>`
+              SELECT tenant_id FROM proposals WHERE id = ${id}::uuid LIMIT 1`
+          : await sql<{ tenantId: string | null }[]>`
+              SELECT p.tenant_id FROM proposal_sections s
+              JOIN proposals p ON p.id = s.proposal_id WHERE s.id = ${id}::uuid LIMIT 1`;
+        if (row && row.tenantId && row.tenantId !== tenantId) {
+          return {
+            ok: false,
+            status: 400,
+            error: `overlay.${key} belongs to a different tenant than the launch is scoped to`,
+            code: 'OVERLAY_TENANT_MISMATCH',
+          };
+        }
+      } catch (err) {
+        // A lookup failure must not become a silent pass — refuse rather than launch unchecked.
+        console.error('[launchTemplate] overlay tenant check failed:', err);
+        return { ok: false, status: 500, error: 'Could not verify overlay scope', code: 'DB_ERROR' };
+      }
+    }
   }
 
   // ── Parse "namespace:type:phase" ───────────────────────────────────

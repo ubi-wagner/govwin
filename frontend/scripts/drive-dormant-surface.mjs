@@ -65,13 +65,30 @@ async function snapshot() {
  * the rest, and building 20 bespoke overlays would be 20 chances to guess a field name wrong.
  */
 async function liveOverlay() {
-  const [tenant] = await sql`SELECT id, slug, name FROM tenants WHERE archived_at IS NULL ORDER BY created_at LIMIT 1`;
-  const [proposal] = await sql`SELECT id, tenant_id, title, opportunity_id FROM proposals ORDER BY created_at DESC LIMIT 1`;
+  // ONE TENANT, AND EVERYTHING ELSE DERIVED FROM IT.
+  //
+  // The first version took the OLDEST tenant and the NEWEST proposal independently. Both were real
+  // rows — the comment above was true — and they belonged to different tenants. Passing
+  // `tenantId=foundation` with `overlay.proposalId=<immobileyes' proposal>` scoped every instance to
+  // one tenant while pointing it at another's work, and 18 `agent_task_log` rows crossed the
+  // boundary before the copy-inward invariant checker caught them.
+  //
+  // Real ids that do not belong together are WORSE than fabricated ones: a fabricated uuid fails
+  // the first existence check, and this passed every one of them.
+  const [tenant] = await sql`
+    SELECT t.id, t.slug, t.name FROM tenants t
+    WHERE t.archived_at IS NULL AND EXISTS (SELECT 1 FROM proposals p WHERE p.tenant_id = t.id)
+    ORDER BY t.created_at LIMIT 1`;
+  const [proposal] = await sql`
+    SELECT id, tenant_id, title, opportunity_id FROM proposals
+    WHERE tenant_id = ${tenant?.id ?? null} ORDER BY created_at DESC LIMIT 1`;
   // `curated_solicitations` has no `title` — it is `solicitation_title`. Column names read off the
   // live catalogue via scripts/schema-check.mjs rather than assumed from the sibling tables.
   const [sol] = await sql`SELECT id, solicitation_title FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`;
   const [opp] = await sql`SELECT id, title FROM opportunities WHERE is_active ORDER BY created_at DESC LIMIT 1`;
-  const [section] = await sql`SELECT id, proposal_id FROM proposal_sections ORDER BY created_at DESC LIMIT 1`;
+  const [section] = await sql`
+    SELECT id, proposal_id FROM proposal_sections
+    WHERE proposal_id = ${proposal?.id ?? null} ORDER BY created_at DESC LIMIT 1`;
   const [user] = await sql`SELECT id, email FROM users WHERE role = 'rfp_admin' OR role = 'master_admin' ORDER BY created_at LIMIT 1`;
   return {
     tenantId: tenant?.id ?? null,
