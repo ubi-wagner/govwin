@@ -352,4 +352,50 @@ every date plausible, and only an assertion on the predicate itself can catch it
 
 ---
 
-*D6 onward appended as built.*
+## D6 · The award bridge
+
+**Shipped:** `pipeline/src/workflows/on_contract_started.py`, the `delivery_setup_ready` CRM
+template. The `project` namespace and its event labels landed earlier — in D2 (out of order,
+because `project.created` could not wait) and in the registry consolidation.
+
+### One event, and it deliberately does not create the project
+
+`capture:contract.started` already fires when a proposal's outcome is recorded as awarded. The
+bridge turns it into a **ToDo** — *"Set up delivery workspace"* — plus an independent notification.
+
+It does **not** auto-create the delivery project, and resisting that is the whole design. A
+workspace is anchored to two uploaded artifacts; one created the instant an outcome is recorded
+would be anchored to **nothing**, which is exactly what the provenance model forbids. It is the
+ingest-provenance rule one domain over: *a value the product did not read from the source must never
+look like one it did* — and an auto-created project would look precisely like a sourced one.
+
+So the bridge raises work for a person, and `readiness()` refuses to baseline until both files are
+actually there. Two independent enforcement points for one rule.
+
+### The two steps are independent, on purpose
+
+Neither `depends_on` the other. A failed notification must not leave the ToDo unraised, and a failed
+ToDo must not leave the admin uninformed — either one alone still lands the customer in the right
+place, and there is no downstream step waiting on either, so nothing dead-ends.
+
+The ToDo's timeout is **ten days**. Award-to-kickoff is measured in weeks; a gate that expires
+before the work is plausible is a gate people learn to ignore.
+
+### The template was written in the same change as the workflow that names it
+
+A NOTIFY step naming a template that exists nowhere does **not** error — `render_template()` returns
+`None` and the listener emits `system:notification.failed` instead of sending mail. That has
+happened twice in this repo (the 052 regression, then eight more found by the spine audit's join 7).
+
+Red-first, and **both** instruments caught it: renaming the template to `delivery_setup_TYPO` fired
+`test_notify_templates_exist.py` and the audit's join 7, each naming
+`OnContractStarted.notify_delivery_setup → delivery_setup_ready`. Green on restore.
+
+Spine audit after: **35 workflows · 119 steps · 0 dead triggers · 0 dead waits · 0 unresolvable
+actions · 0 NOTIFY steps naming a template with no renderer.**
+
+`pipeline` 1,319 passed · vitest 2,107 · `tsc` 0.
+
+---
+
+*D7 onward appended as built.*
