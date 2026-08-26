@@ -17,6 +17,37 @@ from typing import Any, Optional
 log = logging.getLogger("pipeline.events")
 
 
+#: THE EVENT-NAMESPACE REGISTRY — the one Python copy.
+#:
+#: Mirrors `frontend/lib/events.ts` → `EVENT_NAMESPACES`. Python cannot import TypeScript and the
+#: database can import neither, so three copies is the floor. What stops them diverging is
+#: `frontend/__tests__/event-namespace-registry.test.ts`, which reconciles this against the
+#: TypeScript constant, the migration SQL, and every document that writes the list out.
+#:
+#: WHY IT EXISTS: the registry was a literal in nine places across three languages. Adding
+#: `project` (migration 217) updated four and left five on the old seven — including the pipeline's
+#: own observability contract test, which would have failed the first `project:` event emitted here,
+#: and the frontend's admin emit endpoint, which would have answered 422 to all of them.
+#:
+#: Anything in the pipeline that needs the set imports it from here. Nobody writes it out again.
+#:
+#: `project` is post-award delivery — baselines, milestone gates, deliverable acceptance.
+#: `proposal` is the PRE-award workspace and does not own it.
+EVENT_NAMESPACES: frozenset[str] = frozenset({
+    "finder",
+    "capture",
+    "identity",
+    "proposal",
+    "library",
+    "system",
+    "tool",
+    "project",
+})
+
+#: Never these, in any position (docs/EVENT_CONTRACT.md §4).
+FORBIDDEN_NAMESPACES: frozenset[str] = frozenset({"admin", "cms", "spotlight"})
+
+
 async def emit_event(
     conn,
     *,

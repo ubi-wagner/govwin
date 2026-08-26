@@ -29,15 +29,42 @@ const log = createLogger('events');
 // event-contract guard enforces this for LITERAL call sites; this runtime set catches DYNAMIC
 // namespaces (computed at call time) the static check can't see. Non-fatal by contract — emitters
 // never throw — so an unregistered namespace only logs a warning (drift signal, not a break).
-// EIGHT namespaces. `project` = post-award delivery: baselines, milestone gates, deliverable
-// acceptance. None of the other seven owns that — `proposal` is the PRE-award workspace,
-// `capture` is the customer lifecycle up to purchase, `system` is infra.
-//
-// This set only WARNS. The enforcement is `system_events_namespace_chk` in the database
-// (migration 217), which raises 23514 on an unregistered namespace. Changing the registry means
-// changing four places: that CHECK, this set, the event-contract test, and docs/EVENT_CONTRACT.md.
-const KNOWN_NAMESPACES = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
-  'project']);
+/**
+ * THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy.
+ *
+ * Eight namespaces. `project` = post-award delivery: baselines, milestone gates, deliverable
+ * acceptance. None of the other seven owns that — `proposal` is the PRE-award workspace, `capture`
+ * is the customer lifecycle up to purchase, `system` is infra.
+ *
+ * ── WHY THIS IS EXPORTED, AND WHY THAT IS NOT ENOUGH ─────────────────────────────────────────
+ * The registry was written out as a literal in NINE places across three languages, a SQL CHECK and
+ * four documents. Adding `project` updated four of them and left five on the old seven — including
+ * `app/api/events/route.ts`, which would have answered **422 to every project event**, and
+ * `pipeline/tests/test_observability_contract.py`, which would have failed the first one the
+ * pipeline emitted.
+ *
+ * Every TypeScript reader now imports THIS constant. Python has one equivalent
+ * (`pipeline/src/observability/event_namespaces.py`), because it cannot import TypeScript, and the
+ * database has a CHECK, because it cannot import either.
+ *
+ * Three copies is the floor — so `__tests__/event-namespace-registry.test.ts` reconciles all of
+ * them, plus the migration SQL and every document that writes the list out, and fails naming which
+ * one disagreed. **You cannot have one source of truth across a database constraint, two languages
+ * and a doc. You can have one test that refuses to let them diverge.**
+ */
+export const EVENT_NAMESPACES = [
+  'finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
+  'project',
+] as const;
+
+export type EventNamespace = (typeof EVENT_NAMESPACES)[number];
+
+/** Never these, in any position (docs/EVENT_CONTRACT.md §4). */
+export const FORBIDDEN_NAMESPACES = ['admin', 'cms', 'spotlight'] as const;
+
+// This set only WARNS on an unknown namespace. The ENFORCEMENT is
+// `system_events_namespace_chk` (migration 217), which raises 23514 at the insert.
+const KNOWN_NAMESPACES = new Set<string>(EVENT_NAMESPACES);
 function warnUnknownNamespace(namespace: string, type: string): void {
   if (!KNOWN_NAMESPACES.has(namespace)) {
     log.warn({ namespace, type }, 'event uses an unregistered namespace (see docs/EVENT_CONTRACT.md)');

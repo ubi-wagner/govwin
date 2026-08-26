@@ -24,6 +24,7 @@
  * from already-validated sources and are out of static scope.
  */
 import { describe, it, expect } from 'vitest';
+import { EVENT_NAMESPACES, FORBIDDEN_NAMESPACES } from '@/lib/events';
 import fs from 'node:fs';
 import ts from 'typescript';
 import path from 'node:path';
@@ -32,11 +33,10 @@ const FRONTEND = path.join(__dirname, '..');
 const SCAN_DIRS = ['app', 'lib', 'components'].map((d) => path.join(FRONTEND, d));
 
 // The authoritative event-namespace registry (docs/EVENT_CONTRACT.md §Namespace registry).
-const REGISTRY = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
-  // Post-award delivery (migration 217). The DB CHECK is the enforcement; this set and
-  // lib/events.ts must agree with it or an emit that passes here throws at the insert.
-  'project']);
-const FORBIDDEN = new Set(['admin', 'cms', 'spotlight']);
+// IMPORTED from lib/events.ts, not re-declared. A test that keeps its own copy of the thing it is
+// testing passes whenever the two drift together and fails for the wrong reason when they do not.
+const REGISTRY = new Set<string>(EVENT_NAMESPACES);
+const FORBIDDEN = new Set<string>(FORBIDDEN_NAMESPACES);
 const TYPE_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
 // Deliberate, documented type-format exceptions. Each MUST carry a reason (adding one is reviewed).

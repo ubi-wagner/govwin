@@ -453,7 +453,13 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
-  proposal (workspace), library (content), system (infra), tool (invocations)
+  proposal (pre-award workspace), library (content), system (infra), tool (invocations),
+  project (post-award delivery — baselines, milestone gates, deliverables; mig 217)
+- The registry lives in THREE runtimes and cannot be consolidated further — `EVENT_NAMESPACES`
+  in `frontend/lib/events.ts`, the same in `pipeline/src/events.py`, and
+  `system_events_namespace_chk` in Postgres (the only one that FAILS rather than warns).
+  Everything else imports one of them; `__tests__/event-namespace-registry.test.ts` reconciles
+  all three plus the migration SQL and every doc that writes the list out.
 - NEVER use: admin, cms, spotlight as namespaces
 - Type format: entity.action_past_tense (snake_case)
 - Admin events: tenantId = null

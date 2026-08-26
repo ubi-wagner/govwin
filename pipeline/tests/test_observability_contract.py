@@ -17,11 +17,22 @@ from __future__ import annotations
 import os
 import pathlib
 import re
+import sys
 
 import pytest
 
-VALID = {"finder", "capture", "identity", "proposal", "library", "system", "tool"}
-FORBIDDEN = {"admin", "cms", "spotlight", "pipeline"}
+# IMPORTED, not re-declared. This line was its own copy of the registry, and when `project` was
+# added (migration 217) it was one of five copies left on the old seven — so the first project-
+# namespace emit from the pipeline would have failed this test against a namespace the database
+# accepts everywhere else.
+_SRC_FOR_NS = pathlib.Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(_SRC_FOR_NS))
+from events import EVENT_NAMESPACES, FORBIDDEN_NAMESPACES  # noqa: E402
+
+VALID = set(EVENT_NAMESPACES)
+# `pipeline` is forbidden as a NAMESPACE here on top of the shared three: it is an actor_type, and
+# using it as a namespace is the specific mistake this suite was written to catch.
+FORBIDDEN = set(FORBIDDEN_NAMESPACES) | {"pipeline"}
 
 _SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
 # emit_event(...namespace="X", type="Y"...) — namespace then type, allowing whitespace/newlines.

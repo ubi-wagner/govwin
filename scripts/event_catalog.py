@@ -19,8 +19,13 @@ which a static scan cannot resolve. It is not a registry entry and is reported s
 import os, re, sys, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FORBIDDEN = {"admin", "cms", "spotlight"}
-REGISTRY = {"finder", "capture", "identity", "proposal", "library", "system", "tool"}
+# IMPORTED from the pipeline's copy rather than re-declared — this was one of nine literal copies
+# of the registry, and one of five left stale when `project` was added.
+sys.path.insert(0, os.path.join(ROOT, "pipeline", "src"))
+from events import EVENT_NAMESPACES, FORBIDDEN_NAMESPACES  # noqa: E402
+
+FORBIDDEN = set(FORBIDDEN_NAMESPACES)
+REGISTRY = set(EVENT_NAMESPACES)
 TYPE_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
 TYPE_ALLOW = {"tool:invoke"}  # documented bracket (docs/EVENT_CONTRACT.md §3)
 

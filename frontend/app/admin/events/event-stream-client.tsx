@@ -1,5 +1,6 @@
 'use client';
 
+import { EVENT_NAMESPACES } from '@/lib/events';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -18,7 +19,11 @@ export type SerializedEvent = {
   createdAt: string;
 };
 
-const NAMESPACES = ['all', 'finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool'] as const;
+// The filter options, derived from the registry rather than repeated. This list was its own copy
+// and went stale when `project` was added — so post-award delivery events existed in the database,
+// were emitted correctly, and had NO OPTION in the filter that finds them. An events console that
+// cannot show a namespace is a console that says it does not exist.
+const NAMESPACES = ['all', ...EVENT_NAMESPACES] as const;
 const PHASES = ['all', 'start', 'end', 'single', 'error'] as const;
 
 const NAMESPACE_COLORS: Record<string, string> = {

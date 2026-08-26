@@ -677,7 +677,7 @@ TOOL names, not event namespaces — never emit events under them.)
 docs (now archived) but is **never emitted at runtime**
 (confirmed by grep across all 3 services). It is a stale schema/doc artifact.
 Agent/tool activity emits under `tool` (e.g. `tool:tool.invoked`). The canonical
-set is the 7 listed above — do NOT emit `agent.*` events.
+set is the 8 listed above — do NOT emit `agent.*` events.
 
 Event type format: `entity.verb_past_tense` (snake_case)
 Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
@@ -1867,13 +1867,13 @@ Comp-code purchase `POST /api/portal/[slug]/purchase` (code `rfppipelinetest`) �
   but does NOT yet. Retiring the god-view is on the gap register below.
 
 ### Events — new types this cycle
-Namespaces unchanged (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`; still NEVER
+Namespaces (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`, `project`; still NEVER
 `admin`/`cms`/`spotlight`). New: `capture:purchase.completed`, `capture:workspace.released`,
 `content.document_archived`, `content.document_restored`, `proposal:proposal.ready_for_customer`.
 
 ### Events — additions (2026-07-22 auditability sweep)
 The both-sides emission sweep raised path coverage to **97/97**. New/fixed types, all valid
-`entity.action_past_tense` under the 7 allowed namespaces:
+`entity.action_past_tense` under the 8 allowed namespaces:
 - `library:atom.created` — now emitted by **all three** atom producers: `POST /atoms` (manual),
   `atoms/upload` (upload→reference), and `atomize-node` (annotate→atomize). Any new atom-creating path
   must emit it too.

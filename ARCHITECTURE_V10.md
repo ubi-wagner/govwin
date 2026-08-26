@@ -528,8 +528,10 @@ automation listener, the audit surface, and the spine correlation below.
 
 ### 6.2 Namespaces → templates → instances (carrying the opportunity)
 
-The 7 canonical namespaces are unchanged (V9 §8.2: `finder | capture | identity | proposal | library |
-system | tool`). The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
+There are now **8 canonical namespaces**: V9 §8.2's seven (`finder | capture | identity | proposal |
+library | system | tool`) plus **`project`** — post-award delivery, added by migration 217.
+They are reconciled across TypeScript, Python, the SQL CHECK and the docs by
+`frontend/__tests__/event-namespace-registry.test.ts`. The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
 templates** on boot (each writes a `process_templates` row with `active` + `trigger_key`), up from 9 in
 V9 — the additions are `ProjectCollaboration`, `OnProposalSectionEdited`, and `OnProposalOutcomeRecorded`.
 
@@ -722,7 +724,7 @@ Everything below is **unchanged** by this refactor — V9 is the source of truth
 | CMS/CRM (87 endpoints, 7 workers, Vite SPA, event listener) | V9 §6 |
 | Storage (S3/R2, three prefixes) | V9 §11 |
 | Deployment (Railway, migrations at deploy, CI) | V9 §12 |
-| Event system shape (system_events, 7 namespaces, start/end/single) | V9 §8 |
+| Event system shape (system_events, 8 namespaces, start/end/single) | V9 §8 + mig 217 |
 
 The 3-source strawman generation remains the open AI-integration gap (the `publish_section_draft`
 landing primitive is shipped; `OnProposalCreated → draft_v0` fires only when the pipeline
