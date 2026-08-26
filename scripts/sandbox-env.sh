@@ -28,7 +28,10 @@ export DATABASE_URL_OWNER="postgresql://govtech:changeme@localhost:5432/govtech_
 # nothing, and nothing reads exactly like a pass (docs/CRM_ANALYSIS.md §0).
 #
 #   createdb -O govtech cms_postgres && bash services/cms/db/run.sh
-export CMS_DATABASE_URL="postgresql://govtech:changeme@localhost:5432/cms_postgres"
+export CRM_DATABASE="postgresql://govtech:changeme@localhost:5432/cms_postgres"
+# Legacy name, still honoured by the resolver during the rename. Remove once Railway,
+# the GitHub secrets and staging all carry CRM_DATABASE.
+export CMS_DATABASE_URL="$CRM_DATABASE"
 # The bridge the CRM uses to reach the MAIN database. Note the role: migration 215 denies
 # writes to email_send_ledger on the app role, so a non-owner here makes every CRM send run
 # degraded (docs/CRM_MIGRATION_PLAN.md, last section).

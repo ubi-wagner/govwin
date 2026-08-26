@@ -1,6 +1,6 @@
 # CRM inventory — generated
 
-Regenerate: `CMS_DATABASE_URL=… node frontend/scripts/inventory-crm.mjs`
+Regenerate: `CRM_DATABASE=… node frontend/scripts/inventory-crm.mjs`
 
 Schema read from: **live catalog**
 

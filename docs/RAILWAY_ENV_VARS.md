@@ -54,7 +54,7 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 
 Not part of the alpha customer path; its variables live on the `rfp-crm` service + `cms-postgres`.
 Reconcile against Railway when the CRM is built out — the code-read set (see `docs/SECRETS_INVENTORY.md`):
-`CMS_DATABASE_URL` (→ `cms-postgres`), `SHARED_DATABASE_URL` (→ main DB `system_events` bridge),
+`CRM_DATABASE` (→ the CRM's own Postgres — see below), `SHARED_DATABASE_URL` (→ main DB bridge),
 `ANTHROPIC_API_KEY`, `CMS_STORAGE_ROOT`/R2, `ALLOWED_ORIGINS`, `CMS_API_KEY`, `CMS_JWT_SECRET`,
 `GOOGLE_SERVICE_ACCOUNT_JSON` (the email-unlock key) + `GOOGLE_WORKSPACE_EMAIL`, `LOG_LEVEL`.
 
@@ -93,6 +93,43 @@ frontend writes it through `DATABASE_URL_OWNER`. Nothing in the repo records whi
 `SHARED_DATABASE_URL` carries — it has only ever written `system_events` and `cms_content`, neither
 of which has RLS. **If it is not the owner, every CRM send runs DEGRADED** (mail goes, no idempotency
 reservation) and logs a 42501 naming the remedy once per process. Check it before the cutover.
+
+---
+
+## The CRM database
+
+**Renamed: `CMS_DATABASE_URL` → `CRM_DATABASE`.** The service reads it through ONE resolver
+(`services/cms/src/models/database.py::crm_database_url()`), which honours
+`CRM_DATABASE` → `CRM_DATABASE_URL` → `CMS_DATABASE_URL` in that order and logs a deprecation
+warning on the last. That chain exists because **a rename crosses a deploy boundary**: the platform
+variable and the code that reads it do not change in the same instant, and `init_db()` raises at
+startup — so a single-name reader turns the gap into an outage. Retire the legacy entry once
+Railway, the GitHub secrets and staging all carry the new name; the warning is what tells you when
+that is true.
+
+**It is INTERNAL to the Railway private network.** No public TCP proxy. Reference it by the private
+hostname (`*.railway.internal`) or by a Railway service variable reference, and leave the public
+endpoint off. Only `rfp-crm` connects to it — the platform frontend and the pipeline do not, and the
+sweep in docs/CRM_ANALYSIS.md confirms that is already true in code: the only platform-side mention
+of the CRM is a link-out card.
+
+### The consequence, which is the part worth planning for
+
+**GitHub Actions runs outside that network, so `migrate.yml` cannot reach an internal-only CRM
+database.** Two honest options:
+
+| option | what it means |
+|---|---|
+| **run migrations inside the deployment** (recommended) | a release step on the `rfp-crm` service, or `services/cms/db/run.sh` from a Railway shell. Keeps the database closed. |
+| keep a public endpoint for the migration path | the workflow keeps working, and the database is reachable from the internet with only its password in the way |
+
+Until one is chosen, `migrate-crm-prod` **fails** with a message naming both. It used to
+`::warning::` and `exit 0` — a silent skip that left the database un-migrated while the run stayed
+green, which is the same shape as B145 and precisely how a rename of the GitHub secret would have
+gone unnoticed.
+
+`tests/test_crm_database_var.py` reconciles the Python resolver, the bash chain in `db/run.sh`
+(which cannot import it) and both workflows, and asserts the skip has not come back.
 
 ---
 

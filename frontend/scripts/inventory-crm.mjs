@@ -27,7 +27,7 @@
  * "the inventory below is not trustworthy" and exits 2. A scanner with a wrong root reports an
  * empty CRM and looks exactly like a clean one.
  *
- *   export CMS_DATABASE_URL=postgresql://…/cms_postgres
+ *   export CRM_DATABASE=postgresql://…/cms_postgres
  *   node frontend/scripts/inventory-crm.mjs            # → docs/CRM_INVENTORY.md + .json
  *
  * Exit 0 wrote the inventory · 2 the instrument cannot be trusted.
@@ -42,7 +42,9 @@ const CMS = path.join(REPO, 'services', 'cms');
 const SRC = path.join(CMS, 'src');
 const CONSOLE_SRC = path.join(CMS, 'frontend', 'src');
 
-const CONN = process.env.CMS_DATABASE_URL;
+// Same chain as the service resolver, newest first — see
+// services/cms/src/models/database.py::crm_database_url().
+const CONN = process.env.CRM_DATABASE || process.env.CRM_DATABASE_URL || process.env.CMS_DATABASE_URL;
 
 // ── file walking ──────────────────────────────────────────────────────────────────────────────
 function walk(dir, exts, out = []) {
@@ -340,7 +342,7 @@ const P = (s = '') => lines.push(s);
 
 P('# CRM inventory — generated');
 P('');
-P(`Regenerate: \`CMS_DATABASE_URL=… node frontend/scripts/inventory-crm.mjs\``);
+P(`Regenerate: \`CRM_DATABASE=… node frontend/scripts/inventory-crm.mjs\``);
 P('');
 P(`Schema read from: **${schemaSource}**`);
 P('');

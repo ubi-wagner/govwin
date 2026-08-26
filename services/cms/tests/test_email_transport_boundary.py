@@ -120,12 +120,19 @@ def test_every_exempt_file_still_honours_the_suppression_list():
     )
 
 
+#: The table named in a SQL POSITION, not merely mentioned. A bare-name scan flagged
+#: `models/database.py` for a DOCSTRING listing which tables the shared bridge reaches — prose,
+#: not a query. Second time this exact weakness has surfaced in this file (see the
+#: `await suppression_for(` note below): naming a thing is not using it.
+_LEDGER_QUERY = re.compile(r'(?:FROM|INTO|UPDATE|JOIN)\s+email_send_ledger\b', re.I)
+
+
 def test_only_the_seam_touches_the_ledger_table():
     # `email_send_ledger` lives in the MAIN database and is deliberately named unlike the CRM's own
     # `email_sends` queue in cms-postgres, because this service holds a pool to both.
     offenders = [
         _rel(f) for f in _py_files()
-        if SEAM not in f and re.search(r'\bemail_send_ledger\b', _read(f))
+        if SEAM not in f and _LEDGER_QUERY.search(_read(f))
     ]
     assert offenders == [], (
         'the ledger is written in one place, through the shared-database pool: ' + ', '.join(offenders)
@@ -139,7 +146,7 @@ def test_the_two_email_send_tables_are_not_confused():
     # must be using the CMS pool; anything reaching for the ledger must be using the shared one.
     for f in _py_files():
         src = _read(f)
-        if not re.search(r'\bemail_send_ledger\b', src):
+        if not _LEDGER_QUERY.search(src):
             continue
         assert SEAM in f, (
             f'{_rel(f)} queries email_send_ledger outside the seam — and if that was meant to be '

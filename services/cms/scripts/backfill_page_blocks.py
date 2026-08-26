@@ -17,6 +17,8 @@ import asyncio
 import json
 import logging
 import os
+import sys
+import pathlib
 
 import asyncpg
 
@@ -36,11 +38,16 @@ _STATUS_MAP = {
 
 async def backfill() -> int:
     shared_url = os.getenv("SHARED_DATABASE_URL") or os.getenv("DATABASE_URL")
-    cms_url = os.getenv("CMS_DATABASE_URL")
+    # The resolver, not the raw variable — see src/models/database.py for why the name is a
+    # chain during the CMS_DATABASE_URL → CRM_DATABASE rename.
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+    from src.models.database import crm_database_url
+
+    cms_url = crm_database_url()
     if not shared_url:
         raise SystemExit("SHARED_DATABASE_URL (or DATABASE_URL) is required")
     if not cms_url:
-        raise SystemExit("CMS_DATABASE_URL is required")
+        raise SystemExit("CRM_DATABASE is required")
 
     shared = await asyncpg.connect(shared_url)
     cms = await asyncpg.connect(cms_url)

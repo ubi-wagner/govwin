@@ -104,15 +104,29 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Run CRM migrations
         env:
+          # Renamed CMS_DATABASE_URL → CRM_DATABASE. Both are read so the GitHub secret and this
+          # workflow can be updated at different moments without a window in which migrations
+          # silently stop.
+          CRM_DATABASE: ${{ secrets.CRM_DATABASE }}
           CMS_DATABASE_URL: ${{ secrets.CMS_DATABASE_URL }}
         run: |
-          if [ -z "$CMS_DATABASE_URL" ]; then
-            echo "::warning::CMS_DATABASE_URL not set — skipping CRM migrations"
-            exit 0
+          CONN="${CRM_DATABASE:-${CMS_DATABASE_URL:-}}"
+          if [ -z "$CONN" ]; then
+            # A ::warning:: + exit 0 used to live here, so an unset secret was a SILENT SKIP and the
+            # workflow stayed green while the CRM database went un-migrated. That is B145's shape:
+            # a step that finds a problem and does not fail the run reports the opposite of what it
+            # found. The main-DB job above already uses ::error::; so does this one now.
+            echo "::error::Neither CRM_DATABASE nor CMS_DATABASE_URL is set."
+            echo "If the CRM database is INTERNAL to Railway's private network — which is the"
+            echo "intended posture — this job cannot reach it from GitHub Actions at all, and the"
+            echo "migrations belong in a release step on the rfp-crm service instead."
+            echo "See docs/RAILWAY_ENV_VARS.md §CRM database."
+            exit 1
           fi
+          export CRM_DATABASE="$CONN"
           chmod +x services/cms/db/run.sh
           echo "=== CRM DB → Production ==="
-          psql "$CMS_DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          psql "$CRM_DATABASE" -c "SELECT 1 AS connection_ok;" -tA
           services/cms/db/run.sh
           echo "--- CRM migration status ---"
           services/cms/db/run.sh --status
@@ -130,15 +144,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Run CRM migrations
         env:
+          CRM_DATABASE: ${{ secrets.CRM_STAGING_DATABASE }}
           CMS_DATABASE_URL: ${{ secrets.CMS_STAGING_DATABASE_URL }}
         run: |
-          if [ -z "$CMS_DATABASE_URL" ]; then
+          CONN="${CRM_DATABASE:-${CMS_DATABASE_URL:-}}"
+          export CRM_DATABASE="$CONN"
+          if [ -z "$CONN" ]; then
             echo "::warning::CMS_STAGING_DATABASE_URL not set — skipping CRM staging migrations"
             exit 0
           fi
           chmod +x services/cms/db/run.sh
           echo "=== CRM DB → Staging ==="
-          psql "$CMS_DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          psql "$CRM_DATABASE" -c "SELECT 1 AS connection_ok;" -tA
           services/cms/db/run.sh
           echo "--- CRM migration status ---"
           services/cms/db/run.sh --status
