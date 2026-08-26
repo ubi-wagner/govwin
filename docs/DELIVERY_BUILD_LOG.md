@@ -1,0 +1,134 @@
+# Delivery management — build log
+
+The as-built record. Design: **docs/DELIVERY_MANAGEMENT_DESIGN.md** (the decisions). This file is
+what actually happened, including the places the design was wrong.
+
+Build order and task ids are the register in the V1 close-out plan: **D1 … D9**.
+
+---
+
+## D1 · Schema, RLS, and the assignment boundary — migration 216
+
+**Shipped:** `db/migrations/216_delivery_spine.sql`, `frontend/lib/delivery/access.ts`,
+`frontend/scripts/verify-delivery-isolation.mjs` (13 assertions),
+`frontend/__tests__/delivery-assignment-boundary.test.ts` (14).
+
+Eight tables. Nothing renders yet — isolation is provable before anything depends on it, which is
+the whole point of doing this step first.
+
+### The design's DDL would not have applied
+
+```
+CREATE TEMP TABLE probe (id int, current_date date);
+ERROR:  syntax error at or near "current_date"
+```
+
+`delivery_milestones.current_date` is in the design doc and `CURRENT_DATE` is a **reserved
+keyword**. Quoting it works, and then every hand-written query needs the quotes forever — a
+permanent trap that reads like a typo when someone forgets.
+
+It is **`forecast_date`** here, which is also the truer name: the current forecast for a milestone,
+against the immutable `baseline_date`. The lens carries a standing regression check that no
+`delivery_*` column is ever named with that keyword again.
+
+### Every table carries `tenant_id`, and none carries it by lineage
+
+Migrations 184, 212 and 213 exist because tables shipped without a policy and had to be retrofitted.
+Mig 212's header records the cost: seven proposal-spine tables had `relrowsecurity = false` and zero
+policies, so **100% of their rows were readable from any tenant context** — including
+`canvas_versions`, which holds the text of every proposal.
+
+It stayed invisible because every audit in this repo looks for a `tenant_id` **column**, and those
+seven had none; their tenancy was FK lineage. So two rules here:
+
+- every table gets `tenant_id uuid NOT NULL` **as a column**, even where the FK parent already
+  implies it — a lineage-shaped table is invisible to the instrument meant to cover it;
+- FORCE RLS plus the policy is written in the **same migration** that creates the table, so there is
+  no window in which it exists unprotected.
+
+The lens asserts all three properties (RLS on · FORCE on · exactly one policy · NOT NULL
+`tenant_id`) and that assertion needs **no fixture data** — which matters, because an empty box is
+exactly when a missing policy is easiest to introduce and hardest to see.
+
+### Baseline immutability is a trigger, not a convention
+
+Variance only means something if you still hold what you promised. A rebaseline that overwrote the
+baseline would destroy "fourteen days late against baseline" — forever, and silently, because the
+arithmetic would still work.
+
+An app-layer rule protects only the writers that exist today, and the thing being protected cannot
+be reconstructed afterwards. So `delivery_baseline_is_immutable()` fires `BEFORE UPDATE` on the WBS,
+the milestones and the project, and allows exactly two things:
+
+| transition | allowed | why |
+|---|---|---|
+| `NULL → value` | ✅ | setting the baseline, once |
+| `value → same value` | ✅ | otherwise an idempotent whole-row UPDATE fails for touching a column it did not change |
+| `value → different` | ❌ 23001 | the headline |
+| `value → NULL` | ❌ 23001 | clearing is moving |
+
+The lens asserts **all four**, and the first two matter as much as the third: a trigger that refused
+the initial set would be a deny-all wearing an immutability badge, and would satisfy every "cannot
+be moved" assertion. There is a fifth assertion that the **current** plan stays freely editable — a
+trigger that was one column too wide would make the whole capability read-only and still pass
+everything above it.
+
+### Assignment is the half RLS cannot enforce
+
+RLS scopes by tenant because the per-request context carries one value. Delivery needs a second,
+narrower scope — *which employees of that tenant* — and a policy cannot consult the requesting user
+without putting the user id into the request context for every table in the database.
+
+So `lib/delivery/access.ts` is one module with one predicate, and CLAUDE.md says why that is not
+optional: *"Treat that belt as load-bearing — a new reader that omits it leaks, and RLS will not
+catch it."*
+
+| actor | scope |
+|---|---|
+| `tenant_admin` + (incl. descended `rfp_admin` / `master_admin`) | every project at their tenant |
+| `tenant_user` | exactly their `delivery_assignments` rows |
+| `partner_admin` (bare) | **none** — it ranks below `tenant_admin` and reaches a tenant only through a membership, pinning to `tenant_admin` when it descends |
+| `partner_user` | **none, membership or not** |
+
+That last row is the one worth stating out loud. `verifyTenantAccess` admits a cross-company
+collaborator on a `source='collaborator'` membership — correct for the proposal spine, where
+collaboration is the point. Delivery v1 has no collaborator surface at all, and **refusing the role
+makes that a rule rather than a convention nobody wrote down.**
+
+The boundary test asserts the **SQL text**, which is unusual and deliberate: the join is the
+security boundary and its absence produces *more rows*, not an error. It also asserts that a refused
+role issues **no query at all** — an empty result from a query that ran is indistinguishable from
+one that was scoped out — and that both functions fail **closed** when the database is unreachable.
+
+### Red first
+
+| probe | result |
+|---|---|
+| before mig 216 | 8 tables reported absent · exit 1 |
+| policy DROPPED on `delivery_wbs_nodes` | structure check fired · exit 1 |
+| policy REPLACED with `USING (true)` — structure still valid, one policy, FOR ALL | **behaviour fired**: a foreign WBS node visible, and the cross-tenant INSERT succeeded · exit 1 |
+| baseline trigger DISABLED | moving and clearing a set baseline both succeeded · exit 1 |
+| assignment JOIN removed from the employee query | the boundary test fired · 13 of 14 still passing |
+
+The third row is the meaningful one — it leaves the structure entirely plausible, so only the
+behavioural assertion can catch it. All five went green on restore.
+
+### The harness was wrong twice before the product was wrong once
+
+Both were mine, both caught before reporting, and both are the same underlying trap:
+
+1. `AS tenant_col` in a **bare-client** script. `lib/db.ts` applies
+   `transform: { column: { from: toCamel } }`; a standalone `postgres()` does not, so `row.tenantCol`
+   read `undefined` and the lens reported *"no NOT NULL tenant_id column"* against eight tables that
+   all had one. **Second occurrence this session** — the email drive did the same thing with
+   `sent_at`. The rule now written into both files: in a bare-client script, every alias is quoted
+   camelCase.
+2. A backtick inside a SQL comment **inside a JS tagged template**, which ends the literal. Instant
+   `SyntaxError`, cheap to fix, and worth the comment that now sits next to it.
+
+`tsc` 0 · vitest **2,034** (2,020 before) · `check-rls-posture` — 67 policies over 44 force-RLS
+tables, 45 tenant-owned tables partitioning cleanly across 7 contexts.
+
+---
+
+*D2 onward appended as built.*
