@@ -694,14 +694,23 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
 
       if (admins.length > 0) {
-        const { sendEmail } = await import('@/lib/email');
+        const { send } = await import('@/lib/email');
         const tenantRow = await sql<{ name: string }[]>`SELECT name FROM tenants WHERE id = ${tenantId}::uuid`;
         const tenantName = tenantRow[0]?.name || tenantSlug;
 
         for (const admin of admins) {
           try {
-            await sendEmail({
+            await send({
               to: admin.email,
+              kind: 'transactional',
+              // PLATFORM scope. This alert goes to rfp_admins about a tenant, not to the tenant;
+              // filing it under the tenant would put platform staffing traffic in that customer's
+              // own send history.
+              tenantId: null,
+              template: 'admin_proposal_locked',
+              idempotencyKey: `admin_proposal_locked:${proposal.id}:${admin.email.toLowerCase()}`,
+              tags: ['admin-alert'],
+              metadata: { proposal_id: proposal.id, tenant_id: tenantId },
               subject: `ACTION REQUIRED — New Proposal Locked for Admin Review — ${tenantName}`,
               html: `
                 <p>Hi ${admin.name || 'Admin'},</p>

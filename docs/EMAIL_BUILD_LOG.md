@@ -108,4 +108,136 @@ remedy (`DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs`).
 
 ---
 
-*E2 onward appended as built.*
+## E2 · The seam — `lib/email/`
+
+**Shipped:** `lib/email/{index,types,ledger,sender-identity}.ts`, `lib/email/drivers/gmail.ts`,
+`lib/google-calendar.ts`. `lib/email.ts` is gone; `@/lib/email` now resolves to the directory.
+
+`send()` owns four things no transport may reimplement — suppression, idempotency, the ledger,
+sender resolution — and a driver's whole job is to hand bytes to a provider and say what happened.
+That split is what makes Postmark additive rather than a second implementation of the same four
+concerns with its own bugs.
+
+### The order is the contract
+
+```
+1  validate the recipient       ← before any DB call, so a typo costs nothing
+2  resolve sender / text / ids  ← a message is never half-specified past here
+3  suppression check            ← a refused send still gets a ledger row
+4  RESERVE the ledger row       ← BEFORE dispatch. This is the idempotency mechanism.
+5  dispatch
+6  confirm the outcome
+```
+
+Step 4 before step 5 is the load-bearing part. Send-then-record means a crash in between re-sends
+on replay, and a duplicate nudge to a government customer is worse than a missing one. The unit
+test asserts the *sequence*, not just the return value — a test that only checked the result would
+pass against exactly the implementation this is meant to forbid.
+
+### Three preservation details, each a place the refactor could have stopped being one
+
+| found | decision |
+|---|---|
+| The pre-seam Resend fallback defaulted to `noreply@` while the Gmail path defaulted to `platform@` — two From addresses for the same message, chosen by which transport fired | preserved via `isDefaultPlatformSender()`. Almost certainly a latent bug, but nothing establishes `platform@` is a verified Resend sender, and it disappears with Resend at the cutover |
+| The Gmail MIME is a `multipart/alternative` carrying only an HTML part | left alone. Adding the text part changes what every recipient receives. The seam still RESOLVES `text` so Postmark can send both |
+| An unconditionally quoted display name is valid RFC 5322 and would have changed the bytes of every message | quoting is conditional on the name actually containing a special. `RFP Pipeline <platform@rfppipeline.com>` is byte-identical to before, and `Ulepic, Kate via RFP Pipeline` is correctly quoted |
+
+### `lib/calendar.ts` already existed, and I overwrote it
+
+The Google Calendar helpers needed a home outside a module named `email`. `lib/calendar.ts` was the
+obvious name and is **already taken** — by the expert-time scheduling primitive (Terms §7), a
+database feature with no connection to Google. Writing it clobbered 230 lines; `tsc` caught it
+immediately (`Module '@/lib/calendar' has no exported member 'listAdminAvailability'`) and
+`git checkout` restored it. The Google helpers now live in `lib/google-calendar.ts`, which says
+which calendar it means.
+
+Two different calendars in one codebase is a naming hazard, not a mistake anyone made: the header of
+each now names the other.
+
+---
+
+## E3 · The call sites — eleven, not eight
+
+**The register said eight.** It was counted with `grep -l "from '@/lib/email'"`, which cannot see
+
+```ts
+const { sendEmail } = await import('@/lib/email');
+```
+
+and three of the eleven are exactly that shape — `team`, `proposals/create`, `proposals/[p]/lock`.
+Those three matter most: a dynamic destructuring import of a name the module no longer exports is
+**not a type error**. It resolves to `undefined`, throws a `TypeError` at the call, and every one of
+those three sites is wrapped in a best-effort `catch`. The mail simply stops, silently. The boundary
+test now greps for that shape specifically.
+
+The same defect appeared in the test suite. `proposals-create.test.ts` mocks `@/lib/email`; the mock
+still exported `sendEmail`, so after conversion `send` was `undefined`, the route threw into its own
+catch, and **all 1,975 tests kept passing** while the admin-alert path was no longer exercised at
+all. A mock that names an export the module no longer has does not fail — it quietly stops testing
+something.
+
+### Idempotency keys: which sends get one, and which must not
+
+A natural key means a replay sends nothing. That is right for a lifecycle fact and **wrong** for a
+request a person can legitimately repeat:
+
+| call site | key | why |
+|---|---|---|
+| application accepted / rejected | `application_accepted:<applicationId>` | a replayed accept must not mail a second temp password |
+| tenant admin welcome / added | `…:<tenantId>:<email>` | |
+| collaborator invite | `collaborator_invite:<proposalId>:<email>` | |
+| vault invite | `vault_invite:<memberId>` | keyed on the membership row, so a different address to the same vault still sends |
+| proposal ready | `proposal_ready:<proposalId>:<email>` | a repeated unlock is the same fact |
+| admin proposal-locked alert | `admin_proposal_locked:<proposalId>:<email>` | |
+| manager request | `manager_request:<taskId>` | the caller already refuses a duplicate open request |
+| **password reset** | **none** | asking twice is what a person does when the first mail does not arrive. A natural key would make the product silently refuse while still answering `{ sent: true }` |
+| **team invite** | **none** | re-inviting a member who never got the first mail is a thing an admin does |
+
+### Tenancy at each site, which is not always the obvious one
+
+`tenantId: null` is a real answer, not a missing value. A rejected application never became a
+tenant. A password reset belongs to no tenant, because identity is global — auth resolves a user
+before any tenant context exists. And the **admin proposal-locked alert goes to rfp_admins about a
+tenant, not to the tenant**, so filing it under that tenant would put platform staffing traffic in a
+customer's own send history.
+
+### One deliberate behaviour change
+
+`emailSent` in the accept route was `emailResult.provider !== 'skipped'`, which reports a **failed
+Resend send as sent** — provider is `resend`, error is set, and the expression is true. It is now
+`emailResult.accepted`. The neighbouring `emailFailed: !!emailResult.error` already carried the
+truth, so the two fields disagreed. Preserving a known-wrong value is not what "provably a refactor"
+is protecting.
+
+---
+
+## E5 · The boundary tests — frontend half
+
+**Shipped:** `__tests__/email-transport-boundary.test.ts` (7 assertions),
+`__tests__/email-seam.test.ts` (19).
+
+A seam nothing is forced through is a suggestion. The storage abstraction was written with the same
+intent and was bypassed by two routes, one customer-facing, because nothing enforced it. Email gets
+its guard on day one.
+
+The scanner's **first** test asserts it can see the codebase at all (>200 files, and the two files
+it must contain by name), and its second asserts each rule against a string that IS a violation. A
+scanner with a wrong root reports "no offenders" and looks exactly like a clean codebase.
+
+### Red first, on the same build
+
+| probe | result |
+|---|---|
+| a module importing `googleapis` and calling `google.gmail(...)` plus a raw `email_sends` query | **3 rules fired** — transport, googleapis importer, ledger table. Green on removal |
+| `driver.send()` hoisted above `reserve()` in the seam | **5 assertions fired** — the ordering contract, the duplicate refusal, the ledger-unavailable refusal, the throw-still-closes-the-row case, and never-throws. Green on restore |
+
+The second probe is the meaningful one: it leaves the code type-correct and every return value
+plausible, so only the sequencing assertion can catch it.
+
+`tsc` 0 · vitest **2003 passed** (1977 before, +26 new). The two counted as "skipped" in the earlier
+run are `skipIf` tests keyed on `ANTHROPIC_API_KEY` / `ATOM_EMBED`, which differ by whether
+`sandbox-env.sh` was sourced — not by anything in this change.
+
+---
+
+*E4 onward appended as built.*

@@ -13,7 +13,7 @@ import { auth } from '@/auth';
 import { sqlBypass as sql, enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { createTenantWithAdmin } from '@/lib/tenants/create-tenant';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 
 function validEmail(e: string): boolean {
@@ -221,13 +221,22 @@ export async function POST(request: Request) {
       const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       if (created.isNewUser && tempPw) {
         const c = applicationAcceptedEmail({ contactName: adminName ?? adminEmail, contactEmail: adminEmail, companyName: name, tempPassword: tempPw, tenantSlug: created.slug, loginUrl: `${base}/login` });
-        const r = await sendEmail({ to: adminEmail, subject: c.subject, html: c.html });
-        emailSent = r.provider !== 'skipped' && !r.error;
+        const r = await send({
+          to: adminEmail, subject: c.subject, html: c.html,
+          kind: 'transactional', tenantId: created.tenantId, template: 'application_accepted',
+          idempotencyKey: `tenant_admin_welcome:${created.tenantId}:${adminEmail.toLowerCase()}`,
+          tags: ['onboarding'],
+        });
+        emailSent = r.accepted;
       } else {
         const safe = (s: string | null) => String(s ?? '').replace(/[<>&"]/g, '');
-        const r = await sendEmail({ to: adminEmail, subject: `You've been added as an administrator of ${safe(name)}`,
-          html: `<p>Hi ${safe(adminName) || 'there'},</p><p>You now have <strong>administrator</strong> access to <strong>${safe(name)}</strong> on RFP Pipeline. Sign in with your existing account to manage the workspace.</p><p><a href="${base}/login">Sign in</a></p>` });
-        emailSent = r.provider !== 'skipped' && !r.error;
+        const r = await send({ to: adminEmail, subject: `You've been added as an administrator of ${safe(name)}`,
+          html: `<p>Hi ${safe(adminName) || 'there'},</p><p>You now have <strong>administrator</strong> access to <strong>${safe(name)}</strong> on RFP Pipeline. Sign in with your existing account to manage the workspace.</p><p><a href="${base}/login">Sign in</a></p>`,
+          kind: 'transactional', tenantId: created.tenantId, template: 'tenant_admin_added',
+          idempotencyKey: `tenant_admin_added:${created.tenantId}:${adminEmail.toLowerCase()}`,
+          tags: ['onboarding'],
+        });
+        emailSent = r.accepted;
       }
     } catch (e) { console.error('[admin/tenants/create] acceptance email failed', e); }
 

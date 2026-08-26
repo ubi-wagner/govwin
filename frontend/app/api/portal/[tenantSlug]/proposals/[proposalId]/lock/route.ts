@@ -441,7 +441,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       `;
 
       if (tenantMembers.length > 0) {
-        const { sendEmail } = await import('@/lib/email');
+        const { send } = await import('@/lib/email');
         const [tenantRow] = await sql<{ name: string }[]>`
           SELECT name FROM tenants WHERE id = ${tenantId}::uuid
         `;
@@ -454,8 +454,16 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
 
         for (const member of tenantMembers) {
           try {
-            await sendEmail({
+            await send({
               to: member.email,
+              kind: 'transactional',
+              tenantId,
+              template: 'proposal_ready_for_customer',
+              // One notice per member per unlock. A repeated unlock of the same proposal is the
+              // same fact, so the key carries the proposal and the recipient but not a timestamp.
+              idempotencyKey: `proposal_ready:${proposalId}:${member.email.toLowerCase()}`,
+              tags: ['proposal'],
+              metadata: { proposal_id: proposalId },
               subject: `Your proposal is ready — ${pTitle}`,
               html: `
                 <p>Hi ${member.name || 'there'},</p>

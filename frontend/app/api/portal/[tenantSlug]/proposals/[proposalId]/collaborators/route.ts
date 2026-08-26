@@ -5,7 +5,7 @@ import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { collaboratorInviteEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
@@ -426,7 +426,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     const acceptUrl = `${base}/invite/${collaboratorId}`;
     const proposalUrl = `${base}/portal/${tenantSlug}/proposals/${proposalId}`;
     const inviterName = (session.user as { name?: string }).name || sessionUser.email || 'A team member';
-    let emailResult: { provider: string; error?: string } = { provider: 'skipped' };
+    let emailResult: { provider: string; accepted: boolean; error?: string | null } =
+      { provider: 'skipped', accepted: false };
     try {
       const emailContent = collaboratorInviteEmail({
         recipientName: name,
@@ -439,17 +440,23 @@ export async function POST(request: Request, ctx: RouteContext) {
         acceptUrl,
         proposalUrl,
       });
-      emailResult = await sendEmail({
+      emailResult = await send({
         to: email,
         subject: emailContent.subject,
         html: emailContent.html,
+        kind: 'transactional',
+        tenantId,
+        template: 'collaborator_invite',
+        idempotencyKey: `collaborator_invite:${proposalId}:${email.toLowerCase()}`,
+        tags: ['invite'],
+        metadata: { proposal_id: proposalId },
       });
     } catch (emailErr) {
       console.error('[api/portal/proposals/collaborators] invite email failed', {
         email,
         err: emailErr instanceof Error ? emailErr.message : String(emailErr),
       });
-      emailResult = { provider: 'skipped', error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
+      emailResult = { provider: 'skipped', accepted: false, error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
     }
 
     // Emit email delivery completion event (closed-loop)
@@ -462,7 +469,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         payload: {
           recipientEmail: email,
           proposalId,
-          status: emailResult.provider !== 'skipped' && !emailResult.error ? 'sent' : 'failed',
+          status: emailResult.accepted ? 'sent' : 'failed',
           provider: emailResult.provider,
           error: emailResult.error ?? null,
         },

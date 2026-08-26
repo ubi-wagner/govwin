@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sql } from '@/lib/db'
-import { sendEmail } from '@/lib/email'
+import { send } from '@/lib/email'
 import { emitEventSingle, systemActor } from '@/lib/events'
 
 /**
@@ -61,8 +61,19 @@ export async function POST(request: Request) {
         const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
         const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalized)}`
 
-        await sendEmail({
+        await send({
           to: normalized,
+          kind: 'transactional',
+          // Platform scope. Identity is global — auth resolves a user before any tenant context
+          // exists — so a reset belongs to no tenant even when the user has one.
+          tenantId: null,
+          template: 'password_reset',
+          tags: ['identity'],
+          // DELIBERATELY NO idempotencyKey. Every other converted call site has a natural key so a
+          // replay cannot double-send; this one must NOT, because asking twice is a legitimate
+          // thing a person does when the first mail does not arrive. A natural key here would make
+          // the product silently refuse the second request while still answering `{ sent: true }`,
+          // which is worse than a duplicate.
           subject: 'Reset Your RFP Pipeline Password',
           html: `
             <h2>Password Reset</h2>

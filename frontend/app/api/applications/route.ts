@@ -18,7 +18,7 @@ import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { adminNewApplicationAlert } from '@/lib/email-templates';
 
 const ApplicationSchema = z.object({
@@ -186,10 +186,18 @@ export async function POST(request: Request) {
       techSummary: input.techSummary.slice(0, 300),
       adminDashboardUrl: `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || ''}/admin/applications`,
     });
-    await sendEmail({
+    await send({
       to: adminEmail,
       subject: adminEmailContent.subject,
       html: adminEmailContent.html,
+      kind: 'transactional',
+      tenantId: null,
+      template: 'admin_new_application',
+      // The application row is the natural key: a client that retries the submit gets a new
+      // application and a new alert, which is correct — a re-POST of the SAME application cannot
+      // reach here, because the insert above would have created a different row.
+      idempotencyKey: rows[0]?.id ? `admin_new_application:${rows[0].id}` : undefined,
+      tags: ['admin-alert'],
     });
 
     // Raise an rfp_admin triage ToDo so the application lands in the work-item ledger
