@@ -82,10 +82,12 @@ export async function setBaseline(
         payload: { projectId, name: project.name },
       },
       async () => {
-        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts):
+        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts),
+        // and those files carry NO eslint-disable — the rule is not configured in this project,
+        // so naming it in a disable comment is itself a build error:
+        //   Error: Definition for rule '@typescript-eslint/no-explicit-any' was not found.
         // postgres.js's TransactionSql type is not callable as a tagged template under this
         // config, and every transaction in the tree annotates it the same way.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const out = await sql.begin(async (tx: any) => {
           // NULL → value on every row. The trigger permits exactly this transition; a second call
           // would be value → different and is refused above with a legible message.
@@ -239,10 +241,12 @@ export async function rebaseline(
         payload: { projectId, shiftDays, reason },
       },
       async () => {
-        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts):
+        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts),
+        // and those files carry NO eslint-disable — the rule is not configured in this project,
+        // so naming it in a disable comment is itself a build error:
+        //   Error: Definition for rule '@typescript-eslint/no-explicit-any' was not found.
         // postgres.js's TransactionSql type is not callable as a tagged template under this
         // config, and every transaction in the tree annotates it the same way.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const out = await sql.begin(async (tx: any) => {
           // ONLY the planned_* columns. The baseline_* columns are not in this statement at all —
           // and if a future edit added them, the trigger would refuse the write rather than let it

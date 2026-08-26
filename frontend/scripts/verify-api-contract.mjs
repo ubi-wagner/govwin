@@ -122,7 +122,13 @@ async function bindings() {
   const [src] = await sql`SELECT id FROM source_profiles LIMIT 1`.catch(() => [undefined]);
   const [usr] = await sql`
     SELECT u.id FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE t.slug = 'foundation' LIMIT 1`;
+  // Delivery (migration 216). Without this the five delivery GETs land in `unbound` — reported,
+  // which is the honest outcome, but uncovered rather than passing. A seeded project binds them.
+  const [proj] = await sql`
+    SELECT d.id FROM delivery_projects d JOIN tenants t ON t.id = d.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY d.created_at LIMIT 1`.catch(() => [undefined]);
   return {
+    projectId: proj?.id,
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, artifactId: art?.id,
     atomId: atom?.id, bucketId: bucket?.id, cardId: card?.id, taskId: task?.id,
     instanceId: inst?.id, solId: sol?.id, opportunityId: opp?.id, tenantId: tenant?.id,
