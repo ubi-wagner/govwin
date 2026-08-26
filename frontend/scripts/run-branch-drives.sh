@@ -123,6 +123,19 @@ else
   echo "║ CROSS-TENANT REFERENCES EXIST — data must move by inward COPY, never by reference.    ║"
   echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
   sed 's/^/  /' "$OUT/tenant-invariant.log" | tail -12
+  # AND IT FAILS THE RUN. This branch used to print the banner and fall through, so the suite
+  # reported "39 passed · 0 failed" and exited 0 with a live cross-tenant reference on the box —
+  # a green that is not green, and the one thing most likely to be believed without reading.
+  #
+  # It contradicted this file's own rule, stated in its header: a drive that cannot run "is still a
+  # FAILURE here — it is uncovered, not passing". A stored reference across the tenant boundary is
+  # strictly worse than uncovered; it is a violation of a non-negotiable invariant, found. The RLS
+  # posture preflight above already acts on what it finds (it marks the isolation drives CANT-RUN);
+  # this one only talked.
+  #
+  # It does NOT abort: the drives below still measure real things, and killing the run would trade
+  # one blind spot for another. The violation is carried to the summary and forces a non-zero exit.
+  INVARIANT_VIOLATION=1
 fi
 
 # ── PREFLIGHT: does anything in this suite still point at a row that no longer exists? ──────────
@@ -372,9 +385,13 @@ done
 echo
 echo "── ${pass} passed · ${fail} failed · ${cantrun} could-not-run · ${missing} missing ──"
 echo "   (could-not-run measured NOTHING — it is uncovered, not passing, and not a finding)"
+if [ "${INVARIANT_VIOLATION:-0}" -ne 0 ]; then
+  echo "   ✗ CROSS-TENANT REFERENCES were found by the preflight — see $OUT/tenant-invariant.log"
+  echo "     Every drive above may be green and the box is still in violation. This fails the run."
+fi
 # Decide on the COUNTERS, not on the array — an empty array expansion is exactly what tripped
 # `set -u` here and made a fully green run exit with a shell error.
-if [ $((fail + cantrun + missing)) -gt 0 ]; then
+if [ $((fail + cantrun + missing + ${INVARIANT_VIOLATION:-0})) -gt 0 ]; then
   echo "logs for the failures:"
   for f in ${FAILED[@]+"${FAILED[@]}"}; do echo "  $OUT/${f%% *}.log"; done
   exit 1
