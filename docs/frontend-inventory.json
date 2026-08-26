@@ -40,7 +40,7 @@
   {
    "kind": "lib",
    "files": 303,
-   "lines": 60145
+   "lines": 60161
   },
   {
    "kind": "middleware",
@@ -70,7 +70,7 @@
   {
    "kind": "test",
    "files": 211,
-   "lines": 28180
+   "lines": 28240
   }
  ],
  "records": [
@@ -3669,8 +3669,8 @@
   {
    "file": "__tests__/delivery-dates.test.ts",
    "kind": "test",
-   "lines": 92,
-   "bytes": 3937,
+   "lines": 152,
+   "bytes": 7511,
    "client": false,
    "exports": [],
    "imports": [
@@ -3725,7 +3725,28 @@
     "expect(varianceLabel(1)?.text).toBe",
     "expect(varianceLabel(-1)?.text).toBe",
     "expect(varianceLabel(0)).toBeNull",
-    "expect(varianceLabel(null)).toBeNull"
+    "expect(varianceLabel(null)).toBeNull",
+    "src\n    .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "src.replace",
+    "join",
+    "expect(BAD.test(stripComments('const v = String(row.baselineDate).slice(0, 10);'))).toBe",
+    "BAD.test",
+    "stripComments",
+    "expect(BAD.test(stripComments('const v = d.toISOString().slice(0, 10);'))).toBe",
+    "expect(BAD.test(stripComments('// was String(x).slice(0, 10)\\n'))).toBe",
+    "expect(BAD.test(stripComments('/* was String(x).slice(0, 10) */\\n'))).toBe",
+    "existsSync",
+    "readdirSync(dir, { withFileTypes: true }).flatMap",
+    "readdirSync",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "ROOTS\n      .flatMap((r) => walk(join(root, r)))\n      .map((f) => relative(root, f)).filter",
+    "ROOTS\n      .flatMap((r) => walk(join(root, r))).map",
+    "ROOTS.flatMap",
+    "relative",
+    "readFileSync",
+    "expect(offenders, 'use isoDate()/daysBetween() from lib/delivery/dates.ts').toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -92447,8 +92468,8 @@
   {
    "file": "lib/delivery/baseline.ts",
    "kind": "lib",
-   "lines": 329,
-   "bytes": 14678,
+   "lines": 334,
+   "bytes": 15059,
    "client": false,
    "exports": [
     {
@@ -92513,6 +92534,12 @@
      ]
     },
     {
+     "spec": "./dates",
+     "names": [
+      "isoDate"
+     ]
+    },
+    {
      "spec": "./projects",
      "names": [
       "readiness",
@@ -92525,31 +92552,31 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 51
+     "line": 52
     },
     {
      "tag": "sql",
-     "line": 195
+     "line": 200
     },
     {
      "tag": "sql",
-     "line": 218
+     "line": 223
     },
     {
      "tag": "sql",
-     "line": 304
+     "line": 309
     }
    ],
    "calls": [
     "canAssign",
     "canAccessProject",
-    "String(project.baselinedAt).slice",
-    "String",
+    "isoDate",
     "readiness",
     "ready.missing.join",
     "withEventBracket",
     "userActor",
     "sql.begin",
+    "String",
     "auditLog",
     "console.error",
     "(input.reason ?? '').trim",
@@ -92809,8 +92836,8 @@
   {
    "file": "lib/delivery/milestones.ts",
    "kind": "lib",
-   "lines": 417,
-   "bytes": 19103,
+   "lines": 428,
+   "bytes": 19828,
    "client": false,
    "exports": [
     {
@@ -92899,6 +92926,12 @@
      ]
     },
     {
+     "spec": "./dates",
+     "names": [
+      "daysBetween"
+     ]
+    },
+    {
      "spec": "./projects",
      "names": [
       "Fail",
@@ -92910,15 +92943,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 62
+     "line": 63
     },
     {
      "tag": "sql",
-     "line": 76
-    },
-    {
-     "tag": "sql",
-     "line": 119
+     "line": 77
     },
     {
      "tag": "sql",
@@ -92926,43 +92955,47 @@
     },
     {
      "tag": "sql",
-     "line": 126
+     "line": 121
     },
     {
      "tag": "sql",
-     "line": 169
+     "line": 127
     },
     {
      "tag": "sql",
-     "line": 183
+     "line": 170
     },
     {
      "tag": "sql",
-     "line": 242
+     "line": 184
     },
     {
      "tag": "sql",
-     "line": 249
+     "line": 247
     },
     {
      "tag": "sql",
-     "line": 303
+     "line": 254
     },
     {
      "tag": "sql",
-     "line": 310
+     "line": 308
     },
     {
      "tag": "sql",
-     "line": 320
+     "line": 315
     },
     {
      "tag": "sql",
-     "line": 375
+     "line": 325
     },
     {
      "tag": "sql",
-     "line": 387
+     "line": 386
+    },
+    {
+     "tag": "sql",
+     "line": 398
     }
    ],
    "calls": [
@@ -92978,10 +93011,7 @@
     "outstanding.slice(0, 3).map((d) => d.title).join",
     "outstanding.slice(0, 3).map",
     "outstanding.slice",
-    "Math.round",
-    "Date.parse",
-    "String",
-    "String(row.baselineDate).slice",
+    "daysBetween",
     "emitEventSingle",
     "userActor",
     "(input.filename ?? '').trim",

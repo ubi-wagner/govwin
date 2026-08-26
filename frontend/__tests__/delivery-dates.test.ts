@@ -89,3 +89,63 @@ describe('varianceLabel', () => {
     expect(varianceLabel(null)).toBeNull();
   });
 });
+
+/**
+ * ── AND A GUARD, BECAUSE THIS HAS NOW HAPPENED THREE TIMES ───────────────────────────────────
+ * The D8 fix repaired the *page* and left two siblings holding the identical idiom:
+ *
+ *   lib/delivery/milestones.ts   the milestone variance in the `project.milestone.met` payload —
+ *                                NaN, and `JSON.stringify(NaN)` is `null`, so every met milestone
+ *                                recorded "no baseline" instead of "nine days late", permanently
+ *   lib/delivery/baseline.ts     the ALREADY_BASELINED message, shown to a person, reading
+ *                                "This project was baselined on Tue Apr 28" — no year
+ *
+ * Neither is reachable by a unit test without a database, and both are invisible to every lens:
+ * one lives in an event payload nothing renders, the other in a 409 body no happy path produces.
+ * A grep is the only instrument that sees them, so it is the instrument.
+ *
+ * Narrow on purpose. It matches `String(x).slice(0, 10)` — slicing a value's *string form*, which
+ * is only correct if the value is already ISO, and a `date`/`timestamptz` column never is.
+ * `toISOString().slice(0, 10)` is untouched: that one is right, and it is what `isoDate` does.
+ *
+ * COMMENTS ARE STRIPPED FIRST. Every file that fixes this bug quotes it — including this one — and
+ * a guard that cannot tell a warning from an offence would force the fix to stop describing what
+ * it fixed. No file is exempt once the comments are gone, `dates.ts` included.
+ */
+describe('the delivery module does not slice the string form of a date', () => {
+  const ROOTS = ['lib/delivery', 'components/delivery', 'app/portal/[tenantSlug]/delivery'];
+  // The lookbehind is load-bearing: `toISOString()` ENDS IN `String()`, so a bare `String\(` also
+  // matches the one idiom that is correct — and the first version of this guard did, which is why
+  // it was written with `dates.ts` exempted. The exemption was hiding the flaw. The self-test
+  // below is what surfaced it.
+  const BAD = /(?<![A-Za-z0-9_$])String\([^)]*\)\s*\.slice\(\s*0\s*,\s*10\s*\)/;
+  const stripComments = (src: string) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('has no `String(…).slice(0, 10)` in delivery code', async () => {
+    const { readdirSync, readFileSync, existsSync } = await import('node:fs');
+    const { join, relative } = await import('node:path');
+    const root = join(__dirname, '..');
+
+    // The guard has to be able to SEE the thing it guards against, or a clean run means nothing —
+    // and it has to leave the correct idiom alone, or it is a nuisance rather than a check.
+    expect(BAD.test(stripComments('const v = String(row.baselineDate).slice(0, 10);'))).toBe(true);
+    expect(BAD.test(stripComments('const v = d.toISOString().slice(0, 10);'))).toBe(false);
+    expect(BAD.test(stripComments('// was String(x).slice(0, 10)\n'))).toBe(false);
+    expect(BAD.test(stripComments('/* was String(x).slice(0, 10) */\n'))).toBe(false);
+
+    const walk = (dir: string): string[] => (existsSync(dir)
+      ? readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory()
+        ? walk(join(dir, e.name))
+        : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []))
+      : []);
+
+    const offenders = ROOTS
+      .flatMap((r) => walk(join(root, r)))
+      .map((f) => relative(root, f))
+      .filter((rel) => BAD.test(stripComments(readFileSync(join(root, rel), 'utf8'))));
+
+    expect(offenders, 'use isoDate()/daysBetween() from lib/delivery/dates.ts').toEqual([]);
+  });
+});

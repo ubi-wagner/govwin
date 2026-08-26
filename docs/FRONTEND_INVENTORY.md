@@ -20,14 +20,14 @@
 | component | 163 | 41,516 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 303 | 60,145 |
+| lib | 303 | 60,161 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
 | page | 118 | 17,883 |
 | script | 184 | 24,175 |
 | server-action | 1 | 45 |
-| test | 211 | 28,180 |
-| **total** | **1366** | **233,147** |
+| test | 211 | 28,240 |
+| **total** | **1366** | **233,223** |
 
 ## 2. Pages — every addressable customer/admin surface
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useClientNow } from '@/components/ui/time-ago';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -88,10 +89,19 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function formatRelative(iso: string): string {
+/**
+ * Relative time, with the mount rule from `components/ui/time-ago.tsx`.
+ *
+ * `now` is null until mounted, so the first paint — server and client alike — is a deterministic UTC
+ * stamp. Reading the clock during render makes the text a function of WHEN it rendered, the server
+ * and the client disagree by a second, and React #418 takes the whole subtree to its error boundary
+ * while the route answers 200 (bug-log B79). Wording unchanged, including the absolute date past a
+ * week: this is a hydration fix, not a copy change.
+ */
+function formatRelative(iso: string, now: number | null): string {
   const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
+  if (now === null) return d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+  const diffMs = now - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -130,6 +140,8 @@ interface SourceCardProps {
 }
 
 function SourceCard({ source, onRefresh }: SourceCardProps) {
+  // Null until mounted — see formatRelative(). B79: reading the clock in render breaks hydration.
+  const now = useClientNow();
   const [showNotes, setShowNotes] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
@@ -298,7 +310,7 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
             </span>
           )}
           <span className="text-gray-400">
-            Last crawl: {source.lastCrawlAt ? formatRelative(source.lastCrawlAt) : 'never'}
+            Last crawl: {source.lastCrawlAt ? formatRelative(source.lastCrawlAt, now) : 'never'}
           </span>
         </div>
 
@@ -439,6 +451,7 @@ interface ActivityTimelineProps {
 }
 
 function ActivityTimeline({ visits }: ActivityTimelineProps) {
+  const now = useClientNow();
   if (visits.length === 0) {
     return (
       <div className="text-sm text-gray-500 py-4 text-center">
@@ -454,7 +467,7 @@ function ActivityTimeline({ visits }: ActivityTimelineProps) {
         return (
           <div key={v.id} className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
             <div className="text-xs text-gray-400 w-24 shrink-0 pt-0.5">
-              {formatRelative(v.createdAt)}
+              {formatRelative(v.createdAt, now)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -487,6 +500,7 @@ interface RecentChangesFeedProps {
 }
 
 function RecentChangesFeed({ diffs }: RecentChangesFeedProps) {
+  const now = useClientNow();
   if (diffs.length === 0) {
     return (
       <div className="text-sm text-gray-500 py-4 text-center">
@@ -502,7 +516,7 @@ function RecentChangesFeed({ diffs }: RecentChangesFeedProps) {
         return (
           <div key={d.id} className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
             <div className="text-xs text-gray-400 w-24 shrink-0 pt-0.5">
-              {formatRelative(d.createdAt)}
+              {formatRelative(d.createdAt, now)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

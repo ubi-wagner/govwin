@@ -20,6 +20,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerDeliveryPath } from '@/lib/storage/paths';
 import { canAccessProject, canAssign, type DeliveryActor } from './access';
+import { daysBetween } from './dates';
 import type { Fail, Ok } from './projects';
 
 export interface Milestone {
@@ -196,9 +197,13 @@ export async function markMilestoneMet(
 
     // The variance, computed once and carried in the payload, so the activity feed can say
     // "met, nine days late" without re-deriving it from two dates a reader has to subtract.
-    const variance = row.baselineDate && row.metAt
-      ? Math.round((Date.parse(String(row.metAt)) - Date.parse(`${String(row.baselineDate).slice(0, 10)}T00:00:00Z`)) / 86_400_000)
-      : null;
+    //
+    // Via `daysBetween`, NOT by slicing the string form of a Date. This line used to read
+    // `String(row.baselineDate).slice(0, 10)` — which is "Tue Apr 28", so the subtraction was NaN,
+    // and `JSON.stringify(NaN)` is `null`: the event carried "no baseline" instead of "nine days
+    // late", silently and forever. Same defect as the D8 page bug, in the sibling the D8 fix did
+    // not touch.
+    const variance = daysBetween(row.baselineDate, row.metAt);
 
     await emitEventSingle({
       namespace: 'project',
@@ -328,6 +333,12 @@ export async function uploadDeliverable(
        WHERE id = ${deliverableId}::uuid AND tenant_id = ${actor.tenantId}::uuid
       RETURNING id, milestone_id, title, required_by, storage_key, filename, content_type,
                 byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index`;
+    // The row was there a statement ago; if it is not now, something removed it mid-upload. Say so
+    // rather than returning `{ ok: true, data: undefined }` — which type-checks (postgres.js rows
+    // are not `| undefined` without noUncheckedIndexedAccess) and reaches the client as `{}`.
+    if (!row) {
+      return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
+    }
 
     await emitEventSingle({
       namespace: 'project',

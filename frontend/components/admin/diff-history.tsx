@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useClientNow } from '@/components/ui/time-ago';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -30,10 +31,23 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
 };
 
-function formatRelative(iso: string): string {
+/**
+ * Relative time, with the mount rule from `components/ui/time-ago.tsx`.
+ *
+ * `now` is null until the client has mounted, so the FIRST paint — server and client alike — is a
+ * deterministic UTC stamp and the relative form appears on the next tick. Reading the clock during
+ * render instead makes the text a function of WHEN it rendered: the server writes "just now", the
+ * client hydrates a beat later and writes "1m ago", and React throws #418, which takes the whole
+ * subtree to its error boundary while the route answers 200. That is bug-log B79, and this is one of
+ * the occurrences the D9 sweep found still open.
+ *
+ * The wording is kept exactly as it was — including the absolute date past a week, which the shared
+ * `relativeFrom` does not do — so this is a hydration fix and not a copy change.
+ */
+function formatRelative(iso: string, now: number | null): string {
   const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
+  if (now === null) return d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+  const diffMs = now - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -60,6 +74,8 @@ interface DiffHistoryProps {
 
 export default function DiffHistory({ profileId, diffs, onReviewed }: DiffHistoryProps) {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  // Null until mounted — see formatRelative(). Ticks so an open tab does not go stale.
+  const now = useClientNow();
 
   const handleReview = useCallback(async (diffId: string) => {
     setReviewingId(diffId);
@@ -99,7 +115,7 @@ export default function DiffHistory({ profileId, diffs, onReviewed }: DiffHistor
           <div key={diff.id} className="flex items-start gap-3 px-4 py-3">
             {/* Timestamp */}
             <div className="text-xs text-gray-400 w-24 shrink-0 pt-0.5">
-              {formatRelative(diff.createdAt)}
+              {formatRelative(diff.createdAt, now)}
             </div>
 
             {/* Main content */}
@@ -142,7 +158,7 @@ export default function DiffHistory({ profileId, diffs, onReviewed }: DiffHistor
               {/* Reviewed status */}
               {diff.reviewedAt && (
                 <span className="text-xs text-gray-400">
-                  Reviewed {formatRelative(diff.reviewedAt)}
+                  Reviewed {formatRelative(diff.reviewedAt, now)}
                 </span>
               )}
             </div>

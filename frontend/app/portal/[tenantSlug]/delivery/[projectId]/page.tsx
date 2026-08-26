@@ -10,6 +10,7 @@ import { listMilestones, listDeliverables } from '@/lib/delivery/milestones';
 import { provenanceFor, badgeFor } from '@/lib/delivery/provenance';
 import { rollup } from '@/lib/delivery/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/delivery/dates';
+import { usd, spentOf } from '@/lib/delivery/money';
 import { DeliverableRow } from '@/components/delivery/deliverable-row';
 import { canAssign } from '@/lib/delivery/access';
 
@@ -131,9 +132,8 @@ export default async function DeliveryProjectPage({
           <Measure
             label="Cost"
             value={measures.project.costPct}
-            detail={measures.project.plannedCost
-              ? `${measures.project.actualCost} of ${measures.project.plannedCost} spent`
-              : 'nothing planned yet'}
+            detail={spentOf(measures.project.actualCost, measures.project.plannedCost)
+              ?? 'nothing planned yet'}
           />
           <Measure
             label="Schedule"
@@ -195,7 +195,7 @@ export default async function DeliveryProjectPage({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="tabular-nums text-gray-900">{c.fundedAmount ?? '—'}</div>
+                        <div className="tabular-nums text-gray-900">{usd(c.fundedAmount) ?? '—'}</div>
                         <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] ring-1 ring-inset ${BADGE_TONE[fundedBadge.tone]}`}>
                           {fundedBadge.label}
                         </span>

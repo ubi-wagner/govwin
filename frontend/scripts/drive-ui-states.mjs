@@ -409,6 +409,32 @@ const LANES = {
   collab: { label: 'partner_user', email: 'collab@lighthouse.com', pw: process.env.COLLAB_PW || 'CollabPass1' },
 };
 
+/**
+ * ── THE DRIVE'S SCOPE IS THE ATLAS, SO A PARTIAL ATLAS IS A HARNESS DEFECT ───────────────────
+ * This ran once against an index a `--lane tenant` capture had overwritten. Five of six lanes had
+ * zero routes, `if (!mine.length) continue` skipped them **without a word**, and the run finished
+ * `EXIT=0` with "94 state screenshot(s) across 29 route(s)" — while the committed index from the
+ * previous full run held 311 shots across 123 routes. Nothing failed. The scope silently shrank to
+ * a quarter, and the only trace was arithmetic in a header nobody subtracts.
+ *
+ * A lane with no routes is now REPORTED, and on a full run it is fatal: a sweep that cannot see
+ * five of its six actors has no business printing a clean summary.
+ */
+const laneCounts = Object.fromEntries(
+  Object.keys(LANES).map((id) => [id, atlas.shots.filter((s) => s.lane === id && !s.redirected).length]),
+);
+const empty = Object.entries(laneCounts).filter(([, n]) => n === 0).map(([id]) => id);
+if (!ONLY && empty.length) {
+  console.error(`✗ HARNESS DEFECT — the atlas index carries no routes for ${empty.length} lane(s): ${empty.join(', ')}`);
+  console.error(`  Lanes present: ${Object.entries(laneCounts).filter(([, n]) => n).map(([id, n]) => `${id}=${n}`).join(' · ')}`);
+  console.error('  Every lane below would be unmeasured, and a clean summary would be unearned.');
+  console.error('  Re-capture the full atlas first:  node scripts/capture-ui-atlas.mjs');
+  process.exit(2);
+}
+if (atlas.partialLanes?.length) {
+  console.log(`· note: the atlas index was last refreshed for lane(s) ${atlas.partialLanes.join(', ')} only; other lanes are carried forward`);
+}
+
 console.log(`· serving ${BASE} · driving overlays on ${atlas.shots.length} captured route(s), ≤${LIMIT} triggers each`);
 const before = await tableCounts();
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });

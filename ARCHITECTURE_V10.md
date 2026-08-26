@@ -579,9 +579,9 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 184)
+## 7. New / Changed Schema (migrations 093 → 217)
 
-Highest migration: **184** (179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **217** (215 email ledger · 216 delivery spine · 217 the `project` namespace — see §7.x; 214 closed a committed demo credential; 185–213 per docs/; 179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
@@ -630,6 +630,36 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
   PK `(group_atom_id, member_atom_id)`, **`atom_lineage`** PK `(parent_atom_id, child_atom_id)` CHECK
   parent≠child, **`document_cocoons`**, **`taxonomy_terms`** UNIQUE `(dimension, value)`.
 - **`proposal_compliance_matrix`** (pre-exists mig 001) — now *populated*.
+
+### 7.x The outbound-email ledger and the post-award delivery spine (migs 215 → 217)
+
+Two capabilities landed after 184 and both add tables rather than change the existing spine.
+
+- **mig 215 — the email seam.** `email_send_ledger` (**not** `email_sends`: the CRM already owns a table
+  of that name in `cms-postgres`, and `rfp-crm` holds pools to *both* databases, so the collision was
+  real) + `email_suppressions` (`CHECK (email = lower(email))`, so a case variant cannot slip past a
+  suppression). The ledger's SELECT policy is **equality only** — no `OR tenant_id IS NULL` arm, the
+  `episodic_memories` shape from mig 186 rather than the `tasks` shape from 185 — and there is **no write
+  policy at all**: every insert goes through the seam under an explicit bypass, so an app-context writer
+  cannot forge a send record. One row is RESERVED *before* dispatch and confirmed after, which is what
+  makes a crash mid-send visible instead of invisible.
+- **mig 216 — delivery.** Eight tables: `delivery_projects`, `delivery_assignments`,
+  `delivery_source_documents`, `delivery_clins`, `delivery_wbs_nodes`, `delivery_milestones`,
+  `delivery_deliverables`, `delivery_provenance`. Every one carries `tenant_id` **NOT NULL and directly**
+  — never by lineage through a parent — with force-RLS and a `tenant_isolation` policy, because a policy
+  that has to join to find its tenant is a policy that can be joined around. Baseline immutability is a
+  **trigger** raising `23001`, not an app rule: an app-layer rule protects only the writers that exist
+  today, and the baseline is the one value in the capability that cannot be recomputed once lost. Note
+  `forecast_date` — the design's DDL said `current_date`, which is a reserved word and would not have
+  applied.
+- **mig 217 — the `project` namespace.** Widens `system_events_namespace_chk` to 8. See §6.2.
+
+Assignment — *which employees* of a tenant see a project — is **app-enforced** in one predicate
+(`lib/delivery/access.ts`), because the per-request context carries `app.tenant_id` and nothing else;
+expressing it in RLS would mean putting a user id into the request context for every table in the
+database to serve one feature. That belt is load-bearing exactly as CLAUDE.md says of platform rows:
+a reader that omits it leaks, and RLS will not catch it. `partner_user` is refused the capability
+outright, which is what removes cross-tenant from delivery entirely.
 
 ### Table drops & the drop rule (migs 121, 125)
 

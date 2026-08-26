@@ -461,3 +461,253 @@ stays unfinished.
 ---
 
 *D8 onward appended as built.*
+## D8 · The UI — and two visible defects every automated lens passed
+
+**Shipped:** `app/portal/[tenantSlug]/delivery/page.tsx` (the list),
+`app/portal/[tenantSlug]/delivery/[projectId]/page.tsx` (the workspace), the nav entry in the portal
+layout, `components/delivery/deliverable-row.tsx` (the upload/accept controls),
+`lib/delivery/dates.ts`, `__tests__/delivery-dates.test.ts` (9),
+`frontend/scripts/seed-delivery-scenario.mjs`.
+
+### The rail item is shown to someone with nothing in it
+
+`deliveryScope` refuses `partner_user` outright and the link does not render for that role — delivery
+v1 has no collaborator surface, which is what takes cross-tenant out of this capability entirely. But
+an *employee with no assignments* still sees the link and lands on an empty list that explains who can
+add them. A missing rail item reads as "this company does not do delivery"; an empty list with a
+sentence reads as what it is.
+
+### The page refuses to state a number nobody measured
+
+Three measures side by side, never averaged, and a measure with no denominator renders **"not
+measured"** rather than `0%` — the UI half of D7's `null`-not-zero rule. Every CLIN field carries a
+provenance badge, and a value with no recorded source reads **Unverified**, not neutral: silence about
+where a number came from is the same claim as "we made it up".
+
+### All five lenses were green, and the page was visibly broken
+
+```
+Kickoff and SOW agreed          met  NaN days early against baseline
+0001  Base period …   Tue Apr 28 → Wed Apr 28
+```
+
+postgres.js returns a `date` column as a JavaScript `Date`; the page treated one as an ISO string.
+`String(d).slice(0,10)` gives `"Tue Apr 28"`, and `Date.parse` of that is `NaN`.
+
+Both halves of that are worth naming, because neither is a typo:
+
+* the variance rendered **at all** because `NaN !== 0` is true, and it labelled itself **early**
+  because `NaN > 0` is false, so the ternary took the cheerful branch. A wrong number would have been
+  better — a wrong number looks wrong.
+* the period of performance showed start and end identically because ten characters of a `Date`'s
+  string form cut before the year.
+
+`verify-surfaces` scored it clean (it rendered). `verify-api-contract` scored it clean (the envelope
+was textbook). `verify-ui-vs-db` scored it clean (its expectation is the page's own query, and the
+page's own query returned the right rows — the defect was in the *rendering* of them). None of those
+lenses is broken. **This is the case docs/UI_ATLAS.md exists for**, and it was found by opening the
+screenshot.
+
+### The fix's own test caught a flaw in the fix
+
+`lib/delivery/dates.ts` accepts whatever the driver hands back, and is unit-tested **against a real
+`Date`** — a test fed only ISO strings would have passed against the broken code too.
+
+The first version simply handed the string to `new Date()`. That does not throw and is not `Invalid
+Date`: Node parses `'Tue Apr 28'` and **invents a year**. So the exact value produced by the bug this
+file exists for would have been accepted and turned into a confident, wrong date. Hence `ISO_SHAPE` —
+a `Date` instance is trusted because the driver produced it, a string must look like an ISO date, and
+anything else is `null`.
+
+`daysBetween` returns `null`, never `NaN`: a milestone with no baseline has no variance, which is a
+different fact from "on time".
+
+### The seed exists so the photographs show something
+
+A page rendering its empty state is a valid render and proves almost nothing —
+`verify-ui-vs-db` in particular cannot compare a stated number to a held one when there are no rows.
+`seed-delivery-scenario.mjs` seeds one coherent award: both anchor documents, two CLINs whose
+provenance is deliberately *mixed* (one cited, one a deferral with a citation and no value, one with
+no provenance at all), a WBS whose child inherits its CLIN, milestones with real variance, and
+deliverables in all three states. A screenshot in which the three badges look the same is the failure
+the provenance model exists to prevent, so the fixture makes all three appear at once.
+
+### D8b · The controls the capability lens found unsurfaced
+
+The upload and accept routes shipped in D5 and **nothing called them.** Five green lenses said
+nothing, because none of them can: a route with no caller answers correctly to a harness and is
+invisible to a person. `reconcile-capability.mjs` reported the pair UNSURFACED in a feature written
+the same week — the class it exists for, caught inside its own build.
+
+`DeliverableRow` is the caller. Two controls, because they are two facts: any assigned employee
+attaches a file, only a tenant_admin accepts. Replacing a file revokes a prior acceptance server-side,
+so the confirm says so *first* rather than letting someone discover it afterwards. Accept is hidden
+when there is nothing to accept — the server still refuses, but that refusal is a backstop, not the
+first thing a person should meet.
+
+`tsc` 0 · vitest **2,120** · five lenses green · atlas re-shot.
+
+---
+
+## D9 · The verification pass — and three defects the pass itself found
+
+**Shipped:** the delivery block in `frontend/scripts/verify-ui-vs-db.mjs`, a lane-partial guard in
+`drive-ui-states.mjs`, a merge-not-replace index write in `capture-ui-atlas.mjs`, the date-idiom guard
+in `__tests__/delivery-dates.test.ts`, and fixes in `lib/delivery/milestones.ts` and
+`lib/delivery/baseline.ts`.
+
+The point of a verification pass is not to collect greens. Every finding below came from the pass.
+
+### 1 · The D8 date bug had two siblings the D8 fix did not touch
+
+`lib/delivery/dates.ts` repaired the *page*. A grep for the idiom that caused it found two more:
+
+| where | what it did |
+|---|---|
+| `milestones.ts` — the `project:milestone.met` payload | `String(baselineDate).slice(0,10)` → `NaN`, and `JSON.stringify(NaN)` is **`null`** — so every met milestone recorded "no baseline" instead of "nine days late", permanently and with nothing to notice |
+| `baseline.ts` — the ALREADY_BASELINED 409 | told a person *"This project was baselined on Tue Apr 28"* — **no year**, in a message whose only job is to say when |
+
+Neither is reachable by a unit test without a database, and neither is visible to any lens: one lives
+in an event payload nothing renders, the other in a 409 body no happy path produces. A grep is the
+only instrument that sees them, so a grep is now the instrument —
+`__tests__/delivery-dates.test.ts` scans the delivery tree for `String(…).slice(0, 10)`.
+
+Red-first, against `HEAD`: both files OFFEND before the fix, both clean after.
+
+**The guard's own self-test caught a flaw in the guard.** The first regex was
+`/String\([^)]*\)\.slice\(0, 10\)/` — and `toISOString()` **ends in** `String()`, so it also matched
+the one idiom that is correct. That is why the first version had `dates.ts` exempted: the exemption
+was hiding the defect rather than expressing a rule. A lookbehind fixed the regex, and no file is
+exempt now. Comments are stripped before matching, because every file that fixes this bug quotes it.
+
+### 2 · The `ui-vs-db` lens had no expectation for delivery at all
+
+Four hand-written blocks, none of them delivery — which under this repo's own rule means the surface
+was **uncovered, not passing**, and it is precisely the surface where two visible defects survived
+every other lens. The new block reconciles the deliverables denominator (`N of M accepted`) against
+the deliverables query **copied from `lib/delivery/rollup.ts`, GROUP BY and all**, checks the roster
+count, and asserts three things about the rendering itself:
+
+* no `NaN` anywhere — it reaches a page as literal text no matcher would otherwise look for, which
+  is exactly why nothing caught it
+* no `Invalid Date` — the sibling symptom of the same root cause
+* a period of performance renders as two ISO dates **whose ends differ** — `Tue Apr 28 → Wed Apr 28`
+  was the D8 symptom
+
+It also fails, rather than skipping, when there is no delivery project to reconcile against.
+
+### 3 · A `--lane` capture had silently shrunk the sweep to a quarter
+
+`docs/ui-atlas/index.json` is not only the atlas's report — `drive-ui-states.mjs` reads it to decide
+what to drive. A `capture-ui-atlas.mjs --lane tenant` run had **overwritten** it, leaving 40 shots
+all in one lane. The next full states drive then found five of its six lanes empty, skipped them at
+`if (!mine.length) continue` **without a word**, and finished `EXIT=0` with
+
+```
+94 state screenshot(s) across 29 route(s)
+```
+
+against a committed index from the previous full run holding **311 shots across 123 routes**. Nothing
+failed. Coverage fell by three quarters and the only trace was arithmetic in a header — 40 considered,
+29 driven — that nobody subtracts.
+
+Two changes, at both ends of the coupling:
+
+* a lane capture now **merges** into the index, replacing only its own lane and recording
+  `partialLanes`, so `--lane` can never narrow a downstream consumer's scope again;
+* a full states drive **exits 2 as a HARNESS DEFECT** when any lane has no routes, naming them.
+
+Red-first: the guard fires on exactly the index that produced the false-clean run.
+
+### 4 · The atlas caught an intermittent twice, on two different routes — and it was a bug class
+
+The full atlas reported `/partner` **broken**: `Minified React error #418`, a hydration mismatch,
+during a sweep of 153 pages. It did not reproduce — no structural divergence between the server HTML
+and the hydrated DOM, no invalid nesting, and 18 loads across 6 fresh sessions threw nothing. On its
+own that reads like noise.
+
+Then the next full sweep threw the same error on **`/admin/agents`**. Two routes with nothing in
+common, both only under sustained load. That is not a page defect; it is a **timing** defect, and the
+repo already has its name: **B79 — a `'use client'` component that reads the clock during render.**
+The server writes "just now", the client hydrates a beat later and computes "1m ago", the text does
+not match, React throws #418, and **hydration fails for the whole subtree while the route answers
+HTTP 200 the entire time.** It is intermittent by construction: the two renders usually agree, and
+disagree only when the gap between them crosses a rounding boundary — which is exactly what a
+153-page sweep makes likely and a single local load makes vanishingly unlikely.
+
+`components/ui/time-ago.tsx` was written for this, after occurrences one to three. **Five components
+had re-implemented the unsafe version anyway:**
+
+| file | helper | granularity |
+|---|---|---|
+| `components/portal/proposal-timeline.tsx` | `relativeTime` | **seconds** — customer-facing, on every proposal |
+| `components/scout/candidate-queue.tsx` | `rel` | **seconds** |
+| `components/admin/recent-sessions.tsx` | `relTime` | **seconds** |
+| `components/admin/diff-history.tsx` | `formatRelative` | minutes, `just now` |
+| `components/admin/source-card-actions.tsx` | `formatRelative` | minutes, `just now` (3 call sites) |
+
+All five now go through the mount rule — `now` is null until mounted, so the first paint is a
+deterministic UTC stamp on both sides and the relative form appears on the next tick. The two with an
+absolute-date fallback past a week keep their exact wording: this is a hydration fix, not a copy
+change.
+
+And a guard, because this is the eighth occurrence: `__tests__/client-clock-in-render.test.ts` matches
+the SHAPE — a module-level function in a `'use client'` file that reads the clock, builds a
+relative-time string, and is called from JSX. A clock read inside an effect, a handler or a `useMemo`
+is fine and is not matched. Red-first against `HEAD`: it fires on all five, and is clean on all five
+fixes.
+
+**What this does not claim.** I have not reproduced #418 on a fixed build under load, so I cannot say
+the two observed throws were *these* five components — none of them renders on `/partner` or
+`/admin/agents`. What is established is that the class was live in five places, that it produces
+exactly this signature, and that it is now closed in those five. If a sweep throws again, the next
+step is a dev-build capture where React names the component.
+
+### 5 · A third defect, and the picture caught this one too
+
+```
+FUNDED
+1100000.00                       ← $1.1M, or $11,000.00 with a stray zero?
+805000 of 1750000 spent
+```
+
+Every number was **correct**, and `verify-ui-vs-db` compares the value the page states to the value
+the table holds — so it matched, exactly. `numeric` comes back from postgres.js as a string, and the
+page rendered the string. On a federal contract workspace the funded amount is the first number a
+reader looks for, and a wall of digits with no separator and no currency is not a style preference:
+it is a number the reader has to count on their fingers before they trust it.
+
+`lib/delivery/money.ts` follows the house convention (`lib/export/canvas-html.ts:172`) — `$`, `en-US`
+grouping, no cents. Cents on a million-dollar CLIN are noise; the ledger keeps them, the page does not
+show them. **The unit test caught a hole in the first version**: `Number(String([]))` is `0`, so an
+empty array rendered as **`$0`** — a confident zero on a funded amount, which is the failure this
+whole codebase keeps fighting. `usd` now takes a number or a numeric-shaped string and nothing else.
+
+### The pass itself
+
+| instrument | result |
+|---|---|
+| `verify-surfaces` | 80 surfaces · 80 clean · 0 broken · 3 unaddressable, each reported |
+| `verify-api-contract` | 139 GETs on disk · 119 graded · 4 exempt · 16 unbound · **0 no-actor** |
+| `verify-ui-vs-db` | every stated number matches, **including the new delivery block** |
+| `verify-db-crud` | every write landed; fixture restored |
+| `verify-write-contract` | 225 write verbs · 225 called · 0 no-actor |
+| `verify-delivery-isolation` | 13 assertions — RLS, cross-tenant INSERT refused, baseline immutable |
+| `verify-delivery-rollup` | 9 assertions against hand-computed values |
+| `verify-email-ledger-rls` | 8 assertions — own rows visible, foreign and platform rows not, writes refused |
+| `check-rls-posture` | 67 policies · 44 force-RLS tables · 53 tenant-owned tables partition cleanly |
+| `audit-automation-spine` | 0 dead triggers · 0 dead waits · 0 unclosed brackets · **119** step actions all resolve · 17 NOTIFY steps all have a renderer |
+| `reconcile-capability` | UNSURFACED back to the pre-existing **6** — none of them delivery |
+| `drive-ui-states` | **273 states across 126 routes in 6 lanes** (the pre-guard run: 94 across 29 in one) · 2 harness navigation aborts, reported not swallowed |
+| `capture-ui-atlas` | 153 shots · 118 routes considered · 0 no-actor |
+| build | `tsc` 0 · vitest **212 files / 2,130 tests** · `next build` 0 |
+
+Every mutating drive ran between a `pg_dump` and a `pg_restore`, and the restore was verified against
+the pre-drive counts (27 tasks · 45 bucket scores · 2 delivery projects · 4,023 events · 863 atoms).
+
+**What is still uncovered, stated rather than implied:** `verify-db-crud` has no delivery block — the
+two purpose-built delivery drives cover that ground more closely than a generic CRUD walk would, but
+that is a judgement, not a measurement. `/admin/site` produced no states this run (a navigation abort
+the drive reported); the atlas renders it 200. And `/partner` threw once and has not since.
+
+---

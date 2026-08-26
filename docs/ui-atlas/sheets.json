@@ -1,5 +1,47 @@
 [
  {
+  "lane": "anon",
+  "part": 1,
+  "parts": 2,
+  "file": "sheet-anon-1.png",
+  "routes": [
+   "/",
+   "/about",
+   "/apply",
+   "/blog/[slug]",
+   "/customers",
+   "/engine",
+   "/features",
+   "/forgot-password",
+   "/get-started",
+   "/how-it-works",
+   "/infosec",
+   "/invite/[token]",
+   "/legal",
+   "/legal/acceptable-use",
+   "/legal/ai-disclosure",
+   "/legal/privacy"
+  ]
+ },
+ {
+  "lane": "anon",
+  "part": 2,
+  "parts": 2,
+  "file": "sheet-anon-2.png",
+  "routes": [
+   "/legal/terms",
+   "/login",
+   "/pricing",
+   "/reset-password",
+   "/resources",
+   "/resources/[slug]",
+   "/security",
+   "/team",
+   "/the-expert",
+   "/value"
+  ]
+ },
+ {
   "lane": "tenant",
   "part": 1,
   "parts": 3,
@@ -61,6 +103,157 @@
    "/portal/[tenantSlug]/todos",
    "/portal/[tenantSlug]/vaults",
    "/select-company"
+  ]
+ },
+ {
+  "lane": "tenant2",
+  "part": 1,
+  "parts": 3,
+  "file": "sheet-tenant2-1.png",
+  "routes": [
+   "/change-password",
+   "/dashboard",
+   "/federal-rd-101",
+   "/go",
+   "/portal",
+   "/portal/[tenantSlug]",
+   "/portal/[tenantSlug]/activity",
+   "/portal/[tenantSlug]/agents",
+   "/portal/[tenantSlug]/atoms",
+   "/portal/[tenantSlug]/automation",
+   "/portal/[tenantSlug]/billing",
+   "/portal/[tenantSlug]/buckets",
+   "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/command",
+   "/portal/[tenantSlug]/contracts",
+   "/portal/[tenantSlug]/contracts/[contractId]"
+  ]
+ },
+ {
+  "lane": "tenant2",
+  "part": 2,
+  "parts": 3,
+  "file": "sheet-tenant2-2.png",
+  "routes": [
+   "/portal/[tenantSlug]/dashboard",
+   "/portal/[tenantSlug]/delivery",
+   "/portal/[tenantSlug]/documents",
+   "/portal/[tenantSlug]/documents/new",
+   "/portal/[tenantSlug]/library",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "/portal/[tenantSlug]/library/review",
+   "/portal/[tenantSlug]/library/upload",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/pipeline",
+   "/portal/[tenantSlug]/portals",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/proposals",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]"
+  ]
+ },
+ {
+  "lane": "tenant2",
+  "part": 3,
+  "parts": 3,
+  "file": "sheet-tenant2-3.png",
+  "routes": [
+   "/portal/[tenantSlug]/spotlights",
+   "/portal/[tenantSlug]/spotlights/[spotlightId]",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/templates",
+   "/portal/[tenantSlug]/todos",
+   "/portal/[tenantSlug]/vaults",
+   "/portal/[tenantSlug]/vaults/[vaultId]",
+   "/select-company"
+  ]
+ },
+ {
+  "lane": "admin",
+  "part": 1,
+  "parts": 3,
+  "file": "sheet-admin-1.png",
+  "routes": [
+   "/admin",
+   "/admin/agents",
+   "/admin/analytics",
+   "/admin/applications",
+   "/admin/architecture",
+   "/admin/automation",
+   "/admin/automation-framework",
+   "/admin/billing",
+   "/admin/cards",
+   "/admin/command",
+   "/admin/crm",
+   "/admin/dashboard",
+   "/admin/documents",
+   "/admin/events",
+   "/admin/expert-time",
+   "/admin/guardrail-defaults"
+  ]
+ },
+ {
+  "lane": "admin",
+  "part": 2,
+  "parts": 3,
+  "file": "sheet-admin-2.png",
+  "routes": [
+   "/admin/intake",
+   "/admin/opportunities",
+   "/admin/pipeline",
+   "/admin/process",
+   "/admin/processes",
+   "/admin/proposals",
+   "/admin/provisioning",
+   "/admin/provisioning/[portalId]",
+   "/admin/purchases",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation/[solId]",
+   "/admin/rfp-curation/[solId]/topic/[topicId]",
+   "/admin/rfp-curation/upload",
+   "/admin/scouts",
+   "/admin/site",
+   "/admin/site/[pageKey]"
+  ]
+ },
+ {
+  "lane": "admin",
+  "part": 3,
+  "parts": 3,
+  "file": "sheet-admin-3.png",
+  "routes": [
+   "/admin/site/docs/[type]/[slug]",
+   "/admin/sources",
+   "/admin/sources/[profileId]",
+   "/admin/storage",
+   "/admin/system",
+   "/admin/system-state",
+   "/admin/template-stable",
+   "/admin/templates",
+   "/admin/templates/[templateId]/edit",
+   "/admin/tenants",
+   "/admin/tenants/[tenantId]",
+   "/admin/waitlist",
+   "/admin/workflows"
+  ]
+ },
+ {
+  "lane": "collab",
+  "part": 1,
+  "parts": 1,
+  "file": "sheet-collab-1.png",
+  "routes": [
+   "/vaults"
+  ]
+ },
+ {
+  "lane": "partner",
+  "part": 1,
+  "parts": 1,
+  "file": "sheet-partner-1.png",
+  "routes": [
+   "/partner"
   ]
  }
 ]

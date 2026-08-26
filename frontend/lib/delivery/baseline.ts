@@ -20,6 +20,7 @@
 import { sql, auditLog } from '@/lib/db';
 import { withEventBracket, emitEventSingle, userActor } from '@/lib/events';
 import { canAssign, canAccessProject, type DeliveryActor } from './access';
+import { isoDate } from './dates';
 import { readiness, type Fail, type Ok } from './projects';
 
 export interface BaselineResult {
@@ -54,9 +55,13 @@ export async function setBaseline(
     if (!project) return { ok: false, status: 404, error: 'Project not found', code: 'NOT_FOUND' };
 
     if (project.baselinedAt) {
+      // `isoDate`, not a ten-character slice of the string form: `baselined_at` arrives as a
+      // JavaScript Date, and slicing it yields "Tue Apr 28" — a date with no year, shown to a
+      // person, in a message whose whole job is to tell them WHEN. Same class as the D8 page bug.
+      const on = isoDate(project.baselinedAt);
       return {
         ok: false, status: 409, code: 'ALREADY_BASELINED',
-        error: `This project was baselined on ${String(project.baselinedAt).slice(0, 10)}. `
+        error: `${on ? `This project was baselined on ${on}.` : 'This project is already baselined.'} `
           + 'Use rebaseline to move the current plan — the baseline itself is permanent.',
       };
     }

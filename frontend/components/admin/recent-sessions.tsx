@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { VisitorSession } from '@/lib/analytics-admin';
+import { TimeAgo } from '@/components/ui/time-ago';
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—';
@@ -12,18 +13,6 @@ function fmtTime(iso: string | null): string {
   }
 }
 
-function relTime(iso: string | null): string {
-  if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '';
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
-}
 
 function fmtDur(ms: number | null): string {
   if (ms == null || ms <= 0) return '—';
@@ -60,7 +49,7 @@ function SessionRow({ s }: { s: VisitorSession }) {
             {(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)}{loc ? ` · ${loc}` : ''} · {acq}
           </div>
         </div>
-        <span className="text-[11px] text-gray-400 whitespace-nowrap">{relTime(s.lastSeen)}</span>
+        <span className="text-[11px] text-gray-400 whitespace-nowrap"><TimeAgo iso={s.lastSeen} /></span>
       </button>
       {open && (
         <div className="px-3 pb-3 bg-gray-50/60">

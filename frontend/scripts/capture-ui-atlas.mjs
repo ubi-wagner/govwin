@@ -310,8 +310,45 @@ if (redirects.length) {
 }
 if (broken.length) { console.log('\n✗ broken:'); for (const s of broken) console.log(`  · ${s.route} — ${s.errors?.join(' | ') || 'boundary'}`); }
 
-fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ base: BASE, considered, reached: capturedRoutes.size, shots, unbound: Object.fromEntries(unbound), noLane }, null, 1));
-console.log(`\nwrote ${shots.length} screenshot(s) + index.json to docs/ui-atlas/`);
+/**
+ * ── A `--lane` CAPTURE MERGES INTO THE INDEX; IT DOES NOT REPLACE IT ─────────────────────────
+ * `index.json` is not just this run's report — `drive-ui-states.mjs` reads it to decide what to
+ * drive. A lane-scoped capture that overwrote it silently narrowed that drive's scope to one lane,
+ * and the drive then reported a clean run over 29 routes while five lanes went unvisited. Nothing
+ * failed; the coverage simply shrank, which is the shape of every defect this repo's guards exist
+ * to stop.
+ *
+ * So a lane run replaces ONLY its own lane's shots and keeps the rest. The index always describes
+ * every lane, and `partialLanes` records which ones this run actually refreshed.
+ */
+const indexPath = path.join(OUT, 'index.json');
+let merged = shots;
+let carried = 0;
+// `considered`/`reached` describe the WHOLE catalog. A lane run considers only its own lane's
+// routes, so writing its numbers into the merged index would say "1 route considered" next to 153
+// shots — a coverage claim three orders of magnitude wrong, in the file every consumer reads.
+// Carry the full-run scalars and record the lane run's own under `laneRun`.
+let scalars = { considered, reached: capturedRoutes.size };
+let laneRun;
+if (onlyLane) {
+  try {
+    const prev = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const others = (prev.shots ?? []).filter((s) => s.lane !== onlyLane);
+    carried = others.length;
+    merged = [...others, ...shots];
+    if (carried) {
+      laneRun = { lane: onlyLane, considered, reached: capturedRoutes.size };
+      scalars = { considered: prev.considered ?? considered, reached: prev.reached ?? capturedRoutes.size };
+    }
+  } catch { /* no prior index — this run is all there is */ }
+}
+fs.writeFileSync(indexPath, JSON.stringify({
+  base: BASE, ...scalars, shots: merged,
+  unbound: Object.fromEntries(unbound), noLane,
+  ...(onlyLane ? { partialLanes: [onlyLane], ...(laneRun ? { laneRun } : {}) } : {}),
+}, null, 1));
+console.log(`\nwrote ${shots.length} screenshot(s) + index.json to docs/ui-atlas/`
+  + (onlyLane ? ` (lane '${onlyLane}' refreshed; ${carried} shot(s) from other lanes carried forward)` : ''));
 
 if (accounted !== considered) {
   console.log(`\n✗ HARNESS DEFECT — ${considered - accounted} route(s) neither captured nor reported.`);

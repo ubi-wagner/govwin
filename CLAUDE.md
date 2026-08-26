@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **213** — migs 212/213 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **217** — migs 215–217 the outbound-email ledger + the post-award delivery spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
 proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
@@ -195,6 +195,35 @@ human-triggered (docs/FULL_DRAFT_LANDING_DESIGN.md).
 trigger+step templates, the start→end event gate, and the two stateless reconcilers — is mapped in
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
 orchestration pattern.
+
+**Post-award DELIVERY is the second half of the customer's life** (mig 216 · 8 tables · the `project`
+event namespace, mig 217; canonical **docs/DELIVERY_MANAGEMENT_DESIGN.md**, as-built
+**docs/DELIVERY_BUILD_LOG.md**). It anchors on **two UPLOADED files** — the executed contract and the
+proposal *as submitted* — never on `proposals`/`proposal_sections`, because what lives in the proposal
+spine is a working copy that stayed editable after submission; `delivery_projects.contract_id` is
+navigation, not truth. From there: CLINs (every field carrying a `delivery_provenance` badge on the
+ingest-provenance trust order — a value with no source reads **Unverified**, a citation with no value
+reads **Set elsewhere**), a WBS whose children inherit their CLIN, and milestones + deliverables where
+**uploading is not accepting** (any assigned employee attaches a file; only a tenant_admin accepts, and
+a replaced file REVOKES acceptance). The **baseline freezes once** — enforced by a trigger (`23001`),
+not a convention — and `rebaseline` moves the *current plan* and never the baseline, which is the one
+number that cannot be recomputed. Progress is **three measures side by side and never blended**
+(`lib/delivery/rollup.ts`): cost, duration-weighted schedule, deliverables — and a measure with no
+denominator is `null` → **"not measured"**, never a confident `0%`. Access is two layers: RLS scopes by
+tenant, and **assignment is app-enforced** in one predicate (`lib/delivery/access.ts`) because the
+request context carries a tenant, not a user — `partner_user` is refused the capability outright, which
+is what removes cross-tenant from it entirely. `contract:started` raises a ToDo; it deliberately does
+NOT create the project.
+
+**EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
+`services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
+`email_suppressions` (mig 215; docs/EMAIL_INTERFACE_DESIGN.md, as-built docs/EMAIL_BUILD_LOG.md). Never
+call a transport (nodemailer, the Postmark API, `smtplib`) directly. The order is the contract:
+validate → resolve sender identity → check suppression → **RESERVE a ledger row** → dispatch → confirm;
+reserving *before* dispatch is what makes a crash mid-send visible instead of invisible. Bounces and
+complaints arrive at `POST /api/webhooks/postmark` (Basic auth — **Postmark does not sign webhooks**)
+and write suppressions; a *soft* bounce does not suppress. `EMAIL_DRIVER` selects gmail | postmark |
+the committed emulator, so every path is drivable with no live key.
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes + **all front-facing content** → `frontend/`.
@@ -426,6 +455,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   → "Invalid time value" 500; `proposals/[p]/document` → `r.volume_name` undefined → every section's
   volume grouping silently dropped from the assembled doc). Declare the `sql<typeof rows>` field names
   **camelCase**, matching the runtime, and read them camelCase.
+- **A `date`/`timestamptz` column arrives as a JavaScript `Date`, not a string — the #2 crash
+  class, and the one no lens can see.** `String(d).slice(0, 10)` is `"Tue Apr 28"`, so
+  `Date.parse(that + 'T00:00:00Z')` is **NaN** — and NaN survives a `!== 0` check, then picks a
+  branch: a milestone variance rendered live as `NaN days early against baseline`, cheerful because
+  `NaN > 0` is false. In an event payload it is worse: `JSON.stringify(NaN)` is `null`, so the
+  record reads "no baseline" forever, with nothing to notice. It has shipped **three times** — a
+  page, an event payload, and a 409 message that told a person their project was baselined on
+  `Tue Apr 28`, no year. Use `isoDate()` / `daysBetween()` (`lib/delivery/dates.ts`) or
+  `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/delivery-dates.test.ts`
+  guards the idiom across the delivery tree, and any fixture for date code must be a real `Date` —
+  a test fed ISO strings passes against the broken code.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
   On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).
@@ -435,6 +475,16 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - **CHECK columns:** confirm a literal is in the column's CHECK (`\d table`) before writing it.
 - **Workflow status writes:** force-fail a paused instance only with `… WHERE id=$1 AND status='paused'`
   (compare-and-swap) and expire its sibling task; resume HITL only after entity correlation.
+- **A `'use client'` component must NEVER read the clock during render — the intermittent that reads
+  as noise.** `Date.now()` in render makes the output a function of WHEN it rendered: the server
+  writes "just now", the client hydrates a beat later and writes "1m ago", React throws **#418**, and
+  **hydration fails for the whole subtree while the route answers HTTP 200** — so nothing gating on a
+  status code can see it. It usually agrees and disagrees only when the gap crosses a rounding
+  boundary, which is why it surfaced twice on two unrelated routes during a 153-page atlas sweep and
+  never on a single local load. **Eight occurrences.** Use `<TimeAgo iso={x}/>` or
+  `relativeFrom(x, useClientNow())` (`components/ui/time-ago.tsx`): `now` is null until mounted, so
+  the first paint is a deterministic UTC stamp on both sides. `__tests__/client-clock-in-render.test.ts`
+  guards the shape.
 - **`next/dynamic({ssr:false})` drops `ref`** (Next 15 sets `ref.current={retry}`, a truthy non-handle):
   pass an imperative handle via a normal prop (`innerRef`), not `ref`. And load browser-only libs
   (react-pdf / pdfjs) via `next/dynamic({ssr:false})` — a static import into a `'use client'` component
@@ -456,7 +506,9 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   proposal (pre-award workspace), library (content), system (infra), tool (invocations),
   project (post-award delivery — baselines, milestone gates, deliverables; mig 217)
 - The registry lives in THREE runtimes and cannot be consolidated further — `EVENT_NAMESPACES`
-  in `frontend/lib/events.ts`, the same in `pipeline/src/events.py`, and
+  in `frontend/lib/event-namespaces.ts` (a **zero-import leaf**, re-exported by `lib/events.ts`;
+  it is a leaf because a client component importing `lib/events` pulls `node:async_hooks` into the
+  browser bundle and only `next build` catches it), the same in `pipeline/src/events.py`, and
   `system_events_namespace_chk` in Postgres (the only one that FAILS rather than warns).
   Everything else imports one of them; `__tests__/event-namespace-registry.test.ts` reconciles
   all three plus the migration SQL and every doc that writes the list out.

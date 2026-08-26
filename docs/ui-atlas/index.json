@@ -1,8 +1,710 @@
 {
  "base": "http://localhost:3000",
- "considered": 43,
- "reached": 40,
+ "considered": 118,
+ "reached": 115,
  "shots": [
+  {
+   "lane": "anon",
+   "route": "/forgot-password",
+   "url": "/forgot-password",
+   "file": "anon__forgot-password.png",
+   "status": 200,
+   "finalUrl": "/forgot-password",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 1,
+    "inputs": 1,
+    "forms": 1,
+    "text": 132,
+    "h1": "Reset Your Password"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 1,
+    "links": 2,
+    "forms": 1,
+    "handlers": 2
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/login",
+   "url": "/login",
+   "file": "anon__login.png",
+   "status": 200,
+   "finalUrl": "/login",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 1,
+    "inputs": 6,
+    "forms": 1,
+    "text": 199,
+    "h1": "Sign in"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 2,
+    "links": 1,
+    "forms": 1,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/reset-password",
+   "url": "/reset-password",
+   "file": "anon__reset-password.png",
+   "status": 200,
+   "finalUrl": "/reset-password",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 0,
+    "links": 1,
+    "inputs": 0,
+    "forms": 0,
+    "text": 121,
+    "h1": "Invalid Reset Link"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 2,
+    "links": 3,
+    "forms": 1,
+    "handlers": 3
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/about",
+   "url": "/about",
+   "file": "anon__about.png",
+   "status": 200,
+   "finalUrl": "/about",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2250,
+    "h1": "Expert + AI + Automation + Collaboration = Win."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/apply",
+   "url": "/apply",
+   "file": "anon__apply.png",
+   "status": 200,
+   "finalUrl": "/apply",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 49,
+    "links": 29,
+    "inputs": 19,
+    "forms": 1,
+    "text": 2935,
+    "h1": "Apply to join the founding cohort"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/blog/[slug]",
+   "url": "/blog/understanding-sbir-sttr-programs",
+   "file": "anon__blog-slug.png",
+   "status": 200,
+   "finalUrl": "/resources/understanding-sbir-sttr-programs",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 31,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1864,
+    "h1": "SBIR vs STTR: Understanding the Programs That Fund Innovation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/customers",
+   "url": "/customers",
+   "file": "anon__customers.png",
+   "status": 200,
+   "finalUrl": "/customers",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1268,
+    "h1": "A 25-year record of funded outcomes."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/engine",
+   "url": "/engine",
+   "file": "anon__engine.png",
+   "status": 200,
+   "finalUrl": "/value",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 34,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4875,
+    "h1": "The fastest, cheapest way to win non-dilutive federal R&D funding."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/features",
+   "url": "/features",
+   "file": "anon__features.png",
+   "status": 200,
+   "finalUrl": "/features",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2732,
+    "h1": "Everything you need to win."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/get-started",
+   "url": "/get-started",
+   "file": "anon__get-started.png",
+   "status": 200,
+   "finalUrl": "/pricing",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 37,
+    "inputs": 0,
+    "forms": 0,
+    "text": 7710,
+    "h1": "One subscription.Per-proposal portals.No surprises."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/how-it-works",
+   "url": "/how-it-works",
+   "file": "anon__how-it-works.png",
+   "status": 200,
+   "finalUrl": "/how-it-works",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 32,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4300,
+    "h1": "From application to submitted proposal"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/infosec",
+   "url": "/infosec",
+   "file": "anon__infosec.png",
+   "status": 200,
+   "finalUrl": "/infosec",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 3835,
+    "h1": "Your data. Your agents.Nobody else’s."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/legal/acceptable-use",
+   "url": "/legal/acceptable-use",
+   "file": "anon__legal-acceptable-use.png",
+   "status": 200,
+   "finalUrl": "/legal/acceptable-use",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 34,
+    "inputs": 0,
+    "forms": 0,
+    "text": 3850,
+    "h1": "Acceptable Use Policy"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/legal/ai-disclosure",
+   "url": "/legal/ai-disclosure",
+   "file": "anon__legal-ai-disclosure.png",
+   "status": 200,
+   "finalUrl": "/legal/ai-disclosure",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 34,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4368,
+    "h1": "AI Usage Disclosure"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/legal",
+   "url": "/legal",
+   "file": "anon__legal.png",
+   "status": 200,
+   "finalUrl": "/legal",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 37,
+    "inputs": 0,
+    "forms": 0,
+    "text": 852,
+    "h1": "Legal"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/legal/privacy",
+   "url": "/legal/privacy",
+   "file": "anon__legal-privacy.png",
+   "status": 200,
+   "finalUrl": "/legal/privacy",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 34,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4675,
+    "h1": "Privacy Policy"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/legal/terms",
+   "url": "/legal/terms",
+   "file": "anon__legal-terms.png",
+   "status": 200,
+   "finalUrl": "/legal/terms",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 33,
+    "inputs": 0,
+    "forms": 0,
+    "text": 11267,
+    "h1": "Terms of Service"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/",
+   "url": "/",
+   "file": "anon__root.png",
+   "status": 200,
+   "finalUrl": "/",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 44,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4346,
+    "h1": "A proposalengine, not aproposalgamble."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 13,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/pricing",
+   "url": "/pricing",
+   "file": "anon__pricing.png",
+   "status": 200,
+   "finalUrl": "/pricing",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 37,
+    "inputs": 0,
+    "forms": 0,
+    "text": 7710,
+    "h1": "One subscription.Per-proposal portals.No surprises."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/resources/[slug]",
+   "url": "/resources/understanding-sbir-sttr-programs",
+   "file": "anon__resources-slug.png",
+   "status": 200,
+   "finalUrl": "/resources/understanding-sbir-sttr-programs",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 31,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1864,
+    "h1": "SBIR vs STTR: Understanding the Programs That Fund Innovation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/resources",
+   "url": "/resources",
+   "file": "anon__resources.png",
+   "status": 200,
+   "finalUrl": "/resources",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 6,
+    "links": 47,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4261,
+    "h1": "Insights, guides, and your portals."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/security",
+   "url": "/security",
+   "file": "anon__security.png",
+   "status": 200,
+   "finalUrl": "/infosec",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 3835,
+    "h1": "Your data. Your agents.Nobody else’s."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/team",
+   "url": "/team",
+   "file": "anon__team.png",
+   "status": 200,
+   "finalUrl": "/team",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1138,
+    "h1": "Built by practitioners."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/the-expert",
+   "url": "/the-expert",
+   "file": "anon__the-expert.png",
+   "status": 200,
+   "finalUrl": "/the-expert",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 30,
+    "inputs": 0,
+    "forms": 0,
+    "text": 7329,
+    "h1": "Eric Wagner"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/value",
+   "url": "/value",
+   "file": "anon__value.png",
+   "status": 200,
+   "finalUrl": "/value",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 34,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4875,
+    "h1": "The fastest, cheapest way to win non-dilutive federal R&D funding."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "anon",
+   "route": "/invite/[token]",
+   "url": "/invite/e3ec48cf-d3e6-458a-a74c-af9998d9f499",
+   "file": "anon__invite-token.png",
+   "status": 200,
+   "finalUrl": "/invite/e3ec48cf-d3e6-458a-a74c-af9998d9f499",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 0,
+    "links": 1,
+    "inputs": 0,
+    "forms": 0,
+    "text": 121,
+    "h1": "Invite Already Accepted"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 2,
+    "links": 1,
+    "forms": 1,
+    "handlers": 3
+   },
+   "ok": true,
+   "errors": []
+  },
   {
    "lane": "tenant",
    "route": "/change-password",
@@ -121,11 +823,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 203,
+    "buttons": 200,
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 20184,
+    "text": 20260,
     "h1": "Foundation"
    },
    "declared": {
@@ -422,7 +1124,7 @@
     "links": 22,
     "inputs": 3,
     "forms": 0,
-    "text": 1350,
+    "text": 1355,
     "h1": "Foundation"
    },
    "declared": {
@@ -1082,17 +1784,2381 @@
    },
    "ok": true,
    "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/change-password",
+   "url": "/change-password",
+   "file": "tenant2__change-password.png",
+   "status": 200,
+   "finalUrl": "/change-password",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 0,
+    "inputs": 3,
+    "forms": 1,
+    "text": 124,
+    "h1": "Change password"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/federal-rd-101",
+   "url": "/federal-rd-101",
+   "file": "tenant2__federal-rd-101.png",
+   "status": 200,
+   "finalUrl": "/federal-rd-101",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 31,
+    "inputs": 2,
+    "forms": 1,
+    "text": 2281,
+    "h1": "There's non-dilutive money for your R&D. You probably qualify."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/dashboard",
+   "url": "/dashboard",
+   "file": "tenant2__dashboard.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/go",
+   "url": "/go",
+   "file": "tenant2__go.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/activity",
+   "url": "/portal/immobileyes/activity",
+   "file": "tenant2__portal-tenantSlug-activity.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/activity",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 91,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 6769,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/agents",
+   "url": "/portal/immobileyes/agents",
+   "file": "tenant2__portal-tenantSlug-agents.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/agents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 6,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 414,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/atoms",
+   "url": "/portal/immobileyes/atoms",
+   "file": "tenant2__portal-tenantSlug-atoms.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/atoms",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1890,
+    "links": 41,
+    "inputs": 204,
+    "forms": 0,
+    "text": 52553,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/automation",
+   "url": "/portal/immobileyes/automation",
+   "file": "tenant2__portal-tenantSlug-automation.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/automation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 21,
+    "links": 21,
+    "inputs": 12,
+    "forms": 0,
+    "text": 2580,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/billing",
+   "url": "/portal/immobileyes/billing",
+   "file": "tenant2__portal-tenantSlug-billing.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/billing",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 5,
+    "links": 21,
+    "inputs": 1,
+    "forms": 0,
+    "text": 847,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/buckets",
+   "url": "/portal/immobileyes/buckets",
+   "file": "tenant2__portal-tenantSlug-buckets.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/buckets",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 21,
+    "inputs": 6,
+    "forms": 0,
+    "text": 728,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/cards",
+   "url": "/portal/immobileyes/cards",
+   "file": "tenant2__portal-tenantSlug-cards.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 18,
+    "links": 28,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1566,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/command",
+   "url": "/portal/immobileyes/command",
+   "file": "tenant2__portal-tenantSlug-command.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/command",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 22,
+    "links": 31,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1704,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/contracts/[contractId]",
+   "url": "/portal/immobileyes/contracts/97f37f94-6f67-483b-9a5b-c0363eb5bd5b",
+   "file": "tenant2__portal-tenantSlug-contracts-contractId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/contracts/97f37f94-6f67-483b-9a5b-c0363eb5bd5b",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 23,
+    "inputs": 0,
+    "forms": 0,
+    "text": 543,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/contracts",
+   "url": "/portal/immobileyes/contracts",
+   "file": "tenant2__portal-tenantSlug-contracts.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/contracts",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 477,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "url": "/portal/immobileyes/dashboard",
+   "file": "tenant2__portal-tenantSlug-dashboard.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 6,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/delivery",
+   "url": "/portal/immobileyes/delivery",
+   "file": "tenant2__portal-tenantSlug-delivery.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/delivery",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 534,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/documents/new",
+   "url": "/portal/immobileyes/documents/new",
+   "file": "tenant2__portal-tenantSlug-documents-new.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/documents/new",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 7,
+    "links": 23,
+    "inputs": 2,
+    "forms": 0,
+    "text": 952,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/documents",
+   "url": "/portal/immobileyes/documents",
+   "file": "tenant2__portal-tenantSlug-documents.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/documents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 132,
+    "inputs": 1,
+    "forms": 0,
+    "text": 9484,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 12,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "url": "/portal/immobileyes/library/foundation/7bdc1858-dc80-4ebd-9cc9-7aade913e99d",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/library/foundation/7bdc1858-dc80-4ebd-9cc9-7aade913e99d",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 58,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1096,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/library",
+   "url": "/portal/immobileyes/library",
+   "file": "tenant2__portal-tenantSlug-library.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1890,
+    "links": 41,
+    "inputs": 204,
+    "forms": 0,
+    "text": 52553,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/library/review",
+   "url": "/portal/immobileyes/library/review",
+   "file": "tenant2__portal-tenantSlug-library-review.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1890,
+    "links": 41,
+    "inputs": 204,
+    "forms": 0,
+    "text": 52553,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/library/upload",
+   "url": "/portal/immobileyes/library/upload",
+   "file": "tenant2__portal-tenantSlug-library-upload.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1890,
+    "links": 41,
+    "inputs": 204,
+    "forms": 0,
+    "text": 52553,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/manage",
+   "url": "/portal/immobileyes/manage",
+   "file": "tenant2__portal-tenantSlug-manage.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/manage",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 23,
+    "inputs": 0,
+    "forms": 0,
+    "text": 759,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]",
+   "url": "/portal/immobileyes",
+   "file": "tenant2__portal-tenantSlug.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/pipeline",
+   "url": "/portal/immobileyes/pipeline",
+   "file": "tenant2__portal-tenantSlug-pipeline.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 18,
+    "links": 28,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1566,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/portals",
+   "url": "/portal/immobileyes/portals",
+   "file": "tenant2__portal-tenantSlug-portals.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/portals",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 411,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "url": "/portal/immobileyes/processes",
+   "file": "tenant2__portal-tenantSlug-processes.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/processes",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 18,
+    "links": 21,
+    "inputs": 1,
+    "forms": 0,
+    "text": 879,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/profile",
+   "url": "/portal/immobileyes/profile",
+   "file": "tenant2__portal-tenantSlug-profile.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/profile",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1494,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
+   "url": "/portal/immobileyes/proposals/86346914-80d4-4f91-8608-2ca2f4c5b98b",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/proposals/86346914-80d4-4f91-8608-2ca2f4c5b98b",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 30,
+    "links": 21,
+    "inputs": 5,
+    "forms": 1,
+    "text": 2256,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "url": "/portal/immobileyes/proposals/86346914-80d4-4f91-8608-2ca2f4c5b98b/sections/d24d8c60-e1d1-447c-89b5-f4483ff70723",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-sectionId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/proposals/86346914-80d4-4f91-8608-2ca2f4c5b98b/sections/d24d8c60-e1d1-447c-89b5-f4483ff70723",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 74,
+    "links": 22,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1683,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals",
+   "url": "/portal/immobileyes/proposals",
+   "file": "tenant2__portal-tenantSlug-proposals.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/proposals",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 470,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
+   "url": "/portal/immobileyes/spotlights/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "file": "tenant2__portal-tenantSlug-spotlights-spotlightId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 18,
+    "links": 28,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1566,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/spotlights",
+   "url": "/portal/immobileyes/spotlights",
+   "file": "tenant2__portal-tenantSlug-spotlights.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 18,
+    "links": 28,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1566,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/team",
+   "url": "/portal/immobileyes/team",
+   "file": "tenant2__portal-tenantSlug-team.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/team",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 21,
+    "inputs": 3,
+    "forms": 1,
+    "text": 654,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/templates",
+   "url": "/portal/immobileyes/templates",
+   "file": "tenant2__portal-tenantSlug-templates.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/templates",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 85,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 3073,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/todos",
+   "url": "/portal/immobileyes/todos",
+   "file": "tenant2__portal-tenantSlug-todos.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/todos",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 311,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/vaults/[vaultId]",
+   "url": "/portal/immobileyes/vaults/ca628c1a-8866-43f4-bf60-0e89c2ea53ef",
+   "file": "tenant2__portal-tenantSlug-vaults-vaultId.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/vaults/ca628c1a-8866-43f4-bf60-0e89c2ea53ef",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 6,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 573,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/vaults",
+   "url": "/portal/immobileyes/vaults",
+   "file": "tenant2__portal-tenantSlug-vaults.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/vaults",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 640,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal",
+   "url": "/portal",
+   "file": "tenant2__portal.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/select-company",
+   "url": "/select-company",
+   "file": "tenant2__select-company.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 472,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 1,
+    "links": 0,
+    "forms": 1,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/agents",
+   "url": "/admin/agents",
+   "file": "admin__admin-agents.png",
+   "status": 200,
+   "finalUrl": "/admin/agents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 41,
+    "inputs": 8,
+    "forms": 0,
+    "text": 13833,
+    "h1": "AI Tools & Agents"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": false,
+   "errors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-mi"
+   ]
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/analytics",
+   "url": "/admin/analytics",
+   "file": "admin__admin-analytics.png",
+   "status": 200,
+   "finalUrl": "/admin/analytics",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 33,
+    "links": 49,
+    "inputs": 0,
+    "forms": 0,
+    "text": 3513,
+    "h1": "Analytics"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/applications",
+   "url": "/admin/applications",
+   "file": "admin__admin-applications.png",
+   "status": 200,
+   "finalUrl": "/admin/applications",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 43,
+    "inputs": 0,
+    "forms": 0,
+    "text": 673,
+    "h1": "Founding Cohort Applications"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/architecture",
+   "url": "/admin/architecture",
+   "file": "admin__admin-architecture.png",
+   "status": 200,
+   "finalUrl": "/admin/architecture",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 46,
+    "inputs": 0,
+    "forms": 0,
+    "text": 854,
+    "h1": "System Architecture"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/automation",
+   "url": "/admin/automation",
+   "file": "admin__admin-automation.png",
+   "status": 200,
+   "finalUrl": "/admin/automation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 35,
+    "links": 64,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4474,
+    "h1": "Automation Rules"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/automation-framework",
+   "url": "/admin/automation-framework",
+   "file": "admin__admin-automation-framework.png",
+   "status": 200,
+   "finalUrl": "/admin/automation-framework",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 46,
+    "inputs": 5,
+    "forms": 0,
+    "text": 1297,
+    "h1": "Automation Framework"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 3,
+    "links": 0,
+    "forms": 0,
+    "handlers": 4
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/billing",
+   "url": "/admin/billing",
+   "file": "admin__admin-billing.png",
+   "status": 200,
+   "finalUrl": "/admin/billing",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 61,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1440,
+    "h1": "Billing Management"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/cards",
+   "url": "/admin/cards",
+   "file": "admin__admin-cards.png",
+   "status": 200,
+   "finalUrl": "/admin/cards",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 53,
+    "inputs": 23,
+    "forms": 0,
+    "text": 6920,
+    "h1": "Opportunity Cards"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/command",
+   "url": "/admin/command",
+   "file": "admin__admin-command.png",
+   "status": 200,
+   "finalUrl": "/admin/command",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 5,
+    "links": 63,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1345,
+    "h1": "Command Center"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/crm",
+   "url": "/admin/crm",
+   "file": "admin__admin-crm.png",
+   "status": 200,
+   "finalUrl": "/admin/crm",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 50,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1117,
+    "h1": "CRM"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "url": "/admin/dashboard",
+   "file": "admin__admin-dashboard.png",
+   "status": 200,
+   "finalUrl": "/admin/dashboard",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 17,
+    "links": 69,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4017,
+    "h1": "Admin Dashboard"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/documents",
+   "url": "/admin/documents",
+   "file": "admin__admin-documents.png",
+   "status": 200,
+   "finalUrl": "/admin/documents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 51,
+    "inputs": 0,
+    "forms": 0,
+    "text": 884,
+    "h1": "Document Builder"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "url": "/admin/events",
+   "file": "admin__admin-events.png",
+   "status": 200,
+   "finalUrl": "/admin/events",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 259,
+    "links": 52,
+    "inputs": 3,
+    "forms": 1,
+    "text": 39463,
+    "h1": "Event Stream"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/expert-time",
+   "url": "/admin/expert-time",
+   "file": "admin__admin-expert-time.png",
+   "status": 200,
+   "finalUrl": "/admin/expert-time",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 51,
+    "inputs": 2,
+    "forms": 1,
+    "text": 1030,
+    "h1": "Expert Time"
+   },
+   "declared": {
+    "buttons": 2,
+    "inputs": 2,
+    "links": 0,
+    "forms": 1,
+    "handlers": 4
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/guardrail-defaults",
+   "url": "/admin/guardrail-defaults",
+   "file": "admin__admin-guardrail-defaults.png",
+   "status": 200,
+   "finalUrl": "/admin/guardrail-defaults",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 51,
+    "inputs": 4,
+    "forms": 0,
+    "text": 1322,
+    "h1": "Guardrail Defaults"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/intake",
+   "url": "/admin/intake",
+   "file": "admin__admin-intake.png",
+   "status": 200,
+   "finalUrl": "/admin/intake",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 57,
+    "inputs": 15,
+    "forms": 0,
+    "text": 1340,
+    "h1": "Stage Opportunity Intake"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "url": "/admin/opportunities",
+   "file": "admin__admin-opportunities.png",
+   "status": 200,
+   "finalUrl": "/admin/opportunities",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 10,
+    "links": 51,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2347,
+    "h1": "Opportunity Rollup"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin",
+   "url": "/admin",
+   "file": "admin__admin.png",
+   "status": 200,
+   "finalUrl": "/admin/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 17,
+    "links": 69,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4029,
+    "h1": "Admin Dashboard"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "url": "/admin/pipeline",
+   "file": "admin__admin-pipeline.png",
+   "status": 200,
+   "finalUrl": "/admin/pipeline",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 51,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2098,
+    "h1": "Pipeline Monitor"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/process",
+   "url": "/admin/process",
+   "file": "admin__admin-process.png",
+   "status": 200,
+   "finalUrl": "/admin/process",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 34,
+    "links": 54,
+    "inputs": 0,
+    "forms": 0,
+    "text": 3844,
+    "h1": "Process Monitor"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "url": "/admin/processes",
+   "file": "admin__admin-processes.png",
+   "status": 200,
+   "finalUrl": "/admin/processes",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 5,
+    "links": 51,
+    "inputs": 1,
+    "forms": 0,
+    "text": 1210,
+    "h1": "Processes"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/proposals",
+   "url": "/admin/proposals",
+   "file": "admin__admin-proposals.png",
+   "status": 200,
+   "finalUrl": "/admin/proposals",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 61,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1920,
+    "h1": "All Proposals"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/provisioning/[portalId]",
+   "url": "/admin/provisioning/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
+   "file": "admin__admin-provisioning-portalId.png",
+   "status": 200,
+   "finalUrl": "/admin/provisioning/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 54,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1912,
+    "h1": "TVSF-R45: Ohio TVSF Round 45 — Technology Validation & Startup Fund (D"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/provisioning",
+   "url": "/admin/provisioning",
+   "file": "admin__admin-provisioning.png",
+   "status": 200,
+   "finalUrl": "/admin/provisioning",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 52,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1087,
+    "h1": "Releases & SLA"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/purchases",
+   "url": "/admin/purchases",
+   "file": "admin__admin-purchases.png",
+   "status": 200,
+   "finalUrl": "/admin/purchases",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 12,
+    "links": 54,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1778,
+    "h1": "Purchases"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation/[solId]",
+   "url": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a",
+   "file": "admin__admin-rfp-curation-solId.png",
+   "status": 200,
+   "finalUrl": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 21,
+    "links": 52,
+    "inputs": 6,
+    "forms": 0,
+    "text": 3425,
+    "h1": "AGENTS-LIVE probe 8df03882 — Directed Energy Counter-UAS (live opportu"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
+   "url": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a/topic/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "file": "admin__admin-rfp-curation-solId-topic-topicId.png",
+   "status": 200,
+   "finalUrl": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a/topic/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 53,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1087,
+    "h1": "AGENTS-LIVE probe 8df03882 — Directed Energy Counter-UAS (live opportu"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "url": "/admin/rfp-curation",
+   "file": "admin__admin-rfp-curation.png",
+   "status": 200,
+   "finalUrl": "/admin/rfp-curation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 54,
+    "links": 63,
+    "inputs": 1,
+    "forms": 0,
+    "text": 6063,
+    "h1": "Your To-Dos8"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation/upload",
+   "url": "/admin/rfp-curation/upload",
+   "file": "admin__admin-rfp-curation-upload.png",
+   "status": 200,
+   "finalUrl": "/admin/rfp-curation/upload",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 53,
+    "inputs": 11,
+    "forms": 1,
+    "text": 1961,
+    "h1": "Upload RFP"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/scouts",
+   "url": "/admin/scouts",
+   "file": "admin__admin-scouts.png",
+   "status": 200,
+   "finalUrl": "/admin/scouts",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 2,
+    "links": 64,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2402,
+    "h1": "Scout Monitor"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/[pageKey]",
+   "url": "/admin/site/about",
+   "file": "admin__admin-site-pageKey.png",
+   "status": 200,
+   "finalUrl": "/admin/site/about",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 14,
+    "links": 52,
+    "inputs": 65,
+    "forms": 0,
+    "text": 5939,
+    "h1": "about"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site/docs/[type]/[slug]",
+   "url": "/admin/site/docs/resource/understanding-sbir-sttr-programs",
+   "file": "admin__admin-site-docs-type-slug.png",
+   "status": 200,
+   "finalUrl": "/admin/site/docs/resource/understanding-sbir-sttr-programs",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 49,
+    "links": 52,
+    "inputs": 10,
+    "forms": 0,
+    "text": 1643,
+    "h1": "Untitled"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/site",
+   "url": "/admin/site",
+   "file": "admin__admin-site.png",
+   "status": 200,
+   "finalUrl": "/admin/site",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 98,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4274,
+    "h1": "Site Content"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/sources/[profileId]",
+   "url": "/admin/sources/5596dc3e-b6a4-46ee-be22-33c1d929dd43",
+   "file": "admin__admin-sources-profileId.png",
+   "status": 200,
+   "finalUrl": "/admin/sources/5596dc3e-b6a4-46ee-be22-33c1d929dd43",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 53,
+    "inputs": 5,
+    "forms": 1,
+    "text": 1857,
+    "h1": "DSIP — DoD SBIR/STTR Topics"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/sources",
+   "url": "/admin/sources",
+   "file": "admin__admin-sources.png",
+   "status": 200,
+   "finalUrl": "/admin/sources",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 38,
+    "links": 63,
+    "inputs": 6,
+    "forms": 0,
+    "text": 2615,
+    "h1": "Opportunity Sources"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/storage",
+   "url": "/admin/storage",
+   "file": "admin__admin-storage.png",
+   "status": 200,
+   "finalUrl": "/admin/storage",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 51,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1122,
+    "h1": "Storage Manager"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/system",
+   "url": "/admin/system",
+   "file": "admin__admin-system.png",
+   "status": 200,
+   "finalUrl": "/admin/system",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 54,
+    "inputs": 0,
+    "forms": 0,
+    "text": 10079,
+    "h1": "System Health"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/system-state",
+   "url": "/admin/system-state",
+   "file": "admin__admin-system-state.png",
+   "status": 200,
+   "finalUrl": "/admin/system-state",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 15,
+    "links": 54,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2214,
+    "h1": "System State"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/template-stable",
+   "url": "/admin/template-stable",
+   "file": "admin__admin-template-stable.png",
+   "status": 200,
+   "finalUrl": "/admin/template-stable",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 41,
+    "links": 51,
+    "inputs": 0,
+    "forms": 0,
+    "text": 4707,
+    "h1": "Template Stable"
+   },
+   "declared": {
+    "buttons": 2,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 2
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates/[templateId]/edit",
+   "url": "/admin/templates/e11a7e00-0000-4000-8000-000000000001/edit",
+   "file": "admin__admin-templates-templateId-edit.png",
+   "status": 200,
+   "finalUrl": "/admin/templates/e11a7e00-0000-4000-8000-000000000001/edit",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 7,
+    "links": 52,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1801,
+    "h1": ""
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "url": "/admin/templates",
+   "file": "admin__admin-templates.png",
+   "status": 200,
+   "finalUrl": "/admin/templates",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 5,
+    "links": 51,
+    "inputs": 3,
+    "forms": 0,
+    "text": 2768,
+    "h1": "Document Templates"
+   },
+   "declared": {
+    "buttons": 7,
+    "inputs": 6,
+    "links": 1,
+    "forms": 0,
+    "handlers": 13
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants/[tenantId]",
+   "url": "/admin/tenants/17780cad-76c0-4cef-95ec-2a536bcf5c8f",
+   "file": "admin__admin-tenants-tenantId.png",
+   "status": 200,
+   "finalUrl": "/admin/tenants/17780cad-76c0-4cef-95ec-2a536bcf5c8f",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 56,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3358,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "url": "/admin/tenants",
+   "file": "admin__admin-tenants.png",
+   "status": 200,
+   "finalUrl": "/admin/tenants",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 65,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1295,
+    "h1": "Tenant Management"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/waitlist",
+   "url": "/admin/waitlist",
+   "file": "admin__admin-waitlist.png",
+   "status": 200,
+   "finalUrl": "/admin/waitlist",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 52,
+    "inputs": 0,
+    "forms": 0,
+    "text": 847,
+    "h1": "Waitlist"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/workflows",
+   "url": "/admin/workflows",
+   "file": "admin__admin-workflows.png",
+   "status": 200,
+   "finalUrl": "/admin/workflows",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 63,
+    "inputs": 20,
+    "forms": 3,
+    "text": 3129,
+    "h1": "Workflow Monitor"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 2,
+    "links": 6,
+    "forms": 1,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "partner",
+   "route": "/partner",
+   "url": "/partner",
+   "file": "partner__partner.png",
+   "status": 200,
+   "finalUrl": "/partner",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 12,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1517,
+    "h1": "Partner Console"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 5,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "collab",
+   "route": "/vaults",
+   "url": "/vaults",
+   "file": "collab__vaults.png",
+   "status": 200,
+   "finalUrl": "/vaults",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 1,
+    "inputs": 0,
+    "forms": 0,
+    "text": 352,
+    "h1": "Your collaboration vaults"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
   }
  ],
  "unbound": {
   "/portal/[tenantSlug]/documents/[documentId]": [
-   "tenant: no [documentId]"
+   "tenant: no [documentId]",
+   "tenant2: no [documentId]"
   ],
   "/portal/[tenantSlug]/library/foundation/[foundationId]": [
    "tenant: no [foundationId]"
   ],
   "/portal/[tenantSlug]/vaults/[vaultId]": [
    "tenant: no [vaultId]"
+  ],
+  "/portal/[tenantSlug]/delivery/[projectId]": [
+   "tenant2: no [projectId]"
+  ],
+  "/portal/[tenantSlug]/portals/[portalId]": [
+   "tenant2: no [portalId]"
+  ],
+  "/admin/documents/[documentId]": [
+   "admin: no [documentId]"
+  ],
+  "/vaults/[vaultId]": [
+   "collab: no [vaultId]"
   ]
  },
  "noLane": []
