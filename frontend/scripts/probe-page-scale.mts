@@ -60,11 +60,27 @@ try {
    */
   let target = doc;
   if (!target) {
+    // PICK AN ACCOUNT THIS PROBE CAN ACTUALLY SIGN IN AS.
+    //
+    // Two independent reasons, because the old query satisfied neither:
+    //
+    //   temp_password = false — an account required to change its password cannot be driven AT ALL.
+    //     Even with the correct password the middleware redirects to /change-password, so the probe
+    //     lands somewhere it cannot work from. This is a precondition, not a preference.
+    //
+    //   ORDER BY t.created_at — the OLDEST tenant, which is a stable seeded one. Ordering by SLUG
+    //     meant a scenario tenant named `acme-labs-<timestamp>` — created by `scenario-factory`,
+    //     which runs FIRST in the same suite — sorted ahead of every real tenant. Its founder's
+    //     password is scenario-generated, so the probe signed in with TENANT_PW and was refused,
+    //     reporting "still on /login after 25s". Verified directly: no drive password matches that
+    //     account's hash. The seven sibling drives already order by created_at, which is why none
+    //     of them were affected.
     const [host] = await sql<Array<{ slug: string; email: string }>>`
       SELECT t.slug, u.email FROM tenants t
       JOIN user_memberships m ON m.tenant_id = t.id
       JOIN users u ON u.id = m.user_id AND u.is_active AND u.role = 'tenant_admin'
-      WHERE t.status = 'active' ORDER BY t.slug LIMIT 1`;
+      WHERE t.status = 'active' AND u.temp_password = false
+      ORDER BY t.created_at LIMIT 1`;
     if (!host) {
       console.log('· NOT MEASURED — no active tenant has a tenant_admin membership to drive as.');
       console.log('  Uncovered, not a finding.');

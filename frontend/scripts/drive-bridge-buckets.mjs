@@ -113,6 +113,14 @@ const orphanCards = await sql`
   SELECT t.slug, count(*)::int AS n
   FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
   WHERE NOT EXISTS (SELECT 1 FROM opportunity_bridge b WHERE b.opportunity_id = c.opportunity_id)
+    -- A card CLAIMING a bridge version must have one. bridge_version is NOT NULL DEFAULT 0, and 0
+    -- is the schema's own way of saying "no bridge event produced me" - a directly-placed fixture
+    -- card declaring 0 is not lying about anything, and this check is about the write that skipped
+    -- the bridge WHILE PRETENDING IT DID NOT. Scoping to > 0 reads the column's existing semantics
+    -- rather than widening the exclusion list, and keeps the check strict for every real card.
+    -- (No backticks in this comment: it sits inside a tagged template literal, and a backtick here
+    --  terminates the SQL string - which is exactly how the first version of it crashed the drive.)
+    AND c.bridge_version > 0
     AND t.slug NOT IN ('ubihere', 'rfp-pipeline', 'youngstown-business-incubator')
   GROUP BY t.slug`;
 check(orphanCards.length === 0, 'no product-made card exists without a bridge event behind it',
