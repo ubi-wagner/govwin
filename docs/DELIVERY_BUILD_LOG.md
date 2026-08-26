@@ -250,4 +250,48 @@ instrument's first output describes the instrument.*
 
 ---
 
-*D4 onward appended as built.*
+## D4 · Baseline and rebaseline
+
+**Shipped:** `lib/delivery/baseline.ts`, `…/delivery/projects/[projectId]/baseline` (GET · POST ·
+PATCH), `__tests__/delivery-baseline.test.ts` (13).
+
+Migration 216 already made the baseline immutable in a trigger. This is the other half of the same
+rule and the legible half: the trigger raises `23001`, which reaches a user as a 500 and a stack
+trace, while these guards turn the same refusals into an answer a person can act on.
+
+| refusal | code | why it is not just the trigger's job |
+|---|---|---|
+| already baselined | `409 ALREADY_BASELINED` | the message names the alternative — *rebaseline* — which a SQLSTATE cannot |
+| anchor documents missing | `409 NOT_READY` | names WHICH one is missing. The two-artifact rule is enforced here and nowhere else |
+| no baseline to rebaseline from | `409 NOT_BASELINED` | |
+| no reason given | `400 VALIDATION_ERROR` | a rebaseline is the moment a schedule stopped being true; six months later that field is the only answer to "why is everything fourteen days late" |
+
+The set is a **compare-and-swap** — `baselined_at IS NULL` in the predicate — so two concurrent
+requests cannot both win. The loser matches zero rows and rolls back rather than stamping a second,
+later timestamp over the same frozen plan.
+
+### The assertion this module exists for
+
+`rebaseline` shifts `planned_*` and `forecast_date` and **does not name the baseline columns at
+all** — asserted against the SQL text, the same way the assignment boundary is, and for the same
+reason: the failure produces a plausible result rather than an error.
+
+A rebaseline that shifted the baseline too would return *"shifted 14 days"*, every date would look
+internally consistent, and **the variance would read zero** — the schedule silently having never
+slipped. The trigger would catch it at run time; this catches it at build time and says why.
+
+Red-first: adding `baseline_start = baseline_start + shift` to the update fired that assertion
+immediately; removing it went green.
+
+Two smaller decisions worth their line:
+
+- **A met milestone does not move.** Its date is a fact, not a forecast, so the update is scoped to
+  `status = 'pending'`.
+- **`startOn` is converted into the same uniform shift** as `shiftDays` rather than taking its own
+  path — one delta applied everywhere is what keeps durations intact.
+
+`tsc` 0 · vitest **2,070** (2,057 after D3).
+
+---
+
+*D5 onward appended as built.*
