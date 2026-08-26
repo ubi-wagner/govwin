@@ -3,8 +3,25 @@ name: Run Database Migrations
 # Runs pending migrations against production and/or staging databases.
 # Supports both the main app DB (db/migrations/) and the CRM DB (services/cms/db/).
 #
-# Manual-only — migrations run automatically via entrypoint.sh on Railway deploy.
-# Use this workflow for ad-hoc runs against production/staging.
+# ── THIS IS THE BREAK-GLASS PATH, NOT THE MAIN ONE ──────────────────────────────────────────
+# Migrations run INSIDE THE DEPLOYMENT, on every deploy, and both services fail closed:
+#
+#   frontend   entrypoint.sh runs db/migrations/migrate.mjs before `node server.js`, under
+#              `set -e`, using DATABASE_URL_OWNER — the app role cannot create a table that
+#              references `tenants` and the boot would crash-loop on "permission denied".
+#   rfp-crm    the Dockerfile CMD runs db/run.sh before uvicorn and exits 1 on failure —
+#              "refusing to boot on an unmigrated schema".
+#
+# So this workflow is manual-only and exists for ad-hoc or recovery runs.
+#
+# ⚠️ IT CANNOT REACH A DATABASE THAT HAS NO PUBLIC ENDPOINT. GitHub Actions runs outside
+#    Railway's private network. The CRM database is internal by design (docs/RAILWAY_ENV_VARS.md
+#    §The CRM database), so the CRM jobs below will fail to connect unless a public proxy is
+#    deliberately enabled — and the right answer to that failure is to run the migration from
+#    inside the deployment, not to open the database.
+#
+#    Never run this while a deploy is in progress: two runners against one database is the race
+#    the in-deployment path exists to avoid.
 
 on:
   workflow_dispatch:

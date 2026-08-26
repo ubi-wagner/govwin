@@ -113,20 +113,43 @@ endpoint off. Only `rfp-crm` connects to it — the platform frontend and the pi
 sweep in docs/CRM_ANALYSIS.md confirms that is already true in code: the only platform-side mention
 of the CRM is a link-out card.
 
-### The consequence, which is the part worth planning for
+### Migrations run inside the deployment — decided, and already the mechanism
 
-**GitHub Actions runs outside that network, so `migrate.yml` cannot reach an internal-only CRM
-database.** Two honest options:
+**Both services already migrate at boot, and both fail closed.** This was the design before the
+question was asked; what was missing was one thing that would have broken it.
 
-| option | what it means |
-|---|---|
-| **run migrations inside the deployment** (recommended) | a release step on the `rfp-crm` service, or `services/cms/db/run.sh` from a Railway shell. Keeps the database closed. |
-| keep a public endpoint for the migration path | the workflow keeps working, and the database is reachable from the internet with only its password in the way |
+| service | when | how it fails |
+|---|---|---|
+| `govtech-frontend` | `entrypoint.sh`, before `node server.js` | `set -e` — the boot stops |
+| `rfp-crm` | Dockerfile `CMD`, before `uvicorn` | `exit 1` — *"refusing to boot on an unmigrated schema"* |
 
-Until one is chosen, `migrate-crm-prod` **fails** with a message naming both. It used to
-`::warning::` and `exit 0` — a silent skip that left the database un-migrated while the run stayed
-green, which is the same shape as B145 and precisely how a rename of the GitHub secret would have
-gone unnoticed.
+That makes the internal-only posture free: nothing outside the deployment needs to reach either
+database to migrate it, so the CRM's Postgres can stay on the private network with no public proxy.
+
+**⚠️ The defect this decision surfaced, which was live.** `migrate.mjs` reads `DATABASE_URL`, and on
+the frontend service that is `govtech_app` — the NOBYPASSRLS application role. Reproduced against a
+live database:
+
+```
+psql "$DATABASE_URL" -c "CREATE TABLE probe (id uuid REFERENCES tenants(id))"
+ERROR:  permission denied for table tenants
+```
+
+Migrations **215, 216 and 217 all carry `REFERENCES tenants(id)`**, so with `set -e` the next deploy
+would not have come up — and the error names `tenants`, which sends the hunt to the wrong place.
+
+`entrypoint.sh` now migrates as `DATABASE_URL_OWNER` and serves as `DATABASE_URL`, warning loudly
+when the owner variable is absent. **`DATABASE_URL_OWNER` on `govtech-frontend` is therefore a
+hard requirement, not an optimisation** — it was already on the outstanding list; this promotes it.
+
+`__tests__/deployment-migrations.test.ts` locks all of it: migrations before the server, failing
+closed, the owner connection, the image actually carrying what the entrypoint runs, and psql
+present in the CRM image.
+
+`migrate.yml` stays as a **manual break-glass path** and now says in its own header that it cannot
+reach a database with no public endpoint. Its CRM step used to `::warning::` and `exit 0` — a silent
+skip that left the database un-migrated while the run stayed green, which is B145's shape and
+precisely how a rename of the GitHub secret would have gone unnoticed. It fails now.
 
 `tests/test_crm_database_var.py` reconciles the Python resolver, the bash chain in `db/run.sh`
 (which cannot import it) and both workflows, and asserts the skip has not come back.
