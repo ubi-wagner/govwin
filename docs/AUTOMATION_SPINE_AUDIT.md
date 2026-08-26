@@ -326,7 +326,7 @@ pipeline (`emit_event`/`emit_start`/`emit_end`, 0 unbalanced), and the CRM
 
 ## Verification
 
-`tsc` 0 · `vitest` 1968 pass · `pytest` 1319 pass / 9 skipped / 0 failed · `next build` clean ·
+`tsc` 0 · `vitest` 1977 pass · `pytest` 1319 pass / 9 skipped / 0 failed · `next build` clean ·
 14/14 audit self-tests · joins 1, 2, 3, 6 and 7 all zero, and the audit exits non-zero if any of
 them is not.
 

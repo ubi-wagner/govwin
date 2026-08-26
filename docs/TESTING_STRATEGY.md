@@ -791,6 +791,41 @@ Content pipeline events use the `system` namespace for infrastructure-level acti
 
 ---
 
+## Rules learned by breaking them — 2026-08-26
+
+Four, each earned the hard way in one session. The full narratives are B143–B147.
+
+**1 · A script that has never been run is not evidence, however carefully written.**
+`drive-agent-flows.mjs` was written, reviewed, committed and described in two hand-offs, and died on
+its first real execution — `column v.content_source does not exist`, a column that lives on a
+different table. Run it once before citing it.
+
+**2 · A suite that passes only when run in the right order is reporting the order.**
+The 39 branch drives passed, then produced four CANT-RUN and one FAIL an hour later with no code
+change. Every cause was two things that must agree kept in two places: one account with two
+passwords, a fixture claiming a provenance it lacked, a resolver selecting for the wrong property,
+a probe picking whichever tenant sorted first. Fix the disagreement, not the symptom.
+
+**3 · A resolver must select for what its consumer NEEDS, not for what is nearest.**
+`run-branch-drives.sh` handed the amendment drive the newest solicitation with *volumes*; the drive
+needs one with an active *proposal*. `probe-page-scale.mts` took the alphabetically-first tenant and
+assumed it knew its password. Both agreed with reality by luck, and luck expires the moment an
+earlier drive in the same suite creates a row that sorts first.
+
+**4 · A preflight that finds a violation must fail the run.**
+The same runner printed `✗ CROSS-TENANT REFERENCES FOUND — 18 row(s)` and then
+`39 passed · 0 failed`, exiting 0. Its own header already said a drive that cannot run "is still a
+FAILURE here — it is uncovered, not passing". A violation *found* is strictly worse than uncovered.
+
+**And one about fixing, not testing.** When the first fix for the cross-tenant cards inserted the
+missing `opportunity_bridge` rows, it looked right and was structurally wrong: the bridge is GLOBAL,
+so a row there does not mean "this card exists", it means "publish to every subscribed tenant". Two
+local fixtures became global opportunities and the backfill fanned them into five more tenants — 10
+cards and 10 bucket scores. The real fix read the schema's own semantics instead
+(`bridge_version NOT NULL DEFAULT 0`, where 0 already means "no bridge event produced me").
+**Before fixing an invariant violation, check what the fix implies downstream** — and count the
+footprint rather than assuming your own change was small.
+
 ## Deviations
 
 If you cannot follow this strategy for a specific test, call it out in the PR description and propose an amendment. "I couldn't figure out how to test it" is not a valid excuse — ask for help before skipping.

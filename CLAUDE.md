@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1968 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 1977 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -266,7 +266,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1968 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (1977 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
@@ -336,6 +336,21 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   ⚠️ Run the pipeline tests as `python3 -m pytest` **with `scripts/sandbox-env.sh` sourced** — the
   `pytest` on PATH is a uv tool that cannot see `asyncpg` (66 collection errors) and an unsourced
   `DATABASE_URL` makes ~22 live-DB tests fail at connect instead of skipping (docs/CONTINUATION.md §2).
+- **A suite that passes only when run in the right order is not passing — it is reporting the
+  order.** The 39 branch drives passed, then gave four CANT-RUN and one FAIL an hour later with no
+  code change: one account with two different passwords (the drives resolve `TENANT_PW`,
+  `e2e/auth.setup.ts` used `LIGHTHOUSE_PW`), a fixture claiming a `bridge_version` no bridge row
+  backed, a resolver handing the amendment drive a solicitation with no active proposal, and a probe
+  signing in as whichever tenant sorted first alphabetically — which a scenario tenant created by an
+  earlier drive in the same suite always wins (B146, B147). Two rules fall out. **A resolver must
+  select for what its consumer NEEDS**, not for what is merely nearest: `ORDER BY created_at` picks
+  the stable seeded tenant, `ORDER BY slug` picks whatever a fixture just named. And **one
+  credential, one place** — `scripts/sandbox-reset-passwords.mjs` is that place.
+- **A preflight that finds a violation must FAIL the run.** `run-branch-drives.sh` printed
+  `✗ CROSS-TENANT REFERENCES FOUND — 18 row(s)` and then `39 passed · 0 failed`, exiting 0 (B145).
+  Its own header already says a drive that cannot run "is still a FAILURE here — it is uncovered,
+  not passing"; a violation *found* is strictly worse than uncovered. Check the exit code, not the
+  summary line.
 - **The lenses cannot see what was never surfaced.** Every instrument above asks whether what the
   product does, it does correctly — none can find a feature with no way in, because no page renders
   it, no route is called, and nobody writes a test for something unreachable. That question needs the

@@ -98,6 +98,18 @@ a way to start. Fifteen have not run *in this sandbox*, which is a statement abo
 exercised, not about capability — `section_drafter` is in that list and CLAUDE.md correctly calls it
 live.
 
+> **Superseded by measurement (2026-08-26).** That "fifteen" was the right caveat and the wrong
+> number to leave standing. `frontend/scripts/drive-dormant-surface.mjs` later launched every
+> launchable workflow through the product's own admin route and took the count from **21 to 26 of
+> 36** — `content_curator`, `ops_digest`, `social_scheduler`, `curation_qa` and `amendment_monitor`
+> all ran. The remaining twelve need a real business operation (a proposal created, a stage
+> advanced, an RFP uploaded, an application accepted) rather than an overlay launch, and each is
+> listed with what it needs in **docs/LAUNCH_READINESS_DRIVE.md §3**.
+>
+> The interesting part was *why* they looked dormant: four instances **paused at human gates**, and
+> the AI steps sit AFTER the gate — so `opportunity_analyst` was not blocked by anything, nobody had
+> clicked the button. Completing each ToDo through `POST /api/admin/tasks` resumed them all.
+
 ---
 
 ## 4 · workflow templates ↔ a UI reference

@@ -855,6 +855,23 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 
 ## 2. Spin up the sandbox (exact commands + gotchas)
 
+> ### ⚠️ Three traps that each cost a cycle in the 2026-08-26 run
+>
+> **1. Never edit a shell script while it is executing.** Bash reads a script incrementally by byte
+> offset, so inserting lines into `run-branch-drives.sh` mid-run shifted everything beneath a live
+> interpreter and it died with `syntax error near unexpected token '('`. Its exit code and every
+> late result in that run were worthless. Wait for the process to exit, then edit.
+>
+> **2. `pgrep -f "run-branch-drives.sh"` matches ITSELF** when used inside a wait-loop whose own
+> command line contains that string, so the loop never exits — the same self-match that makes
+> `pkill -f` dangerous here. Use `ps -eo cmd | grep "[s]cripts/run-branch-drives.sh"`.
+>
+> **3. Run the suites in a known order, or reset between them.** `e2e/auth.setup.ts` re-seeds
+> passwords, so running the Playwright personas and then the branch drives left three isolation
+> drives reporting "could not authenticate" — which reads exactly like a deny-all isolation failure
+> and is a password (B146). `scripts/sandbox-reset-passwords.mjs` is the one place that decides
+> them; run it after any suite that touches credentials.
+
 > ### ⚠️ Running the PIPELINE tests: `python3 -m pytest`, with the env sourced
 >
 > Two traps, and each one manufactures failures that look like real regressions.

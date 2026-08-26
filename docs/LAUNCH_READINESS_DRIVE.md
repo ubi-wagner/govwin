@@ -124,6 +124,68 @@ and asserts the property instead.
 
 ---
 
+## 5 · The whole path, walked as a human, then every branch
+
+The four sections above each proved a slice. This is the end-to-end walk.
+
+### The arc, from an empty database
+
+`scripts/reset-minimal.sh` strips the box to schema plus platform config — 1 house tenant, 0
+proposals, 0 opportunities. `frontend/e2e/mt-arc-drive.spec.ts` then walks twelve acts as the human
+in the loop, creating everything it touches through the UI.
+
+```
+══ ARC LEDGER ══  ok=170  decision=42  note=36  override=3        blocked=0
+1 passed (4.1m)
+```
+
+`blocked=0` was verified by grepping the ledger for `✗`, not read off the tally line — an absent
+counter and a zero counter look identical.
+
+It built **9 tenants, 7 proposals, 18 opportunities and 108 workflow instances** where a minimal
+reset had left one house tenant. All three overrides are the product correctly refusing to guess and
+a human deciding:
+
+| act | override |
+|---|---|
+| 1 | accepted the default skeleton **with the deferral recorded** |
+| 1 | entered `submission_format` by hand — the product refused to invent a value the solicitation never stated, so it lands with `hitl` provenance |
+| 7 | the 13-pages-against-10 overflow, knowingly, as a customer clicking "Submit anyway" |
+
+Two invariants closed their own acts: *"the automated path is advisory, not autonomous"* (Mode C
+proposed work without advancing, locking or submitting) and the Act 10 isolation probes.
+
+### Every branch, and every persona
+
+| suite | result |
+|---|---|
+| 39 branch drives | **39 passed · 0 failed · 0 could-not-run · 0 missing** |
+| Playwright persona specs | **122 of 122** |
+
+The persona suite first reported 120 passed and 2 skipped. This repo's rule is that a skip is
+*uncovered, not passing*, so both were chased down and run: `ranking.tenant` needed
+`E2E_WITH_PIPELINE=1` (the rescore worker was already up), and `hitl-onboard-tvs-build` was pinned to
+a card that no longer existed — the exact fixture rot its own runner's preflight exists to catch.
+
+### What running them twice exposed
+
+The branch suite passed 39/39, then produced **four CANT-RUN and one FAIL** an hour later with no
+code change between. Every cause was cross-suite contamination — two things that must agree, kept in
+two places — and none was a product defect (B146, B147):
+
+- one account with **two different passwords** (branch drives vs `auth.setup.ts`), so running the
+  personas first made three isolation drives report what looks exactly like a deny-all;
+- a fixture **claiming a bridge provenance it did not have**;
+- a resolver selecting the newest solicitation with *volumes* when its drive needs one with an
+  active *proposal*;
+- a probe signing in as whichever tenant sorted first alphabetically — which a scenario tenant
+  created minutes earlier, by an earlier drive in the same suite, always wins.
+
+**A suite that passes only when run in the right order is not passing; it is reporting the order.**
+All four are fixed and the final run is clean.
+
+---
+
 ## What this drive did NOT establish
 
 - **Model output.** Every AI flow ran against the emulator. The plumbing is proven end to end; a
@@ -140,5 +202,7 @@ and asserts the property instead.
 
 ## Verification
 
-`tsc` 0 · `vitest` 1972 · `pytest` 1319 · five lenses exit 0 · spine audit joins 1,2,3,6,7 all zero ·
-`drive-agent-flows` exit 0 · `drive-dormant-surface` 13/13 launched, 0 failed, 0 left parked.
+`tsc` 0 · `vitest` **1977** (199 files) · `pytest` **1319** (9 skipped) · five lenses exit 0 ·
+spine-audit joins 1, 2, 3, 6 and 7 all zero · `drive-agent-flows` exit 0 · `drive-dormant-surface`
+13/13 launched, 0 failed, 0 left parked · **arc `blocked=0`** · **39/39 branch drives** ·
+**122/122 persona specs**.
