@@ -120,6 +120,10 @@ export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"
 # UI atlas its whole `/vaults` lane, which is the only surface a vault-only partner can see.
 export COLLAB_PW="${COLLAB_PW:-CollabPass1}"
 export TENANT_PW="${TENANT_PW:-DemoPass123!}"
+# The lighthouse tenant_admin is driven by BOTH suites and they resolved its password differently —
+# the branch drives via passwordFor()/TENANT_PW, e2e/auth.setup.ts via LIGHTHOUSE_PW. Pointing the
+# second at the first means running one suite cannot silently break the other.
+export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-$TENANT_PW}"
 
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
 

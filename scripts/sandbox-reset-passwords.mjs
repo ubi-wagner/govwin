@@ -50,6 +50,15 @@ const TARGETS = [
   // here and bailed before its first assertion.
   // A TENANT account, so it gets the TENANT password — this is the one that was wrong.
   { email: 'admin@immobileyes.test', pw: TENANT_PW },   // tenant_admin (Immobileyes Inc.)
+  // THE ACCOUNT TWO SUITES DISAGREED ABOUT. The branch drives resolve a tenant_admin's password
+  // through `passwordFor()` — i.e. TENANT_PW — while `e2e/auth.setup.ts` signs the same account in
+  // with `LIGHTHOUSE_PW || 'LighthouseAdmin'`. Both are right on their own and whichever suite ran
+  // last won: running the persona setup and then the branch drives left rls-app, rls-portal and
+  // rls-pages all CANT-RUN on "could not authenticate as eric@lighthouse.com", which reads exactly
+  // like a deny-all isolation failure and is a password. Naming it here, and pointing LIGHTHOUSE_PW
+  // at the same value in sandbox-env.sh, gives the box ONE answer — the "one credential, one place"
+  // rule this file and run-branch-drives.sh both already state (B109, B111).
+  { email: 'eric@lighthouse.com', pw: TENANT_PW },      // tenant_admin (Lighthouse Defense Systems)
 ];
 
 const hashes = new Map();

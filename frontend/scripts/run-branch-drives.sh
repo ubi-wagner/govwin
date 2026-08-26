@@ -324,12 +324,28 @@ for entry in "${DRIVES[@]}"; do
   # usage and exits 1, which is indistinguishable in a table from the flow being broken.
   drive_args=""
   if [ "$argspec" = "SOLICITATION" ]; then
+    # RESOLVE WHAT THE DRIVE NEEDS, NOT WHAT IS MERELY NEAREST.
+    #
+    # This used to select the newest solicitation that had VOLUMES. The amendment drive needs one
+    # with an active PROPOSAL — an amendment fans out to the builds made from it, so a solicitation
+    # nobody has built against has nothing to fan to. The two predicates agreed only by luck: the
+    # moment any newer volume-bearing solicitation appeared, the resolver handed over one the drive
+    # had to refuse, and the table read CANT-RUN — which this file's own rule calls uncovered, not
+    # passing. So the amendment path quietly stopped being covered, which is precisely the failure
+    # this runner was written to prevent ("run one at a time by hand, which is how one quietly stops
+    # being run at all"). Observed exactly that between two runs an hour apart.
+    #
+    # The join direction is the one the schema map warns about (B46, §4): the populated FK is
+    # `opportunities.solicitation_id`, NOT `curated_solicitations.opportunity_id`.
     drive_args=$(psql "$DATABASE_URL_OWNER" -tAc "
       SELECT cs.id FROM curated_solicitations cs
       WHERE EXISTS (SELECT 1 FROM solicitation_volumes v WHERE v.solicitation_id = cs.id)
+        AND EXISTS (SELECT 1 FROM opportunities o
+                      JOIN proposals p ON p.opportunity_id = o.id AND p.archived_at IS NULL
+                    WHERE o.solicitation_id = cs.id)
       ORDER BY cs.created_at DESC LIMIT 1" 2>/dev/null | tr -d ' ')
     if [ -z "$drive_args" ]; then
-      printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no curated solicitation with volumes to drive against"
+      printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no curated solicitation with volumes AND an active proposal"
       cantrun=$((cantrun+1)); FAILED+=("$label"); continue
     fi
   fi

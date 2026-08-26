@@ -162,6 +162,15 @@ BEGIN
   VALUES ('6c8571ca-292f-41db-9762-c5055a06e71e', '6c000000-0000-4000-8000-000000000001', 'af', 'approved', 'Autonomy Interest BAA', 'BAA-AUD-2026', 'Autonomy interest solicitation — customer-interest audit fixture.')
   ON CONFLICT (id) DO NOTHING;
   UPDATE opportunities SET solicitation_id = '6c8571ca-292f-41db-9762-c5055a06e71e' WHERE id = '6c000000-0000-4000-8000-000000000001';
+  -- The card claims `bridge_version = 1`, so version 1 has to EXIST. Without this row the card is
+  -- a mirror of nothing: `drive-bridge-buckets` checks "no product-made card exists without a
+  -- bridge event behind it" and counted these two, so running the e2e specs and then the branch
+  -- drives turned a passing drive into a failing one. Seeding a provenance the product could never
+  -- have produced is the same error the ingest-provenance doctrine forbids for solicitation values.
+  INSERT INTO opportunity_bridge (opportunity_id, version, event_type, card) VALUES
+    ('6c000000-0000-4000-8000-000000000001', 1, 'published',
+     jsonb_build_object('title', 'Autonomy Interest Topic', 'opportunityId', '6c000000-0000-4000-8000-000000000001'))
+  ON CONFLICT DO NOTHING;
   INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage, is_pinned, pinned_at) VALUES
     (lh, '6c000000-0000-4000-8000-000000000001', jsonb_build_object('title', 'Autonomy Interest Topic', 'opportunityId', '6c000000-0000-4000-8000-000000000001'), 1, 'open', 'open', true, now())
   ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET is_pinned = true, pinned_at = now(), lifecycle_status = 'open';
@@ -177,6 +186,11 @@ BEGIN
   INSERT INTO opportunities (id, source, source_id, title, is_active, close_date, dates_estimated) VALUES
     ('223f57f4-d6c4-47d6-8795-2f0c46a61c06', 'manual_upload', 'fx-freeportal-opp', 'Free Portal Fixture Opp', true, now() + interval '50 days', true)
   ON CONFLICT (id) DO NOTHING;
+  -- Same as above: bridge_version = 1 must name a bridge row that exists.
+  INSERT INTO opportunity_bridge (opportunity_id, version, event_type, card) VALUES
+    ('223f57f4-d6c4-47d6-8795-2f0c46a61c06', 1, 'published',
+     jsonb_build_object('title', 'Free Portal Fixture Opp', 'opportunityId', '223f57f4-d6c4-47d6-8795-2f0c46a61c06'))
+  ON CONFLICT DO NOTHING;
   INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage) VALUES
     (lh, '223f57f4-d6c4-47d6-8795-2f0c46a61c06', jsonb_build_object('title', 'Free Portal Fixture Opp', 'opportunityId', '223f57f4-d6c4-47d6-8795-2f0c46a61c06'), 1, 'open', 'open')
   ON CONFLICT (tenant_id, opportunity_id) DO NOTHING;
