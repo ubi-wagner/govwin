@@ -72,6 +72,9 @@ const PUBLIC_PATHS = [
   '/api/content',
   '/api/analytics',
   '/api/stripe/webhook',
+  // Delivery outcomes from Postmark. No session by construction — the request arrives from the
+  // provider — and POSTMARK_WEBHOOK_SECRET is the authorization, checked inside the route.
+  '/api/webhooks/postmark',
   '/invite',
 ];
 

@@ -172,6 +172,49 @@ export async function recordSuppressed(params: {
   }
 }
 
+/** A ledger row, as much of it as an outcome consumer needs. */
+export interface LedgerSend {
+  id: string;
+  tenantId: string | null;
+  correlationId: string;
+  template: string | null;
+}
+
+/**
+ * Find the send an inbound delivery outcome belongs to.
+ *
+ * The provider's Message-ID is the primary key here because it is what a future inbound REPLY's
+ * `In-Reply-To` header will also carry — the same lookup serves both, which is the whole reason
+ * that column exists. The correlation echo is the fallback for an outcome reported without one.
+ *
+ * Lives in this module rather than in the webhook route because the ledger is written and read in
+ * one place; `__tests__/email-transport-boundary.test.ts` enforces that, and the route would
+ * otherwise need the owner connection of its own.
+ */
+export async function findSend(params: {
+  providerMessageId: string | null;
+  correlationId: string | null;
+}): Promise<LedgerSend | null> {
+  if (!params.providerMessageId && !params.correlationId) return null;
+  try {
+    const rows = await sqlBypass<LedgerSend[]>`
+      SELECT id, tenant_id, correlation_id, template
+        FROM email_send_ledger
+       WHERE (${params.providerMessageId}::text IS NOT NULL
+              AND provider_message_id = ${params.providerMessageId})
+          OR (${params.correlationId}::text IS NOT NULL
+              AND correlation_id = ${params.correlationId}::uuid)
+       ORDER BY created_at DESC
+       LIMIT 1`;
+    return rows[0] ?? null;
+  } catch (err) {
+    // An outcome we cannot attribute is still worth recording. Losing it because a lookup failed
+    // would be worse than an event carrying a null tenant.
+    console.error('[email/ledger] findSend failed:', err);
+    return null;
+  }
+}
+
 /** Add an address to the suppression list. Idempotent — a second bounce is not an error. */
 export async function suppress(params: {
   email: string;

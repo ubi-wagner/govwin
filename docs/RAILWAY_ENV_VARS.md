@@ -60,6 +60,42 @@ Reconcile against Railway when the CRM is built out — the code-read set (see `
 
 ---
 
+## Email (Postmark + Gmail) — set on BOTH `govtech-frontend` and `rfp-crm`
+
+The send seam is implemented twice, once per language, and both halves read the same names and write
+the same `email_send_ledger` table in the main DB. A variable set on one service and not the other
+produces mail that goes out under two different configurations — which is exactly the class of thing
+the seam exists to prevent.
+
+| Variable | Purpose | Status |
+|---|---|---|
+| `EMAIL_DRIVER` | `postmark` \| `gmail`. Selects the transport for **transactional** mail only; `correspondence` is pinned to Gmail whatever this says. Absent ⇒ `gmail`, which is today's behaviour | **➕ ADD** (`postmark`, at cutover) |
+| `POSTMARK_SERVER_TOKEN` | **Server API Token, NOT the Account token.** The account token manages domains and cannot send; using it returns a 401 that reads exactly like a wrong key | **➕ ADD** |
+| `POSTMARK_MESSAGE_STREAM` | Postmark's transactional stream | ○ (defaults to `outbound`) |
+| `POSTMARK_WEBHOOK_SECRET` | shared secret on `POST /api/webhooks/postmark`. Postmark does **not** sign webhooks — the mechanism is HTTP Basic auth on the webhook URL, so configure the URL in Postmark as `https://postmark:<secret>@<host>/api/webhooks/postmark` | **➕ ADD** (frontend only — the route lives there) |
+| `POSTMARK_API_BASE` | endpoint override. **Sandbox only** — points the drivers at `scripts/test-harness/emulated-postmark.mjs`, the same way `ANTHROPIC_BASE_URL` points the AI flows at the emulated model. Leave UNSET in production | 💤 (never set in prod) |
+| `EMAIL_FROM_ADDRESS` | `notifications@rfppipeline.com`. Must be on the Postmark-verified domain | **➕ ADD** at cutover |
+| `EMAIL_FROM_NAME` | `RFP Pipeline` — the fallback display name when no tenant persona resolves | ○ |
+
+**DNS, once:** verify the DOMAIN in Postmark (not individual sender signatures) — DKIM plus a custom
+Return-Path. Then update SPF so **both** senders appear in ONE record:
+
+```
+v=spf1 include:_spf.google.com include:spf.mtasv.net ~all
+```
+
+A domain may have exactly one SPF record. Publishing a second is a `permerror` that fails **both**
+senders — the classic way adding an email provider breaks the mail that already worked.
+
+**⚠️ One open item, and it is a real blocker for the CRM half.** Migration 215 gives
+`email_send_ledger` no write policy, so the NOBYPASSRLS `govtech_app` role is refused by design. The
+frontend writes it through `DATABASE_URL_OWNER`. Nothing in the repo records which role the CRM's
+`SHARED_DATABASE_URL` carries — it has only ever written `system_events` and `cms_content`, neither
+of which has RLS. **If it is not the owner, every CRM send runs DEGRADED** (mail goes, no idempotency
+reservation) and logs a 42501 naming the remedy once per process. Check it before the cutover.
+
+---
+
 ## Cross-service invariants
 - **`API_KEY_ENCRYPTION_SECRET` must be identical** on frontend + pipeline (it decrypts the same DB-stored keys).
 - **`DATABASE_URL` role matters:** frontend = `govtech_app` (RLS on). Owner/superuser access is only via

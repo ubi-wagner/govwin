@@ -338,4 +338,128 @@ and the only reason it surfaced is that the probe was run at all.
 
 ---
 
-*E6 onward appended as built.*
+## E6 · The Postmark driver, and an emulator so the whole thing runs with no key
+
+**Shipped:** `lib/email/drivers/postmark.ts`, `src/mailer/drivers/postmark.py`,
+`scripts/test-harness/emulated-postmark.mjs`, `__tests__/email-postmark.test.ts` (17).
+
+Additive by construction. `EMAIL_DRIVER` defaults to `gmail`, so registering Postmark changes
+nothing until the variable is set — and Gmail stays one variable away in the other direction if
+Postmark has an outage.
+
+### The emulator is the point
+
+`POSTMARK_API_BASE` overrides the endpoint in both drivers, exactly as `ANTHROPIC_BASE_URL` points
+the AI flows at the committed model harness. With it set, **the driver, the request body, the ledger
+write, the webhook, the suppression row and the event all execute** — real product code, a real
+database, RLS on — and nothing leaves the building. Unset, the code path is byte-for-byte the one
+that talks to Postmark.
+
+A provider's interesting behaviour is its **failures**, and they are the half a happy-path emulator
+never exercises. The local-part selects one, deterministically:
+
+| recipient | what the emulator does | what it proves |
+|---|---|---|
+| `bounce@…` | accepts, then posts a hard Bounce | suppression row · `notification.bounced` · the next send refused |
+| `complaint@…` | accepts, then posts a SpamComplaint | suppression row · `notification.complained` |
+| `inactive@…` | refuses **406** | the divergence message — Postmark has it suppressed and we do not |
+| `ratelimit@…` | refuses 429 | the ledger row closes as `failed` |
+| anything else | accepts, then posts a Delivery | `notification.delivered`, resolved to the send |
+
+It also validates the token, because the specific failure worth rehearsing is using the **Account**
+token instead of the **Server** token — which returns a 401 that reads exactly like a wrong key. The
+driver's translation of that 401 is exercised rather than assumed.
+
+### Two error translations that are the actual value of a provider integration
+
+- **401** → "this is usually the ACCOUNT token rather than the SERVER token". Postmark returns 401
+  for both, and the second is far more common.
+- **406** → "Postmark has this address suppressed but ours does not — the two lists have diverged,
+  which means a bounce webhook was missed". A 406 is not a send failure; it is evidence that our
+  suppression list is behind, and saying so turns a dead end into a diagnosis.
+
+---
+
+## E7 · The webhook — "we sent it" becomes "it landed"
+
+**Shipped:** `app/api/webhooks/postmark/route.ts`, `ledger.findSend()`, two new labels in
+`lib/event-labels.ts`, a middleware public path, an audit-coverage allowlist entry with its reason.
+
+### Postmark does not sign its webhooks
+
+The design said "verified against `POSTMARK_WEBHOOK_SECRET`", and the obvious reading is an HMAC
+signature. **There isn't one.** Postmark's documented mechanism is HTTP Basic auth on the webhook
+URL (or a secret in the URL) over TLS. So the route accepts the secret as the Basic password or as
+`?token=`, compared in constant time — and the emulator sends Basic auth, not a signature.
+
+Building the HMAC check anyway would have looked more secure and been strictly worse: a verification
+path that can never run against the real provider is the most expensive kind of green.
+
+### Two status decisions that are about the provider's retry behaviour, not about us
+
+| case | status | why |
+|---|---|---|
+| record type we do not handle (`Open`, `Click`) | **200** | Postmark retries on non-2xx. "Understood, nothing to do" must not become a redelivery schedule |
+| `POSTMARK_WEBHOOK_SECRET` unset | **503** | a deployment gap, not a fault. 503 keeps Postmark retrying, so outcomes replay once the secret is set instead of being lost to a 200 |
+
+### A soft bounce must not suppress
+
+`HardBounce`, `BadEmailAddress`, `ManuallyDeactivated`, `Unsubscribe`, `SpamNotification` suppress.
+A **soft** bounce — mailbox full, server temporarily down — does not: the address is fine and will
+accept mail tomorrow, and suppressing on one would silently stop that customer's notifications for
+good over a condition that clears by itself. The event payload carries `suppressed: false`
+explicitly, so the audit trail shows the decision rather than leaving someone to infer it from an
+absent row.
+
+### The route does not query the ledger
+
+It calls `ledger.findSend()`. The first draft had the SQL inline and the boundary test would have
+failed it — correctly. The ledger is read and written in one place, and the route would otherwise
+have needed an owner connection of its own.
+
+`notification.delivered` and `notification.delivery_failed` **already had labels** in
+`lib/event-labels.ts` and were emitted by nothing — a label waiting for an event since before this
+build. The webhook is what finally makes the first of them real.
+
+---
+
+## The end-to-end drive
+
+**Shipped:** `frontend/scripts/drive-email-spine.mts`.
+
+Every other instrument here asserts one layer. The unit tests mock the ledger, so they prove `send()`
+CALLS it; this proves **the row is actually there afterwards**, written against a table whose write
+policy denies the application role — a claim only a live database can settle.
+
+```
+  ok    emulator up on 127.0.0.1:8788
+  ok    sent via postmark, provider message id emu-0001-31
+  ok    ledger row: sent · tenant foundation · message id recorded · sent_at set
+  ok    a replayed idempotency key reached the provider zero times
+  ok    hard bounce → suppression row (hard_bounce · postmark_webhook)
+  ok    hard bounce → notification.bounced, resolved to the send, tenant rfp-pipeline
+  ok    a suppressed address: refused before dispatch, no provider call, ledger row still written
+  ok    delivery → notification.delivered, resolved, tenant foundation
+  ok    a provider refusal: error surfaced, ledger row closed as failed
+  ok    correspondence stayed on gmail despite EMAIL_DRIVER=postmark
+✓ Email spine holds end to end.
+```
+
+The replay assertion is the one worth reading twice: it does not check a return value, it checks the
+**emulator's request counter** before and after. A `duplicate` result with the provider still called
+would satisfy the first and fail the second.
+
+### The drive's first run reported a defect that was its own
+
+`WRONG ledger sent_at is null on a sent row` — against a database where `sent_at` was correctly set.
+The script uses a bare `postgres()` client with **no** `transform: { column: { from: toCamel } }`,
+unlike `lib/db.ts`, so `sent_at` comes back as `sent_at` and `row.sentAt` reads `undefined`. Every
+other column in that query happened to be aliased; that one was not.
+
+The camelCase trap, in reverse, in a harness rather than in product code — and the reason it cost
+minutes rather than a false bug report is the standing rule: **a new instrument's first output
+describes the instrument.**
+
+---
+
+*E8 (the cutover) is blocked on the Postmark token and DNS. E9 is the verification pass.*

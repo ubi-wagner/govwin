@@ -30,6 +30,7 @@
  */
 import { randomUUID } from 'crypto';
 import { gmailDriver } from './drivers/gmail';
+import { postmarkDriver } from './drivers/postmark';
 import { confirm, recordSuppressed, reserve, suppressionFor } from './ledger';
 import { resolveSender } from './sender-identity';
 import type { EmailDriver, OutboundMessage, ResolvedMessage, SendResult } from './types';
@@ -38,17 +39,20 @@ export type {
   EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult, SendStatus,
 } from './types';
 export { resolveSender } from './sender-identity';
-export { suppress, suppressionFor } from './ledger';
+export { suppress, suppressionFor, findSend } from './ledger';
+export type { LedgerSend } from './ledger';
 
 /** Deliberately permissive — the same shape the admin routes already validate with. */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Transports, by name. Postmark joins this map in E6; until then `EMAIL_DRIVER=postmark` resolves
- * to nothing and falls back with a loud log rather than dead-ending a notification.
+ * Transports, by name. `EMAIL_DRIVER` selects among them for transactional mail and defaults to
+ * `gmail`, so registering Postmark here changes nothing until the variable is set — and Gmail stays
+ * one variable away in the other direction if Postmark has an outage.
  */
 const DRIVERS: Record<string, EmailDriver> = {
   gmail: gmailDriver,
+  postmark: postmarkDriver,
 };
 
 /**

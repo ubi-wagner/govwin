@@ -37,6 +37,7 @@ from typing import Optional
 
 from . import ledger
 from .drivers import gmail as gmail_driver
+from .drivers import postmark as postmark_driver
 from .types import (
     DriverResult, EmailKind, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult,
 )
@@ -49,8 +50,10 @@ __all__ = ['send', 'html_to_text', 'resolve_identity', 'OutboundMessage', 'SendR
 #: Deliberately permissive — the same shape the rest of the platform validates with.
 _EMAIL_SHAPE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
 
-#: Transports by name. Postmark joins this map in E6.
-_DRIVERS = {'gmail': gmail_driver}
+#: Transports by name. `EMAIL_DRIVER` selects among them for transactional mail and defaults to
+#: `gmail`, so registering Postmark here changes nothing until the variable is set — and Gmail stays
+#: one variable away in the other direction if Postmark has an outage.
+_DRIVERS = {'gmail': gmail_driver, 'postmark': postmark_driver}
 
 
 def _driver_for(kind: str):

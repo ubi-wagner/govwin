@@ -195,6 +195,16 @@ export function describeEvent(ev: EventLike): string {
       return `Admin alert sent (${count} admin${count === 1 ? '' : 's'} notified)`;
     }
     if (type === 'notification.delivered') return `Notification delivered to ${recipient}`;
+    if (type === 'notification.bounced') {
+      // The hard/soft distinction is the whole content of this event for a reader: one means the
+      // address is dead and will not be mailed again, the other means try tomorrow.
+      return payload.hard
+        ? `Notification hard-bounced for ${recipient} — address suppressed`
+        : `Notification soft-bounced for ${recipient} — will be retried`;
+    }
+    if (type === 'notification.complained') {
+      return `${recipient} marked a notification as spam — address suppressed`;
+    }
     if (type === 'notification.delivery_failed') return `Notification failed for ${recipient}`;
     if (type.endsWith('.failed')) {
       const action = str(payload.actionType) ?? humanizeType(type);

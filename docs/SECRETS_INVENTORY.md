@@ -89,6 +89,8 @@ two-voice sender model. It needs **one credential** to switch on.
 | `CMS_JWT_SECRET`, `CMS_AUTH_MODE`, `CMS_BASIC_USER`, `CMS_BASIC_PASS` | CMS admin auth |
 | `REVALIDATE_SECRET` | frontend↔CMS ISR revalidation (same value both sides) |
 | `CMS_STORAGE_ROOT` | CMS media volume (default `/data/cms`) |
+| `POSTMARK_SERVER_TOKEN` | the transactional transport — **Server** token, not the Account token |
+| `POSTMARK_WEBHOOK_SECRET` | shared secret on the delivery webhook (frontend route; Basic auth on the URL) |
 | `ALLOWED_ORIGINS`, `CMS_PUBLIC_URL`, `FRONTEND_URL` | CORS + cross-service URLs |
 
 ---
