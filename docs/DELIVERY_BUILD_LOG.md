@@ -294,4 +294,62 @@ Two smaller decisions worth their line:
 
 ---
 
-*D5 onward appended as built.*
+## D5 · Milestones, deliverables, acceptance
+
+**Shipped:** `lib/delivery/milestones.ts`, three API routes,
+`__tests__/delivery-deliverables.test.ts` (18).
+
+### Three acts, not one
+
+Declaring a deliverable, uploading a file, and accepting it are separate verbs with separate
+permissions:
+
+| act | who | why |
+|---|---|---|
+| declare | `tenant_admin`+ | it defines what the contract owes |
+| **upload** | **any assigned employee** | the everyday act of delivery work. Requiring an admin for every progress report would make the assignment roster pointless |
+| **accept** | `tenant_admin`+ | acceptance is what closes a CLIN |
+
+**A file being present is not a deliverable met.** Collapsing upload and acceptance would make "we
+uploaded a draft" and "the government accepted it" indistinguishable, and the second is the one that
+matters. So `uploadDeliverable` never sets `accepted_at`, `acceptDeliverable` never touches the
+file, and `markMilestoneMet` refuses while any deliverable on it is unaccepted — naming them, and
+saying why: *"Uploading a file is not acceptance."*
+
+### A replaced file revokes acceptance
+
+An accepted deliverable whose file has since changed is not an accepted deliverable. Re-uploading
+clears `accepted_at`/`accepted_by`, and the emitted event carries `replacedAcceptance: true` so the
+revocation is visible rather than inferred from an absent flag. Without it a milestone could close
+against a document nobody approved.
+
+Each upload gets a **new object key**, so a replacement does not overwrite the prior bytes — the row
+points at the current file and the old one survives for audit.
+
+### Two compare-and-swaps, both closing a real window
+
+- `markMilestoneMet` updates `WHERE status = 'pending'`, so a double-click cannot stamp two
+  `met_at` values or emit two events.
+- `acceptDeliverable` carries **both** refusal conditions in one statement's predicate —
+  `storage_key IS NOT NULL AND accepted_at IS NULL`. A read-then-write would leave a window in which
+  two accepts both see a null. The follow-up read exists only to say *which* refusal it was
+  (`NOTHING_UPLOADED` vs `ALREADY_ACCEPTED`), never to decide it.
+
+The met event carries `varianceDays` computed once, so the activity feed can say "met, nine days
+late" instead of leaving a reader to subtract two dates.
+
+### Red first
+
+| probe | result |
+|---|---|
+| `uploadDeliverable` also sets `accepted_at` — the two facts collapse | **2 assertions fired**, including the replaced-acceptance one |
+| the milestone gate checks `storage_key IS NULL` instead of `accepted_at IS NULL` | **fired** — a milestone would close on files nobody approved |
+
+Both green on restore. The second probe is the one worth keeping: it leaves every return value and
+every date plausible, and only an assertion on the predicate itself can catch it.
+
+`tsc` 0 · vitest **2,097** (2,079 after the registry work) · delivery isolation lens green.
+
+---
+
+*D6 onward appended as built.*
