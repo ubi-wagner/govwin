@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { estimatePageCount } from '@/lib/types/canvas-document';
 
-// The real narrative page metrics: US-Letter, 0.75in margins, 26pt header/footer,
-// 11pt Times New Roman body, 1.06 line spacing — the SAME layout the .docx/.pdf
-// exporter uses, so estimatePageCount must track the exported page count.
+// The real narrative page metrics: US-Letter, 0.75in margins, a 26pt running header and footer,
+// 11pt Times New Roman body, 1.06 declared line spacing — the SAME layout the .docx/.pdf exporter
+// uses, so estimatePageCount must track the exported page count. Two things about this frame are
+// easy to get wrong and were: the header and footer are drawn INSIDE the margins and take nothing
+// from the content box, and the stylesheet floors leading at 1.28, so the declared 1.06 renders as
+// 1.28 (B69 · B71).
 const canvas = {
   format: 'letter', width: 612, height: 792,
   margins: { top: 54, right: 54, bottom: 54, left: 54 },
@@ -34,10 +37,14 @@ describe('estimatePageCount — height model tracks the exported docx', () => {
     expect(p3).toBeGreaterThan(p2);
   });
 
-  it('~5000 chars of body text is roughly one page; ~10k is two', () => {
-    // usable 504×632pt at 11pt/1.06 → ~54 lines × ~95 chars ≈ 5100 chars/page
+  it('~4700 chars of body text is one page; ~9000 is two', () => {
+    // The old numbers here (632pt of usable height, 1.06 leading) were the two defects this frame
+    // was carrying, not the frame: the running header and footer do NOT come out of the content
+    // box — Chromium draws them in the margins — and canvas-html floors line-height at 1.28, so
+    // 11pt body sets on 14.08pt leading, never 11.66 (bug log B69 · B71).
+    // Corrected: usable 504×684pt, 48 lines of ~101 characters ≈ 4,850 characters a page.
     expect(estimatePageCount(doc([text(4700)]))).toBe(1);
-    expect(estimatePageCount(doc([text(10200)]))).toBe(2);
+    expect(estimatePageCount(doc([text(9000)]))).toBe(2);
   });
 
   it('headings, tables, and figures consume real vertical space beyond their text', () => {

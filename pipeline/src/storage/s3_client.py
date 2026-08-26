@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+from pathlib import Path
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,35 @@ logger = logging.getLogger(__name__)
 BUCKET = os.environ.get("AWS_S3_BUCKET") or os.environ.get("AWS_S3_BUCKET_NAME", "rfp-pipeline-local")
 
 _s3_client: Optional[Any] = None
+
+# ── Local filesystem driver (dev / sandbox) ─────────────────────────────────
+#
+# The FRONTEND has had one of these since STORAGE-LOCAL (lib/storage/s3-client.ts): with
+# STORAGE_DRIVER=local the same helpers read and write under LOCAL_STORAGE_DIR instead of talking
+# to R2. The pipeline never got the counterpart, so every storage call here needed boto3 — which is
+# not installed in this sandbox. The failure was quiet rather than loud: the shredder catches the
+# exception and logs "S3 fetch failed … skipping", so a document simply never gets extracted and
+# the run reports success having done less.
+#
+# Same two variables, same layout (<dir>/<bucket>/<key>), so the two services agree about where a
+# key lives and a file written by one is readable by the other. Production is untouched: without
+# STORAGE_DRIVER=local every function takes the boto3 path exactly as before.
+LOCAL = os.environ.get("STORAGE_DRIVER") == "local"
+LOCAL_DIR = os.environ.get("LOCAL_STORAGE_DIR", "/tmp/govwin-storage")
+
+
+def _local_path(key: str) -> Path:
+    """Resolve a key to its on-disk path, refusing anything that escapes the bucket root.
+
+    Containment is checked with is_relative_to, NOT a string prefix: with a bucket named
+    `testbucket`, the key `../testbucket-evil/x` resolves outside the root yet still starts with
+    it, so a prefix test would wave through the one thing this guard exists to stop.
+    """
+    root = (Path(LOCAL_DIR) / BUCKET).resolve()
+    target = (root / key).resolve()
+    if not target.is_relative_to(root):
+        raise RuntimeError(f"storage key escapes the bucket root: {key}")
+    return target
 
 
 def get_s3_client() -> Any:
@@ -57,6 +88,17 @@ def put_object(
         extra["CacheControl"] = cache_control
     if metadata is not None:
         extra["Metadata"] = metadata
+    if LOCAL:
+        # Resolved OUTSIDE the try: a refused key is a caller error with a specific message, and
+        # collapsing it into the generic "storage put failed" would hide which of the two it was.
+        path = _local_path(key)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(body)
+            return
+        except Exception as e:
+            logger.error("[storage.put_object] local write failed key=%s err=%s", key, e)
+            raise RuntimeError("storage put failed") from e
     try:
         get_s3_client().put_object(Bucket=BUCKET, Key=key, Body=body, **extra)
     except Exception as e:
@@ -65,6 +107,10 @@ def put_object(
 
 
 def get_object_bytes(key: str) -> Optional[bytes]:
+    if LOCAL:
+        path = _local_path(key)
+        # A missing key is None on both drivers — the callers branch on that, not on an exception.
+        return path.read_bytes() if path.is_file() else None
     try:
         res = get_s3_client().get_object(Bucket=BUCKET, Key=key)
     except Exception as e:
@@ -83,6 +129,8 @@ def get_object_bytes(key: str) -> Optional[bytes]:
 
 
 def object_exists(key: str) -> bool:
+    if LOCAL:
+        return _local_path(key).is_file()
     try:
         get_s3_client().head_object(Bucket=BUCKET, Key=key)
         return True
@@ -96,6 +144,10 @@ def object_exists(key: str) -> bool:
 
 
 def delete_object(key: str) -> None:
+    if LOCAL:
+        # Deleting an absent key is a no-op on S3; keep that contract.
+        _local_path(key).unlink(missing_ok=True)
+        return
     try:
         get_s3_client().delete_object(Bucket=BUCKET, Key=key)
     except Exception as e:
@@ -105,6 +157,13 @@ def delete_object(key: str) -> None:
 
 def ping_s3() -> dict[str, Any]:
     """Health check — verifies the bucket is reachable via HeadBucket."""
+    if LOCAL:
+        root = Path(LOCAL_DIR) / BUCKET
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            return {"ok": True, "bucket": BUCKET, "driver": "local", "dir": str(root)}
+        except Exception as e:
+            return {"ok": False, "driver": "local", "error": str(e)}
     try:
         get_s3_client().head_bucket(Bucket=BUCKET)
         return {"ok": True, "bucket": BUCKET}
@@ -139,6 +198,18 @@ def put_json(*, key: str, obj: Any, metadata: Optional[dict[str, str]] = None) -
 
 def copy_object(*, source_key: str, dest_key: str) -> None:
     """Server-side copy within the same bucket (no download/upload)."""
+    if LOCAL:
+        src, dst = _local_path(source_key), _local_path(dest_key)  # refusals surface as themselves
+        try:
+            if not src.is_file():
+                raise FileNotFoundError(source_key)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dst)
+            return
+        except Exception as e:
+            logger.error("[storage.copy_object] local copy failed src=%s dst=%s err=%s",
+                         source_key, dest_key, e)
+            raise RuntimeError("storage copy failed") from e
     try:
         get_s3_client().copy_object(
             Bucket=BUCKET,
@@ -155,6 +226,16 @@ def copy_object(*, source_key: str, dest_key: str) -> None:
 
 def list_keys(*, prefix: str, max_keys: int = 1000) -> list[str]:
     """List object keys under a prefix (for copy-all operations)."""
+    if LOCAL:
+        root = (Path(LOCAL_DIR) / BUCKET).resolve()
+        if not root.is_dir():
+            return []
+        # Keys are POSIX-style and relative to the bucket root, matching what S3 returns.
+        keys = sorted(
+            str(p.relative_to(root)).replace(os.sep, "/")
+            for p in root.rglob("*") if p.is_file()
+        )
+        return [k for k in keys if k.startswith(prefix)][:max_keys]
     try:
         resp = get_s3_client().list_objects_v2(
             Bucket=BUCKET, Prefix=prefix, MaxKeys=max_keys,

@@ -17,7 +17,20 @@
 
 import { useState } from 'react';
 import { useTool } from '@/lib/hooks/use-tool';
-import { createEmptyCanvas, CANVAS_PRESETS, type CanvasNode } from '@/lib/types/canvas-document';
+import { createEmptyCanvas, CANVAS_PRESETS, getNodeText, type CanvasNode } from '@/lib/types/canvas-document';
+
+/**
+ * An atom's body as text the drafter can read, whether it is prose or structure.
+ *
+ * `content` holds prose; `canvasNodes` holds the real nodes for a table, schedule, figure or list.
+ * Flattening the latter with the canvas's own `getNodeText` keeps ONE definition of "the words in
+ * this node" — a second extractor here would drift from the one the rest of the canvas uses.
+ */
+function atomText(a: { content: string | null; canvasNodes: CanvasNode[] | null }): string {
+  if (a.content && a.content.trim()) return a.content.trim();
+  const fromNodes = (a.canvasNodes ?? []).map(getNodeText).filter((t) => t && t.trim()).join('\n');
+  return fromNodes.trim();
+}
 
 // ─── Section title → unified-taxonomy vol (mig 101/102) ──────────────
 // Map common RFP section titles to a canonical `vol` so the scored atom
@@ -64,6 +77,9 @@ interface Section {
   nodeCount: number;
   pageLimit?: number;
   requiredSubsections?: string[];
+  /** The VOLUME's page cap, stamped on the section's canvas at provision — NOT the section's
+   *  own share (`pageLimit`). An AI-draft landing must preserve it. */
+  canvasMaxPages?: number | null;
   // Expert's curation note for this section (the "blank mold + prompt"). Passed to
   // the drafter as the grounding instruction so a section with no atoms can still
   // draft from the expert's prompt + the fallback all-proposal atoms.
@@ -117,7 +133,13 @@ export function DraftAllSections({
         try {
           const vol = sectionToVol(sec.title);
           const kinds = VOL_DEFAULT_KINDS[vol] ?? [];
-          const qs = new URLSearchParams({ vol, limit: '5', sectionId: sec.id });
+          // Scale retrieval to the section's ALLOWANCE. A flat 5 atoms was the same budget for a one-page
+        // abstract and a ten-page technical volume, so the long section ran out of material to write
+        // from and stopped at a fraction of its page envelope (measured: 60%% of a 10-page volume,
+        // with the ranker returning nothing further). ~4 atoms per allowed page, floored at 5 so
+        // short sections behave exactly as before and capped at 40 to bound the prompt.
+          const atomLimit = Math.min(40, Math.max(5, (sec.pageLimit ?? 1) * 4));
+          const qs = new URLSearchParams({ vol, limit: String(atomLimit), sectionId: sec.id });
           if (kinds.length) qs.set('kinds', kinds.join(','));
           if (context.length) qs.set('context', context.join(','));
           // the section title is the semantic query — ranks atoms by MEANING when embeddings are on
@@ -126,10 +148,24 @@ export function DraftAllSections({
           // so the atom return at lock can set lineage back to them.
           const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
           if (res.ok) {
-            const ranked = ((await res.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;
+            const ranked = ((await res.json()).data?.atoms ?? []) as Array<{
+              id: string; content: string | null; canvasNodes: CanvasNode[] | null;
+            }>;
+            // A STRUCTURED ATOM IS NOT AN EMPTY ONE. An atom's body lives in `content` when it is
+            // prose and in `canvasNodes` when it is a table, a schedule, a figure or a list — and
+            // this filtered on `content` alone, so every structured atom was dropped on the way to
+            // the drafter. Measured on this box: 699 of 2,148 approved atoms (30% of one tenant's
+            // library, 69% of another's) carry their body only in canvasNodes.
+            //
+            // The consequence was not "slightly less context." The drafter has no retrieval of its
+            // own — `libraryAtoms` is an INPUT — so a section whose best material is a schedule
+            // table got an empty list and correctly answered "No approved library content was
+            // retrieved", while a dozen relevant atoms sat one field away. The selector already
+            // returns canvasNodes for exactly this reason ("so structured atoms insert
+            // faithfully"); only this bridge ignored them.
             libraryAtoms = ranked
-              .filter((a) => a.content && a.content.trim())
-              .map((a) => ({ id: a.id, content: a.content as string, category: vol }));
+              .map((a) => ({ id: a.id, category: vol, content: atomText(a) }))
+              .filter((a) => a.content.length > 0);
           }
         } catch {
           // Library selection failure is non-fatal — draft without library context
@@ -157,9 +193,16 @@ export function DraftAllSections({
           // sets status='ai_drafted', and emits section.saved. Draft-All only targets
           // genuinely-empty sections, so there is no prior canvas content to preserve.
           const now = new Date().toISOString();
+          // Preserve the VOLUME's page cap, which provisioning stamped onto this section's canvas
+          // and the sections list returns as `canvasMaxPages`. It is NOT the section's own share
+          // (page_allocation, carried separately as layout.page_budget at assembly), and it is not
+          // the preset's hard-coded 15 — rebuilding from the bare preset made the compliance floor
+          // measure against a limit the solicitation never gave.
           const doc = createEmptyCanvas({
             documentId: sec.id,
-            canvas: CANVAS_PRESETS.letter_sbir_phase1,
+            canvas: sec.canvasMaxPages != null && sec.canvasMaxPages > 0
+              ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: sec.canvasMaxPages }
+              : CANVAS_PRESETS.letter_sbir_phase1,
             metadata: {
               title: sec.title,
               volume_id: '',

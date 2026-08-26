@@ -223,6 +223,7 @@ export async function GET(request: Request, ctx: RouteContext) {
  * Body: { stage, requirementType, label, description? }
  */
 export async function POST(request: Request, ctx: RouteContext) {
+  let gateStartId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -381,7 +382,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for gate requirement creation ──────────────────
-    const gateStartId = await emitEventStart({
+    gateStartId = await emitEventStart({
       namespace: 'proposal',
       type: 'gate_requirement.created',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -420,6 +421,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     }, { status: 201 });
   } catch (e) {
+    if (gateStartId) {
+      await emitEventEnd(gateStartId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/proposals/gates] POST error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },
@@ -437,6 +441,7 @@ export async function POST(request: Request, ctx: RouteContext) {
  * Body: { requirementId, isMet, evidence? }
  */
 export async function PATCH(request: Request, ctx: RouteContext) {
+  let toggleStartId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -564,7 +569,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for gate requirement toggle ──────────────────
-    const toggleStartId = await emitEventStart({
+    toggleStartId = await emitEventStart({
       namespace: 'proposal',
       type: 'gate_requirement.toggled',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -637,6 +642,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (toggleStartId) {
+      await emitEventEnd(toggleStartId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/proposals/gates] PATCH error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

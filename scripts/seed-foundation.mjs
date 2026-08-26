@@ -180,29 +180,64 @@ async function run() {
     console.log(`✓ ${f.role.padEnd(12)} ${f.name} (${f.title}) ${f.email}`);
   }
 
-  // 3) Paul Jackson — EC mentor appointed SHADOW ADMIN of Foundation. Native role tenant_admin
-  //    so a NORMAL login lands him in the workspace with full access (buckets/pipeline/download);
-  //    external (no home tenant) — the dispatcher resolves Foundation from his membership. His
-  //    EC-partner origin is captured by the proposal-collaborator grant (added by the build driver).
-  //    (partner_user was too low a role: below tenant_user, so it 403'd buckets + download.)
-  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'tenant_admin', tenantId: null });
+  // 3) Paul Jackson — EC mentor appointed SHADOW ADMIN of Foundation.
+  //
+  // DO NOT DEMOTE HIM. This used to write `role: 'tenant_admin', tenantId: null`, which was right
+  // when it was written (migration 141 elevated him off partner_user so buckets and download would
+  // stop 403-ing) and became wrong when the partner-manager landed: migration 157 makes Paul a
+  // `partner_admin` and 159 gives him the Entrepreneurs' Center as his own partner_org home. Running
+  // this seed afterwards reset BOTH — role back to tenant_admin and tenant_id back to NULL — so
+  // /partner failed its `canManagePartnerTenants` gate and redirected instead of rendering, and
+  // hitl-cc-actors / hitl-cc-partner failed on a missing "Partner Console" heading. Nothing was
+  // wrong with the console; the seed had walked his identity backwards.
+  //
+  // The end state the migrations define, which this now reproduces on a bare box too:
+  //   users.role = partner_admin, users.tenant_id = entrepreneurs-center (his own org)
+  //   membership @ entrepreneurs-center = tenant_admin/home   (he builds via the tested portal)
+  //   membership @ foundation           = tenant_admin/collaborator  (the descend target)
+  const [ec] = await sql`SELECT id FROM tenants WHERE slug = 'entrepreneurs-center' LIMIT 1`;
+  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'partner_admin', tenantId: ec?.id ?? null });
+  if (ec) {
+    await sql`
+      INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+      VALUES (${paulId}::uuid, ${ec.id}::uuid, 'tenant_admin', 'active', 'home', ${paulId}::uuid)
+      ON CONFLICT (user_id, tenant_id) DO UPDATE SET role='tenant_admin', status='active', source='home'`;
+  }
   await sql`
     INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
     VALUES (${paulId}::uuid, ${tid}::uuid, 'tenant_admin', 'active', 'collaborator', ${kateId}::uuid)
     ON CONFLICT (user_id, tenant_id) DO UPDATE SET role='tenant_admin', status='active', source='collaborator'`;
-  console.log(`✓ partner/shadow-admin  ${PARTNER.name} (${PARTNER.org}) ${PARTNER.email} → tenant_admin membership`);
+  // Foundation is his first owned company, so it shows in his stable (migration 157 step 4).
+  await sql`UPDATE tenants SET owner_id = ${paulId}::uuid WHERE id = ${tid}::uuid AND owner_id IS NULL`;
+  console.log(`✓ partner-manager  ${PARTNER.name} (${PARTNER.org}) ${PARTNER.email} → partner_admin${ec ? ' @ entrepreneurs-center' : ''}, tenant_admin in foundation`);
 
   // 4) buckets (deactivate any prior, then upsert the 5 Foundation buckets)
+  //
+  // LOOK BEFORE INSERTING. This used to read `INSERT … ON CONFLICT DO NOTHING RETURNING id` with a
+  // recover-by-name fallback, which looks idempotent and is not: tenant_spotlight_buckets has no
+  // unique on (tenant_id, name), so an untargeted ON CONFLICT has nothing to conflict ON — every
+  // run inserted a fresh row, RETURNING found it, and the fallback never ran. Four runs left
+  // Foundation with 4 copies of each of its 5 buckets, and since this seed is now part of the e2e
+  // globalSetup that would grow on every suite run until it tripped the per-tenant bucket cap and
+  // broke hitl-bucket-rls for a reason that has nothing to do with the product.
   await sql`UPDATE tenant_spotlight_buckets SET is_active=false WHERE tenant_id=${tid}::uuid`;
   const bucketRows = [];
   for (const b of BUCKETS) {
-    const [row] = await sql`
-      INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, is_active, created_by)
-      VALUES (${tid}::uuid, ${b.name}, ${b.description}, ${sql.json(b.criteria)}, true, ${kateId}::uuid)
-      ON CONFLICT DO NOTHING RETURNING id`;
-    let bid = row?.id;
-    if (!bid) { const [ex] = await sql`SELECT id FROM tenant_spotlight_buckets WHERE tenant_id=${tid}::uuid AND name=${b.name} LIMIT 1`; bid = ex.id;
-      await sql`UPDATE tenant_spotlight_buckets SET description=${b.description}, criteria=${sql.json(b.criteria)}, is_active=true WHERE id=${bid}::uuid`; }
+    const [existing] = await sql`
+      SELECT id FROM tenant_spotlight_buckets
+      WHERE tenant_id = ${tid}::uuid AND name = ${b.name} ORDER BY created_at LIMIT 1`;
+    let bid = existing?.id;
+    if (bid) {
+      await sql`UPDATE tenant_spotlight_buckets
+                   SET description = ${b.description}, criteria = ${sql.json(b.criteria)}, is_active = true
+                 WHERE id = ${bid}::uuid`;
+    } else {
+      const [row] = await sql`
+        INSERT INTO tenant_spotlight_buckets (tenant_id, name, description, criteria, is_active, created_by)
+        VALUES (${tid}::uuid, ${b.name}, ${b.description}, ${sql.json(b.criteria)}, true, ${kateId}::uuid)
+        RETURNING id`;
+      bid = row.id;
+    }
     bucketRows.push({ id: bid, name: b.name, criteria: b.criteria });
   }
   console.log(`✓ ${bucketRows.length} spotlight buckets`);

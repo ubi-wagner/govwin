@@ -9,6 +9,7 @@
  * lock→advance→download). Screenshots → docs/proposals/foundation-tvsf/ui-walkthrough/.
  */
 import { test, expect } from '@playwright/test';
+import postgres from 'postgres';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -32,11 +33,58 @@ async function login(page: any, email: string, pw: string) {
 }
 const shot = async (page: any, name: string) => {
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-  console.log(`  📸 ${name}`);
+  // A screenshot is this tour's OUTPUT, not its assertion — every step asserts what it means
+  // separately. Letting a capture failure fail the step turned a teardown race into a red build.
+  try {
+    await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+    console.log(`  📸 ${name}`);
+  } catch (e) {
+    console.log(`  ⚠ ${name} not captured — ${String(e).split('\n')[0]}`);
+  }
 };
+/* Read the state of the proposal this tour is driving.
+ *
+ * Steps 9 and 10 were written as `if (await button.isVisible()) { click }` with no assertion on the
+ * result, so when the control was absent they silently did nothing and reported success. The tour
+ * then photographed a DRAFT proposal as "the completed proposal", and step 11's download failed
+ * with no visible cause — the package route 403s on anything not locked or submitted. A step that
+ * cannot tell whether it worked is worse than one that fails. */
+/* PIN TO TVSF, not to "the newest launched portal".
+ *
+ * This tour drives the TVSF build specifically, and other drives create Foundation portals too —
+ * once flex-midwindow stopped skipping, "newest" became ITS fresh draft and step 10 failed
+ * asserting that a build it never touched had left draft. Resolve by identity
+ * (docs/FIXTURE_INTEGRITY.md). */
+async function proposalState(): Promise<{ id: string; stage: string; sections: number; locked: number }> {
+  const dsn = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+  const sql = postgres(dsn!, { max: 1 });
+  try {
+    const [r] = await sql<{ id: string; stage: string; sections: number; locked: number }[]>`
+      SELECT p.id, p.stage,
+             count(s.id)::int AS sections,
+             count(s.id) FILTER (WHERE s.is_locked)::int AS locked
+      FROM proposal_portals pp
+      JOIN tenants t ON t.id = pp.tenant_id AND t.slug = ${SLUG}
+      JOIN proposals p ON p.id = pp.proposal_id
+      LEFT JOIN proposal_sections s ON s.proposal_id = p.id
+      WHERE pp.status = 'launched' AND pp.proposal_id IS NOT NULL
+        AND pp.opportunity_id = ${TVSF_OPP}::uuid
+      GROUP BY p.id, p.stage, pp.created_at
+      ORDER BY pp.created_at DESC LIMIT 1`;
+    return r;
+  } finally { await sql.end(); }
+}
+
 // Reach the provisioned build workspace (portals → "Open build →"), no proposalId needed.
 async function openBuild(page: any) {
+  /* Navigate straight to the TVSF build rather than clicking the first "Open build" on the page —
+   * that link list holds every Foundation portal, so "first" drifts onto another drive's build. */
+  const st = await proposalState();
+  if (st?.id) {
+    await page.goto(`/portal/${SLUG}/proposals/${st.id}`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    return;
+  }
   await page.goto(`/portal/${SLUG}/portals`);
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.getByRole('link', { name: /Open build/i }).first().click();
@@ -55,12 +103,30 @@ test('step 2 — pin + comp-code purchase (Kate)', async ({ page }) => {
   await login(page, KATE, PW);
   await page.goto(`/portal/${SLUG}/cards`);
   await page.waitForLoadState('networkidle').catch(() => {});
-  const card = page.locator('div')
-    .filter({ has: page.getByRole('heading', { name: /TVSF Round 45/ }) })
-    .filter({ has: page.getByRole('button', { name: /Pin/ }) }).last();
-  await card.getByRole('button', { name: /Pin/ }).click();
-  // Purchase appears only after pinning; only TVSF is pinned → the sole Purchase button.
-  await page.getByRole('button', { name: 'Purchase' }).click();
+  /* SCOPE TO THE CARD, VIA ITS OWN HEADING.
+   *
+   * `page.locator('div').filter({has: heading}).filter({has: PinButton}).last()` reads like "the
+   * card", and is not: it matches every ANCESTOR div that contains both, and `.last()` only
+   * happens to land on the card while exactly one TVSF card exists. Once the database held
+   * several ("Ohio TVSF Round 45" and "TVSF Round 45 — …(818079)") it resolved to a wrapper
+   * holding seven Pin buttons and the step died on a strict-mode violation with no product defect
+   * behind it — the second time this same locator shape has broken here, per the note below.
+   *
+   * Walk UP from the heading instead: XPath's ancestor axis with [1] is the NEAREST enclosing div
+   * that has a Pin button, which is the card by construction, however many siblings exist.
+   */
+  const heading = page.getByRole('heading', { name: /TVSF Round 45/ }).first();
+  await expect(heading, 'no TVSF card on Kate\'s feed').toBeVisible({ timeout: 15_000 });
+  const card = heading.locator('xpath=ancestor::div[.//button[contains(normalize-space(.), "Pin")]][1]');
+  await card.getByRole('button', { name: /Pin/ }).first().click();
+  // Buy from the TVSF CARD, not from the page. This used to read
+  //   await page.getByRole('button', { name: 'Purchase' }).click();
+  // on the reasoning "only TVSF is pinned → the sole Purchase button", which stopped being true as
+  // soon as anything else pinned a Foundation card: strict mode found two identical buttons and the
+  // step failed with no product defect behind it. Scoping to the card the test just pinned says what
+  // it means and holds however many other cards are pinned beside it.
+  const tvsf = heading.locator('xpath=ancestor::div[.//button[normalize-space(.)="Purchase"]][1]');
+  await tvsf.getByRole('button', { name: 'Purchase' }).first().click();
   await expect(page.getByRole('button', { name: 'Complete purchase' })).toBeVisible({ timeout: 15_000 });
   await shot(page, '02_purchase_modal');
   await page.getByPlaceholder('Enter code').fill('rfppipelinetest');
@@ -76,8 +142,25 @@ test('step 4 — RFP admin releases the portal', async ({ page }) => {
   await page.getByRole('button', { name: /I understand/i }).click({ timeout: 10_000 }).catch(() => {});
   await page.waitForLoadState('networkidle').catch(() => {});
   await shot(page, '04a_admin_curation_queue');
-  await page.getByRole('button', { name: /Release to customer/i }).first().click();
-  await expect(page.getByRole('link', { name: /Open build/i }).first()).toBeVisible({ timeout: 25_000 });
+
+  /* RELEASE IS A ONE-WAY TRANSITION, so this step can only be performed once per portal.
+   *
+   * It used to click "Release to customer" unconditionally. On any run after the first the portal
+   * is already `launched`, that button is correctly not rendered, and the step died on a 60-second
+   * click timeout that read like a broken release control. What this step is FOR is the released
+   * state — a provisioned build the customer can open — and that is true whether this run performed
+   * the flip or an earlier one did.
+   */
+  const release = page.getByRole('button', { name: /Release to customer/i }).first();
+  if (await release.count() > 0) {
+    await release.click();
+  } else {
+    console.log('[walk] no portal awaiting release — already launched; asserting the end state');
+  }
+  await expect(
+    page.getByRole('link', { name: /Open build/i }).first(),
+    'a released portal must offer its provisioned build',
+  ).toBeVisible({ timeout: 25_000 });
   await shot(page, '04b_released_provisioned');
 });
 
@@ -136,6 +219,11 @@ test('step 9 — accept & lock all sections', async ({ page }) => {
   }
   await page.waitForTimeout(2500);
   await shot(page, '09_locked');
+
+  const after = await proposalState();
+  console.log(`[walk] after lock: ${after.locked}/${after.sections} sections locked, stage=${after.stage}`);
+  expect(after.locked, 'locking must actually lock sections — a no-op step is not a passing step')
+    .toBeGreaterThan(0);
 });
 
 test('step 10 — advance the stage (→ submitted)', async ({ page }) => {
@@ -145,19 +233,93 @@ test('step 10 — advance the stage (→ submitted)', async ({ page }) => {
   const adv = page.getByRole('button', { name: /^Advance to /i }).first();
   if (await adv.isVisible().catch(() => false)) { await adv.click(); await page.waitForTimeout(2500); }
   await shot(page, '10_advanced_submitted');
+
+  /* GO THROUGH THE READINESS GATE, NOT AROUND IT.
+   *
+   * This step used to be `if (visible) click` with no assertion, so it reported success while doing
+   * nothing — and what it was silently swallowing was the product being RIGHT. Driven directly, the
+   * advance returns a precise 422:
+   *
+   *   NOT_READY — 2 blocker(s): Required document not provided: Willingness-to-License Letter.
+   *                             Required document not provided: ESP Support Letter.
+   *
+   * This sandbox proposal genuinely lacks two required documents, so submission-readiness refuses.
+   * The product offers an explicit way through — `acknowledgeBlockers`, the customer's "submit
+   * anyway" — and a tour that claims to reach a completed, downloadable proposal has to take it.
+   * Doing so exercises MORE than the old no-op did: the gate fires, its reasons are read, and the
+   * acknowledged path is walked.
+   */
+  const st = await proposalState();
+  if (st.stage === 'draft') {
+    const first = await page.request.post(
+      `/api/portal/${SLUG}/proposals/${st.id}/advance`, { data: {} });
+    if (first.status() === 422) {
+      const body = await first.json();
+      const blockers = (body?.details?.blockers ?? []) as Array<{ message: string }>;
+      console.log(`[walk] readiness gate held with ${blockers.length} blocker(s):`);
+      for (const b of blockers) console.log(`         · ${b.message}`);
+      expect(blockers.length, 'a 422 NOT_READY must say what is blocking').toBeGreaterThan(0);
+
+      const ack = await page.request.post(
+        `/api/portal/${SLUG}/proposals/${st.id}/advance`, { data: { acknowledgeBlockers: true } });
+      expect(ack.ok(), `acknowledged advance failed: ${ack.status()} ${(await ack.text()).slice(0, 200)}`)
+        .toBeTruthy();
+      console.log('[walk] blockers acknowledged — advanced');
+    } else {
+      expect(first.ok(), `advance failed: ${first.status()} ${(await first.text()).slice(0, 200)}`)
+        .toBeTruthy();
+    }
+    await page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+    await shot(page, '10_advanced_submitted');
+  }
+
+  // The export gate is stage-based: package? refuses anything not locked/submitted/archived.
+  const after = await proposalState();
+  console.log(`[walk] after advance: stage=${after.stage}`);
+  expect(after.stage, 'the build must leave draft for the package export gate to open')
+    .not.toBe('draft');
 });
 
 test('step 11 — download the completed proposal (.docx)', async ({ page }) => {
+  /* This step logs in, opens the build, switches two tabs, waits up to 25s for a download and
+   * writes two screenshots. That does not fit the 60s default, so Playwright tore the context down
+   * while the final screenshot was still in flight and the step failed with "Target page, context
+   * or browser has been closed" — a teardown race reported as a broken download. */
+  test.setTimeout(150_000);
   await login(page, KATE, PW);
   await openBuild(page);
   await page.getByRole('button', { name: /All Sections/i }).first().click().catch(() => {});
   await page.getByRole('button', { name: /Artifacts/i }).first().click().catch(() => {});
   await shot(page, '11a_completed_ready_to_download');
+  /* BOUND THE CLICK.
+   *
+   * `dlBtn.click().catch(() => {})` looks defensive and is not: with no explicit timeout a click on
+   * a button that is not there waits the whole TEST budget, so the catch never runs and the step
+   * dies on "Test timeout exceeded" instead of on the thing that is actually wrong. Ask whether the
+   * control exists first, and say so when it does not — an export button missing from a completed
+   * proposal is a finding, not something to swallow.
+   */
   const dlBtn = page.getByRole('button', { name: /Download Proposal \(\.docx\)/i }).first();
-  const dl = await Promise.all([
-    page.waitForEvent('download', { timeout: 25_000 }).catch(() => null),
-    dlBtn.click().catch(() => {}),
+  /* ENABLED, not merely VISIBLE.
+   *
+   * `isVisible()` is true for a DISABLED button, and that distinction cost a wrong diagnosis here:
+   * on a draft proposal the export controls are correctly disabled — with the hint "Lock the
+   * proposal or advance to submitted stage to export" beside them — so this check passed, the click
+   * did nothing, and the missing download looked like a broken control rather than a working gate.
+   * Ask what the user can actually do.
+   */
+  await expect(dlBtn, 'the Artifacts tab of a completed proposal must offer the .docx download')
+    .toBeVisible({ timeout: 15_000 });
+  await expect(dlBtn, 'the .docx download must be ENABLED once the proposal is exportable')
+    .toBeEnabled({ timeout: 15_000 });
+  const st = await proposalState();
+  console.log(`[walk] downloading from stage=${st.stage} (${st.locked}/${st.sections} locked)`);
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }).catch(() => null),
+    dlBtn.click({ timeout: 15_000 }).catch(() => {}),
   ]);
-  if (dl[0]) { await dl[0].saveAs(`${SHOTS}/../Foundation_TVSF_UI_downloaded.docx`); console.log('  ⬇ downloaded via UI'); }
+  expect(download, 'clicking Download Proposal (.docx) must produce a file').toBeTruthy();
+  await download!.saveAs(`${SHOTS}/../Foundation_TVSF_UI_downloaded.docx`);
+  console.log('  ⬇ downloaded via UI');
   await shot(page, '11b_download_done');
 });

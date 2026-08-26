@@ -92,7 +92,13 @@ export async function GET(
             ORDER BY r.created_at DESC LIMIT 1
           ) fit ON true
           WHERE c.tenant_id = ${tenantId}::uuid
-            ${includeClosed ? tx`` : tx`AND c.lifecycle_status <> 'archived'`}
+            ${/* "Include closed" means closed, not archived. lifecycle_status is exactly
+                  ('open','closed','archived'), so unchecked = open only. This used to read
+                  <> 'archived', which let every admin-closed card through a filter whose label
+                  promised to hide them — and since cards are not an archive target, it excluded
+                  a state nothing produces. The date-derived closure (closeDate in the past on a
+                  still-'open' card) is filtered client-side, where the badge computes it. */
+              includeClosed ? tx`` : tx`AND c.lifecycle_status = 'open'`}
             ${includePassed ? tx`` : tx`AND c.pursuit_status <> 'passed'`}
             ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}
           ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC

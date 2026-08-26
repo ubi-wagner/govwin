@@ -13,11 +13,14 @@
  * Screenshots land in public/guides/rfp-ingest/ so the guidebook can serve them.
  */
 import { test, expect } from '@playwright/test';
-import path from 'node:path';
+import { requireUploads } from './upload-fixtures';
 
-const UPLOADS = '/root/.claude/uploads/34d597b2-183f-5787-9057-fc7251e3f9ff';
-const BAA = path.join(UPLOADS, '67121ede-DoW_2026_SBIR_BAA_Preface_07152026.pdf');
-const TOPIC = path.join(UPLOADS, '728a892f-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF');
+// Skips (does not fail) when the source PDFs are not on this machine — see e2e/upload-fixtures.ts.
+const [BAA, TOPIC] = requireUploads(
+  '67121ede-DoW_2026_SBIR_BAA_Preface_07152026.pdf',
+  '728a892f-topic_OSW26BZ04DP013_T3CP_Patent_Holiday_SBIR_Open_Topic_Call.PDF',
+);
+
 const SHOTS = 'public/guides/rfp-ingest';
 
 const ADMIN_EMAIL = process.env.DRIVE_ADMIN_EMAIL || 'eric@rfppipeline.com';

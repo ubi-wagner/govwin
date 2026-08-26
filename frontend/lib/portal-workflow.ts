@@ -428,14 +428,45 @@ export interface StageReviewState {
   summary: string | null;
   noteCount: number | null;
   completedAt: string | null;
+  /**
+   * Did the agent cohort actually RUN (B17)? Derived by the pipeline from the engine's own step
+   * record, not asserted. `false` means the manager safe-skipped — no key, rate-limited, fabric
+   * absent — and the stage has been reviewed by nobody. Null on completions emitted before this
+   * field existed, which the auto gate treats the same as false: unknown is not a pass.
+   */
+  cohortRan: boolean | null;
 }
+/**
+ * May an AI-manager gate close ITSELF on this review? Returns the refusal reason, or null to pass.
+ *
+ * Pure, and separate from the DB work, because this one boolean is what decides whether a
+ * customer's proposal stage advances with no human looking at it. Two things have to be true, and
+ * the product has been wrong about each of them in turn:
+ *
+ *  · The cohort found nothing. (PATTERN_AUDIT HIGH-4 — "the cohort ran" is not "the cohort found
+ *    nothing". Any advisory note parks the gate for a person.)
+ *  · The cohort RAN. (B17 — and "found nothing" is not "ran", which is the dangerous direction. A
+ *    manager that safe-skipped for want of a key posts zero notes, and zero notes read as clean.
+ *    Silence used to authorize the advance.)
+ *
+ * So the verdict must be an AFFIRMATIVE pass; null, missing, or `not_reviewed` all park the gate.
+ * The ASSISTED path is deliberately untouched — a human may still close a gate the AI never
+ * reviewed, which is exactly the judgement a human is for. They just get told, now.
+ */
+export function autoGateRefusal(review: Pick<StageReviewState, 'verdict' | 'noteCount' | 'cohortRan'>): string | null {
+  if (!['reviewed', 'pass', 'clean'].includes(String(review.verdict ?? ''))) return 'review_not_evidenced';
+  if (review.cohortRan === false) return 'review_not_evidenced';
+  if (Number(review.noteCount ?? 0) > 0) return 'review_has_findings';
+  return null;
+}
+
 export async function getStageReviewState(
   portalId: string, stageKey: string,
 ): Promise<StageReviewState> {
   try {
     // Scalar subqueries (always exactly one row, even with no completion yet), pulling the latest
     // completion's verdict + the manager's SUMMARY of what the cohort found (SPINE-T3).
-    const [r] = await sql<Array<{ requestedAt: Date | null; completedAt: Date | null; verdict: string | null; summary: string | null; noteCount: string | null }>>`
+    const [r] = await sql<Array<{ requestedAt: Date | null; completedAt: Date | null; verdict: string | null; summary: string | null; noteCount: string | null; cohortRan: string | null }>>`
       SELECT
         (SELECT max(created_at) FROM system_events
            WHERE namespace = 'capture' AND type = 'stage_review.requested'
@@ -454,7 +485,11 @@ export async function getStageReviewState(
         (SELECT payload->>'noteCount' FROM system_events
            WHERE namespace = 'capture' AND type = 'stage_review.completed'
              AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
-           ORDER BY created_at DESC LIMIT 1) AS "noteCount"`;
+           ORDER BY created_at DESC LIMIT 1) AS "noteCount",
+        (SELECT payload->>'cohortRan' FROM system_events
+           WHERE namespace = 'capture' AND type = 'stage_review.completed'
+             AND payload->>'portalId' = ${portalId} AND payload->>'stageKey' = ${stageKey}
+           ORDER BY created_at DESC LIMIT 1) AS "cohortRan"`;
     const requestedAt = r?.requestedAt ? new Date(r.requestedAt) : null;
     const completedAt = r?.completedAt ? new Date(r.completedAt) : null;
     const completed = !!completedAt && (!requestedAt || completedAt >= requestedAt);
@@ -466,10 +501,11 @@ export async function getStageReviewState(
       summary: completed ? (r?.summary ?? null) : null,
       noteCount: completed && Number.isFinite(n) ? n : null,
       completedAt: completed && completedAt ? completedAt.toISOString() : null,
+      cohortRan: completed && r?.cohortRan != null ? r.cohortRan === 'true' : null,
     };
   } catch (e) {
     console.error('[getStageReviewState] failed (non-fatal)', e);
-    return { requested: false, completed: false, verdict: null, summary: null, noteCount: null, completedAt: null };
+    return { requested: false, completed: false, verdict: null, summary: null, noteCount: null, completedAt: null, cohortRan: null };
   }
 }
 
@@ -508,13 +544,9 @@ export async function closeAgentGate(
   // Auto is opt-in per stage — never auto-advance a stage the tenant didn't set to autoAdvance.
   if (opts.auto && stage.autoAdvance !== true) return { advanced: false, reason: 'auto_not_enabled' };
 
-  // AUDIT FIX (PATTERN_AUDIT HIGH-4): AUTO closes only a PASSED review — "the cohort ran"
-  // is not "the cohort found nothing". Any advisory note (or a non-clean verdict) leaves the
-  // gate for a human; the ASSISTED click (a human weighing the notes) is unchanged.
   if (opts.auto) {
-    const notes = Number(review.noteCount ?? 0);
-    const verdictOk = review.verdict == null || ['reviewed', 'pass', 'clean'].includes(String(review.verdict));
-    if (notes > 0 || !verdictOk) return { advanced: false, reason: 'review_has_findings' };
+    const blocked = autoGateRefusal(review);
+    if (blocked) return { advanced: false, reason: blocked };
   }
 
   // Close the gate ToDo (its completion IS the gate close). RLS-scoped update (prod app role is

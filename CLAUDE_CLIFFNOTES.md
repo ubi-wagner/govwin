@@ -1,6 +1,10 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-06-23 (Phase 4 reconcile — as-built baseline from ARCHITECTURE_V9.md)
+**Last updated:** the sections are dated INDIVIDUALLY, and that is deliberate — §1's baseline is
+2026-06-23 and its supersession notice is 2026-08-22, while §4b's bug classes are amended whenever one
+is caught. A single file-level date on a document this size is the mechanism that produced the §1
+failure: it read "current" while 135 migrations went by underneath it. Trust a section's own stamp,
+and trust `docs/SCHEMA_MAP.md` over any schema text here.
 **Architecture reference:** `ARCHITECTURE_V10.md` is the authoritative as-built master (supersedes V5–V8).
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
@@ -27,16 +31,33 @@ mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library
 side-to-side V1 test. State at launch: migs **148**, `tsc 0 · vitest 855 · next build`. Full launch
 punch list: **docs/V1_LAUNCH_PUNCHLIST.md**. Standalone-serving caveats: CLAUDE.md SOP + docs/CONTINUATION.md §2.
 
-**Sandbox facts:** DB `postgresql://claude@127.0.0.1:5433/govtech_intel` (pg data dir `/tmp/pgs_gov/data`).
-App served standalone on **:3000** (`next start` is BROKEN — `output:'standalone'`). Chromium for Playwright:
-`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`, not `127.0.0.1`.
+**Sandbox facts:** Postgres on **:5432** via `pg_ctlcluster 16 main` (data dir
+`/var/lib/postgresql/16/main`). TWO roles, not interchangeable (docs/RLS_CUTOVER.md): `DATABASE_URL`
+= `govtech_app` (NOBYPASSRLS — what the FRONTEND runs as) and `DATABASE_URL_OWNER` = `govtech` (owner
+— migrations, admin cross-tenant reads, and **the pipeline worker**, which cannot write a
+tenant-scoped `process_instances` row on any other role). App served standalone on **:3000**
+(`next start` is BROKEN — `output:'standalone'`). Emulated Claude on **:8787**. Chromium for
+Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Login must hit `localhost:3000`,
+not `127.0.0.1`. Everything above is exported by `scripts/sandbox-env.sh` — source it first, always.
 
-### FAST refresh (~2 min — box already has DB data dir + a `.next` build)
+### FAST refresh (~1 min — box already has a DB data dir + a `.next` build)
 ```bash
-bash scripts/heartbeat.sh          # idempotent: (re)starts pg :5433 + standalone server :3000; prints HEARTBEAT status
-export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
-node scripts/seed_dev_accounts.mjs # additive: admin + Lighthouse/Ubihere tenants + backfills every tenant's cards
+source scripts/sandbox-env.sh      # the ONLY source of DSNs, secrets, driver passwords
+bash scripts/sandbox-up.sh         # idempotent: postgres + schema drift + accounts + emulator + worker + frontend
 ```
+`sandbox-up.sh` is safe to run at any time and exits non-zero if anything is still not serving, so a
+zero means the stack is genuinely up — it checks the CSS actually serves and that the running server
+is not older than the build on disk.
+
+**Keep it up:** `nohup scripts/sandbox-watch.sh > "$GOVWIN_RUN_DIR/watch.log" 2>&1 &` — a 60s
+supervisor that probes each service with a REAL transaction and repairs what broke. Silent while
+healthy (`$GOVWIN_RUN_DIR/watch.beat` mtime proves it is cycling). `ONCE=1 scripts/sandbox-watch.sh`
+for a one-shot check. Rationale + per-probe reasoning: `scripts/sandbox-probe.sh`.
+
+Admin password is **`SandboxDrive2026!`** (`scripts/sandbox-reset-passwords.mjs` writes it;
+`sandbox-env.sh` exports it as `$RFP_ADMIN_PW`/`$ADMIN_PW`/`$DRIVE_ADMIN_PW` so every driver script
+picks it up). It is NOT `RFPAdmin2026!` any more — migrations 124 and 198 rotated the seeded admins
+onto random hashes nobody holds, and the reset script is the out-of-band operator fix.
 Accounts after the seed (passwords ROTATED by the seed — these are the e2e-canonical ones):
 `eric@rfppipeline.com`/`RFPAdmin2026!` (master), `eric@lighthouse.com`/`LighthouseAdmin`,
 `eric@ubihere.com`/`UbihereAdmin`. The **Foundation demo** accounts are separate and use `DemoPass123!`
@@ -45,11 +66,11 @@ Accounts after the seed (passwords ROTATED by the seed — these are the e2e-can
 `RFPAdmin2026!` — so after seeding, admin login is NOT `DemoPass123!` anymore on the sandbox.
 
 ### FULL refresh (rebuild from migrations — container reclaim / schema drift)
-`heartbeat.sh` prints `pg=DATA_GONE` when the data dir is gone → rebuild:
+`sandbox-up.sh` reports `no migration ledger` when the database is bare or wiped → rebuild:
 `initdb` + `createdb govtech_intel` → `DATABASE_URL=<sandbox> node db/migrations/migrate.mjs` (⚠ never
 `ALLOW_SCHEMA_RESET` unless you mean the destructive 000_drop_all) → `node scripts/seed_dev_accounts.mjs`.
 Then `cd frontend && npx next build`, stage `cp -r .next/static .next/standalone/.next/static && cp -r public
-.next/standalone/public`, and `heartbeat.sh` will boot it. Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
+.next/standalone/public`, and `sandbox-up.sh` will boot it (it stages those two directories itself). Recipe detail: docs/CONTINUATION.md §2 + FOUNDATION_TVSF_SEED.md.
 
 > **Starter content is now migration-seeded** (no separate step). `migrate.mjs` applies **mig 152**
 > (`system_starter` MASTER LIBRARY — the 18-foundation `STARTER_SET` decomposed into the rfp-pipeline
@@ -119,6 +140,24 @@ deliberately re-capturing the guides (in which case rebuild them: `python3 docs/
 ---
 
 ## 1. Database Schema Quick Reference
+
+> ## ⛔ SUPERSEDED — use **`docs/SCHEMA_MAP.md`**
+> 
+> Measured 2026-08-22: this section described **72 tables frozen at migration 067** against a live
+> schema of **113 tables at migration 205** — 138 migrations and 41 tables stale, while instructing
+> "Do NOT guess column names. Look them up here." Following that instruction would have MISLED you.
+> It cost six schema mistakes in one session (`opportunities.status`, `tenant_opportunity_cards.status`,
+> `proposal_sections.status = 'locked'`, the direction of the solicitation↔opportunity link, the
+> `system_events` namespace/type split), each rediscovered by a failing live run.
+>
+> `docs/SCHEMA_MAP.md` is **generated from the live database** and carries what a column list cannot:
+> the actual VALUE VOCABULARIES (with CHECK constraints), and every foreign key with **how full each
+> direction actually is**. Regenerate with `node scripts/schema-map.mjs`; validate your SQL before
+> running it with `node scripts/schema-check.mjs <file>`.
+>
+> The text below is kept as history — it explains intent, and is accurate for the tables that
+> existed at mig 067. It is not a reference.
+
 
 The schema is defined across **69 migrations (000–067, plus the interleaved
 `030a_ensure_full_schema.sql`)** — highest numbered file is `067`. This
@@ -724,6 +763,64 @@ New workflow tracking:
 ---
 
 ## 4. Common Mistakes We've Fixed (Do NOT Repeat)
+
+### Mistake 0: A handler that catches its own failure and carries on
+**The highest-yield class in this file.** Four bugs on 2026-08-22 (B42–B45) had one shape: a
+`try/except` that logged a warning, or a route that returned `201` with the error folded into a
+`failed[]` array nobody reads. Each produced a run that **reported success having done less than it
+claimed** — which no test suite can catch, because there is nothing to fail.
+
+```python
+# The pattern. Every one of B42-B45 is a variant of this.
+try:
+    write_the_artifact(key)
+except Exception as e:
+    log.warning("write failed: %s", e)   # ← run continues, reports success
+```
+
+What it cost: half of every solicitation's shredded-section artifacts were never written (B42);
+every topic upload failed while the route returned 201 (B44); the sandbox exercised none of the
+per-section path while appearing to (B45).
+
+**Rule — the fix is always two-part.** Correct the behaviour, AND make the failure legible in the
+record the run writes. `runner.py` already had the right instinct ten lines below the B42 guard:
+`section_extraction_skipped` is recorded in `metadata.json`, not merely logged, with the comment
+*"a skipped evidence step must be visible, or 'no sections' reads like a document that genuinely had
+none."* Apply that everywhere.
+
+**Sweep for:** a bare `log.warning`/`console.error` inside an `except`/`catch` in a loop body; a
+`failed[]` array on a 2xx response; any best-effort write whose absence the caller cannot detect.
+
+### Mistake 0b: A validator that disagrees with the vocabulary it validates
+`_SECTION_SLUG_RE` allowed `[a-z0-9-]`. The shredder prompt enumerates ten canonical section keys
+and says use EXACTLY those — five contain underscores. The list lived in a prompt, the rule in a
+regex, two files apart, and they drifted silently for as long as both existed.
+
+**Rule:** when a controlled list is declared in one place (a prompt, a CHECK, an enum, a docs table)
+and enforced by a pattern somewhere else, write the test so it **parses the list from its own
+source** and asserts every member passes. `test_storage_paths.py::test_every_canonical_section_key_can_be_written`
+reads the keys out of the prompt file — add an unwritable key and CI fails, loudly, instead of a
+warning line during a live shred.
+
+### Mistake 0c: An estimate stored in a field named for a measurement
+`page_count = len(pdf_bytes) // 40000 + 1  # rough page estimate` — handed to the packaging
+specialist beside genuinely-extracted values, 72–81% low on real BAAs (a 254-page document recorded
+as 60 pages). This is docs/INGEST_PROVENANCE.md's rule applied outside the compliance matrix: *a
+value the product did not read must never look like one it did.*
+
+**Rule:** if it cannot be measured, the column is nullable and the value is `NULL` — never a
+fallback number. If it genuinely must be approximate, the NAME says so (`page_count_estimated`).
+**Sweep for:** `# rough`, `# approx`, `estimate`, arithmetic on a byte length landing in a column a
+human or agent reads as fact.
+
+### Mistake 0d: `startswith` is not containment; `importlib.reload` is not reversible
+Two bugs found in the *fixes* for the above, before they landed:
+- `str(target).startswith(str(root))` let `../testbucket-evil/x` past a traversal guard for bucket
+  `testbucket` — it resolves outside the root yet still starts with it. Use `Path.is_relative_to`
+  (Python) / a real path relationship, never a string prefix, for anything hierarchical.
+- A test fixture used `monkeypatch.setenv` + `importlib.reload` to pick up module-scope config.
+  monkeypatch reverts the env but NOT the globals the reload rebound, so the leaked value broke an
+  assertion in a *later file*. Patch module attributes with `monkeypatch.setattr` instead.
 
 ### Mistake 1: Wrong column names in SQL
 The #1 source of runtime crashes. Column names in the DB are snake_case.

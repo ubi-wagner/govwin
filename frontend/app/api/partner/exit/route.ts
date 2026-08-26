@@ -29,8 +29,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const own = await partnerOwnOrg(u.id);
+    // Ascending RELEASES the company commitment that descending made: /api/partner/enter sets
+    // membershipPinned, and leaving it set would weld the manager to the company they just left —
+    // the portal layout denies any other tenant while a session is pinned elsewhere.
     await unstable_update({
-      user: { role: rr, tenantId: own?.id ?? null, tenantSlug: own?.slug ?? null, partnerHomeRole: null },
+      user: { role: rr, tenantId: own?.id ?? null, tenantSlug: own?.slug ?? null, partnerHomeRole: null, membershipPinned: false },
     } as unknown as Parameters<typeof unstable_update>[0]);
 
     try {
@@ -42,7 +45,7 @@ export async function GET(req: NextRequest) {
     console.error('[partner/exit] failed:', e);
     // Restore the base role even if the own-org lookup failed, so the partner isn't stuck descended.
     try {
-      await unstable_update({ user: { role: rr, tenantId: null, tenantSlug: null, partnerHomeRole: null } } as unknown as Parameters<typeof unstable_update>[0]);
+      await unstable_update({ user: { role: rr, tenantId: null, tenantSlug: null, partnerHomeRole: null, membershipPinned: false } } as unknown as Parameters<typeof unstable_update>[0]);
     } catch { /* best-effort */ }
     return NextResponse.redirect(url('/partner'));
   }

@@ -4,9 +4,32 @@
 build log, the data-model reference, or a superseded design that has been folded into this file — the full
 map is §9. Read this first; when the canvas changes, change this.
 
-_Last realigned: 2026-08-13 — a four-surface source sweep (doc/pdf · ppt · xls · editor shell) plus the
-unified-UI direction. Line refs below were re-verified this pass unless marked "(P1)" (Phase-1-dated —
-authoritative fact holds, exact line may have drifted)._
+> **For "what can an author actually DO today, and does it survive export" → `docs/CANVAS_STYLING_CAPABILITIES.md`.**
+> That file is the measured capability map: every styling control against every writer (docx · pptx ·
+> xlsx · pdf), which controls apply to which node type, layering, and — stated as plainly as the
+> capabilities — what is absent from the model and what is built but unmeasured. It is generated from
+> two instruments rather than read off the source, because this question was answered from source three
+> times and answered wrong twice; §6 there records how, since the failure mode is reusable.
+
+_Last realigned: **2026-08-23** — a full design-vs-as-built re-verification against the code (the previous
+realignment, 2026-08-13, had gone stale in BOTH directions: it understated two shipped phases and
+overstated one gap). Every status in §2 and §7 below was re-read from source this pass; line refs marked
+"(P1)" are Phase-1-dated (fact holds, exact line may have drifted)._
+
+> **Two different things are called "one canvas". Keep them apart.**
+>
+> **(A) The unified canvas UI** — "one canvas, three surfaces, ONE interaction layer" (§3, §7). This is a
+> *UI* programme. **Substantially shipped**: phases 0, 1 and 5 are done, phase 2 is built but unevenly
+> mounted, phase 3 is part-done. Phases 4 and 6 are not.
+>
+> **(B) T2.x — the polymorphic artifact key.** This is a *data-model* refactor: re-key `canvas_versions`
+> and `proposal_comments` off `(artifact_type, artifact_id)` so a standalone document stops being
+> second-class. **Not done, and structurally visible:** `canvas_versions.section_id` is
+> `NOT NULL REFERENCES proposal_sections(id)` (`017_canvas_templates.sql:49`) and
+> `proposal_comments.proposal_id` is `NOT NULL REFERENCES proposals(id)` (`001_baseline.sql:382`), so a
+> one-off document **cannot** carry version history or comments at all. No migration introduces
+> `(artifact_type, artifact_id)` on either table. This is what `LAUNCH_READINESS_2026-08.md` descopes, and
+> what T7.x (agents drafting letters/marketing) is gated on.
 
 ---
 
@@ -52,12 +75,48 @@ on `canvas.format` into three bespoke surfaces over the same `CanvasNode[]`:**
 - **The spreadsheet is the one siloed surface** — `SheetEditor` returns *before* the shell, so it has no
   overlays, no selection/range-verbs, no AI-assist, and no chart affordance in the grid
   (`sheet-media-strip.tsx:34` = images+shapes only).
-- **Selection-verbs today:** `Atomize · Annotate · Regenerate` (`selection-toolbar.tsx:16`). `Reuse` and
-  `Compliance-check` do **not** exist as selection verbs. The read-only fluid view
-  (`fluid-document-view.tsx`, behind the admin-only "Document" tab) wires Atomize + Annotate only.
+- **Selection-verbs (re-read 2026-08-23 — the previous text here was wrong on both counts).**
+  `SelectionToolbar` accepts **all five** verbs as optional props — `onAtomize · onRegenerate · onAnnotate ·
+  onReuse · onComplianceCheck` (`selection-toolbar.tsx:18-22`). What differs is what each host *mounts*:
+  | Host | Verbs wired | Ref |
+  |---|---|---|
+  | Fluid document view | Atomize · Annotate · **Reuse · Compliance-check** (no Regenerate — read-only) | `fluid-document-view.tsx:543-546` |
+  | Section canvas editor | Atomize · Regenerate · Annotate | `canvas-editor.tsx:1175-1177` |
+  | Sheet editor | **none** — it returns before the shell | `canvas-editor.tsx:191` |
+  So the verb *component* is unified; the **mounting** is not. That is the whole of the remaining Phase 2.
+- **The fluid document view is the DEFAULT surface, not an admin-only tab.** `proposal-workspace.tsx:177`
+  opens tenant-wide members on `document` and scopes non-tenant-wide collaborators to `my-sections` — which
+  is simultaneously "fluid as default" (§7.5) and the collaboration lens (§3). The earlier "behind the
+  admin-only Document tab" line described a state the product left behind. The tab row as rendered is
+  **Document · All Sections · My Sections · Timeline** (`:228-230`; the `workspace` key is labelled
+  "All Sections"), and the fluid view carries the §3 slim action bar — overlay chips left, save state right,
+  with the comment at `fluid-document-view.tsx:437` recording that "the Manage tab-row dissolves into this."
+
+> **A method note, because it cost a wrong statement in this very file.** The first pass of this review
+> read the `OVERLAYS` **array** and concluded "Compliance + Budget do not exist." The screenshot of the
+> running page showed five chips. Both layers were there, hand-rolled next to the shared bar. Reading a
+> definition is not reading a surface — the same confusion that let a 200 stand in for a rendered page
+> (bug log B78/B79). **For any claim in this document about what a user sees, look at the capture:**
+> `docs/assets/guides/customer/09b-fluid-document.png`.
 - **Export** (`lib/export/*`, `renderCanvas` dispatcher): docx (`docx`) · pptx (`pptxgenjs`, one section =
   one slide) · xlsx (`exceljs`, one table = one worksheet, real formulas) · pdf (Chromium). Whole-proposal
   package `?format=json|docx|pdf|zip`. Uploaded S3 images now inline to data-URIs across all four (W4.3).
+
+> **The deck writer is the one that PLACES rather than FLOWS, and that changes what a mistake costs.**
+> docx and pdf reflow, so a wrong height estimate shows up as untidy spacing. A `.pptx` gives every
+> node an absolute frame, and **PowerPoint clips rather than spilling** — so a frame that is too short
+> deletes content from the delivered file. Six node types used to size themselves without reading their
+> text (`rows × 0.36`, `items × 0.42`, `length / 95`); a wrapping cell overran its frame and a
+> three-row risk register exported with its third row absent (B121).
+>
+> Since 2026-08-24 the deck writer measures with `wrappedLines`, exported from `canvas-document.ts` —
+> **the page ruler's own character-advance model**, so a deck and a document cannot disagree about how
+> tall the same paragraph is (B112: one ruler, one answer). Tables additionally declare per-row heights
+> via `rowH`. Body content is also optically balanced where genuine slack exists, and left alone where
+> it does not, since nudging a full slide down would push content off the frame.
+>
+> **None of this is checkable from the bytes** — the row text is emitted faithfully either way. It
+> needs an engine that did not write the file: `scripts/probe-deck-overlap.mts`.
 
 ## 3. The direction — one canvas, three surfaces, ONE interaction layer
 
@@ -147,15 +206,93 @@ From the Phase-1 baseline (G1–G17), updated to current reality:
 | G16 | Prior-proposal reuse fragmented + admin-gated + upload-blind | **Closed** — W3.1 + W3.2 |
 | G17 | No per-tenant opp scoping | **Open** (niche opps stay single-tenant by never pushing) |
 
-## 7. Phased path to the unified UI (design only until each phase is signed off)
+## 7. Phased path to the unified UI — status re-verified against source 2026-08-23
 
-0. Revert the nav-sectioning (compartment drift) — **DONE**. 1. Shared **`OverlayLayer`** (F3, dotted layers +
-toggle) — **SHIPPED** (Sections/Atoms/Provenance across all four surfaces; Compliance/Budget layers pending).
-2. Unify **`ActOnSelection`** (+ Reuse/Compliance-check + sheet range). 3. **Sheets into the shell** (ribbon +
-chart-from-range + overlays + AI). 4. **Slides finish** (section=slide canonical + on-slide placement).
-5. **Fluid as default** (list view optional; `Manage` tabs dissolve). 6. Consistency pass (one action bar,
-one lens, one AssistPanel). Each phase: green backbone (`tsc` 0 · `vitest` · `next build`) + live-proven,
-both lenses.
+| # | Phase | Status | Evidence |
+|---|---|---|---|
+| 0 | Revert nav-sectioning (compartment drift) | ✅ **DONE** | — |
+| 1 | Shared **`OverlayLayer`** | ✅ **all 5 layers on the default surface — but only 3 are SHARED** | `canvas-overlays.tsx:19-21` defines `sections · atoms · provenance`, mounted on the fluid view (`:437`), the section editor **and the sheet grid** (`sheet-editor.tsx:692`). **Compliance + Budget also ship** — but as hand-rolled buttons with their own `showCompliance`/`showBudget` state in `fluid-document-view.tsx:440-450`, reading real data (the compliance matrix `:100`, the page budget `:109`). So a reader of the fluid view sees all five chips; the editor and the sheet can never get the last two, because they are not in `OVERLAYS`. The gap is **not unbuilt layers — it is two layers built outside the shared abstraction.** |
+| 2 | Unify **`ActOnSelection`** | 🟡 **BUILT, UNEVENLY MOUNTED** | All five verbs are props on `SelectionToolbar` (`:18-22`); the fluid view wires 4, the editor 3, the sheet 0. Nothing left to *build* — only to mount. |
+| 3 | **Sheets into the shell** | 🟡 **PART-DONE — overlays only** | The sheet got `CanvasOverlayBar`, but `canvas-editor.tsx:191` still early-returns to `SheetEditor` *before* `CanvasEditorInner`, so it has no selection verbs, no sidebar, no AI. No ribbon. `sheet-media-strip.tsx:33` filters `image \| shape` → **no chart-from-range**. |
+| 4 | **Slides finish** | ❌ **NOT DONE** | `slide-editor.tsx:35` still splits the flat node list on `page_break`; section=slide is not canonical. No `position` handling → no on-slide direct placement. |
+| 5 | **Fluid as default** | ✅ **SHIPPED** | `proposal-workspace.tsx:177` — tenant-wide members open on `document`; scoped collaborators on `my-sections`. |
+| 6 | Consistency pass (one action bar · one lens · one **`AssistPanel`**) | ❌ **NOT DONE** | No `AssistPanel` component exists (`components/canvas/` has `ai-revision-panel.tsx`, reachable only through `CanvasSidebar` → doc + slides). The lens shipped with phase 5; the single action bar did not. |
+
+**The honest one-liner:** the *model* was already unified before this programme began (§1) — one
+`CanvasDocument`, one `canvas.format` discriminator, no second type key. What phases 1–6 unify is the
+**interaction layer**, and that is **about two-thirds done**: overlays and the fluid default are in, the
+verb component is built but not mounted everywhere, and the two genuinely unbuilt pieces are the
+**spreadsheet's escape from its early return** and the **shared assist panel**.
+
+### 7a. What the unfinished phase actually costs — the cost volume is on the island
+
+Phase 3 is not an abstract tidiness item. **Every cost/budget volume is a `spreadsheet`-format canvas**
+(`lib/artifact-spec.ts:115` — `artifactType === 'cost'` → the spreadsheet preset; `artifact-export.ts:41`
+→ xlsx; the `dod-sbir-phase1-cost` and `sf424a-budget` templates are declared `format:'spreadsheet'`,
+`lib/templates/index.ts:189,221`). And `spreadsheet` is the one format that returns *before* the shell.
+
+So the customer filling in the volume with the **highest compliance and arithmetic risk** — the one an
+agency rejects outright for a wrong indirect rate or a missing form line — is the only one working without:
+
+- the **selection verbs** (no Atomize, no Regenerate, no Compliance-check on a range),
+- the **sidebar**, and with it the whole **Compliance tab** (`canvas-sidebar.tsx:531`), which is simply
+  unreachable for a sheet because the sidebar mounts inside `CanvasEditorInner`, and
+- any **AI assist** at all.
+
+They do get the overlays (phase 1 reached the grid). The deterministic burden engine
+(`cost-model.ts`/`cost-forms.ts`) is still the source of computed cells, so the *numbers* are sound — what
+is missing is every affordance for checking, revising, or reusing them. Closing phase 3 is therefore worth
+more than its position in the list suggests, and "add a ribbon + chart-from-range" undersells it: **the
+valuable half is moving the early return so the sheet mounts the shell.**
+
+### 7b. Phase 3 design — how the sheet gets into the shell (DESIGN, not yet signed off)
+
+**Why it is not a wiring change.** `SheetEditor` is **1,225 lines** and is a *whole editor*: it owns
+`doc` state (`:122`), undo/redo stacks (`:132-133`), the save cycle (`onSave`/`saving`/`dirty`/
+`saveError`, `:127-129`, `:592`), cell + sheet selection (`:123-126`), and its own chrome — sheet tabs,
+formula bar, media strip, overlay bar. `CanvasEditorInner` owns all of the same for doc and slides.
+Mounting one inside the other duplicates every one of them: two doc states, two save buttons, two
+overlay bars. Deleting the early return at `canvas-editor.tsx:191` is the *last* step, not the first.
+
+**The shape to aim at.** `CanvasRenderer` and `SlideEditor` are presentational — they take `document`,
+a selection, and `onUpdateNode`, and the shell owns everything stateful. The sheet must become the
+third of those. Extract **`SheetSurface`**: the grid, and nothing else.
+
+| Stays in the shell (already there for doc + slides) | Genuinely sheet-specific — becomes props/callbacks |
+|---|---|
+| `doc` state · undo/redo · save + dirty + error | Worksheet tabs (which `table` node is active) |
+| `CanvasToolbar` · `CanvasSidebar` (incl. the Compliance tab) | Formula bar (edit the active cell's `formula`) |
+| `SelectionToolbar` verbs · `CanvasOverlayBar` | Cell/range selection · add/remove rows + columns |
+
+**Order — smallest reversible steps, each independently verifiable:**
+
+1. **3a · Extract `SheetSurface`, no behaviour change.** `SheetEditor` keeps owning all state and
+   renders the new component. *Verify:* the sheet still edits and saves; `verify-exports-on-stored-artifacts`
+   produces byte-identical xlsx for every stored cost volume.
+2. **3b · Lift the state up.** Move `doc`/undo/redo/save out of `SheetEditor` into `CanvasEditorInner`;
+   `SheetEditor` becomes a thin adapter over `SheetSurface`. *Verify:* same as 3a, plus undo/redo and
+   the 409 non-destructive save path still behave.
+3. **3c · Delete the early return.** The centre fork becomes three-way
+   (`isSlideFormat ? SlideEditor : isSheet ? SheetSurface : CanvasRenderer`). *Verify:* opening a cost
+   volume now reaches the sidebar, and **the Compliance tab is finally reachable on a spreadsheet**
+   (`canvas-sidebar.tsx:531`) — the whole point of the phase.
+4. **3d · Range-aware verbs.** `ActOnSelection` reads a **cell range** on the sheet, not a span; wire
+   Atomize/Regenerate/Compliance-check against it. Completes phase 2 for the third surface.
+5. **3e · Move Compliance + Budget into `OVERLAYS`.** They exist today only as hand-rolled buttons on
+   the fluid view (§2); promoting them to the shared array gives the editor and the sheet the last two
+   layers and closes the phase-1 residual found on 2026-08-23.
+
+**The invariant that must not break, at any step.** The deterministic burden engine
+(`cost-model.ts`/`cost-forms.ts`) stays the source of computed cells; `lib/numeric-cell.ts` keeps edited
+`value`s in sync so tenant edits still drive the roll-up and the exports; AI is advisory *over* the
+numbers and never writes them. A cost volume that changes its arithmetic during this refactor is a
+failed step, not a merge conflict — `verify-exports-on-stored-artifacts.mts` is the gate.
+
+**Do not start at step 3.** Deleting the early return first is the tempting one-line change and it
+produces two doc states editing the same document — the class of bug that looks like it works until a
+save races.
+
+Each remaining phase: green backbone (`tsc` 0 · `vitest` · `next build`) + live-proven, both lenses.
 
 ## 8. Two-lens rule (standing)
 
@@ -164,6 +301,78 @@ grammar (same chips, same verb menu, same assist); structure summoned, never nav
 sees only their sections. **Machine:** one model, one `canvas.format` discriminator, one `CanvasNode[]`, one
 compliance floor, one ruler, one export dispatcher; overlays read existing data; verbs route through
 `sectionOf`; permissions in `proposal-access.ts`. No data migration, no new discriminator.
+
+## 8b. Measured, not asserted — the 88-cell matrix (2026-08-24)
+
+`__tests__/node-vocabulary-coverage.test.ts` proved all 22 primitives survive all four writers, by
+building a `CanvasDocument` in memory and calling `exportToDocx(doc)` directly. It never touched the
+create route, the save route (`validateStandaloneCanvas` + the compare-and-swap), the export route
+(gate, `X-Compliance-Violations`, audit event), or an authenticated actor with RLS on. The claim was
+true of a function call.
+
+`frontend/scripts/drive-canvas-authoring.mts` now authors from a **blank canvas** as both a
+`tenant_admin` and an `rfp_admin`, saves, **reads the row back from the database**, and exports —
+because the export route takes the document in its request BODY, so exporting proves nothing about
+what was persisted.
+
+**22 primitives × 4 formats = 88 cells · 0 silent drops.** Three arrive as an embedded raster by
+design (`chart`→docx, `chart`/`shape`→xlsx), each with a media part to show for it. Two are
+deliberate no-ops in xlsx (`page_break`, `spacer` — a grid has no pages and no whitespace to place;
+`xlsx-exporter.ts:120`).
+
+**One number per node.** B109: a `spacer` had five readers and four different heights, none of them
+the author's — the ruler read `content.height`, canvas-html read `style.space_after` and fell back to
+a hardcoded 12pt, docx hardcoded 200 twips, pptx 0.3in, the editor `h-8`. `spacerHeightPt()` is now
+the one answer for all five. The single remaining asymmetry is deliberate and documented at the call
+site: with no author height the writers use 12pt and the ruler a body line, because §8's ruler may
+over-count and must never under-count.
+
+**On instruments.** The structural primitives (`toc`, `page_break`, `spacer`, `divider`) carry no
+text, so the marker search that proves the other 18 cannot see them. The differential built for them
+was wrong five times before it was right — measuring them alone (a `toc` with no headings correctly
+renders nothing), byte-comparing a zip (the same input does not always compress to the same length),
+and page-counting a `toc` (which adds content, not a page). **No single metric answers for all four
+types in all four formats.** The drive's table therefore names its instrument and REPORTS; the
+decisive per-node assertions live in `scripts/probe-structural-nodes.mts`, where each type is
+measured by the effect it actually has. Both are registered in `run-branch-drives.sh`.
+
+## 8c. The ruler system (2026-08-24)
+
+Four layers over the page, sharing ONE geometry — `gridGeometry` is called once, so a ruler
+gradation, a grid line and a page boundary are the same number by construction rather than three
+functions that happen to agree today.
+
+| layer | what it answers | source | cost |
+|---|---|---|---|
+| **Grid** | spacing — how far is that? | `CanvasRules` | pure |
+| **Rulers** | absolute position, in the gutter | same geometry | pure |
+| **Boundaries** | where the page actually breaks | `paginate().perNode` + DOM | measured |
+| **Group boxes** | how tall is this run, and do the page and the ruler agree? | DOM + `nodesHeightPt` | measured |
+
+**The step ladder is 72 · 36 · 18 · 12 · 6pt.** Every step divides 72, because a step that does not
+puts its lines off the inch marks that make a grid readable as a ruler — 72/5 = 14.4, which is why
+6pt and not 5pt is the floor. It is deliberately NOT a pure halving: 72/36/18 are inch fractions and
+12/6 are picas, and 12pt is a body line, the measurement an author reaches for most.
+
+**Boundaries follow the PAGINATOR, never arithmetic (B112).** `fitKeep` relocates a block that will
+not fit — table, figure, `keep_together` group — wholesale to the next page. A line at
+`marginTop + k × usableHeight` therefore falls *inside* a block that actually begins the page. The
+hatched band shows the whitespace a relocation leaves behind, which is the thing an author
+experiences as "the image jumped a page" and which a continuous editor otherwise shows nowhere.
+
+**Only two layers measure.** The grid and rulers are pure geometry. Boundaries and group boxes read
+the DOM, on a rAF-batched pass **after paint** — `offsetHeight` forces a synchronous reflow, and
+doing that per keystroke is jank where a writer notices it. `offsetTop`/`offsetHeight`, never
+`getBoundingClientRect`, because client rects are post-transform.
+
+**What building it found.** Four defects, each invisible because the page *looked* right: a spacer
+with five readers and four heights (B109), the ruler and renderer disagreeing about it, the page
+scaling itself twice (B111), and boundaries drawn from a model the product does not use (B112). A
+measurement layer earns its keep by being impossible to build without pinning down what everything
+else only assumed.
+
+Driven end to end by `scripts/drive-ruler-overlays.mts`; geometry by `probe-measure-grid.mts` (all
+10 presets) and `__tests__/measure-grid.test.ts`; the page-scale class by `probe-page-scale.mts`.
 
 ## 9. Canvas doc map — the single source → everything else
 

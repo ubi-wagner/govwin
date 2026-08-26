@@ -426,9 +426,25 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     expect(res.status).toBe(404);
   });
 
-  // ── DB failure mid-transaction → 500, no event emitted ────────────
+  // ── DB failure mid-transaction → 500, and the bracket still CLOSES ────────
+  //
+  // This assertion used to read "emitEventEnd is NOT called", reasoning that "the proposal was not
+  // created → emitEventEnd signals completion". That reads `end` as "succeeded", and the contract
+  // says it means TERMINATED — the `error` column is what distinguishes the two:
+  //
+  //   docs/EVENT_CONTRACT.md §2 — "a handler that emits `start` MUST emit `end` on *every* exit
+  //   path (success return AND catch block)"; `error` is "populated on a failed `end` row; the poll
+  //   loop reads it to skip failed ops".
+  //
+  // The workflow engine depends on that being true. `EventTrigger.matches()` returns False for any
+  // event carrying `error`, with the comment "a failed op still emits a terminal phase='end' event
+  // (with error set + empty payload); matching it spawns junk workflow instances" — so emitting the
+  // failed `end` cannot start anything, and NOT emitting it leaves every downstream waiter with no
+  // terminal signal at all, plus a `start` row that says "started" forever.
+  //
+  // The old behaviour left two such rows in the sandbox corpus, which is how it was found.
 
-  it('DB failure inside sql.begin → 500 and emitEventEnd is NOT called', async () => {
+  it('DB failure inside sql.begin → 500 and the start bracket is closed with an error', async () => {
     authMock.mockResolvedValue(makeSession());
     getTenantBySlugMock.mockResolvedValue(makeTenant());
     verifyTenantAccessMock.mockResolvedValue(true);
@@ -447,9 +463,13 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     const json = await res.json();
     expect(json.code).toBe('DB_ERROR');
 
-    // Proposal was not created → emitEventEnd should not have been called
-    // (emitEventStart may have been called; emitEventEnd signals completion)
-    expect(emitEventEndMock).not.toHaveBeenCalled();
+    // The bracket closes on the failure path, carrying the error — never silently left open.
+    expect(emitEventEndMock).toHaveBeenCalledTimes(1);
+    const [, endArgs] = emitEventEndMock.mock.calls[0];
+    expect(endArgs.error).toBeTruthy();
+    expect(endArgs.error.message).toContain('database connection lost');
+    // And it is a FAILED end — no `result`, so nothing downstream reads it as a completion.
+    expect(endArgs.result).toBeUndefined();
 
     // S3 operations should not have run
     expect(putObjectMock).not.toHaveBeenCalled();

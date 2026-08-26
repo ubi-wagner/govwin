@@ -32,6 +32,7 @@ import { TeamMemberActions } from './team-member-actions';
 export interface ManagePurchase {
   id: string; productType: string; amountCents: number; status: string;
   createdAt: string; opportunityId: string | null;
+  proposalTitle: string | null; opportunityTitle: string | null;
 }
 export interface ManageMember {
   id: string; name: string | null; email: string; role: string;

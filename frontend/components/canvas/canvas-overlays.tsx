@@ -12,14 +12,37 @@
  * This is the "toggle section breaks / atom-primitive outlines on-off" surface, made real.
  */
 import { useCallback, useState } from 'react';
+import type { CanvasDocument } from '@/lib/types/canvas-document';
 
-export type OverlayKey = 'sections' | 'atoms' | 'provenance';
+export type OverlayKey = 'sections' | 'atoms' | 'groups' | 'provenance' | 'grid';
 
 export const OVERLAYS: { key: OverlayKey; label: string; dot: string; hint: string }[] = [
   { key: 'sections',   label: 'Sections',   dot: '#6d5ef0', hint: 'Dotted boundary + label at each section start' },
   { key: 'atoms',      label: 'Atoms',      dot: '#0f9d8f', hint: 'Dotted outline on every content primitive' },
+  // The group is the unit an author thinks in: one run from one library atom, moving across a page
+  // edge as one when `keep_together` is set. The model has always had it and the UI never showed
+  // it, so the layer the assembler populates and a scoped review addresses was invisible.
+  { key: 'groups',     label: 'Groups',     dot: '#c2410c', hint: 'Runs from one library atom — solid rail = moves as one block' },
   { key: 'provenance', label: 'Provenance', dot: '#7c5cf0', hint: 'Source gutter — AI · Library · Reuse' },
+  // The measurement grid belongs with the other overlays rather than beside them: it is the same
+  // kind of thing — a togglable transparent layer that reads existing data and never edits.
+  { key: 'grid',       label: 'Grid',       dot: '#2563eb', hint: 'Measurement grid in points — inch lines, margin box, page ruler' },
 ];
+
+/**
+ * Does this document carry the group layer?
+ *
+ * Hosts filter the chip bar with this rather than always offering `Groups`. A toggle that provably
+ * paints nothing is worse than an absent one: it invites the reader to conclude the document has no
+ * groups when what it really means is that this SHAPE of document cannot express them. Flat
+ * canvases — which is every canvas stored today — are exactly that case.
+ */
+export const documentHasGroups = (doc: Pick<CanvasDocument, 'sections'> | null | undefined): boolean =>
+  !!doc?.sections?.some((s) => (s.groups ?? []).length > 0);
+
+/** The chips worth offering for this document: everything, minus what it cannot show. */
+export const overlaysFor = (doc: Pick<CanvasDocument, 'sections'> | null | undefined) =>
+  OVERLAYS.filter((o) => o.key !== 'groups' || documentHasGroups(doc));
 
 /** Overlay on/off state (a Set of active keys) + a toggle. */
 export function useOverlays(initial: OverlayKey[] = []) {

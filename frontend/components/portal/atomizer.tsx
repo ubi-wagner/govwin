@@ -230,7 +230,7 @@ export function Atomizer({ tenantSlug, onAtomized }: { tenantSlug: string; onAto
               <span className="text-green-700">✓ Atoms landed for review.</span>
               {onAtomized
                 ? <button onClick={onAtomized} className="text-blue-600 font-medium hover:underline">Review in Library →</button>
-                : <a href={`/portal/${tenantSlug}/library/review`} className="text-blue-600 font-medium hover:underline">Review in Library →</a>}
+                : <a href={`/portal/${tenantSlug}/atoms?tab=review`} className="text-blue-600 font-medium hover:underline">Review in Library →</a>}
             </div>
           )}
         </div>

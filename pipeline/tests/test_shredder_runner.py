@@ -288,19 +288,98 @@ async def test_no_text_available_flips_to_shredder_failed(conn):
         await conn.execute("DELETE FROM opportunities WHERE id = $1", opp_id)
 
 
+#: Prose that STATES rules the way a federal BAA does, so the locator has something real to find.
+#: Padding around it stands in for the ~99% of a BAA that is topic narrative.
+_RULE_TEXT = (
+    "\n6.0 PROPOSAL SUBMISSION\n"
+    "Page Limitations: the Technical Volume shall not exceed 20 pages in length.\n"
+    "Font size must be no smaller than 10 point font, Times New Roman, with a one-inch margin.\n"
+    "Volume 1 is the Cover Sheet. Volume 2 is the Technical Volume. Volume 3 is the Cost Volume.\n"
+    "Proposals are submitted electronically via DSIP and are due no later than the close date.\n"
+    "Eligibility: the offeror must be a small business concern and the principal investigator\n"
+    "must be primarily employed by the firm. Component-specific instructions supersede these.\n"
+)
+
+
+def _big_solicitation_text(total_chars: int) -> str:
+    """A document too large for the section-call budget that nonetheless states its rules.
+
+    The rules sit past the halfway mark deliberately — that is where a real BAA puts them, and a
+    prefix-taking reader would never reach them.
+    """
+    filler = "The topic seeks novel approaches to materials research. " * 200
+    head = (filler * ((total_chars // 2) // len(filler) + 1))[: total_chars // 2]
+    tail = (filler * ((total_chars // 2) // len(filler) + 1))[: total_chars // 2]
+    return head + _RULE_TEXT + tail
+
+
 @pytest.mark.asyncio
-async def test_budget_exceeded_raises_and_flips_status(conn, seed, monkeypatch):
-    """Oversized text triggers ShredderBudgetError + shredder_failed status."""
-    from errors import ShredderBudgetError
-    from shredder import runner
+async def test_oversized_solicitation_is_located_not_refused(conn, seed, monkeypatch):
+    """A BAA too large to ship whole is EXCERPTED and shredded, not failed.
+
+    REGRESSION. The pre-flight guard used to raise unconditionally above the token budget. That was
+    sized when the extractor capped documents at 200K chars; raising the cap to 2M — so a full BAA
+    is actually read — put every real federal BAA over the line. Measured on the three in this repo:
+    316,863 / 419,138 tokens estimated against a 150,000 budget. Not one AI shred of a real BAA had
+    ever succeeded. The run now locates the rule-stating passages and shreds those.
+    """
+    from shredder import runner as _runner
     from shredder.runner import shred_solicitation
 
-    # Trigger budget breach: est = chars/4 * 1.25 > 150_000 requires
-    # ~480_000 chars after the 200K extractor cap. To simulate that,
-    # swap the cap and set full_text above the new bar. The runner
-    # caps full_text at MAX_CHARS_PER_DOCUMENT, so setting it to a
-    # size LARGER than the cap isn't enough — we patch the cap for
-    # this test to 800K so the ×1.25 est on 800K chars = 250K tokens.
+    monkeypatch.setattr(_runner, "MAX_CHARS_PER_DOCUMENT", 900_000)
+    big = _big_solicitation_text(900_000)
+    assert len(big) > _runner.MAX_SECTION_CALL_CHARS, "fixture must exceed the section-call budget"
+    await conn.execute(
+        "UPDATE curated_solicitations SET full_text = $2 WHERE id = $1",
+        seed["solicitation_id"], big,
+    )
+
+    fake = _make_fake_anthropic(
+        {"sections": [{"key": "submission", "title": "Proposal Submission",
+                       "raw_text_excerpt": "shall not exceed 20 pages"}]},
+        {"matches": []},
+    )
+    result = await shred_solicitation(conn, str(seed["solicitation_id"]), fake)
+    assert result["status"] == "ai_analyzed"
+
+    # The section call must have received the EXCERPT, not the whole document.
+    section_call = next(c for c in fake._calls if "MASTER VARIABLES" not in c["user_first_line"])
+    assert section_call is not None
+
+    # Provenance: the run has to say it read part of the document, or a missing page limit reads
+    # as "the BAA does not state one" rather than "we did not send that part".
+    ai = await conn.fetchval(
+        "SELECT ai_extracted FROM curated_solicitations WHERE id = $1", seed["solicitation_id"]
+    )
+    blob = json.loads(ai) if isinstance(ai, str) else ai
+    src = blob["source_excerpt"]
+    assert src["excerpted"] is True
+    assert src["source_chars"] == len(big)
+    assert src["excerpt_chars"] <= _runner.MAX_SECTION_CALL_CHARS
+    assert 0 < src["coverage"] < 1
+    # The locator found the rules that sit past the halfway mark — the whole point.
+    assert "page_limits" in src["topics_covered"]
+    assert "formatting" in src["topics_covered"]
+
+    located = await conn.fetchval(
+        "SELECT payload FROM system_events "
+        "WHERE namespace='finder' AND type='rfp.sections_located' "
+        "ORDER BY created_at DESC LIMIT 1"
+    )
+    assert located is not None, "an excerpted read must be visible in the event stream"
+
+
+@pytest.mark.asyncio
+async def test_budget_exceeded_raises_and_flips_status(conn, seed, monkeypatch):
+    """Oversized text with NO rule-stating passage still fails loudly.
+
+    800K repeated 'A's is not a solicitation: the locator finds nothing, and falling back to a
+    prefix would reintroduce the cover-page bug with none of the honesty. The run refuses and names
+    the topics it searched for.
+    """
+    from errors import ShredderBudgetError
+    from shredder.runner import shred_solicitation
+
     from shredder import runner as _runner
     monkeypatch.setattr(_runner, "MAX_CHARS_PER_DOCUMENT", 800_000)
     await conn.execute(
@@ -320,12 +399,50 @@ async def test_budget_exceeded_raises_and_flips_status(conn, seed, monkeypatch):
     )
     assert status == "shredder_failed"
 
-    # End event payload includes reason=budget_exceeded
     end_payload = await conn.fetchval(
         "SELECT payload FROM system_events "
         "WHERE namespace='finder' AND type='rfp.shredding.end' "
         "ORDER BY created_at DESC LIMIT 1"
     )
     payload = json.loads(end_payload) if isinstance(end_payload, str) else end_payload
-    assert payload["reason"] == "budget_exceeded"
-    assert payload["estimated_input_tokens"] > runner.MAX_INPUT_TOKENS_PER_RUN
+    assert payload["reason"] == "no_locatable_sections"
+    assert payload["topics_searched"], "must say what it looked for, not just that it failed"
+
+
+@pytest.mark.asyncio
+async def test_section_extraction_failure_safe_skips(conn, seed):
+    """A model failure on section extraction SKIPS the evidence step — it does not crash the run.
+
+    REGRESSION, and a sharp one: the safe-skip commit landed the two READERS of `section_skip` but
+    not its assignment, so the name was unbound. Python raises NameError only when that line
+    executes, which needs a real section-extraction failure — no unit test reached it, the suite
+    stayed green, and the first real document died with
+    `name 'section_skip' is not defined` instead of skipping.
+    """
+    from safe_skip import NEEDS_VERIFICATION_COMMENT
+    from shredder.runner import shred_solicitation
+
+    async def _create(**kwargs):
+        user_msg = kwargs["messages"][0]["content"]
+        if "MASTER VARIABLES:" in user_msg:
+            return SimpleNamespace(content=[SimpleNamespace(text=json.dumps({"matches": []}))],
+                                   usage=SimpleNamespace(input_tokens=1, output_tokens=1))
+        # Never valid JSON, so the retry inside _call_claude also fails and the caller must skip.
+        return SimpleNamespace(content=[SimpleNamespace(text="I'm afraid I can't do that.")],
+                               usage=SimpleNamespace(input_tokens=1, output_tokens=1))
+
+    fake = SimpleNamespace(messages=SimpleNamespace(create=_create), _calls=[])
+
+    result = await shred_solicitation(conn, str(seed["solicitation_id"]), fake)
+    assert result["status"] == "ai_analyzed", "a skipped evidence step must not fail the run"
+
+    ai = await conn.fetchval(
+        "SELECT ai_extracted FROM curated_solicitations WHERE id = $1", seed["solicitation_id"]
+    )
+    blob = json.loads(ai) if isinstance(ai, str) else ai
+    skip = blob["section_extraction_skipped"]
+    assert skip["skipped"] is True
+    assert skip["kind"] == "evidence"
+    assert skip["comment"] == NEEDS_VERIFICATION_COMMENT
+    assert "content" not in skip, "evidence never fabricates"
+    assert blob["sections"] == []

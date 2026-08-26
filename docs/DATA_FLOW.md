@@ -152,4 +152,4 @@ Break one and the failure is quiet: lost history, a stranded workflow, an off-le
   (engine), `docs/START_END_FRAMEWORK.md` (event gate), `docs/EVENT_CONTRACT.md` (event catalog),
   `CLAUDE_CLIFFNOTES.md` (schema quick-reference + bug classes).
 
-_Every identifier in this document is live in the codebase as of migration head 185._
+_Every identifier in this document is live in the codebase as of migration head 205._

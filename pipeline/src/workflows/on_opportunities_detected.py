@@ -159,10 +159,16 @@ class OnOpportunitiesDetected(Workflow):
             # completion — there is no downstream step, so closing the task ends
             # the instance.
             task_type='"triage_new_opportunities"',
-            task_title='"Triage new opportunities from source"',
+            # Title + entity come from the payload so each intake is a DISTINCT, openable row.
+            # Both used to be static/unresolvable: the title was the literal "Triage new
+            # opportunities from source", and entity_ref was payload.source — a string like
+            # "intake:admin" that _safe_uuid dropped, leaving entity_id NULL. taskHref() returns
+            # null without an entity id, so the ToDo had no "Open →" at all. The result was 21
+            # open rows sharing one title, none of them linked to anything.
+            task_title="payload.triageTitle",
             assignee_role='"rfp_admin"',
-            entity_type='"source"',
-            entity_ref="payload.source",
+            entity_type='"solicitation"',
+            entity_ref="payload.solicitationId",
             timeout_minutes=4320,  # 72h park window for the triage gate
         ),
     ]

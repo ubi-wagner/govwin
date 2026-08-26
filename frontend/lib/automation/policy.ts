@@ -86,18 +86,37 @@ interface TenantPolicyRow {
 
 /**
  * The platform cap on spotlight buckets per tenant (automation_framework
- * .max_buckets_per_tenant, mig 126; default raised 12→6 in mig 181). rfp_admin tunes it
- * globally at /admin/automation-framework. Framework-HARD: a tenant may not exceed it.
- * Falls back to DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
+ * .max_buckets_per_tenant, mig 126). rfp_admin tunes it globally at
+ * /admin/automation-framework. Framework-HARD: a tenant may not exceed it. Falls back to
+ * DEFAULT_MAX_BUCKETS on any read error so bucket-create never breaks.
+ *
+ * THE CAP IS AN AUTHORING BUDGET, and nothing is spent before the customer spends it.
+ * It used to be `DEFAULT_BUCKETS.length + headroom`, because every tenant-creation path
+ * seeded six starter buckets and mig 181 then set the cap to exactly six — so a brand-new
+ * tenant opened at 100% of cap and got 409 BUCKET_LIMIT before authoring anything (B62).
+ * Mig 203 patched that by adding headroom, which kept the two numbers entangled: move
+ * either and they collide again.
+ *
+ * Seeding is gone from the product path entirely (see lib/spotlight/default-buckets.ts),
+ * so the entanglement has no reason to exist. A bucket is now purely the customer's own
+ * lens — a 1:n they open empty and fill — and the cap is a single honest number.
+ *
+ * On the size of it: a bucket costs one pass over the tenant's own opportunity cards at
+ * creation and O(1) per card on arrival (`rankBucket` / the card-arrival rescore — plain
+ * deterministic SQL, no model call), plus O(buckets × cards) rows in tenant_bucket_scores.
+ * That is cheap, so the cap exists to bound STORAGE and to give an operator a lever, not
+ * because ranking is expensive. 25 is room to work in, not a rationing device.
  */
-export const DEFAULT_MAX_BUCKETS = 6;
+export const DEFAULT_MAX_BUCKETS = 25;
+/** A cap below this would leave a tenant unable to author any lens at all. */
+export const MIN_MAX_BUCKETS = 1;
 export async function getMaxBucketsPerTenant(): Promise<number> {
   try {
     // camelCase off toCamel: max_buckets_per_tenant → maxBucketsPerTenant (declare + read camelCase).
     const [row] = await sql<Array<{ maxBucketsPerTenant: number }>>`
       SELECT max_buckets_per_tenant FROM automation_framework WHERE id = 1`;
     const n = row?.maxBucketsPerTenant;
-    return typeof n === 'number' && n > 0 ? n : DEFAULT_MAX_BUCKETS;
+    return typeof n === 'number' && n > 0 ? Math.max(n, MIN_MAX_BUCKETS) : DEFAULT_MAX_BUCKETS;
   } catch (e) {
     log.warn?.({ msg: 'max-buckets read failed — using default', err: e instanceof Error ? e.message : String(e) });
     return DEFAULT_MAX_BUCKETS;

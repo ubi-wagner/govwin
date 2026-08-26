@@ -16,7 +16,7 @@ try {
   // Log in as rfp_admin.
   await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', 'eric@rfppipeline.com');
-  await page.fill('input[name="password"]', 'RFPAdmin2026!');
+  await page.fill('input[name="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await Promise.all([
     page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
     page.click('button[type="submit"]'),

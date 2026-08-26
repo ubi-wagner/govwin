@@ -155,6 +155,11 @@ PER_CALL_CEILING_USD = 0.50  # mid-loop cost ceiling for a single invocation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
+# Whether the installed SDK still takes `temperature` — see src/sdk_compat.py for what this cost
+# when it was assumed rather than asked. Imported, not re-derived: two copies of a capability check
+# is how the fabric got fixed while the CMS generator stayed broken.
+from sdk_compat import sampling_kwargs
+
 # Sonnet pricing: $3/M input, $15/M output (kept for backwards-compat).
 INPUT_COST_PER_TOKEN = 3.0 / 1_000_000
 OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000
@@ -178,6 +183,59 @@ def _cost_for(model: str, input_tokens: int, output_tokens: int) -> float:
     """Return the USD cost of a call, priced per-model."""
     in_rate, out_rate = MODEL_PRICING.get(model, _DEFAULT_PRICING)
     return input_tokens * in_rate / 1_000_000 + output_tokens * out_rate / 1_000_000
+
+
+_SCOPE_LEVELS = {"node", "group", "section", "pages", "document"}
+
+
+def _scope_anchor(task_input: dict) -> dict | None:
+    """The `proposal_comments.anchor` for a scoped review, or None for an unscoped one.
+
+    A colour-team review used to be one-per-section, so a finding needed no address beyond
+    `section_id`. Since mig 207 a review can be aimed at one node, one library-derived group, a
+    page range or the whole document — and a finding that does not record which is a finding that
+    claims to be about the whole section when the reviewer only read one figure.
+
+    Shape: the `{nodeId, quote}` the comment UI already reads (mig 183), plus the scope keys. That
+    is deliberate reuse rather than a parallel scheme — `nodeId` keeps the partial index
+    `idx_proposal_comments_anchor_node` working, and every existing reader keeps working because
+    it only ever looks at keys it knows.
+
+    Returns None for an unscoped review AND for a section-scoped one: a section-scoped finding is
+    fully addressed by `section_id` alone, so an anchor would be noise. Untrusted only in the sense
+    that it comes off the queue row — every value is checked against a closed vocabulary or
+    dropped, so a malformed `input` cannot produce a malformed anchor.
+    """
+    level = task_input.get("scope_level") or task_input.get("scopeLevel")
+    if level not in _SCOPE_LEVELS or level == "section":
+        return None
+
+    ref = task_input.get("scope_ref") or task_input.get("scopeRef") or {}
+    if not isinstance(ref, dict):
+        ref = {}
+
+    anchor: dict = {"scopeLevel": level}
+    label = task_input.get("scope_label") or task_input.get("scopeLabel")
+    if isinstance(label, str) and label.strip():
+        anchor["scopeLabel"] = label.strip()[:200]
+
+    node_id = ref.get("nodeId")
+    if isinstance(node_id, str) and node_id.strip():
+        # Also as a bare `nodeId`, which is what the comment thread and the index both read.
+        anchor["nodeId"] = node_id.strip()[:200]
+    group_id = ref.get("groupId")
+    if isinstance(group_id, str) and group_id.strip():
+        anchor["groupId"] = group_id.strip()[:200]
+    pages = ref.get("pages")
+    if isinstance(pages, dict):
+        try:
+            start, end = int(pages["start"]), int(pages["end"])
+            if start >= 1 and end >= start:
+                anchor["pages"] = {"start": start, "end": end}
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    return anchor
 
 
 class AgentFabric:
@@ -292,7 +350,9 @@ class AgentFabric:
 
         try:
             for name, archetype in self._archetypes.items():
-                if archetype.handles_event(event_type):
+                # handles_dispatch, not handles_event: the type-only gate cannot tell a usable
+                # event from one that merely names the right subject. Defaults to handles_event.
+                if archetype.handles_dispatch(event):
                     result = await self.invoke_agent(
                         conn, name, event, tenant_id=tenant_id,
                     )
@@ -530,9 +590,12 @@ class AgentFabric:
             api_kwargs: dict = {
                 "model": model,
                 "max_tokens": max_tokens,
-                "temperature": temperature,
                 "system": system_prompt,
                 "messages": list(messages),
+                # Only where the installed SDK still takes it. Omitting the argument costs the
+                # archetype its sampling preference; passing one the SDK dropped costs it the
+                # entire call.
+                **sampling_kwargs(temperature),
             }
             if merged_tools:
                 api_kwargs["tools"] = merged_tools
@@ -1034,20 +1097,33 @@ class AgentFabric:
             if not text:
                 return
 
+            # SCOPE (mig 207). A review can now be aimed at one node, one library-derived group,
+            # a page range or the whole document — not just a whole section. The task carries what
+            # it was pointed at; the finding has to carry it too, or the comment claims to be about
+            # the section when the reviewer only ever read one figure.
+            #
+            # It lands in `anchor`, the column mig 183 already added for span/node-anchored
+            # comments, in the shape the UI already reads (`{nodeId, quote}`) plus the scope keys.
+            # Additive by construction: an unscoped review writes anchor NULL, exactly as before,
+            # and the partial index on `anchor->>'nodeId'` keeps working untouched.
+            anchor = _scope_anchor(task_input)
+
             await conn.execute(
                 """
                 INSERT INTO proposal_comments
-                    (proposal_id, section_id, user_id, content, recommendation_type, category)
-                VALUES ($1, $2, $3, $4, 'ai_review', $5)
+                    (proposal_id, section_id, user_id, content, recommendation_type, category, anchor)
+                VALUES ($1, $2, $3, $4, 'ai_review', $5, $6::jsonb)
                 """,
                 proposal_id,
                 section_id,
                 uuid.UUID(str(requested_by)),
                 text[:10000],
                 task_input.get("category"),
+                json.dumps(anchor) if anchor else None,
             )
             logger.info(
-                "[process_task_queue] posted AI recommendation for section %s", section_id,
+                "[process_task_queue] posted AI recommendation for section %s (scope=%s)",
+                section_id, (anchor or {}).get("scopeLevel", "section"),
             )
         except Exception as exc:
             logger.error(

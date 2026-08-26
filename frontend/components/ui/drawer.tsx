@@ -39,6 +39,12 @@ export interface DrawerProps {
   width?: string;
   /** If set, render inline (static) at/above this breakpoint; overlay below. */
   inlineAt?: Breakpoint;
+  /**
+   * The landmark role the panel takes while it is INLINE (i.e. `inlineAt` is set and it is not
+   * open as an overlay). The nav rail passes `navigation`; leave unset for a generic panel, which
+   * then falls back to `<aside>`'s implicit complementary landmark.
+   */
+  inlineRole?: string;
   /** Extra classes for the panel (bg/text/padding, e.g. 'bg-navy-900 text-white p-6'). */
   className?: string;
   ariaLabel?: string;
@@ -51,6 +57,7 @@ export function Drawer({
   side = 'right',
   width = 'w-80',
   inlineAt,
+  inlineRole,
   className = 'bg-white',
   ariaLabel = 'Panel',
   children,
@@ -79,8 +86,29 @@ export function Drawer({
           aria-hidden
         />
       )}
+      {/*
+        THE ROLE FOLLOWS THE BEHAVIOUR, and it used to be hardcoded.
+
+        `role="dialog"` was unconditional, so the **primary navigation rail was announced as a
+        dialog on every admin and portal page** — it is a `Drawer` with `inlineAt="lg"`, which at
+        and above the breakpoint is not an overlay at all but a static 256px column. Two costs, both
+        real: a screen-reader user meets a dialog where the site's main navigation should be, and
+        the nav is missing from landmark navigation, which is the standard way they would jump to it.
+
+        In `inlineAt` mode the drawer is only a dialog while it is genuinely open as an overlay
+        (below the breakpoint, hamburger pressed). At rest it takes `inlineRole` — `navigation` for
+        the nav rail — so it is a labelled landmark instead. A drawer with no `inlineAt` is always a
+        real overlay and keeps the dialog role.
+
+        Found by a harness, not by reading: an overlay probe kept reporting one persistent
+        `role="dialog"` on every page at rest, which is exactly what this bug looks like from outside.
+      */}
       <aside
-        role="dialog"
+        role={!inlineAt || open ? 'dialog' : inlineRole}
+        // `open` is only ever true BELOW the inline breakpoint — the hamburger that sets it is
+        // `lg:hidden` — so an open drawer is a real overlay in both modes and keeps aria-modal.
+        // (An earlier version of this fix dropped it for `inlineAt` drawers, which would have
+        // demoted the mobile nav from a modal to a plain region while it covers the page.)
         aria-modal={open ? true : undefined}
         aria-label={ariaLabel}
         className={[

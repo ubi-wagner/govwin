@@ -78,7 +78,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
 
       let tagged = 0;
       if (addTag) {
-        const rows = await tx<Array<{ atom_id: string }>>`
+        // camelCase: lib/db.ts applies postgres.toCamel to every client, so RETURNING atom_id
+        // arrives as `atomId`. A snake_case field here compiles (tsc trusts the assertion) and
+        // reads undefined at runtime — only `rows.length` is used today, so declare it true.
+        const rows = await tx<Array<{ atomId: string }>>`
           INSERT INTO atom_tags (atom_id, dimension, value, is_other, tag_source, confirmed, confirmed_by, confirmed_at)
           SELECT unnest(${validIds}::uuid[]), ${addTag.dimension}, ${addTag.value}, false, 'admin', true, ${u.id}::uuid, now()
           ON CONFLICT (atom_id, dimension, value) DO UPDATE SET

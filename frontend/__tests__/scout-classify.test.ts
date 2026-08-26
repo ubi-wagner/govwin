@@ -78,4 +78,55 @@ describe('classifyCandidateAgainst', () => {
     expect(r.classification).toBe('update');
     expect(r.matchOpportunityId).toBe('opp-af');
   });
+
+  // ── The agency-floor regression ─────────────────────────────────────────
+  //
+  // Rule 4 used to read `0.55 + titleSim * 0.45` when the agency matched, so ~11% title overlap
+  // crossed UPDATE_THRESHOLD. Because an agency name ALSO contributes matching title tokens, the
+  // agency was deciding on its own. Found by driving the scout queue against real data: three
+  // unrelated Air Force notices all classified as UPDATE to an Air Force CSO at 0.63–0.64.
+  //
+  // The cost is concrete — releasing an "update" logs an amendment on a live solicitation, which
+  // fans out to every tenant holding it and asks them to acknowledge a change that never happened.
+  describe('a shared agency corroborates a match; it must not BE the match', () => {
+    const AF = [{
+      id: 'opp-cso', source: 'manual_upload', sourceId: 'manual-x',
+      title: 'Air Force X24.5 — Commercial Solutions Opening',
+      agency: 'Department of the Air Force', solicitationNumber: 'AF X24.5 CSO',
+    }] satisfies ExistingOpp[];
+    const AGENCY = 'Department of the Air Force';
+
+    it.each([
+      ['Air Force Advanced Propulsion Research Initiative'],
+      ['Air Force Hypersonic Materials Broad Agency Announcement'],
+      ['Air Force Small Business Industry Day'],
+    ])('does not call an unrelated same-agency notice an UPDATE: %s', (title) => {
+      const r = classifyCandidateAgainst({ title, agency: AGENCY }, AF);
+      expect(r.classification).not.toBe('update');
+      expect(r.score).toBeLessThan(UPDATE_THRESHOLD);
+    });
+
+    it('still calls a genuine re-post an UPDATE', () => {
+      const r = classifyCandidateAgainst(
+        { title: 'Air Force X24.5 Commercial Solutions Opening — Amendment 2', agency: AGENCY }, AF);
+      expect(r.classification).toBe('update');
+      expect(r.matchOpportunityId).toBe('opp-cso');
+    });
+
+    it('surfaces a partial-overlap notice as UNKNOWN rather than asserting either way', () => {
+      // Half the tokens shared and the same agency: too close to dismiss, too thin to assert.
+      // UNKNOWN is the honest answer — the queue shows the possible match and a person decides.
+      const r = classifyCandidateAgainst(
+        { title: 'Air Force Commercial Solutions Opening — Industry Day Announcement', agency: AGENCY }, AF);
+      expect(r.classification).toBe('unknown');
+      expect(r.score).toBeGreaterThanOrEqual(AMBIGUOUS_THRESHOLD);
+      expect(r.score).toBeLessThan(UPDATE_THRESHOLD);
+    });
+
+    it('agency alone carries no weight without any title overlap', () => {
+      const r = classifyCandidateAgainst({ title: 'Cryogenic Fluid Management', agency: AGENCY }, AF);
+      expect(r.classification).toBe('new');
+      expect(r.score).toBe(0);
+    });
+  });
 });

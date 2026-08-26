@@ -14,7 +14,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const page = await browser.newPage({ baseURL: 'http://localhost:3000' });
 await page.goto('/login');
 await page.fill('input[type="email"]', 'eric@rfppipeline.com');
-await page.fill('input[type="password"]', 'RFPAdmin2026!');
+await page.fill('input[type="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
 await Promise.all([page.waitForURL((u) => !u.pathname.includes('/login')), page.click('button[type="submit"]')]);
 
 const sol = (await (await page.request.get(`/api/admin/rfp-curation/${SOL}`)).json()).data;

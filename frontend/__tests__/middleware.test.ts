@@ -155,6 +155,119 @@ describe('middleware — public paths', () => {
     expect(location).not.toContain('/login');
   });
 
+  /**
+   * The PAGE being public was already asserted above. Nothing asserted the API it depends on, and
+   * it was not — so `/invite/<token>` rendered, its `GET /api/invite` fetch answered 401 into a
+   * silent catch, and the POST that sets the invitee's password answered 401 too. The whole
+   * collaborator-invite flow was dead for exactly the person it exists for: someone with no
+   * account, for whom "log in first" is not a step they can take.
+   *
+   * The reason no test caught it is worth keeping: the page test and the route test each passed in
+   * isolation, and the defect lived only in their COMPOSITION. Assert both halves together.
+   */
+  it('allows /api/invite without auth — the token IS the credential', async () => {
+    for (const method of ['GET', 'POST'] as const) {
+      const req = makeReq('/api/invite', { session: null, method });
+      const res = await middlewareDefault(req as any, {} as any);
+      expect((res as Response).status).not.toBe(401);
+    }
+  });
+
+  it('does NOT open /api/invite as a prefix — only the exact path', async () => {
+    // PUBLIC_EXACT_PATHS, never a prefix: /api/invitations or /api/invite/admin must stay gated.
+    const req = makeReq('/api/invite/anything-else', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    expect((res as Response).status).toBe(401);
+  });
+
+  /**
+   * THE PASSWORD-RESET PAGES — the same defect as /api/invite, with a bigger blast radius.
+   *
+   * Every user can forget a password; only invited collaborators hit the invite path. And this one
+   * was a closed loop: /login renders a "Forgot password?" link, clicking it redirected to /login,
+   * and a reset EMAIL pointing at /reset-password?token=…&email=… bounced the same way, so the page
+   * that consumes the token never ran.
+   *
+   * Nothing else in the flow was broken — both pages exist and read their query parameters, and
+   * POST /api/auth/forgot-password answers 200 {"data":{"sent":true}} because /api/auth/* is
+   * public. The API was reachable; the UI in front of it was not.
+   *
+   * `/change-password` is deliberately NOT here: it requires a session by design, and middleware
+   * has its own tempPassword branch for it.
+   */
+  it('allows the password-reset pages without auth — they are for people who cannot log in', async () => {
+    for (const p of ['/forgot-password', '/reset-password']) {
+      const req = makeReq(p, { session: null });
+      const res = await middlewareDefault(req as any, {} as any);
+      const location = (res as Response).headers?.get('location') ?? '';
+      expect(location, `${p} must not bounce to /login`).not.toContain('/login');
+    }
+  });
+
+  it('/reset-password stays public WITH its token query — the emailed link is the real caller', async () => {
+    const req = makeReq('/reset-password?token=abc&email=a%40b.com', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    const location = (res as Response).headers?.get('location') ?? '';
+    expect(location).not.toContain('/login');
+  });
+
+  it('/change-password still REQUIRES a session — it is not a reset page', async () => {
+    const req = makeReq('/change-password', { session: null });
+    const res = await middlewareDefault(req as any, {} as any);
+    const location = (res as Response).headers?.get('location') ?? '';
+    expect(location).toContain('/login');
+  });
+
+  /**
+   * THE DRIFT GUARD — enumerate the public trees from DISK and require middleware to agree.
+   *
+   * One sweep found three separate omissions from the public lists: `/api/invite`, the two
+   * password-reset pages, and `/federal-rd-101` (linked from the homepage twice and sitting in the
+   * site nav). Each was found by a different accident. The common cause is structural: a
+   * hand-maintained array lives next to a DIRECTORY of public pages, and nothing compares them, so
+   * every new marketing page is public-by-intent and gated-by-default until someone notices.
+   *
+   * Middleware runs on the Edge and cannot read the filesystem, so the array has to stay
+   * hand-written. This test is the other half: it walks `app/(marketing)` and `app/(auth)`, drives
+   * each route through the real middleware with no session, and fails on any that redirects to
+   * /login. Adding a marketing page without listing it now breaks the suite instead of the site.
+   *
+   * `/change-password` is the one deliberate exception — it is in `(auth)` and legitimately needs a
+   * session, which the test above pins from the other direction.
+   */
+  it('every page under app/(marketing) and app/(auth) is reachable without a session', async () => {
+    const { readdirSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const APP = join(process.cwd(), 'app');
+    const NEEDS_SESSION_BY_DESIGN = new Set(['/change-password']);
+
+    const routes: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(join(dir, e.name), `${rel}/${e.name}`);
+        else if (e.name === 'page.tsx') {
+          const r = rel.replace(/\/\([^)]+\)/g, '') || '/';
+          // A dynamic segment needs a real value; substitute a plausible one.
+          routes.push(r.replace(/\[\w+\]/g, 'sample-slug'));
+        }
+      }
+    };
+    for (const group of ['(marketing)', '(auth)']) {
+      const d = join(APP, group);
+      if (existsSync(d)) walk(d, '');
+    }
+    expect(routes.length, 'the walk found no pages — the test is not testing anything').toBeGreaterThan(15);
+
+    const gated: string[] = [];
+    for (const r of routes) {
+      if (NEEDS_SESSION_BY_DESIGN.has(r)) continue;
+      const res = await middlewareDefault(makeReq(r, { session: null }) as any, {} as any);
+      const location = (res as Response).headers?.get('location') ?? '';
+      if (location.includes('/login')) gated.push(r);
+    }
+    expect(gated, `these public pages redirect anonymous visitors to /login: ${gated.join(', ')}`).toEqual([]);
+  });
+
   it('allows _next static paths without auth', async () => {
     const req = makeReq('/_next/static/chunks/main.js', { session: null });
     const res = await middlewareDefault(req as any, {} as any);
@@ -175,6 +288,41 @@ describe('middleware — unauthenticated access', () => {
     expect((res as Response).status).toBe(401);
     const json = await (res as Response).json();
     expect(json.error).toBe('unauthenticated');
+    // `code` is half the contract — see the envelope test below for why this line exists.
+    expect(json.code).toBe('UNAUTHENTICATED');
+  });
+
+  /**
+   * THE ENVELOPE, AT THE LAYER THAT ANSWERS FIRST.
+   *
+   * CLAUDE.md: "EVERY error response MUST include both `error` and `code` fields." All 250 route
+   * handlers obey it — 2,525 error responses, every one conforming. This middleware fronts all of
+   * them and answered `{error:'unauthenticated'}` with no `code` to every caller without a session,
+   * which is the most common failure in the product. A client switching on `code` fell through to
+   * its default there and nowhere else.
+   *
+   * It stayed invisible because of WHERE the checks looked: the api-contract lens drives every
+   * route through a real logged-in session (deliberately — grading an authed route anonymously
+   * answers the wrong question), so it never saw a middleware 401; and the assertions here checked
+   * `error` and never `code`. Uncovered, not passing.
+   *
+   * The tell that it was an oversight rather than a decision: the two rate-limit branches in the
+   * same file already carried `code: 'RATE_LIMITED'`.
+   */
+  it('every middleware error response carries BOTH error and code', async () => {
+    const cases: Array<[string, FakeSession | null, number, string]> = [
+      ['/api/portal/acme/proposals', null, 401, 'UNAUTHENTICATED'],
+      ['/api/portal/acme/proposals', { user: { id: 'u1', role: 'tenant_admin', tempPassword: true } }, 403, 'PASSWORD_CHANGE_REQUIRED'],
+      ['/api/admin/tenants', { user: { id: 'u1', role: 'tenant_user' } }, 403, 'FORBIDDEN'],
+    ];
+    for (const [path, session, status, code] of cases) {
+      const req = makeReq(path, { session });
+      const res = await middlewareDefault(req as any, {} as any);
+      expect((res as Response).status).toBe(status);
+      const json = await (res as Response).json();
+      expect(typeof json.error, `${path} → error`).toBe('string');
+      expect(json.code, `${path} → code`).toBe(code);
+    }
   });
 
   it('redirects unauthenticated HTML request to /login with from param', async () => {

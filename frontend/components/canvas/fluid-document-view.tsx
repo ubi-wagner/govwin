@@ -24,11 +24,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CanvasRenderer } from './canvas-renderer';
 import { SelectionToolbar } from './selection-toolbar';
-import { CanvasOverlayBar, overlayClass, useOverlays } from './canvas-overlays';
+import { CanvasOverlayBar, overlayClass, useOverlays, overlaysFor } from './canvas-overlays';
 import { selectionLabel, type CanvasSelection } from '@/lib/canvas/selection';
 import { originalNodeId, reconstructSectionDoc, type AssembledProposal, type FluidSectionMeta } from '@/lib/canvas/assemble-proposal';
-import { estimatePageCount, getNodeText, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
+import { estimatePageCount, getNodeText, withCanvasDefaults, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { toast } from '@/lib/toast';
+import { ScopeBar, type ScopeAction } from './scope-bar';
+import type { Scope, Selection } from '@/lib/canvas/scope';
 
 interface Props {
   assembled: AssembledProposal;
@@ -54,7 +56,9 @@ const STATUS_DOT: Record<string, string> = {
 
 export function FluidDocumentView({ assembled, sections: sectionsProp, canManage = false, tenantSlug, proposalId, variables, canAct = true }: Props) {
   const { sectionOf, outline } = assembled;
-  const [doc, setDoc] = useState<CanvasDocument>(assembled.doc);
+  // Partial-canvas normalization (B78) — an assembled multi-section document inherits the
+  // canvas of whichever section supplied it, and those are not all complete.
+  const [doc, setDoc] = useState<CanvasDocument>(() => withCanvasDefaults(assembled.doc));
   // Per-section meta held in STATE so a lock/unlock (F2b) flips editability live without a reload.
   const [sections, setSections] = useState<FluidSectionMeta[]>(sectionsProp);
   const [lockBusy, setLockBusy] = useState<string | null>(null);
@@ -426,6 +430,76 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
     [tenantSlug, proposalId],
   );
 
+  // ── SCOPE (Phase B) ───────────────────────────────────────────────────────────────────────────
+  // One piece of state for "what is focused", and it FOLLOWS the canvas selection rather than
+  // living beside it. A panel with its own private idea of what is selected is how the same click
+  // ends up meaning two different things in two places — the exact thing the scope work exists to
+  // stop. Clicking a node in the document moves the scope to that node; the bar can then widen.
+  const [scopeSel, setScopeSel] = useState<Selection>({});
+  const [scopeBusy, setScopeBusy] = useState(false);
+  useEffect(() => { if (selectedNodeId) setScopeSel({ nodeId: selectedNodeId }); }, [selectedNodeId]);
+
+  /** Queue a colour-team review of exactly the focused scope. Advisory — it posts findings. */
+  const reviewScope = useCallback(async (scope: Scope, sel: Selection) => {
+    setScopeBusy(true);
+    try {
+      // The section hint disambiguates a RAW node id from the per-section editor. Here the ids are
+      // already assembly-scoped, so it is belt-and-braces — but sending it costs nothing and makes
+      // the same call correct from either surface, which is what continuity means in practice.
+      const hint = sel.nodeId ? sectionOf[sel.nodeId]?.id : undefined;
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: { ...sel, ...(hint ? { sectionId: hint } : {}) } }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(j?.error ?? 'Could not queue that review.'); return; }
+      toast.success(`Review queued for ${j?.data?.scope?.label ?? scope.label}.`);
+    } catch { toast.error('Could not queue that review.'); }
+    finally { setScopeBusy(false); }
+  }, [tenantSlug, proposalId, sectionOf]);
+
+  /** Re-assemble a section from the tenant's library, landing a PROPOSED version to review. */
+  const assembleScope = useCallback(async (scope: Scope) => {
+    setScopeBusy(true);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${scope.id}/assemble`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(j?.error ?? 'Could not assemble from the library.'); return; }
+      const d = j?.data ?? {};
+      const skipped = (d.skipped ?? []).length;
+      toast.success(
+        `Proposed a draft from ${d.atoms?.length ?? 0} library atom${d.atoms?.length === 1 ? '' : 's'} `
+        + `(${d.pagesUsed} page${d.pagesUsed === 1 ? '' : 's'}${skipped ? `, ${skipped} did not fit` : ''}). `
+        + 'Review it in the section’s version history.',
+      );
+    } catch { toast.error('Could not assemble from the library.'); }
+    finally { setScopeBusy(false); }
+  }, [tenantSlug, proposalId]);
+
+  const scopeActions = useMemo<ScopeAction[]>(() => [
+    {
+      id: 'review',
+      label: 'Adversarial review of this scope',
+      hint: 'Queue a colour-team reviewer aimed at exactly this content. Advisory — it posts findings, it never edits.',
+      levels: ['node', 'group', 'section', 'pages', 'document'],
+      run: (scope, sel) => reviewScope(scope, sel),
+    },
+    {
+      id: 'assemble',
+      // SECTION ONLY, and not because narrower is unsupported: the assembler builds a SECTION out
+      // of ranked atoms. There is no smaller thing it produces, so offering it at node level would
+      // promise something that does not exist.
+      label: 'Re-assemble from the library',
+      hint: 'Rank this tenant’s library for this section and propose a draft, fitted to its page budget. Lands for review; never overwrites.',
+      levels: ['section'],
+      run: (scope) => assembleScope(scope),
+    },
+  ], [reviewScope, assembleScope]);
+
   const dirtyCount = dirty.size;
   const saveLabel = saving ? 'Saving…' : dirtyCount > 0 ? `Save ${dirtyCount} section${dirtyCount === 1 ? '' : 's'}` : 'Saved';
 
@@ -434,7 +508,7 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
       {/* Slim action bar: overlays + editable save state (the Manage tab-row dissolves into this). */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 px-1">
         <div className="flex flex-wrap items-center gap-2">
-          <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} />
+          <CanvasOverlayBar active={overlays} onToggle={toggleOverlay} items={overlaysFor(doc)} />
           {/* F3 — Compliance + Budget layers (real data), summonable like the dotted layers. */}
           <button type="button" onClick={() => setShowCompliance((v) => !v)} aria-pressed={showCompliance}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${showCompliance ? 'border-transparent bg-rose-500 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
@@ -535,6 +609,17 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
             onUpdateNode={onUpdateNode}
             variables={variables}
             readOnly={!anyEditable}
+            // The Grid chip was OFFERED on this surface and wired to nothing. `CanvasRenderer`
+            // takes `grid` and defaults it to false; this view never passed it, and there is no CSS
+            // rule for `ov-grid` either, so the class `overlayClass` adds paints nothing on its own.
+            // The result: on the DEFAULT tab of the proposal workspace — the main authoring surface
+            // — an author toggled Grid, the chip lit up, and no grid appeared. Measured at 0.09%
+            // pixel change (the chip itself) against 2.02% where it works.
+            //
+            // Wiring it is the right fix rather than hiding the chip: this is the assembled
+            // document, where page boundaries across eleven pages are exactly what a measurement
+            // grid is for.
+            grid={overlays.has('grid')}
           />
           {canAct && (
             <SelectionToolbar
@@ -547,6 +632,28 @@ export function FluidDocumentView({ assembled, sections: sectionsProp, canManage
             />
           )}
         </div>
+
+        {/* ── THE SCOPE BAR ────────────────────────────────────────────────────────────────────
+            The right column, acting on whatever rung the reader has focused. Mounted HERE rather
+            than only in the per-section editor because this is the surface where every rung is
+            meaningful: a page range and a whole-document scope have no meaning inside one section.
+
+            `sectionOf` is what lets the ladder name a section at all — the assembled document is
+            one flat node list (that is what reading a continuous document needs), so without the
+            map the ladder would jump from `node` straight to `document` and lose the rung the
+            compliance matrix, the mold and the review queue all address. */}
+        {canAct && (
+          <aside className="w-72 shrink-0 overflow-y-auto pl-1">
+            <ScopeBar
+              doc={doc}
+              selection={scopeSel}
+              onSelectionChange={setScopeSel}
+              sectionOf={sectionOf}
+              busy={scopeBusy}
+              actions={scopeActions}
+            />
+          </aside>
+        )}
       </div>
     </div>
   );

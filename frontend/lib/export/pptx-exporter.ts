@@ -38,8 +38,9 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, resolveImageDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
-import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
+import { docNodes, sectionsToNodes, nodesHeightPt, wrappedLines } from '@/lib/types/canvas-document';
 
 // ─── Layout constants (inches) ────────────────────────────────────────
 const SLIDE_LAYOUTS: Record<string, { w: number; h: number }> = {
@@ -135,6 +136,29 @@ function runStyle(style: NodeStyle, font: string, fontSize: number, fallbackColo
   if (style.strikethrough) o.strike = 'sngStrike';
   const hl = hex(style.highlight); if (hl) o.highlight = hl;
   if (style.alignment) o.align = style.alignment;
+
+  // ── PARAGRAPH GEOMETRY — indent and spacing ──────────────────────────────────────────────────
+  //
+  // These were the only three keys in the whole common ribbon that the deck writer dropped. A
+  // difference-based style probe caught them: exporting the same deck with and without
+  // `space_after` produced BYTE-IDENTICAL .pptx files, which is the one signal that cannot be
+  // argued with — the writer was not reading them at all. docx and the HTML/PDF path honour all
+  // three, so an author moved a paragraph apart on screen, saw it hold in the Word and PDF
+  // versions, and got the slides back unchanged.
+  //
+  // Spacing maps directly: pptxgenjs `paraSpaceBefore` / `paraSpaceAfter` are points, which is
+  // exactly what NodeStyle stores.
+  //
+  // Indent does NOT map directly, and the honest thing is to say so rather than invent precision.
+  // DrawingML paragraphs indent by LEVEL, not by an arbitrary measure, and pptxgenjs exposes only
+  // `indentLevel`. A level is a half-inch (36pt) by convention, so the indent is converted to the
+  // nearest level and clamped to the 0–8 range PowerPoint accepts. A 40pt indent therefore renders
+  // as one level, not as 40pt — closer than ignoring it, and not pretending to be exact.
+  if (typeof style.space_before === 'number') o.paraSpaceBefore = style.space_before;
+  if (typeof style.space_after === 'number') o.paraSpaceAfter = style.space_after;
+  if (typeof style.indent === 'number' && style.indent > 0) {
+    o.indentLevel = Math.min(8, Math.max(0, Math.round(style.indent / 36)));
+  }
   return o;
 }
 
@@ -209,9 +233,52 @@ export async function exportToPptx(
     }
 
     // ── body flow ──
-    let curY = BODY_TOP;
+    //
+    // IN POWERPOINT, Z-ORDER IS EMISSION ORDER. There is no z attribute on a shape: whatever is
+    // added last sits on top. So a deck that honours `position.z` has to SORT before it writes,
+    // and this writer did not — it emitted in document order and the author's stacking was
+    // silently dropped on the way out.
+    //
+    // That matters precisely on the decks this product is for. A dense slide overlaps things on
+    // purpose — a callout over a chart, a label over an image — and the editor and the PDF path
+    // both already honour z (canvas-renderer, canvas-html). The .pptx was the one artifact where
+    // the layering a person arranged came back rearranged.
+    //
+    // STABLE, and that word is doing work: nodes without a `z` must keep their document order
+    // relative to each other, or a deck with no layering at all would be reshuffled by the very
+    // fix meant to preserve arrangement. `Array.prototype.sort` is stable in modern V8, and the
+    // comparator returns 0 for equal z so it leans on that guarantee deliberately.
+    //
+    // `wrap: 'behind'` is the floor — content explicitly sent behind the text goes out first, which
+    // matches how the other two surfaces already draw it.
+    const zOf = (n: CanvasNode) => (n.position?.wrap === 'behind' ? -1 : (n.position?.z ?? 5));
+    const ordered = [...bodyNodes].sort((a, b) => zOf(a) - zOf(b));
+
     const bodyBottom = dims.h - 0.5;
-    for (const node of bodyNodes) {
+
+    // OPTICAL CENTRING FOR A SHORT SLIDE, top-anchored for a full one.
+    //
+    // Body content always began at BODY_TOP regardless of how much there was, so a title slide with
+    // two lines sat on top of five inches of white and the deck read as unfinished even where the
+    // content was right. Every slide in a rendered deck looked like a draft.
+    //
+    // A dense slide must still start at the top — it needs every inch, and nudging it down would
+    // push content off the frame that currently fits. So the offset applies only where there is
+    // genuine slack, and it is capped: a slide two-thirds full moves barely at all.
+    //
+    // 0.38 rather than 0.5 is deliberate. Content centred by true arithmetic reads as LOW, because
+    // the eye weights the space above a block more heavily than the space below it — the same
+    // reason a picture is hung above the geometric centre of a wall. Slightly-above-centre is what
+    // "centred" looks like.
+    //
+    // Measured with the same ruler the rest of the canvas uses, so a slide's idea of how tall its
+    // content is cannot disagree with the gauge in the editor or the overflow advisory.
+    const bandIn = Math.max(0, bodyBottom - BODY_TOP);
+    const contentIn = nodesHeightPt(ordered, canvas) / 72;
+    const slackIn = Math.max(0, bandIn - contentIn);
+    let curY = BODY_TOP + slackIn * 0.38;
+
+    for (const node of ordered) {
       const added = addNodeToSlide(slide, node, canvas, MARGIN, curY, bodyW, Math.max(0.3, bodyBottom - curY), sub, nodes, raster, accent);
       curY += added;
     }
@@ -246,19 +313,32 @@ function renderTitleSlide(
     x: MARGIN, y: 0.7, w: bodyW, h: 1.2,
     fontSize: 40, fontFace: canvas.font_default.family, bold: true, color: 'FFFFFF', valign: 'middle',
   });
-  // subtitle lines below the band
-  let y = 3.0;
-  for (const n of bodyNodes) {
-    if (n.type !== 'text_block') continue;
+  // ── SUBTITLE STACK, OPTICALLY CENTRED IN THE WHITE BELOW THE BAND ──
+  //
+  // These lines were pinned to y=3.0 whatever they were, so a one-line subtitle sat just under the
+  // band with four inches of nothing beneath it and the deck's FIRST slide — the one thing every
+  // reviewer sees — read as unfinished. The content slides already centre their short content;
+  // this path returns before that code and kept its own constants.
+  //
+  // Same rule, same reason: 0.38 of the slack rather than 0.5, because the eye weights the space
+  // above a block more heavily than the space below it, so arithmetic centring reads as low.
+  const lines = bodyNodes.filter((n) => n.type === 'text_block' && (n.content as TextBlockContent).text);
+  const stackH = lines.reduce((h, _n, i) => h + (i === 0 ? 0.7 : 0.45), 0);
+  const bandBottom = 2.5;
+  const footerTop = dims.h - 0.28;
+  const slack = Math.max(0, (footerTop - bandBottom) - stackH);
+  let y = bandBottom + Math.max(0.5, slack * 0.38);
+
+  let first = true;
+  for (const n of lines) {
     const c = n.content as TextBlockContent;
-    if (!c.text) continue;
-    const first = y === 3.0;
     slide.addText(sub(c.text), {
       x: MARGIN, y, w: bodyW, h: 0.5,
       fontSize: first ? 22 : 16, fontFace: canvas.font_default.family,
       color: first ? INK : MUTED, bold: first, valign: 'top', wrap: true,
     });
     y += first ? 0.7 : 0.45;
+    first = false;
   }
   // accent footer rule
   slide.addShape((slide as unknown as { _shapeType?: never }, 'rect') as unknown as PptxGenJS.ShapeType, { x: 0, y: dims.h - 0.28, w: dims.w, h: 0.28, fill: { color: accent }, line: { type: 'none' } } as PptxGenJS.ShapeProps);
@@ -298,6 +378,23 @@ function cellBg(cell: string | CanvasTableCell): string | undefined {
   return typeof cell === 'string' ? undefined : hex(cell.style?.bg) ?? undefined;
 }
 
+/**
+ * Lines a run of `text` wraps to inside a box `wIn` inches wide at `fs` pt.
+ *
+ * Replaces four hardcoded divisors — `length / 95`, `/ 60`, `/ 60`, `/ 65` — each of which was a
+ * characters-per-line guess for one assumed width at one assumed font size. Set a node to 20pt or
+ * put it in a narrow column and every one of them under-counted, which on a slide means the next
+ * node is drawn over this one.
+ */
+function linesIn(text: string, wIn: number, fs: number, insetIn = 0.16): number {
+  return wrappedLines(text, Math.max(24, (wIn - insetIn) * 72), fs);
+}
+
+/** Height of one line box at `fs` pt, in inches — leans long, as the ruler is required to. */
+function lineIn(fs: number): number {
+  return (fs * 1.25) / 72;
+}
+
 /** Add a body node; returns estimated vertical inches consumed. */
 function addNodeToSlide(
   slide: PptxGenJS.Slide,
@@ -326,8 +423,8 @@ function addNodeToSlide(
     case 'text_block': {
       const c = node.content as TextBlockContent;
       if (!c.text) return 0.1;
-      const lineCount = Math.ceil(sub(c.text).length / 95);
-      const h = Math.min(Math.max(0.35, lineCount * 0.28), maxH);
+      const lineCount = linesIn(sub(c.text), w, fontSize, 0);
+      const h = Math.min(Math.max(0.35, lineCount * lineIn(fontSize)), maxH);
       const formats = c.inline_formats ?? [];
       if (formats.length === 0) {
         slide.addText(sub(c.text), { x, y, w, h, ...runStyle(node.style, font, fontSize, INK), valign: 'top', wrap: true });
@@ -367,7 +464,14 @@ function addNodeToSlide(
           paraSpaceAfter: 8, breakLine: true,
         },
       }));
-      const h = Math.min(Math.max(0.4, c.items.length * 0.42), maxH);
+      // Same under-count as the table: `items * 0.42` is a one-line bullet. A wrapping bullet
+      // overran the box and the node after it was drawn on top — on the repro slide the third
+      // bullet vanished entirely. Measured per item, with the bullet indent taken off the width.
+      const bulletWpt = (w - 0.3) * 72;
+      const lineIn = (fontSize * 1.22) / 72;
+      const lines = c.items.reduce(
+        (n, item) => n + wrappedLines(sub(item.text), bulletWpt - (item.indent_level ?? 0) * 18, fontSize), 0);
+      const h = Math.min(Math.max(0.4, lines * lineIn + c.items.length * 0.11), maxH);
       slide.addText(items, { x, y, w, h, valign: 'top', lineSpacingMultiple: 1.05 });
       return h + 0.12;
     }
@@ -384,9 +488,39 @@ function addNodeToSlide(
         })),
       );
       const colCount = c.headers.length || (c.rows[0]?.length ?? 1);
-      const rowCount = 1 + c.rows.length;
-      const h = Math.min(Math.max(0.5, rowCount * 0.36), maxH);
-      slide.addTable([headerRow, ...dataRows], { x, y, w, h, colW: w / colCount, fontSize: Math.max(10, fontSize - 4), fontFace: font, valign: 'middle' });
+      const cellFs = Math.max(10, fontSize - 4);
+
+      // ── MEASURE THE ROWS. DO NOT ASSUME THEY ARE ONE LINE EACH. ──
+      //
+      // This was `rowCount * 0.36`, and the 0.36 is a single-line row. A cell that wraps is taller
+      // than that, so the frame came out short — and PowerPoint does not spill a table onto the
+      // next slide, it CLIPS at the frame. A three-row risk register exported with its third row
+      // missing and its second cut mid-word, and the callout beneath it was drawn over the gap.
+      // Nothing caught it: the row text is all present in the XML, so a byte-level or vocabulary
+      // check sees a complete table. It is only absent from the RENDERED page.
+      //
+      // Each row is as tall as its tallest cell. Width per column is the frame width shared out,
+      // less the cell insets pptxgenjs applies, converted to points because that is what the ruler
+      // speaks. `wrappedLines` is the page ruler's own model, so a deck and a document cannot
+      // disagree about how tall the same paragraph is.
+      const CELL_PAD_IN = 0.14;                     // pptxgenjs cell insets, top+bottom
+      const colWpt = ((w / colCount) - 0.16) * 72;  // less left+right inset
+      const lineIn = (cellFs * 1.22) / 72;          // a line box at this size
+      const rowHeight = (cells: Array<string | CanvasTableCell>): number => {
+        const lines = Math.max(1, ...cells.map((cell) => wrappedLines(sub(cellText(cell)), colWpt, cellFs)));
+        return Math.max(0.36, lines * lineIn + CELL_PAD_IN);
+      };
+      const rowH = [rowHeight(c.headers), ...c.rows.map(rowHeight)];
+      const natural = rowH.reduce((a, b) => a + b, 0);
+
+      // Declaring the per-row heights is what makes the frame honest: the renderer no longer has to
+      // grow rows past a total it was never told about. If the table genuinely does not fit the
+      // slide it is still capped at maxH — that is the author's overflow to resolve, and it is
+      // reported by the advisory rather than silently swallowed here.
+      const h = Math.min(natural, maxH);
+      slide.addTable([headerRow, ...dataRows], {
+        x, y, w, h, colW: w / colCount, rowH, fontSize: cellFs, fontFace: font, valign: 'middle',
+      });
       return h + 0.2;
     }
     case 'image': {
@@ -461,8 +595,8 @@ function addNodeToSlide(
     }
     case 'text_box': {
       const c = node.content as TextBoxContent;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60));
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * 0.3 + 0.15), maxH), maxH);
+      const lines = linesIn(sub(c.text), w, fontSize);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * lineIn(fontSize) + 0.15), maxH), maxH);
       slide.addText(sub(c.text), {
         x: b.x, y: b.y, w: b.w, h: b.h,
         ...runStyle(node.style, font, fontSize, INK),
@@ -476,8 +610,8 @@ function addNodeToSlide(
     case 'callout': {
       const c = node.content as CalloutContent;
       const pal = CALLOUT_COLORS[c.variant] ?? CALLOUT_COLORS.note;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60)) + (c.title ? 1 : 0);
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.6, lines * 0.3 + 0.2), maxH), maxH);
+      const lines = linesIn(sub(c.text), w, fontSize, 0.24) + (c.title ? 1 : 0);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.6, lines * lineIn(fontSize) + 0.2), maxH), maxH);
       slide.addText([
         ...(c.title ? [{ text: sub(c.title), options: { bold: true, color: pal.fg, fontFace: font, fontSize, breakLine: true } }] : []),
         { text: sub(c.text), options: { color: INK, fontFace: font, fontSize } },
@@ -501,8 +635,8 @@ function addNodeToSlide(
     }
     case 'blockquote': {
       const c = node.content as BlockquoteContent;
-      const lines = Math.max(1, Math.ceil(sub(c.text).length / 65));
-      const b = placeBox(node, x, y, w, Math.min(Math.max(0.5, lines * 0.32 + 0.2), maxH), maxH);
+      const lines = linesIn(sub(c.text), w - 0.26, fontSize);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.5, lines * lineIn(fontSize) + 0.2), maxH), maxH);
       slide.addShape('rect', { x: b.x, y: b.y, w: 0.06, h: b.h, fill: { color: accent }, line: { type: 'none' } });
       slide.addText([
         { text: sub(c.text), options: { italic: true, color: INK, fontFace: font, fontSize, breakLine: true } },
@@ -568,7 +702,14 @@ function addNodeToSlide(
       return b.consumed;
     }
     case 'spacer':
-      return 0.3;
+      // 72 points to the inch. Was a hardcoded 0.3in (21.6pt) regardless of the author's height.
+      //
+      // CLAMPED TO WHAT IS LEFT. This loop is `curY += added` with no slide-advance, so a height
+      // the author meant as "push the rest down a page" would push it off the slide entirely — a
+      // 900pt spacer asks for 12.5in on a 7.5in slide. Honouring the intent as far as the slide
+      // allows keeps the content visible, and the compliance floor still raises slide_overflow so
+      // the author is told rather than left to discover it in the deck.
+      return Math.min(spacerHeightPt(node) / 72, maxH);
     case 'toc': {
       const headings = allNodes.filter((n) => n.type === 'heading').map((n) => n.content as HeadingContent);
       const tocText = headings.map((hh) => `${'  '.repeat(hh.level - 1)}${hh.numbering ? `${hh.numbering} ` : ''}${hh.text}`).join('\n');

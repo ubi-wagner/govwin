@@ -114,6 +114,25 @@ describe('rfpPipelinePath', () => {
       rfpPipelinePath({ opportunityId: 'not-a-uuid', kind: 'text' }),
     ).toThrow(/invalid opportunity id/);
   });
+
+  // Mirrors pipeline/tests/test_storage_paths.py. The pipeline WRITES these keys; this side must be
+  // able to address what it wrote. A hyphens-only slug rule rejected the five underscored canonical
+  // section keys, so the pipeline dropped their artifacts and the frontend could not have named them.
+  it.each([
+    'cover', 'technical_approach', 'commercialization', 'team', 'cost_volume',
+    'eligibility', 'evaluation_criteria', 'submission_format', 'compliance_requirements', 'appendix',
+  ])('canonical section key %s is addressable', (key) => {
+    expect(rfpPipelinePath({ opportunityId: OPP_UUID, kind: 'shredded', name: key }))
+      .toBe(`rfp-pipeline/${OPP_UUID}/shredded/${key}.md`);
+  });
+
+  it('still rejects a name that is not a slug', () => {
+    for (const bad of ['EMULATED key — sandbox harness, not a real extraction', '../escape', 'Cover']) {
+      expect(() =>
+        rfpPipelinePath({ opportunityId: OPP_UUID, kind: 'shredded', name: bad }),
+      ).toThrow(/invalid section slug/);
+    }
+  });
 });
 
 describe('customerPath', () => {

@@ -69,7 +69,13 @@ export default async function BillingPage({
     console.error('[billing] subscription status query failed', e);
   }
 
-  // Purchase history
+  // Purchase history.
+  //
+  // The titles come from the joins `/api/portal/[tenantSlug]/purchases` has always carried — the
+  // route computes `proposal_title` and `opportunity_title` and nothing had ever called it, so a
+  // customer with three portal purchases saw three rows reading "Proposal Portal (Phase I) · $0.00 ·
+  // Completed", two of them on the same date, with nothing to tell them apart. Query copied from
+  // that route rather than rewritten, so the two cannot drift on scoping or ordering.
   interface PurchaseRow {
     id: string;
     productType: string;
@@ -77,15 +83,21 @@ export default async function BillingPage({
     status: string;
     createdAt: string;
     opportunityId: string | null;
+    proposalTitle: string | null;
+    opportunityTitle: string | null;
   }
 
   let purchases: PurchaseRow[] = [];
   try {
     purchases = await sql<PurchaseRow[]>`
-      SELECT id, product_type, amount_cents, status, created_at, opportunity_id
-      FROM purchases
-      WHERE tenant_id = ${tenantId}
-      ORDER BY created_at DESC
+      SELECT pu.id, pu.product_type, pu.amount_cents, pu.status, pu.created_at, pu.opportunity_id,
+             p.title AS proposal_title,
+             o.title AS opportunity_title
+      FROM purchases pu
+      LEFT JOIN proposals p ON p.id = pu.proposal_id
+      LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+      WHERE pu.tenant_id = ${tenantId}
+      ORDER BY pu.created_at DESC
       LIMIT 50
     `;
   } catch (e) {
@@ -112,6 +124,8 @@ export default async function BillingPage({
           status: p.status,
           createdAt: p.createdAt,
           opportunityId: p.opportunityId,
+          proposalTitle: p.proposalTitle,
+          opportunityTitle: p.opportunityTitle,
         }))}
       />
     </div>

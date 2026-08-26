@@ -30,6 +30,14 @@ interface Props {
   readOnly?: boolean;
 }
 
+/**
+ * The two ends of the stack, either side of the default 5 that canvas-renderer and canvas-html
+ * both use when `z` is absent. Kept well clear of it so repeated "bring to front" on different
+ * nodes does not collide, and so an untouched node keeps landing between them.
+ */
+const Z_TOP = 900;
+const Z_BOTTOM = 1;
+
 const label = 'text-[10px] text-gray-400 block mb-1';
 const field = 'w-full text-xs border rounded px-1.5 py-1';
 const H3 = ({ children }: { children: React.ReactNode }) => (
@@ -37,12 +45,12 @@ const H3 = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** A 0..1 opacity slider with a % readout. */
-function Opacity({ value, onChange, title }: { value?: number; onChange: (v: number | undefined) => void; title: string }) {
+function Opacity({ value, onChange, title, control }: { value?: number; onChange: (v: number | undefined) => void; title: string; control: string }) {
   const pct = Math.round((value ?? 1) * 100);
   return (
     <div>
       <label className={label}>{title} <span className="text-gray-400 tabular-nums">{pct}%</span></label>
-      <input type="range" min={0} max={100} step={5} value={pct}
+      <input data-control={control} type="range" min={0} max={100} step={5} value={pct}
         onChange={(e) => { const v = parseInt(e.target.value) / 100; onChange(v >= 1 ? undefined : v); }}
         className="w-full h-1.5 accent-blue-600" />
     </div>
@@ -100,11 +108,11 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
         <>
           <H3>Emphasis</H3>
           <div className="flex flex-wrap items-center gap-1">
-            <button onClick={() => onStyle({ underline: !s.underline })} className={`${toggle} underline ${s.underline ? on : off}`} title="Underline">U</button>
-            <button onClick={() => onStyle({ strikethrough: !s.strikethrough })} className={`${toggle} line-through ${s.strikethrough ? on : off}`} title="Strikethrough">S</button>
+            <button data-control="underline" onClick={() => onStyle({ underline: !s.underline })} className={`${toggle} underline ${s.underline ? on : off}`} title="Underline">U</button>
+            <button data-control="strikethrough" onClick={() => onStyle({ strikethrough: !s.strikethrough })} className={`${toggle} line-through ${s.strikethrough ? on : off}`} title="Strikethrough">S</button>
             <label className="ml-1 flex items-center gap-1 text-[10px] text-gray-500" title="Highlight">
               <span aria-hidden>🖍</span>
-              <input type="color" value={s.highlight || '#FFFF00'} onChange={(e) => onStyle({ highlight: e.target.value })} className="h-6 w-6 rounded border cursor-pointer p-0" />
+              <input data-control="highlight" type="color" value={s.highlight || '#FFFF00'} onChange={(e) => onStyle({ highlight: e.target.value })} className="h-6 w-6 rounded border cursor-pointer p-0" />
               {s.highlight && <button onClick={() => onStyle({ highlight: undefined })} className="text-rose-500 hover:underline">clear</button>}
             </label>
           </div>
@@ -119,19 +127,19 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
             <div>
               <label className={label}>Fill</label>
               <div className="flex items-center gap-1">
-                <input type="color" value={s.fill?.color || '#DCE6F1'} onChange={(e) => onStyle({ fill: { ...s.fill, color: e.target.value } })} className="h-6 w-6 rounded border cursor-pointer p-0" />
+                <input data-control="fill" type="color" value={s.fill?.color || '#DCE6F1'} onChange={(e) => onStyle({ fill: { ...s.fill, color: e.target.value } })} className="h-6 w-6 rounded border cursor-pointer p-0" />
                 {s.fill?.color && <button onClick={() => onStyle({ fill: undefined })} className="text-[10px] text-rose-500 hover:underline">none</button>}
               </div>
             </div>
             <div>
               <label className={label}>Border</label>
               <div className="flex items-center gap-1">
-                <input type="color" value={s.border?.color || '#334155'} onChange={(e) => onStyle({ border: { ...s.border, color: e.target.value } })} className="h-6 w-6 rounded border cursor-pointer p-0" />
+                <input data-control="border" type="color" value={s.border?.color || '#334155'} onChange={(e) => onStyle({ border: { ...s.border, color: e.target.value } })} className="h-6 w-6 rounded border cursor-pointer p-0" />
                 {s.border && <button onClick={() => onStyle({ border: undefined })} className="text-[10px] text-rose-500 hover:underline">none</button>}
               </div>
             </div>
           </div>
-          {s.fill && <div className="mb-2"><Opacity title="Fill opacity" value={s.fill.opacity} onChange={(v) => onStyle({ fill: { ...s.fill, opacity: v } })} /></div>}
+          {s.fill && <div className="mb-2"><Opacity control="fill-opacity" title="Fill opacity" value={s.fill.opacity} onChange={(v) => onStyle({ fill: { ...s.fill, opacity: v } })} /></div>}
           <div className="grid grid-cols-3 gap-2 mb-2">
             <div>
               <label className={label}>Width</label>
@@ -151,14 +159,14 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
             </div>
           </div>
           <H3>Effects</H3>
-          <div className="mb-2"><Opacity title="Opacity" value={s.opacity} onChange={(v) => onStyle({ opacity: v })} /></div>
+          <div className="mb-2"><Opacity control="opacity" title="Opacity" value={s.opacity} onChange={(v) => onStyle({ opacity: v })} /></div>
           <div className="grid grid-cols-2 gap-2 items-end">
             <div>
               <label className={label}>Rotation°</label>
-              <input type="number" min={-180} max={180} step={5} value={s.rotation ?? ''} placeholder="0"
+              <input data-control="rotation" type="number" min={-180} max={180} step={5} value={s.rotation ?? ''} placeholder="0"
                 onChange={(e) => onStyle({ rotation: e.target.value ? parseInt(e.target.value) : undefined })} className={field} />
             </div>
-            <button onClick={() => onStyle({ shadow: !s.shadow })} className={`${toggle} ${s.shadow ? on : off}`}>Shadow {s.shadow ? '✓' : ''}</button>
+            <button data-control="shadow" onClick={() => onStyle({ shadow: !s.shadow })} className={`${toggle} ${s.shadow ? on : off}`}>Shadow {s.shadow ? '✓' : ''}</button>
           </div>
         </>
       )}
@@ -171,16 +179,65 @@ export function NodeFormatControls({ node, onStyle, onContent, onPosition, readO
             {(['x', 'y', 'w', 'h'] as const).map((k) => (
               <div key={k}>
                 <label className={label}>{k.toUpperCase()} (in)</label>
-                <input type="number" min={0} max={30} step={0.25} value={p[k] ?? ''} placeholder="auto"
+                <input data-control={`pos-${k}`} type="number" min={0} max={30} step={0.25} value={p[k] ?? ''} placeholder="auto"
                   onChange={(e) => onPosition({ [k]: e.target.value ? parseFloat(e.target.value) : undefined })} className={field} />
               </div>
             ))}
           </div>
           <div>
             <label className={label}>Text wrap</label>
-            <select value={p.wrap ?? 'inline'} onChange={(e) => onPosition({ wrap: e.target.value as NonNullable<NodePosition['wrap']> })} className={field}>
+            <select data-control="wrap" value={p.wrap ?? 'inline'} onChange={(e) => onPosition({ wrap: e.target.value as NonNullable<NodePosition['wrap']> })} className={field}>
               {WRAP_MODES.map((w) => <option key={w} value={w}>{w === 'inline' ? 'In line with text' : w === 'float' ? 'Float (wrap text)' : w === 'front' ? 'In front of text' : 'Behind text'}</option>)}
             </select>
+          </div>
+
+          {/* ── LAYERING ──────────────────────────────────────────────────────────────────────
+              `position.z` has always existed in the model and has always been honoured by the
+              editor and the HTML/PDF path — with no way for a person to set it. The only way to
+              change stacking was to reorder the document, which is the wrong lever: on a dense
+              slide the order things are READ in and the order they are DRAWN in are different
+              intentions.
+
+              Named the way the two applications people arrive from name them, because this is
+              precisely where a familiar verb is worth more than an accurate one: "bring to front"
+              rather than "increase z-index".
+
+              Z_TOP/Z_BOTTOM sit either side of the default 5 used by canvas-renderer and
+              canvas-html, so a node that has never been touched keeps landing in the middle. */}
+          <label className={label}>Layer</label>
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              data-control="layer-front"
+              onClick={() => onPosition({ z: Z_TOP, wrap: p.wrap === 'behind' ? 'front' : p.wrap })}
+              disabled={readOnly}
+              className={`${toggle} ${off}`}
+              title="Bring to front"
+            >⬆ Front</button>
+            <button
+              data-control="layer-back"
+              onClick={() => onPosition({ z: Z_BOTTOM })}
+              disabled={readOnly}
+              className={`${toggle} ${off}`}
+              title="Send to back"
+            >⬇ Back</button>
+            <button
+              data-control="layer-behind"
+              onClick={() => onPosition({ wrap: 'behind', z: Z_BOTTOM })}
+              disabled={readOnly}
+              className={`${toggle} ${p.wrap === 'behind' ? on : off}`}
+              title="Send behind text"
+            >Behind text</button>
+            {(p.z !== undefined || p.wrap === 'behind') && (
+              <button
+                data-control="layer-reset"
+                onClick={() => onPosition({ z: undefined, wrap: p.wrap === 'behind' ? 'inline' : p.wrap })}
+                disabled={readOnly}
+                className="text-[10px] text-rose-500 hover:underline ml-1"
+              >reset</button>
+            )}
+            <span className="ml-1 text-[10px] text-gray-400 tabular-nums">
+              {p.wrap === 'behind' ? 'behind' : `z ${p.z ?? 5}`}
+            </span>
           </div>
         </>
       )}

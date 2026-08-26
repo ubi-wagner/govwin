@@ -82,6 +82,48 @@ async function upsertUser({ email, name, role, tenantId }) {
   }
 }
 
+// The scenario proposal the tenant roles drive. Its id is PINNED because e2e/hitl-full-draft.spec.ts
+// hardcodes it (`const PROPOSAL = '3b0e7f8b-…'`) — that spec used to depend on a proposal that
+// existed only as hand-made runtime state on one long-lived box, so on a machine built from the
+// repo it failed 4/4 with no product defect behind it. Seeding it here is what makes the spec mean
+// something. Change the id in both places or not at all.
+const SCENARIO_PROPOSAL = '3b0e7f8b-7ca2-4570-91d9-48326add00ff';
+const SCENARIO_OPP = '3b0e7f8b-0000-4000-8000-00000000000a';
+
+/** Draft + unlocked + sectioned — the three properties full-draft Modes A/B/C need. */
+async function ensureScenarioProposal(tenantId) {
+  await sql`
+    INSERT INTO opportunities (id, source, source_id, title, is_active, close_date, dates_estimated)
+    VALUES (${SCENARIO_OPP}::uuid, 'manual_upload', 'e2e-acme-navy-sbir',
+            'Acme → Navy SBIR Phase I', true, now() + interval '60 days', true)
+    ON CONFLICT (id) DO NOTHING`;
+  await sql`
+    INSERT INTO proposals (id, tenant_id, opportunity_id, title, stage, is_locked)
+    VALUES (${SCENARIO_PROPOSAL}::uuid, ${tenantId}::uuid, ${SCENARIO_OPP}::uuid,
+            'Acme → Navy SBIR Phase I', 'draft', false)
+    ON CONFLICT (id) DO UPDATE SET stage = 'draft', is_locked = false, tenant_id = EXCLUDED.tenant_id`;
+  // A section per volume so the draft cohort has somewhere to write and the build page is not an
+  // empty shell. sort_index is the ordering key (mig 143) — section_number is a LABEL, never sorted.
+  // Pinned ids + ON CONFLICT (id): proposal_sections has NO unique on (proposal_id, section_number)
+  // — only the pkey — so conflict-targeting the pair throws 42P10 on every call. Same shape as
+  // scripts/e2e_fixtures.sql.
+  const SECTIONS = [
+    ['3b0e7f8b-0000-4000-8000-000000000101', '1', 'Identification and Significance of the Problem', 'technical'],
+    ['3b0e7f8b-0000-4000-8000-000000000102', '2', 'Phase I Technical Objectives', 'technical'],
+    ['3b0e7f8b-0000-4000-8000-000000000103', '3', 'Phase I Work Plan', 'technical'],
+    ['3b0e7f8b-0000-4000-8000-000000000104', '4', 'Commercialization Strategy', 'narrative'],
+  ];
+  for (const [i, [id, num, title, type]] of SECTIONS.entries()) {
+    await sql`
+      INSERT INTO proposal_sections (id, proposal_id, section_number, sort_index, title, section_type,
+                                     status, version, is_locked, content)
+      VALUES (${id}::uuid, ${SCENARIO_PROPOSAL}::uuid, ${num}, ${i + 1}, ${title}, ${type}, 'in_progress', 1, false,
+              ${sql.json({ version: 1, nodes: [{ id: `n${i + 1}`, type: 'text_block', content: { text: 'seed' } }] })})
+      ON CONFLICT (id) DO UPDATE
+        SET is_locked = false, status = 'in_progress', sort_index = EXCLUDED.sort_index`;
+  }
+}
+
 // Replay the bridge head into the tenant's card pipeline (inlined backfillTenant, same as
 // seed_dev_accounts.mjs) so the Spotlight / purchase flow has cards to act on.
 async function backfillTenantCards(tenantId) {
@@ -127,6 +169,9 @@ async function run() {
     await upsertUser({ email: a.email, name: a.name, role: a.role, tenantId: tid });
     console.log(`✓ ${a.role.padEnd(13)} ${a.email}${a.tenant ? ` @ ${a.tenant}` : ''}`);
   }
+
+  await ensureScenarioProposal(tenantId);
+  console.log(`✓ scenario proposal ${SCENARIO_PROPOSAL} (draft, unlocked, 4 sections)`);
 
   const cards = await backfillTenantCards(tenantId);
   console.log(`✓ pipeline: ${cards} card(s) in '${SCENARIO_TENANT.slug}'`);

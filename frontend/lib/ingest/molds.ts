@@ -338,11 +338,33 @@ export function buildMoldCanvas(opts: {
   if (requiredSections.length === 0) nodes.push(node('text_block', { text: '' }));
 
   const now = new Date().toISOString();
+  // Page furniture. `letter_standard` sets `header: null, footer: null`, and a mold's canvas WINS
+  // at assembly (assembleArtifactCanvas takes the first section's canvas and never reaches its own
+  // `letter_sbir_phase1` fallback, which does carry both). Net effect, measured on a live build:
+  // every generated narrative volume went out with no running header and NO PAGE NUMBERS, while
+  // the hand-built reference volume for the same solicitation carries both — and most agency BAAs
+  // require them.
+  //
+  // The placeholders are the ones the exporters already substitute: `{company_name}` /
+  // `{project_title}` / `{topic_number}` come from the export routes' `vars`, and `{n}`/`{N}`
+  // become live page-number fields in docx and Chromium's pageNumber/totalPages in pdf.
+  //
+  // `formatSpec` still wins — a solicitation that mandates its own header, or explicitly none
+  // (`header: null`), overrides this — so this is a default, not a policy.
+  const spec = formatSpec as Record<string, unknown>;
+  const paginated = spec.format !== 'spreadsheet';
+  const furniture = paginated && !('header' in spec) && !('footer' in spec)
+    ? {
+      header: { template: '{project_title} — {company_name}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+      footer: { template: '{company_name}  |  Page {n} of {N}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+    }
+    : {};
   return {
     version: 1,
     document_id: crypto.randomUUID(),
     canvas: {
       ...JSON.parse(JSON.stringify(CANVAS_PRESETS.letter_standard)),
+      ...furniture,
       ...formatSpec,
     },
     nodes,

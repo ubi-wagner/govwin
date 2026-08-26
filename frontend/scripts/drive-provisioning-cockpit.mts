@@ -17,12 +17,71 @@ import { provisionAndReleasePortal } from '@/lib/provisioning/release-portal';
 
 const OPP = 'd53a22e4-792d-4fe7-8253-a42270fd9981';       // TVSF Round 45 (2 vols, 13 items, has compliance)
 const SOL = 'b356a211-9448-4025-8626-27d149088da7';
-const BUYER = 'eb90abbc-198b-4452-96c0-5c5ecff1fdf4';     // Entrepreneurs' Center — holds the card, no portal
-const BUYER_NAME = "Entrepreneurs' Center";
-const BUYER_SLUG = 'entrepreneurs-center';
-const OTHER = '17780cad-76c0-4cef-95ec-2a536bcf5c8f';     // Foundation — also holds the card (the broadcast must reach it)
-const ADMIN = '3667ead2-3b5e-4cc8-97f7-b2ab1cfa907d';
-const ADMIN_EMAIL = 'eric@rfppipeline.com';
+
+/**
+ * THE CAST IS RESOLVED, NOT PINNED.
+ *
+ * This drive used to hold `BUYER` and `ADMIN` as literal UUIDs. Both stopped existing when the box
+ * was rehydrated — the tenant and the admin were RECREATED under new ids — and the drive then died
+ * on a foreign-key violation ("Key (tenant_id)=(eb90abbc…) is not present in table \"tenants\""),
+ * which reads like a broken product and is actually a broken fixture. It had been failing that way
+ * for long enough to be treated as a known-bad drive.
+ *
+ * A pinned id asserts something the drive does not actually care about. What it needs is a tenant
+ * with a PROPERTY: one that holds this opportunity's card and has no portal for it yet, so there
+ * is a purchase to release. Asking for the property finds it on any seed; asking for the id finds
+ * it only on the seed it was written against.
+ *
+ * The original cast is still PREFERRED (the `ORDER BY … DESC` puts it first when present) so the
+ * narrative in the log stays the one this drive was written to tell — but preference is not
+ * requirement, and a reseed changes the names in the output rather than the result.
+ */
+const [buyerRow] = await sqlBypass<Array<{ id: string; name: string; slug: string }>>`
+  SELECT t.id, t.name, t.slug
+  FROM tenant_opportunity_cards c
+  JOIN tenants t ON t.id = c.tenant_id
+  WHERE c.opportunity_id = ${OPP}::uuid
+    AND NOT EXISTS (
+      SELECT 1 FROM proposal_portals p
+      WHERE p.tenant_id = t.id AND p.opportunity_id = ${OPP}::uuid
+    )
+  ORDER BY (t.slug = 'entrepreneurs-center') DESC, t.slug
+  LIMIT 1`;
+if (!buyerRow) {
+  console.error('CANT-RUN no tenant holds this opportunity card without already having a portal for '
+    + 'it — there is no purchase to release. That is a missing fixture, not a product failure.');
+  process.exit(1);
+}
+
+// The broadcast half of the proof needs a SECOND card-holder, so "reached everyone" is a claim with
+// more than one witness in it.
+const [otherRow] = await sqlBypass<Array<{ id: string; slug: string }>>`
+  SELECT t.id, t.slug
+  FROM tenant_opportunity_cards c
+  JOIN tenants t ON t.id = c.tenant_id
+  WHERE c.opportunity_id = ${OPP}::uuid AND t.id <> ${buyerRow.id}::uuid
+  ORDER BY (t.slug = 'foundation') DESC, t.slug
+  LIMIT 1`;
+if (!otherRow) {
+  console.error('CANT-RUN only one tenant holds this card, so a fan-out to "everyone" cannot be '
+    + 'distinguished from a fan-out to the buyer. Seed a second card-holder.');
+  process.exit(1);
+}
+
+const [adminRow] = await sqlBypass<Array<{ id: string; email: string }>>`
+  SELECT id, email FROM users
+  WHERE role IN ('rfp_admin', 'master_admin') AND is_active
+  ORDER BY (email = 'eric@rfppipeline.com') DESC, created_at
+  LIMIT 1`;
+if (!adminRow) { console.error('CANT-RUN no active rfp_admin to act as.'); process.exit(1); }
+
+const BUYER = buyerRow.id;
+const BUYER_NAME = buyerRow.name;
+const BUYER_SLUG = buyerRow.slug;
+const OTHER = otherRow.id;
+const ADMIN = adminRow.id;
+const ADMIN_EMAIL = adminRow.email;
+console.log(`cast: buyer=${BUYER_SLUG} · other=${otherRow.slug} · admin=${ADMIN_EMAIL}`);
 
 let pass = 0, fail = 0;
 const ok = (b: boolean) => (b ? '✅' : '❌');
@@ -39,8 +98,18 @@ async function bridgeMax() {
   return r?.v ?? 0;
 }
 
+// A LABEL UNIQUE TO THIS RUN. `proposal_portals` has a unique key on
+// (tenant_id, opportunity_id, label), and this drive used the fixed label 'pv-proof' — so a single
+// run that died before its cleanup left a row that made EVERY later run fail at line 56 with a
+// duplicate-key error, on a fixture the drive itself had created. One crash poisoned the drive
+// permanently. A per-run tag makes a leftover row inert instead of fatal.
+const RUN = crypto.randomUUID().slice(0, 8);
+const LABEL = `pv-proof-${RUN}`;
+
 let portalId = '';
 let proposalId: string | null = null;
+/** Every required item's metadata as this drive FOUND it, so the finally block restores exactly. */
+let originalItemMeta: Array<{ id: string; metadata: Record<string, unknown> }> = [];
 try {
   // Bare-ish start: clear the master's build_complete so we prove the flag FLIPS.
   await sqlBypass`UPDATE curated_solicitations SET build_complete=false, build_completed_at=NULL, build_completed_by=NULL WHERE id=${SOL}::uuid`;
@@ -53,14 +122,60 @@ try {
   // Simulate the purchase: a curation_pending portal for the buyer (72h SLA), no proposal yet.
   const [pp] = await sqlBypass<Array<{ id: string }>>`
     INSERT INTO proposal_portals (tenant_id, opportunity_id, proposal_id, label, status, curation_due_at, created_by)
-    VALUES (${BUYER}::uuid, ${OPP}::uuid, NULL, 'pv-proof', 'curation_pending', now() + interval '72 hours', ${ADMIN}::uuid)
+    VALUES (${BUYER}::uuid, ${OPP}::uuid, NULL, ${LABEL}, 'curation_pending', now() + interval '72 hours', ${ADMIN}::uuid)
     RETURNING id`;
   portalId = pp.id;
-  console.log(`setup: throwaway curation_pending portal ${portalId} for ${BUYER_NAME}\n`);
+  console.log(`setup: throwaway curation_pending portal ${portalId} (${LABEL}) for ${BUYER_NAME}\n`);
+  // Sweep any portal a PREVIOUS run left behind — same tenant + opportunity, a pv-proof label, and
+  // not this run's. Cheap, and it means one crashed run cannot accumulate clutter forever.
+  await sqlBypass`
+    DELETE FROM proposal_portals
+    WHERE tenant_id = ${BUYER}::uuid AND opportunity_id = ${OPP}::uuid
+      AND label LIKE 'pv-proof%' AND label <> ${LABEL} AND proposal_id IS NULL`;
 
-  // Readiness bar (advisory) — TVSF has compliance + 2 vols + 13 items ⇒ ready.
+  // ── the readiness bar, BOTH WAYS ──────────────────────────────────────────────────────────────
+  //
+  // This used to be one line asserting `ready === true`, labelled "compliance + N vols + N items".
+  // The bar has FIVE terms, not three: it also requires that no required item and no volume is
+  // still waiting on a person (`itemsUndecided`/`volumesUndecided` — an item is decided when it has
+  // a mold, or is explicitly marked completed-elsewhere). Those two terms were added after this
+  // master was authored, so all 13 of its items were undecided and the check failed — correctly,
+  // as it turns out, but under a label that named none of the reasons and read as a cockpit fault.
+  //
+  // So it now proves the bar in BOTH directions, on state it sets itself and puts back: not ready
+  // while items are undecided, ready once they are decided, with the deciding done through the same
+  // field the product reads.
+  //
+  // And it ESTABLISHES both sides rather than trusting what it finds — which matters, because
+  // reading the "not ready" side off ambient state is exactly how the first version of this became
+  // untestable within an hour: a run crashed after marking the items decided and before its
+  // restore, the master stayed permanently ready, the refusal could never be observed again, and
+  // the check then reported a failure caused by its own earlier crash. The prior metadata is
+  // captured per item so the restore puts back what was actually there.
+  const items = await sqlBypass<Array<{ id: string; metadata: Record<string, unknown> | null }>>`
+    SELECT vri.id, vri.metadata FROM volume_required_items vri
+    JOIN solicitation_volumes sv ON sv.id = vri.volume_id
+    WHERE sv.solicitation_id = ${SOL}::uuid`;
+  originalItemMeta = items.map((i) => ({ id: i.id, metadata: i.metadata ?? {} }));
+  const itemIds = items.map((i) => i.id);
+
+  const readinessLine = (r: Awaited<ReturnType<typeof getBuildReadiness>>) =>
+    `compliance=${r.hasCompliance} vols=${r.volumeCount} items=${r.requiredItemCount} `
+    + `itemsUndecided=${r.itemsUndecided} volsUndecided=${r.volumesUndecided}`;
+
+  // (a) UNDECIDED — strip the key (absent means "nobody ruled"; false is a different, explicit state)
+  await sqlBypass`UPDATE volume_required_items SET metadata = COALESCE(metadata, '{}'::jsonb) - 'dsipOnly'
+                  WHERE id = ANY(${itemIds}::uuid[])`;
   const r0 = await getBuildReadiness(SOL);
-  check(`readiness meets the bar (compliance + ${r0.volumeCount} vols + ${r0.requiredItemCount} items)`, r0.ready === true);
+  check(`the bar REFUSES a master with undecided items — ${readinessLine(r0)}`,
+    r0.ready === false && r0.itemsUndecided > 0);
+
+  // (b) DECIDED — through the same field the product reads
+  await sqlBypass`UPDATE volume_required_items
+                  SET metadata = COALESCE(metadata, '{}'::jsonb) || ${sqlBypass.json({ dsipOnly: true })}
+                  WHERE id = ANY(${itemIds}::uuid[])`;
+  const r1 = await getBuildReadiness(SOL);
+  check(`the bar PASSES once every item is decided — ${readinessLine(r1)}`, r1.ready === true);
   check('build_complete starts false', r0.buildComplete === false);
 
   // ── OUTCOME 1: complete the master build-out + broadcast to ALL mirror cards ──
@@ -141,7 +256,16 @@ try {
     }
     if (portalId) await sqlBypass`DELETE FROM tasks WHERE entity_type='portal' AND entity_id=${portalId}::uuid`;
     if (portalId) await sqlBypass`DELETE FROM proposal_portals WHERE id=${portalId}::uuid`;
-    console.log('cleanup: throwaway portal + proposal + tasks removed');
+    // Undecide exactly the items this run decided — the master is shared, and leaving it "built out"
+    // would quietly make the next run's first assertion untestable (a bar that cannot refuse cannot
+    // be shown to refuse). Removing the KEY, not setting it false: false is the admin's explicit
+    // "authored here" override and would be a different state than the one we found.
+    for (const it of originalItemMeta) {
+      await sqlBypass`UPDATE volume_required_items SET metadata = ${sqlBypass.json(it.metadata)}
+                      WHERE id = ${it.id}::uuid`;
+    }
+    console.log('cleanup: throwaway portal + proposal + tasks removed'
+      + (originalItemMeta.length ? `; ${originalItemMeta.length} required item(s) restored to their prior metadata` : ''));
   } catch (ce) { console.error('cleanup warning (non-fatal)', ce); }
   await sqlBypass.end({ timeout: 5 });
   process.exit(fail === 0 ? 0 : 1);

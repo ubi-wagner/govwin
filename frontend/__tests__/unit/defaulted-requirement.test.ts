@@ -48,8 +48,15 @@ describe('readiness splits blocker from warning on provenance', () => {
   it('both cases still appear on the checklist', () => {
     // The severity changes; the entry does not disappear. A requirement the product assumed is
     // still worth showing — it just must not stake a hard refusal on the assumption.
-    const block = SRC.slice(SRC.indexOf('for (const d of requiredDocs)'));
-    const pushes = block.slice(0, block.indexOf('blockers.sort')).match(/blockers\.push\(/g) ?? [];
+    //
+    // The window is the requiredDocs LOOP, not everything up to `blockers.sort`. The wider window
+    // was a proxy that happened to work while nothing else sat between them; the open-findings
+    // roll-up (Phase E) then landed there and failed this guard for a reason it does not care
+    // about. Measuring the loop measures the claim.
+    const from = SRC.indexOf('for (const d of requiredDocs)');
+    expect(from).toBeGreaterThan(-1);
+    const loop = SRC.slice(from, SRC.indexOf('\n  }', from));
+    const pushes = loop.match(/blockers\.push\(/g) ?? [];
     expect(pushes).toHaveLength(1);
   });
 

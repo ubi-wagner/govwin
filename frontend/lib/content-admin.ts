@@ -4,9 +4,15 @@
  * the latest draft to active and archives the prior active + intermediate
  * drafts (kept as history). See ARCHITECTURE_V8.md.
  */
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
+import { runInBypass } from '@/lib/tenant-context';
+import { completeTask } from '@/lib/tasks/tasks';
+import type { Role } from '@/lib/rbac';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { docBodyFromCanvas } from '@/lib/content-canvas';
+
+/** Who is publishing — threaded through so the review ToDo closes under a real actor. */
+export type ContentActor = { id: string; email?: string | null; role: Role };
 
 export interface PageBlock {
   section: string;
@@ -191,6 +197,7 @@ export async function saveDraft(
 /** Publish the latest draft: promote it to active, archive the prior active + older drafts. */
 export async function publishPage(
   pageKey: string,
+  actor?: ContentActor,
 ): Promise<{ published: boolean; versionNo?: number; reason?: string }> {
   return await sql.begin(async (tx: any) => {
     const draftRows = await tx`
@@ -218,6 +225,9 @@ export async function publishPage(
       WHERE id = ${draft.id}
     `;
     return { published: true, versionNo: draft.versionNo };
+  }).then(async (r: { published: boolean; versionNo?: number; reason?: string }) => {
+    if (r.published) await closePublishTodos(pageKey, 'page', actor);
+    return r;
   });
 }
 
@@ -405,10 +415,81 @@ export async function saveDocumentDraft(
   return toVersion(row);
 }
 
+/**
+ * Close the review ToDo that asked for this publish.
+ *
+ * A `content_publish` ToDo means "a human still has to look at this and publish it". Publishing IS
+ * that work, so leaving the ToDo open is a queue that can never be emptied — and an admin whose
+ * content-review list only ever grows stops reading it, which is how the next real review gets
+ * missed. Nothing completed these before: a published BAA guide sat with an open "Review & publish"
+ * ToDo whose entity pointed at a version the publish had since archived.
+ *
+ * TWO THINGS HERE ARE EASY TO GET WRONG, and the first version of this got both.
+ *
+ * 1. MATCHED BY page_key, NOT by the entity id. The ToDo names a specific `content_pages` ROW, and
+ *    a publish rewrites rows — the draft is promoted and the prior active archived — so an id that
+ *    was right when the ToDo was raised is routinely stale by the time anyone acts on it. page_key
+ *    is what survives a version, which makes it the honest join.
+ *
+ * 2. IT MUST RUN IN BYPASS. These ToDos are PLATFORM scope (`tenant_id IS NULL`) — curation is
+ *    owned by no tenant — and mig 185 made `tasks` UPDATE own-tenant-only. A tenant-equality
+ *    policy never matches NULL, so the same statement through the context-aware `sql` under
+ *    `govtech_app` updates ZERO rows and reports no error. Same trap as B51. It looked fixed
+ *    against an owner connection (which bypasses RLS) and was still broken in the browser: worth
+ *    remembering that a probe run as the owner cannot see this class of bug at all.
+ *
+ * Completion goes through `completeTask`, not a bare UPDATE, so the close lands in the audit trail
+ * with the admin who published as its actor.
+ *
+ * Best-effort by design: it runs after the publish transaction has committed and never throws. A
+ * publish that succeeded must not be reported as failed because a bookkeeping update did not.
+ */
+async function closePublishTodos(
+  pageKey: string,
+  contentType: string,
+  actor?: ContentActor,
+): Promise<number> {
+  try {
+    const open = await sqlBypass<{ id: string }[]>`
+      SELECT t.id FROM tasks t
+      WHERE t.task_type = 'content_publish'
+        AND t.status IN ('open', 'in_progress')
+        AND t.entity_id IN (
+          SELECT id FROM content_pages WHERE page_key = ${pageKey} AND content_type = ${contentType}
+        )`;
+    if (open.length === 0) return 0;
+    // No actor → leave the ToDo alone rather than invent one. `completeTask` stamps
+    // `completed_by = ${actor.id}::uuid`, so a placeholder like 'system' would throw on the cast,
+    // and a real person's queue is not the place to record a fictional reviewer. Both product
+    // callers (the two publish routes) always have one; a script that publishes without an actor
+    // simply leaves the review open, which is the honest state.
+    if (!actor) {
+      console.error('[content-admin] closePublishTodos skipped — no actor', pageKey, contentType);
+      return 0;
+    }
+
+    let closed = 0;
+    for (const t of open) {
+      const r = await runInBypass(() => completeTask({
+        taskId: t.id,
+        actor: { id: actor.id, email: actor.email ?? null, role: actor.role, tenantId: null },
+        result: { closedBy: 'content_publish', pageKey, contentType },
+      }));
+      if (r.ok) closed += 1;
+      else if (r.code !== 'TASK_CLOSED') console.error('[content-admin] closePublishTodos refused', t.id, r.code);
+    }
+    return closed;
+  } catch (e) {
+    console.error('[content-admin] closePublishTodos failed', e);
+    return 0;
+  }
+}
+
 /** Publish a document: promote its latest draft, archive prior active + drafts. */
 export async function publishDocument(
   slug: string,
   contentType: string,
+  actor?: ContentActor,
 ): Promise<{ published: boolean; versionNo?: number; reason?: string }> {
   return await sql.begin(async (tx: any) => {
     const draftRows = await tx`
@@ -426,5 +507,8 @@ export async function publishDocument(
     `;
     await tx`UPDATE content_pages SET status = 'active', published_at = now() WHERE id = ${draft.id}`;
     return { published: true, versionNo: draft.versionNo };
+  }).then(async (r: { published: boolean; versionNo?: number; reason?: string }) => {
+    if (r.published) await closePublishTodos(slug, contentType, actor);
+    return r;
   });
 }

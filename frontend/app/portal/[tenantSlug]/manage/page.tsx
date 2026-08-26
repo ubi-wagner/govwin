@@ -56,10 +56,17 @@ export default async function ManagePage({
 
   let purchases: ManagePurchase[] = [];
   try {
+    // Same query as app/portal/[tenantSlug]/billing/page.tsx and the `…/purchases` route: the
+    // titles are what let a customer tell two same-day portal purchases apart.
     purchases = await sql<ManagePurchase[]>`
-      SELECT id, product_type, amount_cents, status, created_at, opportunity_id
-      FROM purchases WHERE tenant_id = ${tenantId}
-      ORDER BY created_at DESC LIMIT 50
+      SELECT pu.id, pu.product_type, pu.amount_cents, pu.status, pu.created_at, pu.opportunity_id,
+             p.title AS proposal_title,
+             o.title AS opportunity_title
+      FROM purchases pu
+      LEFT JOIN proposals p ON p.id = pu.proposal_id
+      LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+      WHERE pu.tenant_id = ${tenantId}
+      ORDER BY pu.created_at DESC LIMIT 50
     `;
   } catch (e) { console.error('[manage] purchases query failed', e); }
 
@@ -138,6 +145,7 @@ export default async function ManagePage({
         purchases: purchases.map((p) => ({
           id: p.id, productType: p.productType, amountCents: p.amountCents,
           status: p.status, createdAt: p.createdAt, opportunityId: p.opportunityId,
+          proposalTitle: p.proposalTitle, opportunityTitle: p.opportunityTitle,
         })),
         canEdit,
         // Stripe checkout/portal act on the SESSION's tenant; only the company's own

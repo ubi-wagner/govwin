@@ -11,17 +11,34 @@
  *      volumes, the 12 mandated Technical Volume sections), each stamped `pattern_match`
  *      with a citable excerpt — and with NO page limit, because the BAA sets none.
  *
- * Run: DRIVE_SOL_ID=<curated_solicitations.id> npx playwright test --project=drive dow-assist
+ *   C. (added after driving it) A Component's rule is not the solicitation's rule. This BAA
+ *      carries the Navy's instructions inline; adopting them bound every proposer to a Navy
+ *      page cap, badged "Read from source" with a real citation. B is about not inventing a
+ *      value; C is about not promoting one that is real but scoped to someone else.
+ *
+ * Run: npx playwright test --project=drive dow-assist
+ *      (the solicitation is resolved from the DB; DRIVE_SOL_ID overrides — see below)
  */
 import { test, expect } from '@playwright/test';
+import postgres from 'postgres';
+import { resolveShreddedSolicitation } from './resolve-solicitation';
 
 const SHOTS = 'public/guides/rfp-ingest';
-const SOL = process.env.DRIVE_SOL_ID!;
+
+/* Resolved from the DB — `process.env.DRIVE_SOL_ID!` was unset, so every request went to
+ * /api/admin/rfp-curation/undefined/… and this file failed on a bare false. The resolver, its
+ * rationale, and how to stand a solicitation up live in e2e/resolve-solicitation.ts. */
+let SOL = '';
+/* dow-assist OWNS a scenario too, and for the opposite reason to the others: it asserts that a
+ * deferral blocker keeps the matrix STAGED. Any drive that lands a shared solicitation first turns
+ * that assertion into landed:true — which is what happened once ingest-studio started running on
+ * the same one. Its scenario must stay untouched. */
+test.beforeAll(async () => { SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID', 'assist')).id; });
 
 async function loginAsRfpAdmin(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.fill('input[type="email"]', 'eric@rfppipeline.com');
-  await page.fill('input[type="password"]', 'RFPAdmin2026!');
+  await page.fill('input[type="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await Promise.all([
     page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 60_000 }),
     page.click('button[type="submit"]'),
@@ -91,9 +108,6 @@ test('B · Assist reads the BAA and stamps pattern_match provenance', async ({ p
   const { data } = await res.json();
   console.log('[drive] assist:', JSON.stringify(data, null, 2));
 
-  // The document's own seven volumes, not the six-volume default.
-  expect(data.volumes).toBe(7);
-
   // Read, not guessed.
   expect(data.fieldSources.min_font_size).toBe('pattern_match');
   expect(data.fieldSources.margins).toBe('pattern_match');
@@ -103,15 +117,71 @@ test('B · Assist reads the BAA and stamps pattern_match provenance', async ({ p
   // The BAA states no page limit — it defers to the Component instructions. Assert we say so.
   expect(String(data.notes.join(' '))).toMatch(/defers the technical-volume page limit/i);
 
+  /* THE DEFERRAL IS A BLOCKER, SO THE RUN STAGES RATHER THAN LANDS.
+   *
+   * `data.volumes` is the LANDED count and reads 0 here — not because the parse found no volumes,
+   * but because an unfounded page limit must not reach a live matrix unreviewed. This assertion
+   * used to be `expect(data.volumes).toBe(7)`, written when the deferral produced no blocker and
+   * the run landed. Asserting the landed count would now quietly require the WRONG behaviour.
+   */
+  expect(data.landed, 'a deferral blocker must stay staged for a human').toBe(false);
+  expect(String(data.blockers.join(' '))).toMatch(/page limit/i);
+
+  // The document's own seven volumes ARE read — they sit on the staged draft, which is where a
+  // staged run's parse lives. Read it as the review panel does.
+  const dsn = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+  const sql = postgres(dsn!, { max: 1 });
+  try {
+    const [draft] = await sql<{ vols: number; plt: string | null }[]>`
+      SELECT jsonb_array_length(parsed->'volumes')::int AS vols,
+             parsed->'compliance'->>'pageLimitTechnical' AS plt
+      FROM solicitation_compliance_drafts
+      WHERE solicitation_id = ${SOL} AND status = 'staged'
+      ORDER BY created_at DESC LIMIT 1`;
+    expect(draft?.vols, "the document's own seven volumes, not the six-volume default").toBe(7);
+    expect(draft?.plt, 'no page limit may be invented for a document that sets none').toBeNull();
+  } finally { await sql.end(); }
+
+  /* A COMPONENT RULE IS NOT THE SOLICITATION'S RULE.
+   *
+   * This BAA carries the Navy's own instructions inline: "DON Phase I Technical Volume (Volume 2)
+   * page limit is not to exceed 10 pages", one bullet under "the DON Proposal Submission
+   * Instructions take precedence". That bound page_limit_technical to 10 solicitation-wide, badged
+   * `pattern_match` with a real page-31 citation — so an Air Force proposer was told their cap was
+   * 10 on the authority of a Navy rule, with evidence that looked stronger than a default. The
+   * finding must be SURFACED (a curator building for the Navy needs it) and must NOT be adopted.
+   */
+  const componentNote = data.notes.find((n: string) => /NOT applied solicitation-wide/i.test(n));
+  expect(componentNote, 'the Component-specific rule must be surfaced, not silently dropped').toBeTruthy();
+  expect(componentNote).toMatch(/DON/);
+
+  /* The cell stays `pattern_match` — and that is the RIGHT answer, not a leftover.
+   *
+   * A deferral is itself a reading: "we read that this document sets no limit here"
+   * (parse-solicitation.ts:192). That provenance is what makes the UI render "Set elsewhere" with a
+   * citation instead of a red "Default — unverified", and it is why the default 10 was cleared
+   * rather than left standing. What must never happen is a NUMBER arriving under that badge, which
+   * is exactly what the draft assertion above pins: pageLimitTechnical is null.
+   */
+  expect(data.fieldSources.page_limit_technical, 'read-as-deferred, not read-as-10').toBe('pattern_match');
+
   await page.goto(`/admin/rfp-curation/${SOL}`);
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: `${SHOTS}/08-after-ingest-assist.png`, fullPage: true });
 
-  // The curator sees "Read from source", not a red "Default — unverified", on the fields we read.
-  await expect(page.getByText('Read from source').first()).toBeVisible({ timeout: 15_000 });
-
-  // …and the EMPTY page-limit cell explains itself rather than reading as an unfilled gap.
-  await expect(page.getByText('Set elsewhere').first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/defers the technical-volume page limit/i).first()).toBeVisible();
-  console.log('[drive] assist re-run complete — pattern_match + deferral badges rendering');
+  /* WHAT THE CURATOR SEES WHILE THE MATRIX IS STAGED.
+   *
+   * These assertions used to require "Read from source" and "Set elsewhere" badges. Those render
+   * off `solicitation_compliance.field_provenance`, which is written on LANDING — and a deferral
+   * blocker deliberately keeps this run staged, so the live row's provenance is `{}` and every
+   * cell reads "Default — unverified". That is the honest rendering: nothing landed, so nothing
+   * may claim to have been read. Asserting the landed badges here would have required the matrix
+   * to land despite its blocker. The badge rendering itself is covered where it belongs, by
+   * ingest-studio-drive's staged → reviewed → landed walk.
+   *
+   * What must be true HERE is that the curator is told WHY the page-limit cell is empty.
+   */
+  await expect(page.getByText(/defers the technical-volume page limit/i).first())
+    .toBeVisible({ timeout: 15_000 });
+  console.log('[drive] staged with the deferral surfaced — no value claimed as read');
 });

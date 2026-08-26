@@ -126,12 +126,29 @@ function scoreAgainst(c: CandidateInput, o: ExistingOpp): PerOpp {
       : { score: 0.85, signal: 'title_exact', reason: 'identical title' };
   }
 
-  // 4. Fuzzy title similarity (token Jaccard). Same-agency corroboration boosts it into the
-  //    UPDATE band; without agency it stays weaker.
+  // 4. Fuzzy title similarity (token Jaccard). The TITLE decides; a matching agency CORROBORATES.
+  //
+  //    This used to read `0.55 + titleSim * 0.45` when the agency matched — a 0.55 FLOOR, which
+  //    meant roughly 11% title overlap was enough to cross UPDATE_THRESHOLD. Since an agency name
+  //    also supplies matching title tokens ("Air Force" appears in both titles), the agency was
+  //    effectively deciding on its own. Measured against a real solicitation: "Air Force Advanced
+  //    Propulsion Research Initiative", "Air Force Hypersonic Materials BAA" and "Air Force Small
+  //    Business Industry Day" ALL classified as UPDATE to an unrelated Air Force CSO at 0.63–0.64.
+  //    Changing only the agency dropped the identical titles to 0.13.
+  //
+  //    That is not a cosmetic mis-label. Releasing such a finding as an update logs an amendment
+  //    against a live solicitation, which fans out to every tenant holding it and asks them to
+  //    acknowledge a change that never happened. A busy admin clicking through a queue that says
+  //    "update, 0.64, matched" is exactly how that ships.
+  //
+  //    Title-led with a bounded bonus keeps the true matches and drops the false ones: a genuine
+  //    re-post still lands well above the threshold, a partial-overlap notice lands in the
+  //    UNKNOWN band where it is SURFACED for a person rather than asserted, and an unrelated
+  //    notice from the same agency reads as new.
   const titleSim = jaccard(tokenize(c.title), tokenize(o.title));
   if (titleSim > 0) {
     const pct = Math.round(titleSim * 100);
-    const score = agencyMatch ? Math.min(0.55 + titleSim * 0.45, 0.9) : titleSim * 0.7;
+    const score = agencyMatch ? Math.min(titleSim * 0.75 + 0.18, 0.9) : titleSim * 0.7;
     return {
       score,
       signal: 'title_similarity',

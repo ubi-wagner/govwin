@@ -21,6 +21,7 @@ interface RouteContext {
  * - lock_count > 2: rejected, requires master_admin
  */
 export async function POST(_request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -119,7 +120,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
 
     // ── Start event for proposal locking ─────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'proposal',
       type: 'proposal.locked',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -218,6 +219,9 @@ export async function POST(_request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/proposals/lock] POST error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },
@@ -235,6 +239,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
  * - lock_count >= 2: only master_admin can unlock
  */
 export async function DELETE(_request: Request, ctx: RouteContext) {
+  let unlockStartId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -346,7 +351,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
     // ── Start event for proposal unlocking ───────────────────────────
-    const unlockStartId = await emitEventStart({
+    unlockStartId = await emitEventStart({
       namespace: 'proposal',
       type: 'proposal.unlocked',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -501,6 +506,9 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (unlockStartId) {
+      await emitEventEnd(unlockStartId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/portal/proposals/lock] DELETE error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

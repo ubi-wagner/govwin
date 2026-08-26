@@ -11,6 +11,7 @@
  * stage, locks a section, or submits. "complete" = drafted + reviewed, not submitted.
  */
 import { sql } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
@@ -41,12 +42,27 @@ export interface RequestReviewPhaseParams {
 
 export async function requestReviewPhase(p: RequestReviewPhaseParams): Promise<void> {
   // Mark the TARGET phase running (the ACTION flips it to awaiting_review / auto-chains on completion).
+  //
+  // RETURNING voice is load-bearing, not incidental (bug log B84). `OnReviewPhaseRequestedDraft`'s
+  // plan_draft step and `OnReviewPhaseRequestedRefine`'s restyle step both declare
+  // `"voice": "payload.voice"` in their input_map, and this emitter never wrote that key — so the
+  // engine resolved it to null on every Studio run and the drafting agent fell back to its default
+  // register. `requestFullDraft` DOES carry voice, so the same proposal with the same persisted
+  // setting drafted in the tenant's voice from the full-draft button and in the house voice from the
+  // Studio. Reading it here closes that, and gives `proposals.voice` its first reader anywhere:
+  // `section_drafter` takes voice from the invocation context, never from the row.
+  //
+  // Same statement, no extra round-trip. If the UPDATE throws, voice stays null — which is exactly
+  // the pre-fix behaviour, so a failure here degrades rather than breaking the run.
+  let voice: unknown = null;
   try {
-    await sql`
+    const [row] = await sql<{ voice: unknown }[]>`
       UPDATE proposals
       SET studio_phase = ${p.phase}, studio_phase_status = 'running', studio_auto = ${p.auto}
       WHERE id = ${p.proposalId} AND tenant_id = ${p.tenantId}::uuid
+      RETURNING voice
     `;
+    voice = coerceJsonb<unknown>(row?.voice, null);
   } catch (stateErr) {
     console.error('[requestReviewPhase] state update failed', stateErr);
   }
@@ -59,6 +75,7 @@ export async function requestReviewPhase(p: RequestReviewPhaseParams): Promise<v
     phase: p.phase,
     auto: p.auto,
     guidance: p.guidance,
+    voice,
     opportunity_id: p.opportunityId,
     source: p.source,
   };

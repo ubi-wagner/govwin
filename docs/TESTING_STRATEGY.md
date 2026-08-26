@@ -234,6 +234,60 @@ Scenarios are the closest thing we have to production-like tests without full E2
 
 ---
 
+## Live drives: build the scenario, then take it away
+
+The drive estate (`frontend/scripts/drive-*.mts`, run together by
+`scripts/run-branch-drives.sh`) exercises the product over HTTP as real signed-in people. Every one
+of those drives needs a situation to exist — two companies and a person who belongs to both, a
+submitted build with no contract yet, a master with undecided required items. **The drive builds
+that situation itself and disposes it.** It does not look for one and it does not assume one.
+
+`frontend/scripts/lib/scenario.mts` is the factory: `s.tenant()`, `s.user()`, `s.partnerOrg()`,
+`s.build()`, `s.admin()`, and `s.track()` for anything the caller creates itself. `runScenario(name,
+fn)` wraps a drive so disposal happens on every exit path, including a throw, and reports what it
+removed. Teardown reads the catalog rather than a maintained list of tables, and retries until a
+pass makes no progress, so it stays correct when the next migration adds a foreign key.
+
+**Why this is not merely tidier.** A drive that borrows a fixture rots the day the database is
+rebuilt, and it rots *invisibly* — the failure looks like a regression in the thing the drive tests.
+Every one of these was a live example:
+
+| what was pinned | what the drive reported |
+|---|---|
+| a tenant slug that had been rebuilt away | `Cannot read properties of undefined (reading 'id')` |
+| four uuids from a proposal that had moved on | ten assertions saying the section-ToDo spine was broken |
+| a `.test` account, deactivated on purpose by mig 124 | a 30-second `waitForURL` timeout in the isolation half |
+| a demo tenant's submitted build | CANNOT-RUN, and for a while a false pass |
+
+Three further properties fall out, and they are the reason this is a rule rather than a preference:
+
+- **A drive can run twice.** Anything a drive stages must carry a per-run identifier, because the
+  schema's unique keys are real: a fixed intake notice collides on `opportunities.content_hash`, a
+  fixed portal label collides on `(tenant_id, opportunity_id, label)`. A drive that stages a fixed
+  identifier is green the day it is written and red forever after, and the redness looks exactly
+  like a regression.
+- **A crashed run cannot poison the next one.** If a drive mutates shared state to establish a
+  precondition, it must ESTABLISH both sides rather than read one off ambient state, and restore
+  exactly what it found. A readiness check that read "not ready" from the fixture stopped being able
+  to observe a refusal the first time a run died before its restore — and then reported a failure
+  caused by its own earlier crash.
+- **A mutating drive stops constraining the other harnesses.** `award-to-contract` used to carry
+  "⚠️ RUN THIS BEFORE `capture-guides.mjs`, NEVER AFTER", because winning a demo company's build
+  archived it out of the dashboard the guide screenshots show. Winning inside a company that is
+  disposed at the end of the run removes the constraint rather than documenting it.
+
+**Two connections, because the suite genuinely needs both.** Isolation drives must run with
+`DATABASE_URL` = the scoped `govtech_app` role — under the owner, RLS is bypassed and "no
+cross-tenant rows visible" is unfalsifiable (B86). Scenario drives must run with the OWNER, because
+creating a company is a platform-plane act and the product's own helpers use the context-aware
+`sql`; under a scoped role with no tenant context those writes are half-applied (tenant yes,
+membership no) and the drive then fails on assertions that have nothing to do with the product. The
+runner hands each group the connection its job requires, `DATABASE_URL_APP` always names the scoped
+role for checks that need it regardless, and the factory refuses loudly rather than half-working if
+it is ever handed the wrong one.
+
+---
+
 ## Running tests
 
 Commands (defined in `frontend/package.json`):
@@ -259,8 +313,10 @@ The test pyramid above is *what* to write; this is the ordered sequence every ch
 before it is called done. Each gate must pass before the next is meaningful:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. First gate, always.
-2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1129/1129** at migration
-   head 185). Run on every change, not only schema changes.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1680/1680**, 173 files,
+   at migration head 205). Run on every change, not only schema changes. In a resource-constrained
+   sandbox the default worker pool can collapse with `Cannot find package '@/...'` across ~all files —
+   that is worker exhaustion, not a code fault; confirm with `--no-file-parallelism` before chasing it.
 3. **Migration (schema changes only)** — apply the new migration through the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner tracks
    applied files in `_migration_history`, so re-running must be a clean no-op (idempotency proof).
@@ -277,9 +333,188 @@ before it is called done. Each gate must pass before the next is meaningful:
    in its lane. Every reported finding must be **PROVEN** — reproduced against the running app or the
    sandbox DB — before it is filed. An unproven "possible bug" is discarded, not reported; the sweep's
    value is that it lands only defects it can demonstrate.
+7. **The four lenses (any UI/API/DB change, and any backward review)** — `verify-surfaces` ·
+   `verify-api-contract` · `verify-db-crud` · `verify-ui-vs-db`, against a running box. Detailed below;
+   the fourth is not optional, because the other three were all green through B80.
 
-**Sandbox DB coordinates:** `postgres://claude:claude@127.0.0.1:5433/govtech_intel` (local PG16, trust
-auth). This is the target for steps 3, 5, and the SQL lane of step 6.
+**Sandbox DB coordinates:** `postgresql://govtech:changeme@localhost:5432/govtech_intel` (local PG16).
+This is the target for steps 3, 5, 7 and the SQL lane of step 6.
+
+> ⚠️ This line used to name `postgres://claude:claude@127.0.0.1:5433/govtech_intel`, and it stayed wrong
+> for a long time after the sandbox moved. That is not a cosmetic doc rot: `verify-surfaces.mjs` carried
+> the same stale default and spent several runs **binding row ids from a database the server was not
+> reading** (B81). Ids that existed in both clusters rendered 200 and the sweep reported "clean". If you
+> change where the sandbox lives, change it *here and in every script default in the same commit*, and
+> make the tools print the DSN they used.
+
+### The five lenses (step 7) — and the reconciliation they exist for
+
+Steps 1–6 answer "does the code compile, pass its tests, and not crash". They do not answer *is the
+product telling the customer the truth*. These four do, each driven against a running box as a real
+signed-in actor, each reporting what it could **not** reach rather than skipping it silently:
+
+| lens | question | blind to |
+|---|---|---|
+| `scripts/verify-surfaces.mjs` | does every page RENDER (no boundary, no client throw)? | a page that renders a wrong value perfectly |
+| `scripts/verify-api-contract.mjs` | does every addressable GET honour `{data}` / `{error,code}`? | the *value* inside the envelope |
+| `scripts/verify-db-crud.mjs` | do writes LAND — and do the guards refuse what they promise to? | what the customer is shown afterwards |
+| `scripts/verify-ui-vs-db.mjs` | is the number the page STATES the number the table HOLDS? | anything it has no expectation for |
+| `scripts/verify-write-contract.mjs` | does every POST/PATCH/PUT/DELETE refuse bad input as 4xx with `{error,code}`, never 500? | whether a *valid* write is correct |
+
+The fourth is the reconciliation lens and it exists because the first three were **all green** while the
+tenant dashboard told a customer with 8 active builds that they had 6 (B80). Three green lenses are not
+three independent confirmations — they are three answers to three questions, none of which was "is this
+number right".
+
+**Start from `docs/FRONTEND_INVENTORY.md`, not from a walk you invent.** Each lens enumerates its own
+scope, so whatever belongs to no walk has never appeared in a coverage number. The manifest
+(`node frontend/scripts/inventory-frontend.mjs`) is the full set — every page, API route, component,
+lib module and framework surface — with the harness that reaches each one and, more usefully, the ones
+nothing reaches. It was written after `verify-api-contract` was found closing with "every reachable
+GET honours the response contract" over two of the tree's directories (B125), and it is how the 213
+unwalked write verbs were counted.
+
+**The fifth lens exists for a scope that was never written down.** No lens walked a write verb,
+because calling every POST mutates the box being measured — defensible, unstated, and it left 213
+routes outside every walk while three green lenses read like a verified API. It binds every `[param]`
+to a fresh UUID owning nothing and asserts the one property that needs no successful write: a client
+error answers **4xx with both `error` and `code`, never 500** — a 500 on bad input means validation
+ran after the DB call, which is the SOP's ordering rule inverted. ⚠️ It is **not read-only**: several
+routes take no required input by design, so it prints its mutation footprint every run. Sandbox only.
+
+**Two lenses now refuse to report a verdict they cannot earn.** Both guards were added after the thing
+they guard against had already happened:
+
+* `verify-api-contract` **reconciles its coverage against the tree** — graded + exempt + unbound +
+  no-actor must equal the GET routes on disk, or it exits **2 as a HARNESS DEFECT** before printing
+  anything. Its own output had held the contradiction for as long as the gap existed: 104 called + 12
+  unbound against 130 on disk, and nothing compared the two numbers (B125).
+* `verify-surfaces` **proves its detector before believing it** — each actor lane opens by driving a
+  route that is definitely an error surface and requiring a non-zero count, exiting 2 with *"every
+  clean below would be unearned"* otherwise. That detector has been wrong in BOTH directions: too
+  narrow once (a red "Document not found" went into the admin guide captioned as a working screen) and
+  too broad once (B127 — it matched `not found` inside a `system_events` payload and called four
+  healthy monitor pages broken, which would have turned permanently red on any box that had ever
+  logged an error). The vocabulary will be edited again; that is the argument for the preflight.
+
+**Apply all five to backward review too.** A retrospective audit of existing code is exactly where
+"it's been in production for months" substitutes for evidence. B80 had shipped and survived every prior
+sweep. When reviewing code you did not just write, run the lenses against it before forming an opinion,
+and treat a lens that has no expectation for a surface as *uncovered*, not *passing*.
+
+### Four rules, each learned by breaking it
+
+1. **Red first.** A check that has never failed proves nothing. Show it failing against the unfixed
+   code, then fix, then show it passing — on the same build. `verify-ui-vs-db` creates scratch
+   proposals to push past the dashboard's 6-card cap for precisely this reason: below the cap a correct
+   and a broken implementation return the same answer, so a check that stays under it is decoration.
+2. **The instrument before the finding.** A new harness's first output describes the *harness*, not the
+   system. Validate it against a known answer before reporting anything from it. The contract lens's
+   first run reported **38 envelope violations**; every one was a well-formed `{data:…}` that had been
+   truncated to 2000 chars before `JSON.parse`.
+3. **The expectation is the page's own query, copied from source.** Never a predicate you believe is
+   equivalent. Re-typing a filter from memory manufactures confident, wrong findings — and the failure
+   mode is symmetric: it invents defects that aren't there *and* blesses ones that are.
+4. **Assert the contract the system has.** `DELETE` on a bucket is a *deactivation* — the Archivable
+   contract says nothing is hard-deleted, the route says "deactivate", the response says
+   `{deactivated:true}`. Asserting "the row is gone" against that is a harness bug, not a finding. Read
+   the route before writing the assertion.
+
+### Cross-checking a lens (when "the harness said so" isn't enough)
+
+The four lenses share a stack — Playwright, one postgres.js client, assertion code written in one
+sitting — so a green lens is evidence that *the lens and the product agree*, which is weaker than
+evidence that the product is right. When a result matters enough, confirm it by a method that shares
+nothing with the lens that produced it:
+
+- `scripts/crosscheck-shipped-fixes.sh` — raw HTTP via `curl` against the server's own bytes, with
+  expectations from `psql`. No browser, no Node, no shared helper.
+- `scripts/crosscheck-canvas-normalize.mts` — calls the shipped normalizer directly over every canvas
+  the database actually holds. Stronger than the unit tests, which assert against shapes we invented.
+
+These are **not** a fifth lens and must not grow into one. A cross-check that cannot dissent from the
+lens it checks is decoration.
+
+### The canvas measurement harnesses (steps 2 and 5, for anything touching layout or export)
+
+These are not unit tests — each one runs the product's real writer and compares against the artifact
+that comes out. Any change to `lib/types/canvas-document.ts`, `lib/export/*`, or a template body
+should be driven through all of them; each exits non-zero on drift.
+
+| harness | what it measures |
+|---|---|
+| `scripts/verify-ruler-on-proposals.mts` | the ruler against 8 REAL authored proposals — the safety gate: it must never UNDER-count |
+| `scripts/calibrate-page-ruler.mts` | 36 synthetic cases, one variable each, against Chromium's printed page count |
+| `scripts/calibrate-slide-ruler.mts` | 7 deck cases against a real rendered `.pptx` |
+| `scripts/sweep-mold-quality.mts` | all 39 shipped templates: rendered pages, compliance violations, page furniture, token leaks |
+| `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
+| `scripts/verify-exports-on-stored-artifacts.mts` | the question under the ruler: does the file come out AT ALL, in every format offered for its shape |
+| `scripts/probe-deck-overlap.mts` | the question under THAT: does a slide node's declared frame actually HOLD its content, measured against an engine that shares no code with ours (B121). Registered in the branch suite behind `check-office-filters.mjs`, which converts a deck **pptxgenjs** wrote — not ours, and not a `.txt` (text needs the WRITER filter; the probe needs IMPRESS, so a `.txt` control marks a capable rig broken). No filter → the drive is **CANT-RUN**, never a pass. |
+| `scripts/render-artifact-pages.mts` | no pass/fail — renders `.pdf`/`.pptx`/`.docx`/`.xlsx` to page images so a person can look at what the customer receives |
+| `scripts/verify-surfaces.mjs` | **every** `page.tsx` under `app/admin` and `app/portal/[tenantSlug]`, driven as the right actor: does the page RENDER — no error boundary, no client throw (B78 · B79) |
+| `scripts/capture-guides.mjs` | the ~35 surfaces the two front-door guides document, captured as evidence and gated the same way |
+
+When one of them disagrees, `scripts/diagnose-mold-ruler.mts` says WHY: `--nodes` charges every node
+against the height Chromium gives that same node in place, `--segments` does it per page-break
+segment, `--pages` replays the ruler's own placement. Prefer it over amplifying one node type ×N —
+that method lies about anything carrying a vertical margin, because a long run of them collapses
+margins a real document does not.
+
+### The measurement gap these did not cover, and how it was found (B121)
+
+Every harness above measures OUR writer against OUR ruler, or against Chromium rendering OUR HTML.
+None of them opened an Office artifact with an Office engine. That gap hid a defect for as long as it
+existed: six slide node types sized their frames without reading their text, so a wrapping table was
+CLIPPED and a wrapping list was painted underneath the callout below it. **Delivered decks were
+missing rows and bullets the author wrote.**
+
+Every check above passed it, correctly. The row text is all present in the slide XML, so the bytes
+are complete, the vocabulary probe finds all 22 node types, the export gate reports no violations and
+the ruler counts the slides right. The loss happens at RENDER, and nothing rendered.
+
+Two rules come out of it:
+
+- *An artifact is not verified until an engine that did not write it has opened it.* `.docx` and
+  `.pdf` flow, so a bad height estimate shows up as untidy spacing; `.pptx` places absolutely and
+  PowerPoint **clips rather than spilling**, so the same class of error deletes content silently.
+- *Check that the converter works before concluding anything about the file.* This box ships
+  `libreoffice-core` with no filter packages, so `soffice` fails on **everything** — including a
+  plain `.txt`. That bare failure was once written up as "LibreOffice cannot open the .pptx this
+  product writes," which blamed the artifact for a broken tool and ruled out the only instrument
+  that could see B121. Convert a plain text file first. Install line in `CONTINUATION.md §2`.
+
+**Four instruments for one defect, three of them wrong.** Each was plausible, and each would have
+been reported as a clean result:
+
+| instrument | why it failed |
+|---|---|
+| declared geometry (`<a:off>`/`<a:ext>`) | always clean — the writer leaves a tidy gap under the frame it believes in. The frame is the lie. |
+| ink position on the rendered page | caught the table (grew past its frame), passed the list (stayed inside one). A tick on a slide that had lost a third of its content. |
+| text presence in the page's text layer | found every authored phrase *including the invisible one* — occluded text is still painted into the PDF |
+| **node height measured in isolation** | works: export the node ALONE with the whole body band free, render it, compare the ink SPAN to the declared height |
+
+The fourth was wrong on its first run too — it computed `inkBottom − BODY_TOP`, which charges the
+vertical-balance offset to the node as if it were content, and reported every node type
+under-declared including pages that were visibly perfect. And a node that paints its own fill is
+reported INDETERMINATE, never green: there the ink measures the box, so declared and realised agree
+by construction and a tick would mean nothing.
+
+**Two rules these harnesses exist to enforce**, both learned by violating them (bug log B66-B72):
+
+- *A default that switches off the thing under test is not coverage.* Every page-ruler case once used
+  the one preset declaring `header: null, footer: null`, so the running-header path — which every
+  agency mold uses — had no measurement at all, and carried an 11%-per-page error for as long as it
+  existed. Two other cases passed override keys that were not fields of `CanvasRules`, so they
+  silently re-ran a case that already existed.
+- *Synthetic filler must break like the real thing.* The prose filler was one lowercase sentence
+  repeated. Measured against Chromium (`scripts/measure-char-width.mts`), Times New Roman averages
+  0.41 of the font size on lowercase prose and 0.58 on acronym-dense text, so a lowercase-only corpus
+  was exercising the ruler in the single register where its constant has the most slack.
+
+`__tests__/node-vocabulary-coverage.test.ts` is the cheap always-on companion: every member of the
+`NodeType` union, through all four writers, asserting each type comes out as text or as the raster
+it deliberately became. `VOCAB` is typed `Record<NodeType, …>`, so adding a node type without adding
+a case is a compile error rather than an uncovered type.
 
 ---
 
@@ -555,6 +790,41 @@ Content pipeline events use the `system` namespace for infrastructure-level acti
 | Full content lifecycle event chain | Create draft -> submit for review -> approve -> publish -> unpublish. Query `/admin/events` filtered by `system` namespace and `content.*` type. Verify 5 events in chronological order with correct `parent_event_id` links where applicable. |
 
 ---
+
+## Rules learned by breaking them — 2026-08-26
+
+Four, each earned the hard way in one session. The full narratives are B143–B147.
+
+**1 · A script that has never been run is not evidence, however carefully written.**
+`drive-agent-flows.mjs` was written, reviewed, committed and described in two hand-offs, and died on
+its first real execution — `column v.content_source does not exist`, a column that lives on a
+different table. Run it once before citing it.
+
+**2 · A suite that passes only when run in the right order is reporting the order.**
+The 39 branch drives passed, then produced four CANT-RUN and one FAIL an hour later with no code
+change. Every cause was two things that must agree kept in two places: one account with two
+passwords, a fixture claiming a provenance it lacked, a resolver selecting for the wrong property,
+a probe picking whichever tenant sorted first. Fix the disagreement, not the symptom.
+
+**3 · A resolver must select for what its consumer NEEDS, not for what is nearest.**
+`run-branch-drives.sh` handed the amendment drive the newest solicitation with *volumes*; the drive
+needs one with an active *proposal*. `probe-page-scale.mts` took the alphabetically-first tenant and
+assumed it knew its password. Both agreed with reality by luck, and luck expires the moment an
+earlier drive in the same suite creates a row that sorts first.
+
+**4 · A preflight that finds a violation must fail the run.**
+The same runner printed `✗ CROSS-TENANT REFERENCES FOUND — 18 row(s)` and then
+`39 passed · 0 failed`, exiting 0. Its own header already said a drive that cannot run "is still a
+FAILURE here — it is uncovered, not passing". A violation *found* is strictly worse than uncovered.
+
+**And one about fixing, not testing.** When the first fix for the cross-tenant cards inserted the
+missing `opportunity_bridge` rows, it looked right and was structurally wrong: the bridge is GLOBAL,
+so a row there does not mean "this card exists", it means "publish to every subscribed tenant". Two
+local fixtures became global opportunities and the backfill fanned them into five more tenants — 10
+cards and 10 bucket scores. The real fix read the schema's own semantics instead
+(`bridge_version NOT NULL DEFAULT 0`, where 0 already means "no bridge event produced me").
+**Before fixing an invariant violation, check what the fix implies downstream** — and count the
+footprint rather than assuming your own change was small.
 
 ## Deviations
 

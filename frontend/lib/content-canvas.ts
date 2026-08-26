@@ -16,7 +16,7 @@
  */
 import {
   CANVAS_PRESETS,
-  type CanvasDocument, type CanvasNode, type CanvasSection,
+  type CanvasDocument, type CanvasNode, type CanvasSection, type TextBlockContent,
 } from '@/lib/types/canvas-document';
 
 // Self-contained node factory (mirrors lib/library/artifact-canvas.ts) — a seed node needs
@@ -204,6 +204,67 @@ function htmlToMarkdownish(html: string): string {
   return decodeEntities(s);
 }
 
+// ── Inline markdown → canvas inline_formats ───────────────────────────────────────────────
+//
+// WHY THIS EXISTS. The seed above turns a legacy markdown body into canvas nodes, and until this
+// pass it copied every line through VERBATIM. So opening one of the older guides in the Content
+// Studio and saving it published literal `**SBIR**` and literal `[eligibility checklist](/…)` onto
+// the public marketing site — four active pages carry 76 emphasis markers and 4 markdown links
+// between them. The corruption needed no mistake by the editor: opening and saving is the whole
+// job the Studio exists for.
+//
+// WHAT IS AND IS NOT REPRESENTABLE. `TextBlockContent.inline_formats` accepts exactly
+// bold/italic/underline/superscript/subscript, so `**x**` and `*x*` round-trip properly and the
+// web projection already renders them as <strong>/<em>. Two things cannot round-trip and are
+// handled honestly rather than silently:
+//   · LINKS have no canvas primitive (no href anywhere in the node vocabulary, which is locked
+//     against every exporter). `[text](url)` becomes `text (url)` — lossy, but it keeps the
+//     destination readable and puts no markup on the page.
+//   · LIST ITEMS have no `inline_formats` field at all (`ListContent.items` is `{text, indent_level,
+//     children}`), so emphasis inside a bullet is STRIPPED to plain text. Losing the bold is a far
+//     smaller harm than printing the asterisks.
+// `_underscore_` emphasis and `` `code` `` are deliberately NOT parsed: no stored body uses them,
+// and every underscore in the corpus sits inside a word or a URL, where treating it as a marker
+// would mangle real text.
+const MD_LINK = /\[([^\]\n]+)\]\(([^()\s]+)(?:\s+"[^"]*")?\)/g;
+const MD_EMPHASIS = /(\*\*|\*)(?=\S)([\s\S]*?\S)\1/;
+
+/** `[text](url)` → `text (url)`. Applied before emphasis so a marker inside a label still parses. */
+function flattenLinks(s: string): string {
+  return s.replace(MD_LINK, (_m, label: string, url: string) => `${label} (${url})`);
+}
+
+interface Inline { text: string; formats: NonNullable<TextBlockContent['inline_formats']> }
+
+/**
+ * Strip `**bold**` / `*italic*` markers, recording each span as an inline_format offset.
+ * Offsets are in CODE POINTS, matching `inlineRunsWeb`, which indexes `[...text]` — counting
+ * UTF-16 units here would slide every format right of an emoji or a surrogate pair.
+ */
+function parseInline(raw: string): Inline {
+  const src = flattenLinks(raw);
+  const formats: Inline['formats'] = [];
+  let out = '';
+  let rest = src;
+  while (rest.length > 0) {
+    const m = MD_EMPHASIS.exec(rest);
+    if (!m) { out += rest; break; }
+    out += rest.slice(0, m.index);
+    const inner = parseInline(m[2]);          // nested: `**bold with *italic* inside**`
+    const start = [...out].length;
+    for (const f of inner.formats) formats.push({ ...f, start: f.start + start });
+    formats.push({ start, length: [...inner.text].length, format: m[1] === '**' ? 'bold' : 'italic' });
+    out += inner.text;
+    rest = rest.slice(m.index + m[0].length);
+  }
+  return { text: out, formats };
+}
+
+/** The same strip with no formats kept — for list items and headings, which cannot carry them. */
+function plainInline(raw: string): string {
+  return parseInline(raw).text;
+}
+
 interface Line { kind: 'heading' | 'bullet' | 'number' | 'text' | 'blank'; level?: number; text: string; }
 
 function classify(raw: string): Line {
@@ -221,6 +282,8 @@ function classify(raw: string): Line {
 /**
  * Parse a markdown/HTML body into a flat sequence of canvas nodes:
  *   headings → heading, consecutive bullets/numbers → list, other runs → text_block.
+ * Inline `**bold**` / `*italic*` become inline_formats on a text_block; see parseInline above for
+ * what links and list items do instead, and why.
  * Best-effort and lossless-enough — a one-time on-open seed the author then edits richly.
  */
 export function parseBodyToNodes(body: string): CanvasNode[] {
@@ -230,13 +293,21 @@ export function parseBodyToNodes(body: string): CanvasNode[] {
   let para: string[] = [];
   let bullets: string[] = [];
   let numbers: string[] = [];
-  const flushPara = () => { if (para.length) { nodes.push(node('text_block', { text: para.join(' ') })); para = []; } };
-  const flushBullets = () => { if (bullets.length) { nodes.push(node('bulleted_list', { items: bullets.map((t) => ({ text: t })) })); bullets = []; } };
-  const flushNumbers = () => { if (numbers.length) { nodes.push(node('numbered_list', { items: numbers.map((t) => ({ text: t })) })); numbers = []; } };
+  const flushPara = () => {
+    if (!para.length) return;
+    // Join FIRST, then parse: emphasis that opens on one line and closes on the next is one span
+    // in the joined paragraph, and parsing per line would leave both markers stranded.
+    const { text, formats } = parseInline(para.join(' '));
+    nodes.push(node('text_block', formats.length ? { text, inline_formats: formats } : { text }));
+    para = [];
+  };
+  const flushBullets = () => { if (bullets.length) { nodes.push(node('bulleted_list', { items: bullets.map((t) => ({ text: plainInline(t) })) })); bullets = []; } };
+  const flushNumbers = () => { if (numbers.length) { nodes.push(node('numbered_list', { items: numbers.map((t) => ({ text: plainInline(t) })) })); numbers = []; } };
   const flushAll = () => { flushPara(); flushBullets(); flushNumbers(); };
 
   for (const ln of lines) {
-    if (ln.kind === 'heading') { flushAll(); nodes.push(node('heading', { level: Math.min(ln.level ?? 2, 6), text: ln.text })); continue; }
+    // HeadingContent is {level, text, numbering} — no inline_formats — so a heading strips too.
+    if (ln.kind === 'heading') { flushAll(); nodes.push(node('heading', { level: Math.min(ln.level ?? 2, 6), text: plainInline(ln.text) })); continue; }
     if (ln.kind === 'bullet') { flushPara(); flushNumbers(); bullets.push(ln.text); continue; }
     if (ln.kind === 'number') { flushPara(); flushBullets(); numbers.push(ln.text); continue; }
     if (ln.kind === 'blank') { flushAll(); continue; }

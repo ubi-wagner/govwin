@@ -78,3 +78,129 @@ Every AI path runs: the **entire event-triggered agent fabric** (full-draft, ai-
 assess-ingest, ai/research) drives end-to-end through the worker → emulator → tenant-scoped memory →
 land-or-review, with full `system_events` auditability; the rule-based routes return real results; the
 gated drop-ins are unit-tested and inert by design. Prod runs the identical wiring with the live key.
+
+---
+
+## Addendum 2026-08-19 — the visual reviewer (a new AI-gated path)
+
+`lib/review/visual-review.ts` was added after this register was written and belongs in it, because
+it is the one reviewer that reads a PICTURE rather than the model.
+
+**It has two halves and they are gated differently, which the register must say plainly.**
+
+- **The page-count half is NOT gated and is fully live here.** It renders the volume through the
+  product's own PDF exporter, captures the pages Chromium laid out, and reports a blocker when the
+  count exceeds the agency's cap. This is the only page number in the product that is not an
+  estimate, and it runs with no key. Proven on the live T3CP build: it caught a Technical Volume
+  downloading at 11 pages against a 10-page cap, which every model-side check had cleared.
+- **The vision half needs a real `ANTHROPIC_API_KEY`.** The emulator cannot see images and returns
+  `[]` — deliberately. A harness that invented plausible defects would make this review look proven
+  when nothing had looked at a page, and that is exactly the failure this reviewer exists to catch
+  elsewhere. So in this rig the wire is exercised end to end and the eyesight is not.
+
+**What IS proven without a key:** the render → capture → request → parse → land path, including the
+landing into `proposal_comments` (`recommendation_type='ai_review'`, `category='visual'`) via
+`lib/proposal-visual-review.ts`, invoked by `requestAiReview` on the existing AI-review button.
+Recorded model replies pin the parse/sort/cap behaviour against the malformed shapes models really
+produce (`__tests__/visual-review-parse.test.ts`, 15 cases).
+
+**What is not:** whether the model sees what a person would. One pass with a live key against the
+T3CP volumes closes it; until then this line stays here rather than in the Verdict above.
+
+---
+
+## Addendum 2026-08-23 — the inventory was the stale part, and it hid a live defect
+
+Re-opened by rebuilding this register's **inventory** from source rather than re-reading its
+conclusions. The conclusions held. The inventory did not.
+
+### What the register claimed, and what it actually proved
+
+The Verdict above says "the **entire** event-triggered agent fabric" drives end-to-end, on the
+grounds that every triggered flow routes through the same trigger → worker → cohort → emulator path.
+That is true of the **mechanism**, and it is an argument, not a measurement. Counted from the
+registry: **29 workflows carry 65 `AI_INVOKE` steps across 22 distinct triggers.** This register
+individually fired three.
+
+The gap that argument leaves is specific and it is not hypothetical: every template builds its step
+**inputs** differently, and **a degraded `AI_INVOKE` is a safe skip by design** — the engine must
+never dead-end a workflow. So a broken input contract and a working one are indistinguishable from
+the workflow's own point of view. Shared code path, unshared input contract.
+
+### The defect that was sitting in it (B84)
+
+Both Proposal Studio phases read `payload.voice`; `requestReviewPhase`, the one canonical emitter for
+their trigger, never wrote it. Every Studio draft ran in the house voice while the full-draft button
+— same proposal, same persisted `proposals.voice` — ran in the tenant's. Full write-up: bug log B84.
+
+### The standing lens
+
+`pipeline/scripts/check_ai_invoke_contract.py`. Compares every `payload.*` key an `AI_INVOKE` step
+reads against the keys real emitters really wrote, taken from `system_events` rather than regexed out
+of TypeScript — evidence, not inference. Run it after touching any emitter or any `input_map`:
+
+```
+PYTHONPATH=src DATABASE_URL=… python3 pipeline/scripts/check_ai_invoke_contract.py
+```
+
+It reports MISS (a read key no payload carries), WEAK (present but always null), and **UNCOVERED**.
+A MISS is a **lead, not a verdict** — the evidence is historical, so it prints when each trigger was
+last fired, and confirmation means reading the emitter and resolving a stored payload through
+`resolve_inputs`, which is how B84 was confirmed.
+
+### The honest coverage number
+
+**15 of 29** AI-carrying workflows have a trigger that has never been emitted on this box:
+
+```
+OnApplicationAccepted · OnCmsContentRequested · OnCollaboratorInvited · OnIngestAssessmentRequested
+OnIngestPhaseRequested{Extract,Matrix,Molds,Review} · OnOpportunitiesDetected
+OnPortalStageReviewRequested · OnProposalCreated · OnProposalOutcomeRecorded · OnRfpUploaded
+OnSolicitationReviewRequested · OnSourceChangeDetected
+```
+
+These are **unmeasured, not passing** — the same rule the four lenses use, applied here. Firing them
+is the remaining Track A work, and it is now a mechanical list rather than an open question. (Note
+`OnIngestAssessmentRequested` appears here even though the register above records assess-ingest
+firing: those runs predate this database. Uncovered means no evidence *here*, which is exactly the
+staleness the lens is designed to make visible rather than paper over.)
+
+### Coverage run — 15 uncovered down to 9, MISS still none
+
+Two scripts fire the domain emitters, and the split between them is not cosmetic:
+
+- `frontend/scripts/fire-uncovered-triggers.mjs` — route-backed emitters, driven through a real
+  signed-in `master_admin` session.
+- `frontend/scripts/fire-uncovered-lib-triggers.mts` — emitters that are domain functions with no
+  route in front of them, called directly (as `verify-studio-voice.mts` calls `requestReviewPhase`).
+
+**Neither may use `POST /api/admin/workflows`.** That launcher emits the trigger with the operator's
+overlay AS the payload, so clearing an UNCOVERED through it would compare my own typing to the
+`input_map` — a tautology that turns every uncovered workflow into a false pass. A direct lib call is
+different in exactly the way that matters: I supply DOMAIN arguments, and the lib decides which keys
+the event carries. Those keys are the thing under test, and they come from the product.
+
+Cleared so far (6): `OnIngestAssessmentRequested` · `OnIngestPhaseRequested{Extract,Matrix,Molds,
+Review}` · `OnOpportunitiesDetected`. All clean — no MISS. Their `guidance` shows as WEAK, correctly:
+it is only populated on a `regenerate`.
+
+Still uncovered (9), each with the reason it was not cleared:
+
+| workflow | emitter | why not yet |
+|---|---|---|
+| `OnRfpUploaded` | `admin/rfp-upload` route | needs a real file upload |
+| `OnApplicationAccepted` | `admin/applications/[id]/accept` | `applications` is empty — needs one to accept |
+| `OnCollaboratorInvited` | portal collaborators route | needs an invite against a live proposal |
+| `OnProposalCreated` | `provisionProposalForPortal` | provisions a whole build; needs setup + teardown |
+| `OnProposalOutcomeRecorded` | `lib/proposal/outcome-todo.ts` | needs a proposal at outcome stage |
+| `OnPortalStageReviewRequested` | `lib/portal-workflow.ts` | needs a portal stage advance |
+| `OnSolicitationReviewRequested` | `lib/tools/solicitation-request-review.ts` | an agent TOOL, not a route (my first probe hit 404 — reported not-tried, not refused) |
+| `OnSourceChangeDetected` | `lib/tools/source-scout.ts` | an agent TOOL; needs a source profile with a real change |
+| `OnCmsContentRequested` | **none** | see below |
+
+**`OnCmsContentRequested` has no domain emitter at all.** Not in the frontend, the pipeline, or the
+CRM service. The agent roster states it plainly: *"Admin-launched via LaunchContentClient; no
+automatic emitter (that stays post-V1)"* — and `LaunchContentClient` posts to the generic workflow
+launcher. So its only producer is the launcher, which by the rule above is not evidence. This one
+cannot be cleared by firing; it needs a decision — give it a real emitter, or document it as
+launcher-only. Recorded rather than counted as covered.

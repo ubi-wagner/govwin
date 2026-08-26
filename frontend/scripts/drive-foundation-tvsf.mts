@@ -199,7 +199,9 @@ try {
 
   // draft all 13 sections
   const C = contentFor(proposalId);
-  const secs = await sql<{ id: string; title: string; artifact_id: string; version: number }[]>`
+  // camelCase — this file imports the TRANSFORMED client from @/lib/db, so artifact_id
+  // arrives as artifactId. Declared true even though only id/title/version are read.
+  const secs = await sql<{ id: string; title: string; artifactId: string; version: number }[]>`
     SELECT id, title, artifact_id, version FROM proposal_sections WHERE proposal_id=${proposalId}::uuid ORDER BY volume_number, section_number::int`;
   let drafted = 0;
   for (const s of secs) {

@@ -32,7 +32,7 @@ import {
 } from 'docx';
 import { rasterizeDataUri, resolveImageDataUri, type RasterPng } from '@/lib/export/image-raster';
 import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
-import { docNodes } from '@/lib/types/canvas-document';
+import { docNodes, spacerHeightPt } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -489,7 +489,8 @@ function nodeToDocx(
       return [new Paragraph({ pageBreakBefore: true, children: [] })];
 
     case 'spacer':
-      return [new Paragraph({ spacing: { after: 200 }, children: [] })];
+      // 20 twips to the point. Was a hardcoded 200 (10pt) regardless of what the author set.
+      return [new Paragraph({ spacing: { after: Math.round(spacerHeightPt(node) * 20) }, children: [] })];
 
     case 'toc': {
       const headings = allNodes

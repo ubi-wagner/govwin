@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { describeEvent as describeEventLabel } from '@/lib/event-labels';
 
@@ -23,6 +24,11 @@ export type SerializedActivityEvent = {
 /*  Namespace config                                                   */
 /* ------------------------------------------------------------------ */
 
+// The relative-time helpers that used to live here read the clock
+// DURING RENDER — the server wrote one number, the client hydrated a beat later and wrote
+// another, and React #418 took the whole page to its error boundary while the route kept
+// answering 200. They are now <TimeAgo> / <Elapsed>, which own their own mount state.
+// Bug log B82; the shared component is components/ui/time-ago.tsx.
 const NAMESPACE_TABS = [
   { label: 'All', value: '' },
   { label: 'Proposal', value: 'proposal' },
@@ -84,19 +90,6 @@ function describeEvent(
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
-}
 
 function absoluteTime(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -400,7 +393,7 @@ export function ActivityStreamClient({
                     title={absoluteTime(ev.createdAt)}
                   >
                     <span className="text-xs text-gray-400">
-                      {relativeTime(ev.createdAt)}
+                      <TimeAgo iso={ev.createdAt} />
                     </span>
                   </div>
 
@@ -501,7 +494,7 @@ export function ActivityStreamClient({
                               className="text-xs text-gray-400"
                               title={absoluteTime(childEvent.createdAt)}
                             >
-                              {relativeTime(childEvent.createdAt)}
+                              <TimeAgo iso={childEvent.createdAt} />
                             </span>
                           </div>
                           {childEvent.error != null && (

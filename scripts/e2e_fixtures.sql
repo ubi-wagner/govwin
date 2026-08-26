@@ -162,8 +162,20 @@ BEGIN
   VALUES ('6c8571ca-292f-41db-9762-c5055a06e71e', '6c000000-0000-4000-8000-000000000001', 'af', 'approved', 'Autonomy Interest BAA', 'BAA-AUD-2026', 'Autonomy interest solicitation — customer-interest audit fixture.')
   ON CONFLICT (id) DO NOTHING;
   UPDATE opportunities SET solicitation_id = '6c8571ca-292f-41db-9762-c5055a06e71e' WHERE id = '6c000000-0000-4000-8000-000000000001';
+  -- NOT FROM THE BRIDGE, AND IT SAYS SO. `bridge_version` is NOT NULL DEFAULT **0**, and 0 is the
+  -- column's own sentinel for a card that no bridge event produced. This fixture places a card
+  -- directly, so 0 is the truth; claiming 1 asserted a bridge version that did not exist, which
+  -- `drive-bridge-buckets` correctly flagged.
+  --
+  -- The first fix here INSERTED the missing bridge row instead. That was wrong in a way worth
+  -- recording: the bridge is GLOBAL and forward-only, so a bridge row does not mean "this card
+  -- exists" — it means "this opportunity is published to every subscribed tenant". It promoted two
+  -- Lighthouse-local audit fixtures into globally published opportunities, and the very next run
+  -- failed a different check (the backfill no longer brought every tenant level, short by exactly
+  -- these two). 0 is also forward-compatible: a real bridge event arriving later has a version > 0
+  -- and updates the card normally.
   INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage, is_pinned, pinned_at) VALUES
-    (lh, '6c000000-0000-4000-8000-000000000001', jsonb_build_object('title', 'Autonomy Interest Topic', 'opportunityId', '6c000000-0000-4000-8000-000000000001'), 1, 'open', 'open', true, now())
+    (lh, '6c000000-0000-4000-8000-000000000001', jsonb_build_object('title', 'Autonomy Interest Topic', 'opportunityId', '6c000000-0000-4000-8000-000000000001'), 0, 'open', 'open', true, now())
   ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET is_pinned = true, pinned_at = now(), lifecycle_status = 'open';
   -- (zzaudit's 2nd test creates 'audit-proof-co' but makes NO assertion — a screenshot drive —
   --  so it passes whether or not the company already exists. We deliberately do NOT delete it:
@@ -177,8 +189,9 @@ BEGIN
   INSERT INTO opportunities (id, source, source_id, title, is_active, close_date, dates_estimated) VALUES
     ('223f57f4-d6c4-47d6-8795-2f0c46a61c06', 'manual_upload', 'fx-freeportal-opp', 'Free Portal Fixture Opp', true, now() + interval '50 days', true)
   ON CONFLICT (id) DO NOTHING;
+  -- Same as above: directly placed, so bridge_version 0.
   INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage) VALUES
-    (lh, '223f57f4-d6c4-47d6-8795-2f0c46a61c06', jsonb_build_object('title', 'Free Portal Fixture Opp', 'opportunityId', '223f57f4-d6c4-47d6-8795-2f0c46a61c06'), 1, 'open', 'open')
+    (lh, '223f57f4-d6c4-47d6-8795-2f0c46a61c06', jsonb_build_object('title', 'Free Portal Fixture Opp', 'opportunityId', '223f57f4-d6c4-47d6-8795-2f0c46a61c06'), 0, 'open', 'open')
   ON CONFLICT (tenant_id, opportunity_id) DO NOTHING;
   -- drop any portal a prior t1 run approved so it re-approves clean (FK-safe: shadow_admin_grants
   -- references proposal_portals; clear grants first). purchases has no unique on (tenant,opp) so a

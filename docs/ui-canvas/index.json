@@ -1,0 +1,348 @@
+{
+ "shots": [
+  {
+   "surface": "fluid-document",
+   "label": "baseline-all-off",
+   "file": "fluid-document__001-baseline-all-off.jpg",
+   "chips": 6,
+   "active": []
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Sections",
+   "file": "fluid-document__002-overlay-Sections.jpg",
+   "active": [
+    "Sections"
+   ],
+   "paintedPct": 8.58
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Atoms",
+   "file": "fluid-document__003-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0.52
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Provenance",
+   "file": "fluid-document__004-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0.18
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Grid",
+   "file": "fluid-document__005-overlay-Grid.jpg",
+   "active": [
+    "Grid"
+   ],
+   "paintedPct": 2.33
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Compliance",
+   "file": "fluid-document__006-overlay-Compliance.jpg",
+   "active": [
+    "Compliance"
+   ],
+   "paintedPct": 13.52
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-Budget",
+   "file": "fluid-document__007-overlay-Budget.jpg",
+   "active": [
+    "Budget"
+   ],
+   "paintedPct": 13.42
+  },
+  {
+   "surface": "fluid-document",
+   "label": "overlay-ALL",
+   "file": "fluid-document__008-overlay-ALL.jpg",
+   "active": [
+    "Sections",
+    "Atoms",
+    "Provenance",
+    "Grid",
+    "Compliance",
+    "Budget"
+   ]
+  },
+  {
+   "surface": "fluid-document",
+   "label": "node-selected",
+   "file": "fluid-document__009-node-selected.jpg",
+   "nodeId": "sec:dc9be2c3-45b6-4050-914f-aa203834ae62"
+  },
+  {
+   "surface": "fluid-document",
+   "label": "node-selected-with-structure",
+   "file": "fluid-document__010-node-selected-with-structure.jpg",
+   "nodeId": "sec:dc9be2c3-45b6-4050-914f-aa203834ae62",
+   "active": [
+    "Atoms",
+    "Sections"
+   ]
+  },
+  {
+   "surface": "proposal-section",
+   "label": "baseline-all-off",
+   "file": "proposal-section__011-baseline-all-off.jpg",
+   "chips": 3,
+   "active": []
+  },
+  {
+   "surface": "proposal-section",
+   "label": "overlay-Atoms",
+   "file": "proposal-section__012-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0.23
+  },
+  {
+   "surface": "proposal-section",
+   "label": "overlay-Provenance",
+   "file": "proposal-section__013-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "proposal-section",
+   "label": "overlay-Grid",
+   "file": "proposal-section__014-overlay-Grid.jpg",
+   "active": [
+    "Grid"
+   ],
+   "paintedPct": 2.03
+  },
+  {
+   "surface": "proposal-section",
+   "label": "overlay-ALL",
+   "file": "proposal-section__015-overlay-ALL.jpg",
+   "active": [
+    "Atoms",
+    "Provenance",
+    "Grid"
+   ]
+  },
+  {
+   "surface": "proposal-section",
+   "label": "node-selected",
+   "file": "proposal-section__016-node-selected.jpg",
+   "nodeId": "n1"
+  },
+  {
+   "surface": "proposal-section",
+   "label": "node-selected-with-structure",
+   "file": "proposal-section__017-node-selected-with-structure.jpg",
+   "nodeId": "n1",
+   "active": [
+    "Atoms",
+    "Sections"
+   ]
+  },
+  {
+   "surface": "blank-letter",
+   "label": "baseline-all-off",
+   "file": "blank-letter__018-baseline-all-off.jpg",
+   "chips": 3,
+   "active": []
+  },
+  {
+   "surface": "blank-letter",
+   "label": "overlay-Atoms",
+   "file": "blank-letter__019-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-letter",
+   "label": "overlay-Provenance",
+   "file": "blank-letter__020-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-letter",
+   "label": "overlay-Grid",
+   "file": "blank-letter__021-overlay-Grid.jpg",
+   "active": [
+    "Grid"
+   ],
+   "paintedPct": 2.08
+  },
+  {
+   "surface": "blank-letter",
+   "label": "overlay-ALL",
+   "file": "blank-letter__022-overlay-ALL.jpg",
+   "active": [
+    "Atoms",
+    "Provenance",
+    "Grid"
+   ]
+  },
+  {
+   "surface": "blank-deck",
+   "label": "baseline-all-off",
+   "file": "blank-deck__023-baseline-all-off.jpg",
+   "chips": 2,
+   "active": []
+  },
+  {
+   "surface": "blank-deck",
+   "label": "overlay-Atoms",
+   "file": "blank-deck__024-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-deck",
+   "label": "overlay-Provenance",
+   "file": "blank-deck__025-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-deck",
+   "label": "overlay-ALL",
+   "file": "blank-deck__026-overlay-ALL.jpg",
+   "active": [
+    "Atoms",
+    "Provenance"
+   ]
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "baseline-all-off",
+   "file": "blank-sheet__027-baseline-all-off.jpg",
+   "chips": 2,
+   "active": []
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "overlay-Atoms",
+   "file": "blank-sheet__028-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0.2
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "overlay-Provenance",
+   "file": "blank-sheet__029-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "overlay-ALL",
+   "file": "blank-sheet__030-overlay-ALL.jpg",
+   "active": [
+    "Atoms",
+    "Provenance"
+   ]
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "node-selected",
+   "file": "blank-sheet__031-node-selected.jpg",
+   "nodeId": "3d324807-3570-448c-b539-d6bbb02ae768"
+  },
+  {
+   "surface": "blank-sheet",
+   "label": "node-selected-with-structure",
+   "file": "blank-sheet__032-node-selected-with-structure.jpg",
+   "nodeId": "3d324807-3570-448c-b539-d6bbb02ae768",
+   "active": [
+    "Atoms",
+    "Sections"
+   ]
+  },
+  {
+   "surface": "blank-flier",
+   "label": "baseline-all-off",
+   "file": "blank-flier__033-baseline-all-off.jpg",
+   "chips": 3,
+   "active": []
+  },
+  {
+   "surface": "blank-flier",
+   "label": "overlay-Atoms",
+   "file": "blank-flier__034-overlay-Atoms.jpg",
+   "active": [
+    "Atoms"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-flier",
+   "label": "overlay-Provenance",
+   "file": "blank-flier__035-overlay-Provenance.jpg",
+   "active": [
+    "Provenance"
+   ],
+   "paintedPct": 0,
+   "note": "nothing to draw (empty canvas / no sourced nodes) — the layer is not at fault"
+  },
+  {
+   "surface": "blank-flier",
+   "label": "overlay-Grid",
+   "file": "blank-flier__036-overlay-Grid.jpg",
+   "active": [
+    "Grid"
+   ],
+   "paintedPct": 2.08
+  },
+  {
+   "surface": "blank-flier",
+   "label": "overlay-ALL",
+   "file": "blank-flier__037-overlay-ALL.jpg",
+   "active": [
+    "Atoms",
+    "Provenance",
+    "Grid"
+   ]
+  }
+ ],
+ "findings": [
+  {
+   "surface": "blank-letter",
+   "what": "no [data-node-id] element — selection could not be exercised (an empty canvas?)"
+  },
+  {
+   "surface": "blank-deck",
+   "what": "no [data-node-id] element — selection could not be exercised (an empty canvas?)"
+  },
+  {
+   "surface": "blank-flier",
+   "what": "no [data-node-id] element — selection could not be exercised (an empty canvas?)"
+  }
+ ]
+}

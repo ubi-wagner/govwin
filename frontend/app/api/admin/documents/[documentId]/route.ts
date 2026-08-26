@@ -175,6 +175,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
+  let startId: string | null = null;
   try {
     const authResult = await checkAdmin();
     if (!authResult.ok) return authResult.response;
@@ -206,7 +207,7 @@ export async function PUT(
     }
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'document.saved',
       actor: userActor(authResult.userId, authResult.email),
@@ -252,6 +253,9 @@ export async function PUT(
       data: { id: documentId, version: document.metadata?.version_number || 1 },
     });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[admin/documents/[id]] PUT error', err);
     return NextResponse.json(
       { error: 'Failed to save document', code: 'INTERNAL_ERROR' },
@@ -266,6 +270,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
+  let startId: string | null = null;
   try {
     const authResult = await checkAdmin();
     if (!authResult.ok) return authResult.response;
@@ -279,7 +284,7 @@ export async function DELETE(
     }
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'document.deleted',
       actor: userActor(authResult.userId, authResult.email),
@@ -302,6 +307,9 @@ export async function DELETE(
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[admin/documents/[id]] DELETE error', err);
     return NextResponse.json(
       { error: 'Failed to delete document', code: 'INTERNAL_ERROR' },

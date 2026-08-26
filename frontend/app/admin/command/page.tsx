@@ -8,6 +8,7 @@ import {
   type QueueSection, type TenantTodo, type SystemItem, type OpsDigest,
 } from '@/lib/admin/review-queue';
 import { getCommandSeen, isNew } from '@/lib/command/seen';
+import { hasRoleAtLeast, isRole, requiredRoleForPath, type Role } from '@/lib/rbac';
 
 // The tabbed admin Command Center — the ONE "what needs my attention" console. Four count-badged
 // lanes (Opportunities · Admin · Tenant-surfaced · System); each row deep-links into its detail view,
@@ -147,6 +148,8 @@ export default async function CommandCenterPage() {
   if (!session?.user) redirect('/login');
   const firstName = (session.user.name ?? session.user.email ?? 'there').split(/[\s@]/)[0];
   const userId = (session.user as { id?: string }).id ?? '';
+  const su = session.user as { role?: unknown };
+  const role: Role | null = isRole(su.role) ? su.role : null;
 
   const [oppQueue, tenant, adminCount, system, newest, seen, opsDigest] = await Promise.all([
     getReviewQueue().catch((e) => { console.error('[admin/command] opp queue failed:', e); return { sections: [], actionable: 0 }; }),
@@ -166,7 +169,7 @@ export default async function CommandCenterPage() {
     system: isNew(seen, 'system', newest.system),
   };
 
-  const tabs: CommandTabInput[] = [
+  const tabs: CommandTabInput[] = ([
     {
       key: 'opp', title: 'Opportunities', tone: 'action', count: oppQueue.actionable, hasNew: hasNew.opp,
       actions: [
@@ -202,7 +205,19 @@ export default async function CommandCenterPage() {
       ],
       body: <><OpsDigestCard digest={opsDigest} /><SystemList items={system.items} /></>,
     },
-  ];
+  ] as CommandTabInput[])
+    // Drop any action this actor cannot reach. "❤️ Health" (/admin/system) is master_admin-only,
+    // so an rfp_admin clicking it hit middleware's deny → redirect('/') and landed on the public
+    // marketing site, out of the console entirely. Derived from requiredRoleForPath — the same
+    // table middleware enforces — so it stays correct as routes are added (mirrors the sidebar
+    // filter in components/admin/admin-nav-data.ts::visibleAdminNav).
+    .map((lane) => ({
+      ...lane,
+      actions: lane.actions.filter((a) => {
+        const need = requiredRoleForPath(a.href);
+        return need == null || (role != null && hasRoleAtLeast(role, need));
+      }),
+    }));
 
   const actionable = oppQueue.actionable + adminCount + tenant.count + system.count;
 

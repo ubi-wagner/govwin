@@ -45,7 +45,7 @@ async function gate(tenantSlug: string, minRole: Role) {
 
 type PurchaseResult =
   | { ok: true; portalId: string; curationDueAt: string; comp: true }
-  | { ok: false; reason: 'invalid_code' | 'not_comp' | 'already_purchased' | 'not_available' };
+  | { ok: false; reason: 'invalid_code' | 'code_spent' | 'code_expired' | 'not_comp' | 'already_purchased' | 'not_available' };
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -93,7 +93,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
             AND (max_uses IS NULL OR used_count < max_uses)
           FOR UPDATE
         `;
-        if (!promo) return { ok: false, reason: 'invalid_code' };
+        if (!promo) {
+          // The code did not pass the live filter — but "we have never heard of this code" and "the
+          // one-time code we issued you has already been used" are different facts, and telling a
+          // buyer holding a real code that it is invalid sends them to support for no reason. Look
+          // it up unfiltered and say which.
+          const [known] = await tx<Array<{ expired: boolean; exhausted: boolean; revoked: boolean }>>`
+            SELECT (expires_at IS NOT NULL AND expires_at <= now())        AS expired,
+                   (max_uses IS NOT NULL AND used_count >= max_uses)       AS exhausted,
+                   (revoked_at IS NOT NULL)                                AS revoked
+            FROM promo_codes WHERE lower(code) = lower(${promoCode}) LIMIT 1`;
+          if (known?.revoked || known?.exhausted) return { ok: false, reason: 'code_spent' };
+          if (known?.expired) return { ok: false, reason: 'code_expired' };
+          return { ok: false, reason: 'invalid_code' };
+        }
         if (promo.kind !== 'comp') return { ok: false, reason: 'not_comp' };
 
         // The purchase must target an opportunity actually RELEASED to this tenant — i.e. a
@@ -128,7 +141,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
             ${promoCode}, ${tx.json({ comp: true, portalId, kind: 'comp' })}
           )
         `;
-        await tx`UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ${promo.id}::uuid`;
+        // Consume it, and record WHO burned it. first_redeemed_at / redeemed_by_tenant_id use
+        // COALESCE so a multi-use code keeps its FIRST redemption instead of overwriting it on every
+        // later use — the question an issuer asks is "when did this go out the door, and to whom".
+        await tx`
+          UPDATE promo_codes
+             SET used_count = used_count + 1,
+                 first_redeemed_at = COALESCE(first_redeemed_at, now()),
+                 redeemed_by_tenant_id = COALESCE(redeemed_by_tenant_id, ${g.tenantId}::uuid)
+           WHERE id = ${promo.id}::uuid`;
 
         // T&C shadow-admin grant so an RFP expert can curate inside the tenant portal.
         await tx`
@@ -152,6 +173,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       }
       if (result.reason === 'not_comp') {
         return NextResponse.json({ error: 'That code requires card checkout, which is not enabled yet', code: 'CODE_NEEDS_STRIPE' }, { status: 400 });
+      }
+      // A one-time code that has already been redeemed is a DIFFERENT problem from a typo, and the
+      // buyer can act on the difference: one means "check the code", the other means "ask us for a
+      // new one". Saying "not valid" to someone holding a code we issued them is just wrong.
+      if (result.reason === 'code_spent') {
+        return NextResponse.json({ error: 'That code has already been used. Ask us for a new one.', code: 'CODE_ALREADY_USED' }, { status: 400 });
+      }
+      if (result.reason === 'code_expired') {
+        return NextResponse.json({ error: 'That code has expired. Ask us for a new one.', code: 'CODE_EXPIRED' }, { status: 400 });
       }
       return NextResponse.json({ error: 'That code is not valid', code: 'INVALID_PROMO_CODE' }, { status: 400 });
     }

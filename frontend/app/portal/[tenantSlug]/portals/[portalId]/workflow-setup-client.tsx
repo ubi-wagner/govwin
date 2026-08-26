@@ -19,6 +19,9 @@ interface Config { stages?: Stage[]; collaborators?: unknown[]; nudgeDays?: numb
 export interface ReviewState {
   requested: boolean; completed: boolean; verdict: string | null; completedAt: string | null;
   summary: string | null; noteCount: number | null;
+  /** Did the manager cohort actually run (B17)? `false` = it safe-skipped and nothing reviewed
+   *  this stage. Null on completions emitted before the pipeline carried the evidence. */
+  cohortRan: boolean | null;
   stageKey: string; stageLabel: string; agentManagerKey: string | null; autoAdvance: boolean;
 }
 /** A LIVE open ToDo row for this portal (TW-9) — active-instantiation management (reassign/reschedule). */
@@ -159,12 +162,15 @@ export function WorkflowSetupClient({
   const autoFired = useRef(false);
   useEffect(() => {
     if (autoFired.current) return;
-    if (accepted && reviewState?.completed && reviewState.autoAdvance) {
+    // B17: don't even ask when the pipeline told us the cohort never ran — the server refuses it
+    // (`review_not_evidenced`) and the round-trip would surface as an error on a gate that is
+    // behaving correctly. The server stays the authority; this just avoids a pointless call.
+    if (accepted && reviewState?.completed && reviewState.autoAdvance && reviewState.cohortRan !== false) {
       autoFired.current = true;
       void gateAdvance(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accepted, reviewState?.completed, reviewState?.autoAdvance]);
+  }, [accepted, reviewState?.completed, reviewState?.autoAdvance, reviewState?.cohortRan]);
 
   const assigneeValue = (t: Todo) => (t.assigneeUserId ? `user:${t.assigneeUserId}` : t.assigneeRole ? `role:${t.assigneeRole}` : '');
   const setAssignee = (si: number, ti: number, v: string) => {
@@ -192,24 +198,42 @@ export function WorkflowSetupClient({
         </div>
       )}
 
-      {/* TW-8c — the LIVE AI-manager stage gate: the cohort's review status + a one-click advance. */}
-      {accepted && reviewState && (
-        <div className={`mb-5 rounded-lg border p-4 ${reviewState.completed ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50'}`}>
+      {/* TW-8c — the LIVE AI-manager stage gate: the cohort's review status + a one-click advance.
+          B17: a landed gate has TWO outcomes, not one. The cohort may have reviewed the stage, or
+          it may have safe-skipped (no key, rate-limited, fabric absent) and reviewed nothing at
+          all. Both used to render as a green "AI review complete ✓" — the panel asserting to a
+          customer that their work had been checked when nothing had checked it. The unreviewed
+          case is now amber and says so, and the advance button says what the click actually
+          means. The button stays: a person may absolutely advance a stage the AI never read.
+          What they may not do is be told it was read. */}
+      {accepted && reviewState && (() => {
+        const unreviewed = reviewState.completed && reviewState.cohortRan === false;
+        const tone = !reviewState.completed
+          ? { border: 'border-blue-200 bg-blue-50', head: 'text-blue-900', body: 'text-blue-800' }
+          : unreviewed
+            ? { border: 'border-amber-300 bg-amber-50', head: 'text-amber-900', body: 'text-amber-800' }
+            : { border: 'border-emerald-200 bg-emerald-50', head: 'text-emerald-900', body: 'text-emerald-800' };
+        return (
+        <div className={`mb-5 rounded-lg border p-4 ${tone.border}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className={`text-sm font-medium ${reviewState.completed ? 'text-emerald-900' : 'text-blue-900'}`}>
-                {reviewState.completed
-                  ? <>AI review complete for <span className="font-semibold">{reviewState.stageLabel}</span> ✓</>
-                  : <>AI review in progress for <span className="font-semibold">{reviewState.stageLabel}</span>…</>}
+              <p className={`text-sm font-medium ${tone.head}`}>
+                {!reviewState.completed
+                  ? <>AI review in progress for <span className="font-semibold">{reviewState.stageLabel}</span>…</>
+                  : unreviewed
+                    ? <>AI review did NOT run for <span className="font-semibold">{reviewState.stageLabel}</span></>
+                    : <>AI review complete for <span className="font-semibold">{reviewState.stageLabel}</span> ✓</>}
               </p>
-              <p className={`text-xs mt-1 ${reviewState.completed ? 'text-emerald-800' : 'text-blue-800'}`}>
+              <p className={`text-xs mt-1 ${tone.body}`}>
                 {reviewState.agentManagerKey && <>Manager: <span className="font-medium">{reviewState.agentManagerKey.replace(/_/g, ' ')}</span>. </>}
-                {reviewState.completed
-                  ? (reviewState.autoAdvance ? 'Auto-advance is on — the stage advances on its own once the review lands.' : 'The cohort landed its review and the adversarial pass reconciled. Advance when you’re ready.')
-                  : 'The manager cohort is running. This gate opens when it lands its review.'}
+                {!reviewState.completed
+                  ? 'The manager cohort is running. This gate opens when it lands its review.'
+                  : unreviewed
+                    ? 'The gate is open, but nothing reviewed this stage. Read the work yourself before advancing — auto-advance will not close a gate on a review that never ran.'
+                    : (reviewState.autoAdvance ? 'Auto-advance is on — the stage advances on its own once the review lands.' : 'The cohort landed its review and the adversarial pass reconciled. Advance when you’re ready.')}
               </p>
               {reviewState.completed && reviewState.summary && (
-                <p className="text-xs mt-1 font-medium text-emerald-900">
+                <p className={`text-xs mt-1 font-medium ${tone.head}`}>
                   {reviewState.summary}
                   {typeof reviewState.noteCount === 'number' && reviewState.noteCount > 0 && ' Review the section threads for the cohort’s notes.'}
                 </p>
@@ -217,13 +241,14 @@ export function WorkflowSetupClient({
             </div>
             {reviewState.completed && !reviewState.autoAdvance && (
               <button onClick={() => gateAdvance(false)} disabled={busy}
-                className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium rounded">
-                {busy ? 'Advancing…' : 'Advance stage →'}
+                className={`shrink-0 px-4 py-2 disabled:opacity-50 text-white text-sm font-medium rounded ${unreviewed ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                {busy ? 'Advancing…' : unreviewed ? 'Advance anyway →' : 'Advance stage →'}
               </button>
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Stages */}
       <div className="space-y-4">

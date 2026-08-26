@@ -95,29 +95,50 @@ log = logging.getLogger("pipeline.workflows.processor")
 
 # ─── Duplicate tracking ──────────────────────────────────────────────
 
-# In-memory set of trigger event IDs already processed in this
-# processor lifetime. Prevents double-processing if the high-water
-# mark query returns an event that was already handled (e.g., due to
-# timestamp collisions at millisecond granularity).
-_processed_event_ids: set[str] = set()
+# In-memory record of trigger event IDs already processed in this processor lifetime.
+#
+# WHY IT IS LOAD-BEARING, not a nicety. The poll bound is `created_at >= last_processed_at` and the
+# watermark is set to the newest event's OWN timestamp, so the newest event is re-selected on EVERY
+# poll — for ever, until a newer one arrives. That inclusive bound is deliberate: system_events
+# timestamps collide at millisecond granularity, and `>` would silently drop an event that shares a
+# millisecond with the last one processed. So re-selection is the design, and this is the only thing
+# standing between it and a re-triggered workflow.
+#
+# A dict, not a set, because eviction has to drop the OLDEST — see _track_processed. Python dicts
+# are insertion-ordered (3.7+), so this is an ordered set; the values are unused.
+_processed_event_ids: dict[str, None] = {}
 
-# Cap the size of the dedup set to prevent unbounded memory growth.
-# When exceeded, we clear the oldest half (approximated by clearing all).
+# Cap the size to prevent unbounded memory growth.
 _MAX_DEDUP_SET_SIZE = 50_000
+#: How much to drop when the cap is hit. Half, so eviction is amortised rather than every-insert.
+_DEDUP_EVICT_FRACTION = 0.5
 
 
 def _track_processed(event_id: str) -> bool:
     """Record an event ID as processed. Returns True if it was already seen."""
-    global _processed_event_ids
     if event_id in _processed_event_ids:
         return True
     if len(_processed_event_ids) >= _MAX_DEDUP_SET_SIZE:
+        # DROP THE OLDEST HALF — this used to clear the WHOLE set.
+        #
+        # Wiping it forgets the newest event ids along with the oldest, and the newest is exactly
+        # the one the `>=` bound re-selects on the very next poll. So a clear that landed while an
+        # event was still the newest let that event through a second time and re-triggered its
+        # workflow: a duplicate process_instance from a single emission, roughly once per 50,000
+        # events, with nothing in the log to explain it.
+        #
+        # Evicting oldest-first keeps every recent id, which is the only region the re-selection
+        # window can reach. The oldest ids are unreachable anyway — the watermark has long since
+        # advanced past them.
+        drop = int(_MAX_DEDUP_SET_SIZE * _DEDUP_EVICT_FRACTION)
+        for stale in list(_processed_event_ids)[:drop]:
+            del _processed_event_ids[stale]
         log.info(
-            "dedup set reached %d entries, clearing to prevent memory growth",
-            _MAX_DEDUP_SET_SIZE,
+            "dedup set reached %d entries, evicted the %d oldest (newest ids retained — the poll's "
+            ">= bound re-selects those every tick)",
+            _MAX_DEDUP_SET_SIZE, drop,
         )
-        _processed_event_ids = set()
-    _processed_event_ids.add(event_id)
+    _processed_event_ids[event_id] = None
     return False
 
 
@@ -188,16 +209,47 @@ def resolve_inputs(
 # ─── Step executors ────────────────────────────────────────────────
 
 
+def _declares_step_status(func: Any) -> bool:
+    """True when `func` names `_ai_step_status` as an EXPLICIT parameter.
+
+    Explicit only — a `**_ignored` catch-all does not count, and nearly every action in
+    this package has one. Injecting into a catch-all would mean the signal silently
+    vanishes wherever someone forgot to read it, which is the same shape of quiet
+    failure B17 was: something that looks wired and is not.
+    """
+    try:
+        import inspect  # noqa: PLC0415 — cheap, and only on the ACTION path
+
+        params = inspect.signature(func).parameters
+        p = params.get("_ai_step_status")
+        return p is not None and p.kind in (
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+    except (TypeError, ValueError):  # builtins / C functions have no signature
+        return False
+
+
 async def _execute_action(
     conn: asyncpg.Connection,
     action: str,
     inputs: dict[str, Any],
+    ai_step_status: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Resolve a dotted function path and call it.
 
     For V1, the action string is a Python module path like
     'pipeline.shredder.shred'. We import the module and call the
     last component as a function, passing conn + inputs.
+
+    `ai_step_status` is the ENGINE's own record of what each AI_INVOKE step in this
+    instance did (pending/running/completed/failed/skipped) — see
+    `workflows.actions.cohort_evidence`. It is injected as `_ai_step_status` ONLY into
+    actions that declare that parameter, so every existing action is unaffected and the
+    dependency is visible in the signature rather than hidden in a blanket kwarg.
+
+    It carries no agent OUTPUT, only whether the agent ran, so an action reading it is
+    still not a consumer of agent results — the input-map-ancestor invariant stands.
     """
     parts = action.rsplit(".", 1)
     if len(parts) != 2:
@@ -213,7 +265,12 @@ async def _execute_action(
     if func is None:
         raise AttributeError(f"Module '{module_path}' has no function '{func_name}'")
 
-    result = func(conn, **inputs)
+    call_kwargs = dict(inputs)
+    if _declares_step_status(func):
+        # A copy: an action must not be able to mutate the engine's own state.
+        call_kwargs["_ai_step_status"] = dict(ai_step_status or {})
+
+    result = func(conn, **call_kwargs)
     if asyncio.iscoroutine(result) or asyncio.isfuture(result):
         result = await result
     return {"result": result}
@@ -450,10 +507,11 @@ async def _execute_step(
     inputs: dict[str, Any],
     trigger_event: dict[str, Any] | None = None,
     fabric: Any = None,
+    ai_step_status: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Dispatch a single workflow step by its type."""
     if step.step_type == StepType.ACTION:
-        return await _execute_action(conn, step.action, inputs)
+        return await _execute_action(conn, step.action, inputs, ai_step_status=ai_step_status)
 
     if step.step_type == StepType.AI_INVOKE:
         return await _execute_ai_invoke(
@@ -724,7 +782,13 @@ async def run_workflow_processor(
                     # Duplicate detection — skip if already processed
                     event_id = event_dict["id"]
                     if _track_processed(event_id):
-                        log.info(
+                        # DEBUG, not INFO. The `>=` poll bound re-selects the newest event on every
+                        # tick, so on an idle platform this fires once per 10s for ever, on the same
+                        # id. At INFO it is not a signal — it is a screen that hides real ones: 40 of
+                        # the last 40 lines in a live worker log, which is how a burst of
+                        # "new row violates row-level security policy" went unnoticed for half an
+                        # hour. Expected-by-design behaviour does not belong at INFO.
+                        log.debug(
                             "skipping duplicate event %s (already processed)",
                             event_id,
                         )

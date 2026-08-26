@@ -27,9 +27,48 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 
+#: Databases this file must never open. Its cleanup TRUNCATES shared tables, so pointing
+#: TEST_DATABASE_URL at a working database deletes real rows — and the deletes that DON'T trip a
+#: foreign key are the ones that do the damage silently. Names, not URLs, because the same database
+#: is reachable under several host spellings.
+_FORBIDDEN_DB_NAMES = ("govtech_intel", "railway", "postgres_prod")
+
+
+def _force_stub_mode(monkeypatch):
+    """Put the ingesters in stub mode, and PROVE it took.
+
+    This used to be `monkeypatch.setenv("USE_STUB_DATA", "true")` followed by a reload of the config
+    module, because config computes the flag once at import. Two things are wrong with that. The
+    reload is guarded on `"config" in sys.modules`, so it silently does nothing when config has not
+    been imported yet; and monkeypatch restores the ENV at teardown without reloading, so the
+    module attribute keeps whatever the last reload left. Run alone these tests passed; run inside
+    the full suite the flag was False and `sam_gov.fetch_page` made a REAL call to the SAM.gov API,
+    failing with 403 Forbidden. A test suite that reaches the public internet depending on file
+    ordering is worse than one that fails.
+
+    Set the attribute the code actually reads, reached THROUGH the ingester module rather than by a
+    fresh `import config`. Those can be different objects: test_crypto.py evicts config from
+    sys.modules, so anything imported before it keeps the original module while a later import
+    builds a second one. Patching `sam_gov.config` patches whichever object sam_gov is holding,
+    whatever the import history was.
+
+    The assertion is the point — silently not taking effect is the failure mode being fixed.
+    """
+    from ingest import sam_gov
+    monkeypatch.setattr(sam_gov.config, "USE_STUB_DATA", True)
+    assert sam_gov.config.USE_STUB_DATA is True
+
+
 @pytest_asyncio.fixture
 async def conn():
     """Connect to the test PG instance (skip if unreachable)."""
+    name = TEST_DATABASE_URL.rsplit("/", 1)[-1].split("?")[0]
+    if name in _FORBIDDEN_DB_NAMES:
+        pytest.fail(
+            f"TEST_DATABASE_URL points at '{name}', a working database. This file's cleanup "
+            "truncates pipeline_jobs / curated_solicitations / solicitation_compliance and deletes "
+            "finder events. Point it at a throwaway database (see scripts/sandbox-env.sh)."
+        )
     try:
         c = await asyncpg.connect(TEST_DATABASE_URL, timeout=2)
     except (asyncpg.exceptions.PostgresError, OSError, ConnectionError):
@@ -42,12 +81,37 @@ async def conn():
 
 @pytest_asyncio.fixture
 async def clean_tables(conn):
-    """Clear the tables we'll test against before each run."""
+    """Clear what these tests produce, and nothing else.
+
+    THESE DELETES USED TO BE UNQUALIFIED, written against a bare schema where curated_solicitations
+    had no dependents and system_events had no referrers. A database built by actually running the
+    migrations has both: 140/143 seed a demo solicitation with a proposal, sections and a compliance
+    matrix hanging off it, and workflow rows point at seeded events. So
+    `DELETE FROM curated_solicitations` trips proposals_solicitation_id_fkey and every test here
+    errors in setup.
+
+    It went unnoticed because these tests SKIP when no test PG is reachable — the suite reported
+    green while this fixture had never once run against a real schema.
+
+    Deleting the seeded graph would be the wrong repair anyway; other tests depend on it. Scope each
+    delete to rows nothing owns instead: the stub ingest's own opportunities, solicitations with no
+    proposal built on them, events no workflow instance references. Both an empty database and a
+    fully seeded one end up in the state these tests expect.
+    """
     async def _cleanup():
         await conn.execute("DELETE FROM pipeline_jobs")
-        await conn.execute("DELETE FROM system_events WHERE namespace = 'finder'")
-        await conn.execute("DELETE FROM solicitation_compliance")
-        await conn.execute("DELETE FROM curated_solicitations")
+        await conn.execute(
+            "DELETE FROM system_events WHERE namespace = 'finder' AND id NOT IN "
+            "(SELECT trigger_event_id FROM process_instances WHERE trigger_event_id IS NOT NULL)"
+        )
+        await conn.execute(
+            "DELETE FROM solicitation_compliance WHERE solicitation_id NOT IN "
+            "(SELECT solicitation_id FROM proposals WHERE solicitation_id IS NOT NULL)"
+        )
+        await conn.execute(
+            "DELETE FROM curated_solicitations WHERE id NOT IN "
+            "(SELECT solicitation_id FROM proposals WHERE solicitation_id IS NOT NULL)"
+        )
         await conn.execute("DELETE FROM opportunities WHERE source IN ('sam_gov', 'sbir_gov', 'grants_gov')")
     await _cleanup()
     yield
@@ -62,11 +126,7 @@ async def test_dispatcher_consumes_sam_gov_job_stub_mode(conn, clean_tables, mon
     calls happen; it returns 9 synthetic opportunities (SBIR Phase I
     + II, STTR, BAA, OTA).
     """
-    monkeypatch.setenv("USE_STUB_DATA", "true")
-    # Force config module to re-read env (it caches at import time)
-    import importlib, sys
-    if "config" in sys.modules:
-        importlib.reload(sys.modules["config"])
+    _force_stub_mode(monkeypatch)
 
     from ingest.dispatcher import consume_one_job
 
@@ -120,10 +180,7 @@ async def test_dispatcher_idempotent_content_hash_dedupe(conn, clean_tables, mon
     and an ON CONFLICT DO UPDATE WHERE content_hash changes pattern.
     Second run should UPDATE 0 rows when content hasn't changed.
     """
-    monkeypatch.setenv("USE_STUB_DATA", "true")
-    import importlib, sys
-    if "config" in sys.modules:
-        importlib.reload(sys.modules["config"])
+    _force_stub_mode(monkeypatch)
 
     from ingest.dispatcher import consume_one_job
 

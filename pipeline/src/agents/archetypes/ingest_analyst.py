@@ -29,6 +29,7 @@ import logging
 import uuid
 
 from .base import BaseArchetype
+from shredder.section_locate import locate_sections
 
 logger = logging.getLogger("pipeline.agents.ingest_analyst")
 
@@ -146,7 +147,7 @@ Use get_solicitation to read the shredded text. Be precise and conservative. Out
                     "number": row["solicitation_number"],
                     "type": row["solicitation_type"],
                     "ai_extracted": ai_extracted,
-                    "full_text": (row["full_text"][:24000] if row["full_text"] else ""),
+                    "full_text": locate_sections(row["full_text"], budget=24000).text,
                 },
                 "status": row["status"],
             }

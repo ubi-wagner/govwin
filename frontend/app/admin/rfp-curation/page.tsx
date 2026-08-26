@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { sqlBypass as sql } from '@/lib/db';
 import { TriageQueue } from '@/components/rfp-curation/triage-queue';
 import TriageTodos from './triage-todos';
+import IntakeStageStrip from '@/components/admin/intake-stage-strip';
+import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,8 +81,12 @@ export default async function RFPCurationPage() {
     postedDate: r.postedDate?.toISOString() ?? null,
   }));
 
+  // The discovery river's backlog, shared by every stage (#176).
+  const stageCounts = await loadIntakeStageCounts();
+
   return (
     <div>
+      <IntakeStageStrip current="curation" counts={stageCounts} />
       <TriageTodos />
       <div className="flex items-center justify-between mb-6">
         <div>

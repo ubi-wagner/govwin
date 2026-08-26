@@ -50,6 +50,34 @@ const CALLOUT_ARGB: Record<string, { bg: string; fg: string }> = {
 
 interface SheetCtx { workbook: ExcelJS.Workbook; raster: Map<CanvasNode, RasterPng | null> }
 
+/**
+ * Apply a node's own styling to a cell — font, alignment and highlight.
+ *
+ * THIS EXISTED AND WAS NEVER CALLED. `applyRunFont` was written to map NodeStyle onto an ExcelJS
+ * font and then wired into nothing: zero callers, so every prose node written into a sheet came out
+ * with whatever the switch below hardcoded and none of what the author chose. A style-versus-writer
+ * matrix caught it — eleven capabilities present in the model, absent from the .xlsx, and the tell
+ * was that the artifact did not change at all between `weight: 'normal'` and `weight: 'bold'`.
+ *
+ * NOTE THE SCOPE. This is about PROSE placed in a sheet — a heading, a paragraph, a caption. The
+ * spreadsheet's own cell model (`sheet` nodes, via `resolved.style`) has always honoured bold,
+ * colour and alignment on its own path and is untouched here.
+ *
+ * ORDER MATTERS: the hardcoded defaults in each case go on FIRST and this overlays them, so a
+ * heading stays bold unless the author said otherwise, and an explicit choice always wins.
+ */
+function applyNodeStyle(cell: ExcelJS.Cell, style?: NodeStyle): void {
+  if (!style) return;
+  applyRunFont(cell, style);
+  if (style.alignment) {
+    cell.alignment = { ...cell.alignment, horizontal: style.alignment as 'left' | 'center' | 'right' | 'justify' };
+  }
+  const hl = style.highlight ?? style.background;
+  if (hl) {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(hl) } };
+  }
+}
+
 /** Apply the run styling common to every primitive (family/size/bold/italic/underline/strike/color) to a cell. */
 function applyRunFont(cell: ExcelJS.Cell, style?: NodeStyle): void {
   if (!style) return;
@@ -324,6 +352,7 @@ function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode, ctx: SheetCtx
         bold: true,
         size: headingSize(c.level),
       };
+      applyNodeStyle(row.getCell(1), node.style);
       // Add a blank row after heading for spacing
       ws.addRow([]);
       break;
@@ -334,6 +363,7 @@ function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode, ctx: SheetCtx
       if (c.text) {
         const row = ws.addRow([c.text]);
         row.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        applyNodeStyle(row.getCell(1), node.style);
       }
       break;
     }
@@ -345,7 +375,7 @@ function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode, ctx: SheetCtx
         const prefix = node.type === 'bulleted_list'
           ? `${'  '.repeat(item.indent_level ?? 0)}• `
           : `${'  '.repeat(item.indent_level ?? 0)}${idx + 1}. `;
-        ws.addRow([prefix + item.text]);
+        applyNodeStyle(ws.addRow([prefix + item.text]).getCell(1), node.style);
       });
       break;
     }
@@ -354,12 +384,13 @@ function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode, ctx: SheetCtx
       const c = node.content as CaptionContent;
       const row = ws.addRow([`${c.prefix} ${c.number}: ${c.text}`]);
       row.getCell(1).font = { italic: true };
+      applyNodeStyle(row.getCell(1), node.style);
       break;
     }
 
     case 'footnote': {
       const c = node.content as { marker: string; text: string };
-      ws.addRow([`[${c.marker}] ${c.text}`]);
+      applyNodeStyle(ws.addRow([`[${c.marker}] ${c.text}`]).getCell(1), node.style);
       break;
     }
 

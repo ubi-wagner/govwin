@@ -208,6 +208,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Update tenant ────────────────────────────────────────────
+    let startId: string | null = null;
     try {
       // Verify tenant exists
       const [existing] = await sql<{ id: string }[]>`
@@ -221,7 +222,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
 
       // ── Start event ────────────────────────────────────────────────
-      const startId = await emitEventStart({
+      startId = await emitEventStart({
         namespace: 'finder',
         type: 'tenant.updated',
         actor: userActor(sessionUser.id as string),
@@ -259,6 +260,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
       return NextResponse.json({ data: { tenant: updated } });
     } catch (dbErr) {
+      if (startId) {
+        await emitEventEnd(startId, { error: { message: dbErr instanceof Error ? dbErr.message : String(dbErr), code: 'HANDLER_THREW' } });
+      }
       console.error('[admin/tenants] PATCH DB error:', dbErr);
       return NextResponse.json(
         { error: 'Failed to update tenant', code: 'DB_ERROR' },

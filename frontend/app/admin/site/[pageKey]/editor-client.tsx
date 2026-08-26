@@ -15,6 +15,79 @@ function fmtWhen(d: Date | string | null): string {
   return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/**
+ * The full publish history of a page, which the product has always kept and never shown.
+ *
+ * `content_pages` stores every version, `getVersions()` returns them newest-first, and
+ * `GET /api/admin/site/pages/[pageKey]/versions` serves them — and nothing called it, so the header
+ * above could only ever say "Live v7 · Draft v8". An editor about to overwrite v8 had no way to see
+ * that v6 was live for a month or who published v4. The data and the endpoint were already there;
+ * this is the read.
+ *
+ * Collapsed by default and fetched on first open — the history of a rarely-edited marketing page is
+ * not worth a request on every editor load.
+ */
+function VersionHistory({ pageKey }: { pageKey: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<PageVersion[] | null>(null);
+  const [err, setErr] = useState('');
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (!next || rows) return;
+    try {
+      const res = await fetch(`/api/admin/site/pages/${encodeURIComponent(pageKey)}/versions`);
+      const json = (await res.json()) as { data?: PageVersion[]; error?: string };
+      if (!res.ok) { setErr(json.error ?? 'Could not load history'); return; }
+      setRows(json.data ?? []);
+    } catch {
+      setErr('Could not load history');
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <button onClick={toggle} className="text-xs text-blue-600 hover:underline" aria-expanded={open}>
+        {open ? 'Hide' : 'Show'} version history
+      </button>
+      {open && (
+        <div className="mt-2 border rounded-lg bg-white p-3 max-w-2xl">
+          {err && <p className="text-xs text-red-600">{err}</p>}
+          {!err && rows === null && <p className="text-xs text-gray-400">Loading…</p>}
+          {!err && rows?.length === 0 && <p className="text-xs text-gray-400">No versions yet.</p>}
+          {!err && rows && rows.length > 0 && (
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="pb-1 pr-4 font-medium">Version</th>
+                  <th className="pb-1 pr-4 font-medium">Status</th>
+                  <th className="pb-1 pr-4 font-medium">Saved</th>
+                  <th className="pb-1 pr-4 font-medium">Published</th>
+                  <th className="pb-1 pr-4 font-medium">By</th>
+                  <th className="pb-1 font-medium">Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.map((v) => (
+                  <tr key={v.id}>
+                    <td className="py-1 pr-4 font-medium">v{v.versionNo}</td>
+                    <td className="py-1 pr-4 text-gray-600">{v.status}</td>
+                    <td className="py-1 pr-4 text-gray-500">{fmtWhen(v.createdAt)}</td>
+                    <td className="py-1 pr-4 text-gray-500">{fmtWhen(v.publishedAt)}</td>
+                    <td className="py-1 pr-4 text-gray-500">{shortActor(v.createdBy)}</td>
+                    <td className="py-1 text-gray-400 truncate max-w-xs">{v.auditNote ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Read/write the line-art icon name from a block's metadata JSON, leaving any
 // other metadata keys untouched.
 function metaIcon(metaText: string): string {
@@ -208,6 +281,7 @@ export default function EditorClient({
         {(draft ?? active)?.auditNote && (
           <div className="mt-1 text-xs text-gray-400">Last note: &ldquo;{(draft ?? active)?.auditNote}&rdquo;</div>
         )}
+        <VersionHistory pageKey={pageKey} />
       </div>
 
       <div className="space-y-4">

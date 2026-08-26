@@ -3,6 +3,8 @@ import { sqlBypass as sql } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { MasterCards } from '@/components/admin/master-cards';
+import IntakeStageStrip from '@/components/admin/intake-stage-strip';
+import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,8 +144,12 @@ export default async function AdminMasterCardsPage() {
     pinnedCount: r.pinnedCount,
   }));
 
+  // The discovery river's backlog, shared by every stage (#176).
+  const stageCounts = await loadIntakeStageCounts();
+
   return (
     <div>
+      <IntakeStageStrip current="cards" counts={stageCounts} />
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Opportunity Cards</h1>
         <p className="text-sm text-gray-500 mt-1">

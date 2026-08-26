@@ -6,7 +6,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import * as fs from 'fs';
 
-const PW = { foundation: 'DemoPass123!', admin: 'RFPAdmin2026!' };
+const PW = { foundation: 'DemoPass123!', admin: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const DIR = process.env.CC_SHOT_DIR || '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/cc-shots/actors';
 const DESKTOP = { width: 1280, height: 900 };
 const MOBILE = { width: 390, height: 844 };

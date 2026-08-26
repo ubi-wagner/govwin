@@ -20,6 +20,7 @@ interface RouteContext {
 }
 
 export async function POST(_request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     // ── Auth ────────────────────────────────────────────────────────
     const session = await auth();
@@ -69,7 +70,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     // ── Start event ──────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'source.scout_triggered',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -98,6 +99,9 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { jobId: job.id } }, { status: 201 });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/sources/[profileId]/scout POST] error:', e);
     return NextResponse.json(
       { error: 'Failed to enqueue scout job', code: 'DB_ERROR' },

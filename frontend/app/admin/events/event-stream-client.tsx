@@ -41,8 +41,21 @@ const TIME_RANGES = [
 
 type SortKey = 'time' | 'event' | 'phase' | 'actor' | 'tenant' | 'duration';
 
-function relativeTime(iso: string): string {
-  const diffSec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+/**
+ * "3m ago" — but only once we are on the client (bug log B79).
+ *
+ * This read `Date.now()` during render. On a server-rendered page that makes the cell a function of
+ * WHEN IT RENDERED: the server wrote "2s ago", the client hydrated a beat later and computed
+ * "4s ago", the text did not match, and React threw #418 — which does not degrade one cell, it
+ * fails hydration for the subtree and takes the Event Stream down to the error boundary. The page
+ * still answered HTTP 200 the whole time, so nothing watching status codes ever saw it.
+ *
+ * `now = null` until mounted, so the first paint (server AND client) is the deterministic UTC
+ * timestamp, and the relative form appears on the next tick.
+ */
+function relativeTime(iso: string, now: number | null): string {
+  if (now === null) return iso.slice(0, 19).replace('T', ' ') + 'Z';
+  const diffSec = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
   if (diffSec < 60) return `${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;
@@ -108,6 +121,13 @@ export function EventStreamClient({
   const [typeInput, setTypeInput] = useState(currentType);
   const [sortKey, setSortKey] = useState<SortKey>('time');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Null until mounted — see relativeTime(). Ticks so "2m ago" does not go stale on an open tab.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const buildUrl = useCallback(
     (over: { namespace?: string; hours?: string; phase?: string; type?: string } = {}) => {
@@ -254,7 +274,7 @@ export function EventStreamClient({
                 const isExpanded = expandedIds.has(ev.id);
                 return (
                   <tr key={ev.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap text-xs" title={ev.createdAt}>{relativeTime(ev.createdAt)}</td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap text-xs" title={ev.createdAt}>{relativeTime(ev.createdAt, now)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${nsColor}`}>{ev.namespace}.{ev.type}</span>
                     </td>

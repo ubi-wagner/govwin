@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Role } from '@/lib/rbac';
+import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 
 interface Card {
@@ -90,6 +90,18 @@ const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string; role: Role }) {
+  // The `role` prop was received and never read (the only other `role` in this file was the HTML
+  // role="alert"). /cards admits anyone passing canManageBuckets — which explicitly INCLUDES a
+  // tenant_user holding the designee grant (lib/db.ts, settable from the Team page) — but both
+  // buying paths are floored at tenant_admin server-side:
+  //   • POST …/purchase            → gate(tenantSlug, 'tenant_admin') → 403 "Insufficient permissions"
+  //   • /portal/<slug>/portals     → tenant_admin-gated page
+  // So the designee saw a primary emerald "Purchase" CTA that could only ever 403. Read the prop.
+  const canBuy = hasRoleAtLeast(role, 'tenant_admin');
+  // Deep link from a notification (lib/event-labels.ts). Opportunity notifications used to point at
+  // /spotlights/<id>, a retired stub that redirects to /cards and DROPS the id — so the user landed
+  // on the generic list, not the card they were told about. They point here now; honour the id.
+  const [focusOpp, setFocusOpp] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -113,6 +125,17 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   }, [tenantSlug, includeClosed, includePassed]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Read ?opp= once, then scroll it into view when the cards have rendered. Highlight persists so
+  // the user can see WHICH card the notification meant even after the scroll settles.
+  useEffect(() => {
+    const opp = new URLSearchParams(window.location.search).get('opp');
+    if (opp) setFocusOpp(opp);
+  }, []);
+  useEffect(() => {
+    if (!focusOpp || cards.length === 0) return;
+    document.getElementById(`opp-${focusOpp}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusOpp, cards.length]);
 
   const act = useCallback(async (opp: string, method: 'POST' | 'DELETE', qs = '') => {
     setBusy(opp); setErr(null);
@@ -139,7 +162,20 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
     } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
-  const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
+  // An opportunity whose close date has passed is closed to the customer whatever the admin
+  // lifecycle says — nobody has flipped lifecycle_status, because that is a manual admin
+  // transition with no date sweeper behind it. So "Include closed" has to honour the date too,
+  // using the same predicate the chip renders from; otherwise the filter hides admin-closed
+  // cards while leaving expired ones on screen, which reads as simply broken.
+  // The card a notification deep-linked to is always kept: telling someone to look at an
+  // opportunity and then hiding it because it just closed is worse than showing it closed.
+  const visible = useMemo(
+    () => (includeClosed
+      ? cards
+      : cards.filter((c) => c.opportunityId === focusOpp || (daysUntil(str(c, 'closeDate')) ?? 0) >= 0)),
+    [cards, includeClosed, focusOpp],
+  );
+  const sorted = useMemo(() => sortCards(visible, sortBy), [visible, sortBy]);
   const selectedBucketId = sortBy.startsWith('bucket:') ? sortBy.slice(7) : null;
   const selectedBucketName = selectedBucketId ? buckets.find((b) => b.id === selectedBucketId)?.name : null;
 
@@ -156,7 +192,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
           <input type="checkbox" checked={includePassed} onChange={(e) => setIncludePassed(e.target.checked)} /> Show passed
         </label>
         <button onClick={load} className="text-blue-600 hover:underline">Refresh</button>
-        <span className="text-gray-400">· {cards.length} cards</span>
+        <span className="text-gray-400">· {visible.length} cards</span>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
@@ -173,7 +209,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       </div>
 
       {loading && <p className="text-gray-400 text-sm py-8 text-center">Loading…</p>}
-      {!loading && cards.length === 0 && (
+      {!loading && visible.length === 0 && (
         <div className="text-center py-16 text-gray-400">
           <p className="text-lg">No opportunities yet.</p>
           <p className="text-sm mt-1">Cards appear here as the RFP team releases opportunities.</p>
@@ -182,7 +218,15 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sorted.map((c) => (
-          <div key={c.id} className={`border rounded-xl p-4 bg-white ${c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'}`}>
+          <div
+            key={c.id}
+            id={`opp-${c.opportunityId}`}
+            className={`border rounded-xl p-4 bg-white scroll-mt-24 ${
+              focusOpp === c.opportunityId
+                ? 'border-amber-400 ring-2 ring-amber-200'
+                : c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'
+            }`}
+          >
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="text-sm font-semibold text-gray-800">{str(c, 'title') ?? 'Untitled opportunity'}</h3>
               {STAGE_BADGE[c.submissionStage] && (
@@ -231,7 +275,9 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                 <>
                   <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">Pinned</span>
                   <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-1">Unpin</button>
-                  <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
+                  {canBuy && (
+                    <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
+                  )}
                 </>
               ) : c.pursuitStatus === 'passed' ? (
                 <>
@@ -246,7 +292,11 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                   <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'passed')} className="text-xs text-gray-400 hover:text-gray-700" title="Hide this from your feed — trains your matches">Not interested</button>
                 </>
               )}
-              <a href={`/portal/${tenantSlug}/portals?opp=${c.opportunityId}`} className="text-xs text-gray-600 hover:text-gray-900 ml-auto">Build →</a>
+              {canBuy ? (
+                <a href={`/portal/${tenantSlug}/portals?opp=${c.opportunityId}`} className="text-xs text-gray-600 hover:text-gray-900 ml-auto">Build →</a>
+              ) : (
+                <span className="text-xs text-gray-400 ml-auto" title="Only a company admin can purchase a proposal portal. Pin what you want and ask yours to buy it.">Admin buys</span>
+              )}
             </div>
           </div>
         ))}

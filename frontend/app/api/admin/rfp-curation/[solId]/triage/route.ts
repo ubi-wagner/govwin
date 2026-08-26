@@ -141,7 +141,9 @@ export async function POST(
     const toState = mapping.to;
 
     // ── Start event ────────────────────────────────────────────────
-    let startId: string;
+    // Initialised so the catch below can close the bracket — the `end` emit runs on the throw
+    // path too, where nothing has assigned it yet.
+    let startId: string | null = null;
     try {
       startId = await emitEventStart({
         namespace: 'finder',
@@ -155,6 +157,9 @@ export async function POST(
         },
       });
     } catch (evtErr) {
+      if (startId) {
+        await emitEventEnd(startId, { error: { message: evtErr instanceof Error ? evtErr.message : String(evtErr), code: 'HANDLER_THREW' } });
+      }
       console.error('[rfp-curation] POST triage emitEventStart failed:', evtErr);
       return NextResponse.json(
         { error: 'Internal error', code: 'DB_ERROR' },

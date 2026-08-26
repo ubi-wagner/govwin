@@ -6,8 +6,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { shouldFocusNodeTab } from '@/lib/canvas/format-controls';
 import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules, NodeType } from '@/lib/types/canvas-document';
-import { getNodeText } from '@/lib/types/canvas-document';
+import { getNodeText, docNodes } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
 import { CommentThread, type NodeComment } from './collaboration';
@@ -86,6 +87,20 @@ interface Props {
   tenantSlug?: string;
   /** Section ID for version history (only available in portal context) */
   sectionId?: string;
+}
+
+/**
+ * Margins for a read-out: points → inches, 2dp, and "all" only when it is true.
+ *
+ * Trailing zeros are trimmed so a plain 1" margin reads `1"` rather than `1.00"`, and a slide's
+ * 40pt reads `0.56"` rather than the raw `0.5555555555555556` this replaced.
+ */
+export function marginLabel(m: { top: number; right: number; bottom: number; left: number }): string {
+  const inch = (pt: number) => String(Number((pt / 72).toFixed(2)));
+  const same = m.top === m.right && m.right === m.bottom && m.bottom === m.left;
+  return same
+    ? `${inch(m.left)}" all`
+    : `${inch(m.top)} · ${inch(m.right)} · ${inch(m.bottom)} · ${inch(m.left)}"`;
 }
 
 // ─── Self-contained comments section with data fetching ─────────────
@@ -445,15 +460,39 @@ export function CanvasSidebar({
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings' | 'review'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
+  // ── SELECTING A NODE LANDS YOU WHERE ITS FORMATTING IS ──────────────────────────────────────
+  //
+  // The panel opens on `compliance`, and every shape, arrange and layering control lives under
+  // `Node`. So the full ribbon was two steps from the page — select, then switch tab — and the
+  // capability doc named that as a real friction point rather than a missing feature: the controls
+  // were all built, just not where a person looks after clicking something.
+  //
+  // ONLY FROM THE DEFAULT TAB, which is the whole subtlety. Jumping unconditionally would hijack a
+  // deliberate choice: inserting from the `Add` tab selects the node it just inserted, so an
+  // unconditional rule would throw the author out of the insert panel on every insert — worse than
+  // the friction it fixes. Moving off `compliance` is an expressed preference; sitting on it is
+  // not, so only the untouched default gives way.
+  // The rule itself is `shouldFocusNodeTab` in lib/canvas/format-controls — a pure predicate, so it
+  // is unit-tested rather than only typechecked (vitest runs in `node` here; there is no jsdom).
+  const lastSelId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = selectedNode?.id ?? null;
+    if (shouldFocusNodeTab(lastSelId.current, id, activeTab)) setActiveTab('node');
+    lastSelId.current = id;
+  }, [selectedNode, activeTab]);
+
   const maxPages = doc.canvas.max_pages;
   // Real word-budget fit (the section "mold") — replaces the old ceil(nodeCount/8) guess.
   const budget = computeSectionBudget({ pageLimit: maxPages, fontSize: doc.canvas.font_default?.size, lineSpacing: doc.canvas.line_spacing });
-  const fit = evaluateFit(doc.nodes, budget);
+  // `docNodes`, not `doc.nodes`: a canvas carrying the SECTION layer has no top-level `nodes`, and
+  // every read below would throw on it — taking the whole workspace to the error boundary.
+  const allNodes = docNodes(doc);
+  const fit = evaluateFit(allNodes, budget);
   const pageOk = fit.withinBudget;
 
-  const aiNodes = doc.nodes.filter((n) => n.provenance?.source === 'ai_draft').length;
-  const libraryNodes = doc.nodes.filter((n) => n.provenance?.source === 'library').length;
-  const manualNodes = doc.nodes.filter((n) => n.provenance?.source === 'manual').length;
+  const aiNodes = allNodes.filter((n) => n.provenance?.source === 'ai_draft').length;
+  const libraryNodes = allNodes.filter((n) => n.provenance?.source === 'library').length;
+  const manualNodes = allNodes.filter((n) => n.provenance?.source === 'manual').length;
 
   // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
   // user keeps the read panels (status, node info, history, comments).
@@ -536,11 +575,18 @@ export function CanvasSidebar({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status</span>
-                  <span className="font-medium">{doc.metadata.status.replace(/_/g, ' ')}</span>
+                  {/* B78 class, third occurrence: an unguarded read of a stored canvas field takes
+                      the ENTIRE section workspace to the route error boundary — status 200, no
+                      server log, nothing rendered. `metadata.status` and `nodes` are both typed
+                      required and both absent from real shapes the product can produce (a canvas
+                      carrying the section layer has no top-level `nodes` at all). No stored row
+                      violates either today; the guard costs nothing and the failure mode is a
+                      white screen on a customer's proposal. */}
+                  <span className="font-medium">{(doc.metadata?.status ?? 'draft').replace(/_/g, ' ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Atoms</span>
-                  <span className="font-medium">{doc.nodes.length}</span>
+                  <span className="font-medium">{allNodes.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Version</span>
@@ -575,7 +621,13 @@ export function CanvasSidebar({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Margins</span>
-                  <span className="font-medium text-xs">{doc.canvas.margins.left / 72}&quot; all</span>
+                  {/* Rounded, and honest about "all".
+                      Margins are stored in POINTS; a 40pt slide margin divided by 72 rendered as
+                      `0.5555555555555556" all` — a raw float in a customer-facing read-out, next to
+                      a claim that was also wrong whenever the four sides differ. Two decimals is the
+                      precision an inches control with a 0.25 step can express; "all" now appears
+                      only when the four sides really are equal. */}
+                  <span className="font-medium text-xs">{marginLabel(doc.canvas.margins)}</span>
                 </div>
               </div>
             </div>

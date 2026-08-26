@@ -5,12 +5,15 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
+import { closeTasksForEntity } from '@/lib/tasks/tasks';
+import type { Role } from '@/lib/rbac';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -71,7 +74,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'capture',
       type: 'application.rejected',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -99,6 +102,20 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    // The question the triage ToDo asked has now been answered, so the ToDo is moot, not pending.
+    // Rejecting drains it exactly as accepting does — the two decisions must not diverge (B51).
+    try {
+      const closed = await closeTasksForEntity({
+        entityType: 'application',
+        entityId: id,
+        actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: role as Role, tenantId: null },
+        result: { decision: 'rejected', reason },
+      });
+      if (closed.failed) console.error('[admin/applications/reject] some triage ToDos did not close', closed);
+    } catch (taskErr) {
+      console.error('[admin/applications/reject] ToDo close failed (non-fatal):', taskErr);
+    }
+
     // Send rejection email (non-fatal)
     let emailSent = false;
     try {
@@ -124,6 +141,9 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { rejected: true } });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/applications/reject] error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

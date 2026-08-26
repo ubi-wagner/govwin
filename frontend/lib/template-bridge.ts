@@ -163,22 +163,68 @@ export async function publishAndFanOutTemplate(
 
 /** New-tenant backfill: apply the latest bridge version of EVERY template to a tenant (100% copy on creation). */
 export async function backfillTenantTemplates(tenantId: string): Promise<number> {
-  let heads: Array<{ id: string; templateId: string; version: number; eventType: TemplateBridgeEventType; snapshot: TemplateSnapshot }> = [];
-  try {
-    heads = await sql`
+  const readHeads = async () => sql`
       SELECT DISTINCT ON (template_id)
              id, template_id AS "templateId", version, event_type AS "eventType", template AS snapshot
       FROM template_bridge
       ORDER BY template_id, version DESC
-    ` as typeof heads;
+    ` as Promise<Array<{ id: string; templateId: string; version: number; eventType: TemplateBridgeEventType; snapshot: TemplateSnapshot }>>;
+
+  let heads: Awaited<ReturnType<typeof readHeads>> = [];
+  try {
+    heads = await readHeads();
   } catch (e) {
     console.error('[tpl-bridge] backfill head query failed', e);
     return 0;
   }
+
+  // AN EMPTY STABLE IS AN ANOMALY, NOT AN ANSWER (bug log B34).
+  //
+  // The chain is TEMPLATE_CATALOG (39 entries, in TypeScript) → syncTemplateStableFromCatalog →
+  // master_templates → template_bridge → here. The sync was reachable ONLY from an admin clicking
+  // /admin/template-stable/sync, so on a database nobody had clicked it on, every link downstream
+  // was empty — and this function read zero heads, applied zero, returned 0, and every caller's
+  // best-effort try/catch treated that as success. Confirmed live on a box built from migration
+  // 001: `master_templates=0  template_bridge=0  tenant_template_cards=0`, on every tenant
+  // including our own. The customer lands and every proposal mold the product ships is invisible
+  // to them, with nothing anywhere saying so.
+  //
+  // Seeding the catalog in SQL would duplicate 39 canvas bodies that live in TypeScript and let
+  // the two drift. Self-healing here keeps ONE source of truth and repairs whatever provisions
+  // next: the sync is idempotent (it change-detects against the stored body), `template_key` is
+  // uniquely indexed so a concurrent double-run cannot double-insert, and it costs one pass — the
+  // moment master is populated the check below short-circuits forever. `publishAndFanOutTemplate`
+  // inside the sync also fans to tenants that already exist, so this repairs the ones provisioned
+  // while the stable was empty, not only the one being provisioned now.
+  if (heads.length === 0) {
+    try {
+      const [{ n }] = await sql<Array<{ n: number }>>`SELECT count(*)::int AS n FROM master_templates`;
+      if (n === 0) {
+        console.error('[tpl-bridge] template stable is EMPTY — seeding from TEMPLATE_CATALOG before backfill (B34)');
+        const { syncTemplateStableFromCatalog } = await import('@/lib/template-stable-sync');
+        const results = await syncTemplateStableFromCatalog(null);
+        const failed = results.filter((r) => r.action === 'error');
+        console.error(`[tpl-bridge] stable seeded: ${results.length - failed.length}/${results.length} templates`
+          + (failed.length ? ` — ${failed.length} FAILED: ${failed.map((f) => f.key).join(', ')}` : ''));
+        heads = await readHeads();
+      }
+    } catch (e) {
+      // Never fail a provision over this — the tenant is still usable, just template-less, and the
+      // line below makes that visible rather than silent.
+      console.error('[tpl-bridge] stable self-heal failed', e);
+    }
+  }
+
   let applied = 0;
   for (const h of heads) {
     try { await applyTemplateToTenant(tenantId, h); applied++; }
     catch (e) { console.error('[tpl-bridge] backfill apply failed', h.templateId, e); }
+  }
+  // Say so when a tenant ends up with nothing. "Found nothing and succeeded" is the shape this bug
+  // hid inside for as long as it existed.
+  if (applied === 0) {
+    console.error('[tpl-bridge] backfill applied 0 templates to tenant', tenantId,
+      `— ${heads.length} bridge head(s) available. This tenant has an EMPTY template shelf.`);
   }
   return applied;
 }

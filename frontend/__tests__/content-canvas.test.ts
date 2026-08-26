@@ -110,3 +110,61 @@ describe('newContentCanvas', () => {
     expect((nodes[0].content as { text: string }).text).toBe('Fresh');
   });
 });
+
+describe('inline markdown never reaches a published page (B104)', () => {
+  const textOf = (n: { content: unknown }) => (n.content as { text: string }).text;
+  const itemsOf = (n: { content: unknown }) => (n.content as { items: { text: string }[] }).items;
+  const fmtsOf = (n: { content: unknown }) =>
+    (n.content as { inline_formats?: { start: number; length: number; format: string }[] }).inline_formats ?? [];
+
+  it('turns **bold** and *italic* into inline_formats, not literal asterisks', () => {
+    const [n] = parseBodyToNodes('**SBIR** and **STTR** award *non-dilutive* funding.');
+    expect(textOf(n)).toBe('SBIR and STTR award non-dilutive funding.');
+    expect(textOf(n)).not.toContain('*');
+    const f = fmtsOf(n);
+    expect(f).toHaveLength(3);
+    // offsets must address the STRIPPED text, or the emphasis lands on the wrong words
+    expect(f.filter((x) => x.format === 'bold').map((x) => textOf(n).slice(x.start, x.start + x.length)))
+      .toEqual(['SBIR', 'STTR']);
+    expect(f.filter((x) => x.format === 'italic').map((x) => textOf(n).slice(x.start, x.start + x.length)))
+      .toEqual(['non-dilutive']);
+  });
+
+  it('projects those formats to <strong>/<em> in the public HTML', () => {
+    const html = docBodyFromCanvas(canvasFromDocBody('T', '**bold** then *soft*.'));
+    expect(html).toContain('<strong>bold</strong>');
+    expect(html).toContain('<em>soft</em>');
+    expect(html).not.toContain('*');
+  });
+
+  it('flattens a markdown link to "text (url)" — the canvas has no href to put it in', () => {
+    const [n] = parseBodyToNodes('See the [eligibility checklist](/resources/sbir-sttr-eligibility-check).');
+    expect(textOf(n)).toBe('See the eligibility checklist (/resources/sbir-sttr-eligibility-check).');
+    expect(textOf(n)).not.toContain('](');
+  });
+
+  it('strips emphasis inside list items and headings, which cannot carry inline_formats', () => {
+    const nodes = parseBodyToNodes('## **Why** it matters\n- **Phase I** — proof of concept.\n- plain');
+    expect(textOf(nodes[0])).toBe('Why it matters');
+    expect(itemsOf(nodes[1]).map((i) => i.text)).toEqual(['Phase I — proof of concept.', 'plain']);
+    expect(JSON.stringify(nodes)).not.toContain('**');
+  });
+
+  it('spans an emphasis run that opens on one line and closes on the next', () => {
+    const [n] = parseBodyToNodes('a **bold phrase\nthat wraps** end');
+    expect(textOf(n)).toBe('a bold phrase that wraps end');
+    expect(fmtsOf(n)).toHaveLength(1);
+  });
+
+  it('counts offsets in code points, so an emoji does not slide the format right', () => {
+    const [n] = parseBodyToNodes('🚀 **rocket**');
+    const [f] = fmtsOf(n);
+    expect([...textOf(n)].slice(f.start, f.start + f.length).join('')).toBe('rocket');
+  });
+
+  it('leaves underscores and lone asterisks alone (snake_case, SF-424A, a * b)', () => {
+    const [n] = parseBodyToNodes('page_key and 2 * 3 and file_name.txt');
+    expect(textOf(n)).toBe('page_key and 2 * 3 and file_name.txt');
+    expect(fmtsOf(n)).toHaveLength(0);
+  });
+});

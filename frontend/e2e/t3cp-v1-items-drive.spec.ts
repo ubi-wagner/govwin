@@ -16,8 +16,17 @@
  * Run: npx playwright test --project=drive t3cp-v1-items
  */
 import { test, expect, type Page } from '@playwright/test';
+import { resolveShreddedSolicitation, ensureLandedSkeleton } from './resolve-solicitation';
 
-const SOL = process.env.DRIVE_SOL_ID ?? '11263a74-ab09-48bb-ada5-565aa2ee986e';
+/* Resolved from the DB in beforeAll — `process.env.DRIVE_SOL_ID!` was unset, so every request
+ * went to /…/undefined/… and this file failed on a bare false.
+ *
+ * This drive OWNS its scenario ("[owned:v1items]"). It mutates the solicitation's matrix/structure,
+ * and a shared one meant the next drive read state this one had left behind — dow-assist asserting
+ * a deferral stays STAGED found it already landed, t3cp-v1-items found its items rearranged. Heavy
+ * mutators get their own; the shared pool excludes every owned scenario. See
+ * e2e/resolve-solicitation.ts and docs/FIXTURE_INTEGRITY.md. */
+let SOL = '';
 
 /** Read off DoW_2026_SBIR_BAA_Preface_07152026.pdf — the sentence the cap comes from. */
 const CITATION =
@@ -29,7 +38,7 @@ const CHAR_CAP = 3000;
 async function signIn(page: Page) {
   await page.goto('/login');
   await page.fill('input[type="email"]', 'eric@rfppipeline.com');
-  await page.fill('input[type="password"]', 'RFPAdmin2026!');
+  await page.fill('input[type="password"]', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   await Promise.all([
     page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 60_000 }),
     page.click('button[type="submit"]'),
@@ -42,9 +51,19 @@ async function tool(page: Page, name: string, input: unknown) {
   return { ok: res.ok(), status: res.status(), body };
 }
 
+test.beforeAll(async () => {
+  SOL = (await resolveShreddedSolicitation('DRIVE_SOL_ID', 'v1items')).id;
+});
+
 test('Volume 1 carries the DSIP webform plus two 3,000-character narrative documents', async ({ page }) => {
   test.setTimeout(5 * 60 * 1000);
   await signIn(page);
+
+  /* This drive reads a BUILT skeleton and its own scenario starts staged, so land it first.
+   * Must run AFTER sign-in: the bare `request` fixture carries no session and the admin route
+   * answers 401. See ensureLandedSkeleton for why a manual land over a known blocker is the
+   * sanctioned path. */
+  await ensureLandedSkeleton(page.request, SOL);
 
   // ── Find Volume 1 through the admin read path ──
   const solRes = await page.request.get(`/api/admin/rfp-curation/${SOL}`);

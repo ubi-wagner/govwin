@@ -1,121 +1,122 @@
 /**
- * Drive-test: singular-session enforcement + active-role rewrite.
+ * THE SINGULAR SESSION — one identity, several companies, exactly one of them active at a time.
  *
- * expert@beacon-labs.test is tenant_admin @ beacon-labs (home) AND partner_user @
- * acme-navy-systems (collaborator). Proves:
- *  1. >1 membership + not pinned → login lands on /select-company.
- *  2. Picking Acme REWRITES the session (role→partner_user, tenant→acme) and pins it
- *     — verified via GET /api/auth/session (the real JWT-derived session).
- *  3. Pinned session CANNOT hop to beacon-labs mid-session (bounced back to acme).
- *  4. Control: teammate@acme.test (single membership) logs straight in, unaffected.
+ * A person can legitimately belong to more than one company: their own, plus every company that has
+ * invited them onto a build. The rule is that a session acts in **one** of them, chosen explicitly
+ * and then pinned, so nothing they do is ambiguous about whose work it was.
+ *
+ *   1. more than one membership, not yet pinned → login lands on /select-company
+ *   2. picking a company REWRITES the session — role and tenant both — and pins it
+ *   3. a pinned session cannot hop to the other company mid-session
+ *   4. /select-company will not re-offer the choice once pinned
+ *   5. control: one membership → straight in, no selector, role unchanged
+ *   6. control: a platform admin has no memberships → never sees the selector, and can still
+ *      descend into any customer as a shadow
+ *
+ * Every assertion reads the session the SERVER derived from the JWT (`GET /api/auth/session`), not
+ * the URL. A URL is where the browser ended up; the session is who the server thinks you are, and
+ * those are exactly the two things a session bug makes disagree.
+ *
+ * BUILDS ITS OWN SITUATION — it used to pin `expert@beacon-labs.test`, `teammate@acme-navy.test`
+ * and two tenants, none of which exist any more.
+ *
+ *   cd frontend && DATABASE_URL=… node --import tsx scripts/drive-pin.mts
  */
-import { chromium, type Page } from 'playwright';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import type { Page } from 'playwright';
+import { runScenario } from './lib/scenario.mts';
+import { BASE, buildCrossCompany, launch, newDriveContext, signIn, session, settledSession, waitForLanding } from './lib/cross-company.mts';
 
-const BASE = 'http://localhost:3000';
-const PW = 'DemoPass123!';
-const OUT = '/home/user/govwin/docs/user-guides/img';
-mkdirSync(OUT, { recursive: true });
+const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
 
-function ok(cond: boolean, label: string) {
-  console.log(`${cond ? '✅' : '❌ FAIL'}  ${label}`);
-  if (!cond) process.exitCode = 1;
-}
+await runScenario('pin', async (s) => {
+  let ok = true;
+  const A = (label: string, cond: boolean, detail = '') => {
+    console.log(`${cond ? '✅' : '❌ FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
+    if (!cond) ok = false;
+  };
 
-async function sessionJson(page: Page): Promise<Record<string, unknown>> {
-  const res = await page.request.get(`${BASE}/api/auth/session`);
-  const j = await res.json();
-  return (j?.user ?? {}) as Record<string, unknown>;
-}
+  const browser = await launch();
+  try {
+    const xc = await buildCrossCompany(s, browser);
 
-async function login(page: Page, email: string) {
-  await page.context().clearCookies();
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', PW);
-  await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type="submit"]')]);
-  await page.waitForTimeout(1500);
-}
+    // ── 1 · multi-membership, unpinned → the selector ───────────────────────────────────────────
+    //
+    // Signed in WITHOUT the shared helper's "must not still be on /login" check, because landing on
+    // /select-company is the expected outcome here and the helper would be happy either way.
+    const bc = await newDriveContext(browser);
+    const page: Page = await bc.newPage();
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await page.fill('#email', xc.multiEmail);
+    await page.fill('#password', xc.multiPassword);
+    await page.click('button[type="submit"]');
+    await waitForLanding(page);
+    A('two memberships + not pinned → login lands on the company selector',
+      page.url().includes('/select-company'), page.url().replace(BASE, ''));
 
-async function shot(page: Page, name: string) {
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: false });
-  console.log(`   📸 ${name}.png  (${page.url()})`);
-}
+    const pre = await settledSession(bc);
+    A('  → and the session is NOT yet pinned', pre.membershipPinned !== true, `pinned=${pre.membershipPinned}`);
 
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    // ── 2 · pick the HOST company, where they are only a collaborator ───────────────────────────
+    // BY NAME, exactly. The first version matched the slug OR the bare word "host" — and only the
+    // second alternative ever hit, by luck, because the display name happens to contain it. A
+    // locator that passes for the wrong reason is a locator that will stop passing without warning.
+    const hostBtn = page.locator(`form:has-text("${xc.host.name}") button[type="submit"]`).first();
+    if (await hostBtn.count() === 0) {
+      A('the selector offers the host company', false, 'no form matched the host company');
+    } else {
+      await hostBtn.click();
+      await waitForLanding(page);
+      // Wait for the pick to have TAKEN — pinned, at the host — not merely for the slug to appear.
+      // Picking a company IS pinning it, and waiting on the weaker condition reintroduces the race
+      // that made `identity-deeplink` assert against a session the click had not yet rewritten.
+      const post = await settledSession(bc,
+        (x) => x.tenantSlug === xc.host.slug && x.membershipPinned === true);
+      A('picking the host company rewrites the ACTIVE ROLE to the collaborator role',
+        post.role === 'partner_user', `role=${post.role}`);
+      A('  → and the active tenant to the host', post.tenantSlug === xc.host.slug, `tenant=${post.tenantSlug}`);
+      A('  → and pins the session', post.membershipPinned === true, `pinned=${post.membershipPinned}`);
+
+      // ── 3 · the pin holds: no hopping to their own company mid-session ────────────────────────
+      await page.goto(`${BASE}/portal/${xc.home.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      A('a pinned session cannot hop to the other company',
+        !page.url().includes(`/portal/${xc.home.slug}`), `ended at ${page.url().replace(BASE, '')}`);
+      const afterHop = await session(bc);
+      A('  → and the session is still pinned where it was', afterHop.tenantSlug === xc.host.slug,
+        `tenant=${afterHop.tenantSlug}`);
+
+      // ── 4 · re-pick-proof ──────────────────────────────────────────────────────────────────────
+      await page.goto(`${BASE}/select-company`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1800);
+      A('the selector will not re-offer the choice once pinned',
+        !page.url().includes('/select-company'), `ended at ${page.url().replace(BASE, '')}`);
+    }
+    await bc.close();
+
+    // ── 5 · control: one membership → straight in ───────────────────────────────────────────────
+    const solo = await signIn(browser, xc.singleEmail, xc.singlePassword);
+    const soloPage = solo.pages()[0];
+    A('one membership skips the selector entirely',
+      !soloPage.url().includes('/select-company'), soloPage.url().replace(BASE, ''));
+    const soloSess = await settledSession(solo, (x) => !!x.tenantSlug);
+    A('  → landing in its own company', soloSess.tenantSlug === xc.host.slug, `tenant=${soloSess.tenantSlug}`);
+    A('  → keeping its own role', soloSess.role === 'tenant_user', `role=${soloSess.role}`);
+    await solo.close();
+
+    // ── 6 · control: a platform admin, who has no memberships at all ────────────────────────────
+    const adminUser = await s.admin();
+    const admin = await signIn(browser, adminUser.email, ADMIN_PW);
+    const adminPage = admin.pages()[0];
+    A('a platform admin never sees the selector',
+      !adminPage.url().includes('/select-company'), adminPage.url().replace(BASE, ''));
+    await adminPage.goto(`${BASE}/portal/${xc.host.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await adminPage.waitForTimeout(2000);
+    A('  → and can still descend into a customer as a shadow',
+      adminPage.url().includes(`/portal/${xc.host.slug}`), adminPage.url().replace(BASE, ''));
+    await admin.close();
+  } finally {
+    await browser.close();
+  }
+  console.log(`\n${ok ? '✅ ALL PASS' : '❌ FAILURES ABOVE'}\n`);
+  return ok;
 });
-const ctx = await browser.newContext({ viewport: { width: 1680, height: 1000 }, deviceScaleFactor: 2 });
-const page = await ctx.newPage();
-
-try {
-  // ---- 1. Multi-membership login → selector ----
-  console.log('\n== expert@beacon-labs.test (multi-membership) ==');
-  await login(page, 'expert@beacon-labs.test');
-  ok(page.url().includes('/select-company'), `login lands on /select-company (got ${page.url()})`);
-  await shot(page, 'pin-01-select-company');
-
-  const pre = await sessionJson(page);
-  console.log(`   session pre-pick: role=${pre.role} tenant=${pre.tenantSlug} pinned=${pre.membershipPinned}`);
-  ok(pre.membershipPinned !== true, 'pre-pick: NOT pinned');
-
-  // ---- 2. Pick Acme (where expert is only a partner_user) ----
-  // Find the Acme form's submit button by its visible company name.
-  const acmeBtn = page.locator('form:has-text("Acme") button[type="submit"]').first();
-  await acmeBtn.click();
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(1500);
-  ok(page.url().includes('/portal/acme-navy-systems'), `landed in acme portal (got ${page.url()})`);
-  await shot(page, 'pin-02-acme-collaborator-view');
-
-  const post = await sessionJson(page);
-  console.log(`   session post-pick: role=${post.role} tenant=${post.tenantSlug} pinned=${post.membershipPinned}`);
-  ok(post.role === 'partner_user', `active role REWRITTEN to partner_user (got ${post.role})`);
-  ok(post.tenantSlug === 'acme-navy-systems', `active tenant = acme (got ${post.tenantSlug})`);
-  ok(post.membershipPinned === true, 'session is PINNED');
-
-  // ---- 3. Try to hop to beacon-labs mid-session → must be denied ----
-  await page.goto(`${BASE}/portal/beacon-labs/dashboard`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
-  ok(!page.url().includes('/portal/beacon-labs'), `beacon hop DENIED (ended at ${page.url()})`);
-  const afterHop = await sessionJson(page);
-  ok(afterHop.tenantSlug === 'acme-navy-systems', `still pinned to acme after hop attempt (got ${afterHop.tenantSlug})`);
-  await shot(page, 'pin-03-beacon-hop-denied');
-
-  // ---- 4. Re-pick-proof: /select-company should NOT re-offer the choice ----
-  await page.goto(`${BASE}/select-company`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1200);
-  ok(!page.url().includes('/select-company'), `/select-company is re-pick-proof (ended at ${page.url()})`);
-
-  // ---- 5. Control: single-membership user unaffected ----
-  console.log('\n== teammate@acme-navy.test (single membership) ==');
-  await login(page, 'teammate@acme-navy.test');
-  ok(!page.url().includes('/select-company'), `single-membership skips selector (got ${page.url()})`);
-  const solo = await sessionJson(page);
-  console.log(`   session: role=${solo.role} tenant=${solo.tenantSlug} pinned=${solo.membershipPinned}`);
-  ok(String(page.url()).includes('/portal/acme-navy-systems'), 'single-membership lands in its portal');
-  ok(solo.role === 'tenant_user', `single-membership keeps its role (got ${solo.role})`);
-  await shot(page, 'pin-04-single-membership-control');
-
-  // ---- 6. Control: admin (0 memberships) → platform, never the selector ----
-  console.log('\n== eric@rfppipeline.com (admin) ==');
-  await login(page, 'eric@rfppipeline.com');
-  ok(!page.url().includes('/select-company'), `admin never sees selector (got ${page.url()})`);
-  ok(page.url().includes('/admin'), `admin lands on platform (got ${page.url()})`);
-  const adm = await sessionJson(page);
-  console.log(`   session: role=${adm.role} tenant=${adm.tenantSlug} pinned=${adm.membershipPinned}`);
-  // Admin can still descend into ANY customer portal (shadow) — not blocked by the pin.
-  await page.goto(`${BASE}/portal/acme-navy-systems/dashboard`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1000);
-  ok(page.url().includes('/portal/acme-navy-systems'), `admin descends into a customer (got ${page.url()})`);
-  await shot(page, 'pin-05-admin-shadow-control');
-
-  console.log('\nDrive-test complete.');
-} catch (e) {
-  console.error('DRIVE-TEST ERROR', e);
-  process.exitCode = 1;
-} finally {
-  await browser.close();
-}

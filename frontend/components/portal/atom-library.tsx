@@ -35,7 +35,11 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   harvest: { label: 'returned', cls: 'bg-emerald-100 text-emerald-700' },
 };
 
-export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
+// canArchive: the archive/restore route (…/atoms/[atomId]/archive) is the ONE tenant_admin gate in
+// the whole atoms surface — upload/bulk/select/review/PATCH are all floored at tenant_user, and the
+// host page admits tenant_user. So a base member was shown Archive/Restore that could only 403 with
+// a bare "Insufficient permissions". Render them only to someone the route will accept.
+export function AtomLibrary({ tenantSlug, canArchive = false }: { tenantSlug: string; canArchive?: boolean }) {
   const [atoms, setAtoms] = useState<Atom[]>([]);
   const [q, setQ] = useState('');
   const [grain, setGrain] = useState('');
@@ -280,14 +284,14 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                 {a.status !== 'approved' ? (
                   <button onClick={() => setStatusOf(a.id, 'approved')} disabled={busy} className="text-xs font-medium text-green-700 border border-green-200 rounded px-2 py-1 hover:bg-green-50">Approve</button>
                 ) : <span className="text-[10px] text-green-600">approved</span>}
-                {showArchived ? (
+                {canArchive && (showArchived ? (
                   // Archived view: bring the atom back into the active library.
                   <button onClick={() => softArchive(a.id, 'restore')} disabled={busy} className="text-xs font-medium text-indigo-700 border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-50 disabled:opacity-50">Restore</button>
                 ) : (
                   // Active view: the soft-archive (archived_at) — hides from library + drafting, reversible.
                   // (One archive concept only — the redundant curation-status 'archive' button was removed.)
                   <button onClick={() => softArchive(a.id, 'archive')} disabled={busy} title="Archive — hide from the active library and from drafting (reversible)" className="text-[10px] font-medium text-gray-400 hover:text-amber-600 disabled:opacity-50">Archive</button>
-                )}
+                ))}
               </div>
             </div>
             {openId === a.id && (

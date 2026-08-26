@@ -89,6 +89,7 @@ export async function GET() {
 // ─── POST — create new document ────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  let startId: string | null = null;
   try {
     const session = await auth();
     if (!session?.user) {
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
     const userId = (session.user as { id?: string }).id;
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'document.created',
       actor: userActor(userId ?? 'unknown', createdBy !== 'unknown' ? createdBy : undefined),
@@ -195,6 +196,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { id, title: title.trim(), preset } }, { status: 201 });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[admin/documents] POST error', err);
     return NextResponse.json(
       { error: 'Failed to create document', code: 'INTERNAL_ERROR' },

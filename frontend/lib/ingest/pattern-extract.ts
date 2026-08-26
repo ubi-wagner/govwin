@@ -157,6 +157,16 @@ function buildPageIndex(text: string): PageIndex {
       const page = parseInt(m[1], 10);
       const total = m[2] ? parseInt(m[2], 10) : 0;
       if (!Number.isFinite(page) || page < 1) { ok = false; break; }
+      // ONE BOUNDARY, SEEN TWICE. The upload route reads PDFs with pdf-parse, which injects its
+      // own "-- N of M --" separator at every page break — and a real solicitation also PRINTS a
+      // page footer, because government documents number their pages. Both match the patterns
+      // above, so the marker stream arrives as 1,1,2,2,3,3. The monotonicity guard below then
+      // reads the repeat as "not a paging scheme", discards EVERY page number, and the extractor
+      // reports "no page markers" on precisely the documents most likely to be real. Verified on
+      // a fixture that prints its own footer: pageResolved false, every anchor collapsed to p1;
+      // with the duplicate removed, p2, correctly. A mark repeating the previous page AND total is
+      // the same boundary — keep the first, skip the echo.
+      if (prev && page === prev.page && total === prev.total) continue;
       if (prev && (page <= prev.page || total !== prev.total)) {
         // A restart is a document boundary — but only a restart AT PAGE 1 of a new total.
         // Anything else (7, 3, 9) is not a paging scheme at all and must not be trusted.
@@ -211,10 +221,20 @@ const int = (s: string | undefined, min: number, max: number): number | undefine
   return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
 };
 const WORD_NUM: Record<string, number> = { one: 1, two: 2, three: 3, half: 0.5 };
+/**
+ * A margin measurement, worded or numeric. parseFLOAT, not parseInt: a fractional margin is
+ * ordinary (DOE asks for 0.75 inch, plenty of programs ask for 0.5), and parseInt would turn
+ * "0.75" into 0 (rejected, a miss) and "1.5" into 1 — silently reporting a margin the document
+ * does not state, which is the one failure this extractor exists to prevent. The rules below
+ * previously alternated over `(one|two|1|2)` only, which was the sole thing keeping "1.5 inch"
+ * away from parseInt; MARGIN_NUM now admits decimals, so the parse has to be honest.
+ */
 const inches = (w: string): string | undefined => {
-  const n = WORD_NUM[w.toLowerCase()] ?? parseInt(w, 10);
+  const n = WORD_NUM[w.toLowerCase()] ?? parseFloat(w);
   return Number.isFinite(n) && n > 0 && n <= 3 ? `${n} inch (all sides)` : undefined;
 };
+/** Worded or decimal margin measurement, e.g. one · half · 1 · 0.75 · 1.5 */
+const MARGIN_NUM = '(one|two|three|half|\\d(?:\\.\\d{1,2})?)';
 
 /**
  * Typefaces we will name. A bare capitalized word near "font" is not enough — the token has
@@ -227,6 +247,13 @@ const RULES: Rule[] = [
   { id: 'min_font.no_smaller_than', field: 'min_font_size',
     re: /\bno\s+(?:type|font)(?:\s+size)?\s+smaller\s+than\s+(\d{1,2})[-\s]?(?:point|pt)\b/i,
     value: (m) => int(m[1], 6, 24) },
+  // "Type size shall be no smaller than 11 point" — the subject-first wording, which is what DoD,
+  // DOE and most state programs actually print. The rule above only matches the inversion
+  // ("no font smaller than 11 point"), so every one of those documents fell through to a default.
+  // Anchored on the type/font subject so a bare "no smaller than" elsewhere cannot be captured.
+  { id: 'min_font.size_no_smaller_than', field: 'min_font_size',
+    re: /\b(?:type|font)\s*(?:size)?\s+(?:must|shall|should|is|will)\s+be\s+no\s+smaller\s+than\s+(\d{1,2})[-\s]?(?:point|pt)\b/i,
+    value: (m) => int(m[1], 6, 24) },
   { id: 'min_font.minimum_of', field: 'min_font_size',
     re: /\b(?:minimum|min\.?)\s+(?:font|type)\s*(?:size)?\s*(?:of|:|is)?\s*(\d{1,2})[-\s]?(?:point|pt)\b/i,
     value: (m) => int(m[1], 6, 24) },
@@ -236,13 +263,13 @@ const RULES: Rule[] = [
 
   // ── margins ──
   { id: 'margins.on_all_sides', field: 'margins',
-    re: /\b(?:page\s+)?margins?\s+(one|two|1|2)[-\s]inch(?:es)?\s+on\s+all\s+sides\b/i,
+    re: new RegExp(`\\b(?:page\\s+)?margins?\\s+${MARGIN_NUM}[-\\s]inch(?:es)?\\s+on\\s+all\\s+sides\\b`, 'i'),
     value: (m) => inches(m[1]) },
   { id: 'margins.n_inch_all_sides', field: 'margins',
-    re: /\b(one|two|1|2)[-\s]inch\s+margins\s+on\s+all\s+sides\b/i,
+    re: new RegExp(`\\b${MARGIN_NUM}[-\\s]inch\\s+margins\\s+on\\s+all\\s+sides\\b`, 'i'),
     value: (m) => inches(m[1]) },
   { id: 'margins.with_n_inch', field: 'margins',
-    re: /\bwith\s+(one|two|1|2)[-\s]inch\s+margins\b/i,
+    re: new RegExp(`\\bwith\\s+${MARGIN_NUM}[-\\s]inch\\s+margins\\b`, 'i'),
     value: (m) => inches(m[1]) },
 
   // ── technical-volume page limit (POSITIVE forms only — the deferral rules run separately) ──
@@ -324,6 +351,60 @@ const RULES: Rule[] = [
     re: /\bdo\s+not\s+lock,?\s*(?:password\s+protect,?\s*)?(?:or\s+)?encrypt\b/i,
     value: () => true },
 ];
+
+/* ── Component-scoped rules must not become solicitation-wide ────────────────────────────────
+ *
+ * A joint BAA is not one voice. The DoW 2026 SBIR BAA sets the common rules and then carries each
+ * Service's own instructions INLINE, under its own heading, each of which may override. Measured on
+ * the real R1 document, the anchored technical-volume rule matched this line on page 31:
+ *
+ *     "• DON Phase I Technical Volume (Volume 2) page limit is not to exceed 10 pages."
+ *
+ * — one bullet below "The information provided in the DON Proposal Submission Instructions takes
+ * precedence over the DoW Instructions posted for this BAA." That is a NAVY rule. It became the
+ * solicitation-wide page_limit_technical = 10, stamped `pattern_match`, and an Air Force or Army
+ * proposer was told their technical volume was capped at 10 pages on the authority of a Navy
+ * instruction.
+ *
+ * This is worse than the fabricated default the provenance doctrine was written against. A default
+ * is badged red, "Default — unverified", and invites challenge. This arrived badged "Read from
+ * source" with a page number and a verbatim excerpt — MORE credible than a default, and wrong.
+ *
+ * Two things made it invisible, and both are fixed here:
+ *
+ *   1. The match ANCHORS on "technical volume", so the excerpt began there and the "DON" that
+ *      disqualified it sat just outside the quoted span. A reviewer checking the citation saw a
+ *      sentence that read as document-wide. The excerpt now extends left to the start of its own
+ *      sentence or bullet, so the qualifier travels WITH the evidence.
+ *   2. Nothing looked for the qualifier. A positive match whose own sentence names a specific
+ *      Component is now rejected as a solicitation-wide value and recorded as a note instead, which
+ *      also lets the DEFERRAL rules below run — and the deferral is the truth for the document as a
+ *      whole: this BAA does defer the technical-volume page limit to the Component instructions.
+ *
+ * Scope note: this is deliberately NOT applied to every field. A Component qualifier on a font or
+ * margin rule is usually restating the common rule, and suppressing those would lose real
+ * information. It is applied to the fields where a Component override is both common and
+ * consequential — the page and character limits that gate a submission.
+ */
+const COMPONENT_QUALIFIER =
+  /\b(?:DON|DoN|DAF|USAF|DHA|MDA|DTRA|DARPA|SOCOM|NGA|NRO|NAVAIR|NAVSEA|NAVWAR|SPAWAR|CBD|USSF|DLA|OSD)\b|\bDepartment\s+of\s+the\s+(?:Navy|Army|Air\s+Force)\b|\b(?:Air\s+Force|Army|Navy|Space\s+Force|Marine\s+Corps)\b/;
+
+/** Fields where a Component override is common AND consequential enough to reject document-wide. */
+const COMPONENT_SCOPED_FIELDS = new Set(['page_limit_technical', 'character_limit_narrative']);
+
+/** Widen a match back to the start of its own sentence or bullet, so qualifiers stay visible. */
+const SENTENCE_LOOKBACK = 240;
+function sentenceAround(norm: string, start: number, end: number): string {
+  const from = Math.max(0, start - SENTENCE_LOOKBACK);
+  const before = norm.slice(from, start);
+  // Nearest sentence end, bullet, or list marker to the LEFT — whichever is closest to the match.
+  const cut = Math.max(
+    before.lastIndexOf('. '), before.lastIndexOf('•'), before.lastIndexOf('; '),
+    before.lastIndexOf(': '), before.lastIndexOf('- '),
+  );
+  const head = cut >= 0 ? before.slice(cut + 1) : before;
+  return `${head}${norm.slice(start, end)}`.replace(/\s+/g, ' ').trim();
+}
 
 /** The document says the rule lives elsewhere — a positive fact, not a missing value. */
 const DEFERRAL_RULES: Array<{ id: string; field: string; re: RegExp; reason: string }> = [
@@ -474,16 +555,39 @@ export function extractByPattern(text: string): PatternExtraction {
   const evidence: Record<string, PatternEvidence> = {};
   const pseudo: Record<string, { value: RuleValue; offset: number; excerpt: string }> = {};
 
+  const componentScoped: string[] = [];
+  const componentLocked = new Set<string>();
   for (const rule of RULES) {
     if (evidence[rule.field] || pseudo[rule.field]) continue;   // first (strongest) rule wins
+    // Once the STRONGEST evidence for a field turned out to be Component-scoped, the weaker rules
+    // below it cannot outrank it. Measured: after the anchored DON rule was rejected, the generic
+    // `page_limit.n_page_limit` matched "Include, within the 10-page limit" nine pages later — a
+    // back-reference to the very rule just rejected, in the same Component's section, and it does
+    // not even name a volume. Letting an unanchored fragment fill a field whose best evidence was
+    // disqualified reintroduces the bug through the back door.
+    if (componentLocked.has(rule.field)) continue;
     const m = rule.re.exec(norm);
     if (!m) continue;
     const value = rule.value(m);
     if (value === undefined) continue;
 
     const offset = map[m.index] ?? 0;
-    const excerpt = m[0].trim();
+    // The excerpt is the EVIDENCE a reviewer checks, so quote the whole statement — not just the
+    // span the regex happened to anchor on. See COMPONENT_QUALIFIER above: the disqualifying word
+    // sat one token to the left of the match, outside the quote, and that is what hid the bug.
+    const excerpt = sentenceAround(norm, m.index, m.index + m[0].length);
     if (rule.field.startsWith('~')) { pseudo[rule.field] = { value, offset, excerpt }; continue; }
+
+    // A rule stated for ONE Component is not this solicitation's rule. Record it, do not adopt it,
+    // and leave the field open so the deferral rules can explain the empty cell honestly.
+    if (COMPONENT_SCOPED_FIELDS.has(rule.field) && COMPONENT_QUALIFIER.test(excerpt)) {
+      componentLocked.add(rule.field);
+      componentScoped.push(
+        `A Component-specific ${rule.field.replace(/_/g, ' ')} appears in this document and was NOT `
+        + `applied solicitation-wide — it binds only that Component: "${excerpt}"`,
+      );
+      continue;
+    }
 
     (compliance as Record<string, unknown>)[toCamel(rule.field)] = value;
     evidence[rule.field] = { rule: rule.id, ...cite(raw, idx, offset, excerpt, rule.field) };
@@ -547,6 +651,10 @@ export function extractByPattern(text: string): PatternExtraction {
   if (pseudo['~no_active_media']) notes.push('Active graphics (video, animation, embedded media) are prohibited in the uploaded file.');
   if (pseudo['~no_encryption']) notes.push('The uploaded file must not be locked, password-protected, or encrypted.');
   for (const d of deferrals) notes.push(d.reason);
+  // A Component rule we declined to adopt is a FINDING, not a discard: the curator needs to know
+  // the document contains it, so they can apply it if this build is for that Component. Deduped —
+  // several rules can match the same sentence, and the curator should read it once.
+  for (const c of new Set(componentScoped)) notes.push(c);
   if (!idx.resolved) notes.push('No page markers in the extracted text — evidence cites excerpts, not page numbers.');
   if (idx.segments > 1) {
     notes.push(

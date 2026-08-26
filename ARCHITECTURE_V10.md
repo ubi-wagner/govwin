@@ -1,6 +1,37 @@
 # ARCHITECTURE_V10.md — RFP Pipeline Portal: Greenfield-Canonical As-Built
 
-**Date:** 2026-07-03
+**THIS DOCUMENT IS ACCRETED, NOT DATED.** The base is 2026-07-03; every layer since is a dated
+`> Update (…)` block appended in place. That matters when you read it: an "Update (2026-07-22) —
+schema now at migration 125" block is a HISTORICAL statement that was true then, not a claim about
+today, and the same goes for the backbone numbers inside those blocks (`vitest 828` at 2026-07-26 is
+not the current suite). Read the newest layer for current state and the older ones as the record of
+how it got here. A single file-level date on a document that grows this way is the mechanism that
+produced CLAUDE_CLIFFNOTES §1's failure.
+
+**Current state — 2026-08-24 · migration head 213 · `tsc` 0 · `vitest` 1915 · `next build` exit 0.**
+(Migs 212/213 close the proposal-spine RLS gap — eleven FK-tenanted tables that carried no policy at
+all, four of them measured leaking every row to a foreign tenant context. B113.)
+
+**Layer 2026-08-23 (migs 186–205).** The ingest-provenance spine lands first — **186** gives
+`episodic_memories` PLATFORM scope (`tenant_id IS NULL`) so curation memory persists; **187–188** add
+`solicitation_compliance.field_provenance` and the `pattern_match` layer behind it, so a value the
+product did not read from the solicitation can never look like one it did (docs/INGEST_PROVENANCE.md).
+Then **189** ingest studio · **190** curation notes/amendment doc · **192** a per-solicitation document
+hash uniqueness · **193** character limits · **194** RLS tenant_id indexes · **195** atom full-text
+index · **196** agent rate-limit default · **197** atom corpus verbatim · **198** rotates the last
+committed admin credential · **199** `agent_task_log` FK to SET NULL · **200** promo-code issuance ·
+**201** decodes pptx entities already stored in atoms · **202** card dates to ISO · **203** the bucket
+authoring headroom that closed B62 (a new tenant was born at 100% of its bucket cap) · **204** retires
+the duplicate application ToDo rule (B51) · **205** back-fills `opportunities.solicitation_id` (B46).
+**191** seeds the Immobileyes proposals for deployment verification.
+
+Verification since: bug log B64–B77 rebuilt the page ruler against measurement rather than assertion
+and produced six harnesses now in the backbone (docs/TESTING_STRATEGY.md) — authored proposals 8/8
+exact, 37 stored artifacts with **0 under-counts**, 41 volumes × 78 exports × 0 failures, 2,560 SQL
+references verified across 683 files. `docs/EVENT_CONTRACT.md` §6b now carries the start/end bracket
+rule and its live integrity numbers.
+
+**Historical base date:** 2026-07-03
 
 > **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
 > (schema · 191 routes · 104 pages · agent wiring · bugs). **2026-08-09 additions (merged PR #205 + deployed):**

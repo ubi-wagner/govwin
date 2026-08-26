@@ -49,6 +49,10 @@ export default async function CurationWorkspacePage({ params }: Props) {
     description: string | null;
     specialRequirements: string[] | null;
     appliesToPhase: string[] | null;
+    /** Tri-state: true = completed elsewhere, false = the admin's "authored here" override,
+     *  null = nobody has decided (and for an item-less volume that means "portal form" by default). */
+    dsipOnly: boolean | null;
+    expertNotes: string | null;
     items: Array<{
       id: string;
       itemNumber: number;
@@ -68,6 +72,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
       templateId: string | null;
       templateName: string | null;
       expertNotes: string | null;
+      dsipOnly: boolean | null;
     }> | null;
   }[] = [];
 
@@ -129,6 +134,10 @@ export default async function CurationWorkspacePage({ params }: Props) {
         v.description,
         v.special_requirements,
         v.applies_to_phase,
+        v.expert_notes,
+        -- Read the KEY, not a truthy value: absent (undecided) and false (the "authored here"
+        -- override) are different answers, and they differ exactly on the item-less volume.
+        (v.metadata->>'dsipOnly')::boolean AS dsip_only,
         COALESCE(
           (
             SELECT json_agg(
@@ -150,7 +159,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
                 'verifiedBy', i.verified_by,
                 'templateId', i.template_id,
                 'templateName', dt.name,
-                'expertNotes', i.expert_notes
+                'expertNotes', i.expert_notes,
+                'dsipOnly', (i.metadata->>'dsipOnly')::boolean
               ) ORDER BY i.item_number
             )
             FROM volume_required_items i
@@ -296,6 +306,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
     description: v.description,
     specialRequirements: v.specialRequirements ?? [],
     appliesToPhase: v.appliesToPhase,
+    dsipOnly: v.dsipOnly,
+    expertNotes: v.expertNotes,
     items: v.items ?? [],
   }));
 

@@ -12,7 +12,8 @@
  * clear error when Chromium is unavailable.
  */
 import type { CanvasDocument, CanvasNode, CanvasRules, CanvasSection } from '@/lib/types/canvas-document';
-import { CANVAS_PRESETS, coalesceGroups, sectionsToNodes } from '@/lib/types/canvas-document';
+import { CANVAS_PRESETS, coalesceGroups, docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
+import { finishVolumeCanvas, type VolumeFacts } from '@/lib/proposal/volume-finish';
 import { exportToDocx } from './docx-exporter';
 
 export type ExportFormat = 'docx' | 'pptx' | 'xlsx' | 'pdf';
@@ -85,6 +86,17 @@ export function assembleArtifactCanvas(
   sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null; characterAllocation?: number | null }>,
   artifactType: string | null | undefined,
   title: string,
+  /**
+   * Pass the volume's own facts to FINISH the assembled document — cover band, figures derived from
+   * its own content, running header/footer, figure numbering (`lib/proposal/volume-finish.ts`).
+   *
+   * Opt-in rather than automatic because assembly has two kinds of caller. Delivery paths (export,
+   * package, the on-screen document view) want the finished volume; extraction paths
+   * (`templates/extract`, past-proposal reuse) want the sections back exactly as the author wrote
+   * them — harvesting a generated cover band into a reusable template would put one tenant's
+   * identity into another's starting point.
+   */
+  finish?: VolumeFacts,
 ): CanvasDocument {
   const outSections: CanvasSection[] = [];
   let canvas: CanvasRules | null = null;
@@ -118,7 +130,7 @@ export function assembleArtifactCanvas(
       });
     });
   }
-  return {
+  const doc: CanvasDocument = {
     version: 2,
     document_id: crypto.randomUUID(),
     canvas: canvas ?? fallbackCanvas(artifactType),
@@ -129,6 +141,9 @@ export function assembleArtifactCanvas(
       created_at: '', last_modified_at: '', last_modified_by: '', version_number: 1, status: 'accepted',
     },
   };
+  return finish
+    ? finishVolumeCanvas(doc, { ...finish, artifactType: artifactType ?? 'narrative', volumeName: finish.volumeName ?? title })
+    : doc;
 }
 
 /** Render a CanvasDocument to the given format. Throws on exporter failure. */
@@ -141,4 +156,67 @@ export async function renderCanvas(
   if (format === 'xlsx') { const { exportToXlsx } = await import('./xlsx-exporter'); return exportToXlsx(doc, vars); }
   if (format === 'pdf') { const { exportToPdf } = await import('./pdf-exporter'); return exportToPdf(doc, vars); }
   return exportToDocx(doc, vars);
+}
+
+/**
+ * Assemble a volume, finish it, and make it FIT — verified against the renderer, not the estimate.
+ *
+ * `estimatePageCount` is a character-width model. It is the right instrument for the editor gauge
+ * (it has to run on every keystroke) and it is measured at ±1 page against Chromium once figures
+ * are involved: on the live T3CP build it cleared a Technical Volume at "10 of 10" that laid out as
+ * 11, and called a Supporting Documents volume 3 pages that laid out as 2. Tuning it closed some of
+ * that — an image is sized from its own dimensions now, and a figure is atomic because the
+ * stylesheet says `page-break-inside: avoid` — and none of that makes an estimate exact.
+ *
+ * A page over the agency's limit is a rejected submission, so the download does not rely on an
+ * estimate. It renders the document, counts the pages, and if the volume is over its cap it drops
+ * one library figure and renders again. Prose is never cut: what gets held back is the optional
+ * thing, which is the right thing to hold back.
+ *
+ * Bounded: at most `MAX_FIT_RENDERS` attempts, and it falls back to the estimate-fitted document if
+ * rendering is unavailable (no Chromium) — a download must not fail because a ruler was unsure.
+ */
+const MAX_FIT_RENDERS = 5;
+
+export async function assembleFittedArtifactCanvas(
+  sections: Array<{ title: string | null; content: string | null; pageAllocation?: number | null; characterAllocation?: number | null }>,
+  artifactType: string | null | undefined,
+  title: string,
+  finish: VolumeFacts,
+  variables: Record<string, string> = {},
+): Promise<CanvasDocument> {
+  let doc = assembleArtifactCanvas(sections, artifactType, title, finish);
+  let ceiling: number = Number.POSITIVE_INFINITY;
+  const cap = doc.canvas?.max_pages ?? null;
+  if (!cap || cap <= 0 || doc.canvas?.format === 'spreadsheet') return doc;
+
+  try {
+    const { capturePdfPages } = await import('@/lib/pdf/page-capture');
+    const { exportToPdf } = await import('./pdf-exporter');
+
+    for (let attempt = 0; attempt < MAX_FIT_RENDERS; attempt += 1) {
+      const pdf = await exportToPdf(doc, variables);
+      const pages = await capturePdfPages(pdf, { scale: 0.5, maxPages: cap + 20 });
+      if (pages.length === 0) return doc;           // could not measure — keep what we have
+      if (pages.length <= cap) return doc;          // fits, for real
+
+      // Over. Lower the ceiling and measure again.
+      //
+      // The ceiling must STRICTLY decrease, which is why it is not read back off the document. The
+      // first version set it to "image nodes minus one", and the image nodes include the COVER
+      // BANNER — so on a volume with two library figures it computed 3 − 1 = 2, which admitted the
+      // same two figures, measured the same eleven pages, computed 2 again, and stopped on its own
+      // no-progress guard. An off-by-one that reads as "the fit does nothing".
+      const current = Number.isFinite(ceiling)
+        ? ceiling
+        : docNodes(doc).filter((n) => n.type === 'image').length;
+      ceiling = Math.max(0, current - 1);
+      finish = { ...finish, maxLibraryFigures: ceiling };
+      doc = assembleArtifactCanvas(sections, artifactType, title, finish);
+      if (ceiling === 0) return doc;                // nothing left to give back
+    }
+  } catch (e) {
+    console.error('[artifact-export] render-verified fit unavailable:', e instanceof Error ? e.message : e);
+  }
+  return doc;
 }

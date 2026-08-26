@@ -22,7 +22,10 @@ const PRESET: CanvasRules = {
   width: 612, height: 792,
   margins: { top: 72, right: 72, bottom: 72, left: 72 },
   header: { template: 'Cost Proposal — {topic_number}', height: 36, font: { family: 'Arial', size: 10 } },
-  footer: { template: '{company_name} | PROPRIETARY', height: 36, font: { family: 'Arial', size: 10 } },
+  // Page {n} of {N} (#152). This form runs to four pages and a contracting officer reconciling a
+  // cost volume against a technical volume needs to know a page is missing. The proprietary
+  // marking stays — it is the reason the footer exists at all.
+  footer: { template: '{company_name} | PROPRIETARY | Page {n} of {N}', height: 36, font: { family: 'Arial', size: 10 } },
   font_default: { family: 'Arial', size: 10 },
   line_spacing: 1.15,
   max_pages: null,

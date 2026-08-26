@@ -18,14 +18,20 @@ import { resolveGatePolicy } from '@/lib/automation/policy';
  * This route MUST NOT use auth() — Stripe calls it directly.
  */
 export async function POST(request: Request) {
+  // `DB_ERROR` was wrong twice over: nothing here touches a database, and the condition is a
+  // DEPLOYMENT one — Stripe keys absent — not a fault. It also disagreed with the two sibling
+  // routes (stripe/checkout, stripe/portal), which already answer `STRIPE_NOT_CONFIGURED` for
+  // exactly this, so an operator grepping the code found two of three occurrences. 503 is the
+  // honest status and keeps Stripe's retry behaviour, which is what you want for a config gap:
+  // the events replay once the keys are set instead of being lost to a 200.
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe not configured', code: 'DB_ERROR' }, { status: 500 });
+    return NextResponse.json({ error: 'Stripe not configured', code: 'STRIPE_NOT_CONFIGURED' }, { status: 503 });
   }
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET not configured');
-    return NextResponse.json({ error: 'Webhook secret not configured', code: 'DB_ERROR' }, { status: 500 });
+    return NextResponse.json({ error: 'Webhook secret not configured', code: 'STRIPE_NOT_CONFIGURED' }, { status: 503 });
   }
 
   // ── Verify signature ────────────────────────────────────────────

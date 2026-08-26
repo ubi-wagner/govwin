@@ -97,6 +97,7 @@ function extractTextFromCanvas(content: string | null): string {
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     const { tenantSlug, proposalId } = await ctx.params;
 
@@ -197,7 +198,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for compliance check ────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'proposal',
       type: 'compliance.checked',
       actor: userActor(sessionUser.id),
@@ -577,6 +578,9 @@ Return ONLY the JSON array. No markdown fences, no explanation.`;
       },
     });
   } catch (err) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'HANDLER_THREW' } });
+    }
     console.error('[portal/proposals/ai/compliance] error:', err);
     return NextResponse.json(
       { error: 'Compliance check failed', code: 'AI_ERROR' },

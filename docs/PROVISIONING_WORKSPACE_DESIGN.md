@@ -19,6 +19,12 @@ four wires and the cockpit that ties the existing authoring surfaces together.
 ## Owner-confirmed decisions
 1. **Built-out signal = explicit flag + readiness bar.** An rfp_admin "Mark build-out complete" action
    sets a flag, gated by a check (compliance authored + ≥1 volume + ≥1 required item).
+   > **As built the bar has five conditions, not three** — `itemsUndecided === 0` and
+   > `volumesUndecided === 0` were folded in later and are load-bearing (an undecided item
+   > provisions as an authorable section and the drafter fills it with plausible prose where a
+   > signed federal form belongs). `lib/provisioning/readiness.ts` is canonical. Without this note
+   > a master showing compliance, six volumes and twenty-two required items yet reporting
+   > `ready:false` reads as a defect; it is the undecided counts doing their job.
 2. **Release gate = advisory + confirm.** Show a readiness checklist; release below the floor is allowed
    only via an explicit "release anyway" confirm (the degenerate provision fallback still works).
 3. **Reuse = fast-track confirm.** The 2nd+ buyer of an already-built OPP gets a lightweight admin glance

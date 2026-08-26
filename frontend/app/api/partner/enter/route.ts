@@ -39,8 +39,13 @@ export async function GET(req: NextRequest) {
     if (!t) return NextResponse.redirect(url('/partner'));
     if (!(await partnerCanEnter(u.id, t.id))) return NextResponse.redirect(url('/partner'));
 
+    // membershipPinned is what the singular-session rule means by "this person has committed to one
+    // company" (docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md). Descending IS that commitment — the
+    // manager named the company on their own console — but this route used to leave the flag unset,
+    // so the portal layout read "not committed, more than one membership" and bounced the manager to
+    // /select-company, which then sent them to /partner. The descend appeared to do nothing.
     await unstable_update({
-      user: { role: 'tenant_admin', tenantId: t.id, tenantSlug: slug, partnerHomeRole: rr },
+      user: { role: 'tenant_admin', tenantId: t.id, tenantSlug: slug, partnerHomeRole: rr, membershipPinned: true },
     } as unknown as Parameters<typeof unstable_update>[0]);
 
     try {

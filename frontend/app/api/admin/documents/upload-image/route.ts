@@ -16,7 +16,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const formData = await request.formData();
+    // Same guard as the portal image route: an unparseable (non-multipart) body is a CLIENT error,
+    // and without this it fell through to the outer catch as `500 STORAGE_ERROR` — reporting a
+    // storage failure for a malformed request. See that route for the full note.
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be multipart/form-data with a file field', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
     const file = formData.get('file');
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'File is required', code: 'VALIDATION_ERROR' }, { status: 422 });

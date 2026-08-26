@@ -8,7 +8,7 @@ const BASE = 'http://localhost:3000';
 const EXE = process.env.PW_EXE || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const OUT = '/home/user/govwin/docs/assets/scout';
 fs.mkdirSync(OUT, { recursive: true });
-const ADMIN = { email: 'eric@rfppipeline.com', pw: 'RFPAdmin2026!' };
+const ADMIN = { email: 'eric@rfppipeline.com', pw: (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!') };
 const shot = async (p, name) => { await p.screenshot({ path: path.join(OUT, name + '.png'), fullPage: true }); console.log('  ✓ shot', name); };
 const settle = async (p, ms = 1600) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };
 

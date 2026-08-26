@@ -250,6 +250,19 @@ async def create_drafts_from_scout(
                     namespace,
                     description[:50000] if description else None,
                 )
+                # Stamp the BACK-link as well (bug log B46). Writing only
+                # curated_solicitations.opportunity_id left this path creating
+                # opportunities whose solicitation_id is NULL while every topic
+                # path stamps it, so the column is populated for some rows and
+                # not others for no reason a reader can infer — and each reader
+                # then either learns the fallback or is silently wrong.
+                await conn.execute(
+                    """UPDATE opportunities
+                          SET solicitation_id = $1, updated_at = now()
+                        WHERE id = $2""",
+                    sol_id,
+                    opp_id,
+                )
                 drafts_created += 1
 
             except Exception as e:

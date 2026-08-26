@@ -1,0 +1,385 @@
+/**
+ * calibrate-page-ruler — pit `paginate()` against what Chromium actually prints.
+ *
+ * WHY THIS EXISTS
+ *
+ * `estimatePageCount` is load-bearing in two places that decide whether a customer's bid is
+ * acceptable: the live editor gauge a person watches while writing, and the export compliance gate
+ * that refuses to advance a volume over its page limit. Both call the same engine, so they can
+ * never disagree with *each other* — which is the invariant the code was built for, and it holds.
+ *
+ * Nothing checks whether either of them agrees with the PAGE. That is a different invariant, and
+ * it is the one that matters to an agency: a proposal the product measured at 10 pages and
+ * Chromium prints as 12 is rejected on receipt, and the product will have told the customer they
+ * were fine. The estimator's own comments record three prior corrections of exactly this class
+ * ("a flat height for every image; a footer token nothing substituted; captions borrowed from alt
+ * text"), each found by accident. This makes it a measurement instead.
+ *
+ * METHOD
+ *
+ * Synthetic documents, one per node type and per layout rule, each built to a known shape, then:
+ *   predicted = paginate(doc).totalPages
+ *   actual    = pages in the PDF that exportToPdf(doc) produces
+ * Isolating one variable per case means a mismatch names its own cause — "tables are short by a
+ * page" rather than "something is off somewhere".
+ *
+ * Run:  npx tsx scripts/calibrate-page-ruler.mts
+ * Exit: 0 if every case agrees, 1 otherwise (so it can gate a release).
+ */
+import { paginate, CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '../lib/types/canvas-document';
+import { exportToPdf } from '../lib/export/pdf-exporter';
+import { readFileSync } from 'fs';
+
+/** Count pages in a PDF buffer without a parser dependency: /Type /Page objects, minus /Pages. */
+function pdfPageCount(buf: Buffer): number {
+  const s = buf.toString('latin1');
+  // Chromium writes one `/Type /Page` per page and one `/Type /Pages` for the tree node; the
+  // negative lookahead keeps the tree node out of the count. Whitespace between the key and the
+  // value varies, hence \s*.
+  const m = s.match(/\/Type\s*\/Page(?![a-zA-Z])/g);
+  return m ? m.length : 0;
+}
+
+/**
+ * Filler that breaks like a PROPOSAL, not like a lorem generator.
+ *
+ * This was one lowercase sentence repeated, which is the least representative text in the corpus.
+ * Measured against Chromium (scripts/measure-char-width.mts), the average glyph advance of Times
+ * New Roman depends on the register: 0.41 of the font size for lowercase technical prose, 0.42 for
+ * numerals, 0.44-0.47 for long compound words, 0.58 for acronym-dense text. The ruler's single
+ * CHAR_W of 0.45 is the average of those — so it runs ~10% conservative on lowercase and ~20%
+ * optimistic on capitals, and a harness fed nothing but lowercase was measuring the ruler in the
+ * one register where it has the most slack. Five cases over-counted the moment an unrelated
+ * correction landed; the eight authored NILOC volumes, which mix all three registers, stayed exact.
+ *
+ * The rotation below keeps that mixture in the filler: narrative, boilerplate with agency
+ * acronyms, and a sentence of quantities.
+ */
+const SENTENCES = [
+  'The additive manufacturing cell maintains a controlled thermal profile across the build volume, '
+  + 'which keeps interlaminar shear strength within the qualification band for the full print. ',
+  'The offeror certifies that this SBIR Phase I effort does not duplicate work funded under any other '
+  + 'Federal award, and that the PI identified in the DoD DSIP submission is available at the stated LOE. ',
+  'Coupon sets are printed at 0.015 in. layer height and 210 C, sectioned per ASTM D2344, and reported '
+  + 'across 4,800 specimens at a 99.7% yield over the 36-month period of performance (FY2026-FY2029). ',
+];
+function prose(sentences: number): string {
+  return Array.from({ length: sentences }, (_, i) => SENTENCES[i % SENTENCES.length]).join('').trim();
+}
+
+// A CanvasNode carries its payload under `content`, with `style`/`provenance`/`history` siblings —
+// NOT flattened onto the node. Building them flat produced `content` undefined and a TypeError deep
+// in toSections, which is a harness bug, not a product one; `node()` keeps the shape in one place.
+let seq = 0;
+function node(type: CanvasNode['type'], content: unknown): CanvasNode {
+  seq += 1;
+  return {
+    id: `n${seq}`, type, content,
+    style: {}, provenance: { source: 'human' }, history: [],
+  } as unknown as CanvasNode;
+}
+
+const text = (t: string) => node('text_block', { text: t });
+const heading = (t: string, level: 1 | 2 | 3 = 1) => node('heading', { level, text: t });
+const table = (rows: number, cell: 'short' | 'long' = 'long') => node('table', {
+  headers: ['Milestone', 'Month', 'Deliverable', 'Acceptance'],
+  rows: Array.from({ length: rows }, (_, i) => (cell === 'short'
+    ? [`M${i + 1}`, `${i + 1}`, 'Coupons', 'Pass']
+    : [`M${i + 1}`, `${i + 1}`,
+       `Coupon set ${i + 1} printed, sectioned and tested to ASTM D2344 with witness coupons retained`,
+       'ILSS within the qualification band across all three build orientations'])),
+});
+const chart = () => node('chart', {
+  chart_type: 'bar', categories: ['Baseline', 'Phase I', 'Target'],
+  series: [{ name: 'Throughput (parts/day)', data: [12, 31, 48] }],
+});
+/**
+ * Real PNGs whose INTRINSIC pixel size equals the declared width/height.
+ *
+ * A tiny placeholder PNG declaring itself 1000×620 is not a smaller version of the real thing —
+ * it is a different document. `renderImage` emits `width:Wpx; max-height:Hpx; max-width:100%`, so
+ * Chromium sizes the image by the column width and takes its HEIGHT from the file's own aspect
+ * ratio, capped by max-height. A 4×3 stand-in therefore lays out at 3:4 while the estimator reads
+ * the declared 1000:620, and the two disagree by a page for reasons that have nothing to do with
+ * the ruler. Generated by the sibling block in the header comment; committed as JSON so this runs
+ * without PIL.
+ */
+const FIXTURES: Record<string, string> = JSON.parse(
+  readFileSync(new URL('./.figure-fixtures.json', import.meta.url), 'utf8'),
+);
+const IMG: Record<string, { key: string; w: number; h: number }> = {
+  wide: { key: FIXTURES.wide, w: 1000, h: 620 },
+  tall: { key: FIXTURES.tall, w: 900, h: 1100 },
+  sq: { key: FIXTURES.sq, w: 800, h: 800 },
+};
+const image = (which: keyof typeof IMG) => node('image', {
+  storage_key: IMG[which].key, alt_text: 'Print bed thermal map',
+  width: IMG[which].w, height: IMG[which].h,
+});
+/**
+ * An image node with NOTHING to load — the shape every authored TEMPLATE mold carries, since a
+ * mold declares its figure slots before a customer supplies a figure. `renderImage` draws a dashed
+ * box around one line of alt text, and the declared height acts as a `max-height` CAP on that box
+ * rather than as its height, so a slot declared 900×520 prints ~64pt, not ~390pt (B68).
+ */
+const placeholder = (opts: { w?: number; h?: number; alt?: string; caption?: string } = {}) => node('image', {
+  storage_key: '',
+  alt_text: opts.alt ?? 'Figure 1. System architecture',
+  ...(opts.w ? { width: opts.w } : {}), ...(opts.h ? { height: opts.h } : {}),
+  ...(opts.caption ? { caption: opts.caption } : {}),
+});
+const pageBreak = () => node('page_break', {});
+/** The page furniture every agency mold carries — a running header and a page-numbered footer. */
+const HF = {
+  header: { template: '{topic_number} — {company_name}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+  footer: { template: '{company_name} | Page {n} of {N}', height: 36, font: { family: 'Times New Roman', size: 10 } },
+} as const;
+/** A real `bulleted_list` — NOT `list`, which is not a NodeType and silently renders as nothing. */
+const bullets = (n: number, nested = false) => node('bulleted_list', {
+  items: Array.from({ length: n }, (_, i) => ({
+    text: `Qualification milestone ${i + 1} — coupons printed, sectioned and tested to ASTM D2344`,
+    ...(nested && i % 4 === 0
+      ? { children: [{ text: 'Witness coupons retained for the option year' }, { text: 'ILSS reported per orientation' }] }
+      : {}),
+  })),
+});
+
+function doc(nodes: CanvasNode[], overrides: Partial<NonNullable<CanvasDocument['canvas']>> = {}): CanvasDocument {
+  return {
+    version: 1,
+    canvas: { ...CANVAS_PRESETS.letter_standard, ...overrides },
+    nodes,
+  } as CanvasDocument;
+}
+
+interface Case {
+  name: string;
+  doc: CanvasDocument;
+  note?: string;
+  /**
+   * Accepted |delta| for a case that sits deliberately on a page boundary. Used ONLY where the
+   * residual is understood and written down — never to quiet a case whose cause is unknown, which
+   * would turn this script from an instrument into decoration.
+   */
+  tolerance?: number;
+}
+
+const CASES: Case[] = [
+  // ── Pure prose. The baseline: if this is off, every other number inherits the error. ──
+  { name: 'prose · half a page', doc: doc([text(prose(6))]) },
+  { name: 'prose · ~1 page', doc: doc([text(prose(14))]) },
+  { name: 'prose · ~2 pages', doc: doc([text(prose(30))]) },
+  { name: 'prose · ~4 pages', doc: doc([text(prose(62))]) },
+
+  // ── Headings. Cheap, but they consume leading and can push a page over on their own. ──
+  {
+    name: 'headings · 12 sections of prose',
+    doc: doc(Array.from({ length: 12 }, (_, i) => [heading(`3.${i + 1} Technical Approach`, 2), text(prose(4))]).flat()),
+  },
+
+  // ── Tables. Row height is the estimate most likely to drift from the real render. ──
+  { name: 'table · 8 rows, short cells', doc: doc([text(prose(3)), table(8, 'short')]) },
+  { name: 'table · 40 rows, short cells', doc: doc([text(prose(3)), table(40, 'short')]) },
+  {
+    name: 'table · 40 rows, WRAPPING cells',
+    doc: doc([text(prose(3)), table(40, 'long')]),
+    note: 'same row count as above — only the cell text is longer',
+  },
+
+  // ── Figures. The atomic-node rule is the one the estimator was last corrected for. ──
+  { name: 'figure · one chart', doc: doc([text(prose(6)), chart()]) },
+  { name: 'figure · two images mid-page', doc: doc([text(prose(8)), image('wide'), text(prose(4)), image('sq')]) },
+  {
+    name: 'figure · atomic push (image cannot fit remainder)',
+    doc: doc([text(prose(12)), image('tall'), text(prose(3))]),
+    note: 'the case that produced the 9-vs-10 disagreement recorded in the engine',
+  },
+
+  // ── Figure SLOTS — an image with an empty storage_key. The mold shape, and the one the
+  //    harness had no case for, which is how a ~35% per-figure over-count survived 28 green
+  //    cases (B68). Amplified deliberately: one slot is a rounding error, twenty decide a page. ──
+  { name: 'placeholder · 20 empty figure slots', doc: doc(Array.from({ length: 20 }, () => placeholder({ w: 900, h: 520 }))) },
+  {
+    name: 'placeholder · 20 slots interleaved with prose',
+    doc: doc(Array.from({ length: 20 }, () => [text(prose(2)), placeholder({ w: 640, h: 360 })]).flat()),
+    tolerance: 1,
+    note: 'the mold shape — figure margins collapse against the paragraph above, which a by-hand '
+        + 'reading of the stylesheet double-counts. Any residual here is the PROSE half, not the '
+        + 'figure: the slot measures 63.86pt modelled against 63.76pt printed.',
+  },
+  { name: 'placeholder · 24 slots with captions', doc: doc(Array.from({ length: 24 }, () => placeholder({ caption: 'Interlaminar shear strength by build orientation' }))) },
+  {
+    name: 'placeholder · 20 slots, alt text that wraps',
+    doc: doc(Array.from({ length: 20 }, () => placeholder({
+      alt: 'Figure. Interlaminar shear strength measured across all three build orientations for the '
+         + 'qualification coupon set, sectioned and tested to ASTM D2344 with witness coupons retained',
+    }))),
+  },
+  {
+    name: 'placeholder · 30 slots with a SHORT declared height (max-height caps the box)',
+    doc: doc(Array.from({ length: 30 }, () => placeholder({ w: 320, h: 60 }))),
+    note: 'the declared height can only make the box SHORTER — it is a max-height, not a height',
+  },
+
+  // ── Lists. Each item is its own block; measuring them as reflowed prose under-counted a
+  //    120-bullet document by a page and kept the deck overflow check silent (B65). ──
+  { name: 'list · 20 bullets', doc: doc([bullets(20)]) },
+  { name: 'list · 60 bullets', doc: doc([bullets(60)]) },
+  { name: 'list · 120 bullets (spills)', doc: doc([bullets(120)]) },
+  { name: 'list · 40 bullets with nested children', doc: doc([bullets(40, true)]) },
+  { name: 'list · prose + bullets + prose', doc: doc([text(prose(6)), bullets(25), text(prose(6))]) },
+
+  // ── The rest of the node vocabulary, swept for the same class as B64/B65: a node whose
+  //    content carries STRUCTURE the renderer preserves and the model might flatten. ──
+  {
+    name: 'code_block · 60 preserved newlines',
+    // Renders inside `white-space: pre-wrap`, so every newline is a line. Measured as flowed
+    // prose it would reflow them all away.
+    doc: doc([node('code_block', {
+      language: 'python',
+      code: Array.from({ length: 60 }, (_, i) => `    coupon_${i} = press.run(profile="nominal")`).join('\n'),
+    })]),
+  },
+  {
+    name: 'code_block · one very long line that wraps',
+    doc: doc([node('code_block', {
+      language: 'text',
+      code: 'coupon_profile = ' + '"nominal-thermal-profile-with-witness-coupons", '.repeat(40),
+    })]),
+  },
+  {
+    name: 'toc · document with 30 headings',
+    // The model returns 0 for a toc. The renderer emits the assembled heading list.
+    doc: doc([node('toc', { title: 'Contents' }),
+      ...Array.from({ length: 30 }, (_, i) => [heading(`${i + 1}. Section heading number ${i + 1}`, 2), text(prose(1))]).flat()]),
+    tolerance: 1,
+    note: 'B66: ±1 at a page boundary — the ruler does not model `break-after: avoid` on headings. '
+        + 'Exact without the toc (checked separately); the toc is what pushes headings onto the boundary.',
+  },
+  {
+    name: 'toc · ISOLATED, 40 entries (its own height decides)',
+    // Sharpened so the toc is what tips the page: 40 headings that each fit on one line, with the
+    // narrative deliberately short. If a 40-entry contents list really costs nothing, this stays
+    // at one page in both columns; if it costs ~40 lines, only a model that counts it agrees.
+    doc: doc([node('toc', { title: 'Contents' }),
+      ...Array.from({ length: 40 }, (_, i) => heading(`${i + 1}. Heading ${i + 1}`, 3))]),
+    tolerance: 1,
+    note: 'B66: same boundary effect, other direction. The toc ENTRY height itself is measured '
+        + 'correct in isolation (31 entries fill one page, bracketing it at (19.14, 19.76]pt).',
+  },
+  { name: 'blockquote · long pull quote', doc: doc([text(prose(4)), node('blockquote', { text: prose(8) })]) },
+  { name: 'callout · a warning box', doc: doc([text(prose(4)), node('callout', { variant: 'warning', text: prose(4) })]) },
+  { name: 'divider + spacer + signature', doc: doc([text(prose(4)), node('divider', {}), node('spacer', { height: 40 }), node('signature', { label: 'Authorized official', name: 'Dana Whitlock' })]) },
+  { name: 'footnote + url', doc: doc([text(prose(6)), node('footnote', { marker: '1', text: prose(2) }), node('url', { href: 'https://example.gov', display_text: 'Solicitation notice' })]) },
+
+  // ── Explicit breaks + mixed. What a real volume looks like. ──
+  {
+    // ±1, and the cause is measured rather than assumed. CHAR_W is ONE constant standing in for a
+    // font whose real average advance depends on the words (scripts/measure-char-width.mts, long
+    // paragraphs so line quantisation does not dominate): 0.41 for lowercase technical prose, 0.42
+    // for numerals, 0.44-0.47 for long compound words, 0.58 for acronym-dense text. 0.45 is the
+    // average of those, so it runs ~10% conservative on lowercase and ~20% optimistic on capitals.
+    // This case's table holds two long lowercase cells: 86 characters against a 42-character column
+    // is 2.05 lines, rounded to 3, on every row — 284pt modelled against 221.7pt printed. Closing
+    // it means estimating the advance per text from its character mix, not moving the constant.
+    tolerance: 1,
+    name: 'mixed · realistic technical volume',
+    doc: doc([
+      heading('1. Identification and Significance', 1), text(prose(10)),
+      heading('2. Phase I Technical Objectives', 1), text(prose(8)), table(6),
+      heading('3. Work Plan', 1), text(prose(14)), chart(),
+      heading('4. Related Work', 1), text(prose(9)),
+      heading('5. Facilities', 1), text(prose(6)), image('wide'),
+    ]),
+  },
+  {
+    name: 'page_break · forced three-pager',
+    doc: doc([text(prose(3)), pageBreak(), text(prose(3)), pageBreak(), text(prose(3))]),
+  },
+
+  // ── Frame variations. A different margin or font size must move BOTH numbers together.
+  //    These two spent their whole life testing nothing: they passed `{ margin_in: 0.5 }` and
+  //    `{ body_pt: 12 }`, which are not fields of CanvasRules (`margins` and `font_default` are),
+  //    so the override landed as an ignored property and both cases re-ran the plain 2-page prose
+  //    case. A frame variation that does not vary the frame is the same defect this harness
+  //    exists to catch, one level up. ──
+  { name: 'frame · narrow margins (0.5in)', doc: doc([text(prose(30))], { margins: { top: 36, right: 36, bottom: 36, left: 36 } }) },
+  { name: 'frame · 10pt body', doc: doc([text(prose(30))], { font_default: { family: 'Times New Roman', size: 10 } }) },
+
+  // ── Running header + footer. EVERY case above this line uses `letter_standard`, which declares
+  //    `header: null, footer: null` — so the entire header/footer path was uncalibrated, on a
+  //    product where every agency mold carries both. `page.pdf` draws them INSIDE the page
+  //    margins, so they take nothing from the content box (B69). ──
+  {
+    name: 'frame · running header + footer, 4 pages of prose',
+    doc: doc([text(prose(62))], { header: HF.header, footer: HF.footer }),
+    note: 'must match the same prose without furniture — the header lives in the top margin',
+  },
+  {
+    name: 'frame · running header + footer, prose + figures + a table',
+    doc: doc([
+      heading('1. Identification and Significance', 1), text(prose(10)),
+      heading('2. Phase I Technical Objectives', 1), text(prose(8)), table(6),
+      heading('3. Work Plan', 1), text(prose(14)), chart(),
+      heading('4. Facilities', 1), text(prose(9)), image('wide'),
+    ], { header: HF.header, footer: HF.footer }),
+  },
+  {
+    name: 'frame · footer only',
+    doc: doc([text(prose(30))], { footer: HF.footer }),
+  },
+];
+
+async function main() {
+  const rows: Array<{ name: string; predicted: number; actual: number; delta: number; note?: string; tolerance: number }> = [];
+  for (const c of CASES) {
+    const predicted = paginate(c.doc).totalPages;
+    let actual = -1;
+    try {
+      actual = pdfPageCount(await exportToPdf(c.doc));
+    } catch (e) {
+      console.error(`  ! ${c.name}: export failed —`, e instanceof Error ? e.message : String(e));
+    }
+    // Default the tolerance HERE, not at the comparison. Left undefined it reached
+    // `Math.abs(delta) > r.tolerance`, and every comparison against undefined is false — so the
+    // harness reported success for every case while still printing "off by" beside them. An
+    // instrument that cannot fail is the thing this whole exercise exists to catch.
+    rows.push({
+      name: c.name, predicted, actual,
+      delta: actual < 0 ? NaN : actual - predicted,
+      note: c.note, tolerance: c.tolerance ?? 0,
+    });
+    process.stdout.write('.');
+  }
+  process.stdout.write('\n\n');
+
+  const w = Math.max(...rows.map((r) => r.name.length));
+  console.log(`${'CASE'.padEnd(w)}  PREDICTED  ACTUAL  DELTA`);
+  console.log('─'.repeat(w + 26));
+  for (const r of rows) {
+    const within = !Number.isNaN(r.delta) && Math.abs(r.delta) <= r.tolerance;
+    const flag = Number.isNaN(r.delta) ? ' EXPORT-FAILED'
+      : r.delta === 0 ? ''
+      : within ? `  (off by ${r.delta > 0 ? '+' : ''}${r.delta}, within the stated tolerance)`
+      : `  ← off by ${r.delta > 0 ? '+' : ''}${r.delta}`;
+    console.log(`${r.name.padEnd(w)}  ${String(r.predicted).padStart(9)}  ${String(r.actual).padStart(6)}  ${String(Number.isNaN(r.delta) ? '?' : r.delta).padStart(5)}${flag}`);
+    if (r.note) console.log(`${' '.repeat(w)}  (${r.note})`);
+  }
+
+  const bad = rows.filter((r) => Number.isNaN(r.delta) || Math.abs(r.delta) > r.tolerance);
+  console.log('');
+  if (bad.length === 0) {
+    const tol = rows.filter((r) => r.tolerance > 0 && r.delta !== 0).length;
+    console.log(`✓ the ruler agrees with the page on all ${rows.length} cases`
+      + (tol ? ` (${tol} within a stated ±1 tolerance — see B66)` : ''));
+    process.exit(0);
+  }
+  // UNDER-counting is the dangerous direction: the product tells a customer they are inside the
+  // limit when the printed document is not, and the bid is rejected on receipt. OVER-counting
+  // only costs them pages they were entitled to use, which is a smaller wrong.
+  const under = bad.filter((r) => r.delta > 0);
+  console.log(`✗ ${bad.length}/${rows.length} cases disagree — ${under.length} UNDER-count (the dangerous direction)`);
+  process.exit(1);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });

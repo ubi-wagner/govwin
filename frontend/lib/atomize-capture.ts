@@ -37,6 +37,13 @@ export interface CaptureInput {
   sourceUrl?: string;
   note?: string;
   groupName?: string; // when set, wrap the region atoms into a section group
+  /**
+   * What produced these regions, for the provenance line stamped on every atom. Defaults to
+   * "Screen capture" — the browser Capture tab. The PDF figure harvester passes its own label so a
+   * figure lifted out of an uploaded proposal does not claim somebody grabbed it off a screen; the
+   * provenance line is the only record of where a reusable asset came from, and it has to be true.
+   */
+  sourceLabel?: string;
   ctxTags: AtomTagInput[];
   actor: { id: string; kind: CreatorKind };
 }
@@ -81,9 +88,9 @@ const defaultStore: StoreFn = async (tenantSlug, img) => {
 };
 
 /** Human provenance line stamped into each captured atom's summary. */
-function provenanceLine(sourceUrl?: string, note?: string): string {
+function provenanceLine(sourceUrl?: string, note?: string, label = 'Screen capture'): string {
   const host = (() => { try { return sourceUrl ? new URL(sourceUrl).host : ''; } catch { return sourceUrl ?? ''; } })();
-  const parts = ['Screen capture'];
+  const parts = [label];
   if (host) parts.push(`from ${cleanText(host)}`);
   parts.push(`· ${new Date().toISOString()}`);
   if (note) parts.push(`· ${cleanText(note).slice(0, 200)}`); // sanitize user note → DB-safe (no 22021)
@@ -96,10 +103,10 @@ export async function atomizeCaptureIntoLibrary(
   input: CaptureInput,
   opts?: { store?: StoreFn; enrich?: (buffers: Buffer[]) => Promise<Enriched[]> },
 ): Promise<CaptureResult> {
-  const { full, regions, sourceUrl, note, groupName, ctxTags, actor } = input;
+  const { full, regions, sourceUrl, note, groupName, ctxTags, actor, sourceLabel } = input;
   const doStore = opts?.store ?? defaultStore;
   const doEnrich = opts?.enrich ?? enrichImages;
-  const prov = provenanceLine(sourceUrl, note);
+  const prov = provenanceLine(sourceUrl, note, sourceLabel);
 
   // OCR every region up front (one worker for the whole batch) so each image atom carries searchable,
   // machine-legible text. Best-effort — a failure just leaves the atoms text-less, never aborts.
@@ -112,7 +119,7 @@ export async function atomizeCaptureIntoLibrary(
   try {
     const [row] = await withTenant<Array<{ id: string }>>(tenantId, async (tx) =>
       tx`INSERT INTO document_cocoons (tenant_id, name, scope, source)
-         VALUES (${tenantId}::uuid, ${`Screen capture — ${new Date().toISOString()}`}, 'document', 'upload')
+         VALUES (${tenantId}::uuid, ${`${sourceLabel ?? 'Screen capture'} — ${new Date().toISOString()}`}, 'document', 'upload')
          RETURNING id`);
     cocoonId = row?.id ?? null;
   } catch (e) { console.error('[atomize-capture] cocoon insert failed (non-fatal)', e); }
@@ -124,7 +131,7 @@ export async function atomizeCaptureIntoLibrary(
       const { key } = await doStore(tenantSlug, full);
       const ref = await createAtom(tenantId, {
         grain: 'reference',
-        title: cleanText(`Screen capture ${sourceUrl ? `(${(() => { try { return new URL(sourceUrl).host; } catch { return sourceUrl; } })()})` : ''}`.trim()),
+        title: cleanText(`${sourceLabel ?? 'Screen capture'} ${sourceUrl ? `(${(() => { try { return new URL(sourceUrl).host; } catch { return sourceUrl; } })()})` : ''}`.trim()),
         content: null,
         canvasNodes: [imageNode(key, { alt: 'screen capture', caption: note ? cleanText(note) : undefined, width: full.width, height: full.height })],
         summary: prov,

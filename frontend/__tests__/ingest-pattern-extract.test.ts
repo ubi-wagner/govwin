@@ -302,3 +302,196 @@ describe('parseSolicitation — layers pattern over default (no API key)', () =>
     expect(r.fieldSources!.page_limit_technical).toBe('default');
   });
 });
+
+describe('a Component rule is not the solicitation rule', () => {
+  /* The text below is VERBATIM from the DoW 2026 SBIR BAA (R1), page 31 — found by ingesting the
+   * real 3 MB PDF and reading the char offset the extractor itself cited. It is quoted rather than
+   * paraphrased because the whole bug lives in one leading token. */
+  const JOINT_BAA = `
+DEPARTMENT OF THE NAVY (DON) PROPOSAL SUBMISSION INSTRUCTIONS
+
+• The information provided in the DON Proposal Submission Instructions takes precedence
+over the DoW Instructions posted for this BAA.
+• DON Phase I Technical Volume (Volume 2) page limit is not to exceed 10 pages.
+• Proposing SBCs that are more than 50% owned by multiple venture capital operating
+companies are eligible to submit proposals in response to DON topics advertised in this BAA.
+
+GENERAL PROPOSAL PREPARATION
+
+Proposals must be typed with no type smaller than 10-point font on standard 8-1/2" x 11" paper
+with one-inch margins on all sides.
+Refer to the Component-specific instructions for the applicable Technical Volume page limit.
+`;
+
+  it('does NOT adopt a Navy-only page limit as the whole solicitation\'s', () => {
+    const r = extractByPattern(JOINT_BAA);
+    // The DON bullet is real, cited, and 10 pages — and binds only the Navy. Adopting it told an
+    // Air Force proposer their cap was 10, badged "Read from source", which is worse than a
+    // default: a default is flagged unverified, this arrives with a page number and a quote.
+    expect(r.compliance.pageLimitTechnical).toBeUndefined();
+    expect(r.evidence.page_limit_technical).toBeUndefined();
+  });
+
+  it('records the Component rule as a finding rather than discarding it', () => {
+    const r = extractByPattern(JOINT_BAA);
+    const note = r.notes.find((n) => /Component-specific/i.test(n) && /NOT\s+applied/i.test(n));
+    expect(note, 'the curator must be told the document contains it').toBeTruthy();
+    expect(note).toMatch(/DON/);   // and which Component it binds
+  });
+
+  it('falls through to the DEFERRAL, which is the truth for the document as a whole', () => {
+    const r = extractByPattern(JOINT_BAA);
+    const d = r.deferrals.find((x) => x.field === 'page_limit_technical');
+    expect(d, 'the BAA defers the page limit to the Component instructions').toBeTruthy();
+    expect(r.notes.join(' ')).toMatch(/defers the technical-volume page limit/i);
+  });
+
+  it('quotes the whole statement, so the disqualifying qualifier travels with the evidence', () => {
+    // The rules anchor on "technical volume", so the match span began AFTER "DON" — a reviewer
+    // checking the citation saw a sentence that read document-wide. Every excerpt now extends back
+    // to the start of its own sentence or bullet.
+    const r = extractByPattern(JOINT_BAA);
+    expect(r.evidence.min_font_size.anchor.excerpt).toMatch(/Proposals must be typed/i);
+  });
+
+  it('still reads the common rules the joint BAA does set for everyone', () => {
+    const r = extractByPattern(JOINT_BAA);
+    expect(r.compliance.minFontSize).toBe(10);
+    expect(r.compliance.margins).toBe('1 inch (all sides)');
+  });
+});
+
+/**
+ * Phrasing coverage found by the midterm ingest drive. The corpus above came from ONE real
+ * document (a joint DoW BAA), so the rules were written to its wording and quietly missed forms
+ * that are just as common elsewhere. Each case below is lifted verbatim from a fixture under
+ * e2e/fixtures/solicitations, and each one returned nothing before the rule that now covers it.
+ */
+describe('phrasings other agencies actually print', () => {
+  const wrap = (s: string) => `${'filler. '.repeat(30)}\n-- Page 1 of 1 --\n${s}`;
+
+  it('reads a minimum type size stated SUBJECT-first', () => {
+    // DoD/DOE/state wording. The pre-existing rule only matched the inversion, "no font smaller
+    // than 11 point", so "Type size shall be no smaller than 11 point" fell through to a default.
+    const r = extractByPattern(wrap('Type size shall be no smaller than 11 point.'));
+    expect(r.compliance.minFontSize).toBe(11);
+    expect(r.evidence.min_font_size.rule).toBe('min_font.size_no_smaller_than');
+  });
+
+  it('still reads the object-first inversion it always did', () => {
+    const r = extractByPattern(wrap('Use no font smaller than 10 point.'));
+    expect(r.compliance.minFontSize).toBe(10);
+  });
+
+  it('does not capture a bare "no smaller than" with no type/font subject', () => {
+    // The guard that keeps the widened rule honest: without a type/font subject this is a
+    // statement about something else entirely.
+    const r = extractByPattern(wrap('The award shall be no smaller than 11 point on the scale.'));
+    expect(r.compliance.minFontSize).toBeUndefined();
+  });
+
+  it('reads a FRACTIONAL margin', () => {
+    // DOE asks for 0.75 inch. The alternation was (one|two|1|2), so this returned nothing —
+    // and, worse, inches() used parseInt, so a "1.5 inch" that ever reached it would have been
+    // reported as "1 inch": a margin the document does not state.
+    const r = extractByPattern(wrap('Applications shall use 0.75 inch margins on all sides.'));
+    expect(r.compliance.margins).toBe('0.75 inch (all sides)');
+  });
+
+  it('reads a one-and-a-half inch margin as 1.5, not 1', () => {
+    const r = extractByPattern(wrap('Use 1.5 inch margins on all sides.'));
+    expect(r.compliance.margins).toBe('1.5 inch (all sides)');
+  });
+
+  it('still reads worded and integer margins', () => {
+    expect(extractByPattern(wrap('Page margins one inch on all sides.')).compliance.margins)
+      .toBe('1 inch (all sides)');
+    expect(extractByPattern(wrap('Use 1 inch margins on all sides.')).compliance.margins)
+      .toBe('1 inch (all sides)');
+  });
+
+  it('rejects an out-of-range margin rather than reporting a wrong one', () => {
+    const r = extractByPattern(wrap('Use 9 inch margins on all sides.'));
+    expect(r.compliance.margins).toBeUndefined();
+  });
+
+  it('declines a typeface with no font token beside it — Georgia is also a place', () => {
+    // Deliberate conservatism, verified rather than assumed: the typeface whitelist contains
+    // Georgia and Cambria, which are also place names, so a name needs a font/typeface token in
+    // the same sentence before it becomes a mandate.
+    const r = extractByPattern(wrap('Proposals shall be prepared in Georgia. Type size shall be no smaller than 12 point.'));
+    expect(r.compliance.fontFamily).toBeUndefined();
+    expect(r.compliance.minFontSize).toBe(12);
+  });
+
+  it('reads a typeface when a font token IS beside it', () => {
+    const r = extractByPattern(wrap('Proposals must use Arial typeface.'));
+    expect(r.compliance.fontFamily).toBe('Arial');
+  });
+});
+
+describe('a document that prints its own page numbers', () => {
+  /**
+   * The upload route reads PDFs with pdf-parse, which injects "-- N of M --" at every page
+   * break. Government solicitations also PRINT a page footer. Both match the marker patterns, so
+   * the stream arrives doubled — and the monotonicity guard used to read the repeat as a broken
+   * paging scheme and throw away every page number, on exactly the documents most likely to be
+   * real. This is the shape taken verbatim from a live ingest.
+   */
+  const doubled = [
+    'A. FORMAT',
+    'Type size shall be no smaller than 11 point. Use 1 inch margins on all sides.',
+    '-- Page 1 of 3 --',
+    '',
+    '-- 1 of 3 --',
+    '',
+    'B. LENGTH',
+    'The Technical Volume shall not exceed 20 pages.',
+    '-- Page 2 of 3 --',
+    '',
+    '-- 2 of 3 --',
+    '',
+    'C. REVIEW',
+    'Applications are evaluated on merit.',
+    '-- Page 3 of 3 --',
+    '',
+    '-- 3 of 3 --',
+  ].join('\n');
+
+  it('resolves pages through the doubled markers', () => {
+    const r = extractByPattern(doubled);
+    expect(r.evidence.min_font_size.pageResolved).toBe(true);
+    expect(r.evidence.min_font_size.anchor.page).toBe(1);
+    expect(r.evidence.page_limit_technical.anchor.page).toBe(2);
+  });
+
+  it('does not report "no page markers" when the document is full of them', () => {
+    const r = extractByPattern(doubled);
+    expect(r.notes.join(' ')).not.toMatch(/no page markers/i);
+  });
+
+  it('still refuses a genuinely erratic sequence rather than mis-citing', () => {
+    // 7, 3, 9 is not a paging scheme; collapsing duplicates must not soften that.
+    const erratic = [
+      // Padded past MIN_USABLE_TEXT_CHARS: extractByPattern declines a document too short to be
+      // a real one, and a 110-character fixture would prove nothing about the paging guard.
+      'filler. '.repeat(30),
+      'Type size shall be no smaller than 11 point.',
+      '-- 7 of 50 --', '', 'more text', '-- 3 of 50 --', '', 'more text', '-- 9 of 50 --',
+    ].join('\n');
+    const r = extractByPattern(erratic);
+    expect(r.evidence.min_font_size.pageResolved).toBe(false);
+  });
+
+  it('still segments a real document boundary (page numbering restarting at 1)', () => {
+    const twoDocs = [
+      'filler. '.repeat(30),
+      'Type size shall be no smaller than 11 point.',
+      '-- 1 of 2 --', '', 'text', '-- 2 of 2 --', '',
+      'SECOND DOCUMENT', '-- 1 of 2 --', '', 'text', '-- 2 of 2 --',
+    ].join('\n');
+    const r = extractByPattern(twoDocs);
+    expect(r.evidence.min_font_size.pageResolved).toBe(true);
+    expect(r.evidence.min_font_size.docSegment).toBe(1);
+  });
+});

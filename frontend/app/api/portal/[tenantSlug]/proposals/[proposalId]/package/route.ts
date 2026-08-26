@@ -22,7 +22,9 @@ import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { exportToPdf } from '@/lib/export/pdf-exporter';
-import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import { assembleArtifactCanvas, assembleFittedArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
+import { finishVolumeCanvas } from '@/lib/proposal/volume-finish';
 import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 import JSZip from 'jszip';
 import {
@@ -283,6 +285,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid
         ORDER BY volume_number, volume_name`;
       const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', project_title: prop.title ?? '', topic_number: '' };
+      const zipFacts = await loadVolumeFacts(proposalId, tenantId);
       const zip = new JSZip();
       const failed: string[] = [];
       let fileCount = 0;
@@ -290,7 +293,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         const secs = await sql<{ title: string | null; content: string | null; pageAllocation: number | null }[]>`
           SELECT title, content, page_allocation AS "pageAllocation" FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
         if (secs.length === 0) continue;
-        const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
+        // Finished per volume, exactly as the single-artifact download finishes it — the zip is
+        // the same deliverable in per-volume-native form, so it must not be a plainer document.
+        const doc = await assembleFittedArtifactCanvas(secs, a.artifactType, a.volumeName, { ...zipFacts, volumeName: a.volumeName }, vars);
         const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
         try {
           const buf = await renderCanvas(fmt, doc, vars);
@@ -332,7 +337,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       } catch (logErr) {
         console.error('[package/zip] activity log failed', logErr);
       }
-      const floor = await packageComplianceFloor(proposalId);
+      const floor = await packageComplianceFloor(proposalId, tenantId);
       await emitEventEnd(zipStartId, { result: { proposalId, format: 'zip', volumeCount: fileCount, compliant: floor.violations === 0, complianceViolations: floor.byArtifact } });
 
       return new Response(new Uint8Array(zipBuf), {
@@ -550,12 +555,22 @@ export async function POST(request: Request, ctx: RouteContext) {
         topic_number: proposal.title ?? 'TBD',
       };
 
+      // Finish the combined document the same way a single volume is finished: cover band, the
+      // figures its own content supports, running header/footer, figure numbering. This is the
+      // whole-proposal download — the one a customer is most likely to send — so it gets the same
+      // treatment rather than a plainer one. (lib/proposal/volume-finish.ts)
+      const finishedDoc = finishVolumeCanvas(combinedDoc, {
+        ...(await loadVolumeFacts(proposalId, tenantId)),
+        artifactType: 'narrative',
+        volumeName: proposal.title ?? 'Proposal',
+      });
+
       let buffer: Buffer;
       try {
         buffer =
           format === 'pdf'
-            ? await exportToPdf(combinedDoc, vars)
-            : await exportToDocx(combinedDoc, vars);
+            ? await exportToPdf(finishedDoc, vars)
+            : await exportToDocx(finishedDoc, vars);
       } catch (e) {
         console.error(
           `[portal/proposals/package] ${format.toUpperCase()} generation failed:`,
@@ -608,7 +623,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
 
       // ── Advisory compliance floor (per artifact, same contract as artifact export) ──
-      const floor = await packageComplianceFloor(proposalId);
+      const floor = await packageComplianceFloor(proposalId, tenantId);
 
       // ── Emit end event ──────────────────────────────────────────
       await emitEventEnd(startEventId, {
@@ -863,12 +878,13 @@ export async function POST(request: Request, ctx: RouteContext) {
  * contract as the per-artifact export route — and roll the violation count into the response
  * header + end-event payload. Best-effort: a floor failure never blocks a locked download.
  */
-async function packageComplianceFloor(proposalId: string): Promise<{ violations: number; byArtifact: Record<string, string[]> }> {
+async function packageComplianceFloor(proposalId: string, tenantId: string): Promise<{ violations: number; byArtifact: Record<string, string[]> }> {
   const out: { violations: number; byArtifact: Record<string, string[]> } = { violations: 0, byArtifact: {} };
   try {
     const arts = await sql<{ id: string; artifactType: string; volumeName: string | null; complianceSpec: ComplianceSpec | null }[]>`
       SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", compliance_spec AS "complianceSpec"
       FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid`;
+    const floorFacts = await loadVolumeFacts(proposalId, tenantId);
     for (const a of arts) {
       if (!a.complianceSpec) continue;
       const secs = await sql<{ title: string | null; content: string | null; pageAllocation: number | null }[]>`
@@ -876,7 +892,11 @@ async function packageComplianceFloor(proposalId: string): Promise<{ violations:
         WHERE artifact_id = ${a.id}::uuid
         ORDER BY volume_number NULLS LAST, sort_index NULLS LAST, section_number`;
       if (secs.length === 0) continue;
-      const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName || 'volume');
+      // Measure what SHIPS. The download finishes each volume (cover band, figures, running
+      // header/footer), and a floor run against the unfinished assembly would report a missing
+      // header on a document that has one and miss a figure that pushes it over its page cap.
+      const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName || 'volume',
+        { ...floorFacts, volumeName: a.volumeName || 'volume' });
       // Mirror submission-readiness's fontExempt rule so the two size gauges never disagree: a cost
       // WORKBOOK or a webFORM is not narrative body text — federal cost tables + form fine print are
       // conventionally below the prose minimum yet legible, and the RFP's "text ≥ N-pt" rule is a

@@ -36,11 +36,14 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
-import { estimatePageCount, estimateSlideCount, countDocCharacters } from '@/lib/types/canvas-document';
+import { estimatePageCount, estimateSlideCount, countDocCharacters, normalizeCanvas, docNodes, spacerHeightPt, paginate } from '@/lib/types/canvas-document';
 import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
 import { parseNumericText, isNumericCell, formatCellDisplay } from '@/lib/numeric-cell';
 import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
+import { MeasureGridOverlay, MeasureRulers } from './measure-grid-overlay';
+import { BoundingBox, measureBox, runsFromGroupMap } from './bounding-box-overlay';
+import { defaultGridStep, isGridStep, type GridStepPt } from '@/lib/canvas/measure-grid';
 
 interface Props {
   document: CanvasDocument;
@@ -50,6 +53,46 @@ interface Props {
   variables?: Record<string, string>;
   readOnly?: boolean;
   onMoveNodeToIndex?: (nodeId: string, targetIndex: number) => void;
+  /**
+   * node id → its group, for the `groups` overlay. Supplied by a host whose document has already
+   * been flattened for editing (`toEditableFlat` drops `sections`), so the group layer survives as
+   * provenance even though the editable shape cannot carry it. Omit and it is derived from
+   * `document.sections` instead.
+   */
+  groups?: GroupMap;
+  /**
+   * Draw the measurement grid over the page. `true` picks a step that keeps the grid legible for
+   * this canvas size; a number pins one. Off by default — a ruler you did not ask for is clutter.
+   */
+  grid?: boolean | GridStepPt;
+}
+
+/** What the `groups` overlay needs to know about one node. */
+export type GroupMap = Record<string, { id: string; label?: string; keep: boolean; pos: string }>;
+
+/**
+ * Derive the group map from a document that still HAS its section layer.
+ *
+ * Exported because the editor must call it on the document it loaded, before `toEditableFlat`
+ * throws the sections away — and calling it after would silently return an empty map, which is
+ * exactly the shape of "there are no groups" rather than "I looked too late".
+ */
+export function groupMapOf(doc: Pick<CanvasDocument, 'sections'> | null | undefined): GroupMap {
+  const map: GroupMap = {};
+  for (const section of doc?.sections ?? []) {
+    for (const g of section.groups ?? []) {
+      const gn = g.nodes ?? [];
+      gn.forEach((n, i) => {
+        map[n.id] = {
+          id: g.id,
+          label: g.label ?? undefined,
+          keep: !!g.keep_together,
+          pos: gn.length === 1 ? 'solo' : i === 0 ? 'start' : i === gn.length - 1 ? 'end' : 'mid',
+        };
+      });
+    }
+  }
+  return map;
 }
 
 /**
@@ -94,14 +137,45 @@ export function CanvasRenderer({
   variables = {},
   readOnly = false,
   onMoveNodeToIndex,
+  groups,
+  grid = false,
 }: Props) {
-  const { canvas, nodes, metadata } = doc;
+  // A stored canvas may be PARTIAL — `{width, height, margins}` with no `font_default` is a shape
+  // that exists in the database today (four TVSF sections carry it). Reading `.font_default.family`
+  // off that threw in a client component and took the whole proposal workspace down to the error
+  // boundary while the same volume still exported as a correct PDF (bug log B78, the render-path
+  // sibling of B73). Normalize to what the exporter draws, once, at the boundary.
+  // `docNodes`, not `doc.nodes`. A canvas carrying the SECTION layer (`sections[].groups[].nodes`)
+  // has no top-level `nodes` at all, so reading it directly rendered a blank page for a document
+  // the model considers perfectly valid — and the moment the library assembler starts writing real
+  // groups, that would be every assembled section. Flattening for display is what the exporters
+  // already do; the group layer is not lost, it is carried in the map below.
+  const nodes = docNodes(doc);
+  const { metadata } = doc;
+  const canvas = normalizeCanvas(doc.canvas);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+
+  // node id → its group, for the `groups` overlay. The group is the unit of PROVENANCE (`atom_ref`)
+  // and of COHESION (`keep_together`) — the run that moves across a page edge as one — and until
+  // now nothing in the UI could show either. `pos` lets the CSS close the bracket at both ends
+  // without the stylesheet needing to know how many nodes are in between.
+  //
+  // Two sources, in that order. `doc.sections` covers a surface that renders a sectioned canvas
+  // directly. `groups` (the prop) covers the EDITOR, which cannot use the first: `toEditableFlat`
+  // sets `sections: undefined` on purpose — the editable surface works on one flat node list — so
+  // by the time the document reaches here the group layer is already gone. The editor therefore
+  // derives the map from the document it LOADED and hands it in.
+  //
+  // A map keyed by node id is the right shape for that because a group is PROVENANCE, not layout:
+  // it records which library atom a node came from. Editing the node does not change that, moving
+  // it does not change that, and a stale entry for a deleted node is simply never looked up.
+  const groupOf = React.useMemo(() => groups ?? groupMapOf(doc), [doc, groups]);
 
   // Scale the page to the ACTUAL available column width (measured), so it fits
   // any viewport — including a Chrome split-screen half — instead of overflowing
   // a hardcoded 750px reference. Never upscale past 1; floor so it stays legible.
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const [availWidth, setAvailWidth] = useState(750);
   useEffect(() => {
     const el = containerRef.current;
@@ -116,6 +190,118 @@ export function CanvasRenderer({
   const contentWidth = canvas.width - canvas.margins.left - canvas.margins.right;
   const scale = Math.min(1, Math.max(0.25, (availWidth - 32) / canvas.width));
 
+  // ── the live unit count, shared by the boundary lines and the status gauge ───────────────────
+  //
+  // REALTIME, AND FREE. `estimatePageCount` was already being called on every render for the status
+  // bar, so drawing the boundaries costs one memo and no measurement: the count is arithmetic over
+  // the node model, not a reading off the DOM. That is the whole reason the boundaries can update
+  // as fast as you type while the GROUP BOXES — the one layer that genuinely needs layout — are
+  // deferred to a post-paint pass below.
+  const gridStep = isGridStep(grid) ? grid : defaultGridStep(canvas);
+  // A deck is measured in SLIDES, and the discriminator is the canvas format — 'slide_16_9' or
+  // 'slide_4_3', not a single 'ppt'. Guessing that name would have compiled against a union that
+  // does not contain it, which is exactly what tsc caught.
+  const isDeck = canvas.format === 'slide_16_9' || canvas.format === 'slide_4_3';
+  const liveUnits = React.useMemo(
+    () => (isDeck ? estimateSlideCount(doc) : estimatePageCount(doc)),
+    [doc, isDeck],
+  );
+
+  // ── measured group boxes ─────────────────────────────────────────────────────────────────────
+  //
+  // LAYOUT pixels, not client rects. The page carries `transform: scale()`, so
+  // getBoundingClientRect returns TRANSFORMED pixels — every measurement would have the transform
+  // baked in and would need dividing back out, which is a second place to get the scale wrong.
+  // offsetTop/offsetHeight are pre-transform, in the same space the grid and the page padding use,
+  // so `px / scale` is points and nothing else has to know.
+  const [groupBoxes, setGroupBoxes] = useState<Array<{
+    key: string; label: string; topPx: number; heightPx: number; nodes: CanvasNode[];
+  }>>([]);
+
+  // WHERE EACH PAGE ACTUALLY STARTS — measured, not computed.
+  //
+  // A geometric boundary at `marginTop + k × usableHeight` is only right when content flows
+  // continuously. It does not: `fitKeep` RELOCATES a block that will not fit — a table, a figure, a
+  // keep_together group — wholesale to the next page, and the paginator's own comment records the
+  // measurement (a 40-row table alone is 2 pages; ONE sentence of prose plus that table is 3).
+  //
+  // So with prose then a tall table, the printed page 2 begins AT THE TABLE, while a geometric line
+  // would fall in the middle of it and claim the break was there. That is worse than no line: it
+  // asserts a break where none happens and hides the one that does.
+  //
+  // This is also the "images pop between pages" the author feels while editing — one sentence added
+  // above a figure moves the whole figure a page down. Showing the real boundary makes that visible
+  // instead of mysterious, and the relocation gap below shows the whitespace it leaves behind.
+  const [pageStarts, setPageStarts] = useState<Array<{ page: number; topPx: number; relocated: boolean }>>([]);
+
+  useEffect(() => {
+    if (!grid) { setGroupBoxes([]); return; }
+    const page = pageRef.current;
+    if (!page) return;
+
+    const usableHeightPt = canvas.height - canvas.margins.top - canvas.margins.bottom;
+
+    /** Offset of `el` from `ancestor`, summing offsetParents — a positioned wrapper would otherwise
+     *  make offsetTop relative to the wrong thing and slide every box up the page. */
+    const offsetWithin = (el: HTMLElement, ancestor: HTMLElement): number => {
+      let y = 0;
+      let cur: HTMLElement | null = el;
+      while (cur && cur !== ancestor) { y += cur.offsetTop; cur = cur.offsetParent as HTMLElement | null; }
+      return cur === ancestor ? y : el.offsetTop;
+    };
+
+    const measure = () => {
+      // ── page starts, from the PAGINATOR's own per-node assignment ──
+      // paginate() models fitKeep, so its `startPage` already accounts for relocation. Reading the
+      // DOM position of the first node on each page turns that model into a line on this page.
+      try {
+        const layout = paginate(doc);
+        const seen = new Set<number>();
+        const starts: Array<{ page: number; topPx: number; relocated: boolean }> = [];
+        for (const info of layout.perNode) {
+          if (info.startPage <= 1 || seen.has(info.startPage)) continue;
+          seen.add(info.startPage);
+          const el = page.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(info.id)}"]`);
+          if (!el) continue;
+          const top = offsetWithin(el, page);
+          // RELOCATED when the node begins a page further down the flow than a continuous break
+          // would have put it — i.e. it was pushed rather than filled in behind what precedes it.
+          const geometric = canvas.margins.top + (info.startPage - 1) * usableHeightPt;
+          starts.push({ page: info.startPage, topPx: top, relocated: top * (1 / (scale || 1)) < geometric - 2 });
+        }
+        setPageStarts(starts);
+      } catch {
+        setPageStarts([]);   // a malformed canvas must not take the editor down with it
+      }
+
+      const runs = runsFromGroupMap(nodes, groupOf);
+      const boxes = runs.map((run, i) => {
+        const els = run.nodes
+          .map((n) => page.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`))
+          .filter((e): e is HTMLElement => !!e);
+        if (els.length === 0) return null;
+        const tops = els.map((e) => offsetWithin(e, page));
+        const top = Math.min(...tops);
+        const bottom = Math.max(...tops.map((t, j) => t + els[j].offsetHeight));
+        return {
+          key: `${run.id}-${i}`,
+          label: run.label ?? `Group ${i + 1}`,
+          topPx: top,
+          heightPx: Math.max(0, bottom - top),
+          nodes: run.nodes,
+        };
+      }).filter((b): b is NonNullable<typeof b> => b !== null);
+      setGroupBoxes(boxes);
+    };
+
+    // Measure after paint, and again whenever the page resizes — a box drawn from a stale layout is
+    // a confident wrong number, which is the one thing a measurement tool must never produce.
+    const raf = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(page);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [grid, nodes, groupOf, scale, canvas, doc]);
+
   const fontStyle = {
     fontFamily: canvas.font_default.family,
     fontSize: `${canvas.font_default.size}pt`,
@@ -127,16 +313,98 @@ export function CanvasRenderer({
       {/* Page — honors canvas.background (deck/page fill) so what you see == what exports
           (pptx slide.background + the html/pdf page); falls back to the bg-white class. */}
       <div
+        ref={pageRef}
         className="bg-white shadow-lg relative"
         style={{
           width: canvas.width * scale,
           minHeight: canvas.height * scale,
           padding: `${canvas.margins.top * scale}px ${canvas.margins.right * scale}px ${canvas.margins.bottom * scale}px ${canvas.margins.left * scale}px`,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top center',
+          // NO `transform: scale()` HERE. Every dimension above is ALREADY multiplied by `scale` —
+          // width, height, padding, and the font sizes below — so a transform scaled the page a
+          // SECOND time and it rendered at scale². Invisible at full width, where scale clamps to 1;
+          // measurably wrong as the viewport narrows, and invisible to the eye even then because
+          // everything inside shrinks together, so the page looks right and is simply too small.
+          //
+          //   viewport 1100  layout 460px · visual 346px   ratio 0.752
+          //   viewport  600  layout 536px · visual 469px   ratio 0.875
+          //
+          // Centring is unaffected: the outer container is `flex ... items-center`, which is what
+          // was actually centring the page — `transformOrigin: 'top center'` only decided where the
+          // redundant shrink pulled towards. Found by writing a grid overlay and needing to know,
+          // exactly, what coordinate space the page was in.
           background: canvas.background || undefined,
         }}
       >
+        {/* The measurement grid — ABOVE the page background, BELOW the content, so it reads as
+            paper ruling rather than as an annotation drawn on top of the text. */}
+        {grid !== false && (
+          <>
+            <MeasureGridOverlay
+              canvas={canvas}
+              step={gridStep}
+              scale={scale}
+              // Only fall back to the GEOMETRIC boundary before the first measurement lands. Once
+              // pageStarts is populated it supersedes it — a measured start accounts for relocation
+              // and a computed one cannot.
+              pageCount={pageStarts.length > 0 ? 1 : liveUnits}
+              unit={isDeck ? 'slide' : 'page'}
+            />
+
+            {/* MEASURED page starts, and the whitespace a relocation leaves behind.
+                The band is the point: a block pushed to the next page leaves that much of the
+                previous one blank in print, and nothing in a continuous editor shows it. This is
+                the "image popped to the next page" made visible while it is still editable. */}
+            {pageStarts.map((p) => (
+              <React.Fragment key={`ps${p.page}`}>
+                {p.relocated && (
+                  <div
+                    style={{
+                      position: 'absolute', left: 0, right: 0,
+                      top: (canvas.margins.top + (p.page - 2) * (canvas.height - canvas.margins.top - canvas.margins.bottom)) * scale,
+                      height: Math.max(0, p.topPx - (canvas.margins.top + (p.page - 2) * (canvas.height - canvas.margins.top - canvas.margins.bottom)) * scale),
+                      background: 'repeating-linear-gradient(45deg, rgba(15,118,110,0.07) 0 6px, transparent 6px 12px)',
+                      pointerEvents: 'none',
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+                <div
+                  style={{
+                    position: 'absolute', left: 0, right: 0, top: p.topPx, height: 0,
+                    borderTop: '1px dashed rgba(15, 118, 110, 0.75)', pointerEvents: 'none',
+                  }}
+                  aria-hidden="true"
+                />
+                <span
+                  style={{
+                    position: 'absolute', right: 2, top: p.topPx + 2,
+                    fontSize: 8, lineHeight: '8px', fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 600, color: 'rgba(15, 118, 110, 0.9)', pointerEvents: 'none',
+                  }}
+                  aria-hidden="true"
+                >
+                  {isDeck ? 'slide' : 'page'} {p.page}{p.relocated ? ' · pushed' : ''}
+                </span>
+              </React.Fragment>
+            ))}
+            <MeasureRulers canvas={canvas} step={gridStep} scale={scale} />
+          </>
+        )}
+
+        {/* Measured group boxes — drawn ABOVE the grid so their edges read against its lines. */}
+        {grid !== false && groupBoxes.map((b) => (
+          <BoundingBox
+            key={b.key}
+            topPx={b.topPx}
+            heightPx={b.heightPx}
+            leftPt={canvas.margins.left}
+            widthPt={canvas.width - canvas.margins.left - canvas.margins.right}
+            scale={scale}
+            kind="group"
+            measurement={measureBox({ label: b.label, drawnPx: b.heightPx, scale, nodes: b.nodes, canvas })}
+          />
+        ))}
+
         {/* Watermark overlay — behind content */}
         {statusToWatermark(metadata.status) && (
           <WatermarkOverlay text={statusToWatermark(metadata.status)!} />
@@ -214,6 +482,7 @@ export function CanvasRenderer({
                   isDragging={draggingNodeId === node.id}
                   onDragStart={() => setDraggingNodeId(node.id)}
                   onDragEnd={() => setDraggingNodeId(null)}
+                  group={groupOf[node.id]}
                 />
               )}
               </NodeErrorBoundary>
@@ -252,7 +521,19 @@ export function CanvasRenderer({
 
       {/* Page info bar */}
       <div className="flex items-center gap-4 text-xs text-gray-500">
-        <span>{metadata.status.replace('_', ' ')}</span>
+        {/* `?? 'draft'` — and it is not defensive noise, it is the whole document opening.
+            `status` is OPTIONAL on CanvasDocument.metadata, and a canvas authored through the API
+            (`{ metadata: { title } }`) simply has none. This read had no fallback, so the moment a
+            document like that was opened the renderer threw
+                TypeError: Cannot read properties of undefined (reading 'replace')
+            React unmounted the tree, and the customer got "Something went wrong — this page failed
+            to load" on a document whose content was perfectly intact: the same canvas exported to
+            .docx and .pdf without complaint the entire time.
+
+            Every sibling read in this file already guarded — `(node.provenance?.source ?? 'manual')`
+            on line ~863, and canvas-sidebar does `(doc.metadata?.status ?? 'draft')` for this exact
+            field. This was the one that did not, and it sat behind a status line nobody looks at. */}
+        <span>{(metadata.status ?? 'draft').replace('_', ' ')}</span>
         <span>&middot;</span>
         <span>{nodes.length} atom{nodes.length !== 1 ? 's' : ''}</span>
         {/* Size gauge — show the REAL estimate (unclamped, so an over-limit doc reads
@@ -499,6 +780,7 @@ function NodeRenderer({
   isDragging,
   onDragStart,
   onDragEnd,
+  group,
 }: {
   node: CanvasNode;
   isSelected: boolean;
@@ -510,6 +792,8 @@ function NodeRenderer({
   isDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
+  /** The group this node belongs to, when the document carries the group layer. */
+  group?: { id: string; label?: string; keep: boolean; pos: string };
 }) {
   const borderClass = isSelected
     ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
@@ -561,6 +845,12 @@ function NodeRenderer({
     <div
       data-node-id={node.id}
       data-node-source={node.provenance?.source}
+      // Read by the `groups` overlay (globals.css). Present only when the document carries the
+      // group layer, so a flat canvas paints exactly as it did before.
+      data-group-id={group?.id}
+      data-group-pos={group?.pos}
+      data-group-keep={group?.keep ? '1' : undefined}
+      data-group-label={group?.label}
       className={`relative rounded px-1 cursor-text transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''} ${freePlaced ? 'ring-1 ring-dashed ring-indigo-300' : ''}`}
       // The node body is NOT draggable (only the grip is) and the text is selectable, so a
       // mouse-drag across the text makes a real selection → pops the fluid selection toolbar,
@@ -607,7 +897,10 @@ function NodeRenderer({
       {node.type === 'footnote' && <FootnoteNode content={node.content as FootnoteContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
-      {node.type === 'spacer' && <div className="h-8" />}
+      {/* The editor is the fifth reader of a spacer's height and was the fourth different answer:
+          a fixed h-8 (≈24pt) regardless of what the author set. Showing the real height is the
+          whole point of a WYSIWYG canvas — otherwise the page you see is not the page you get. */}
+      {node.type === 'spacer' && <div style={{ height: `${spacerHeightPt(node)}pt` }} />}
       {EXTENDED_TYPES.has(node.type) && <ExtendedNodePreview node={node} />}
       {/* toc nodes are rendered by TocRenderer at the parent level */}
     </div>

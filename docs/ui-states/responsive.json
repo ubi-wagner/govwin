@@ -1,0 +1,421 @@
+{
+ "shots": [
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-dashboard__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-dashboard__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-dashboard__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-dashboard__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "admin__admin-dashboard__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-tenants__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-tenants__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-tenants__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-tenants__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/tenants",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "admin__admin-tenants__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-rfp-curation__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-rfp-curation__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-rfp-curation__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-rfp-curation__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "admin__admin-rfp-curation__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-events__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "viewport": "phone",
+   "width": 390,
+   "file": "admin__admin-events__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-events__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "admin__admin-events__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/events",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "admin__admin-events__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/dashboard",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-dashboard__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/dashboard",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-dashboard__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/dashboard",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-dashboard__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/dashboard",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-dashboard__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/dashboard",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-dashboard__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-cards__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-cards__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-cards__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-cards__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-cards__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-atoms__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-atoms__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-atoms__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-atoms__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-atoms__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-proposals__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-proposals__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-proposals__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-proposals__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-proposals__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/",
+   "viewport": "phone",
+   "width": 390,
+   "file": "anon__x__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "anon__x__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "anon__x__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/pricing",
+   "viewport": "phone",
+   "width": 390,
+   "file": "anon__pricing__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/pricing",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "anon__pricing__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/pricing",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "anon__pricing__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/login",
+   "viewport": "phone",
+   "width": 390,
+   "file": "anon__login__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/login",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "anon__login__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/login",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "anon__login__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/federal-rd-101",
+   "viewport": "phone",
+   "width": 390,
+   "file": "anon__federal-rd-101__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/federal-rd-101",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "anon__federal-rd-101__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "anon",
+   "route": "/federal-rd-101",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "anon__federal-rd-101__vp-desktop.jpg",
+   "kind": "viewport"
+  }
+ ],
+ "findings": []
+}

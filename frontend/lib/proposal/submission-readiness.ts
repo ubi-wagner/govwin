@@ -17,12 +17,15 @@
  *
  * Read-only + advisory: it computes and reports; it never locks, submits, or writes business tables.
  */
+import { readFindings, checklistFor } from '@/lib/proposal/scoped-findings';
 import { sql } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
+import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { computeSttrSplit } from '@/lib/proposal/sttr-split';
 import { parseStructuredCostInputs } from '@/lib/proposal/cost-volume-canvas';
 import { computeBudget } from '@/lib/proposal/cost-model';
+import { measureDocument } from '@/lib/proposal/document-furniture';
 import {
   validateCanvasAgainstSpec,
   estimatePageCount,
@@ -42,7 +45,11 @@ export type BlockerCategory =
   | 'missing_document'
   | 'page_overflow'
   | 'work_split'
-  | 'format_floor';
+  | 'format_floor'
+  /** Compliant but obviously unfinished — an unused page envelope, no figures, no emphasis. */
+  | 'underfilled'
+  /** A colour-team finding nobody has resolved yet. ALWAYS a warning — see below. */
+  | 'open_finding';
 
 export interface ReadinessBlocker {
   category: BlockerCategory;
@@ -93,12 +100,69 @@ interface MatrixRow {
   requirementText: string | null;
   status: string;
   sectionId: string | null;
+  notes: string | null;
 }
 interface ArtifactRow {
   id: string;
   complianceSpec: unknown;
   artifactType: string | null;
   volumeName: string | null;
+}
+
+/**
+ * Decide what an UNMET compliance-matrix requirement means for submission. Exported and pure so the
+ * decision can be tested directly rather than asserted against source text.
+ *
+ * Three outcomes:
+ *
+ *   null      — met, or already represented by a live section. That section's own empty/unlocked
+ *               blocker covers it; surfacing the requirement too would double-count.
+ *
+ *   warning   — COMPLETED ELSEWHERE. A null section_id is written by exactly one code path:
+ *               provision-proposal.ts's "completed elsewhere" loop, for items an rfp_admin marked
+ *               as done in the agency portal — the DSIP cover sheet, the CCR, the FWA training
+ *               certificate, a volume that arrived with no items at all. Every other insert (the
+ *               per-item rows, the placeholder-volume row, the default Technical Volume row, both
+ *               rows in the self-serve create route) passes a real section id, so the NULL is
+ *               structural rather than incidental — which is what makes it safe to key on. A note
+ *               would not be: notes are free text an admin can leave blank.
+ *
+ *               Treating these as blockers made marking something completed-elsewhere create a
+ *               submission blocker the buyer could NEVER clear — no section to lock, no field to
+ *               fill, no control that satisfies a section-less row. Measured on a live DoW 2026
+ *               SBIR build: nine such rows, so the proposal could not reach `final`, could not
+ *               lock, and could not export a package. The admin doing the right thing in the
+ *               provisioning cockpit is what broke it.
+ *
+ *               It stays mandatory, stays in the matrix, stays counted as unmet, and carries the
+ *               admin's note saying where it is filed. Not authored here must never read as not
+ *               required — and must not read as forgotten either.
+ *
+ *   blocker   — a REAL orphan: the row names a section that no longer exists. Something was
+ *               deleted out from under a requirement, and no one can submit past that.
+ */
+export function classifyUnmetRequirement(
+  m: { requirementText: string | null; status: string; sectionId: string | null; notes: string | null },
+  liveSectionIds: Set<string>,
+): ReadinessBlocker | null {
+  if (m.status === 'satisfied' || m.status === 'not_applicable') return null;
+  if (m.sectionId && liveSectionIds.has(m.sectionId)) return null;
+
+  const what = (m.requirementText ?? '').slice(0, 120);
+  if (!m.sectionId) {
+    const where = (m.notes ?? '').trim();
+    return {
+      category: 'orphan_requirement',
+      severity: 'warning',
+      message: `Completed outside this workspace — you still have to file it: ${what}`
+        + (where ? ` — ${where.slice(0, 160)}` : ''),
+    };
+  }
+  return {
+    category: 'orphan_requirement',
+    severity: 'blocker',
+    message: `Required item not covered by any section (${m.status}): ${what}`,
+  };
 }
 
 const CATEGORY_ORDER: Record<BlockerCategory, number> = {
@@ -110,6 +174,9 @@ const CATEGORY_ORDER: Record<BlockerCategory, number> = {
   page_overflow: 5,
   work_split: 6,
   format_floor: 7,
+  // Last: never let a polish warning sit above a real submission blocker in the list.
+  underfilled: 8,
+  open_finding: 9,
 };
 
 /**
@@ -154,7 +221,7 @@ export async function computeSubmissionReadiness(
     ORDER BY sort_index NULLS LAST, id
   `;
   const matrix = await sql<MatrixRow[]>`
-    SELECT requirement_text AS "requirementText", status, section_id AS "sectionId"
+    SELECT requirement_text AS "requirementText", status, section_id AS "sectionId", notes
     FROM proposal_compliance_matrix
     WHERE proposal_id = ${proposalId}::uuid AND is_mandatory = true
   `;
@@ -183,7 +250,9 @@ export async function computeSubmissionReadiness(
     metaByArtifact.set(a.id, { artifactType: a.artifactType, volumeName: a.volumeName });
   }
   // Sections collected per artifact (volume), in flow order, for the real rendered-page-count gate.
-  const volSections = new Map<string, Array<{ title: string | null; content: string | null }>>();
+  // pageAllocation rides along so the volume loop can check whether the per-section allowances
+  // even FIT the volume's own cap (assembleArtifactCanvas ignores it; only the sum tells you).
+  const volSections = new Map<string, Array<{ title: string | null; content: string | null; pageAllocation: number | null }>>();
 
   // ── Section state ──────────────────────────────────────────────────────────
   let locked = 0, emptyN = 0, draftedUnlocked = 0, formatViolations = 0, overBudget = 0;
@@ -225,7 +294,7 @@ export async function computeSubmissionReadiness(
     // (paginate over assembleArtifactCanvas), not a per-section node estimate.
     if (s.artifactId) {
       const list = volSections.get(s.artifactId) ?? [];
-      list.push({ title: s.title, content: s.content });
+      list.push({ title: s.title, content: s.content, pageAllocation: s.pageAllocation });
       volSections.set(s.artifactId, list);
     }
 
@@ -288,13 +357,20 @@ export async function computeSubmissionReadiness(
   // can never contradict each other. Over the limit is a BLOCKER: an over-limit Technical Volume is
   // rejected outright on DSIP.
   const volumeInfo: ReadinessReport['summary']['volumes'] = [];
+  const volumeFacts = await loadVolumeFacts(proposalId, tenantId);
   for (const [artifactId, secs] of volSections) {
     const spec = specByArtifact.get(artifactId);
     const meta = metaByArtifact.get(artifactId);
     if (secs.length === 0) continue;
     let doc: CanvasDocument;
-    try { doc = assembleArtifactCanvas(secs, meta?.artifactType ?? 'narrative', meta?.volumeName ?? 'Volume'); }
-    catch { continue; } // a measurement failure must never itself block
+    // FINISHED, as the download finishes it (lib/proposal/volume-finish.ts). The cover band and the
+    // figures are real pages; measuring the bare assembly would tell a customer they have room they
+    // do not have, and the export gate — which measures the finished document — would then disagree
+    // with the readiness panel that cleared them.
+    try {
+      doc = assembleArtifactCanvas(secs, meta?.artifactType ?? 'narrative', meta?.volumeName ?? 'Volume',
+        { ...volumeFacts, volumeName: meta?.volumeName ?? 'Volume' });
+    } catch { continue; } // a measurement failure must never itself block
     // A deck is measured in SLIDES, a prose volume in PAGES; cost spreadsheets / forms have no flow cap.
     const isSlide = doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3';
     if (!isSlide && meta?.artifactType !== 'narrative') continue;
@@ -313,6 +389,41 @@ export async function computeSubmissionReadiness(
         severity: 'blocker',
         message: `"${name}" is estimated at ${size} ${unit} against a ${max}-${noun} limit — trim ${size - max} ${noun}(s) before submission (same estimate the export compliance check uses).`,
       });
+    }
+    // ── Do the section allowances even FIT the volume? ────────────────────────────────────
+    // Each `proposal_sections.page_allocation` comes from `volume_required_items.page_limit`,
+    // authored per ITEM. Nothing checks them against the VOLUME's own cap, so a volume whose
+    // announcement says "NTE 10 pages" can carry ten items each stamped 10 — 100 pages of
+    // allowance against a 10-page envelope. Every per-section check then passes while the assembled
+    // volume is 2.7× over, and the error is invisible until export. Observed exactly this on a live
+    // T3CP build: 10 sections × 10 pages, volume cap 10.
+    //
+    // A blocker, not a warning: unlike an under-filled volume (a judgement call), an over-subscribed
+    // page budget is arithmetic — it cannot be what the solicitation meant, and drafting to those
+    // allowances guarantees an over-length submission.
+    const allowanceSum = secs.reduce((t, x) => t + (x.pageAllocation ?? 0), 0);
+    if (!isSlide && max != null && allowanceSum > max) {
+      blockers.push({
+        category: 'page_overflow',
+        severity: 'blocker',
+        message: `"${name}": its ${secs.length} sections are allocated ${allowanceSum} pages between them, `
+          + `but the volume's limit is ${max}. The per-section allowances over-subscribe the volume — `
+          + 'drafting to them guarantees an over-length submission. Re-allocate the pages across the sections.',
+      });
+    }
+
+    // ── Compliant, but finished? ──────────────────────────────────────────────────────────
+    // The check above answers "is this volume ALLOWED"; this answers "is it FINISHED". They are
+    // different questions, and only the first one existed: a 6-page volume under a 10-page cap
+    // passes every compliance gate and still reads to an evaluator as a half-made proposal.
+    // Measured against a hand-built reference volume for the same solicitation, the generated one
+    // used ~7 of 10 pages, half the character density, and ZERO figures. Warnings only — the
+    // builder decides whether an under-filled volume is deliberate; the system's job is to make
+    // sure they are never surprised by it at submission.
+    if (!isSlide) {
+      for (const w of measureDocument(doc, 0.85, meta?.artifactType ?? 'narrative').warnings) {
+        blockers.push({ category: 'underfilled', severity: 'warning', message: `"${name}": ${w}` });
+      }
     }
     if (isSlide) {
       const ov = overflowingSlides(doc);
@@ -383,16 +494,8 @@ export async function computeSubmissionReadiness(
   const sectionIds = new Set(sections.map((s) => s.id));
   const satisfiedReq = matrix.filter((m) => m.status === 'satisfied' || m.status === 'not_applicable').length;
   for (const m of matrix) {
-    const met = m.status === 'satisfied' || m.status === 'not_applicable';
-    // Only surface an unmet requirement as its OWN blocker when no owning section represents it
-    // (otherwise it is already covered by that section's empty/unlocked blocker — no double-count).
-    if (!met && (!m.sectionId || !sectionIds.has(m.sectionId))) {
-      blockers.push({
-        category: 'orphan_requirement',
-        severity: 'blocker',
-        message: `Required item not covered by any section (${m.status}): ${(m.requirementText ?? '').slice(0, 120)}`,
-      });
-    }
+    const b = classifyUnmetRequirement(m, sectionIds);
+    if (b) blockers.push(b);
   }
 
   // ── Required document/form coverage — the #1 avoidable administrative DQ ─────
@@ -422,6 +525,33 @@ export async function computeSubmissionReadiness(
           + 'came from the program default list, not from this solicitation — confirm whether it applies.'
         : `Required document not provided: ${d.requirementLabel ?? 'Unnamed document'}.`,
     });
+  }
+
+  // ── OPEN REVIEW FINDINGS (Phase E) ──────────────────────────────────────────────────────────
+  // What the gate could never say before: not "reviewed / not reviewed", but WHICH pieces of
+  // outstanding review work remain, and about what. Grouped by scope so the list names a figure, a
+  // group, a page range or a section rather than repeating the proposal's name N times.
+  //
+  // SEVERITY IS ALWAYS 'warning', never 'blocker', and that is a rule rather than a default. An
+  // unresolved finding is an AI's recommendation; the agent invariants say agent output never
+  // advances a gate, and letting it REFUSE a submission would break the same rule from the other
+  // side. A human decides; the gate makes sure they decide with the list in front of them.
+  //
+  // Best-effort: a proposal nobody has reviewed contributes nothing, and a read failure must not
+  // turn a submittable proposal into an unsubmittable one.
+  try {
+    const findings = await readFindings(proposalId);
+    const checklist = checklistFor(findings, { level: 'document' });
+    for (const g of checklist.byScope) {
+      blockers.push({
+        category: 'open_finding',
+        severity: 'warning',
+        message: `${g.open} unresolved review finding${g.open === 1 ? '' : 's'} on ${g.label}`
+          + `${g.total > g.open ? ` (${g.total - g.open} already resolved)` : ''}.`,
+      });
+    }
+  } catch (e) {
+    console.error('[readiness] open-finding roll-up failed (non-fatal)', e);
   }
 
   blockers.sort((a, b) => CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category]);

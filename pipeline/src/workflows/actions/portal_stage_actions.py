@@ -49,21 +49,45 @@ async def record_stage_review(
     stage_key=None,
     agent_manager_key=None,
     auto=None,
+    _ai_step_status=None,
     **_ignored,
 ):
     """Emit capture:stage_review.completed (the cohort has reviewed the stage), carrying a SUMMARY of
     what the manager found so the human closing the gate sees the review, not just "reviewed". Safe
-    no-op on bad input — never dead-ends the workflow. Advisory: no advance, no business-table write."""
+    no-op on bad input — never dead-ends the workflow. Advisory: no advance, no business-table write.
+
+    B17 — the `verdict` is now DERIVED, not asserted. This step is independent of `review_manager`
+    by design (an advisory agent must never gate a hard step), and it used to emit
+    `verdict='reviewed'` as a literal. On the auto path that was actively dangerous: a manager that
+    safe-skipped produced zero advisory notes, zero notes read as "clean", and clean authorized an
+    automatic stage advance. Silence passed the gate.
+
+    `_ai_step_status` is the engine's own record of what the AI steps in this instance did (see
+    `cohort_evidence`). No cohort step completed ⇒ `verdict='not_reviewed'`, and the frontend gate
+    (`closeAgentManagerGate`) refuses to auto-advance on anything but an affirmative pass. The
+    ASSISTED path is untouched: a human still reads the summary — which now says plainly that the
+    review did not run — and closes the gate on their own judgement.
+    """
     if not portal_id:
         return {"completed": False, "reason": "bad_input"}
 
+    from workflows.actions.cohort_evidence import cohort_verdict  # noqa: PLC0415
+
+    verdict, cohort_ran, evidence = cohort_verdict(_ai_step_status)
     note_count, sample = await _summarize_review(conn, proposal_id)
     plural = "s" if note_count != 1 else ""
-    summary = (
-        f"AI manager review complete — {note_count} advisory note{plural} from the cohort."
-        if note_count
-        else "AI manager review complete — no blocking notes."
-    )
+    if not cohort_ran:
+        # Say what happened, not what was hoped for. This sentence is what the person standing at
+        # the gate reads, and it is the difference between "the AI checked it" and "nothing checked
+        # it" — which is the whole of this bug.
+        summary = (
+            "AI manager review did NOT run — no cohort output for this stage "
+            f"({evidence}). Close this gate on your own reading of the work."
+        )
+    elif note_count:
+        summary = f"AI manager review complete — {note_count} advisory note{plural} from the cohort."
+    else:
+        summary = "AI manager review complete — no blocking notes."
 
     from events import emit_event  # noqa: PLC0415
 
@@ -80,7 +104,9 @@ async def record_stage_review(
                 "stageKey": stage_key,
                 "agentManagerKey": agent_manager_key,
                 "auto": bool(auto),
-                "verdict": "reviewed",
+                "verdict": verdict,
+                "cohortRan": cohort_ran,
+                "evidence": evidence,
                 "summary": summary,
                 "noteCount": note_count,
                 "sample": sample,
@@ -89,4 +115,11 @@ async def record_stage_review(
     except Exception as exc:  # noqa: BLE001
         logger.error("record_stage_review: completed emit failed: %s", exc)
 
-    return {"completed": True, "portalId": portal_id, "auto": bool(auto), "noteCount": note_count}
+    return {
+        "completed": True,
+        "portalId": portal_id,
+        "auto": bool(auto),
+        "noteCount": note_count,
+        "verdict": verdict,
+        "cohortRan": cohort_ran,
+    }

@@ -5,7 +5,8 @@
  */
 import { chromium } from '@playwright/test';
 const TENANT = process.env.TENANT ?? 'immobileyes';
-const PROP = process.env.PROP ?? '9ce4a3b5-3168-428d-93de-5dfc95b0ba68';
+// OSW26BZ04-DP013 (T3CP Patent Holiday) build for Immobileyes — provisioned 2026-08-19.
+const PROP = process.env.PROP ?? '082c1f9a-bb83-45b3-8eb9-7754ce210ec9';
 const MODE = process.env.MODE ?? 'a';
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });

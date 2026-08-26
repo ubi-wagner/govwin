@@ -692,3 +692,111 @@ TEMPLATES.update({
         {_button('Open Triage Queue', '/admin/rfp-curation')}
     '''),
 })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE EIGHT WORKFLOW NOTIFY STEPS THAT HAD NO RENDERER.
+#
+# Found by joining every registered workflow's NOTIFY step against this registry
+# (frontend/scripts/audit-automation-spine.mjs, join 7). Fifteen NOTIFY steps name a template;
+# eight of those names existed nowhere here, so `render_template()` returned None and
+# `_handle_notification_requested` emitted `system:notification.failed` instead of an email. Six of
+# the eight had already been requested in the sandbox corpus — 13 of its 30 notification requests.
+#
+# This is the same defect the `TEMPLATES.update({...})` block above was written to fix ("absence
+# meant rfp_admin stopped being notified — the 052 regression"). It recurs because the two sides
+# live in different services with no shared type: the workflow names a string, this file defines
+# one, and nothing compared them until now.
+#
+# Payload keys are the NOTIFY step's `input_map` keys, verbatim — `_execute_notify` spreads inputs
+# into the event payload unchanged. Every field read defensively via p.get(), because a template
+# that raises renders as None and drops the mail exactly like a missing one.
+# ─────────────────────────────────────────────────────────────────────────────
+TEMPLATES.update({
+    # OnCmsContentRequested.notify_author — input_map: slug
+    'content_published': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Content published</h2>
+        <p>A generated content piece has been published and is live on the site.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Slug</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('slug') or 'see site content'))}</td></tr>
+        </table>
+        {_button('Open Site Content', '/admin/site')}
+    '''),
+
+    # OnCollaboratorInvited.notify_admin_partner_draft — tenant_id, proposal_id,
+    # collaborator_email, collaborator_name
+    'partner_onboarding_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Partner collaborator invited</h2>
+        <p><strong>{_e(str(p.get('collaborator_name') or p.get('collaborator_email') or 'A collaborator'))}</strong>
+        has been invited to a proposal and needs partner onboarding.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Email</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('collaborator_email') or '—'))}</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;">Proposal</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('proposal_id') or '—'))}</td></tr>
+        </table>
+        {_button('Open Admin Dashboard', '/admin/tenants')}
+    '''),
+
+    # OnContentResurfaceRequested.email_curation — no entity fields; a scheduled cue.
+    'content_reshare_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Content ready to resurface</h2>
+        <p>The scheduled resurface pass has selected published content worth resharing.</p>
+        <p>Review the queue and pick what goes out.</p>
+        {_button('Open Site Content', '/admin/site')}
+    '''),
+
+    # OnIngestAssessmentRequested.notify_admin — solicitation_id
+    'ingest_assessment_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Ingest assessment ready</h2>
+        <p>The ingest manager has assessed a solicitation and planned the next steps.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Solicitation</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('solicitation_id') or 'see curation queue'))}</td></tr>
+        </table>
+        <p style="font-size:13px;color:#64748b;">The assessment is advisory — nothing has been ingested or
+        published on its own.</p>
+        {_button('Open Curation', '/admin/rfp-curation')}
+    '''),
+
+    # OnOpsDigestRequested.notify_master_admin — scheduled, no entity fields.
+    'ops_digest_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Operations digest ready</h2>
+        <p>The scheduled operations digest has been generated.</p>
+        {_button('Open Admin Dashboard', '/admin')}
+    '''),
+
+    # OnSocialScheduleRequested.email_social_queue — scheduled, no entity fields.
+    'social_queue_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Social queue ready</h2>
+        <p>The scheduled social pass has prepared a queue of posts for review.</p>
+        <p>Nothing is published until someone approves it.</p>
+        {_button('Open Site Content', '/admin/site')}
+    '''),
+
+    # OnSolicitationReviewRequested.notify_reviewer — solicitation_id
+    'curation_qa_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Curation QA ready</h2>
+        <p>A curated solicitation is ready for quality review before it is pushed.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Solicitation</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('solicitation_id') or 'see curation queue'))}</td></tr>
+        </table>
+        {_button('Review in Curation', '/admin/rfp-curation')}
+    '''),
+
+    # OnSolicitationUpdateScan.notify_admin — scheduled scan; counts when present.
+    'amendment_delta_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Solicitation changes detected</h2>
+        <p>The scheduled update scan found changes on tracked solicitations.</p>
+        {(
+            '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">'
+            f'<tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Changed</td>'
+            f'<td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">'
+            f'{_e(str(p.get("changed") or p.get("count")))}</td></tr></table>'
+        ) if (p.get('changed') or p.get('count')) else ''}
+        <p>Confirm each amendment before it fans out to the tenants holding that opportunity.</p>
+        {_button('Open Curation', '/admin/rfp-curation')}
+    '''),
+})

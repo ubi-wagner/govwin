@@ -1,0 +1,840 @@
+{
+ "uncalled": [
+  {
+   "route": "/api/admin/agent-gates/sweep",
+   "file": "app/api/admin/agent-gates/sweep/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/admin/agents",
+   "file": "app/api/admin/agents/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/agents/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/automation",
+   "file": "app/api/admin/automation/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/automation/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/opportunities/[oppId]/publish",
+   "file": "app/api/admin/opportunities/[oppId]/publish/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/admin/proposals/[proposalId]/studio",
+   "file": "app/api/admin/proposals/[proposalId]/studio/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/portal/[tenantSlug]/proposals/[proposalId]/studio (both call requestReviewPhase())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/reconcile-cards",
+   "file": "app/api/admin/reconcile-cards/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/admin/rfp-curation/[solId]/complete-buildout",
+   "file": "app/api/admin/rfp-curation/[solId]/complete-buildout/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/admin/provisioning/[portalId]/release (both call completeBuildOut())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/rfp-curation",
+   "file": "app/api/admin/rfp-curation/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/rfp-curation/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/sbir-data/ingest",
+   "file": "app/api/admin/sbir-data/ingest/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/admin/site/docs/[type]/[slug]",
+   "file": "app/api/admin/site/docs/[type]/[slug]/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/site/docs/[type]/[slug]/page.tsx (both call getDocument())",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/site/docs",
+   "file": "app/api/admin/site/docs/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/site/page.tsx (both call listDocuments())",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/site/pages/[pageKey]",
+   "file": "app/api/admin/site/pages/[pageKey]/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/site/[pageKey]/page.tsx (both call getPage())",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/site/pages",
+   "file": "app/api/admin/site/pages/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/site/page.tsx (both call listPages())",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/system",
+   "file": "app/api/admin/system/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/system/page.tsx (both call eventRates())",
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/admin/tenants/[tenantId]/backfill-cards",
+   "file": "app/api/admin/tenants/[tenantId]/backfill-cards/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/admin/applications/[id]/accept (both call backfillTenant())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/admin/tenants/[tenantId]",
+   "file": "app/api/admin/tenants/[tenantId]/route.ts",
+   "methods": [
+    "GET",
+    "PATCH"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/admin/tenants/[tenantId]/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/auth/[...nextauth]",
+   "file": "app/api/auth/[...nextauth]/route.ts",
+   "methods": [],
+   "reason": "NextAuth owns these; the client calls them through the library, not by URL",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/cms/revalidate",
+   "file": "app/api/cms/revalidate/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "the CRM-CMS publish bridge calls it service-to-service with REVALIDATE_SECRET",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/consent",
+   "file": "app/api/consent/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/content/[slug]",
+   "file": "app/api/content/[slug]/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/events",
+   "file": "app/api/events/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/health",
+   "file": "app/api/health/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": "load balancer / Railway probe",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/partner/tenants",
+   "file": "app/api/partner/tenants/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/partner/page.tsx (both call partnerOwnOrg())",
+   "secondDoor": "/api/partner/exit (both call partnerOwnOrg())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/cards",
+   "file": "app/api/portal/[tenantSlug]/cards/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/cards/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/dashboard",
+   "file": "app/api/portal/[tenantSlug]/dashboard/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/dashboard/page.tsx",
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/activity",
+   "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft",
+   "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/findings",
+   "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance (both call resolveUserAccess())",
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections",
+   "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance (both call resolveUserAccess())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/stage",
+   "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route.ts",
+   "methods": [
+    "GET",
+    "PATCH"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance (both call resolveUserAccess())",
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/create",
+   "file": "app/api/portal/[tenantSlug]/proposals/create/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/admin/workflows/launch-collaboration (both call launchProjectCollaboration())",
+   "nearMiss": false
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/proposals",
+   "file": "app/api/portal/[tenantSlug]/proposals/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/proposals/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/uploads",
+   "file": "app/api/portal/[tenantSlug]/uploads/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/portal/[tenantSlug]/atoms (both call createAtom())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms",
+   "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx",
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/members",
+   "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts",
+   "methods": [
+    "DELETE",
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx",
+   "secondDoor": "/api/admin/applications/[id]/accept (both call sendEmail())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/storage/local/[...key]",
+   "file": "app/api/storage/local/[...key]/route.ts",
+   "methods": [
+    "GET",
+    "PUT"
+   ],
+   "reason": "the local storage driver’s own serving route; signed URLs point at it",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": true
+  },
+  {
+   "route": "/api/stripe/webhook",
+   "file": "app/api/stripe/webhook/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "Stripe is the caller — an inbound webhook has no UI",
+   "duplicatedBy": null,
+   "secondDoor": "/api/admin/workflows/launch-collaboration (both call launchProjectCollaboration())",
+   "nearMiss": false
+  },
+  {
+   "route": "/api/uploads/[...key]",
+   "file": "app/api/uploads/[...key]/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": "public CMS image serving — referenced as an <img> src, never fetched",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
+   "route": "/blog/feed.xml",
+   "file": "app/blog/feed.xml/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": "crawler-facing",
+   "duplicatedBy": "app/(marketing)/customers/page.tsx (both call getPublishedContent())",
+   "secondDoor": null,
+   "nearMiss": false
+  }
+ ],
+ "tailCalled": [
+  {
+   "route": "/api/portal/[tenantSlug]/proposals/[proposalId]",
+   "tail": "/proposals/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download",
+   "tail": "/atoms/:p/download"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest",
+   "tail": "/atoms/:p/ingest"
+  }
+ ],
+ "unreadTables": [
+  {
+   "name": "_migration_history",
+   "rows": 213
+  },
+  {
+   "name": "deploy_baseline",
+   "rows": 2
+  },
+  {
+   "name": "rate_limit_state",
+   "rows": 3
+  },
+  {
+   "name": "source_health",
+   "rows": 3
+  }
+ ],
+ "agents": [
+  {
+   "archetype": "advisory_manager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "amendment_monitor",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "capture_strategist",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "color_team_reviewer",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "compliance_reviewer",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "content_curator",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "content_generator",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "continuity_manager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "cost_estimator",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "curation_qa",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "formatter",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "ingest_analyst",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "librarian",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "library_seed_mapper",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "library_seed_suggester",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "market_analyst",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "matrix_stager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "onboarding_agent",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "opportunity_analyst",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "opportunity_scout",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "ops_digest",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "outcome_analyst",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "packaging_specialist",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "partner_coordinator",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "pp_matcher",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "proposal_architect",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "proposal_manager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "redaction_guard",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "research_scout",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "rfp_ingest_manager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "scoring_strategist",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "section_drafter",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "skeleton_architect",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "social_scheduler",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": false
+  },
+  {
+   "archetype": "stylist",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "traceability_auditor",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  }
+ ],
+ "workflows": [
+  {
+   "template": "on_application_accepted",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_cms_content_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_collaborator_invited",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_content_resurface_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_full_draft_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_ingest_assessment_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_ingest_phase_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_opportunities_detected",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_ops_digest_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_portal_stage_review",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_proposal_advanced",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_proposal_created",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_proposal_outcome_recorded",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_proposal_section_edited",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_review_phase_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_rfp_uploaded",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_social_schedule_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_solicitation_pushed",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  },
+  {
+   "template": "on_solicitation_review_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_solicitation_update_scan",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_source_change_detected",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_tenant_rescore",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
+  }
+ ],
+ "unlabelled": [
+  "amendment.acknowledged",
+  "amendment.flagged",
+  "artifact.exported",
+  "atom.archived",
+  "atom.curated",
+  "atom.restored",
+  "document.created",
+  "document.exported",
+  "document.updated",
+  "portal.stage_advanced",
+  "task.assigned",
+  "template.applied"
+ ]
+}

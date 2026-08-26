@@ -61,7 +61,7 @@ async function main() {
 
   // ── rfp_admin (Eric) ──
   const a = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
-  p = await a.newPage(); await login(p, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  p = await a.newPage(); await login(p, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   // review progress: admin dashboard
   await p.goto(`${BASE}/admin/dashboard`, { waitUntil: 'networkidle', timeout: 35000 });
   await p.waitForTimeout(700); await shot(p, 'ra-01-dashboard', true);

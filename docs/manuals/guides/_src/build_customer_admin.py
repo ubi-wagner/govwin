@@ -106,7 +106,17 @@ sec(id="buckets", toc="4 · Buckets", heading="Buckets — your scoring lenses",
     lead="<p>Spotlight <b>buckets</b> are your scoring criteria — the themes you care about. Each bucket ranks the whole "
          "pipeline by your rules, and editing one re-ranks your Opportunities automatically.</p>",
     img=TS+"buckets.png", caption="Spotlight buckets — define a lens, then rank the pipeline by it.",
+    callouts=[{"kind":"note","html":
+      "Your portal arrives with <b>six starter buckets</b> already in place (AI &amp; Autonomy, Counter-UAS, "
+      "Sensing &amp; RF, Power &amp; Energy, Human Performance, SBIR/STTR Phase I) so opportunities rank the "
+      "moment they reach you rather than arriving unsorted. They are yours to keep, edit or delete. There is a "
+      "platform cap on how many buckets one company may hold — the starter six leave room for several of your "
+      "own, and if you reach the ceiling the product says so and asks you to delete one first."}],
     steps=[
+      S("<b>Start by editing a starter bucket, not by adding a seventh.</b> The six that came with your portal "
+        "are broad on purpose. Renaming one to your actual technology area — and replacing its keywords with the "
+        "words that appear in the solicitations you win — moves your ranking further than adding another lens "
+        "beside it."),
       S("In <b>New bucket</b>, set a Name plus any of keywords, agencies, program types, and NAICS codes; tick "
         "<b>Include closed opportunities</b> if you want them scored. Click <b>Create</b>.",
         TC+"bucket-add.png","Creating a scoring bucket.","half"),
@@ -374,6 +384,14 @@ sec(id="canvas", toc="8 · The canvas editor", heading="The section canvas — w
          "matrix. The top bar carries the title, a status pill, export buttons, Undo/Redo, <b>+ From Library</b>, "
          "<b>Save</b>, and (admins) <b>Complete &amp; Lock</b>.</p>",
     img=TS+"canvas.png", caption="The canvas editor — toolbar, page canvas, and the toolbox sidebar.",
+    callouts=[{"kind":"tip","html":
+      "<b>Argue in figures, not only sentences.</b> A section is a document, so put the picture, the "
+      "table and the chart where a reviewer expects them. Each is its own block with its own export "
+      "path: a <b>table</b> becomes a real Word table, a <b>chart</b> is drawn from your numbers "
+      "(vector in the PDF, a sharp image in Word), and an uploaded <b>image</b> is embedded in the "
+      "file rather than linked — so the download stands on its own. Give every figure a "
+      "<b>caption</b> block; that is what numbers it “Figure 1”, “Table 1”, "
+      "“Chart 1” in the finished document."}],
     subs=[
       {"id":"canvas-toolbar","heading":"The formatting toolbar & node types","toc":"8.1 · Toolbar & nodes",
        "steps":[

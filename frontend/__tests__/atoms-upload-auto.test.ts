@@ -8,10 +8,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { authMock, getTenantMock, verifyMock, atomizeMock, ctxTagsMock, requestAgentTaskMock, emitMock, createAtomMock, readDocMock, textOfNodesMock } = vi.hoisted(() => ({
+const { authMock, getTenantMock, verifyMock, enterTenantMock, atomizeMock, ctxTagsMock, requestAgentTaskMock, emitMock, createAtomMock, readDocMock, textOfNodesMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getTenantMock: vi.fn(),
   verifyMock: vi.fn(),
+  enterTenantMock: vi.fn(),
   atomizeMock: vi.fn(),
   ctxTagsMock: vi.fn(),
   requestAgentTaskMock: vi.fn(),
@@ -22,7 +23,10 @@ const { authMock, getTenantMock, verifyMock, atomizeMock, ctxTagsMock, requestAg
 }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ getTenantBySlug: getTenantMock, verifyTenantAccess: verifyMock }));
+// enterTenant is the RLS choke point the route calls after the access gate — without it the
+// librarian enqueue below raises 42501 on agent_task_queue and requestAgentTask swallows it as
+// null, so the producer this file exists to test silently does nothing.
+vi.mock('@/lib/db', () => ({ getTenantBySlug: getTenantMock, verifyTenantAccess: verifyMock, enterTenant: enterTenantMock }));
 vi.mock('@/lib/atomize-package', () => ({ atomizeDocumentIntoLibrary: atomizeMock, contextTags: ctxTagsMock }));
 vi.mock('@/lib/agent-client', () => ({ requestAgentTask: requestAgentTaskMock }));
 vi.mock('@/lib/events', () => ({ emitEventSingle: emitMock, userActor: (id: string, email?: string) => ({ type: 'user', id, email }) }));

@@ -211,6 +211,58 @@ as-built delta.**
 
 ---
 
+## 2026-08-24 · The deck writer, measured against an engine that did not write the file
+
+Three fixes to `lib/export/pptx-exporter.ts`, all found the same way — by converting an exported deck
+with LibreOffice Impress and **looking at the page.** None is detectable from the bytes.
+
+**1 · Node heights are measured, not guessed (B121 — content loss).** Six node types sized their
+frames without reading their text: `table` said `rows × 0.36`, `bulleted_list` said `items × 0.42`,
+`text_block`/`text_box`/`callout`/`blockquote` divided character counts by fixed constants. Every one
+describes a single line at one assumed width and font size. A wrapping cell is taller, the declared
+frame came out short — measured **0.90in short** for a three-row risk register — and PowerPoint
+**clips rather than spilling.** Two symptoms, one cause: the table lost its third row outright; the
+list kept its third bullet in the file and had the opaque callout beneath it painted on top.
+
+Heights now come from `wrappedLines`, newly exported from `canvas-document.ts` — the page ruler's own
+calibrated advance model. One ruler, one answer (B112). Tables also declare per-row heights via
+pptxgenjs `rowH`, so the renderer is never asked to grow rows past a total it was not given.
+
+**2 · Short slides are balanced; full slides are not disturbed.** Body content began at a fixed
+`BODY_TOP` regardless of volume, so a two-line slide sat on five inches of white and every slide read
+as unfinished. Now offset by 0.38 of the genuine slack — above true centre, because the eye weights
+the space above a block more heavily — and **only** where slack exists, since nudging a dense slide
+down would push content off the frame that currently fits. Both directions are asserted.
+
+**3 · The title slide's subtitle was pinned to `y=3.0`.** The hero path returns before the body flow
+and never received the rule. Same treatment, so a deck is internally consistent.
+
+### What this cost to find, and why it matters more than the fixes
+
+`.docx` and `.pdf` reflow; `.pptx` places absolutely. That difference is the whole story — the same
+estimate error is untidy spacing in one and silent deletion in the other.
+
+It stayed invisible because a note in this repo said *"LibreOffice will not open the .pptx this
+product writes."* It does. The container carried `libreoffice-core` with no filter packages, so
+`soffice` failed on **everything**, including a plain `.txt`. The original write-up
+(`docs/proposals/immobileyes-cuas/README.md`) ran the right control — "fails on the known-good
+samples too" — and then guessed at the mechanism and stated it as fact. That guess ruled out the only
+instrument that could see this class of defect.
+
+**Four instruments, three wrong**, all plausible, all would have reported clean: declared geometry
+(always tidy — the frame is the lie); ink position (caught the table, passed the list); text presence
+(found the *invisible* bullet, because occluded text is still painted into the PDF). What works is
+measuring a node's height ALONE on a slide against a real render. That one was wrong on its first run
+too, charging the new balance offset to the node as content height. A node that paints its own fill
+is reported INDETERMINATE, never green — there the ink measures the box.
+
+Locked by `__tests__/unit/pptx-wrapped-height.test.ts` (asserting the property the old code could not
+satisfy at any tolerance: **height is a function of the text**) and
+`__tests__/unit/pptx-vertical-balance.test.ts`. Both proven red-first. Instrument:
+`scripts/probe-deck-overlap.mts`; `scripts/render-artifact-pages.mts` now renders Office formats too.
+
+---
+
 *Phase 5 (execution) + Phase 6 (documentation) of the Common-Canvas redesign. Commits on
 `claude/nice-hamilton-kBqtD`: a6c0474 · 13592bb · 87a1ec9 · 82fb08e · 3fd87f0 · 7836520 · 52db0e2 (phantom-bug fixes,
-zero-trust full-stack verified).*
+zero-trust full-stack verified); deck-writer pass 3fbdf361 · f332a3d8 · fa8d2fd5.*

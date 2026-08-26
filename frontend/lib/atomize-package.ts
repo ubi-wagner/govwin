@@ -78,7 +78,9 @@ export function contextTags(ctx: Record<string, unknown>): AtomTagInput[] {
   return out;
 }
 
-export interface DocAtomizeResult { file: string; format: string; atoms: number; skipped?: number; cocoonId: string | null; reference?: boolean; error?: string; volumes?: number }
+export interface DocAtomizeResult { file: string; format: string; atoms: number; skipped?: number; cocoonId: string | null; reference?: boolean; error?: string; volumes?: number;
+  /** Figures lifted off the document's rendered pages and landed as draft image atoms. */
+  figures?: number }
 
 /** One primitive atom the plan proposes to mint (pre-write). */
 export interface PlannedAtom { blockIndex: number; title: string; wordCount: number; content: string; nodes: CanvasNode[]; tags: AtomTagInput[]; volumeNumber?: number }
@@ -314,9 +316,15 @@ export async function atomizeDocumentIntoLibrary(
     sharedCocoonId?: string | null;
     /** Deterministic volume assignment from DSIP's own filename taxonomy. */
     volHint?: { volumeNumber: number; volKey: string; label: string } | null;
+    /**
+     * The tenant's slug. Required to harvest FIGURES — image atoms are stored under
+     * `customers/<slug>/images/`, and there is no way to derive the slug from the tenant id here.
+     * Absent ⇒ text-only atomization, exactly as before.
+     */
+    tenantSlug?: string | null;
   },
 ): Promise<DocAtomizeResult> {
-  const { buffer, filename, packageName, ctxTags, actor, docType, sharedCocoonId, volHint } = opts;
+  const { buffer, filename, packageName, ctxTags, actor, docType, sharedCocoonId, volHint, tenantSlug } = opts;
   // A collaborator (cross-company partner_user) OFFERS content up — it lands DRAFT for the company
   // to review before it's reuse-eligible, mirroring the capture path. Company staff uploads stay
   // approved. (selectForSection only pulls status='approved', so draft = not-yet-reusable.)
@@ -407,5 +415,28 @@ export async function atomizeDocumentIntoLibrary(
       made++;
     } catch (e) { console.error('[atomize-package] primitive create failed', filename, p.blockIndex, e); }
   }
-  return { file: filename, format: plan.format, atoms: made, skipped: plan.skipped, cocoonId, reference: !!referenceId, ...(plan.dsip ? { volumes: volumeFoundations.size } : {}) };
+  // ── FIGURES ──────────────────────────────────────────────────────────────────────────────────
+  // Everything above this line extracts TEXT. A proposal is not only text: the photographs, CAD
+  // renders, plots and annotated screenshots are the part an evaluator looks at first, and until
+  // now ingest dropped every one of them. Measured on a real tenant library — 224 atoms, 1,010
+  // canvas nodes, not a single image — which is why a drafted technical volume could only ever be
+  // a wall of prose.
+  //
+  // Runs here rather than at either call site so BOTH entry points get it: the auto-atomize upload
+  // and the package intake share this core. Best-effort and last, so a document whose figures
+  // cannot be read still lands all of its text.
+  let figures = 0;
+  if (tenantSlug && /\.pdf$/i.test(filename)) {
+    try {
+      const { harvestPdfFiguresIntoLibrary } = await import('@/lib/pdf/figure-harvest');
+      const h = await harvestPdfFiguresIntoLibrary(tenantId, tenantSlug, {
+        pdf: buffer, sourceName: filename, ctxTags, actor,
+      });
+      figures = h.harvested;
+    } catch (e) {
+      console.error('[atomize-package] figure harvest failed (non-fatal)', e);
+    }
+  }
+
+  return { file: filename, format: plan.format, atoms: made, skipped: plan.skipped, cocoonId, reference: !!referenceId, ...(figures ? { figures } : {}), ...(plan.dsip ? { volumes: volumeFoundations.size } : {}) };
 }

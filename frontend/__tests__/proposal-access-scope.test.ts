@@ -11,6 +11,8 @@
  * scope jsonb is parsed exactly as in prod.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
 vi.mock('@/lib/db', () => ({ sql: sqlMock }));
@@ -67,5 +69,44 @@ describe('resolveUserAccess — CAP-3 per-proposal scoping', () => {
     const a = await resolveUserAccess(USER, OTHER, TENANT);
     expect(a.role).toBe('contributor');
     expect(a.viewableSections).toContain('sec-1');
+  });
+});
+
+/**
+ * THE COLLABORATOR GATE IS SECTIONS, AND ONLY SECTIONS — decided 2026-08-23, after B83.
+ *
+ * `collaborator_stage_access` carries an `artifact_types` column. It is SELECTed here and carried in
+ * three component prop types, and it is read by no filter, no gate and no rendered element. That is
+ * deliberate, not an oversight, and this guard exists because the column LOOKS like a second gate.
+ *
+ * Why not wire it: B83 was a weaker check (`verifyProposalAccess`) being mistaken for the real one.
+ * A second isolation predicate re-creates that shape — `artifact_types` carries no section ids,
+ * `assigned_sections` carries no artifact types, and when the two disagree every future reader has
+ * to work out which is authoritative. The cost volume is reachable exactly when its sections are in
+ * the grant. One predicate, one answer.
+ *
+ * Source-reading, because what is being pinned is a property of the file: that nobody half-wires the
+ * column into a branch. If you are here because this failed, the decision is written up in
+ * docs/SCOPE_HITL_PROGRAMME.md and docs/BUG_LOG_2026-08-19.md (B83) — read it before deleting this.
+ */
+describe('the collaborator grant is assigned_sections, full stop', () => {
+  const SRC = readFileSync(join(process.cwd(), 'lib/proposal-access.ts'), 'utf8');
+
+  it('the sections the resolver hands out come from the collaborator grant', () => {
+    expect(SRC).toMatch(/collaborator\.assignedSections/);
+  });
+
+  it('artifactTypes is carried but never branched on', () => {
+    // Every mention must be the type declaration or the SELECT list — never a condition, a filter,
+    // an includes(), or an index. Those are the shapes a gate takes.
+    const uses = SRC.split('\n')
+      .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+      .filter((l) => /artifact_types|artifactTypes/.test(l.line));
+    expect(uses.length).toBeGreaterThan(0); // if the column is gone entirely, this guard is stale
+
+    const carriedNotRead = uses.every((l) =>
+      /^artifactTypes:\s*string\[\];$/.test(l.line)          // the row type
+      || /^SELECT permission, artifact_types, stage$/.test(l.line)); // the read
+    expect(carriedNotRead, `artifactTypes is branched on: ${JSON.stringify(uses)}`).toBe(true);
   });
 });

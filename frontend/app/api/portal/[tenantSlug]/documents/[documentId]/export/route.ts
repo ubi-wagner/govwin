@@ -9,6 +9,7 @@
  * Body: { document: CanvasDocument, format: 'docx'|'pptx'|'xlsx'|'pdf' }
  * Auth: tenant_user+ with tenant access.
  */
+import { blockingViolations, type ComplianceViolation } from '@/lib/types/canvas-document';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
@@ -90,9 +91,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Size/format compliance floor (advisory) — the SAME ruler proposals run at the
     // export gate, against the document's OWN declared limits. Surfaced via the
     // X-Compliance-Violations header + the audit event; never blocks the download.
-    let violations: { code: string; message: string }[] = [];
+    // The FULL violation objects, not a {code,message} projection — the projection dropped
+    // `severity`, so an advisory note about a deliberately dense slide became indistinguishable
+    // from an agency page-limit breach by the time anything downstream read it.
+    let violations: ComplianceViolation[] = [];
     try {
-      violations = validateStandaloneCanvas(doc).map((v) => ({ code: v.code, message: v.message }));
+      violations = validateStandaloneCanvas(doc);
     } catch (e) { console.error('[portal/documents/export] compliance check failed (non-fatal):', e); }
 
     let buffer: Buffer;
@@ -120,7 +124,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         type: 'document.exported',
         actor: userActor(su.id, su.email ?? undefined),
         tenantId,
-        payload: { documentId, format, title, compliant: violations.length === 0, complianceViolations: violations.map((v) => v.code) },
+        // BLOCKING only — see the artifact export route. Advisory codes stay in the list.
+        payload: { documentId, format, title, compliant: blockingViolations(violations).length === 0, complianceViolations: violations.map((v) => v.code) },
       });
     } catch (e) { console.error('[portal/documents/export] event emit failed (non-fatal):', e); }
 

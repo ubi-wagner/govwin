@@ -53,3 +53,9 @@ scratchpad/
 # sandbox test-harness runtime logs
 frontend/scripts/test-harness/*.log.jsonl
 frontend/scripts/test-harness/*.out
+
+# NOTE: docs/ui-atlas/*.jpg and docs/ui-states/*.jpg ARE tracked, deliberately. They are the
+# reviewable record of what every screen and every modal state actually looked like, kept as JPEG
+# for that reason. Regenerate with:
+#   cd frontend && node scripts/capture-ui-atlas.mjs && node scripts/drive-ui-states.mjs
+#                  && node scripts/build-ui-contact-sheets.mjs

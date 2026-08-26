@@ -125,28 +125,28 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
         type="button" disabled={!canFormat}
         onClick={() => toggle('weight', 'bold', 'normal')}
         className={`${base} font-bold shrink-0 ${isBold ? on : idle}`}
-        title="Bold (block-level)"
+        data-control="bold" title="Bold (block-level)"
       >B</button>
 
       <button
         type="button" disabled={!canFormat}
         onClick={() => toggle('style', 'italic', 'normal')}
         className={`${base} italic shrink-0 ${isItalic ? on : idle}`}
-        title="Italic (block-level)"
+        data-control="italic" title="Italic (block-level)"
       >I</button>
 
       <button
         type="button" disabled={!canFormat}
         onClick={() => sel && onUpdateNodeStyle(sel.id, { underline: !sel.style.underline })}
         className={`${base} shrink-0 underline ${isUnder ? on : idle}`}
-        title="Underline"
+        data-control="underline" title="Underline"
       >U</button>
 
       <button
         type="button" disabled={!canFormat}
         onClick={() => sel && onUpdateNodeStyle(sel.id, { strikethrough: !sel.style.strikethrough })}
         className={`${base} shrink-0 line-through ${isStrike ? on : idle}`}
-        title="Strikethrough"
+        data-control="strikethrough" title="Strikethrough"
       >S</button>
 
       {sep}
@@ -156,7 +156,7 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
         <button
           key={a.value}
           type="button" disabled={!canFormat}
-          onClick={() => sel && onUpdateNodeStyle(sel.id, { alignment: a.value })}
+          data-control={`align-${a.value}`} onClick={() => sel && onUpdateNodeStyle(sel.id, { alignment: a.value })}
           className={`${base} shrink-0 ${canFormat && sel?.style.alignment === a.value ? on : idle}`}
           title={a.label}
         >{a.glyph}</button>
@@ -166,9 +166,9 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
 
       {/* ── SIZE ─────────────────────────────────────────────────────── */}
       <span className="flex items-center gap-0.5 shrink-0">
-        <button type="button" disabled={!canFormat} onClick={() => setSize((size ?? 12) - 1)} className={`${base} ${idle}`} title="Smaller">A−</button>
+        <button type="button" disabled={!canFormat} onClick={() => setSize((size ?? 12) - 1)} className={`${base} ${idle}`} data-control="size-down" title="Smaller">A−</button>
         <span className="text-[11px] text-gray-500 w-8 text-center tabular-nums">{size ? `${size}pt` : '—'}</span>
-        <button type="button" disabled={!canFormat} onClick={() => setSize((size ?? 12) + 1)} className={`${base} ${idle}`} title="Larger">A+</button>
+        <button type="button" disabled={!canFormat} onClick={() => setSize((size ?? 12) + 1)} className={`${base} ${idle}`} data-control="size-up" title="Larger">A+</button>
       </span>
 
       {sep}
@@ -176,7 +176,7 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
       {/* ── TEXT COLOR ───────────────────────────────────────────────── */}
       <label
         className={`flex items-center gap-1 shrink-0 cursor-pointer ${canFormat ? '' : 'opacity-40 pointer-events-none'}`}
-        title="Text color"
+        data-control="color" title="Text color"
       >
         <span className="text-[11px] text-gray-500 font-bold" aria-hidden>A</span>
         <input
@@ -219,7 +219,7 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
       {/* Full highlight color picker */}
       <label
         className={`flex items-center gap-1 shrink-0 cursor-pointer ${canFormat ? '' : 'opacity-40 pointer-events-none'}`}
-        title="Custom highlight color"
+        data-control="highlight" title="Custom highlight color"
       >
         <input
           type="color"

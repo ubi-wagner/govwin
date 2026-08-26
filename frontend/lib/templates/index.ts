@@ -133,9 +133,13 @@ export type TemplateKey =
   | 'cost-under-12mo'
   | 'cost-18mo'
   | 'cost-phase2-24mo'
-  | 'cost-custom'
-  | 'key-personnel-bio'
-  | 'past-performance-narrative';
+  | 'cost-custom';
+// 'key-personnel-bio' and 'past-performance-narrative' were declared here and never built — no
+// module, no TEMPLATE_MAP entry, no catalog row, and no reference anywhere else in the tree. A
+// union member with no body is worse than a missing one: `getTemplate('key-personnel-bio')`
+// type-checks and returns undefined, so the compiler actively vouches for something that isn't
+// there. Removed rather than stubbed; if either is wanted, it arrives with a document.
+// (Found by __tests__/template-registry-complete.test.ts, which now keeps this honest.)
 
 const TEMPLATE_MAP: Record<string, CanvasDocument> = {
   'dod-sbir-phase1-technical': DOD_SBIR_PHASE1_TECHNICAL,

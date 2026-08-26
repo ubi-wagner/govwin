@@ -13,6 +13,21 @@ import { emitEventSingle, systemActor } from '@/lib/events';
  * Fetch invite details (who invited, which proposal, company name).
  * No auth required — the token itself is the credential.
  */
+/**
+ * The invite token IS a `proposal_collaborators.id`, and that column is `uuid`. So a token that is
+ * not a UUID makes Postgres raise `invalid input syntax for type uuid` — the query never runs, the
+ * catch below turns it into `500 DB_ERROR`, and a malformed URL reads as a server fault.
+ *
+ * That was invisible while middleware refused this route before the handler ran; opening the path
+ * (see middleware.ts PUBLIC_EXACT_PATHS) exposed it on the FIRST anonymous call. Fixing one layer
+ * revealing the next is the normal shape of this, not a surprise.
+ *
+ * A malformed token IS an invalid token, so it gets the SAME 404 as an unknown one. Answering
+ * identically for both also keeps the endpoint from confirming which tokens are well-formed, which
+ * matters more now that it is unauthenticated and rate-limited rather than session-gated.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -20,6 +35,9 @@ export async function GET(request: Request) {
 
     if (!token) {
       return NextResponse.json({ error: 'Token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    if (!UUID_RE.test(token)) {
+      return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     let row: {
@@ -101,6 +119,11 @@ export async function POST(request: Request) {
 
     if (!token) {
       return NextResponse.json({ error: 'Invite token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    // Same uuid guard as GET — see the note above UUID_RE. This path writes a password, so a
+    // malformed token must be refused before any lookup rather than raised as a DB error.
+    if (!UUID_RE.test(token)) {
+      return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     if (password.length < 12) {

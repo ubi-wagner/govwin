@@ -16,10 +16,10 @@ import type {
   TableCell as TableCellType,
   TableCellStyle,
 } from '@/lib/types/canvas-document';
-import { createNode } from '@/lib/types/canvas-document';
+import { createNode, withCanvasDefaults } from '@/lib/types/canvas-document';
 import { parseNumericText, isNumericCell, formatCellDisplay, NUMBER_FORMATS } from '@/lib/numeric-cell';
 import { SheetMediaStrip } from './sheet-media-strip';
-import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS } from './canvas-overlays';
+import { CanvasOverlayBar, overlayClass, useOverlays, OVERLAYS, documentHasGroups } from './canvas-overlays';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -117,7 +117,9 @@ export function SheetEditor({
   actorName,
   readOnly = false,
 }: SheetEditorProps) {
-  const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
+  // Same partial-canvas normalization as the doc editor (B78) — the ribbon reads
+  // `doc.canvas.font_default.family` straight into an <input value>.
+  const [doc, setDoc] = useState<CanvasDocument>(() => withCanvasDefaults(initialDocument));
   const [activeSheet, setActiveSheet] = useState(0);
   const [activeCell, setActiveCell] = useState<CellPosition | null>(null);
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null);
@@ -610,7 +612,16 @@ export function SheetEditor({
         e.preventDefault();
         startEdit(row, col, '');
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Start typing into cell
+        // Start typing into cell.
+        //
+        // `preventDefault` is REQUIRED here, and its absence was the one branch missing it.
+        // `startEdit` seeds the editor with this keystroke, and React flushes the state update
+        // synchronously (a keydown is a discrete event), so the <input autoFocus> is mounted and
+        // focused before the browser applies this same keystroke's DEFAULT text insertion — which
+        // then lands in the freshly focused input. The character arrives twice: typing "Direct
+        // labor" into an empty cell produced "DDirect labor", and 184500 became 1184500. Caught by
+        // driving the grid for the guide captures (docs/assets/guides/customer/24-canvas-sheet).
+        e.preventDefault();
         startEdit(row, col, e.key);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -692,7 +703,10 @@ export function SheetEditor({
         <CanvasOverlayBar
           active={overlays}
           onToggle={toggleOverlay}
-          items={OVERLAYS.filter((o) => o.key === 'atoms' || o.key === 'provenance')}
+          // A sheet is one grid primitive — `sections` says nothing here, and `groups` only when
+          // this workbook actually carries them (today, none do).
+          items={OVERLAYS.filter((o) => o.key === 'atoms' || o.key === 'provenance'
+            || (o.key === 'groups' && documentHasGroups(doc)))}
         />
       </div>
       {/* ── Toolbar ── */}
@@ -713,7 +727,12 @@ export function SheetEditor({
                   : 'bg-gray-100 text-gray-600'
           }`}
         >
-          {doc.metadata.status.replace('_', ' ')}
+          {/* `?? 'draft'` — see canvas-renderer's page-info bar. `status` is OPTIONAL on
+              CanvasDocument.metadata, so a canvas authored through the API has none, and an
+              unguarded read here threw `Cannot read properties of undefined (reading 'replace')`
+              during render. React unmounted the tree and the customer got "Something went wrong"
+              on a document whose content was intact — the same canvas exported fine throughout. */}
+              {(doc.metadata.status ?? 'draft').replace('_', ' ')}
         </span>
 
         {dirty && <span className="text-xs text-orange-500">unsaved</span>}

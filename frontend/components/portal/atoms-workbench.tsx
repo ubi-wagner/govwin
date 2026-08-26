@@ -13,7 +13,7 @@ const TABS: readonly Tab[] = ['library', 'review', 'package', 'atomize', 'captur
 
 /** Tabbed home for the atom library: browse · bulk-atomize a package · hand-shred · capture from screen.
  *  Deep-linkable via ?tab= (the cockpit Library drawer launches straight into capture/atomize). */
-export function AtomsWorkbench({ tenantSlug }: { tenantSlug: string }) {
+export function AtomsWorkbench({ tenantSlug, canArchive = false }: { tenantSlug: string; canArchive?: boolean }) {
   const [tab, setTab] = useState<Tab>('library');
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
@@ -29,8 +29,8 @@ export function AtomsWorkbench({ tenantSlug }: { tenantSlug: string }) {
           </button>
         ))}
       </div>
-      {tab === 'library' && <AtomLibrary tenantSlug={tenantSlug} />}
-      {tab === 'review' && <LibraryReview tenantSlug={tenantSlug} />}
+      {tab === 'library' && <AtomLibrary tenantSlug={tenantSlug} canArchive={canArchive} />}
+      {tab === 'review' && <LibraryReview tenantSlug={tenantSlug} canArchive={canArchive} />}
       {tab === 'package' && <PackageAtomizer tenantSlug={tenantSlug} onDone={() => { /* atoms landed; Library tab reloads on mount */ }} />}
       {tab === 'atomize' && <Atomizer tenantSlug={tenantSlug} onAtomized={() => setTab('review')} />}
       {tab === 'capture' && <CaptureAtomizer tenantSlug={tenantSlug} />}

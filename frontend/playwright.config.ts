@@ -21,6 +21,15 @@ export default defineConfig({
   use: {
     baseURL: process.env.TEST_BASE_URL || 'http://localhost:3000',
     browserName: 'chromium',
+    // A MISSING SELECTOR MUST FAIL, NOT STALL. Playwright's default actionTimeout and
+    // navigationTimeout are BOTH 0, which means "wait forever" — so a page that renders without
+    // the element an action is waiting for (a login form that came back as a redirect, a button
+    // behind a spinner) hangs until the whole test times out. On the long drives that is a
+    // 30-minute stall producing one useless line, and the run is over before it reaches the acts
+    // that matter. Bounding them turns the same situation into a named failure in seconds, which
+    // the drives' ledger records and steps past.
+    actionTimeout: 20_000,
+    navigationTimeout: 45_000,
     // Use the pre-installed Chromium (the bundled build for this Playwright
     // version isn't downloaded in this environment); stable symlink.
     launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH || '/opt/pw-browsers/chromium' },

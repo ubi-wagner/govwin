@@ -35,8 +35,25 @@ class BaseArchetype(ABC):
         return True
 
     def handles_event(self, event_type: str) -> bool:
-        """Check if this archetype handles the given event type. Override in subclasses."""
+        """Check if this archetype handles the given event type. Override in subclasses.
+
+        ⚠️ `event_type` is the BARE `system_events.type` column — `package.atomized`, NOT
+        `library.package.atomized`. Namespace lives in its own column (see `pipeline/src/events.py`
+        and `frontend/lib/events.ts`), so a namespace-prefixed string here can never match and the
+        declaration is inert. Most archetypes in this package declare the prefixed form; they are
+        dormant by design (CLAUDE.md — agents are woken one at a time) and are reached through an
+        `AI_INVOKE` step or an `agent_task_queue` producer instead of this fallback.
+        """
         return False
+
+    def handles_dispatch(self, event: dict) -> bool:
+        """Payload-aware second gate for the processor's archetype-fallback path.
+
+        `handles_event` only sees the type, so it cannot tell a usable event from one that names
+        the right subject but carries none of the inputs this archetype needs. Override to decline
+        those; the default keeps the type-only behaviour.
+        """
+        return self.handles_event(event.get("type", ""))
 
     def get_tools(self) -> list[dict]:
         """Return tool definitions in Anthropic tool-use format. Override in subclasses."""

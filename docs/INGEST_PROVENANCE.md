@@ -175,6 +175,37 @@ document uploaded*, so the admin knows whether to wait or to upload.
 4. **The deterministic layer never guesses.** If a rule needs judgement to read, it belongs to
    the AI layer or to a human, not to a regex.
 5. **Citations are per document.** Always carry `docSegment`, never claim an unresolved page.
+6. **The rule is not limited to `solicitation_compliance`.** It governs every column a human or an
+   agent will read as fact — see below.
+
+## The doctrine reaches past the compliance matrix (2026-08-22)
+
+This document was written from a compliance-matrix case, and the invariants above are phrased that
+way. B43 found the same failure in a column nobody thought of as provenance-bearing:
+
+```
+solicitation_documents.page_count  =  len(pdf_bytes) // 40000 + 1   # "rough page estimate"
+```
+
+A byte-size guess, stored under the name of a measurement, and read by
+`packaging_specialist.get_compliance`, which places it in the document manifest **beside values
+genuinely extracted from the source**. Nothing marked it as estimated. Measured against the real
+solicitations in `docs/`, it was 72–81% low — a 254-page DoD SBIR BAA on record as 60 pages.
+
+Two things generalise:
+
+- **A nullable column is the honest home for an unknown.** The fix reads the true count from
+  pymupdf (already open one function earlier, so it was free the whole time) and returns `None`
+  rather than any fallback — because the old expression returned `1` for empty input, a document
+  claiming to have a page. *Unknown must stay unknown* is the same rule as *absence is a finding*,
+  applied to a scalar instead of a matrix field.
+- **Estimates need a name that says so.** If a value genuinely must be approximate, the column is
+  `page_count_estimated` or the value carries its own provenance — never a bare `page_count` that
+  a reader has no way to distinguish from a measurement.
+
+**Sweep for:** `# rough`, `# approx`, `estimate`, arithmetic on a byte length, or any default that
+lands in a column an agent reads. The question is not "is this close enough" — it is "can the
+reader tell this was not read from the source".
 
 ## Files
 

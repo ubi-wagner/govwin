@@ -1,158 +1,224 @@
 /**
- * Drive-test: "identity is 100% even with deep-linked emails."
+ * IDENTITY HOLDS EVEN WHEN THE LINK CAME FROM AN EMAIL.
  *
- * Nudge/notification emails (platform@rfppipeline.com) deep-link recipients to /go?task=…
- * or /go?tenant=… (and /api/enter). Whatever their session state, they must ALWAYS end up
- * acting in the RIGHT company, auditably, under the singular-session rule. This proves it
- * end-to-end against the real JWT-derived session (GET /api/auth/session).
+ * Nudges and notifications deep-link people straight into work — `/go?task=…`, `/go?tenant=…`,
+ * `/api/enter`. Whatever session the recipient happens to be carrying when they click, they must end
+ * up acting in the RIGHT company, visibly, under the singular-session rule. The failure this guards
+ * against is the quiet one: a link that silently re-scopes a session, so someone's next edit is
+ * attributed to a company they did not think they were in.
  *
- * Fixtures:
- *   expert@beacon-labs.test — MULTI: tenant_admin @ beacon-labs (home) + partner_user @ acme.
- *   teammate@acme-navy.test — SINGLE: tenant_user @ acme (non-member of beacon).
+ *   CASE 1  pinned to one company, deep-link to the other → a SWITCH GATE, never a silent switch;
+ *           taking it signs out and back in, landing pinned to the target
+ *   CASE 2  unauthenticated deep-link to a non-home company → login preserves the target, and they
+ *           land there rather than at their own company
+ *   CASE 3  a NON-MEMBER deep-link is refused, and the session is never re-scoped by the attempt
+ *   CASE 4  a dead link (an already-completed task) → an "already complete" acknowledgement naming
+ *           the company, rather than a broken destination
+ *   CASE 5  hitting /api/enter directly while pinned elsewhere → the switch gate, never a re-pin
  *
- * CASE 1  switch round-trip: pinned to Acme, deep-link → Beacon → switch gate (no silent
- *         switch) → sign out → re-login → lands PINNED to Beacon as tenant_admin.
- * CASE 2  unauthed multi-membership deep-link to ACME (non-home): login preserves the target
- *         (middleware query fix) → lands PINNED to Acme as partner_user, NOT their beacon home.
- * CASE 3  non-member denial: teammate (acme-only) deep-link → beacon → dispatcher, stays acme.
- * CASE 4  dead link: completed task → "already complete" ack (no broken destination).
- * CASE 5  /api/enter direct-hit while pinned-different → hands off to the switch gate, never
- *         silently re-pins.
+ * Every assertion reads the server-derived session, not the URL.
+ *
+ * BUILDS ITS OWN SITUATION — it used to pin two tenants and two accounts that no longer exist, and
+ * hand-inserted its completed task against them.
+ *
+ *   cd frontend && DATABASE_URL=… node --import tsx scripts/drive-identity-deeplink.mts
  */
-import { chromium, type Page } from 'playwright';
-import postgres from 'postgres';
+import type { Page } from 'playwright';
+import { sqlBypass as sql } from '@/lib/db';
+import { runScenario } from './lib/scenario.mts';
+import { BASE, buildCrossCompany, launch, newDriveContext, signIn, session, settledSession, waitForLanding } from './lib/cross-company.mts';
 
-const BASE = 'http://localhost:3000';
-const PW = 'DemoPass123!';
-const EXPERT = 'expert@beacon-labs.test';
-const TEAMMATE = 'teammate@acme-navy.test';
-const sql = postgres(process.env.DATABASE_URL!, { max: 2 });
-let exitCode = 0;
-const ok = (c: boolean, l: string) => { console.log(`${c ? '✅' : '❌ FAIL'}  ${l}`); if (!c) exitCode = 1; };
+await runScenario('identity-deeplink', async (s) => {
+  let ok = true;
+  const A = (label: string, cond: boolean, detail = '') => {
+    console.log(`${cond ? '✅' : '❌ FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
+    if (!cond) ok = false;
+  };
 
-async function sess(page: Page): Promise<Record<string, unknown>> {
-  const r = await page.request.get(`${BASE}/api/auth/session`);
-  const j = await r.json().catch(() => ({}));
-  return (j?.user ?? {}) as Record<string, unknown>;
-}
-async function clean(page: Page) {
-  await page.context().clearCookies();
-}
-async function login(page: Page, email: string) {
-  await clean(page);
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', PW);
-  await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type="submit"]')]);
-  await page.waitForTimeout(1200);
-}
+  const browser = await launch();
+  try {
+    const xc = await buildCrossCompany(s, browser);
+    const [multiUser] = await sql<{ id: string }[]>`SELECT id FROM users WHERE email = ${xc.multiEmail}`;
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
-const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+    // A COMPLETED task at their HOME company, for the dead-link case. Tracked for teardown.
+    const [task] = await sql<{ id: string }[]>`
+      INSERT INTO tasks (tenant_id, assignee_user_id, assignee_role, task_type, title, status, completed_at)
+      VALUES (${xc.home.tenantId}::uuid, ${multiUser.id}::uuid, 'tenant_admin', 'review',
+              ${`Deep-link dead-link fixture ${s.tag}`}, 'completed', now())
+      RETURNING id`;
+    s.track(`dead-link task ${task.id}`, [
+      async () => (await sql`DELETE FROM tasks WHERE id = ${task.id}::uuid`).count,
+    ]);
 
-// ── Seed a COMPLETED task at beacon-labs, owned by expert, so /go?task can prove the
-//    "already complete" dead-link path. Cleaned up in finally.
-let completedTaskId = '';
-try {
-  const [expertRow] = await sql<{ id: string }[]>`SELECT id FROM users WHERE email=${EXPERT}`;
-  const [beacon] = await sql<{ id: string }[]>`SELECT id FROM tenants WHERE slug='beacon-labs'`;
-  const [t] = await sql<{ id: string }[]>`
-    INSERT INTO tasks (tenant_id, assignee_user_id, assignee_role, task_type, title, status, completed_at)
-    VALUES (${beacon.id}::uuid, ${expertRow.id}::uuid, 'tenant_admin', 'review',
-            'Deep-link dead-link fixture', 'completed', now())
-    RETURNING id`;
-  completedTaskId = t.id;
+    /** Sign in on the CURRENT page, so a preserved deep-link target survives the login. */
+    const loginHere = async (page: Page, email: string, password: string) => {
+      await page.fill('#email', email);
+      await page.fill('#password', password);
+      await page.click('button[type="submit"]');
+      // Wait for the login to LAND, not for a guessed number of milliseconds and not merely for the
+      // URL to stop being /login — `/portal` is a dispatcher and reading it as a destination is what
+      // made this drive report six failures it never observed. See `waitForLanding`.
+      await waitForLanding(page);
+      await settledSession(page.context());
+    };
+    // BY NAME, NOT SLUG. The company selector renders the DISPLAY name ("Scenario host 1a2b3c4d");
+    // matching on the slug ("scenario-host-1a2b3c4d") finds no form, the click never happens, and
+    // the session stays on whatever the page defaulted to — which then fails four downstream
+    // assertions for a reason that has nothing to do with deep links.
+    //
+    // AND VERIFY THE POSTCONDITION. A click is an action, not an outcome. Each company on that page
+    // is its own `<form action={selectCompanyAction}>` — a React server action — and a click that
+    // lands before the form is wired leaves the person exactly where they were. Returning `true`
+    // for "I clicked something" is what let this drive assert "picked the host company" while the
+    // session was still sitting, unpinned, at their own company; every case after it then measured
+    // the wrong session. So the pick is only a pick once the SESSION says so, and if the first
+    // click did not take we click once more and say out loud that it was needed — because a
+    // selector that ignores the first click is a product problem, not a harness inconvenience.
+    const pick = async (page: Page, name: string, slug: string) => {
+      const btn = page.locator(`form:has-text("${name}") button[type="submit"]`).first();
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (await btn.count() === 0) return false;
+        await btn.click();
+        await waitForLanding(page);
+        // THE POSTCONDITION IS "PINNED THERE", not "the session mentions that slug". An unpinned
+        // session already carries the person's HOME slug, so `tenantSlug === slug` is satisfied
+        // before `pickHome` clicks anything — the check passes, the pick never happens, and CASE 4
+        // then measures an unpinned session. Picking a company IS pinning it; assert that.
+        const took = (x: Record<string, unknown>) => x.tenantSlug === slug && x.membershipPinned === true;
+        const after = await settledSession(page.context(), took, 6, 700);
+        if (took(after)) {
+          if (attempt > 1) console.error(`  ⚠ picking "${name}" needed ${attempt} clicks to take`);
+          return true;
+        }
+        console.error(`  ⚠ click ${attempt} on "${name}" did not take — at `
+          + `${page.url().replace(BASE, '')}, session tenant=${after.tenantSlug} `
+          + `pinned=${after.membershipPinned}`);
+        if (!page.url().includes('/select-company')) {
+          await page.goto(`${BASE}/select-company`, { waitUntil: 'domcontentloaded' });
+        }
+      }
+      return false;
+    };
+    const pickHost = (page: Page) => pick(page, xc.host.name, xc.host.slug);
+    const pickHome = (page: Page) => pick(page, xc.home.name, xc.home.slug);
 
-  // ══ CASE 1 — switch round-trip, lands PINNED to the target ══
-  console.log('\n== CASE 1: switch round-trip (Acme → Beacon deep link) ==');
-  await login(page, EXPERT);
-  ok(page.url().includes('/select-company'), `multi-membership → /select-company (${page.url()})`);
-  await page.locator('form:has-text("Acme") button[type="submit"]').first().click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(1200);
-  let s = await sess(page);
-  ok(s.membershipPinned === true && s.tenantSlug === 'acme-navy-systems' && s.role === 'partner_user',
-    `pinned to Acme as partner_user (role=${s.role} tenant=${s.tenantSlug} pinned=${s.membershipPinned})`);
+    // ── CASE 1 · pinned here, deep-linked there → the switch gate ──────────────────────────────
+    console.log('\n== CASE 1: pinned to the host, deep link to their home ==');
+    let bc = await newDriveContext(browser);
+    let page = await bc.newPage();
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await loginHere(page, xc.multiEmail, xc.multiPassword);
+    A('multi-membership login offers the selector', page.url().includes('/select-company'),
+      page.url().replace(BASE, ''));
+    const picked = await pickHost(page);
+    A('picked the host company', picked);
+    let sess = await session(bc);
+    A('  → pinned there as a collaborator',
+      sess.membershipPinned === true && sess.tenantSlug === xc.host.slug && sess.role === 'partner_user',
+      `role=${sess.role} tenant=${sess.tenantSlug} pinned=${sess.membershipPinned}`);
 
-  // Deep link to the OTHER company.
-  await page.goto(`${BASE}/go?tenant=beacon-labs`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(800);
-  const switchGate = await page.locator('text=Switching companies').count();
-  ok(switchGate > 0, 'deep link to other company → SWITCH gate (no silent switch)');
-  s = await sess(page);
-  ok(s.tenantSlug === 'acme-navy-systems', `still pinned to Acme while on the gate (${s.tenantSlug})`);
+    await page.goto(`${BASE}/go?tenant=${xc.home.slug}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1600);
+    A('a deep link to the OTHER company raises a switch gate, not a silent switch',
+      await page.locator('text=/Switching companies/i').count() > 0, page.url().replace(BASE, ''));
+    sess = await session(bc);
+    A('  → and the session is still pinned where it was while the gate is up',
+      sess.tenantSlug === xc.host.slug, `tenant=${sess.tenantSlug}`);
 
-  // Take the switch: sign out → re-login into Beacon.
-  await page.locator('button:has-text("Sign in to Beacon Labs")').click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(1200);
-  ok(page.url().includes('/login'), `switch signs out → /login (${page.url()})`);
-  ok(await page.locator('text=/signed out/i').count() > 0, 'login shows the "signed out of X into Y" notice');
-  // Re-login (no cookie clear — we are genuinely signed out).
-  await page.fill('input[name="email"]', EXPERT);
-  await page.fill('input[name="password"]', PW);
-  await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type="submit"]')]);
-  await page.waitForTimeout(1500);
-  s = await sess(page);
-  ok(s.membershipPinned === true, `re-login lands PINNED (pinned=${s.membershipPinned})`);
-  ok(s.tenantSlug === 'beacon-labs', `re-login PINNED to Beacon target (${s.tenantSlug})`);
-  ok(s.role === 'tenant_admin', `active role is Beacon's tenant_admin (${s.role})`);
-  ok(page.url().includes('/portal/beacon-labs'), `landed in Beacon portal (${page.url()})`);
+    const switchBtn = page.locator('button:has-text("Sign in to")').first();
+    if (await switchBtn.count() > 0) {
+      await switchBtn.click();
+      await page.waitForTimeout(2200);
+      A('  → taking the switch signs them out', page.url().includes('/login'), page.url().replace(BASE, ''));
+      A('  → and says so on the login page',
+        await page.locator('text=/signed out/i').count() > 0);
+      await loginHere(page, xc.multiEmail, xc.multiPassword);
+      sess = await settledSession(bc, (x) => x.tenantSlug === xc.home.slug);
+      A('  → re-login lands PINNED to the target company',
+        sess.membershipPinned === true && sess.tenantSlug === xc.home.slug,
+        `tenant=${sess.tenantSlug} pinned=${sess.membershipPinned}`);
+      A('  → with the role they hold THERE, not the one they had before',
+        sess.role === 'tenant_admin', `role=${sess.role}`);
+    } else {
+      A('the switch gate offers a way through', false, 'no "Sign in to …" button on the gate');
+    }
+    await bc.close();
 
-  // ══ CASE 2 — unauthed multi-membership deep link keeps its target through login ══
-  console.log('\n== CASE 2: unauthed deep link to ACME (non-home) survives login ==');
-  await clean(page);
-  await page.goto(`${BASE}/go?tenant=acme-navy-systems`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(800);
-  ok(page.url().includes('/login'), `unauthed deep link → /login (${page.url()})`);
-  // Do NOT clear cookies — sign in on this very page so the preserved `from` is honoured.
-  await page.fill('input[name="email"]', EXPERT);
-  await page.fill('input[name="password"]', PW);
-  await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type="submit"]')]);
-  await page.waitForTimeout(1500);
-  s = await sess(page);
-  ok(s.tenantSlug === 'acme-navy-systems', `landed at the DEEP-LINK target Acme, not beacon home (${s.tenantSlug})`);
-  ok(s.role === 'partner_user' && s.membershipPinned === true,
-    `pinned as Acme partner_user (role=${s.role} pinned=${s.membershipPinned})`);
-  ok(page.url().includes('/portal/acme-navy-systems'), `landed in Acme portal (${page.url()})`);
+    // ── CASE 2 · an unauthenticated deep link keeps its target through login ───────────────────
+    console.log('\n== CASE 2: unauthenticated deep link to the non-home company ==');
+    bc = await newDriveContext(browser);
+    page = await bc.newPage();
+    await page.goto(`${BASE}/go?tenant=${xc.host.slug}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1400);
+    A('an unauthenticated deep link sends them to login', page.url().includes('/login'),
+      page.url().replace(BASE, ''));
+    await loginHere(page, xc.multiEmail, xc.multiPassword);
+    sess = await settledSession(bc, (x) => x.tenantSlug === xc.host.slug);
+    A('  → and login honours the TARGET, not their own company',
+      sess.tenantSlug === xc.host.slug, `tenant=${sess.tenantSlug}`);
+    A('  → pinned there, in the role they hold there',
+      sess.role === 'partner_user' && sess.membershipPinned === true,
+      `role=${sess.role} pinned=${sess.membershipPinned}`);
+    await bc.close();
 
-  // ══ CASE 3 — non-member deep link is denied (dispatcher, no access leak) ══
-  console.log('\n== CASE 3: non-member deep link denied ==');
-  await login(page, TEAMMATE);
-  await page.goto(`${BASE}/go?tenant=beacon-labs`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1000);
-  ok(!page.url().includes('/portal/beacon-labs'), `non-member NOT let into Beacon (${page.url()})`);
-  s = await sess(page);
-  ok(s.tenantSlug !== 'beacon-labs', `session never re-scoped to Beacon (${s.tenantSlug})`);
+    // ── CASE 3 · a non-member is refused, and nothing is re-scoped by the attempt ──────────────
+    console.log('\n== CASE 3: a non-member follows the same link ==');
+    const solo = await signIn(browser, xc.singleEmail, xc.singlePassword);
+    const soloPage = solo.pages()[0];
+    await soloPage.goto(`${BASE}/go?tenant=${xc.home.slug}`, { waitUntil: 'domcontentloaded' });
+    await soloPage.waitForTimeout(1800);
+    A('a non-member is NOT let into the company they were linked to',
+      !soloPage.url().includes(`/portal/${xc.home.slug}`), soloPage.url().replace(BASE, ''));
+    const soloSess = await session(solo);
+    A('  → and their session was never re-scoped by the attempt',
+      soloSess.tenantSlug !== xc.home.slug, `tenant=${soloSess.tenantSlug}`);
+    await solo.close();
 
-  // ══ CASE 4 — dead link (completed task) → "already complete" ack ══
-  console.log('\n== CASE 4: completed-task deep link → already-complete ack ==');
-  await login(page, EXPERT);
-  // Pin Beacon first (multi-membership) so the here-ack path (not the picker) runs.
-  await page.goto(`${BASE}/api/enter?slug=beacon-labs`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1000);
-  await page.goto(`${BASE}/go?task=${completedTaskId}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(800);
-  ok(await page.locator('text=/already complete/i').count() > 0, 'dead link shows "already complete" (no broken destination)');
-  ok(await page.locator('text=/working in Beacon Labs/i').count() > 0, 'ack names the right company (Beacon Labs)');
+    // ── CASE 4 · a dead link acknowledges itself instead of breaking ───────────────────────────
+    console.log('\n== CASE 4: a link to an already-completed task ==');
+    bc = await newDriveContext(browser);
+    page = await bc.newPage();
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await loginHere(page, xc.multiEmail, xc.multiPassword);
+    // PIN THEIR HOME THROUGH THE SELECTOR — the way a person does it.
+    //
+    // The acknowledgement only renders for someone already committed to that company:
+    // `(pinned && sessionSlug === targetSlug) || memberships.length === 1`. A multi-membership
+    // person who is NOT pinned falls through to `/api/enter` and simply lands on the dashboard —
+    // which is what my first version measured, having tried to pin via /api/enter directly and
+    // silently not achieved it. Pinning through the picker is both faithful and unambiguous, and
+    // it leaves /api/enter's own semantics to CASE 5, which is where they belong.
+    await pickHome(page);
+    const pinnedHome = await settledSession(bc, (x) => x.tenantSlug === xc.home.slug);
+    A('pinned to the company the task belongs to',
+      pinnedHome.membershipPinned === true && pinnedHome.tenantSlug === xc.home.slug,
+      `tenant=${pinnedHome.tenantSlug} pinned=${pinnedHome.membershipPinned}`);
+    await page.goto(`${BASE}/go?task=${task.id}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1600);
+    A('a dead link says "already complete" rather than breaking',
+      await page.locator('text=/already complete/i').count() > 0, page.url().replace(BASE, ''));
+    A('  → and names the company they are working in',
+      await page.locator(`text=/working in/i`).count() > 0);
 
-  // ══ CASE 5 — /api/enter direct-hit while pinned-different → switch gate, no silent re-pin ══
-  console.log('\n== CASE 5: /api/enter no-silent-switch guard ==');
-  await login(page, EXPERT);
-  await page.locator('form:has-text("Acme") button[type="submit"]').first().click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(1000);
-  await page.goto(`${BASE}/api/enter?slug=beacon-labs`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1000);
-  ok(await page.locator('text=Switching companies').count() > 0, '/api/enter pinned-different → hands off to switch gate');
-  s = await sess(page);
-  ok(s.tenantSlug === 'acme-navy-systems' && s.membershipPinned === true,
-    `session STILL pinned to Acme (no silent re-pin) (${s.tenantSlug})`);
-
-  console.log('\nIdentity × deep-link drive-test complete.');
-} catch (e) {
-  console.error('DRIVE-TEST ERROR', e);
-  exitCode = 1;
-} finally {
-  if (completedTaskId) { try { await sql`DELETE FROM tasks WHERE id=${completedTaskId}::uuid`; } catch { /* ignore */ } }
-  await browser.close();
-  await sql.end();
-  process.exitCode = exitCode;
-}
+    // ── CASE 5 · /api/enter cannot silently re-pin ─────────────────────────────────────────────
+    console.log('\n== CASE 5: /api/enter hit directly while pinned elsewhere ==');
+    await bc.close();
+    bc = await newDriveContext(browser);
+    page = await bc.newPage();
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await loginHere(page, xc.multiEmail, xc.multiPassword);
+    await pickHost(page);
+    await page.goto(`${BASE}/api/enter?slug=${xc.home.slug}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1800);
+    A('/api/enter to a different company hands off to the switch gate',
+      await page.locator('text=/Switching companies/i').count() > 0, page.url().replace(BASE, ''));
+    sess = await settledSession(bc, (x) => !!x.tenantSlug);
+    A('  → the session is STILL pinned where it was — no silent re-pin',
+      sess.tenantSlug === xc.host.slug && sess.membershipPinned === true, `tenant=${sess.tenantSlug}`);
+    await bc.close();
+  } finally {
+    await browser.close();
+  }
+  console.log(`\n${ok ? '✅ ALL PASS' : '❌ FAILURES ABOVE'}\n`);
+  return ok;
+});

@@ -164,8 +164,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'No valid fields to update', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    let startId: string | null = null;
     try {
-      const startId = await emitEventStart({
+      startId = await emitEventStart({
         namespace: 'system',
         type: 'platform_agent_config.updated',
         actor: userActor(adm.userId),
@@ -213,6 +214,9 @@ export async function PATCH(request: Request) {
 
       return NextResponse.json({ data: serialize(row) });
     } catch (dbErr) {
+      if (startId) {
+        await emitEventEnd(startId, { error: { message: dbErr instanceof Error ? dbErr.message : String(dbErr), code: 'HANDLER_THREW' } });
+      }
       console.error('[admin/agents/platform-config] PATCH DB error:', dbErr);
       return NextResponse.json({ error: 'Failed to update platform config', code: 'DB_ERROR' }, { status: 500 });
     }

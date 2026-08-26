@@ -19,5 +19,12 @@ await runInTenant(tenantId, async () => {
     actorId: u.id, actorEmail: u.email, role: 'tenant_admin', source: 'admin_doorbell',
   });
 });
-console.log(`✅ emitted proposal.full_draft_requested mode=c for proposal ${p.id} (worker will run ModeC cohort)`);
+// WHAT THIS DRIVE DOES NOT PROVE, said out loud rather than left to the reader.
+//
+// It asserts the trigger was EMITTED. It does not wait for the pipeline worker, and it does not
+// check that the Mode C cohort actually ran, landed staged revisions, or left an audit trail. A
+// green line here means "the doorbell rang", not "someone answered". Verifying the answer needs the
+// worker in the loop and belongs in the scenario matrix (S05/S06), which is where it is registered.
+console.log(`✅ emitted proposal.full_draft_requested mode=c for proposal ${p.id}`);
+console.log('   NOTE: EMISSION ONLY — this drive does not verify the cohort ran (see S05/S06).');
 process.exit(0);

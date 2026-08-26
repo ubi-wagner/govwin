@@ -12,8 +12,28 @@ spine is built; this pass closes named gaps and wires the last-mile capabilities
 
 1. **Designee** — a tenant_admin delegates bucket authoring to a chosen team member via
    an audited, revocable per-membership grant (`user_memberships.can_manage_buckets`).
-2. **Cap** — global default raised **12 → 6**; keep all 6 seeded defaults; enforce the cap
+2. **Cap** — global default lowered **12 → 6**; keep all 6 seeded defaults; enforce the cap
    (rfp_admin tunes it globally later at `/admin/automation-framework`).
+   > **Superseded twice — final state is #189 (mig 206): no seeding, cap 25.**
+   >
+   > *First failure (B62).* A cap of 6 alongside a seeded set of 6 means a tenant opens at 100%
+   > of cap, so bucket authoring — item ① of this very spine — answered 409 `BUCKET_LIMIT`
+   > before the customer had authored anything. Mig 203 raised the stored cap to 10 and derived
+   > it as `DEFAULT_BUCKETS.length + BUCKET_AUTHORING_HEADROOM`.
+   >
+   > *Why that was still wrong.* Deriving the cap from the seeded set keeps two unrelated
+   > numbers coupled: move either and they collide again. The headroom treated the symptom.
+   >
+   > *Final.* **Nothing is seeded.** A bucket is the customer's own ranking lens — a 1:n they
+   > open empty and fill — so no creation path calls `seedDefaultBuckets` any more, and the cap
+   > is a plain authoring budget of **25**, independent of the starter catalog (which survives
+   > as a fixture/demo helper only). Cost justifies the room: `rankBucket` is one pass of
+   > deterministic SQL over the tenant's own cards at creation and O(1) per card on arrival —
+   > no model call — so the cap bounds `tenant_bucket_scores` STORAGE at O(buckets × cards) and
+   > gives an operator a lever, rather than rationing compute. Until a tenant authors a lens,
+   > `/cards` falls back to `is_pinned` then `updated_at DESC`: recency-ordered, not blank.
+   > Guarded by `__tests__/bucket-authoring-budget.test.ts`, which reads the SOURCE of all four
+   > creation paths and fails if the seeder returns.
 3. **Admin pin** — rfp_admin arms **OPP-level** update tracking that fans out to every
    tenant holding the mirror card, **pre-purchase** (today's amendment engine only reaches
    opps that already have a proposal).

@@ -159,7 +159,7 @@ next is meaningful — do not skip ahead:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. Non-negotiable first gate.
 2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**1129/1129** at
-   migration head 185). Run on every change, not just schema changes.
+   migration head 205). Run on every change, not just schema changes.
 3. **Migration (schema changes only)** — apply the new migration via the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner is
    idempotent (tracks applied files in `_migration_history`); re-running must be a clean no-op.

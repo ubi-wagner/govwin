@@ -1,7 +1,273 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-16 (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
+**Last updated:** 2026-08-24 (migration head **213** — see "The isolation pass" immediately below: migs
+212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
+was found 100% inert and fixed, and five instruments were found reporting green over a scope smaller
+than their claim. Earlier context from 2026-08-23 at head **205** follows.) (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
 **Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
+
+---
+
+## 📍 The isolation pass (2026-08-24, migration head **213**) — READ THIS BEFORE DEPLOYING
+
+> **⚠️ TWO MIGRATIONS NEED A PRODUCTION RUN, AND ONE PRECONDITION CHECKED.** Migs 212 and 213 are
+> proven on the sandbox only. They `FORCE` row-level security on eleven tables, and FORCE applies
+> policies to the table OWNER too — so **production's owner role must be superuser or `BYPASSRLS`
+> or every `sqlBypass` read breaks.** That is already true of the forced `proposals`, so it is
+> almost certainly fine, but check it before merging rather than after.
+>
+> **B113 — eleven proposal-spine tables had NO row-level security at all.** `relrowsecurity=false`,
+> zero policies, so every row was readable by any connection on the NOBYPASSRLS `govtech_app` pool
+> whatever `app.tenant_id` held. Measured with the context set to a UUID owning nothing:
+> `proposal_artifacts` 17/17 rows visible, `proposal_compliance_matrix` 64/64,
+> `collaborator_stage_access` 8/8, `proposal_collaborators` 4/4 — 100% of every table that had rows.
+> `canvas_versions` is the consequential one: the stored content of every version of every section,
+> plus the `ai_instruction` that produced it.
+>
+> **Why it was invisible:** none of them has a `tenant_id` COLUMN. Their tenancy is FK lineage up to
+> `proposals.tenant_id`, and every audit here looked for the column. **A tenant_id-shaped instrument
+> cannot see a lineage-shaped table.** Fixed by one `FOR ALL tenant_isolation` policy each, EXISTS up
+> the chain. The two mig-213 children INHERIT the parent's predicate via a bare EXISTS rather than
+> restating it — measured: 444 rows across 5 contexts against 300 total = 264 owned seen once + 36
+> platform-scope seen five times; unfiltered would have been 1500.
+>
+> **B115 — the ENTIRE agent workforce was inert, 100% failure, twelve archetypes.** anthropic 1.0.0
+> removed `temperature` from `messages.create()`; passing it raises `TypeError` **client-side, before
+> any HTTP request**. Every archetype recorded `start` then `error` with zero tokens. Nothing
+> surfaced it because the fabric safe-skips rather than dead-ending a workflow (a deliberate
+> invariant), so from outside every flow completed. `pipeline/src/sdk_compat.py` answers the
+> capability ONCE by introspecting the installed SDK. **Known consequence:** archetypes no longer get
+> their requested sampling (several set 0.2–0.3 for deterministic output). Logged at import, not
+> silent. Whether they want `output_config.effort` instead is an open decision.
+>
+> **B118 — the isolation proofs were unfalsifiable.** Every proposal belonged to ONE tenant and every
+> section was locked, so "no foreign rows visible" could not be distinguished from "there was no
+> foreign tenant to see them". `scripts/seed-isolation-fixture.mts` (idempotent, `--undo`) adds a
+> second owner with an UNLOCKED in-flight build, version history, a comment, a stage transition, and
+> a contract per owner. Measured: owners 1→2, unlocked sections 0→3, posture tables measured 36→40,
+> stored volumes 17→18. **Run it on a fresh box** — without it a third of the isolation surface has
+> no behavioural coverage.
+>
+> **Instruments fixed, all the same class — reporting over a scope smaller than the claim:**
+> `check-rls-posture.mjs` proved ONE table (`tenant_opportunity_cards`) and called it the posture of
+> the database; it now enforces a STRUCTURAL rule (every tenant-owned table must carry a policy —
+> needs no fixture data, so it holds on a fresh box) plus a partition check whose expected value is
+> `owned + shared × N`, not `total`. The pipeline's `db_role_preflight.py` probed one table and would
+> log "OK — table owner" for a worker that then cannot write `canvas_versions`. `sandbox-up.sh`'s
+> start guard knew one of the **two spellings** that launch the worker (`python3 src/main.py` vs
+> `python3 -m main`), so two workers ran holding different code and the same drive passed or failed
+> at random. Four id bindings in `verify-surfaces` ignored the tenant they were driven as. And the
+> four lenses defaulted to **port 3001** while everything else serves on 3000 — `GUIDE_BASE` is now
+> exported once from `sandbox-env.sh`.
+>
+> **Current green state:** branch suite **38/38 · 0 could-not-run**, four lenses green (surfaces
+> **80 driven / 80 clean**), `tsc` 0, `vitest` 1915/1915, canvas measurement harnesses **6/6 with
+> zero under-counts**, bug log **121 entries · 0 open · 5 deferred**. New drives: `deck-ruler` (the
+> slide ruler had never measured a deck out of the database — all 64 stored sections are `letter`).
+>
+> **Newest instrument — `probe-deck-overlap.mts` (B121).** Nothing had ever opened one of our
+> `.pptx` files with a PowerPoint engine; every claim about decks was XML-level. Doing it found
+> **decks delivered with table rows and bullets missing** — six node types sized their frames
+> without reading their text, and PowerPoint clips rather than spilling. Needs
+> `libreoffice-impress` (§2 — `soffice` ships here with no document filters at all).
+
+---
+
+## 📍 Most recent work — the midterm end-to-end drive (2026-08-22/23, migration head **205**)
+
+> **B51 is closed (mig 204).** An application used to raise two ToDos — the route's typed,
+> entity-linked `application_triage` row and an untyped, unlinked copy from a mig-040 automation
+> rule — and neither closed when the application was decided. Mig 204 retires the rule and cancels
+> its orphans; a shared `closeTasksForEntity` (`lib/tasks/tasks.ts`) drains the real ToDo from
+> **both** the accept and the reject route. The non-obvious half: those rows are platform-scope
+> (`tenant_id IS NULL`) and mig 185 made `tasks` UPDATE own-only, so the completion had to run
+> under `runInBypass` — without it `completeTask` reports `TASK_CLOSED` while changing nothing
+> (proven: `select_no_ctx=1 · update_no_ctx=0`). Verified live by
+> `frontend/e2e/b51-application-todos-drive.spec.ts` (accept + reject, both green).
+>
+> **B50 and B53 are closed too** (`frontend/e2e/b50-b53-reachability-drive.spec.ts`). B50: contracts
+> now have an index page and a rail link, so an award is not lost when its kickoff ToDo is dismissed.
+> B53: `/admin/scouts` no longer reads `source_health` — a table written exactly once, by the mig-002
+> seed, so its HEALTHY tile was 0 *by construction*. Status is derived from what a scout pass really
+> writes, and `manual` (a source a person reads) is now its own status rather than being reported as
+> a fault. **The bug log's open list is empty.**
+>
+> **B64 — the page ruler now agrees with the printed page.** `estimatePageCount` is what tells a
+> customer whether their volume is inside its page limit, and it under-counted: a 40-row table by a
+> page, the same table with *wrapping* cells by two, and **two of the four real proposals in the
+> sandbox by a page each**. Four defects — a table row modelled as body text, no term for a wrapped
+> cell, equal-width columns in an auto-layout table, and `fitKeep` refusing to relocate an oversized
+> `break-inside: avoid` block. All under-counting, i.e. the direction that clears a bid the printer
+> rejects. Constants are now MEASURED (`scripts/measure-table-row-height.mts`) rather than read off
+> the stylesheet — the stylesheet-derived value falls outside the measured bracket. The missing
+> instrument is the real deliverable: **`scripts/calibrate-page-ruler.mts`** renders every case
+> through Chromium and exits non-zero on drift; run it after anything that touches layout.
+>
+> **B65 — the same defect in lists, found by extending the method to decks.** `nodeStackHeightPt`
+> had no `bulleted_list` / `numbered_list` case, so a list fell through to the prose default: every
+> bullet concatenated and reflowed at full width. A 120-bullet document read 3 pages and printed 4,
+> and a slide holding 30 bullets — needing 648pt of a 452pt frame — reported **no overflow**, the
+> one check standing between a customer and a deck with content cut off. Second harness:
+> **`scripts/calibrate-slide-ruler.mts`** (7/7); the page harness is now 20/20.
+>
+> **The class to keep sweeping for:** *a model that flattens structure the renderer preserves.*
+> B64 found it in table cells, B65 in list items. Any node whose content is a LIST of things —
+> rows, items, series, steps — is a candidate; measuring its text length is not measuring its height.
+>
+> **B66 — swept the remaining twelve node types through the same harness.** Two more: `code_block`
+> (newlines inside `white-space:pre-wrap` were reflowed away — 60 lines read 1 page, printed 2) and
+> `toc` (modelled as **zero height**, so a 40-entry contents list cost nothing and printed two
+> pages). Both fixed and measured. One **named residual** left deliberately un-modelled: the ruler
+> does not implement `h1,h2,h3 { break-after: avoid }`, which binds a heading to its first
+> paragraph; it only bites when a toc pushes headings onto a page boundary, and both affected
+> documents are exact without the toc. Two cases carry an explicit `tolerance: 1` with that reason.
+>
+> **And the harness defeated itself once** — a `tolerance` defaulted at the comparison instead of
+> at the push left it `undefined`, and every comparison against `undefined` is false, so the script
+> printed "off by −1" beside two rows and then declared all 28 passing. It would have reported
+> success for any delta. *A calibration harness that cannot fail is worth less than none, because
+> it is believed.* Second class to sweep for: **a check whose failure path is never exercised.**
+>
+> **B46 + B67 — the last open defect, and the claim that hid it.** B46: `opportunities.solicitation_id`
+> was written by 7 of 10 writers (every topic path stamped it; three umbrella paths did not), so the
+> column was reliable-looking and inconsistent. `compliance-resolver.ts` already carried a fallback
+> with a comment recording the cost of not having one — an umbrella purchase provisioning a default
+> skeleton "while the fully-authored master sits unread". The three writers now stamp it and **mig 205**
+> backfills; verified safe first, because every topic-only query also filters on `topic_number`.
+> B67: I had reported the log clear using a grep that understood one of its **three** heading
+> conventions. **`node frontend/scripts/bug-log-status.mjs`** now reads the status from either end,
+> refuses to guess, and says *"5 deferred entries remain by choice — name them rather than calling the
+> log clear."* **Run it before claiming the log is clean.** As of B74 the log is **74 entries, 0
+> open, 2 deferred** — B30 and B33. (B34, B35 and B40 were all closed later in the same session;
+> the "five deferred" line this paragraph used to carry was true when written and is not now.)
+
+> ### B78–B79 — two live defects a status code could not see, found by LOOKING at the page
+>
+> The guide screenshot pass (docs/CUSTOMER_ONBOARDING_GUIDE.md and
+> docs/RFP_ADMIN_OPERATIONS_GUIDE.md now carry 30 captured screenshots each side) drove the two
+> front-door guides against the running build as real actors, and found two customer-facing
+> surfaces that were **broken while answering HTTP 200**:
+>
+> **B78** — `CanvasRenderer` read `canvas.font_default.family` on a stored partial canvas. Four
+> sections of the Foundation TVSF build carry `{width,height,margins}` and no `font_default`, so the
+> whole **proposal workspace** rendered *"Something went wrong — This page failed to load."* It
+> threw in a client component, so nothing reached the server log, and the capture harness printed
+> `✓ 200`. This is B73's sibling: B73 fixed the RULER's copy of the same defect, and left every
+> other reader brittle. There is now ONE `normalizeCanvas()` and `withCanvasDefaults` is expressed
+> in terms of it (its fast path also no longer waves through a header with no font).
+>
+> **B79** — found ten minutes later by the widened check: `/admin/events` read `Date.now()` during
+> render, so the server wrote "2s ago", the client hydrated and wrote "4s ago", and React #418 took
+> the Event Stream to its error boundary on **every load**. Also 200 throughout.
+>
+> **The class, and the instrument.** A 200 is not evidence that a page rendered — Next serves both a
+> client error boundary and a failed hydration with a 200, and a client-side throw never reaches the
+> server log. `frontend/scripts/verify-surfaces.mjs` now drives **every** `page.tsx` under
+> `app/admin` and `app/portal/[tenantSlug]` as the right actor, enumerated from the tree rather than
+> a list, failing on a rendered error surface OR a client throw, and **reporting** (never skipping)
+> any route it cannot address from sandbox data.
+>
+> **Standing: 79 surfaces driven · 79 clean · 0 broken.** Two routes are NOT driven, and the run
+> now says WHY for each, because "no row in the sandbox" sends the next reader hunting for a seed
+> that would not help:
+> `/admin/documents/[documentId]` is addressed by the OBJECT-STORAGE document index
+> (`reference/documents/_index.json`), not a table — and it is excluded by route rather than handed
+> a `tenant_documents.id` it would reject, since a harness inventing a failure is no better than one
+> inventing a pass. `/portal/[slug]/contracts/[contractId]` is the one real data gap: `contracts` is
+> empty.
+>
+> **The sweep took two passes to become honest, and both were the instrument.** First,
+> `addressable()` tested the bound STRING for a leftover `[…]` — an empty substitution passes, so
+> `/admin/documents/` (a different route that happens to exist) counted as a clean drive of a page
+> never visited. Then, with that fixed, five routes reported "no row in the sandbox" when four of
+> them had rows all along: the lookups queried a `documents` table that does not exist and never
+> looked for a page key or a content slug at all. Every lookup now targets what the PAGE itself
+> reads. Same shape as B74 and B78 — the tool was wrong, not the product.
+>
+> ### B68–B74 — the ruler, the vocabulary, and the tool that was clearing SQL it never read
+>
+> **The page ruler now agrees with the page on every authored proposal, and the safety property is
+> measured rather than assumed.** Four defects on top of B64–B66:
+> **B69** — `flowMetrics` subtracted the running header and footer from the content box on top of
+> the margins, but `page.pdf` draws those templates INSIDE the margin: 72pt of a 648pt page, on
+> every page of every agency mold. Nothing caught it because all 28 calibration cases used the one
+> preset declaring `header: null, footer: null`, and two more passed override keys that are not
+> fields of `CanvasRules`, so they silently re-ran a case that already existed.
+> **B71** — every line of prose was measured at the declared `line_spacing` where the stylesheet
+> floors leading at 1.28: 11% short. Found only by measuring the eight authored NILOC volumes, and
+> B69 did not create that under-count — it removed the mask hiding it (2 of 8 under-counted before
+> the session, 4 after B69, **0 after B71**).
+> **B72** — the ruler charged margins the page collapses, inconsistently (a heading carried both of
+> its own, a paragraph carried none). `nodeMarginsPt` + collapsing in both stackers.
+> **B73** — `flowMetrics` read `c.font_default.size` on a canvas spec that has none. Three stored
+> TVSF volumes carry `{width,height,margins}` only, so the page-budget panel returned **HTTP 500 to
+> a tenant_admin opening her own volume** while the same volume downloaded as a correct PDF. The
+> exporters default every field they read; the ruler did not. Proven live before and after.
+> **B74** — `scripts/schema-check.mjs`, the tool CLAUDE.md tells you to run before writing SQL,
+> matched `` sql` `` and `` sqlBypass` `` only, so `sql<Array<{…}>>\`` — the form the SOP itself
+> writes — never matched. **767 of 2,174 blocks visible; 213 files skipped entirely and reported
+> clean.** It cleared a column that does not exist. Now 2,560 references verified across 683 files,
+> 0 findings, 0 new false positives.
+>
+> **The instruments are the deliverable. Run all four after anything touching layout or export:**
+>
+> | harness | what it measures |
+> |---|---|
+> | `scripts/verify-ruler-on-proposals.mts` | 8 authored NILOC volumes — the safety gate: never UNDER-count |
+> | `scripts/verify-ruler-on-stored-artifacts.mts` | every `proposal_artifacts` row in the DB, assembled exactly as the layout route does |
+> | `scripts/calibrate-page-ruler.mts` | 36 synthetic cases against Chromium's printed page count |
+> | `scripts/calibrate-slide-ruler.mts` | 7 deck cases against a real rendered `.pptx` |
+> | `scripts/sweep-mold-quality.mts` | all 39 shipped templates |
+> | `scripts/verify-surfaces.mjs` | **every page** under `app/admin` + `app/portal/[tenantSlug]`, as the right actor: does it RENDER (boundary / client throw), not just answer 200 |
+> | `scripts/capture-guides.mjs` | the guide surfaces, captured as evidence — same gate |
+>
+> When one disagrees, `scripts/diagnose-mold-ruler.mts --nodes / --segments / --pages` says WHY.
+> Do NOT amplify one node type ×N to find it — that method lies about anything with a vertical
+> margin. `__tests__/node-vocabulary-coverage.test.ts` is the always-on companion: every member of
+> the `NodeType` union through all four writers, typed `Record<NodeType, …>` so a new type without
+> a case is a compile error.
+>
+> **Current standing:** calibration 36 (4 within a stated ±1) · authored 8/8 exact · stored 36/37
+> exact · decks 7/7 · molds 39 clean, 5 over-count, **0 under-counts anywhere**. The five molds are
+> one measured cause, written up in B70: `CHAR_W` is a single constant for a font whose real advance
+> runs 0.41 on lowercase prose and 0.58 on acronyms (`scripts/measure-char-width.mts`).
+>
+> **Two operational traps that cost real time here:**
+> 1. **A `next-server` from an earlier session can still own :3000.** Check the process start time
+>    against `.next/BUILD_ID`'s mtime before believing any live result — two drives "proved the fix
+>    failed" while talking to yesterday's build.
+> 2. **`pkill -f "PORT=3001"` matches its own shell** and dies before killing anything (exit 144).
+>    Kill by PID.
+> 3. **`schema-check` against a stale database invents findings.** A sandbox at migration 163 vs a
+>    repo at 205 produced 24, all phantom. It now warns first — but if you see accusations, check
+>    the ledger before believing them.
+
+The last session ran the product start to finish **from a database holding nothing a user could
+have created** (`scripts/reset-minimal.sh` — schema, platform config, the house tenant's starter
+shelf, one operator). Every tenant, opportunity, library, bucket, purchase, portal, section,
+review and export was composed by driving the real surfaces.
+
+- **Read first: `docs/MIDTERM_RESULTS.md`** — the nine acts, the ledger, the artifacts as opened
+  (not as counted), and what the run deliberately does not cover.
+- **The primaries are part of it.** Sections carry images, tables, charts and captions, not just
+  prose: two photographs uploaded through the customer's own image surface, a milestone table, a
+  throughput bar chart and a Phase I Gantt. Each leaves the canvas a different way (native OOXML
+  table · SVG rasterized for Word but kept vector in the PDF · storage key fetched and inlined) and
+  **all three degrade to a grey `[Image: …]` stub instead of failing**, so the drive counts the real
+  ones and fails on the stubs. Fixtures: `scripts/make-figure-fixtures.py`.
+- **The drive: `frontend/e2e/mt-arc-drive.spec.ts`** — run it with
+  `scripts/reset-minimal.sh && scripts/mt-run.sh mt-arc-drive`. It never throws on a block: every
+  step is recorded `ok` / `decision` / `override` / `note` / `blocked` and the arc continues, so a
+  run always reaches the end and reports honestly. Final tally **`ok=89 · blocked=0`**.
+- **New findings: bug log B62 and B63.** B62 is the real one — a new tenant was born at 100% of
+  the spotlight-bucket cap, so the first thing a customer does answered 409. Fixed by mig **203**
+  plus `lib/automation/policy.ts` deriving the cap from the seeded set instead of duplicating a
+  number. B63 is the harness: `playwright.config.ts` had no `actionTimeout`, and Playwright's
+  default of 0 means *wait forever* — one missing selector ate whole runs silently.
+- **Two behaviours that read as bugs and are not** (now documented in `readiness.ts`,
+  `PROVISIONING_WORKSPACE_DESIGN.md` and the RFP-admin guide): a deferred compliance field
+  correctly blocks the push until a human enters it, and the build-out readiness bar has **five**
+  conditions, not the three its own summary used to claim.
 
 ---
 
@@ -96,7 +362,21 @@ commit is pushed. Recover: `git fetch origin && git reset --hard origin/<branch>
 for the current env):** the sandbox Postgres is now the **system PG16 cluster on :5432** (role
 `govtech`/`changeme`, db `govtech_intel`), NOT `/tmp/pgs_gov:5433`. After a reclaim, run
 **`bash frontend/scripts/rehydrate-sandbox.sh`** — it starts PG, ensures the role+db, runs migrations
-(169/170 self-seed the Foundation demo), builds if the standalone is gone, and stages `static`+`public`.
+(169/170 self-seed the Foundation demo), **resets the admin passwords**, builds if the standalone is
+gone, and stages `static`+`public`.
+
+> **The password step was missing until 2026-08-23, and its absence made every rehydrate half a
+> restore.** Migrations 124/198 rotate every seeded ADMIN onto a random hash nobody holds; the tenant
+> users keep their seeded password. So a rehydrated box looked recovered — `kate.ulepic` signed in
+> fine — and then every admin-driven harness (`capture-guides`, `verify-surfaces`, the award drive,
+> any `/admin` e2e) died at the login form with a bare `/login?error=invalid`, which reads like broken
+> auth rather than a missing setup step.
+>
+> **Two clusters exist and they are not interchangeable.** This recipe targets `:5432` as role
+> `govtech`; a `/tmp/pgs_gov:5433` cluster as role `claude` also exists and some sessions inherit it.
+> `rehydrate-sandbox.sh` only knows about `:5432` — on a `:5433` box you must migrate and reset
+> passwords by hand against that URL. Check which one you are on (`ss -ltnp | grep 543`) before
+> assuming the one-command path applies.
 Then launch **`frontend/scripts/health-manager.sh`** as a **background task**
 (`SCR=<scratchpad> INTERVAL=60 bash frontend/scripts/health-manager.sh` via run_in_background) — it pings
 server+DB+pad every 60s and auto-restarts the server/PG *within a live VM*. Neither can prevent or survive
@@ -222,6 +502,37 @@ Shipped this sprint:
 - **Deliverables committed to git:** `docs/TVSF_PROPOSAL_BUILD_GUIDE.md` (+ `.pdf`, 12 screenshots
   under `docs/tvsf-build-guide/`, driven by `frontend/e2e/hitl-tvsf-build-guide.spec.ts`) and
   `docs/Foundation_TVSF_Proposal.pdf`.
+
+> ### ⚠️ SERVE AS `govtech_app`, OR YOUR ISOLATION RESULTS ARE MEANINGLESS (bug log B86)
+>
+> The single most expensive mistake available on this box. `govtech` is `rolsuper = t`, and **a
+> superuser bypasses row-level security entirely** — so a rig started with
+> `DATABASE_URL=postgresql://govtech:…` produces isolation output *identical* to a perfectly
+> isolated one. An entire session's worth of "RLS proven" once came from exactly that.
+>
+> It is the path of least resistance because `govtech_app` is created **NOLOGIN** by migration
+> (094/177) and prod supplies its password by env, so a fresh box has no usable app credential.
+> Give it one, then serve as it:
+>
+> ```bash
+> psql "$OWNER_URL" -c "ALTER ROLE govtech_app LOGIN PASSWORD 'changeme'"   # once per box
+>
+> DATABASE_URL='postgresql://govtech_app:changeme@localhost:5432/govtech_intel' \
+> DATABASE_URL_OWNER='postgresql://govtech:changeme@localhost:5432/govtech_intel' \
+>   node .next/standalone/server.js
+> ```
+>
+> `DATABASE_URL_OWNER` stays the owner — `sqlBypass` and the legitimate cross-tenant admin reads
+> need it, and so does any HARNESS computing what a tenant *should* see (that is what
+> `harnessDbUrl()` in `scripts/lib/drive-actor.mjs` is for; a harness that asks through the scoped
+> connection sees nothing and concludes the box is empty).
+>
+> **Don't take this on trust — check it.** `node scripts/check-rls-posture.mjs` verifies the role,
+> the policies, and the only assertion that cannot be faked: set one tenant's context, count another
+> tenant's rows, require zero, then require the tenant's OWN rows to be non-zero so a deny-all
+> cannot masquerade as isolation. `run-branch-drives.sh` runs it as a preflight and marks every
+> isolation drive **CANT-RUN** when the posture is wrong, rather than letting them report a verdict
+> they cannot earn.
 
 **Operational reality that ate the most tokens** (now fixed in §2): `next start` does NOT serve
 `output:'standalone'` — you must run `node .next/standalone/server.js` after staging static/public;
@@ -544,6 +855,120 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 
 ## 2. Spin up the sandbox (exact commands + gotchas)
 
+> ### ⚠️ Three traps that each cost a cycle in the 2026-08-26 run
+>
+> **1. Never edit a shell script while it is executing.** Bash reads a script incrementally by byte
+> offset, so inserting lines into `run-branch-drives.sh` mid-run shifted everything beneath a live
+> interpreter and it died with `syntax error near unexpected token '('`. Its exit code and every
+> late result in that run were worthless. Wait for the process to exit, then edit.
+>
+> **2. `pgrep -f "run-branch-drives.sh"` matches ITSELF** when used inside a wait-loop whose own
+> command line contains that string, so the loop never exits — the same self-match that makes
+> `pkill -f` dangerous here. Use `ps -eo cmd | grep "[s]cripts/run-branch-drives.sh"`.
+>
+> **3. Run the suites in a known order, or reset between them.** `e2e/auth.setup.ts` re-seeds
+> passwords, so running the Playwright personas and then the branch drives left three isolation
+> drives reporting "could not authenticate" — which reads exactly like a deny-all isolation failure
+> and is a password (B146). `scripts/sandbox-reset-passwords.mjs` is the one place that decides
+> them; run it after any suite that touches credentials.
+
+> ### ⚠️ Running the PIPELINE tests: `python3 -m pytest`, with the env sourced
+>
+> Two traps, and each one manufactures failures that look like real regressions.
+>
+> **1. The `pytest` on `PATH` is a uv-managed tool with its own isolated site-packages**, so it
+> cannot see `asyncpg` (or anything else installed for the system interpreter) and reports
+> **66 collection errors** — every test module that imports it. Run the tests through the same
+> interpreter the dependencies live in:
+>
+> ```bash
+> python3 -m pip install --break-system-packages -q pytest pytest-asyncio   # once
+> cd pipeline && python3 -m pytest tests/ -q
+> ```
+>
+> **2. Source `scripts/sandbox-env.sh` first.** Roughly 22 tests connect to the live sandbox DB and
+> are guarded by `skipif(not DATABASE_URL)`. If `DATABASE_URL` is set in the container but the
+> sandbox env is not sourced, they do not skip — they run and fail at `asyncpg.connect`, which reads
+> exactly like 22 broken tests. With the env sourced: **1319 passed, 9 skipped, 0 failed.**
+>
+> Both were hit in one sitting while auditing the automation spine, and the first pass through them
+> looked like a broken pipeline rather than a broken invocation.
+
+> ### 🆕 FROM ABSOLUTELY NOTHING — a container with no cluster, no roles, no node_modules
+>
+> The recipe below assumes a box that has run this before. On a genuinely fresh container
+> (2026-08-25 was one: empty PG16 cluster, no `govtech` role, `frontend/node_modules` absent,
+> no `.next`), these four things come first and only the first is non-obvious.
+>
+> **1. pgvector, or migration `001` cannot run.** `db/migrations/001_baseline.sql` needs the
+> `vector` extension (`atom_embeddings`, mig 171) and Debian/Ubuntu does not ship it with the
+> server package. The failure is nastier than it sounds: `migrate.mjs` runs `000_drop_all.sql`
+> FIRST, so it drops everything, dies on `001` with `extension "vector" is not available`, and
+> leaves an empty database plus an error naming an extension rather than a missing package.
+>
+> ```bash
+> apt-get update -qq && apt-get install -y --no-install-recommends postgresql-16-pgvector
+> psql "$DATABASE_URL_OWNER" -c 'CREATE EXTENSION IF NOT EXISTS vector'
+> ```
+>
+> **2. The two roles, created before migrating** (the migrations grant to `govtech_app`, so it must
+> exist first, and the owner must be superuser-or-BYPASSRLS because migs 212/213 FORCE row-level
+> security and FORCE applies to the owner too):
+>
+> ```bash
+> su postgres -c "psql -c \"CREATE ROLE govtech LOGIN SUPERUSER PASSWORD 'changeme'\""
+> su postgres -c "psql -c \"CREATE ROLE govtech_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'apppass'\""
+> su postgres -c "createdb -O govtech govtech_intel"
+> su postgres -c "createdb -O govtech govtech_test"     # the DB-dependent pytest suite; see sandbox-env.sh
+> ```
+>
+> Passwords must match `scripts/sandbox-env.sh` exactly. TCP localhost is `scram-sha-256` here, so
+> a role with no password cannot connect even though `peer` works for `postgres`.
+>
+> **3. `npm ci` in `frontend/`, then symlink the root** — `db/migrations/migrate.mjs` and
+> `scripts/seed_dev_accounts.mjs` live outside `frontend/` and Node resolves bare imports upward
+> from the importing FILE (B108). `sandbox-up.sh` recreates the symlink itself; if you migrate by
+> hand before running it, do `ln -sfn frontend/node_modules node_modules` first.
+>
+> **4. Then `scripts/sandbox-up.sh` does the rest** — migrate, reset passwords, seed the e2e
+> fixtures, start the emulator, worker and server. On a fresh box also run
+> `frontend/scripts/seed-isolation-fixture.mts` (from `frontend/`, so the `@/lib` alias resolves),
+> or a third of the isolation surface has no behavioural coverage (B118).
+>
+> **The pipeline worker needs its own deps, and the install LIES** (B128). Run it and then CHECK:
+>
+> ```bash
+> pip install -r pipeline/requirements.txt          # do NOT pipe this into `tail` — see below
+> python3 - <<'EOF'
+> import importlib.util as u
+> for m in ['dotenv','anthropic','boto3','pymupdf4llm','docx','pptx','fitz','psycopg2']:
+>     print(f'  {m:14} {"ok" if u.find_spec(m) else "MISSING"}')
+> EOF
+> ```
+>
+> On this container pip **aborts** on `Cannot uninstall cryptography 41.0.7, RECORD file not found —
+> the package was installed by debian`, and everything after that line in `requirements.txt` is
+> silently skipped: `anthropic`, `boto3`, `pymupdf4llm`. Piping the install into `tail` makes it
+> worse, because `$?` is then *tail's* status and a failed install exits 0.
+>
+> **Why this is expensive rather than annoying:** with `anthropic` absent the agent fabric
+> **safe-skips** — a deliberate invariant — so every workflow still reports `completed` and the
+> entire AI half of the product does nothing, quietly. 37 of 39 branch drives pass in that state.
+> Only `opp-scout` and `cms-generate` notice, because they assert on the AI half specifically. This
+> is B115's shape with a different cause. **Restart the worker after installing** — it imports at
+> module load, so a running one keeps the failure.
+>
+> Without any deps at all it dies on `ModuleNotFoundError: No module named 'dotenv'` and
+> `sandbox-up.sh` reports `worker FAILED` while everything else comes up green.
+>
+> **`soffice` ships with no document filters** (see the ⚠️ further down this section) — install
+> `libreoffice-impress` (plus `-writer` / `-calc`) before `probe-deck-overlap` or
+> `render-artifact-pages`. `node frontend/scripts/check-office-filters.mjs` says which are present
+> and refuses to let a broken tool produce evidence.
+>
+> A full fresh-box run is written up in **docs/FRONTEND_SWEEP_2026-08-25.md** (state reached:
+> migrations 213/213, tsc 0, vitest 1,931, five lenses green, rulers 0 under-counts).
+
 ```bash
 export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
 
@@ -558,6 +983,12 @@ mkdir -p /tmp/pgs_sock && chown -R claude:claude /tmp/pgs_gov /tmp/pgs_sock
 su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
   -o '-p 5433 -k /tmp/pgs_sock' -l /tmp/pgs_gov/log start"
 psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 4 (incl. rfp-pipeline)
+
+# 1b. BRING THE SCHEMA UP. The surviving data dir is whatever the last session left; it was found
+#     at migration 163 against a repo at 205, which is enough to make schema-check invent 24
+#     findings and to hide 15 stored proposals from any sweep. Cheap, idempotent, always worth it:
+node db/migrations/migrate.mjs
+psql "$DATABASE_URL" -tAc "SELECT max(filename) FROM _migration_history"   # expect the repo head
 # ^ If pg_ctl fails with 'could not create lock file /var/run/postgresql/...: Permission
 #   denied', the -k socket dir isn't being honoured — it MUST point at a claude-writable
 #   path (e.g. /tmp/pgs_sock). psql over TCP (127.0.0.1:5433) still works regardless.
@@ -646,6 +1077,21 @@ on `127.0.0.1` + browsing `localhost` is correct and consistent.
   - **Present:** `soffice`/`libreoffice`; `sharp` (SVG→PNG works — the docx figure path);
     `@napi-rs/canvas`; `pdfjs-dist` **v5** (ESM at `node_modules/pdfjs-dist/legacy/build/pdf.mjs`);
     Chromium at `/opt/pw-browsers`.
+  - ⚠️ **`soffice` is present but ships with NO DOCUMENT FILTERS** — `libreoffice-core` and
+    `-common` only. It fails on *everything*, including a plain `.txt`, with
+    `Error: source file could not be loaded`. **Install them first:**
+    ```
+    apt-get update -qq && apt-get install -y --no-install-recommends libreoffice-impress
+    ```
+    (`libreoffice-writer` / `-calc` for docx / xlsx.) This matters far beyond convenience: the
+    bare failure was previously read as *"LibreOffice cannot open the .pptx this product
+    writes"* and written into a script header as fact. It can. That wrong note stood long enough
+    to keep B121 — decks delivered with table rows and bullets missing — invisible, because it
+    ruled out the only instrument that could see it. **Before concluding anything about our
+    output from a converter failure, convert a plain text file.** If that fails, the tool is
+    broken, not the artifact.
+    Needed by `scripts/probe-deck-overlap.mts` and by `render-artifact-pages.mts` on
+    `.pptx`/`.docx`/`.xlsx`; both report UNMEASURED rather than passing when it is absent.
   - **Look at a PDF** (no poppler): rasterize with pdfjs + `@napi-rs/canvas` (custom
     `canvasFactory` with create/reset/destroy → `page.render` → `canvas.toBuffer('image/png')`),
     then Read the PNGs. **Verify PDF text/pages/order** with pdfjs `getTextContent`.

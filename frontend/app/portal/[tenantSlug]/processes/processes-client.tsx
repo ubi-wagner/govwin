@@ -38,13 +38,45 @@ function formatStepName(name: string | null): string {
   if (!name) return '—';
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
-function relativeTime(iso: string | null): string {
+/**
+ * "3m ago" — but only once we are on the client (bug log B79, second occurrence).
+ *
+ * This read `Date.now()` during render, which makes the cell a function of WHEN IT RENDERED: the
+ * server wrote "2s ago", the client hydrated a beat later and computed "4s ago", the text did not
+ * match, and React threw #418. That does not degrade one cell — it fails hydration for the subtree
+ * and takes the whole Processes page to the error boundary, while the route keeps answering HTTP
+ * 200 the entire time. Caught by `verify-surfaces`, which reads the rendered page instead of the
+ * status code; nothing gating on `< 400` could ever have seen it.
+ *
+ * Same shape as the fix already made for the Event Stream: `now = null` until mounted, so the first
+ * paint (server AND client) is the deterministic UTC timestamp and the relative form appears on the
+ * next tick.
+ */
+function relativeTime(iso: string | null, now: number | null): string {
   if (!iso) return '—';
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  // `iso` is DECLARED string and is not always one: postgres.js hands back a Date for a timestamptz
+  // and the server component passes it straight through. Calling `.slice` on that threw, taking the
+  // page down a second time — the mirror image of the `sql<typeof rows>` trap in CLAUDE.md, where a
+  // declared type is trusted over the runtime value. Normalise once, here.
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '—';
+  if (now === null) return new Date(t).toISOString().slice(0, 19).replace('T', ' ') + 'Z';
+  const diff = Math.max(0, Math.floor((now - t) / 1000));
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+/** Null until mounted (see relativeTime); ticks so an open tab does not go stale. */
+function useNow(): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
 }
 
 interface Transition {
@@ -65,6 +97,9 @@ const STATUS_DOT: Record<string, string> = {
 /** The process_instance_transitions timeline — lets a customer/shadow admin watch
  *  their own workflow's steps execute (tenant-scoped detail route). */
 function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'error' }) {
+  // Called before the early returns — a hook after a conditional return is a different hook order
+  // on the next render, which is its own class of runtime failure.
+  const now = useNow();
   if (state === 'loading') return <p className="mt-3 text-xs text-gray-400">Loading steps…</p>;
   if (state === 'error') return <p className="mt-3 text-xs text-red-500">Couldn&apos;t load the step timeline.</p>;
   if (state.length === 0) return <p className="mt-3 text-xs text-gray-400">No steps recorded yet.</p>;
@@ -80,7 +115,7 @@ function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'erro
               <span className="font-medium text-gray-600">{t.toStatus}</span>
             </span>
             {t.actor && <span className="text-gray-400">· {t.actor}</span>}
-            <span className="ml-auto text-gray-400">{relativeTime(t.createdAt)}</span>
+            <span className="ml-auto text-gray-400">{relativeTime(t.createdAt, now)}</span>
           </div>
           {t.reason && <p className="mt-0.5 text-[11px] text-gray-500">{t.reason}</p>}
         </li>
@@ -101,6 +136,7 @@ export function ProcessesClient({
   tenantSlug: string;
 }) {
   const router = useRouter();
+  const now = useNow();
   const [sortBy, setSortBy] = useState<'health' | 'recent'>('health');
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -267,7 +303,7 @@ export function ProcessesClient({
                   </span>
                 )}
                 <span className="ml-auto text-xs text-gray-400">
-                  {relativeTime(row.updatedAt)}
+                  {relativeTime(row.updatedAt, now)}
                 </span>
                 {showAdvance && (
                   <button

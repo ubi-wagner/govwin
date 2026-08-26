@@ -22,6 +22,10 @@ export default async function AtomsPage({ params }: { params: Promise<{ tenantSl
   if (!tenant) redirect('/portal');
   if (!(await verifyTenantAccess(su.id, role, tenant.id as string))) redirect('/portal');
   if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
+  // The page floor is tenant_user, but two controls it hosts are tenant_admin-gated SERVER-side —
+  // atom archive/restore and "Save as template". Pass the answer down so a base member is not shown
+  // a button whose only possible outcome is 403.
+  const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
 
   return (
     <div>
@@ -44,9 +48,9 @@ export default async function AtomsPage({ params }: { params: Promise<{ tenantSl
         <LibraryBrowser tenantSlug={tenantSlug} />
       </div>
       <div className="mb-6">
-        <TemplifyPastProposals tenantSlug={tenantSlug} />
+        <TemplifyPastProposals tenantSlug={tenantSlug} canTemplify={isTenantAdmin} />
       </div>
-      <AtomsWorkbench tenantSlug={tenantSlug} />
+      <AtomsWorkbench tenantSlug={tenantSlug} canArchive={isTenantAdmin} />
     </div>
   );
 }

@@ -83,6 +83,25 @@ export async function stageIntake(input: IntakeInput, actorId: string | null): P
                 ${sql.json((input.intakeMeta ?? {}) as Parameters<typeof sql.json>[0])})
         RETURNING id
       `;
+      // STAMP THE BACK-LINK TOO (bug log B46). Writing only the forward link left this path — the
+      // head of the river, used by admin intake AND the #176 scout release — creating opportunities
+      // whose `solicitation_id` is NULL, while every topic path stamps it. The result was a column
+      // that is populated for some rows and not others for no reason a reader can infer, so each
+      // reader either learns the fallback or is silently wrong: `compliance-resolver` carries an
+      // explicit umbrella arm precisely because without it "an umbrella purchase resolves to a
+      // NON-degraded empty result and the buyer is provisioned a default skeleton while the fully-
+      // authored master sits unread", and `drive-baa-forward.mjs` reported "nothing reached a tenant
+      // card" against a push that had just created seventeen.
+      //
+      // Safe to stamp on an umbrella: every topic-only query filters on `topic_number` as well
+      // (extract-topics, ingest-topic-files, opportunity-add-topic, bulk-add-topics), and the two
+      // that want both arms already union them explicitly (solicitation-push, curation/republish),
+      // so no existing query changes its result set. Same transaction as both inserts, so the pair
+      // is never half-written.
+      await tx`
+        UPDATE opportunities SET solicitation_id = ${csol.id}::uuid, updated_at = now()
+        WHERE id = ${opp.id}::uuid
+      `;
       return { opportunityId: opp.id, solicitationId: csol.id };
     });
 
@@ -115,6 +134,14 @@ export async function stageIntake(input: IntakeInput, actorId: string | null): P
           newTopics: 0,
           sampleTitles: [title],
           runId: result.solicitationId,
+          // The triage ToDo's identity. It used to carry a STATIC title and an entity_ref of
+          // `source` — a string like "intake:admin", which tasks.entity_id (uuid) silently
+          // dropped. So every intake raised a row reading "Triage new opportunities from source"
+          // with no link: 21 open, 1 distinct title, entity_id NULL on all of them. The intakes
+          // were real; the rows just could not be told apart or opened. These two fields name the
+          // solicitation and point at it (entity_type 'solicitation' → /admin/rfp-curation/<id>).
+          solicitationId: result.solicitationId,
+          triageTitle: `Triage new opportunity: ${title}`.slice(0, 300),
         },
       });
     } catch {

@@ -38,6 +38,7 @@ type Outcome = (typeof VALID_OUTCOMES)[number];
  * first in future drafts, improving quality over time.
  */
 export async function POST(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     // ── Auth check ──────────────────────────────────────────────────
     const session = await auth();
@@ -169,7 +170,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event for outcome recording ──────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'proposal',
       type: 'outcome.recorded',
       actor: userActor(sessionUser.id, sessionUser.email),
@@ -396,6 +397,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     if (e instanceof Error && e.message === 'CONFLICT') {
       return NextResponse.json(
         { error: 'Proposal was modified by another user', code: 'CONFLICT' },

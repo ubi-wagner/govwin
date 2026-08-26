@@ -7,7 +7,12 @@
  *   3) surfaces → the offer shows up in the tenant_admin's open-task queue
  * NODE_ENV=test so the emit path doesn't fire live automation rules. Self-cleaning.
  */
-import { sql } from '@/lib/db';
+// Owner client for this drive's OWN bookkeeping: under the production posture (govtech_app, RLS
+// on) a script has no app.tenant_id, so the scoped client sees nothing and every assertion below
+// reads zero against rows that exist. The product paths under test still run scoped. Same split as
+// harnessDbUrl() for the .mjs drives; see B86.
+import { sqlBypass as sql } from '@/lib/db';
+import { runInTenant } from '@/lib/tenant-context';
 import { offerStarterSet, STARTER_OFFER_TASK_TYPE } from '@/lib/library/starter-offer';
 import { listOpenTasksForActor } from '@/lib/tasks/tasks';
 
@@ -33,7 +38,17 @@ const taskCount = async (): Promise<number> => {
 
 async function main() {
   await cleanup();
-  const actor = { id: ADMIN, email: 'eric@immobileyes.com', role: 'rfp_admin' as const, tenantId: null };
+  // The actor's EMAIL is resolved alongside its id. It used to be the literal
+  // 'eric@immobileyes.com' sitting next to a resolved `ADMIN` uuid — so every event this drive
+  // emitted was attributed to a person who does not exist on this database, which is a small lie
+  // in exactly the place (`system_events.actor_email`) an audit trail is supposed to be read from.
+  const [who] = await sql<Array<{ email: string }>>`SELECT email FROM users WHERE id = ${ADMIN}::uuid`;
+  if (!who) {
+    console.error(`CANNOT RUN — no user ${ADMIN} (set TEST_ACTOR_ID). Uncovered, not a finding.`);
+    await sql.end();
+    process.exit(2);
+  }
+  const actor = { id: ADMIN, email: who.email, role: 'rfp_admin' as const, tenantId: null };
 
   // 1) fresh offer
   const r1 = await offerStarterSet({ tenantId: TENANT, tenantSlug: SLUG, adminUserId: ADMIN, actor });
@@ -51,7 +66,15 @@ async function main() {
   console.log(`2 idempotent: alreadyOffered=${r2.alreadyOffered} sameTask=${r2.taskId === r1.taskId} tasks=${await taskCount()} events=${await eventCount()}  ${s2 ? '✅' : '❌'}`);
 
   // 3) surfaces to the tenant_admin's queue
-  const queue = await listOpenTasksForActor({ id: ADMIN, role: 'tenant_admin', tenantId: TENANT });
+  //
+  // INSIDE A TENANT CONTEXT, because that is the only way this call is ever made for real.
+  // `listOpenTasksForActor` reads through the CONTEXT-AWARE `sql`; a request sets `app.tenant_id`
+  // before calling it, a script does not. Run bare under the scoped role, RLS correctly returns
+  // nothing and the check reported "the offer never reached the queue" — a product finding invented
+  // by the harness skipping the one step the server always takes. It passed only while the suite
+  // happened to be running as the owner, which is exactly the posture B86 says proves nothing.
+  const queue = await runInTenant(TENANT, () =>
+    listOpenTasksForActor({ id: ADMIN, role: 'tenant_admin', tenantId: TENANT }));
   const mine = queue.find((t) => t.id === r1.taskId);
   const s3 = !!mine && mine.taskType === STARTER_OFFER_TASK_TYPE && mine.title.includes('starter set');
   console.log(`3 surfaces  : inQueue=${!!mine} title="${mine?.title ?? ''}"  ${s3 ? '✅' : '❌'}`);

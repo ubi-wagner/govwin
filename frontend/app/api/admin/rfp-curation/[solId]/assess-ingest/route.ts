@@ -20,6 +20,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { auditProvenance, summarizeAudit } from '@/lib/ingest/provenance-audit';
+import { extractionOf } from '@/lib/ingest/source-text-cap';
 import { coerceJsonb } from '@/lib/jsonb';
 import type { Role } from '@/lib/rbac';
 
@@ -119,13 +120,17 @@ export async function POST(request: Request, routeCtx: RouteContext) {
     try {
       const [comp] = await sql<Array<Record<string, unknown>>>`
         SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid LIMIT 1`;
-      const docs = await sql<Array<{ documentType: string | null; fileName: string | null }>>`
-        SELECT document_type AS "documentType", original_filename AS "fileName"
+      // metadata carries the extraction stamp (B40) — a document we did not finish reading
+      // cannot support a "not stated in the source" verdict, and the audit now says so.
+      const docs = await sql<Array<{ documentType: string | null; fileName: string | null; metadata: unknown }>>`
+        SELECT document_type AS "documentType", original_filename AS "fileName", metadata
         FROM solicitation_documents WHERE solicitation_id = ${solId}::uuid`;
       audit = auditProvenance({
         fieldProvenance: coerceJsonb<Record<string, unknown>>(comp?.fieldProvenance, {}),
         values: comp ?? {},
-        documents: docs,
+        documents: docs.map((d) => ({
+          documentType: d.documentType, fileName: d.fileName, extraction: extractionOf(d.metadata),
+        })),
       });
     } catch (auditErr) {
       // Non-fatal: the stage snapshot is still useful without the audit.
@@ -151,7 +156,9 @@ export async function POST(request: Request, routeCtx: RouteContext) {
 
     // ── Emit the trigger (start/end). The workflow reads payload.solicitationId
     //    off the END event, so it is carried in the emitEventEnd result. ──
-    let startId: string;
+    // Initialised so the catch below can close the bracket — the `end` emit runs on the throw
+    // path too, where nothing has assigned it yet.
+    let startId: string | null = null;
     try {
       startId = await emitEventStart({
         namespace: 'finder',
@@ -160,6 +167,9 @@ export async function POST(request: Request, routeCtx: RouteContext) {
         payload: { solicitationId: solId },
       });
     } catch (evtErr) {
+      if (startId) {
+        await emitEventEnd(startId, { error: { message: evtErr instanceof Error ? evtErr.message : String(evtErr), code: 'HANDLER_THREW' } });
+      }
       console.error('[rfp-curation] assess-ingest emitEventStart failed:', evtErr);
       return NextResponse.json(
         { error: 'Internal error', code: 'DB_ERROR' },

@@ -27,6 +27,7 @@ import logging
 import uuid
 
 from .base import BaseArchetype
+from shredder.section_locate import locate_sections
 
 logger = logging.getLogger("pipeline.agents.proposal_manager")
 
@@ -352,7 +353,7 @@ Method: get_proposal_skeleton → get_compliance_matrix → for each section get
                     "title": sol["solicitation_title"] if sol else None,
                     # Bounded excerpt — the untrusted full text is fenced where it is injected
                     # into the prompt (build_messages), not re-instructed here.
-                    "excerpt": (sol["full_text"][:8000] if sol and sol["full_text"] else None),
+                    "excerpt": (locate_sections(sol["full_text"], budget=8000).text if sol else None),
                     "ai_extracted": _coerce_jsonb(sol["ai_extracted"]) if sol else None,
                 } if sol else None,
                 "skeleton": [

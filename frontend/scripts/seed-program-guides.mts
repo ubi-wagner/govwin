@@ -179,14 +179,17 @@ const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'}
 
 try {
   console.log('\n── #168 CONTENT-QUEUE · draft + queue program guides ──\n');
-  // The canvas seed parser handles headings/lists/paragraphs but not inline **bold**/*italic*,
-  // which would otherwise render as literal asterisks. Strip the emphasis markers so the guides
-  // read as clean prose (the heading + list structure carries the hierarchy).
-  const stripMd = (s: string): string =>
-    s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1');
   for (const g of GUIDES) {
     // Author canvas-native (the Content Studio pipeline: markdown → canvas → HTML projection).
-    const canvas = canvasFromDocBody(g.title, stripMd(g.body));
+    //
+    // This used to strip `**`/`*` first, because the seed parser copied the markers through
+    // literally. It now reads them as inline_formats, so the strip is gone and the emphasis
+    // survives. NOTE the consequence: mig 176 captured these four bodies as they were seeded WITH
+    // the strip, and the BAA guide has since been reviewed and published from that version. A
+    // re-run of this script therefore re-authors all four with emphasis restored and re-queues
+    // them for review — which is the right outcome when you want it, and not something that
+    // happens on a rebuild, where mig 176 is what lands.
+    const canvas = canvasFromDocBody(g.title, g.body);
     const nodeCount = (canvas.sections?.[0]?.groups?.[0]?.nodes ?? []).length;
 
     // Remove any prior draft for this slug so re-runs don't stack drafts.

@@ -13,6 +13,7 @@
  * Best-effort: returns {error} on failure; the portal launch itself is unaffected.
  */
 
+import { authoredItems, elsewhereRequirements, isAuthoredVolume, type ScopedVolume } from '@/lib/provisioning/authored-scope';
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { runInTenant } from '@/lib/tenant-context';
@@ -87,31 +88,19 @@ export async function provisionProposalForPortal(opts: {
     return { error: 'Compliance resolution failed (degraded to defaults) — retry the release; the master was not read.' };
   }
   /**
-   * The AUTHORED set — the one rule every provision loop below applies, so they can never
-   * disagree about which volumes and items get an artifact, a section and a matrix row.
-   *
-   * DSIP-only work is completed inside the agency's submission portal (a webform, a report pulled
-   * from SBIR.gov, training taken there), so the company authors no document for it here. It is
-   * flagged at either grain: a whole VOLUME (the CCR, FWA training, Foreign Affiliations) or a
-   * single ITEM inside an otherwise authored volume (the DoW Volume 1 cover-sheet webform, which
-   * sits beside two authored narrative documents). A volume whose items are ALL DSIP-only is
-   * therefore not authored either — giving it an artifact with no sections would recreate the
-   * invisible no-op volume the placeholder rule below exists to prevent.
+   * Which volumes and items yield authoring work, and what the buyer is told about the rest.
+   * lib/provisioning/authored-scope.ts is the single rule — including the one that was wrong here:
+   * a volume with NO required items is a portal form by default, not a blank page to write.
    */
-  const isAuthoredItem = (item: Record<string, unknown>) => (item as { dsipOnly?: boolean }).dsipOnly !== true;
-  const authoredItems = (vol: Record<string, unknown>): Array<Record<string, unknown>> =>
-    ((vol.items as Array<Record<string, unknown>>) ?? []).filter(isAuthoredItem);
-  const isAuthoredVolume = (vol: Record<string, unknown>) =>
-    (vol as { dsipOnly?: boolean }).dsipOnly !== true
-    && !(((vol.items as unknown[]) ?? []).length > 0 && authoredItems(vol).length === 0);
+  const scoped = (v: unknown) => v as unknown as ScopedVolume;
 
   const requiredItems: Array<{ itemNumber: number; itemName: string; itemType: string; pageLimit: number | null; slideLimit: number | null; characterLimit: number | null; volumeName: string | null; volumeNumber: number | null; templateId: string | null; expertNotes: string | null }> = [];
   let gi = 0;
   for (const vol of resolved.volumes) {
     // DSIP-only volumes contribute no authored items — they are completed in the agency portal and
     // tracked as compliance-matrix checklist entries, not built here.
-    if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
-    for (const item of authoredItems(vol as unknown as Record<string, unknown>)) {
+    if (!isAuthoredVolume(scoped(vol))) continue;
+    for (const item of authoredItems(scoped(vol))) {
       gi++;
       requiredItems.push({
         itemNumber: gi, itemName: item.itemName as string, itemType: item.itemType as string,
@@ -156,6 +145,7 @@ export async function provisionProposalForPortal(opts: {
       let count = 0;
       const artifactByVolKey = new Map<string, string>();
       const artifactTypeByVolKey = new Map<string, string>();
+      const volumeCapByVolKey = new Map<string, number | null>();
       const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
       const programType = t.programType ?? '';
       // Normalize to the work-share program family: sbir_phase_1/2 → 'sbir', sttr* / d2p2 → 'sttr',
@@ -172,7 +162,7 @@ export async function provisionProposalForPortal(opts: {
           // standing up an artifact + empty sections for one creates work that can never be done and
           // a readiness blocker that can never clear. The requirement still reaches the customer as a
           // compliance-matrix checklist item — it is tracked, just not authored.
-          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
+          if (!isAuthoredVolume(scoped(vol))) continue;
           // Map the volume to its artifact_type (CHECK: narrative|cost|form|matrix|other). Cost/budget
           // volumes → 'cost'; supporting-document / letter / form / attachment / certification volumes →
           // 'form' (previously mis-typed as 'narrative'); everything else is a narrative volume.
@@ -193,6 +183,9 @@ export async function provisionProposalForPortal(opts: {
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
           artifactTypeByVolKey.set(volKey(volNum, volName), artifactType);
+          // The VOLUME's page cap, kept so each section's canvas envelope can carry it (see the
+          // canvas.max_pages note in the section loop). Distinct from an item's page_allocation.
+          volumeCapByVolKey.set(volKey(volNum, volName), (complianceSpec as { max_pages?: number | null } | null)?.max_pages ?? null);
         }
         // Which item in each COST volume receives the computed workbook. The rule lives in
         // lib/proposal/cost-workbook-item so the MOLD BUILDER can use the same one to decide what
@@ -284,12 +277,23 @@ export async function provisionProposalForPortal(opts: {
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = actorId;
             templateDoc.document_id = section.id;
-            // The ITEM's own limits are provision truth — stamp them onto the canvas so the
-            // editor gauge and the export floor read the per-item cap, not the mold's default.
+            // `canvas.max_pages` is the VOLUME's cap, not this item's share of it.
+            //
+            // Sections of one volume assemble into ONE document (assembleArtifactCanvas), and the
+            // first section's canvas becomes that document's envelope — so stamping the item's own
+            // limit here declares the whole volume to be as long as its shortest item. With the
+            // Technical Volume's ten pages correctly split one page per item, the assembled volume
+            // reported "6 of 1 pages" and the export floor would have refused it. The item's share
+            // is carried separately and correctly, as `proposal_sections.page_allocation` →
+            // `layout.page_budget`, which is what the per-section over-budget check reads.
+            //
+            // Slide limits are per-DECK and a deck item is its own document, so those still take
+            // the item's number.
             const canv = (templateDoc as unknown as { canvas?: { format?: string; max_pages?: number | null; max_slides?: number | null } }).canvas;
             if (canv) {
               const isSlideCanvas = /slide/i.test(canv.format ?? '');
-              if (item.pageLimit != null && !isSlideCanvas) canv.max_pages = item.pageLimit;
+              const volumeCap = volumeCapByVolKey.get(vkey) ?? null;
+              if (!isSlideCanvas && volumeCap != null) canv.max_pages = volumeCap;
               if (item.slideLimit != null && isSlideCanvas) canv.max_slides = item.slideLimit;
             }
             const interpolated = interpolateTemplate(templateDoc, templateVariables);
@@ -325,11 +329,11 @@ export async function provisionProposalForPortal(opts: {
         // volume missing. Give every such volume a placeholder section + matrix row so it must be
         // authored + locked like any other.
         for (const vol of resolved.volumes) {
-          if (authoredItems(vol as unknown as Record<string, unknown>).length > 0) continue;
+          if (authoredItems(scoped(vol)).length > 0) continue;
           // …but NOT for a DSIP-only volume. It has no artifact (skipped above), so a placeholder
           // here would be an orphan section that can never be authored or locked — the exact
           // permanent readiness blocker this whole flag exists to prevent.
-          if (!isAuthoredVolume(vol as unknown as Record<string, unknown>)) continue;
+          if (!isAuthoredVolume(scoped(vol))) continue;
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
           const artifactId = artifactByVolKey.get(volKey(volNum, volName)) ?? null;
@@ -344,6 +348,33 @@ export async function provisionProposalForPortal(opts: {
             VALUES (${p.id}, ${volName ?? 'Volume content'}, ${volName ?? 'RFP'}, true, 'not_addressed', ${phSection.id})
           `;
           count++;
+        }
+        /**
+         * COMPLETED ELSEWHERE IS STILL REQUIRED.
+         *
+         * Everything skipped above — a volume marked completed-elsewhere, a volume whose items are
+         * all marked, an undecided volume with no items (a portal form by default), and each marked
+         * item inside an otherwise authored volume — gets NO artifact and NO section, correctly:
+         * there is nothing to write here. But it was ALSO getting no compliance row, so it left the
+         * buyer's proposal without a trace. Measured on a live DoW 2026 build: the master had seven
+         * volumes and the buyer could see two. The DD Form 2345, the SAM reps & certs, the FWA
+         * training certificate, the foreign-affiliations disclosure — all still mandatory for
+         * submission, all silently absent, and a build could reach "submission-ready" without them.
+         *
+         * A section-less matrix row is the fix, and the schema already allowed it (`section_id` is
+         * nullable and `notes` exists). The row is mandatory and starts `not_addressed`, so it holds
+         * the buyer's checklist open until someone confirms it was filed; `notes` carries the
+         * rfp_admin's note saying WHERE. Not authored here must never read as not required.
+         */
+        for (const vol of resolved.volumes) {
+          const source = (vol.volumeName as string) || 'RFP';
+          for (const r of elsewhereRequirements(scoped(vol))) {
+            await tx`
+              INSERT INTO proposal_compliance_matrix
+                (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id, notes)
+              VALUES (${p.id}, ${r.text}, ${source}, true, 'not_addressed', ${null}, ${r.note})
+            `;
+          }
         }
       } else {
         const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance, ownIdentifiers: [t.topicNumber, t.solicitationNumber] });

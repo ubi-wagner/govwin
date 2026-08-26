@@ -5,11 +5,15 @@
  *  (3) Immobileyes admin completes + Accept & Starts the required Workflow Setup (TW-3),
  *      stage gates dated against the extended close (2026-09-24).
  *
- *  cd frontend && node --import tsx scripts/immo-purchase-release.mts */
+ *  cd frontend && T3CP_OPP=<opportunityId> node --import tsx scripts/immo-purchase-release.mts */
 import { chromium, type Browser, type APIRequestContext } from 'playwright';
 
 const BASE = 'http://localhost:3000';
-const OPP = 'e84c5bd2-0a7e-487a-a1fd-c7dc76027f4c';
+// OSW26BZ04-DP013 — T3CP Patent Holiday SBIR Open Topic Call (close 2026-10-18).
+// The intake mints a fresh opportunity id per run, so this is env-overridable rather than a
+// constant that silently points at a solicitation from a previous life of the database. argv[2] is
+// already the re-entry portalId, hence the env var.
+const OPP = process.env.T3CP_OPP ?? 'bb64f56d-41a5-4cd0-8185-a5604d8574ae';
 const SLUG = 'immobileyes';
 
 let failures = 0;
@@ -46,7 +50,7 @@ if (!existingPortal) {
   console.log(`  portalId=${portalId}`);
 
   // ── 2 · RFP ADMIN: cockpit Complete & Release ──
-  const admin = await login(b, 'eric@rfppipeline.com', 'RFPAdmin2026!');
+  const admin = await login(b, 'eric@rfppipeline.com', (process.env.RFP_ADMIN_PW || 'RFPAdmin2026!'));
   const rel = await admin.post(`${BASE}/api/admin/provisioning/${portalId}/release`, { data: {} });
   const relBody = await rel.json().catch(() => ({}));
   const proposalId: string | null = relBody?.data?.proposalId ?? null;
@@ -64,15 +68,15 @@ const baseCfg = wfBody?.data?.config ?? {};
 const stages: Array<Record<string, unknown>> = Array.isArray(baseCfg.stages) && baseCfg.stages.length === 3
   ? baseCfg.stages : [{ key: 'draft', label: 'Draft' }, { key: 'review', label: 'Review' }, { key: 'final', label: 'Final' }];
 
-// The HITL plan: absolute gate dates working back from the extended close (9/24), every ToDo owned.
+// The HITL plan: absolute gate dates working back from the T3CP close (2026-10-18), every ToDo owned.
 const PLAN: Record<string, { dueDate: string; todos: Array<Record<string, unknown>> }> = {
-  draft:  { dueDate: '2026-09-10', todos: [
-    { type: 'acknowledge', title: 'Draft all volumes (V1 cover summaries · V2 white paper · V3 cost · V4 CCR · V5 supporting · V6 FWA)', assigneeRole: 'tenant_admin', nudgeDays: [3] },
+  draft:  { dueDate: '2026-10-02', todos: [
+    { type: 'acknowledge', title: 'Draft all authored volumes (V2 Technical NTE 10pp · V3 DSIP cost volume · V5 supporting documents)', assigneeRole: 'tenant_admin', nudgeDays: [3] },
   ]},
-  review: { dueDate: '2026-09-17', todos: [
-    { type: 'acknowledge', title: 'Red-team review: technical vs topic areas of interest + cost vs $200K/$115K caps', assigneeRole: 'tenant_admin', nudgeDays: [2] },
+  review: { dueDate: '2026-10-10', todos: [
+    { type: 'acknowledge', title: 'Red-team review: patent number + associated DoW lab + CEL status stated; cost vs the $250,000 Phase I Base ceiling', assigneeRole: 'tenant_admin', nudgeDays: [2] },
   ]},
-  final:  { dueDate: '2026-09-22', todos: [
+  final:  { dueDate: '2026-10-16', todos: [
     { type: 'acknowledge', title: 'Final compliance check + DSIP submission (2 days before close)', assigneeRole: 'tenant_admin', nudgeDays: [1] },
   ]},
 };

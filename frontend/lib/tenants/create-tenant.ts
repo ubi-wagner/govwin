@@ -23,7 +23,6 @@
 import { sqlBypass as sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
-import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { backfillTenantTemplates } from '@/lib/template-bridge';
@@ -130,7 +129,10 @@ export async function createTenantWithAdmin(
     });
 
     // Spotlight + mirror cards (idempotent — buckets skip when any exist; applies are forward-only).
-    try { await seedDefaultBuckets(created.tenantId, created.adminUserId); } catch (e) { console.error('[create-tenant] seed buckets failed', e); }
+    // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
+    // they open empty and fill — so the product imposes none, and the cap is a pure authoring
+    // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
+    // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
     let cardsBackfilled = 0;
     try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[create-tenant] backfill failed', e); }
 

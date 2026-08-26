@@ -52,6 +52,7 @@ from typing import Any, Optional
 import asyncpg
 
 from events import emit_event
+from sdk_compat import sampling_kwargs
 
 log = logging.getLogger("pipeline.workflows.actions.cms_content")
 
@@ -118,7 +119,11 @@ async def _generate_body(brief: str, content_type: str) -> Optional[dict[str, An
         resp = await client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=4096,
-            temperature=0.7,
+            # `temperature` only where the installed SDK still accepts it (src/sdk_compat.py).
+            # anthropic 1.0.0 dropped it, and because the except-branch below falls back to the
+            # brief on ANY exception, this call failing looked from the outside like a draft that
+            # simply chose not to generate — a 100% failure reported as a working feature.
+            **sampling_kwargs(0.7),
             system=_DEFAULT_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user}],
         )

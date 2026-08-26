@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect } from 'react';
 import type {
   HealthSummary,
@@ -47,28 +48,9 @@ type TabKey = (typeof TABS)[number]['key'];
 
 // ─── Formatting helpers ───────────────────────────────────────────────
 
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 0) return 'just now';
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
-}
-
-function formatElapsed(startedAt: string | null): string {
-  if (!startedAt) return '--';
-  const ms = Date.now() - new Date(startedAt).getTime();
-  if (ms < 1000) return '<1s';
-  if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
-  return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
-}
+// `relativeTime` / `formatElapsed` used to live here and read `Date.now()` DURING RENDER, which
+// failed hydration for the whole page (React #418 → error boundary, on a route still answering 200).
+// They are now <TimeAgo> / <Elapsed>, which own their own mount state — see components/ui/time-ago.
 
 function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return '--';
@@ -229,7 +211,7 @@ function WorkflowCard({
           )}
 
           <span className="text-xs font-mono text-blue-600 ml-auto flex-shrink-0">
-            {formatElapsed(workflow.startedAt)}
+            <Elapsed iso={workflow.startedAt} />
           </span>
         </div>
       </button>
@@ -355,7 +337,7 @@ function PipelineSection({ pipeline }: { pipeline: PipelineState }) {
                   <span className="text-xs text-gray-400 ml-2">({s.count} jobs)</span>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {s.lastRun ? relativeTime(s.lastRun) : 'never'}
+                  {s.lastRun ? <TimeAgo iso={s.lastRun} /> : 'never'}
                 </span>
               </div>
             ))}
@@ -473,7 +455,7 @@ function TreeNode({
         )}
 
         <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-          {relativeTime(node.createdAt)}
+          <TimeAgo iso={node.createdAt} />
         </span>
 
         {node.tenantId && (
@@ -579,7 +561,7 @@ function ErrorsTable({ errors }: { errors: ErrorEvent[] }) {
             return (
               <tr key={err.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                  {relativeTime(err.createdAt)}
+                  <TimeAgo iso={err.createdAt} />
                 </td>
                 <td className="px-3 py-2">
                   <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${nsColor.text} ${nsColor.bg}`}>
@@ -818,7 +800,7 @@ function ContentPipelineSection({ data }: { data: ContentPipelineData }) {
               return (
                 <div key={evt.id} className="px-4 py-2.5 flex items-center gap-3 text-sm">
                   <span className="text-xs text-gray-400 whitespace-nowrap w-16 flex-shrink-0">
-                    {relativeTime(evt.createdAt)}
+                    <TimeAgo iso={evt.createdAt} />
                   </span>
                   <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${evtMeta.color}`}>
                     {evtMeta.label}
@@ -912,7 +894,7 @@ function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
               {data.automationLogs.map((log) => (
                 <tr key={log.id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                    {relativeTime(log.executedAt)}
+                    <TimeAgo iso={log.executedAt} />
                   </td>
                   <td className="px-3 py-2 text-xs font-medium text-gray-700">
                     {log.ruleName}
@@ -962,7 +944,7 @@ function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
                 return (
                   <tr key={evt.id} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                      {relativeTime(evt.createdAt)}
+                      <TimeAgo iso={evt.createdAt} />
                     </td>
                     <td className="px-3 py-2">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${evtMeta.color}`}>

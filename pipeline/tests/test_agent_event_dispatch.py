@@ -53,3 +53,54 @@ def test_review_requested_has_no_workflow_so_fabric_runs():
     discover_workflows()
     assert get_workflow_for_event(_ev("proposal", "proposal.review_requested")) is None
     assert AgentFabric().has_handler("proposal.review_requested") is True
+
+
+def test_handles_event_sees_the_BARE_type_so_prefixed_declarations_are_inert():
+    """`system_events.type` carries NO namespace prefix — namespace is its own column.
+
+    The processor passes `event["type"]` straight to has_handler/handles_event, so an
+    archetype declaring `finder.solicitation.triaged` can never match the real type
+    `solicitation.triaged`. Those declarations are inert; the archetype is reached via an
+    AI_INVOKE step or an agent_task_queue producer instead. Pinned so nobody "fixes" the
+    fallback by prefixing the dispatch key and silently wakes ~32 dormant archetypes at once
+    (CLAUDE.md: agents are woken ONE AT A TIME).
+    """
+    f = AgentFabric()
+    assert f.has_handler("solicitation.triaged") is False       # the type actually emitted
+    assert f.has_handler("finder.solicitation.triaged") is True  # curation_qa's inert string
+    assert f.has_handler("scoring.completed") is False
+    assert f.has_handler("section.drafted") is False
+
+
+def test_librarian_declines_a_fallback_dispatch_with_no_cocoon():
+    """The librarian is the ONE archetype the fallback can actually reach (it registers the
+    bare `package.atomized` / `document.locked` forms).
+
+    The upload routes emit `library:package.atomized` AND enqueue an explicit librarian task
+    carrying the cocoonId — so the fallback was a SECOND invocation per upload whose prompt read
+    "Catalog the atoms of package (cocoon) ." (the event payload is
+    {filesProcessed, totalAtoms, source} — no cocoonId). handles_dispatch now requires the id.
+    """
+    lib = AgentFabric()._archetypes["librarian"]
+    # type matches, but the real emitted payload names no cocoon → decline
+    assert lib.handles_event("package.atomized") is True
+    assert lib.handles_dispatch(
+        _ev("library", "package.atomized", filesProcessed=1, totalAtoms=7, source="upload_auto")
+    ) is False
+    # document.locked (both emitters) carries no cocoonId either
+    assert lib.handles_dispatch(_ev("proposal", "document.locked", proposalId="p1")) is False
+    # a payload that DOES name a cocoon is a real catalog request → still dispatches
+    assert lib.handles_dispatch(_ev("library", "package.atomized", cocoonId="c1")) is True
+    assert lib.handles_dispatch(_ev("library", "package.atomized", cocoon_id="c1")) is True
+    # and an unrelated type is still declined outright
+    assert lib.handles_dispatch(_ev("proposal", "proposal.created", cocoonId="c1")) is False
+
+
+def test_handles_dispatch_defaults_to_handles_event_for_every_other_archetype():
+    """The new hook must be a no-op everywhere it is not overridden."""
+    f = AgentFabric()
+    for name, a in f._archetypes.items():
+        if name == "librarian":
+            continue
+        for t in ("proposal.review_requested", "proposal.created", "workspace.released"):
+            assert a.handles_dispatch(_ev("x", t)) is a.handles_event(t), f"{name} on {t}"

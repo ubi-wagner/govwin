@@ -32,7 +32,15 @@ type Status = 'idle' | 'uploading' | 'shredding' | 'assisting' | 'topics' | 'suc
 
 /** How long to wait for the async shred before handing off to the workspace button. */
 const SHRED_POLL_MS = 2_000;
-const SHRED_POLL_TRIES = 20; // ~40s — a 50-page PDF shreds well inside this
+// ~3 minutes. The old ceiling was 20 tries (~40s) on the reasoning that "a 50-page PDF shreds well
+// inside this" — true, but the product's real input is an ANNUAL BAA, and those run 200+ pages.
+// Measured on the solicitations in docs/: a 1.3–1.6 MB CSO or STTR shreds in 6s, while a 3 MB SBIR
+// BAA takes 42–45s. Both of the 3 MB documents landed just past the old ceiling, and every one of
+// the small ones inside it — so the cut-off sat exactly where it would split real inputs in half.
+// The consequence was invisible and total: the poll gave up, Assist was correctly skipped (it must
+// never run against empty text), and the solicitation landed with no compliance and NO OPPORTUNITY,
+// which means it can never be pushed to a tenant. Two of six real solicitations died that way.
+const SHRED_POLL_TRIES = 90;
 
 /**
  * Poll until the solicitation has usable source text. Returns false on timeout or on a
@@ -208,6 +216,16 @@ export function UploadForm() {
       if (runAssist && solId) {
         setStatus('shredding');
         const ready = await waitForShred(solId);
+        if (!ready) {
+          // Say so. Skipping Assist is the right call — running it against empty text is what
+          // fabricates a matrix out of a default skeleton — but doing it silently leaves the admin
+          // on a workspace that looks finished and is not. Any ceiling can be exceeded, so the
+          // message matters more than the number.
+          setError(
+            'Text extraction was still running when we stopped waiting, so Ingest Assist was skipped — ' +
+            'nothing was inferred from a partial read. Open the workspace and run Assist once extraction finishes.',
+          );
+        }
         if (ready) {
           setStatus('assisting');
           try {

@@ -27,6 +27,7 @@ import {
   DeleteObjectCommand,
   CopyObjectCommand,
   ListObjectsV2Command,
+  DeleteObjectsCommand,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -288,4 +289,79 @@ export async function listObjects(prefix: string, delimiter = '/'): Promise<{
     .map(p => p.Prefix!)
     .filter(Boolean);
   return { objects, prefixes };
+}
+
+/**
+ * Every object BENEATH a prefix, recursively — no delimiter, no folder grouping.
+ *
+ * `listObjects` is one level deep by the delimiter convention, which is what a file browser wants.
+ * Renaming or deleting a FOLDER wants the opposite: the whole subtree, so every child can be copied
+ * or removed. Two callers needed that and neither had it, so both built a raw `ListObjectsV2Command`
+ * and called `s3.send` directly — which works against R2 and fails against the local driver with
+ * `InvalidAccessKeyId`, because the local driver is implemented in these helpers and nowhere else.
+ * That is the whole reason this function exists: the gap in the abstraction is what pushed callers
+ * around it.
+ */
+export async function listObjectsDeep(prefix: string): Promise<Array<{ key: string; size: number }>> {
+  if (LOCAL) {
+    const base = join(LOCAL_DIR, BUCKET);
+    const out: Array<{ key: string; size: number }> = [];
+    const walk = async (rel: string): Promise<void> => {
+      let entries;
+      try { entries = await fs.readdir(join(base, rel), { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.name.endsWith('.contenttype')) continue;
+        const childRel = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) await walk(childRel);
+        else {
+          const st = await fs.stat(join(base, childRel));
+          out.push({ key: childRel, size: st.size });
+        }
+      }
+    };
+    await walk(prefix.replace(/\/$/, ''));
+    return out;
+  }
+  if (!s3 || !BUCKET) return [];
+  const out: Array<{ key: string; size: number }> = [];
+  let token: string | undefined;
+  // Paginate. A single ListObjectsV2 caps at 1000 keys, so the un-paginated raw calls this replaces
+  // would have silently renamed or deleted only the first 1000 objects of a large folder.
+  do {
+    const res = await s3.send(new ListObjectsV2Command({
+      Bucket: BUCKET, Prefix: prefix, ContinuationToken: token,
+    }));
+    for (const o of res.Contents ?? []) if (o.Key) out.push({ key: o.Key, size: o.Size ?? 0 });
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  return out;
+}
+
+/** Size + content type for one key, or null when it does not exist. Replaces raw HeadObject. */
+export async function objectStat(key: string): Promise<{ size: number; contentType: string } | null> {
+  if (LOCAL) {
+    try {
+      const st = await fs.stat(_localPath(key));
+      return { size: st.size, contentType: await localContentType(key) };
+    } catch { return null; }
+  }
+  if (!s3 || !BUCKET) return null;
+  try {
+    const res = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return { size: res.ContentLength ?? 0, contentType: res.ContentType ?? 'application/octet-stream' };
+  } catch { return null; }
+}
+
+/** Delete many keys. Batched for S3; a plain loop locally. Replaces raw DeleteObjects. */
+export async function deleteObjects(keys: string[]): Promise<void> {
+  if (!keys.length) return;
+  if (LOCAL) { for (const k of keys) await deleteObject(k); return; }
+  if (!s3 || !BUCKET) return;
+  // DeleteObjects caps at 1000 keys per request.
+  for (let i = 0; i < keys.length; i += 1000) {
+    await s3.send(new DeleteObjectsCommand({
+      Bucket: BUCKET,
+      Delete: { Objects: keys.slice(i, i + 1000).map((Key) => ({ Key })), Quiet: true },
+    }));
+  }
 }

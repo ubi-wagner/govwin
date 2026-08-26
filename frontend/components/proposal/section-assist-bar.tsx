@@ -18,10 +18,14 @@ import { createEmptyCanvas, CANVAS_PRESETS, type CanvasNode } from '@/lib/types/
 import { toast } from '@/lib/toast';
 
 export function SectionAssistBar({
-  tenantSlug, proposalId, sectionId, sectionTitle, isEmpty, canEdit, pageLimit,
+  tenantSlug, proposalId, sectionId, sectionTitle, isEmpty, canEdit, pageLimit, canvasMaxPages = null,
 }: {
   tenantSlug: string; proposalId: string; sectionId: string; sectionTitle: string;
-  isEmpty: boolean; canEdit: boolean; pageLimit: number | null;
+  isEmpty: boolean; canEdit: boolean;
+  /** The SECTION's own page share (proposal_sections.page_allocation) — the drafting budget. */
+  pageLimit: number | null;
+  /** The VOLUME's page cap, from the sections list. What the landed canvas must carry. */
+  canvasMaxPages?: number | null;
 }) {
   const router = useRouter();
   const { invoke, loading: drafting } = useTool();
@@ -35,7 +39,13 @@ export function SectionAssistBar({
       // Atom-grounded single-section draft — the same selector + tool-invoke + save the Draft-All button uses.
       let libraryAtoms: Array<{ id: string; content: string; category: string }> = [];
       try {
-        const qs = new URLSearchParams({ limit: '5', sectionId, text: sectionTitle });
+        // Scale retrieval to the section's ALLOWANCE. A flat 5 atoms was the same budget for a one-page
+        // abstract and a ten-page technical volume, so the long section ran out of material to write
+        // from and stopped at a fraction of its page envelope (measured: 60%% of a 10-page volume,
+        // with the ranker returning nothing further). ~4 atoms per allowed page, floored at 5 so
+        // short sections behave exactly as before and capped at 40 to bound the prompt.
+        const atomLimit = Math.min(40, Math.max(5, (pageLimit ?? 1) * 4));
+        const qs = new URLSearchParams({ limit: String(atomLimit), sectionId, text: sectionTitle });
         const r = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
         if (r.ok) {
           const ranked = ((await r.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;
@@ -49,8 +59,18 @@ export function SectionAssistBar({
       if (!result?.nodes?.length) { toast('The drafter returned nothing to land.', 'error'); return; }
 
       const now = new Date().toISOString();
+      // Preserve the VOLUME's page cap. `canvas.max_pages` describes the document this section
+      // assembles into (10 for an NTE-10-page Technical Volume); the section's own share is
+      // `pageLimit`, which assembleArtifactCanvas carries separately as layout.page_budget.
+      // Rebuilding from the bare preset replaced the volume cap with the preset's hard-coded 15,
+      // so the editor gauge and the export compliance floor both measured against a limit the
+      // solicitation never gave. Same rule the pipeline drafter follows (draft_v0.py "Prefer the
+      // section's OWN canvas envelope when provisioning stamped one").
       const doc = createEmptyCanvas({
-        documentId: sectionId, canvas: CANVAS_PRESETS.letter_sbir_phase1,
+        documentId: sectionId,
+        canvas: canvasMaxPages != null && canvasMaxPages > 0
+          ? { ...CANVAS_PRESETS.letter_sbir_phase1, max_pages: canvasMaxPages }
+          : CANVAS_PRESETS.letter_sbir_phase1,
         metadata: { title: sectionTitle, volume_id: '', required_item_id: '', proposal_id: proposalId, solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: '', version_number: 1, status: 'ai_drafted' },
       });
       doc.nodes = result.nodes;

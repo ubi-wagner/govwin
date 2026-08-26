@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback } from 'react';
 import type { WorkflowInstance, WorkflowStats } from './page';
 import { WorkflowMap } from './workflow-map';
@@ -9,6 +10,11 @@ import { buildGraphFromStatus } from './workflow-shapes';
 
 // ─── Status styles ─────────────────────────────────────────────────
 
+// The relative-time helpers that used to live here read the clock
+// DURING RENDER — the server wrote one number, the client hydrated a beat later and wrote
+// another, and React #418 took the whole page to its error boundary while the route kept
+// answering 200. They are now <TimeAgo> / <Elapsed>, which own their own mount state.
+// Bug log B82; the shared component is components/ui/time-ago.tsx.
 const STATUS_STYLES: Record<string, { border: string; bg: string; dot: string; text: string }> = {
   running:   { border: 'border-l-blue-500',   bg: 'bg-blue-50',   dot: 'bg-blue-500',   text: 'text-blue-700' },
   paused:    { border: 'border-l-yellow-500',  bg: 'bg-yellow-50', dot: 'bg-yellow-500',  text: 'text-yellow-700' },
@@ -32,34 +38,11 @@ function formatWorkflowName(name: string): string {
     .trim();
 }
 
-function formatElapsed(startedAt: string | null): string {
-  if (!startedAt) return '--';
-  const ms = Date.now() - new Date(startedAt).getTime();
-  if (ms < 1000) return '<1s';
-  if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
-  return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
-}
-
 function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return '--';
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
-}
-
-function relativeTime(iso: string | null): string {
-  if (!iso) return '--';
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
 }
 
 function formatStepName(name: string): string {
@@ -160,7 +143,7 @@ function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'erro
                 <span className={`font-medium ${style.text}`}>{t.toStatus}</span>
               </span>
               {t.actor && <span className="text-gray-400">· {t.actor}</span>}
-              <span className="text-gray-400 ml-auto">{relativeTime(t.createdAt)}</span>
+              <span className="text-gray-400 ml-auto"><TimeAgo iso={t.createdAt} /></span>
             </div>
             {t.reason && <p className="text-[11px] text-gray-500 mt-0.5">{t.reason}</p>}
           </li>
@@ -517,7 +500,7 @@ export function WorkflowMonitorClient({
                     )}
 
                     <span className="text-xs font-mono text-blue-600 ml-auto flex-shrink-0">
-                      {formatElapsed(w.startedAt)}
+                      <Elapsed iso={w.startedAt} />
                     </span>
 
                     {/* Actions */}
@@ -633,7 +616,7 @@ export function WorkflowMonitorClient({
                     </span>
 
                     <span className="text-xs text-gray-400 flex-shrink-0">
-                      {relativeTime(w.completedAt)}
+                      <TimeAgo iso={w.completedAt} />
                     </span>
 
                     {/* Retry button for failed workflows */}

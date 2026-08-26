@@ -37,6 +37,7 @@ export function NavShell({
         onClose={() => setOpen(false)}
         side="left"
         inlineAt="lg"
+        inlineRole="navigation"
         width="w-64"
         className="bg-navy-900 text-white p-6 flex flex-col"
         ariaLabel="Navigation"

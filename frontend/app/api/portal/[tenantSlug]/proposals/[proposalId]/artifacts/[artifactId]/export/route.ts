@@ -11,6 +11,7 @@
  * consistent with the section export route. PDF needs Chromium (infra dep); a
  * 503 with a clear message is returned when it is unavailable.
  */
+import { blockingViolations } from '@/lib/types/canvas-document';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
@@ -18,7 +19,8 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
-import { resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
+import { resolveArtifactFormat, assembleFittedArtifactCanvas, renderCanvas, CONTENT_TYPE } from '@/lib/export/artifact-export';
+import { loadVolumeFacts } from '@/lib/proposal/volume-facts';
 import { validateCanvasAgainstSpec, type ComplianceSpec } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -124,7 +126,20 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Assemble + resolve format + render ─────────────────────────────
     const title = artifact.volumeName || 'artifact';
-    const assembled = assembleArtifactCanvas(sections, artifact.artifactType, title);
+    // Finished, not merely assembled: cover band, the figures its own content supports, running
+    // header/footer and figure numbering (lib/proposal/volume-finish.ts). What downloads here is
+    // what the customer submits, so it is the finished document or nothing.
+    const facts = await loadVolumeFacts(proposalId, tenantId);
+    const vars: Record<string, string> = {
+      company_name: (tenant as { name?: string }).name ?? 'Your Company',
+      topic_number: title,
+    };
+    // FITTED, not merely finished: the page count is verified by rendering the document rather than
+    // estimating it, because a page over the agency's limit is a rejected submission and the
+    // estimator is ±1 once figures are involved.
+    const assembled = await assembleFittedArtifactCanvas(
+      sections, artifact.artifactType, title, { ...facts, volumeName: title }, vars,
+    );
 
     // Deterministic compliance floor (E4): record whether the exported artifact
     // satisfies the ComplianceSpec frozen at purchase. Advisory — surfaced via the
@@ -135,10 +150,6 @@ export async function GET(request: Request, ctx: RouteContext) {
       : [];
     const requested = new URL(request.url).searchParams.get('format');
     const format = resolveArtifactFormat(artifact.artifactType, assembled.canvas?.format, requested);
-    const vars: Record<string, string> = {
-      company_name: (tenant as { name?: string }).name ?? 'Your Company',
-      topic_number: title,
-    };
 
     let buffer: Buffer;
     try {
@@ -166,7 +177,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         actor: userActor(su.id, su.email ?? undefined), tenantId,
         payload: {
           proposalId, artifactId, format, title,
-          compliant: violations.length === 0,
+          // BLOCKING only. A dense deck raises the advisory `slide_overflow`, which is a design
+          // choice rather than a rule the agency enforces — counting it here reported a deck
+          // built exactly as intended as non-compliant. The full code list is still emitted
+          // below, so nothing is hidden; only the verdict is narrowed to what can lose a bid.
+          compliant: blockingViolations(violations).length === 0,
           complianceViolations: violations.map((v) => v.code),
         },
       });

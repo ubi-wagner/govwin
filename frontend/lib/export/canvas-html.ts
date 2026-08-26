@@ -10,6 +10,8 @@
  * links, page breaks, spacers. Header/footer are handled by the PDF exporter's
  * running templates (canvas.header/footer), not the body.
  */
+import { latexToHtml } from '@/lib/export/latex-html';
+import { paginate } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -35,6 +37,7 @@ import type {
   VideoContent,
   SignatureContent,
 } from '@/lib/types/canvas-document';
+import { spacerHeightPt } from '@/lib/types/canvas-document';
 import { formatByCode } from '@/lib/numeric-cell';
 
 function esc(s: unknown): string {
@@ -449,7 +452,23 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'equation': {
       const eq = c as EquationContent;
       const tex = eq.latex ?? eq.mathml ?? '';
-      return `<div data-latex="${esc(tex)}" style="text-align:center;font-family:'Cambria Math','Times New Roman',serif;font-style:italic;margin:8pt 0">${esc(tex)}</div>`;
+      // TYPESET IT, or say plainly that it could not be. This used to escape the source into the
+      // page, so a volume printed `\sum_{k=1}^{K}` where the formula belonged — markup in a
+      // document a government reviewer reads. `data-latex` was left for a client-side typesetter
+      // that never existed and could not have run here anyway: the PDF is written by a headless
+      // Chromium with no such library loaded.
+      //
+      // On anything the converter cannot render faithfully it returns the SOURCE, visibly marked.
+      // A renderer that silently produces plausible maths saying something other than what the
+      // author wrote is worse than one that admits it — in a document where a number is a
+      // commitment, a wrong formula is a wrong promise.
+      const rendered = latexToHtml(tex);
+      const base = `text-align:center;font-family:'Cambria Math','Times New Roman',serif;margin:8pt 0`;
+      if (!rendered.complete) {
+        return `<div data-latex="${esc(tex)}" data-unrendered="true" style="${base};font-style:italic;color:#b45309" `
+          + `title="This expression could not be typeset and is shown as written.">${esc(tex)}</div>`;
+      }
+      return `<div data-latex="${esc(tex)}" style="${base};font-style:italic">${rendered.html}</div>`;
     }
     case 'divider': {
       const dv = c as DividerContent;
@@ -469,7 +488,8 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'page_break':
       return `<div style="page-break-after:always"></div>`;
     case 'spacer':
-      return `<div style="height:${(node.style?.space_after ?? 12)}pt"></div>`;
+      // spacerHeightPt, not `style.space_after` alone: this read `content.height = 600` as 12pt.
+      return `<div style="height:${spacerHeightPt(node)}pt"></div>`;
     case 'toc':
       // The document's TOC — a heading-list assembled once in renderCanvasBodyHtml
       // and threaded through `vars` (mirrors the editor's TOC; was silently dropped).
@@ -515,13 +535,25 @@ export function canvasBaseCss(doc: CanvasDocument): string {
   const lineSpacing = doc.canvas?.line_spacing ?? 1.15;
   return `
     * { box-sizing: border-box; }
-    body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${lineSpacing}; color: ${font.color ?? '#111827'}; margin: 0; }
-    h1 { font-size: ${(font.size ?? 12) * 1.6}pt; margin: 16px 0 8px; }
-    h2 { font-size: ${(font.size ?? 12) * 1.3}pt; margin: 14px 0 6px; }
-    h3 { font-size: ${(font.size ?? 12) * 1.1}pt; margin: 12px 0 4px; }
-    p { margin: 6px 0; }
-    ul, ol { margin: 6px 0 6px 22px; }
-    li { margin: 3px 0; }
+    /* Never let the stated line spacing fall below readable leading. A solicitation that mandates
+       "single spaced" means 1.0 of the LEADING a typesetter would use, not 1.0 of the font size —
+       rendered at a literal 1.0 the body set solid and four-line paragraphs became a grey slab. */
+    body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${Math.max(lineSpacing, 1.28)}; color: ${font.color ?? '#111827'}; margin: 0; text-align: justify; hyphens: auto; }
+    /* Headings: a tighter scale than 1.6/1.3/1.1, with the space ABOVE far larger than below, so a
+       heading binds to the text it introduces instead of floating between two blocks. */
+    h1, h2, h3 { line-height: 1.22; text-align: left; page-break-after: avoid; break-after: avoid; }
+    h1 { font-size: ${((font.size ?? 12) * 1.34).toFixed(1)}pt; font-weight: 700; margin: 20pt 0 5pt; }
+    h2 { font-size: ${((font.size ?? 12) * 1.14).toFixed(1)}pt; font-weight: 700; margin: 14pt 0 4pt; }
+    h3 { font-size: ${((font.size ?? 12) * 1.02).toFixed(1)}pt; font-weight: 700; font-style: italic; margin: 11pt 0 3pt; }
+    /* A first paragraph sits tight under its heading; subsequent ones get real separation. */
+    p { margin: 0 0 7pt; orphans: 2; widows: 2; }
+    h1 + p, h2 + p, h3 + p { margin-top: 0; }
+    ul, ol { margin: 0 0 8pt 20pt; padding: 0; }
+    li { margin: 0 0 3pt; text-align: left; }
+    /* A figure and its caption are one object: no gap between them, real space around the pair. */
+    figure { page-break-inside: avoid; break-inside: avoid; }
+    figure + p[style*="italic"] { margin-top: 2pt; }
+    table { page-break-inside: avoid; break-inside: avoid; }
     a { color: #2563eb; }
     th { background: #1e293b; color: #fff; }
   `;
@@ -533,13 +565,13 @@ export function canvasBaseCss(doc: CanvasDocument): string {
  * uses renderCanvasToHtml below. Pure; safe to run in the browser.
  */
 /** Collect heading nodes across the document (sections→groups→nodes, or flat nodes). */
-function collectDocHeadings(doc: CanvasDocument): { level: number; text: string; numbering?: string }[] {
-  const out: { level: number; text: string; numbering?: string }[] = [];
+function collectDocHeadings(doc: CanvasDocument): { id: string; level: number; text: string; numbering?: string }[] {
+  const out: { id: string; level: number; text: string; numbering?: string }[] = [];
   const scan = (nodes: CanvasNode[] | undefined) => {
     for (const n of nodes ?? []) {
       if (n.type === 'heading') {
         const h = n.content as HeadingContent;
-        out.push({ level: Math.min(Math.max(h.level ?? 1, 1), 3), text: h.text, numbering: h.numbering });
+        out.push({ id: n.id, level: Math.min(Math.max(h.level ?? 1, 1), 3), text: h.text, numbering: h.numbering });
       }
     }
   };
@@ -556,12 +588,55 @@ function collectDocHeadings(doc: CanvasDocument): { level: number; text: string;
 function buildTocHtml(doc: CanvasDocument, vars: Record<string, string>): string {
   const headings = collectDocHeadings(doc);
   if (!headings.length) return '';
-  const rows = headings
+
+  // PAGE NUMBERS, from the same paginator the export gate judges the document by.
+  //
+  // A twelve-page volume whose contents page cannot tell you what page anything is on is not doing
+  // the one job a table of contents has. The numbers come from `paginate().perNode`, which already
+  // models `fitKeep` relocation — so an entry points at the page the heading ACTUALLY prints on,
+  // not the page a naive height division would put it on. Any other source would be a second
+  // opinion about pagination, and B112 is the record of what that costs.
+  //
+  // Best-effort by design: pagination can throw on a malformed canvas, and a contents page with no
+  // numbers is far better than an export that fails. A heading the paginator does not know is
+  // rendered without a number rather than with a wrong one.
+  //
+  // A KNOWN AND DELIBERATE LIMITATION, stated because it is visible to a reader. The ruler is tuned
+  // to over-count rather than under-count (B64: an under-count at the export gate clears a volume
+  // that is over its agency page limit, which costs a bid). A contents page inherits that bias, so
+  // on a long document a late entry can read ONE PAGE HIGH — measured here: a twelve-page volume
+  // whose References section prints on page 12 is listed at 13.
+  //
+  // The alternative is worse. Calibrating these numbers against a rendered PDF would make the
+  // contents page a SECOND opinion about pagination, disagreeing with the gauge in the editor and
+  // the gate at export — and B112 is the record of what a second pagination model costs. One ruler,
+  // one answer, and the bias documented where a reader of this code will find it. If the numbers
+  // must be exact, the fix is to make the ruler exact, not to give the TOC its own.
+  let pageOf: Map<string, number> | null = null;
+  try {
+    const { perNode } = paginate(doc);
+    pageOf = new Map(perNode.map((n) => [n.id, n.startPage]));
+  } catch { pageOf = null; }
+
+  // The first top-level heading is the document's own title — it is the page you are looking at,
+  // and listing it as its own first entry is noise every real contents page omits.
+  const firstH1 = headings.findIndex((h) => h.level === 1);
+  const entries = headings.filter((_, i) => i !== firstH1 || headings.length === 1);
+
+  const rows = entries
     .map((h) => {
       const weight =
         h.level === 1 ? 'font-weight:600;color:#1f2937' : h.level === 2 ? 'font-weight:500;color:#374151' : 'color:#4b5563';
       const num = h.numbering ? `<span style="color:#64748b">${esc(h.numbering)} </span>` : '';
-      return `<div style="margin-left:${(h.level - 1) * 20}pt;padding:2pt 0"><span style="${weight}">${num}${esc(subst(h.text, vars))}</span></div>`;
+      const page = pageOf?.get(h.id);
+      // Leader dots via a repeating background on a flexed spacer: it stretches to whatever gap the
+      // title leaves, which a literal run of periods cannot do without measuring the text.
+      const leader = page != null
+        ? '<span style="flex:1;margin:0 4pt;align-self:flex-end;border-bottom:1px dotted #cbd5e1;transform:translateY(-3pt)"></span>'
+          + `<span style="color:#475569;font-variant-numeric:tabular-nums">${page}</span>`
+        : '';
+      return `<div style="display:flex;align-items:baseline;margin-left:${(h.level - 1) * 20}pt;padding:2pt 0">`
+        + `<span style="${weight}">${num}${esc(subst(h.text, vars))}</span>${leader}</div>`;
     })
     .join('');
   return `<nav data-toc style="margin:4pt 0 14pt"><div style="font-size:9pt;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:6pt">Table of Contents</div>${rows}</nav>`;

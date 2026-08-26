@@ -79,6 +79,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
 // ── PATCH: mark a diff as reviewed ──────────────────────────────────
 
 export async function PATCH(request: Request, ctx: RouteContext) {
+  let startId: string | null = null;
   try {
     // ── Auth ────────────────────────────────────────────────────────
     const session = await auth();
@@ -134,7 +135,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Start event ──────────────────────────────────────────────────
-    const startId = await emitEventStart({
+    startId = await emitEventStart({
       namespace: 'finder',
       type: 'source_diff.reviewed',
       actor: userActor(userId, (session.user as { email?: string }).email),
@@ -174,6 +175,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ data: { reviewed: true } });
   } catch (e) {
+    if (startId) {
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
+    }
     console.error('[api/admin/sources/[profileId]/diffs PATCH] error:', e);
     return NextResponse.json(
       { error: 'Failed to review diff', code: 'DB_ERROR' },

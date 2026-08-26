@@ -86,6 +86,11 @@ export default async function DashboardPage({
   const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
 
   // ── Accessible active proposals (the cockpit center) ──
+  // Two reads, deliberately: the LIST is capped at 6 for display, the COUNT is not. The cockpit
+  // summary used to say `proposals.length` active builds, which silently became "6 active builds"
+  // for any tenant with more than six — the page stating a number that was not the number.
+  const activeBuildCount = await count('builds', sql`
+    SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage <> 'archived'`);
   let proposals: { id: string; title: string; stage: string; isLocked: boolean }[] = [];
   try {
     proposals = await sql<{ id: string; title: string; stage: string; isLocked: boolean }[]>`
@@ -208,7 +213,15 @@ export default async function DashboardPage({
             : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
         }`}>
           Your trial expires in {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}.
-          <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">Subscribe to keep your data.</a>
+          {/* /billing redirects anyone below tenant_admin straight back here, so for a base member
+              the link is a no-op click. The "Get started" checklist below is already fenced on
+              canAct for exactly this reason ("avoid a redirect-trap"); this banner sat outside it.
+              Same fence, and tell a base member who CAN act instead of dead-ending them. */}
+          {canAct ? (
+            <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">Subscribe to keep your data.</a>
+          ) : (
+            <span className="ml-2 font-semibold">Ask your company admin to subscribe.</span>
+          )}
         </div>
       )}
       <Cockpit
@@ -220,7 +233,7 @@ export default async function DashboardPage({
         grants={grants}
         proposals={proposals}
         pendingBuilds={pendingBuilds}
-        counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount }}
+        counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount, builds: activeBuildCount }}
         activity={activity}
         getStarted={getStarted}
       />

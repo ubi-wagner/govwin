@@ -17,6 +17,7 @@ import logging
 import signal
 import os
 import sys
+from typing import Callable
 
 # Force line-buffered stdout/stderr so every print() lands in Railway
 # deploy logs immediately. Python defaults to BLOCK-buffered stdout
@@ -138,6 +139,21 @@ async def main() -> None:
     release = os.getenv("APP_RELEASE") or sha
     log.info("RFP Pipeline worker starting... (release=%s, env=%s, version=%s)", release, env, sha)
 
+    # Preflight: can this role write a TENANT-scoped workflow instance? On a role RLS applies to it
+    # cannot, and the failure is silent — platform workflows keep draining while every build
+    # workflow dies one log line at a time. Report it in the first seconds instead.
+    try:
+        import asyncpg as _pg
+
+        from db_role_preflight import check_workflow_write_role
+        _c = await _pg.connect(DATABASE_URL)
+        try:
+            await check_workflow_write_role(_c)
+        finally:
+            await _c.close()
+    except Exception as exc:
+        log.warning("workflow-write preflight skipped: %s", exc)
+
     # Bootstrap seed: ensure a master_admin user exists so the
     # platform has a working login immediately after deploy.
     try:
@@ -166,44 +182,83 @@ async def main() -> None:
     except Exception as exc:
         log.error("AgentFabric initialisation failed (non-fatal): %s", exc)
 
-    # TW-8 AI-manager auto-advance poker — periodically pokes the frontend's agent-gate sweep so an
-    # AI-manager stage marked autoAdvance clears itself the moment its cohort review lands. The advance
-    # is frontend-owned (the pipeline never mutates a business table), so we call the HTTP endpoint rather
-    # than advancing here. Gated on AGENT_GATE_SWEEP_URL — inert (logs once) when unset.
-    async def run_agent_gate_sweep_poker(interval: int = 60) -> None:
+    # HTTP POKERS — the pipeline calling a FRONTEND cron endpoint on a timer.
+    #
+    # Both sweeps below mutate business tables, which the pipeline is not allowed to do (the engine
+    # advances workflows; the frontend owns the domain). So the schedule lives here and the WORK
+    # lives there, reached over HTTP with the shared CRON_SECRET bearer.
+    #
+    # Each is gated on its own URL variable and is INERT when unset — it logs once and returns, so a
+    # deploy that has not configured it ships dark rather than erroring every interval.
+    async def _run_poker(
+        name: str, url_var: str, interval: int, report: Callable[[dict], str | None],
+    ) -> None:
         import os
+
         import httpx
-        url = os.environ.get("AGENT_GATE_SWEEP_URL")
+        url = os.environ.get(url_var)
         if not url:
-            log.info("agent-gate auto-advance poker: AGENT_GATE_SWEEP_URL unset — inert")
+            log.info("%s: %s unset — inert", name, url_var)
             return
         secret = os.environ.get("CRON_SECRET", "")
         headers = {"Authorization": f"Bearer {secret}"} if secret else {}
-        log.info("agent-gate auto-advance poker started (interval=%ds)", interval)
+        log.info("%s started (interval=%ds)", name, interval)
         while not shutdown_event.is_set():
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=60.0) as client:
                     r = await client.post(url, headers=headers)
                 if r.status_code == 200:
-                    adv = (r.json().get("data") or {}).get("advanced", 0)
-                    if adv:
-                        log.info("agent-gate sweep: auto-advanced %d portal(s)", adv)
+                    # Report only when something HAPPENED. A healthy sweep is silent, so a line in
+                    # the log means work was done — otherwise an hourly no-op buries everything else.
+                    line = report((r.json().get("data") or {}))
+                    if line:
+                        log.info("%s: %s", name, line)
                 else:
-                    log.warning("agent-gate sweep poke HTTP %s", r.status_code)
-            except Exception as exc:  # never let the poker crash the worker
-                log.warning("agent-gate sweep poke failed (non-fatal): %s", exc)
+                    log.warning("%s poke HTTP %s", name, r.status_code)
+            except Exception as exc:  # never let a poker crash the worker
+                log.warning("%s poke failed (non-fatal): %s", name, exc)
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=interval)
                 break
             except asyncio.TimeoutError:
                 pass
-        log.info("agent-gate auto-advance poker stopped")
+        log.info("%s stopped", name)
+
+    # TW-8 AI-manager auto-advance — an AI-manager stage marked autoAdvance clears itself the moment
+    # its cohort review lands, so this runs often.
+    def _gate_report(d: dict) -> str | None:
+        adv = d.get("advanced", 0)
+        return f"auto-advanced {adv} portal(s)" if adv else None
+
+    # CARD RECONCILE — heal every active tenant's opportunity mirror to the bridge head.
+    #
+    # The bridge is forward-only: a push fans a card to each active tenant, and a tenant that MISSES
+    # one (created after the push, an apply that failed, a fan-out that raced) stays behind forever
+    # unless something catches it up. The customer feed read-repairs on GET /cards — but only for a
+    # tenant that VISITS. A tenant who never opens their feed keeps a stale mirror, and everything
+    # computed off that mirror is quietly wrong: the weekly discovery digest they receive by email,
+    # the admin rollups, the bucket scores.
+    #
+    # reconcileActiveTenants exists for exactly this and its own docstring calls it "the
+    # scheduled/manual sweep" — but only the manual half was ever wired. /api/admin/reconcile-cards
+    # was even built with a headless-cron bearer path for a caller that did not exist. This is that
+    # caller. Idempotent: each tenant only advances the cards it is behind on.
+    #
+    # HOURLY, not per-minute like the gate sweep: this is healing for tenants who are not looking,
+    # not a latency path for one who is. The feed's own read-repair already covers the active case.
+    def _reconcile_report(d: dict) -> str | None:
+        applied = d.get("totalApplied", 0)
+        if not applied:
+            return None
+        behind = sum(1 for t in (d.get("perTenant") or []) if t.get("applied"))
+        return f"caught up {applied} card(s) across {behind} tenant(s)"
 
     # Run the ingester consumer loop, workflow processor, health
     # server, lifecycle scheduler, and agent task queue consumer
     # concurrently. All manage their own resources and respect shutdown_event.
     await asyncio.gather(
-        run_agent_gate_sweep_poker(),
+        _run_poker('agent-gate auto-advance poker', 'AGENT_GATE_SWEEP_URL', 60, _gate_report),
+        _run_poker('card reconcile sweep', 'CARD_RECONCILE_URL', 3600, _reconcile_report),
         run_consumer_loop(
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,

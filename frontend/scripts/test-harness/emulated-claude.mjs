@@ -94,6 +94,33 @@ function genericToolInput(tool, req) {
 
 const between = (s, tag) => { const m = (s || '').match(new RegExp(`<${tag}>\\s*([\\s\\S]*?)\\s*</${tag}>`)); return m ? m[1] : ''; };
 
+/**
+ * The section's own title, whichever way the caller phrased the ask.
+ *
+ * Two live shapes, and reading only one of them silently ruined every draft the harness produced:
+ *
+ *   1. `Draft the "Phase I Technical Objectives" section.`   — the FRONTEND tool's prompt
+ *   2. `Draft the proposal section named between the markers below…`  — the PIPELINE archetype,
+ *      after its prompt-injection hardening moved the (tenant-editable, untrusted) title inside
+ *      a `--- BEGIN USER CONTENT ---` fence.
+ *
+ * The regex only matched form 1. Against form 2 it fell through to the literal default, so every
+ * section of the volume searched the tenant's library for the word "Section", every search
+ * returned the same six atoms, and every section of the drafted Technical Volume opened with the
+ * same paragraph. The output looked like a retrieval failure and was a title-parsing failure —
+ * worth a named helper so the next prompt change breaks loudly instead of quietly.
+ */
+function sectionTitleFrom(all) {
+  const quoted = all.match(/Draft the "([^"]{2,120})" section/i)?.[1];
+  if (quoted) return quoted.replace(/\s+/g, ' ').trim();
+
+  const fenced = all.match(
+    /section named between the markers below[\s\S]{0,400}?--- BEGIN USER CONTENT ---\s*([\s\S]*?)\s*--- END USER CONTENT ---/i,
+  )?.[1];
+  const t = (fenced ?? '').replace(/\s+/g, ' ').trim();
+  return t && t.length <= 200 ? t : 'Section';
+}
+
 
 // ── Grounded composition helpers ───────────────────────────────────────────────────────────────
 //
@@ -117,6 +144,10 @@ function sentences(text) {
   return (text || '')
     .replace(/\r/g, ' ')
     .replace(/-{2,}\s*\d+\s+of\s+\d+\s*-{2,}/gi, ' ')   // "-- 3 of 41 --" page marks
+    // "p11 · " — the atomizer's page-of-origin prefix. It is provenance, not prose, and it printed
+    // on the rendered page ("p11 · Significance of Problem and Opportunity 5 Topic: X23.5"),
+    // which reads as an unproofed copy-paste rather than a written proposal.
+    .replace(/(^|\s)p\d{1,3}\s*[·•]\s*/g, '$1')
     .replace(/\s+/g, ' ')
     .split(/(?<=[.!?])\s+(?=[A-Z(])/)
     .map((x) => x.trim())
@@ -129,7 +160,13 @@ function sentences(text) {
     // DUNS, CAGE and SBA certifications. A writer skips that; so does this. (The underlying fix is
     // library GRAIN — atomizing those documents into sections — not a filter here.)
     .filter((x) => !/\b(UEI|DUNS|CAGE|SBA SBC|13 C\.?F\.?R|OFFEROR CERTIFIES|Firm Certificate|Number of employees|www\.[a-z]|Mail Address|Website Address)\b/i.test(x))
-    .filter((x) => !/^\s*\d+\.\s/.test(x) || x.length > 140);
+    .filter((x) => !/^\s*\d+\.\s/.test(x) || x.length > 140)
+    // A sentence carrying ANOTHER solicitation's identifiers. The library holds the company's past
+    // proposals, so retrieval legitimately returns text whose header line names the topic and
+    // proposal number it was written for — and copying that into the new volume puts a different
+    // agency's topic number on this submission. The compliance floor has a `foreign_solicitation`
+    // code for exactly this failure; a writer simply would not reuse the sentence.
+    .filter((x) => !/\b(?:Topic\s*(?:Number|#)|Proposal\s*(?:Number|#))\s*:?\s*[A-Z0-9]/i.test(x));
 }
 
 /** Parse the <library_atoms> block the product builds into { id, category, tags, text } records. */
@@ -148,8 +185,17 @@ function parseAtoms(user) {
   return out;
 }
 
-/** Rank candidate sentences by overlap with the section's own vocabulary; keep the best, deduped. */
-function rankSentences(pool, focusTerms, limit) {
+/**
+ * Rank candidate sentences by overlap with the section's own vocabulary; keep the best, deduped.
+ *
+ * `floor` is the minimum score to keep. The default 0.4 is a RELEVANCE gate — useful when you want
+ * only the strongly on-topic material — but it is brutal in aggregate: a perfectly good 13-word
+ * sentence that happens not to repeat the section title scores ~0.33 and is discarded. With a real
+ * library that threw away most of what retrieval returned, which is why drafted sections came in
+ * at a few hundred characters against a multi-page allowance. Pass floor 0 when you need LENGTH:
+ * the sort still puts the most relevant first, you simply stop throwing away the tail.
+ */
+function rankSentences(pool, focusTerms, limit, floor = 0.4) {
   const focus = new Set(focusTerms);
   const seen = new Set();
   return pool
@@ -161,7 +207,7 @@ function rankSentences(pool, focusTerms, limit) {
         + (s.match(/\b[A-Z][A-Za-z]*(?:™|®)/g)?.length ?? 0);
       return { s, score: hits * 2 + concrete * 3 + Math.min(t.length, 40) / 40 };
     })
-    .filter((x) => x.score > 0.4)
+    .filter((x) => x.score > floor)
     .sort((a, b) => b.score - a.score)
     .filter((x) => {
       const key = x.s.slice(0, 70).toLowerCase();
@@ -211,9 +257,197 @@ function harvestProse(raw) {
   return out;
 }
 
+
+// ─── Canvas primitive exerciser ──────────────────────────────────────────────
+//
+// WHY THIS EXISTS. The canvas vocabulary is 22 node types (lib/types/canvas-document.ts).
+// This emulator used to emit THREE — heading, text_block, bulleted_list — and the shipped
+// atom library holds five. So every "AI flows proven end-to-end" run exercised the narrowest
+// possible slice of the canvas: the layout, export and compliance machinery for images,
+// figures, charts, callouts, page breaks and dividers had never once been driven THROUGH an
+// AI flow. A draft that is only prose cannot prove the paginator, the docx/pptx/xlsx writers,
+// the image inliner, or `validateCanvasAgainstSpec`'s image and per-section budgets.
+//
+// So the emulated drafter now emits a realistic MIX. Two rules make it a test instrument
+// rather than a random generator:
+//
+//   1. DETERMINISTIC. Variation comes from a hash of the whole prompt indexed into a fixed
+//      schedule — never a random draw. A harness whose output changes run to run cannot be used
+//      to decide anything, and the four lenses would report drift that is the instrument rather
+//      than the product.
+//   2. BUDGET-HONEST. Every primitive is charged against the same word budget as prose, so a
+//      figure-heavy section still respects the solicitation's page limit. A drafter that
+//      busts the limit to look rich is the exact failure the budget exists to prevent.
+//
+// Set EMU_PRIMITIVES=lean to fall back to the old prose-only shape (for a regression compare).
+const PRIMITIVES_MODE = process.env.EMU_PRIMITIVES || 'rich';
+
+/** Stable 32-bit hash → deterministic per-title variation. */
+function hash32(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/**
+ * An image node pointing at a REAL library storage key when one was supplied, else a
+ * deterministic placeholder key. The point is to drive the image path — inliner, export,
+ * compliance image budget — not to invent binary content.
+ */
+function imageNode(key, alt, n) {
+  return {
+    type: 'image',
+    content: { storage_key: key, alt_text: alt, width: 480, height: 300, caption: `Figure ${n}. ${alt}` },
+  };
+}
+const captionNode = (prefix, n, text) => ({ type: 'caption', content: { prefix, number: n, text } });
+
+/** A small evidence table built from the section's own vocabulary — never fabricated numbers. */
+function tableNode(title, rows) {
+  return {
+    type: 'table',
+    content: {
+      headers: ['Requirement', 'Where addressed', 'Status'],
+      rows: rows.map((r, i) => [r, `${title} ¶${i + 1}`, 'Addressed']),
+      border_style: 'single',
+    },
+  };
+}
+
+/** A schedule chart. Gantt exercises the two-series shape the writers special-case. */
+function chartNode(title, labels) {
+  return {
+    type: 'chart',
+    content: {
+      chart_type: 'gantt',
+      title: `${title} — schedule`,
+      categories: labels,
+      series: [
+        { name: 'start', data: labels.map((_, i) => i * 2) },
+        { name: 'end', data: labels.map((_, i) => i * 2 + 3) },
+      ],
+    },
+  };
+}
+
+const calloutNode = (variant, title, text) => ({ type: 'callout', content: { variant, title, text } });
+const quoteNode = (text, cite) => ({ type: 'blockquote', content: { text, cite } });
+const dividerNode = () => ({ type: 'divider', content: { thickness: 1, line_style: 'solid' } });
+const numberedNode = (items) => ({ type: 'numbered_list', content: { items: items.map((t) => ({ text: t })) } });
+
+/**
+ * Which extra primitives THIS section gets — a deterministic rotation, not a hash of one field.
+ *
+ * The first version keyed off the section TITLE alone and read its bits as flags. Two things were
+ * wrong with that, and the second is the one that matters:
+ *   · `sectionTitleFrom` legitimately falls back to the literal 'Section' when the product's
+ *     prompt shape does not carry a parseable title. Every such section then hashed identically,
+ *     so the whole corpus got ONE plan.
+ *   · Worse, whichever plan that was became the ONLY plan ever exercised — and the bits of
+ *     hash32('Section') happen to clear both `figure` and `table`, so images and tables never
+ *     appeared at all. A canvas exerciser that silently stops emitting images is worse than no
+ *     exerciser, because it reports eight node types and looks like coverage.
+ *
+ * So: hash the WHOLE prompt (title + subsections + criteria + the atom text), which varies per
+ * real section even when the title does not, and index a fixed SCHEDULE rather than reading bits.
+ * The schedule is written so that every primitive appears in it, and the assertion below is the
+ * guarantee: walking the whole schedule exercises all six. Coverage is a property of the table,
+ * not a hope about hash distribution.
+ */
+const PRIMITIVE_SCHEDULE = [
+  { figure: true,  table: true,  chart: false, callout: true,  quote: false, numbered: false },
+  { figure: true,  table: false, chart: true,  callout: false, quote: true,  numbered: true  },
+  { figure: false, table: true,  chart: true,  callout: true,  quote: false, numbered: true  },
+  { figure: true,  table: true,  chart: true,  callout: true,  quote: true,  numbered: true  },
+  { figure: false, table: false, chart: false, callout: true,  quote: true,  numbered: false },
+  { figure: true,  table: false, chart: false, callout: false, quote: false, numbered: true  },
+];
+const LEAN_PLAN = { figure: false, table: false, chart: false, callout: false, quote: false, numbered: false };
+
+function primitivePlanFor(key) {
+  if (PRIMITIVES_MODE === 'lean') return LEAN_PLAN;
+  return PRIMITIVE_SCHEDULE[hash32(String(key)) % PRIMITIVE_SCHEDULE.length];
+}
+
 const wordsIn = (s) => (s.match(/\S+/g) || []).length;
 
 // ── RESPONDER REGISTRY — expand per-agent as flows are wired. First match wins. ─────────────────────
+// ── Structured output ────────────────────────────────────────────────────────
+
+/** Did the caller ask for JSON? Matches the phrasing the real prompts use. */
+function wantsJson(req) {
+  const sys = typeof req.system === 'string' ? req.system : JSON.stringify(req.system ?? '');
+  return /respond only with valid json|respond with (?:a single )?json|valid json matching the schema|no markdown fences/i.test(sys);
+}
+
+/**
+ * Build a response shaped like the schema the prompt declares.
+ *
+ * Reads the first {...} block out of the system prompt and emits one synthetic element per
+ * array-valued key, using the same field names. Shape comes from the PROMPT rather than a
+ * per-caller hardcode, so a new JSON-returning prompt is emulated without editing this file.
+ *
+ * Placeholder values say plainly that they are emulated. A fixture that looks like a real extracted
+ * page limit is worse than no fixture — it could be mistaken for something read from a solicitation
+ * (docs/INGEST_PROVENANCE.md).
+ */
+const SLUG_FIELD = /^(key|slug)$|_(key|slug)$/i;
+
+/**
+ * The controlled vocabulary a prompt enumerates for itself, if it does.
+ *
+ * The shredder's section_extraction prompt writes:
+ *
+ *   Canonical section keys (use EXACTLY these strings, no others):
+ *   - cover                   — front matter, ...
+ *   - technical_approach      — technical volume requirements, ...
+ *
+ * Harvesting the list from the prompt keeps the emulator honest for free: change the canonical
+ * keys and the harness follows, with nothing here to update.
+ */
+function enumeratedSlugs(sys) {
+  const list = sys.match(/canonical[^\n]*\b(?:keys?|values?|slugs?)\b[^\n]*:\s*\n((?:[ \t]*[-*][ \t]*[a-z0-9][a-z0-9_-]*[^\n]*\n?)+)/i);
+  if (!list) return [];
+  return [...list[1].matchAll(/^[ \t]*[-*][ \t]*([a-z0-9][a-z0-9_-]*)/gm)].map((m) => m[1]);
+}
+
+function emulatedJsonFor(req) {
+  const sys = typeof req.system === 'string' ? req.system : '';
+  const block = sys.match(/\{[\s\S]{40,2000}\}/);
+  if (!block) return { emulated: true, note: 'no schema block found in the system prompt' };
+
+  // A key is STRUCTURE, not content — it gets routed on, matched against, and (in the shredder)
+  // used to build an object-storage path. Filling it with the prose placeholder below meant the
+  // shredder's artifact write raised `invalid section slug` for every section, runner.py swallowed
+  // it as a warning, and the harness silently exercised none of the per-section artifact path
+  // while reporting the run a success. Emitting a real slug does not soften the honesty rule in
+  // the docstring above: every prose field still says EMULATED, so nothing here can be mistaken
+  // for a value read from a solicitation.
+  const canonical = enumeratedSlugs(sys);
+  const out = {};
+  for (const m of block[0].matchAll(/"(\w+)"\s*:\s*\[/g)) {
+    const key = m[1];
+    const objMatch = block[0].match(new RegExp('"' + key + '"\\s*:\\s*\\[\\s*\\{([\\s\\S]*?)\\}'));
+    const fields = objMatch ? [...objMatch[1].matchAll(/"(\w+)"\s*:/g)].map((f) => f[1]) : [];
+    if (!fields.length) { out[key] = []; continue; }
+
+    // With a vocabulary in hand, emit one row per value (capped) so a consumer that LOOPS over the
+    // rows is actually made to loop. One row cannot tell a working iteration from a broken one.
+    const slugs = fields.some((f) => SLUG_FIELD.test(f)) && canonical.length ? canonical.slice(0, 3) : [null];
+    out[key] = slugs.map((slug, i) => {
+      const row = {};
+      for (const f of fields) {
+        if (SLUG_FIELD.test(f)) row[f] = slug ?? `emulated_${f.toLowerCase()}`;
+        else if (/confidence/i.test(f)) row[f] = 0.5;
+        else if (/page|count|number|index/i.test(f)) row[f] = i + 1;
+        else row[f] = `EMULATED ${f} — sandbox harness, not a real extraction`;
+      }
+      return row;
+    });
+  }
+  return Object.keys(out).length ? out : { emulated: true, note: 'schema block had no array fields' };
+}
+
 const RESPONDERS = [
   // compliance_reviewer (frontend ai/compliance route) — expects a JSON ARRAY, one entry per compliance
   // variable, text-block-is-the-json (no fences). Since I'm Claude, I return a faithful assessment with
@@ -338,6 +572,22 @@ const RESPONDERS = [
       ].join('\n'));
     },
   },
+  // visual page review (lib/review/visual-review.ts). The request carries PAGE IMAGES and asks what
+  // is visibly wrong with them.
+  //
+  // This stand-in CANNOT SEE. So it returns an empty finding array — the same answer a real
+  // reviewer gives for a clean page — rather than inventing defects, and the surrounding wiring
+  // (render → capture → request → parse → report) is exercised end to end, which is what the
+  // harness exists to prove. The page-COUNT half of that review is not gated on the model and is
+  // fully live here: it measures the rendered document.
+  //
+  // Saying so out loud matters. A harness that fabricates plausible findings would make the visual
+  // review look like it works in the sandbox and hide that the only real reviewer is the keyed one.
+  {
+    name: 'visual_page_review',
+    match: (req) => /You review rendered pages of a government proposal/i.test(systemText(req)),
+    respond: (req) => textMsg(req.model, '[]'),
+  },
   // section_drafter (frontend proposal.draft_section tool) — the tool sends a system prompt
   // beginning "You are a senior government proposal writer" and JSON.parses the text block as a
   // CanvasNode[] array ([{type, content}], no fences).
@@ -357,7 +607,8 @@ const RESPONDERS = [
     respond: (req) => {
       const sys = systemText(req);
       const user = lastUserText(req);
-      const title = (user.match(/Draft the "([^"]{2,120})" section/i)?.[1] ?? 'Section').replace(/\s+/g, ' ').trim();
+      // Same two prompt shapes as the pipeline responder — see sectionTitleFrom.
+      const title = sectionTitleFrom(user) !== 'Section' ? sectionTitleFrom(user) : sectionTitleFrom(reqText(req));
 
       // The budget the product computed from the solicitation's page limit. Respect it — a draft
       // that busts the page limit is the failure the budget exists to prevent.
@@ -391,6 +642,12 @@ const RESPONDERS = [
       // The customer's own material.
       const atoms = parseAtoms(user);
       const pool = atoms.flatMap((a) => sentences(a.text));
+      // Real library storage keys, when the product put any in the atom block. Preferring a real
+      // key means the figure path runs against an object that actually exists (S3/local driver →
+      // data-URI inlining on export) rather than a synthetic one that only proves the schema.
+      const imageKeys = Array.from(new Set(
+        (user.match(/[\w./-]+\.(?:png|jpe?g|webp|gif)\b/gi) || []).filter((k) => k.length > 6),
+      ));
       const focus = terms([title, ...subsections, ...criteria, ...mandatory].join(' '));
 
       const nodes = [{ type: 'heading', content: { level: 1, text: title } }];
@@ -409,6 +666,22 @@ const RESPONDERS = [
           text: `No approved library content was retrieved for "${title}". Add source material to the `
             + 'library, or draft this section directly; nothing here has been generated from thin air.',
         } }, 30);
+      }
+
+      // Which extra primitives this section gets (deterministic per title). See the exerciser above.
+      // Key on the whole prompt, not the title — see primitivePlanFor. A section whose title
+      // did not parse still gets a distinct plan from its subsections/criteria/atoms.
+      const plan = primitivePlanFor(`${title}|${subsections.join(',')}|${criteria.join(',')}|${(atoms[0]?.text || '').slice(0, 120)}`);
+      let figureNo = 0;
+
+      // A figure straight after the lead, when planned. `imageKeys` are REAL library storage keys
+      // when the product supplied any in the atom block; otherwise a stable placeholder so the
+      // image PATH still runs (inliner → export → compliance image budget).
+      if (plan.figure && used < maxWords) {
+        figureNo += 1;
+        const key = imageKeys[0] || `emulated/figure-${hash32(title) % 997}.png`;
+        push(imageNode(key, `${title} — reference figure`, figureNo), 12);
+        push(captionNode('Figure', figureNo, `${title} — reference figure.`), 8);
       }
 
       // One subsection per required subsection, filled from the remaining best-matching material.
@@ -442,6 +715,72 @@ const RESPONDERS = [
           return { text: support ? `${m} — ${support}` : `${m} — addressed above.`, indent_level: 0 };
         });
         push({ type: 'bulleted_list', content: { items } }, items.reduce((a, i) => a + wordsIn(i.text), 0));
+        // A traceability TABLE alongside the list — the shape a reviewer actually reads, and the
+        // node type the docx/pdf writers and the ruler treat completely differently from prose.
+        if (plan.table && used < maxWords) {
+          push(tableNode(title, mandatory.slice(0, 4)), 24);
+          push(captionNode('Table', 1, `${title} — requirement traceability.`), 8);
+        }
+        if (plan.callout && used < maxWords) {
+          push(calloutNode('warning', 'Mandatory requirements',
+            `${mandatory.length} mandatory requirement(s) are traced to this section; each is answered above.`), 18);
+        }
+      }
+
+      // ── FILL THE ALLOWANCE ────────────────────────────────────────────────────────────
+      // The product's own prompt says "Aim for about N words"; without this the responder stopped
+      // after the lead paragraph whenever a mold listed no required subsections — which is the
+      // usual case — and landed ~4 nodes against a ten-page allowance. Measured before this: a
+      // Technical Volume at 40% of its page envelope. Every sentence below is still the tenant's
+      // OWN retrieved material, just no longer discarded; when the library runs dry the section
+      // stays short and the readiness warning says so.
+      // ── The remaining planned primitives ──────────────────────────────────────────────
+      // Placed before the continuation fill so they land inside the budget rather than after it
+      // has been spent on prose. Each is charged; none is free.
+      if (plan.chart && used < maxWords && subsections.length) {
+        push(chartNode(title, subsections.slice(0, 4).map((x) => x.slice(0, 24))), 20);
+        push(captionNode('Chart', 1, `${title} — phase schedule.`), 8);
+      }
+      if (plan.numbered && used < maxWords && criteria.length) {
+        push(numberedNode(criteria.slice(0, 4)), criteria.slice(0, 4).reduce((a, c) => a + wordsIn(c), 0));
+      }
+      if (plan.quote && used < maxWords && criteria.length) {
+        push(quoteNode(criteria[0], 'Solicitation, evaluation criteria'), wordsIn(criteria[0]) + 3);
+      }
+      if ((plan.chart || plan.numbered) && used < maxWords) push(dividerNode(), 0);
+
+      const CONTINUATION = ['Approach', 'Technical Detail', 'Implementation', 'Evidence',
+        'Risk and Mitigation', 'Expected Outcomes'];
+      const remaining = () => rankSentences(pool.filter((x) => !usedSentences.has(x)), focus, 400, 0);
+      let more = remaining();
+      let ci = 0;
+      while (used < targetWords * 0.95 && more.length && ci < CONTINUATION.length) {
+        const take = more.slice(0, 5);
+        take.forEach((x) => usedSentences.add(x));
+        push({ type: 'heading', content: { level: 2, text: CONTINUATION[ci] } }, 2);
+        const para = take.join(' ');
+        push({ type: 'text_block', content: { text: para } }, wordsIn(para));
+        // A short list every other block — the canvas renders and exports bulleted_list natively.
+        const bullets = more.slice(5, 8);
+        if (bullets.length && ci % 2 === 1) {
+          bullets.forEach((x) => usedSentences.add(x));
+          push({ type: 'bulleted_list', content: { items: bullets.map((b) => ({ text: b })) } },
+            bullets.reduce((a, x) => a + wordsIn(x), 0));
+        }
+        ci += 1;
+        more = remaining();
+      }
+
+      // Emphasis on the concrete claim in each paragraph — what a proposal writer actually bolds,
+      // and what the canvas models as text_block.inline_formats. Never invented: the run points at
+      // a figure or designator already in the sentence.
+      const CONCRETE = /\b(?:\d[\d,.]*\s?(?:%|percent|metres?|meters?|km|nm|kW|W|months?|days?|weeks?)|TRL\s?\d|[A-Z]\d{5}-\d{2}-[A-Z]-\d{4}|\$[\d,]+)/;
+      for (const n of nodes) {
+        if (n.type !== 'text_block' || n.content?.inline_formats) continue;
+        const t = n.content?.text ?? '';
+        const m = t.match(CONCRETE);
+        if (!m || m.index == null) continue;
+        n.content.inline_formats = [{ start: m.index, length: m[0].length, format: 'bold' }];
       }
 
       // Trim to the budget from the end, never mid-node, so the draft always parses.
@@ -474,7 +813,7 @@ const RESPONDERS = [
       // tool loop the last user message is the tool_result block, so reading it gave every section
       // the title "Section" and searched the library for a placeholder string.
       const all = reqText(req);
-      const title = (all.match(/Draft the "([^"]{2,120})" section/i)?.[1] ?? 'Section').replace(/\s+/g, ' ').trim();
+      const title = sectionTitleFrom(all);
 
       // Walk every tool once, in the order the archetype's own prompt names them — and call them
       // with the REAL section title. genericToolInput fills a string param with a placeholder
@@ -497,27 +836,134 @@ const RESPONDERS = [
         }
       }
 
-      const user = lastUserText(req);
-
-      // Everything the tools returned is the material to write from.
+      // The MATERIAL is what the tools returned — the tenant's own library. The solicitation
+      // excerpt in the prompt is REFERENCE: it says what the section must address, and the
+      // archetype's own instructions call it untrusted data, never source copy.
+      //
+      // Pooling the two together is what produced the worst output this harness has ever
+      // generated. `rfp_excerpt` carries up to 20,000 characters of DSIP instruction text, so it
+      // outweighed the library by an order of magnitude and every section of the Technical Volume
+      // opened with the same sentence about the False Claims Act and the fraud-waste-and-abuse
+      // tutorial. A real model reads that excerpt and writes ABOUT the topic; quoting it back is
+      // an artifact of the stand-in, and a stand-in whose failure mode does not resemble the
+      // model's teaches the wrong lesson about the pipeline.
       const harvested = results.flatMap((b) => harvestProse(b.content));
-      const pool = [...harvested.flatMap((t) => sentences(t)), ...sentences(user)];
+      const pool = harvested.flatMap((t) => sentences(t));
       const focus = terms(title);
 
+      // ── Honour the prompt's LENGTH + FORMAT contract ────────────────────────────────────
+      // The archetype now states a character TARGET ("aim for roughly N characters") because a
+      // page limit is an allowance to fill, not a ceiling to stay under, and asks for markdown's
+      // full vocabulary. This emulator stands in for Claude, so it has to respond to both — a
+      // stand-in that ignores half the prompt tests half the pipeline.
+      //
+      // It still NEVER fabricates. Length comes from using MORE of what the tools actually
+      // returned (the old code ranked the pool and then threw away everything past the seventh
+      // sentence), and the table below is built from requirement text the prompt itself carries.
+      // When the library genuinely has nothing, it says so and stays short — under-filling is
+      // the honest outcome there, and the readiness warning will say so.
+      const target = Number((all.match(/aim for roughly ([\d,]+) characters/i)?.[1] ?? '0').replace(/,/g, ''))
+        || Number((all.match(/Aim for ([\d,]+)[–-]/i)?.[1] ?? '0').replace(/,/g, ''))
+        || 1200;
+
+      // Emphasise the section's own focus terms — first occurrence per paragraph, mirroring the
+      // narrow rule in lib/proposal/document-furniture.ts::emphasise.
+      // What a proposal writer actually bolds is the CLAIM an evaluator scans for — a measured
+      // result, a contract number, a TRL. So: a focus term if the paragraph carries one, else the
+      // first concrete figure in it. Never invented, never more than one run per paragraph
+      // (emphasising everything is what makes a page look shouted rather than structured).
+      const CONCRETE = /\b(?:\d[\d,.]*\s?(?:%|percent|metres?|meters?|km|nm|kW|W|months?|days?|weeks?)|TRL\s?\d|[A-Z]\d{5}-\d{2}-[A-Z]-\d{4}|\$[\d,]+)/;
+      const bolded = (para) => {
+        if (!para || para.includes('**')) return para;
+        for (const t of focus.slice(0, 3)) {
+          const re = new RegExp(`(?<![\\w*])(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?![\\w*])`, 'i');
+          if (re.test(para)) return para.replace(re, '**$1**');
+        }
+        const m = para.match(CONCRETE);
+        return m ? para.replace(m[0], `**${m[0]}**`) : para;
+      };
+
       const lines = [`# ${title}`, ''];
-      const lead = rankSentences(pool, focus, 6);
-      if (lead.length) {
-        lines.push(lead.slice(0, 4).join(' '), '');
-      } else {
+      // floor 0 — relevance still ORDERS the material, but nothing usable is discarded:
+      // the section has pages to fill and this is all real, retrieved content.
+      const ranked = rankSentences(pool, focus, 400, 0);
+      if (ranked.length === 0) {
         lines.push(
           `No approved library content was retrieved for "${title}". Add source material to the library, `
           + 'or draft this section directly; nothing here has been generated from thin air.', '');
+        return textMsg(req.model, lines.join('\n'));
       }
-      const used = new Set(lead);
-      const rest = rankSentences(pool.filter((x) => !used.has(x)), focus, 6);
-      if (rest.length) {
-        lines.push('## Approach', '', rest.slice(0, 3).join(' '), '');
+
+      // Lead paragraph, then subsections of ~4 sentences until the target is reached or the
+      // retrieved material runs out — whichever comes first.
+      const SUBHEADS = ['Approach', 'Technical Objectives', 'Work Plan', 'Risk and Mitigation',
+        'Relevant Experience', 'Anticipated Results', 'Transition and Commercialization'];
+      let i = 0;
+      const take = (n) => ranked.slice(i, (i += n));
+      lines.push(bolded(take(4).join(' ')), '');
+
+      // STRUCTURE BEFORE BUDGET. This loop used to run only `while length < target`, so when the
+      // retrieved material was dense the 4-sentence lead alone met the target and the subheads,
+      // bullets and table below never ran — the responder emitted one heading and one paragraph
+      // and looked like a converter ceiling when it was a gating bug. Guarantee a minimum of two
+      // subsections, THEN fill to target.
+      const MIN_SUBS = 2;
+      let sub = 0;
+      while (sub < SUBHEADS.length && i < ranked.length
+             && (sub < MIN_SUBS || lines.join('\n').length < target)) {
+        const para = take(4);
+        if (para.length === 0) break;
+        lines.push(`## ${SUBHEADS[sub]}`, '', bolded(para.join(' ')), '');
+        // A short bulleted list every other subsection — markdown the converter now carries
+        // through as a real bulleted_list node.
+        const bullets = take(3);
+        if (bullets.length && sub % 2 === 1) {
+          lines.push(...bullets.map((b) => `- ${b}`), '');
+        }
+        sub += 1;
       }
+
+      // A requirements table, built ONLY from requirement text the prompt itself carries (the
+      // fenced evaluation-criteria / required-subsections blocks). No requirements in the prompt
+      // ⇒ no table, rather than an invented one.
+      // The SHORT fenced blocks only. The archetype fences four things in the same markers: the
+      // section name, the evaluation criteria, the required subsections — and the whole raw
+      // solicitation excerpt, up to 20,000 characters. Taking them all fed the table arbitrary
+      // lines of agency boilerplate ("Distribution A - Approved for Public Release") as if they
+      // were requirements. Requirements come in short bullets; the excerpt does not.
+      const fenced = all.split('--- BEGIN USER CONTENT ---').slice(1)
+        .map((seg) => seg.split('--- END USER CONTENT ---')[0])
+        .filter((seg) => seg.length < 2500)
+        .join('\n');
+      const reqs = fenced.split('\n')
+        .map((l) => l.replace(/^\s*-\s*/, '').trim())
+        .filter((l) => l.length > 12 && l.length < 200);
+      if (reqs.length >= 2) {
+        lines.push('## Compliance Cross-Reference', '',
+          '| Requirement | Addressed in |',
+          '| --- | --- |',
+          ...reqs.slice(0, 8).map((r, n) => `| ${r.replace(/\|/g, '\\|')} | §${n + 1} above |`),
+          '');
+      }
+      // ── The three primitives the shipped MOLDS use and markdown cannot yet say ──────────
+      // Measured demand (scripts/analyze-node-demand.mjs): page_break, callout and divider each
+      // appear in a shipped mold, and none survives the markdown round-trip today. Emitting them
+      // here is the RED half — until markdown_to_canvas parses them these are dropped, which is
+      // the drop this harness exists to demonstrate.
+      //
+      // Syntax choices, deliberately conventional rather than invented:
+      //   callout  → GitHub's `> [!WARNING]` alert, a de-facto standard
+      //   divider  → `***`, standard markdown thematic break. NOT `---`, which collides with the
+      //              table separator row and with frontmatter (the footgun called out in review).
+      //   page_break → `<!-- pagebreak -->`, since markdown has no notion of one. An HTML comment
+      //              degrades to nothing visible in any renderer that does not know it, which is
+      //              the property that makes markdown safe to extend at all.
+      if (reqs.length >= 2) {
+        lines.push('> [!WARNING]', `> ${reqs.length} mandatory requirement(s) are traced to this section.`, '');
+      }
+      lines.push('***', '');
+      lines.push('<!-- pagebreak -->', '');
+
       return textMsg(req.model, lines.join('\n'));
     },
   },
@@ -539,6 +985,17 @@ const RESPONDERS = [
       if (done >= ordered.length) return textMsg(req.model, 'Done — the emulated model completed its tool loop.');
       return toolUseMsg(req.model, ordered[done].name, genericToolInput(ordered[done], req));
     },
+  },
+  // Structured-output call: the caller demanded JSON, so prose is a wiring FAILURE, not a stand-in.
+  // The shredder says "Respond ONLY with valid JSON matching the schema below" and then json.loads()
+  // the reply — so the catch-all text rule below killed every OnRfpUploaded run with
+  // "ValueError: Claude returned unparseable JSON" (7 failed instances), and no structured-output AI
+  // flow could be driven end to end in the sandbox at all. The emulator is documented as mirroring
+  // the prod wiring exactly; here it did the opposite.
+  {
+    name: 'json-schema',
+    match: (req) => wantsJson(req),
+    respond: (req) => textMsg(req.model, JSON.stringify(emulatedJsonFor(req))),
   },
   // Plain-text agent / AI route: a concise, structured completion.
   {

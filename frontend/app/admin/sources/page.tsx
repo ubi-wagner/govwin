@@ -7,6 +7,8 @@ import SourcesHub, {
   type SourceVisit,
   type SourceDiff,
 } from '@/components/admin/source-card-actions';
+import IntakeStageStrip from '@/components/admin/intake-stage-strip';
+import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,8 +170,12 @@ export default async function SourcesPage() {
     regionName: d.regionName,
   }));
 
+  // The discovery river's backlog, shared by every stage (#176).
+  const stageCounts = await loadIntakeStageCounts();
+
   return (
     <div>
+      <IntakeStageStrip current="sources" counts={stageCounts} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Opportunity Sources</h1>

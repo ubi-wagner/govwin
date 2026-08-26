@@ -52,9 +52,23 @@ export async function partnerScopeTenants(userId: string): Promise<ScopeTenant[]
 }
 
 /**
- * May this partner descend into this tenant? True only when they hold the ACTIVE tenant_admin
- * membership the session pin will assume (source home or partner_manager) at a non-archived
- * tenant. Empty inputs → false (no query).
+ * May this partner descend into this tenant? True when they hold the ACTIVE tenant_admin
+ * membership the session pin will assume, at a non-archived tenant they are actually in scope for.
+ * Empty inputs → false (no query).
+ *
+ * THIS MUST AGREE WITH partnerScopeTenants. It did not, and the disagreement rendered a dead
+ * control: the console lists a company when the partner OWNS it (`t.owner_id = them`) *or* holds a
+ * `partner_manager` membership, while this gate accepted only membership `source IN
+ * ('home','partner_manager')`. Paul Jackson owns Foundation and holds an active tenant_admin
+ * membership there with source `collaborator` — the company-appointed shadow-admin grant that
+ * predates the partner-manager model — so /partner rendered "Open workspace →" for a company
+ * /api/partner/enter then refused, bouncing him back to /partner with no explanation.
+ *
+ * Authority still comes from the membership: an owner with no active tenant_admin membership is
+ * refused exactly as before, which is the invariant the D2 design states ("owning a tenant without
+ * a membership grants no portal access"). What no longer vetoes is the `source` label alone, which
+ * records how the membership arose, not what it permits. Scope is now: the tenant is one this
+ * partner owns, or one they manage.
  */
 export async function partnerCanEnter(userId: string, tenantId: string): Promise<boolean> {
   if (!userId || !tenantId) return false;
@@ -64,7 +78,8 @@ export async function partnerCanEnter(userId: string, tenantId: string): Promise
       JOIN tenants t ON t.id = m.tenant_id
       WHERE m.user_id = ${userId}::uuid AND m.tenant_id = ${tenantId}::uuid
         AND m.status = 'active' AND m.role = 'tenant_admin'
-        AND m.source IN ('home','partner_manager') AND t.archived_at IS NULL
+        AND t.archived_at IS NULL
+        AND (t.owner_id = ${userId}::uuid OR m.source IN ('home','partner_manager'))
     ) AS ok`;
   return !!row?.ok;
 }
