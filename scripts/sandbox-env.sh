@@ -23,6 +23,17 @@
 export DATABASE_URL="postgresql://govtech_app:apppass@localhost:5432/govtech_intel"
 export DATABASE_URL_OWNER="postgresql://govtech:changeme@localhost:5432/govtech_intel"
 
+# The CRM's own database. It was ABSENT from every sandbox until 2026-08-26, which is why no
+# instrument in this repo had ever measured the CRM — a lens that cannot connect reports
+# nothing, and nothing reads exactly like a pass (docs/CRM_ANALYSIS.md §0).
+#
+#   createdb -O govtech cms_postgres && bash services/cms/db/run.sh
+export CMS_DATABASE_URL="postgresql://govtech:changeme@localhost:5432/cms_postgres"
+# The bridge the CRM uses to reach the MAIN database. Note the role: migration 215 denies
+# writes to email_send_ledger on the app role, so a non-owner here makes every CRM send run
+# degraded (docs/CRM_MIGRATION_PLAN.md, last section).
+export SHARED_DATABASE_URL="$DATABASE_URL_OWNER"
+
 # The admin password, in ONE place. sandbox-reset-passwords.mjs WRITES $SANDBOX_PASSWORD; eighteen
 # driver scripts READ $RFP_ADMIN_PW / $ADMIN_PW / $DRIVE_ADMIN_PW, each with its own hardcoded
 # default of 'RFPAdmin2026!' — a value nothing sets any more. On a fresh sandbox that mismatch
