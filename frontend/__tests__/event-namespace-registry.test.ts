@@ -31,7 +31,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { EVENT_NAMESPACES, FORBIDDEN_NAMESPACES } from '@/lib/events';
+import { EVENT_NAMESPACES, FORBIDDEN_NAMESPACES } from '@/lib/event-namespaces';
 
 const REPO = path.resolve(process.cwd(), '..');
 const read = (p: string) => fs.readFileSync(path.join(REPO, p), 'utf8');
@@ -67,7 +67,7 @@ describe('the registry has exactly one copy per runtime', () => {
         const relPath = path.join(dir, e.name);
         if (e.isDirectory()) walk(relPath);
         else if (/\.tsx?$/.test(e.name)) {
-          if (relPath === path.join('frontend', 'lib', 'events.ts')) continue;
+          if (relPath === path.join('frontend', 'lib', 'event-namespaces.ts')) continue;
           const src = read(relPath);
           // Three of the eight adjacent in one literal is the signature; no prose does that.
           if (/['"]finder['"]\s*,\s*['"]capture['"]\s*,\s*['"]identity['"]/.test(src)) {
@@ -83,6 +83,25 @@ describe('the registry has exactly one copy per runtime', () => {
       offenders,
       'these files write the registry out again instead of importing EVENT_NAMESPACES from '
       + '@/lib/events. A copy is a copy whether or not it agrees today.',
+    ).toEqual([]);
+  });
+
+  it('the registry module imports NOTHING, so a client component can use it', () => {
+    // It used to live in `lib/events.ts`, which imports the database client. The moment a CLIENT
+    // component imported the registry, `postgres` and `node:async_hooks` were pulled into the
+    // browser bundle and `next build` failed:
+    //
+    //   Import trace: node:async_hooks → lib/tenant-context.ts → lib/db.ts → lib/events.ts
+    //                 → app/admin/events/event-stream-client.tsx
+    //
+    // tsc and vitest both passed. A client component importing a server module is invisible to
+    // both — only a build sees it, which is exactly why this assertion is here and not left to one.
+    const src = read(path.join('frontend', 'lib', 'event-namespaces.ts'));
+    const imports = src.split('\n').filter((l) => /^\s*import\s/.test(l));
+    expect(
+      imports,
+      'lib/event-namespaces.ts must stay a leaf. Any import here can reach a client bundle '
+      + 'through event-stream-client.tsx and break the build in a way no unit test can see.',
     ).toEqual([]);
   });
 

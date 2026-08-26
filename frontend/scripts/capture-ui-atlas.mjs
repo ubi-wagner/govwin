@@ -44,6 +44,48 @@ const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
 fs.mkdirSync(OUT, { recursive: true });
 
 const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'docs/ui-catalog.json'), 'utf8'));
+
+/**
+ * THE CATALOG IS GENERATED, AND NOTHING FORCES IT TO BE CURRENT.
+ *
+ * This whole sweep photographs the routes `docs/ui-catalog.json` lists. That is the right design —
+ * the catalog is the manifest of what a person can DO — but it makes every screenshot only as fresh
+ * as the last `catalog-ui.mjs` run, and nobody adding a page thinks to run it first.
+ *
+ * It has already happened: two delivery pages were added, this atlas ran, wrote 111 screenshots and
+ * reported them all clean — and photographed NEITHER of the new pages, because a day-old catalog
+ * did not contain them. The only reason it surfaced at all is the accounting check at the bottom of
+ * this file, which noticed its own arithmetic was off.
+ *
+ * A visual sweep that cannot see a page does not report it missing. It reports 111 clean shots.
+ *
+ * So: count the page files on disk, compare, and exit 2 as a HARNESS DEFECT rather than
+ * photographing an out-of-date product. Same rule `verify-api-contract`, `verify-surfaces` and
+ * `reconcile-capability` follow.
+ */
+{
+  const walkPages = (dir, out = []) => {
+    if (!fs.existsSync(dir)) return out;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const p2 = path.join(dir, e.name);
+      if (e.isDirectory()) walkPages(p2, out);
+      else if (e.name === 'page.tsx') out.push(p2.replace(path.join(REPO, 'frontend') + '/', ''));
+    }
+    return out;
+  };
+  const onDisk = walkPages(path.join(REPO, 'frontend', 'app'));
+  const inCatalog = new Set(catalog.records.filter((r) => r.kind === 'page').map((r) => r.file));
+  const missing = onDisk.filter((f) => !inCatalog.has(f));
+  if (missing.length) {
+    console.error(`✗ HARNESS DEFECT — ${missing.length} page(s) exist on disk and are ABSENT from`);
+    console.error('  docs/ui-catalog.json, which is where this sweep gets its route list. They would');
+    console.error('  simply not be photographed, and the run would report every other page clean.');
+    console.error('  Regenerate first:  node frontend/scripts/catalog-ui.mjs');
+    for (const f of missing.slice(0, 10)) console.error(`    · ${f}`);
+    process.exit(2);
+  }
+}
 const ROUTES = catalog.records.filter((r) => r.kind === 'page').map((r) => ({ route: r.route, file: r.file, declared: { buttons: r.buttons, inputs: r.inputs, links: r.links, forms: r.forms, handlers: r.handlers.length } }));
 
 /**
@@ -124,13 +166,16 @@ async function bindings(slug) {
   const [post] = await sql`SELECT page_key FROM content_pages WHERE content_type='blog_post' LIMIT 1`;
   const [res] = await sql`SELECT page_key FROM content_pages WHERE content_type='resource' LIMIT 1`;
   const [collab] = await sql`SELECT id FROM proposal_collaborators LIMIT 1`;
+  // Delivery (migration 216). Scoped to the lane's own tenant like every binding here — a project
+  // from another tenant drives the page's correct 404 and photographs a not-found as the feature.
+  const [project] = await sql`SELECT d.id FROM delivery_projects d JOIN tenants t ON t.id=d.tenant_id WHERE t.slug=${slug} ORDER BY d.created_at DESC LIMIT 1`;
   return {
     tenantSlug: slug, proposalId: prop?.id, sectionId: sect?.id, opportunityId: prop?.opportunity_id,
     solId: sol?.id, topicId: topic?.id, spotlightId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
     templateId: tmpl?.id, profileId: src?.id, contractId: contract?.id, vaultId: vault?.id,
     documentId: tdoc?.id, foundationId: found?.id, pageKey: pageRow?.page_key,
     slug: post?.page_key ?? res?.page_key ?? docPage?.page_key, type: docPage?.content_type,
-    token: collab?.id,
+    token: collab?.id, projectId: project?.id,
   };
 }
 

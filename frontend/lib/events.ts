@@ -30,37 +30,16 @@ const log = createLogger('events');
 // namespaces (computed at call time) the static check can't see. Non-fatal by contract — emitters
 // never throw — so an unregistered namespace only logs a warning (drift signal, not a break).
 /**
- * THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy.
+ * The registry lives in `lib/event-namespaces.ts` — a module with NO imports, so a CLIENT component
+ * can use it without dragging `postgres` and `node:async_hooks` into the browser bundle. That is not
+ * hypothetical: it happened, and only `next build` caught it. See that file's header.
  *
- * Eight namespaces. `project` = post-award delivery: baselines, milestone gates, deliverable
- * acceptance. None of the other seven owns that — `proposal` is the PRE-award workspace, `capture`
- * is the customer lifecycle up to purchase, `system` is infra.
- *
- * ── WHY THIS IS EXPORTED, AND WHY THAT IS NOT ENOUGH ─────────────────────────────────────────
- * The registry was written out as a literal in NINE places across three languages, a SQL CHECK and
- * four documents. Adding `project` updated four of them and left five on the old seven — including
- * `app/api/events/route.ts`, which would have answered **422 to every project event**, and
- * `pipeline/tests/test_observability_contract.py`, which would have failed the first one the
- * pipeline emitted.
- *
- * Every TypeScript reader now imports THIS constant. Python has one equivalent
- * (`pipeline/src/observability/event_namespaces.py`), because it cannot import TypeScript, and the
- * database has a CHECK, because it cannot import either.
- *
- * Three copies is the floor — so `__tests__/event-namespace-registry.test.ts` reconciles all of
- * them, plus the migration SQL and every document that writes the list out, and fails naming which
- * one disagreed. **You cannot have one source of truth across a database constraint, two languages
- * and a doc. You can have one test that refuses to let them diverge.**
+ * Re-exported here so `import { EVENT_NAMESPACES } from '@/lib/events'` keeps working for server
+ * code that is already importing the emitters.
  */
-export const EVENT_NAMESPACES = [
-  'finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
-  'project',
-] as const;
-
-export type EventNamespace = (typeof EVENT_NAMESPACES)[number];
-
-/** Never these, in any position (docs/EVENT_CONTRACT.md §4). */
-export const FORBIDDEN_NAMESPACES = ['admin', 'cms', 'spotlight'] as const;
+export { EVENT_NAMESPACES, FORBIDDEN_NAMESPACES } from '@/lib/event-namespaces';
+export type { EventNamespace } from '@/lib/event-namespaces';
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 
 // This set only WARNS on an unknown namespace. The ENFORCEMENT is
 // `system_events_namespace_chk` (migration 217), which raises 23514 at the insert.

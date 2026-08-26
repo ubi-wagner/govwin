@@ -1,13 +1,13 @@
 {
  "totals": {
-  "routes": 116,
+  "routes": 118,
   "components": 184,
-  "handlers": 1479,
-  "binding": 1238,
-  "fetches": 328,
+  "handlers": 1480,
+  "binding": 1239,
+  "fetches": 329,
   "forms": 24,
   "inputs": 458,
-  "buttons": 687,
+  "buttons": 688,
   "orphans": 1
  },
  "records": [
@@ -1582,7 +1582,7 @@
   },
   {
    "file": "app/admin/events/event-stream-client.tsx",
-   "lines": 312,
+   "lines": 319,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -1598,55 +1598,55 @@
      "on": "onClick",
      "element": "th",
      "binds": true,
-     "line": 180
+     "line": 187
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 196
+     "line": 203
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 205
+     "line": 212
     },
     {
      "on": "onSubmit",
      "element": "form",
      "binds": true,
-     "line": 212
+     "line": 219
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 217
+     "line": 224
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 222
+     "line": 229
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 232
+     "line": 239
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 245
+     "line": 252
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 293
+     "line": 300
     }
    ],
    "fetches": [],
@@ -2607,109 +2607,120 @@
   },
   {
    "file": "app/admin/site/[pageKey]/editor-client.tsx",
-   "lines": 342,
+   "lines": 416,
    "client": true,
    "kind": "app-component",
    "exports": [
     "EditorClient"
    ],
    "renders": [
+    "VersionHistory",
     "ImageUploadField",
     "MarketingIcon"
    ],
    "handlers": [
     {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 51
+    },
+    {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 220
+     "line": 294
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 222
+     "line": 296
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 230
+     "line": 304
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 237
+     "line": 311
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 243
+     "line": 317
     },
     {
      "on": "onChange",
      "element": "ImageUploadField",
      "binds": false,
-     "line": 248
+     "line": 322
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 258
+     "line": 332
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 276
+     "line": 350
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 283
+     "line": 357
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 293
+     "line": 367
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 295
+     "line": 369
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 298
+     "line": 372
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 303
+     "line": 377
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 316
+     "line": 390
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 321
+     "line": 395
     }
    ],
    "fetches": [
+    {
+     "method": "GET",
+     "url": "`/api/admin/site/pages/${encodeURIComponent(pageKey)}/versions`"
+    },
     {
      "method": "POST",
      "url": "url"
@@ -2717,7 +2728,7 @@
    ],
    "forms": 0,
    "inputs": 7,
-   "buttons": 7,
+   "buttons": 8,
    "links": 0,
    "localImports": [
     "@/components/admin/image-upload-field",
@@ -2730,7 +2741,7 @@
    "reachableFrom": [
     "/admin/site/[pageKey]"
    ],
-   "bindingHandlers": 14,
+   "bindingHandlers": 15,
    "passedHandlers": 1
   },
   {
@@ -4367,6 +4378,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -4824,7 +4837,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/billing/page.tsx",
-   "lines": 120,
+   "lines": 134,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5031,6 +5044,61 @@
    "passedHandlers": 0
   },
   {
+   "file": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx",
+   "lines": 294,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "DeliveryProjectPage"
+   ],
+   "renders": [
+    "Link",
+    "Measure"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 1,
+   "localImports": [],
+   "route": "/portal/[tenantSlug]/delivery/[projectId]",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/delivery/[projectId]"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/portal/[tenantSlug]/delivery/page.tsx",
+   "lines": 116,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "DeliveryPage"
+   ],
+   "renders": [
+    "Link"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 1,
+   "localImports": [],
+   "route": "/portal/[tenantSlug]/delivery",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/delivery"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
    "lines": 115,
    "client": false,
@@ -5153,7 +5221,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/layout.tsx",
-   "lines": 195,
+   "lines": 202,
    "client": false,
    "kind": "layout",
    "exports": [
@@ -5193,6 +5261,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -5348,7 +5418,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/manage/page.tsx",
-   "lines": 164,
+   "lines": 172,
    "client": false,
    "kind": "page",
    "exports": [
@@ -8818,6 +8888,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -13638,7 +13710,7 @@
   },
   {
    "file": "components/portal/billing-panel.tsx",
-   "lines": 332,
+   "lines": 340,
    "client": true,
    "kind": "component",
    "exports": [
@@ -13650,25 +13722,25 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 212
+     "line": 215
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 223
+     "line": 226
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 265
+     "line": 268
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 274
+     "line": 277
     }
    ],
    "fetches": [
@@ -14679,7 +14751,7 @@
   },
   {
    "file": "components/portal/manage-console.tsx",
-   "lines": 295,
+   "lines": 296,
    "client": true,
    "kind": "component",
    "exports": [
@@ -14704,97 +14776,97 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 137
+     "line": 138
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 157
+     "line": 158
     },
     {
      "on": "onSelect",
      "element": "IndicatorRail",
      "binds": false,
-     "line": 170
+     "line": 171
     },
     {
      "on": "onClose",
      "element": "Drawer",
-     "binds": false,
-     "line": 173
-    },
-    {
-     "on": "onClose",
-     "element": "DrawerShell",
      "binds": false,
      "line": 174
     },
     {
      "on": "onClose",
-     "element": "Drawer",
+     "element": "DrawerShell",
      "binds": false,
-     "line": 202
+     "line": 175
     },
     {
      "on": "onClose",
-     "element": "DrawerShell",
+     "element": "Drawer",
      "binds": false,
      "line": 203
     },
     {
      "on": "onClose",
-     "element": "Drawer",
+     "element": "DrawerShell",
      "binds": false,
-     "line": 212
+     "line": 204
     },
     {
      "on": "onClose",
-     "element": "DrawerShell",
+     "element": "Drawer",
      "binds": false,
      "line": 213
     },
     {
      "on": "onClose",
-     "element": "Drawer",
+     "element": "DrawerShell",
      "binds": false,
-     "line": 258
+     "line": 214
     },
     {
      "on": "onClose",
-     "element": "DrawerShell",
+     "element": "Drawer",
      "binds": false,
      "line": 259
     },
     {
      "on": "onClose",
-     "element": "Drawer",
+     "element": "DrawerShell",
      "binds": false,
-     "line": 265
+     "line": 260
     },
     {
      "on": "onClose",
-     "element": "DrawerShell",
+     "element": "Drawer",
      "binds": false,
      "line": 266
     },
     {
      "on": "onClose",
+     "element": "DrawerShell",
+     "binds": false,
+     "line": 267
+    },
+    {
+     "on": "onClose",
      "element": "Drawer",
      "binds": false,
-     "line": 275
+     "line": 276
     },
     {
      "on": "onClose",
      "element": "DrawerShell",
      "binds": false,
-     "line": 276
+     "line": 277
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 289
+     "line": 290
     }
    ],
    "fetches": [],
@@ -15091,6 +15163,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -16448,6 +16522,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -20280,6 +20356,8 @@
     "/portal/[tenantSlug]/command",
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -20441,6 +20519,8 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/delivery/[projectId]",
+    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",

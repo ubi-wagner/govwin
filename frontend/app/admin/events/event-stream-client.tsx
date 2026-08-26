@@ -1,6 +1,8 @@
 'use client';
 
-import { EVENT_NAMESPACES } from '@/lib/events';
+// The LEAF module, not '@/lib/events' — that one imports the database client, and a client
+// component importing it pulls postgres and node:async_hooks into the browser bundle.
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
