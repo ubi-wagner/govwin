@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 250,
-   "lines": 40143
+   "files": 251,
+   "lines": 40520
   },
   {
    "kind": "app-boundary",
@@ -15,7 +15,7 @@
   {
    "kind": "app-component",
    "files": 26,
-   "lines": 8845
+   "lines": 8919
   },
   {
    "kind": "auth",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 162,
-   "lines": 41310
+   "lines": 41366
   },
   {
    "kind": "e2e",
@@ -39,28 +39,28 @@
   },
   {
    "kind": "lib",
-   "files": 286,
-   "lines": 56768
+   "files": 292,
+   "lines": 57827
   },
   {
    "kind": "middleware",
    "files": 1,
-   "lines": 293
+   "lines": 325
   },
   {
    "kind": "other",
    "files": 4,
-   "lines": 152
+   "lines": 157
   },
   {
    "kind": "page",
    "files": 116,
-   "lines": 17454
+   "lines": 17476
   },
   {
    "kind": "script",
-   "files": 183,
-   "lines": 23810
+   "files": 184,
+   "lines": 24175
   },
   {
    "kind": "server-action",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 192,
-   "lines": 25301
+   "files": 202,
+   "lines": 26779
   }
  ],
  "records": [
@@ -1370,8 +1370,8 @@
   {
    "file": "__tests__/audit-coverage.test.ts",
    "kind": "test",
-   "lines": 184,
-   "bytes": 9441,
+   "lines": 190,
+   "bytes": 9951,
    "client": false,
    "exports": [],
    "imports": [
@@ -3834,6 +3834,70 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/drawer-landmark-role.test.ts",
+   "kind": "test",
+   "lines": 67,
+   "bytes": 3580,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "react",
+     "names": [
+      "h"
+     ]
+    },
+    {
+     "spec": "react-dom/server",
+     "names": [
+      "renderToStaticMarkup"
+     ]
+    },
+    {
+     "spec": "@/components/ui/drawer",
+     "names": [
+      "Drawer"
+     ]
+    },
+    {
+     "spec": "@/components/ui/nav-shell",
+     "names": [
+      "NavShell"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "/<aside([^>]*)>/.exec",
+    "describe",
+    "it",
+    "asideAttrs",
+    "renderToStaticMarkup",
+    "h",
+    "expect(a, 'the inline nav rail must not be announced as a dialog').not.toMatch",
+    "expect",
+    "expect(a).toMatch",
+    "expect(a, 'a non-overlay must not claim aria-modal').not.toMatch",
+    "expect(a, 'the landmark still needs its accessible name').toMatch",
+    "expect(a, 'the mobile nav covers the page — it must stay a modal').toMatch",
+    "expect(html).toMatch",
+    "expect(asideAttrs(html), 'every page would otherwise open with a dialog in the nav').not.toMatch"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/dsip-deconstruct.test.ts",
    "kind": "test",
    "lines": 214,
@@ -3941,6 +4005,285 @@
     "expect(classifyDsipSidecar('i-N26BXNP0020450Foreign_Affiliations.pdf')?.volumeNumber).toBe",
     "expect(classifyDsipSidecar('j-N26BXNP0020450FWA.pdf')?.volumeNumber).toBe",
     "expect(classifyDsipSidecar('k-N26BXNP0020450Proposal.pdf')?.volumeNumber).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/email-postmark.test.ts",
+   "kind": "test",
+   "lines": 249,
+   "bytes": 11346,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach",
+      "afterEach"
+     ]
+    },
+    {
+     "spec": "@/lib/email/drivers/postmark",
+     "names": [
+      "postmarkDriver"
+     ]
+    },
+    {
+     "spec": "@/app/api/webhooks/postmark/route",
+     "names": [
+      "webhook"
+     ]
+    },
+    {
+     "spec": "@/lib/email/types",
+     "names": [
+      "ResolvedMessage"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "vi.mock",
+    "vi.fn",
+    "emitted.push",
+    "suppressed.push",
+    "String",
+    "beforeEach",
+    "afterEach",
+    "describe",
+    "it",
+    "stubFetch",
+    "postmarkDriver.send",
+    "expect(r).toEqual",
+    "expect",
+    "JSON.parse",
+    "expect(body.From).toBe",
+    "expect(body.ReplyTo).toBe",
+    "expect(body.MessageStream).toBe",
+    "expect(body.TextBody).toBeTruthy",
+    "expect(body.Metadata.correlation_id).toBe",
+    "postmarkDriver.send(message).then",
+    "expect(lastRequest!.url).toBe",
+    "Object.fromEntries",
+    "Array.from",
+    "'v'.repeat",
+    "expect(Object.keys(body.Metadata)).toHaveLength",
+    "Object.keys",
+    "expect(Object.values(body.Metadata)[0]).toHaveLength",
+    "Object.values",
+    "expect(r.error).toBe",
+    "expect(r.error).toMatch",
+    "expect(r.messageId).toBeNull",
+    "encodeURIComponent",
+    "webhook",
+    "Buffer.from(opts.basic).toString",
+    "Buffer.from",
+    "JSON.stringify",
+    "hook",
+    "expect(res.status).toBe",
+    "expect(await res.json()).toMatchObject",
+    "res.json",
+    "expect(emitted).toHaveLength",
+    "expect(emitted[0].type).toBe",
+    "expect(emitted[0].tenantId).toBe",
+    "expect(emitted[0].payload).toMatchObject",
+    "expect(suppressed).toEqual",
+    "expect.anything",
+    "expect(suppressed[0]).toMatchObject",
+    "expect(emitted[0].tenantId).toBeNull",
+    "expect(emitted).toEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/email-seam.test.ts",
+   "kind": "test",
+   "lines": 209,
+   "bytes": 9423,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    },
+    {
+     "spec": "@/lib/email",
+     "names": [
+      "send",
+      "htmlToText"
+     ]
+    },
+    {
+     "spec": "@/lib/email/sender-identity",
+     "names": [
+      "formatFrom",
+      "resolveSender"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "vi.fn",
+    "e.trim().toLowerCase",
+    "e.trim",
+    "vi.mock",
+    "driverSend",
+    "beforeEach",
+    "vi.clearAllMocks",
+    "ledger.suppressionFor.mockImplementation",
+    "order.push",
+    "ledger.reserve.mockImplementation",
+    "ledger.confirm.mockImplementation",
+    "ledger.recordSuppressed.mockImplementation",
+    "driverSend.mockImplementation",
+    "describe",
+    "it",
+    "send",
+    "expect(order).toEqual",
+    "expect",
+    "expect(r.accepted).toBe",
+    "expect(r.messageId).toBe",
+    "expect(r.sendId).toBe",
+    "expect(r.correlationId).toMatch",
+    "expect(ledger.reserve.mock.calls[0][0].correlationId).toBe",
+    "expect(dispatched.metadata).toMatchObject",
+    "expect(m.sender.fromAddress).toBeTruthy",
+    "expect(m.text.length).toBeGreaterThan",
+    "expect(m.idempotencyKey).toBeTruthy",
+    "expect(m.tenantId).toBeNull",
+    "expect(m.tags).toEqual",
+    "expect(r.error).toBe",
+    "expect(driverSend).not.toHaveBeenCalled",
+    "expect(r.suppressed).toBe",
+    "expect(r.error).toBeNull",
+    "expect(r.duplicate).toBe",
+    "expect(r.error).toMatch",
+    "expect(ledger.confirm.mock.calls[0][0]).toMatchObject",
+    "expect(ledger.confirm).toHaveBeenCalledTimes",
+    "expect(ledger.confirm.mock.calls[0][0].status).toBe",
+    "expect(send(base)).resolves.toBeTruthy",
+    "expect(r.provider).toBe",
+    "htmlToText",
+    "expect(text).toContain",
+    "expect(text).not.toContain",
+    "expect(text).toBe",
+    "expect(htmlToText('<p>Tom &amp; Jerry &lt;3</p>')).toBe",
+    "expect(formatFrom(resolveSender())).toBe",
+    "formatFrom",
+    "resolveSender",
+    "expect(s.fromName).toBe",
+    "expect(s.fromAddress).toBe",
+    "expect(s.replyTo).toBe",
+    "expect(formatFrom(s)).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/email-transport-boundary.test.ts",
+   "kind": "test",
+   "lines": 159,
+   "bytes": 7372,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "process.cwd",
+    "join",
+    "readdirSync",
+    "e.name.startsWith",
+    "SKIP_DIRS.has",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "out.push",
+    "statSync(join(ROOT, d)).isDirectory",
+    "statSync",
+    "f.replace",
+    "readFileSync",
+    "sourceFiles().filter",
+    "sourceFiles",
+    "f.includes",
+    "describe",
+    "it",
+    "expect(files.length, 'no source files found — the scan root or extension filter is wrong').toBeGreaterThan",
+    "expect",
+    "expect(files.map(rel)).toContain",
+    "files.map",
+    "expect(pattern.test(sample), `rule ${pattern} failed to match its own example`).toBe",
+    "pattern.test",
+    "outside(DRIVERS).filter",
+    "outside",
+    "read",
+    "/\\bgoogle\\.gmail\\s*\\(/.test",
+    "/api\\.postmarkapp\\.com/.test",
+    "/api\\.resend\\.com/.test",
+    "expect(\n      offenders.map(rel),\n      'these files hand a message to a provider without passing through send(), so they get no '\n      + 'suppression check, no idempotency, and no ledger row',\n    ).toEqual",
+    "offenders.map",
+    "outside(DRIVERS)\n      .filter((f) => /from ['\"]googleapis['\"]/.test(read(f)))\n      .map(rel).filter",
+    "outside(DRIVERS)\n      .filter((f) => /from ['\"]googleapis['\"]/.test(read(f))).map",
+    "/from ['\"]googleapis['\"]/.test",
+    "GOOGLEAPIS_EXEMPT.has",
+    "expect(\n      offenders,\n      `googleapis may be imported by ${DRIVERS} and, for calendar only, by `\n      + `${[...GOOGLEAPIS_EXEMPT].join(', ')}. A new importer needs a stated reason here.`,\n    ).toEqual",
+    "[...GOOGLEAPIS_EXEMPT].join",
+    "outside(SEAM).filter",
+    "/\\bemail_send_ledger\\b/.test",
+    "/\\bemail_suppressions\\b/.test",
+    "expect(\n      offenders.map(rel),\n      'the ledger is written in one place. It is denied to the application role by RLS '\n      + '(migration 215), so a query here fails at run time rather than at build time.',\n    ).toEqual",
+    "/from ['\"]@\\/lib\\/email\\/(drivers|ledger)/.test",
+    "/import\\(['\"]@\\/lib\\/email\\/(drivers|ledger)/.test",
+    "expect(\n      offenders.map(rel),\n      \"import { send } from '@/lib/email' — the seam is the public surface; a driver is not\",\n    ).toEqual",
+    "/\\bsendEmail\\s*[,}]/.test",
+    "expect(\n      offenders.map(rel),\n      'sendEmail no longer exists; a destructured dynamic import of it resolves to undefined and '\n      + 'throws inside whatever catch block surrounds the send',\n    ).toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -4072,10 +4415,65 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/event-bracket.test.ts",
+   "kind": "test",
+   "lines": 109,
+   "bytes": 4708,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "vi.mock",
+    "calls.push",
+    "strings.join",
+    "text.includes",
+    "Promise.resolve",
+    "Object.assign",
+    "vi.fn",
+    "calls\n    .filter((v) => v.length === 8 || v.length === 10).map",
+    "calls.filter",
+    "beforeEach",
+    "describe",
+    "it",
+    "withEventBracket",
+    "expect(out).toBe",
+    "expect",
+    "writtenRows",
+    "expect(rows.map((r) => r.phase)).toEqual",
+    "rows.map",
+    "expect(rows[1].error).toBeNull",
+    "expect(rows[1].result).toEqual",
+    "expect(\n      withEventBracket(params, async () => { throw new Error('database connection lost'); }),\n    ).rejects.toThrow",
+    "expect(rows[1].error).toMatchObject",
+    "expect(callerSawIt).toBe",
+    "withEventBracket(params, async () => { throw new Error('x'); }).catch",
+    "expect(rows.filter((r) => r.phase === 'start')).toHaveLength",
+    "rows.filter",
+    "expect(rows.filter((r) => r.phase === 'end')).toHaveLength"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/event-contract.test.ts",
    "kind": "test",
-   "lines": 126,
-   "bytes": 6927,
+   "lines": 182,
+   "bytes": 9891,
    "client": false,
    "exports": [],
    "imports": [
@@ -4091,6 +4489,12 @@
      "spec": "node:fs",
      "names": [
       "fs"
+     ]
+    },
+    {
+     "spec": "typescript",
+     "names": [
+      "ts"
      ]
     },
     {
@@ -4123,7 +4527,22 @@
     "violations.push",
     "REGISTRY.has",
     "TYPE_RE.test",
+    "unclosedOnThrow",
     "txt.includes",
+    "ts.createSourceFile",
+    "ts.isCallExpression",
+    "n.expression.getText(sf).split('.').pop",
+    "n.expression.getText(sf).split",
+    "n.expression.getText",
+    "f",
+    "ts.forEachChild",
+    "go",
+    "callee",
+    "ts.isTryStatement",
+    "has",
+    "sf.getLineAndCharacterOfPosition",
+    "node.getStart",
+    "visit",
     "describe",
     "it",
     "scan",
@@ -4133,6 +4552,54 @@
     "expect(lastScan.sites, `only ${lastScan.sites} emitEvent* call sites found — the scan is not reading the codebase`).toBeGreaterThan",
     "expect(lastScan.literal, `only ${lastScan.literal} call sites had a literal namespace to validate`).toBeGreaterThan",
     "expect(lastScan.files).toBeGreaterThan"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/event-label-jargon.test.ts",
+   "kind": "test",
+   "lines": 67,
+   "bytes": 3279,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/event-labels",
+     "names": [
+      "describeEvent"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "type.replace(/[._]/g, ' ').trim",
+    "type.replace",
+    "w.charAt(0).toUpperCase",
+    "w.charAt",
+    "w.slice",
+    "describe",
+    "it",
+    "fallback",
+    "describeEvent",
+    "expect(label).not.toBe",
+    "expect",
+    "expect(label.length).toBeGreaterThan",
+    "expect(label.toLowerCase()).not.toContain",
+    "label.toLowerCase",
+    "expect(label.toLowerCase()).toContain",
+    "expect(label).toBe"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -5580,6 +6047,53 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/launch-overlay-tenant-scope.test.ts",
+   "kind": "test",
+   "lines": 103,
+   "bytes": 4733,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "vi.mock",
+    "strings.join",
+    "text.includes",
+    "Promise.resolve",
+    "inserted.push",
+    "Object.assign",
+    "launchTemplate",
+    "beforeEach",
+    "describe",
+    "it",
+    "launch",
+    "expect(res.ok).toBe",
+    "expect",
+    "expect(res.code).toBe",
+    "expect(res.status).toBe",
+    "expect(inserted, 'nothing may be emitted for a refused launch').toHaveLength",
+    "expect(res.ok, 'a consistent overlay must still launch').toBe",
+    "expect(inserted).toHaveLength",
+    "expect(res.ok, 'an absent row is not evidence of a mismatch').toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/library-query.test.ts",
    "kind": "test",
    "lines": 22,
@@ -6074,8 +6588,8 @@
   {
    "file": "__tests__/middleware.test.ts",
    "kind": "test",
-   "lines": 439,
-   "bytes": 17659,
+   "lines": 527,
+   "bytes": 22359,
    "client": false,
    "exports": [],
    "imports": [
@@ -6119,10 +6633,26 @@
     "expect((res as Response).status).not.toBe",
     "(res as Response).headers.get",
     "expect(location).not.toContain",
+    "expect(location, `${p} must not bounce to /login`).not.toContain",
+    "expect(location).toContain",
+    "join",
+    "process.cwd",
+    "readdirSync",
+    "e.isDirectory",
+    "walk",
+    "rel.replace",
+    "routes.push",
+    "r.replace",
+    "existsSync",
+    "expect(routes.length, 'the walk found no pages — the test is not testing anything').toBeGreaterThan",
+    "NEEDS_SESSION_BY_DESIGN.has",
+    "location.includes",
+    "gated.push",
+    "expect(gated, `these public pages redirect anonymous visitors to /login: ${gated.join(', ')}`).toEqual",
+    "gated.join",
     "expect(json.error).toBe",
     "expect(typeof json.error, `${path} → error`).toBe",
     "expect(json.code, `${path} → code`).toBe",
-    "expect(location).toContain",
     "expect(json.error).toContain",
     "expect(location).toMatch"
    ],
@@ -8028,8 +8558,8 @@
   {
    "file": "__tests__/proposals-create.test.ts",
    "kind": "test",
-   "lines": 574,
-   "bytes": 21375,
+   "lines": 603,
+   "bytes": 23372,
    "client": false,
    "exports": [],
    "imports": [
@@ -8122,7 +8652,10 @@
     "vi.fn().mockResolvedValueOnce",
     "expect(sqlBeginMock).not.toHaveBeenCalled",
     "sqlBeginMock.mockRejectedValue",
-    "expect(emitEventEndMock).not.toHaveBeenCalled",
+    "expect(emitEventEndMock).toHaveBeenCalledTimes",
+    "expect(endArgs.error).toBeTruthy",
+    "expect(endArgs.error.message).toContain",
+    "expect(endArgs.result).toBeUndefined",
     "expect(putObjectMock).not.toHaveBeenCalled",
     "sqlMock.mockRejectedValueOnce",
     "putObjectMock.mockRejectedValue",
@@ -8204,6 +8737,78 @@
     "expect(truncationNotice(back)).toMatch",
     "truncationNotice",
     "expect(truncationNotice(extractionOf({ extraction: { chars: 10, truncated: false, originalChars: 10 } }))).toBeNull"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/purchase-history-surfacing.test.ts",
+   "kind": "test",
+   "lines": 91,
+   "bytes": 4491,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "react",
+     "names": [
+      "h"
+     ]
+    },
+    {
+     "spec": "react-dom/server",
+     "names": [
+      "renderToStaticMarkup"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "@/components/portal/billing-panel",
+     "names": [
+      "BillingPanel"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "renderToStaticMarkup",
+    "h",
+    "describe",
+    "it",
+    "render",
+    "expect(html).toContain",
+    "expect",
+    "expect(without).not.toContain",
+    "expect(withNames).toContain",
+    "fs.readFileSync",
+    "path.join",
+    "process.cwd",
+    "src.indexOf",
+    "src.slice",
+    "Math.max",
+    "expect(q).toMatch"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -9059,6 +9664,94 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/seeded-credentials.test.ts",
+   "kind": "test",
+   "lines": 165,
+   "bytes": 8790,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "path.join",
+    "fs.readdirSync(MIGRATIONS).filter((f) => /^\\d+_.*\\.sql$/.test(f)).sort",
+    "fs.readdirSync(MIGRATIONS).filter",
+    "fs.readdirSync",
+    "/^\\d+_.*\\.sql$/.test",
+    "fs.readFileSync(path.join(MIGRATIONS, file), 'utf8')\n      .split('\\n').map((l) => l.replace(/--.*$/, '')).join",
+    "fs.readFileSync(path.join(MIGRATIONS, file), 'utf8')\n      .split('\\n').map",
+    "fs.readFileSync(path.join(MIGRATIONS, file), 'utf8').split",
+    "fs.readFileSync",
+    "l.replace",
+    "sql.split",
+    "/\\b(INSERT\\s+INTO\\s+users|UPDATE\\s+users)\\b/i.test",
+    "[...stmt.matchAll(/'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})'/g)].map",
+    "stmt.matchAll",
+    "/email\\s+LIKE\\s+'%\\.test'/i.test",
+    "email.endsWith",
+    "/is_active\\s*=\\s*true/i.test",
+    "/temp_password\\s*=\\s*false/i.test",
+    "/password_hash\\s+LIKE\\s+'\\$2%'/i.test",
+    "applyTo",
+    "stmt.split",
+    "BCRYPT.test",
+    "/password_hash/i.test",
+    "unparsed.push",
+    "accounts.get",
+    "accounts.set",
+    "/\\bUPDATE\\s+users\\b/i.test",
+    "stmtFull.split",
+    "/temp_password\\s*(?:=|,)\\s*(true|false)/i.exec",
+    "/,\\s*(true|false)\\s*,\\s*(?:true|false)\\s*\\)/i.exec",
+    "temp[1].toLowerCase",
+    "/is_active\\s*=\\s*(true|false)/i.exec",
+    "active[1].toLowerCase",
+    "describe",
+    "replayMigrations",
+    "it",
+    "expect(accounts.size).toBeGreaterThan",
+    "expect",
+    "expect([...accounts.keys()]).toContain",
+    "accounts.keys",
+    "expect(unparsed, `unparsed users statements:\\n  ${unparsed.join('\\n  ')}`).toEqual",
+    "unparsed.join",
+    "[...accounts.entries()]\n      .filter(([, s]) => s.hasRealHash && s.tempPassword === false && s.isActive !== false).map",
+    "[...accounts.entries()].filter",
+    "accounts.entries",
+    "expect(exposed, [\n      'These accounts end up sign-in-able with a password hash committed to this repository:',\n      ...exposed.map((e) => `  · ${e}`),\n      '',\n      'Follow the mig-124 pattern: deliver the plaintext out-of-band and set temp_password = true',\n      'so first login forces a reset — see 157_econdev_partner_admin.sql for the shape.',\n    ].join('\\n')).toEqual",
+    "[\n      'These accounts end up sign-in-able with a password hash committed to this repository:',\n      ...exposed.map((e) => `  · ${e}`),\n      '',\n      'Follow the mig-124 pattern: deliver the plaintext out-of-band and set temp_password = true',\n      'so first login forces a reset — see 157_econdev_partner_admin.sql for the shape.',\n    ].join",
+    "exposed.map",
+    "expect(st, `${email} not found by the replay`).toBeDefined",
+    "expect(st!.tempPassword, `${email} should force a reset`).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/source-text-cap.test.ts",
    "kind": "test",
    "lines": 114,
@@ -9206,6 +9899,72 @@
     "titles",
     "PROPOSAL_STARTERS.find((s) => s.slug === 'dp2-technical-volume')!.build",
     "expect(titles(dp2)[0]).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/storage-abstraction-boundary.test.ts",
+   "kind": "test",
+   "lines": 80,
+   "bytes": 3989,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "process.cwd",
+    "readdirSync",
+    "e.name.startsWith",
+    "SKIP_DIRS.has",
+    "join",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "full.includes",
+    "out.push",
+    "statSync(join(ROOT, d)).isDirectory",
+    "statSync",
+    "describe",
+    "it",
+    "sourceFiles().filter",
+    "sourceFiles",
+    "/@aws-sdk\\/client-s3/.test",
+    "readFileSync",
+    "expect(\n      offenders.map((f) => f.replace(ROOT + '/', '')),\n      'these files bypass lib/storage/s3-client.ts, so STORAGE_DRIVER=local does not apply to them',\n    ).toEqual",
+    "expect",
+    "offenders.map",
+    "f.replace",
+    "/\\bs3\\.send\\s*\\(/.test",
+    "expect(\n      offenders.map((f) => f.replace(ROOT + '/', '')),\n      'these files issue raw S3 commands — use the helpers so the local driver keeps working',\n    ).toEqual",
+    "expect(sourceFiles().length).toBeGreaterThan",
+    "expect(src, `lib/storage/s3-client.ts must export ${fn}`).toMatch"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -19383,8 +20142,8 @@
   {
    "file": "app/admin/site/[pageKey]/editor-client.tsx",
    "kind": "app-component",
-   "lines": 342,
-   "bytes": 12326,
+   "lines": 416,
+   "bytes": 15668,
    "client": true,
    "exports": [
     {
@@ -19427,7 +20186,7 @@
      ]
     }
    ],
-   "tryCount": 5,
+   "tryCount": 6,
    "sqlTags": [],
    "calls": [
     "s.includes",
@@ -19435,25 +20194,31 @@
     "Number.isNaN",
     "dt.getTime",
     "dt.toLocaleDateString",
+    "useState",
+    "setOpen",
+    "fetch",
+    "encodeURIComponent",
+    "res.json",
+    "setErr",
+    "setRows",
+    "rows.map",
+    "fmtWhen",
+    "shortActor",
     "JSON.parse",
     "metaText.trim",
     "JSON.stringify",
     "edits.map",
     "b.metaText.trim",
     "b.featuredImage.trim",
-    "useState",
     "initial.map",
     "useUnsavedChanges",
     "setBlocks",
     "bs.map",
     "bs.filter",
-    "fetch",
     "res.json().catch",
-    "res.json",
     "setBusy",
     "setMsg",
     "postJSON",
-    "encodeURIComponent",
     "toBlocks",
     "versionOf",
     "String",
@@ -19462,8 +20227,6 @@
     "save",
     "setPreviewNonce",
     "setPreview",
-    "fmtWhen",
-    "shortActor",
     "blocks.map",
     "update",
     "remove",
@@ -19474,6 +20237,7 @@
     "publish"
    ],
    "jsx": [
+    "VersionHistory",
     "ImageUploadField",
     "MarketingIcon"
    ],
@@ -22018,8 +22782,8 @@
   {
    "file": "app/api/admin/agents/platform-config/route.ts",
    "kind": "api-route",
-   "lines": 224,
-   "bytes": 8627,
+   "lines": 228,
+   "bytes": 8829,
    "client": false,
    "exports": [
     {
@@ -22101,10 +22865,6 @@
     },
     {
      "tag": "sql",
-     "line": 176
-    },
-    {
-     "tag": "sql",
      "line": 177
     },
     {
@@ -22113,11 +22873,15 @@
     },
     {
      "tag": "sql",
-     "line": 182
+     "line": 179
     },
     {
      "tag": "sql",
-     "line": 192
+     "line": 183
+    },
+    {
+     "tag": "sql",
+     "line": 193
     }
    ],
    "calls": [
@@ -22138,7 +22902,8 @@
     "userActor",
     "Object.keys",
     "setClauses.reduce",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -22207,17 +22972,17 @@
     {
      "arg": "{ data: serialize(row) }",
      "opts": "",
-     "line": 214
-    },
-    {
-     "arg": "{ error: 'Failed to update platform config', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 217
+     "line": 215
     },
     {
      "arg": "{ error: 'Failed to update platform config', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
      "line": 221
+    },
+    {
+     "arg": "{ error: 'Failed to update platform config', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 225
     }
    ],
    "route": "/api/admin/agents/platform-config",
@@ -22558,8 +23323,8 @@
   {
    "file": "app/api/admin/applications/[id]/accept/route.ts",
    "kind": "api-route",
-   "lines": 363,
-   "bytes": 15944,
+   "lines": 377,
+   "bytes": 16470,
    "client": false,
    "exports": [
     {
@@ -22599,7 +23364,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -22693,7 +23458,7 @@
     "emitEventSingle",
     "console.error",
     "applicationAcceptedEmail",
-    "sendEmail",
+    "send",
     "String",
     "closeTasksForEntity",
     "backfillTenant",
@@ -22739,14 +23504,14 @@
      "line": 77
     },
     {
-     "arg": "{\n      data: {\n        tenantId: tenantId,\n        tenantSlug: finalSlug,\n        userId: newUserId,\n        contactEmail: app.contactEmail,\n        contactName: app.contactName,\n        companyName: app.companyName,\n        emailSent: emailResult.provider !== 'skipped',\n        emailProvider: emailResult.provider,\n        emailFailed: !!emailResult.error,\n        // The admin UI relays these to ",
+     "arg": "{\n      data: {\n        tenantId: tenantId,\n        tenantSlug: finalSlug,\n        userId: newUserId,\n        contactEmail: app.contactEmail,\n        contactName: app.contactName,\n        companyName: app.companyName,\n        emailSent: emailResult.accepted,\n        emailProvider: emailResult.provider,\n        emailFailed: !!emailResult.error,\n        // The admin UI relays these to the customer w",
      "opts": "",
-     "line": 332
+     "line": 346
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 357
+     "line": 371
     }
    ],
    "route": "/api/admin/applications/[id]/accept",
@@ -22759,8 +23524,8 @@
   {
    "file": "app/api/admin/applications/[id]/reject/route.ts",
    "kind": "api-route",
-   "lines": 150,
-   "bytes": 5449,
+   "lines": 161,
+   "bytes": 5982,
    "client": false,
    "exports": [
     {
@@ -22799,7 +23564,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -22831,11 +23596,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 53
+     "line": 54
     },
     {
      "tag": "sql",
-     "line": 90
+     "line": 91
     }
    ],
    "calls": [
@@ -22851,7 +23616,7 @@
     "String",
     "closeTasksForEntity",
     "applicationRejectedEmail",
-    "sendEmail"
+    "send"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -22860,57 +23625,57 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 19
+     "line": 20
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Review notes are required (min 10 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 47
+     "line": 48
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 62
+     "line": 63
     },
     {
      "arg": "{ error: 'Application not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 66
+     "line": 67
     },
     {
      "arg": "{ error: `Application is already ${app.status}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 69
+     "line": 70
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 101
+     "line": 102
     },
     {
      "arg": "{ data: { rejected: true } }",
      "opts": "",
-     "line": 141
+     "line": 149
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 144
+     "line": 155
     }
    ],
    "route": "/api/admin/applications/[id]/reject",
@@ -22923,8 +23688,8 @@
   {
    "file": "app/api/admin/applications/[id]/status/route.ts",
    "kind": "api-route",
-   "lines": 110,
-   "bytes": 3969,
+   "lines": 114,
+   "bytes": 4151,
    "client": false,
    "exports": [
     {
@@ -22971,11 +23736,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 55
+     "line": 56
     },
     {
      "tag": "sql",
-     "line": 84
+     "line": 85
     }
    ],
    "calls": [
@@ -22999,62 +23764,62 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 15
+     "line": 16
     },
     {
      "arg": "{ error: 'master_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 19
+     "line": 20
     },
     {
      "arg": "{ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Missing user id', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 40
+     "line": 41
     },
     {
      "arg": "{ error: 'Audit note required (min 5 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 47
+     "line": 48
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 61
+     "line": 62
     },
     {
      "arg": "{ error: 'Application not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 64
+     "line": 65
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 95
+     "line": 96
     },
     {
      "arg": "{\n      data: { previousStatus, newStatus: body.status },\n    }",
      "opts": "",
-     "line": 102
+     "line": 103
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 107
+     "line": 111
     }
    ],
    "route": "/api/admin/applications/[id]/status",
@@ -24148,8 +24913,8 @@
   {
    "file": "app/api/admin/documents/[documentId]/route.ts",
    "kind": "api-route",
-   "lines": 312,
-   "bytes": 9572,
+   "lines": 320,
+   "bytes": 9948,
    "client": false,
    "exports": [
     {
@@ -24244,6 +25009,7 @@
     "index.findIndex",
     "saveIndex",
     "emitEventEnd",
+    "String",
     "deleteObject",
     "index.filter"
    ],
@@ -24309,42 +25075,42 @@
     {
      "arg": "{ error: 'documentId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 184
+     "line": 185
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'BAD_REQUEST' }",
      "opts": "{ status: 400 }",
-     "line": 194
+     "line": 195
     },
     {
      "arg": "{ error: 'document object is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 202
+     "line": 203
     },
     {
      "arg": "{\n      data: { id: documentId, version: document.metadata?.version_number || 1 },\n    }",
      "opts": "",
-     "line": 251
+     "line": 252
     },
     {
      "arg": "{ error: 'Failed to save document', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 256
+     "line": 260
     },
     {
      "arg": "{ error: 'documentId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 275
+     "line": 280
     },
     {
      "arg": "{ data: { deleted: true } }",
      "opts": "",
-     "line": 303
+     "line": 308
     },
     {
      "arg": "{ error: 'Failed to delete document', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 306
+     "line": 314
     }
    ],
    "route": "/api/admin/documents/[documentId]",
@@ -24359,8 +25125,8 @@
   {
    "file": "app/api/admin/documents/route.ts",
    "kind": "api-route",
-   "lines": 205,
-   "bytes": 5929,
+   "lines": 209,
+   "bytes": 6117,
    "client": false,
    "exports": [
     {
@@ -24443,7 +25209,8 @@
     "description.trim",
     "index.push",
     "saveIndex",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -24472,37 +25239,37 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 95
+     "line": 96
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 102
+     "line": 103
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'BAD_REQUEST' }",
      "opts": "{ status: 400 }",
-     "line": 112
+     "line": 113
     },
     {
      "arg": "{ error: 'title is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 121
+     "line": 122
     },
     {
      "arg": "{ error: 'preset is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 127
+     "line": 128
     },
     {
      "arg": "{ data: { id, title: title.trim(), preset } }",
      "opts": "{ status: 201 }",
-     "line": 196
+     "line": 197
     },
     {
      "arg": "{ error: 'Failed to create document', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 199
+     "line": 203
     }
    ],
    "route": "/api/admin/documents",
@@ -26942,8 +27709,8 @@
   {
    "file": "app/api/admin/rfp-curation/[solId]/annotations/route.ts",
    "kind": "api-route",
-   "lines": 211,
-   "bytes": 7041,
+   "lines": 215,
+   "bytes": 7235,
    "client": false,
    "exports": [
     {
@@ -26998,11 +27765,11 @@
     },
     {
      "tag": "sql",
-     "line": 155
+     "line": 156
     },
     {
      "tag": "sql",
-     "line": 181
+     "line": 182
     }
    ],
    "calls": [
@@ -27055,67 +27822,67 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 87
+     "line": 88
     },
     {
      "arg": "{ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 97
+     "line": 98
     },
     {
      "arg": "{ error: 'Invalid solicitation ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 106
+     "line": 107
     },
     {
      "arg": "{ error: 'Request body must be valid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 117
+     "line": 118
     },
     {
      "arg": "{ error: `kind is required and must be one of: ${VALID_KINDS.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 126
+     "line": 127
     },
     {
      "arg": "{ error: 'sourceLocation is required and must be an object', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 132
+     "line": 133
     },
     {
      "arg": "{ error: 'payload must be an object', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 138
+     "line": 139
     },
     {
      "arg": "{ error: 'complianceVariableName must be a string', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 144
+     "line": 145
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 160
+     "line": 161
     },
     {
      "arg": "{ error: 'Solicitation not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 163
+     "line": 164
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 195
+     "line": 196
     },
     {
      "arg": "{ data: { annotation } }",
      "opts": "",
-     "line": 202
+     "line": 203
     },
     {
      "arg": "{ error: 'Failed to save annotation', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 205
+     "line": 209
     }
    ],
    "route": "/api/admin/rfp-curation/[solId]/annotations",
@@ -27329,8 +28096,8 @@
   {
    "file": "app/api/admin/rfp-curation/[solId]/assess-ingest/route.ts",
    "kind": "api-route",
-   "lines": 193,
-   "bytes": 8607,
+   "lines": 198,
+   "bytes": 8940,
    "client": false,
    "exports": [
     {
@@ -27424,7 +28191,8 @@
     "summarizeAudit",
     "emitEventStart",
     "userActor",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -27458,17 +28226,17 @@
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 169
+     "line": 174
     },
     {
      "arg": "{ data: { solicitationId: solId, requested: true, snapshot } }",
      "opts": "",
-     "line": 184
+     "line": 189
     },
     {
      "arg": "{ error: 'Failed to request ingest assessment', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 187
+     "line": 192
     }
    ],
    "route": "/api/admin/rfp-curation/[solId]/assess-ingest",
@@ -29457,8 +30225,8 @@
   {
    "file": "app/api/admin/rfp-curation/[solId]/triage/route.ts",
    "kind": "api-route",
-   "lines": 250,
-   "bytes": 8825,
+   "lines": 255,
+   "bytes": 9158,
    "client": false,
    "exports": [
     {
@@ -29509,11 +30277,11 @@
     },
     {
      "tag": "sql",
-     "line": 168
+     "line": 173
     },
     {
      "tag": "sql",
-     "line": 200
+     "line": 205
     }
    ],
    "calls": [
@@ -29528,7 +30296,8 @@
     "mapping.from.includes",
     "emitEventStart",
     "userActor",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -29582,32 +30351,32 @@
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 159
+     "line": 164
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 183
+     "line": 188
     },
     {
      "arg": "{ error: 'Status changed concurrently, please retry', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 191
+     "line": 196
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 212
+     "line": 217
     },
     {
      "arg": "{\n      data: {\n        triageActionId: triageRow.id,\n        solicitationId: solId,\n        action,\n        fromState,\n        toState,\n      },\n    }",
      "opts": "",
-     "line": 233
+     "line": 238
     },
     {
      "arg": "{ error: 'Failed to record triage action', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 244
+     "line": 249
     }
    ],
    "route": "/api/admin/rfp-curation/[solId]/triage",
@@ -30062,8 +30831,8 @@
   {
    "file": "app/api/admin/rfp-upload/route.ts",
    "kind": "api-route",
-   "lines": 671,
-   "bytes": 30145,
+   "lines": 675,
+   "bytes": 30333,
    "client": false,
    "exports": [
     {
@@ -30160,19 +30929,15 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 236
+     "line": 237
     },
     {
      "tag": "sql",
-     "line": 296
+     "line": 297
     },
     {
      "tag": "sql",
-     "line": 383
-    },
-    {
-     "tag": "sql",
-     "line": 439
+     "line": 384
     },
     {
      "tag": "sql",
@@ -30184,15 +30949,19 @@
     },
     {
      "tag": "sql",
-     "line": 475
+     "line": 442
     },
     {
      "tag": "sql",
-     "line": 563
+     "line": 476
     },
     {
      "tag": "sql",
-     "line": 592
+     "line": 564
+    },
+    {
+     "tag": "sql",
+     "line": 593
     }
    ],
    "calls": [
@@ -30279,102 +31048,102 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 100
+     "line": 101
     },
     {
      "arg": "{ error: 'rfp_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 108
+     "line": 109
     },
     {
      "arg": "{ error: 'Invalid multipart body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 119
+     "line": 120
     },
     {
      "arg": "{ error: 'Invalid solicitationId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 130
+     "line": 131
     },
     {
      "arg": "{ error: `Invalid documentType (allowed: ${VALID_DOCUMENT_TYPES.join(', ')})`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 147
+     "line": 148
     },
     {
      "arg": "{\n          error: 'Invalid metadata',\n          code: 'VALIDATION_ERROR',\n          details: parsed.error.issues,\n        }",
      "opts": "{ status: 422 }",
-     "line": 170
+     "line": 171
     },
     {
      "arg": "{ error: 'At least one file is required', code: 'NO_FILES' }",
      "opts": "{ status: 422 }",
-     "line": 188
+     "line": 189
     },
     {
      "arg": "{\n          error: `Unsupported file type: .${ext} (allowed: ${ALLOWED_EXTENSIONS.join(', ')})`,\n          code: 'UNSUPPORTED_FILE_TYPE',\n        }",
      "opts": "{ status: 422 }",
-     "line": 199
+     "line": 200
     },
     {
      "arg": "{\n        error: `Total upload size ${(totalBytes / 1024 / 1024).toFixed(1)}MB exceeds ${MAX_TOTAL_BYTES / 1024 / 1024}MB limit`,\n        code: 'TOO_LARGE',\n      }",
      "opts": "{ status: 413 }",
-     "line": 209
+     "line": 210
     },
     {
      "arg": "{ error: 'Failed to check for duplicate files', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 254
+     "line": 255
     },
     {
      "arg": "{\n        error: `This file is already attached to \"${first.solTitle ?? 'this solicitation'}\". Attaching the same file to a DIFFERENT solicitation is allowed — only a repeat upload into the same one is refused.`,\n        code: 'DUPLICATE_FILE',\n        details: {\n          existingSolicitationId: first.solicitationId,\n          existingFilename: first.originalFilename,\n          matchedHash: first",
      "opts": "{ status: 409 }",
-     "line": 262
+     "line": 263
     },
     {
      "arg": "{ error: 'Solicitation not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 303
+     "line": 304
     },
     {
      "arg": "{ error: 'Failed to look up solicitation', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 313
+     "line": 314
     },
     {
      "arg": "{ error: 'Metadata (title, agency, programType) required for new solicitations', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 322
+     "line": 323
     },
     {
      "arg": "{ error: 'Failed to create opportunity/solicitation rows', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 373
+     "line": 374
     },
     {
      "arg": "{ error: 'Storage upload failed', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 447
+     "line": 448
     },
     {
      "arg": "{\n            error: 'This file is already attached to this solicitation. Attaching it to a different solicitation is allowed — only a repeat upload into the same one is refused.',\n            code: 'DUPLICATE_FILE',\n          }",
      "opts": "{ status: 409 }",
-     "line": 498
+     "line": 499
     },
     {
      "arg": "{ error: 'Failed to record document', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 510
+     "line": 511
     },
     {
      "arg": "{\n      data: {\n        opportunity_id: oppRowId,\n        solicitation_id: solId,\n        document_ids: documentIds,\n        total_bytes: totalBytes,\n        text_extracted: extractedText !== null,\n        topics_found: topicsExtracted,\n        ...(propagation ? { propagation } : {}),\n      },\n    }",
      "opts": "{ status: 201 }",
-     "line": 648
+     "line": 649
     },
     {
      "arg": "{ error: 'Upload failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 664
+     "line": 668
     }
    ],
    "route": "/api/admin/rfp-upload",
@@ -30387,8 +31156,8 @@
   {
    "file": "app/api/admin/sbir-data/ingest/route.ts",
    "kind": "api-route",
-   "lines": 609,
-   "bytes": 21748,
+   "lines": 613,
+   "bytes": 21930,
    "client": false,
    "exports": [
     {
@@ -30450,15 +31219,15 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 438
+     "line": 439
     },
     {
      "tag": "sql",
-     "line": 543
+     "line": 544
     },
     {
      "tag": "sql",
-     "line": 592
+     "line": 596
     }
    ],
    "calls": [
@@ -30517,7 +31286,8 @@
     "batch.push",
     "insertCompanyBatch",
     "insertAwardBatch",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -30526,92 +31296,92 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 387
+     "line": 388
     },
     {
      "arg": "{ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 391
+     "line": 392
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 395
+     "line": 396
     },
     {
      "arg": "{ error: 'Missing s3Key in JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 410
+     "line": 411
     },
     {
      "arg": "{ error: `File not found in S3: ${s3Key}`, code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 415
+     "line": 416
     },
     {
      "arg": "{ error: 'Missing file field', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 424
+     "line": 425
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 444
+     "line": 445
     },
     {
      "arg": "{ error: `This file has already been uploaded (matched ${existingUpload.filename})`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 447
+     "line": 448
     },
     {
      "arg": "{ error: 'CSV file is empty or has no header row', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 457
+     "line": 458
     },
     {
      "arg": "{ error: 'Unable to detect file type. Expected headers like \"Award Title\", \"Award Amount\", or \"Number Awards\".', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 478
+     "line": 479
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 549
+     "line": 550
     },
     {
      "arg": "{\n      data: { fileType, rowCount, filename },\n    }",
      "opts": "",
-     "line": 563
+     "line": 564
     },
     {
      "arg": "{ error: 'Ingest failed', code: 'INGEST_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 568
+     "line": 572
     },
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 583
+     "line": 587
     },
     {
      "arg": "{ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 587
+     "line": 591
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 597
+     "line": 601
     },
     {
      "arg": "{ data: { uploads } }",
      "opts": "",
-     "line": 600
+     "line": 604
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 603
+     "line": 607
     }
    ],
    "route": "/api/admin/sbir-data/ingest",
@@ -32148,8 +32918,8 @@
   {
    "file": "app/api/admin/sources/[profileId]/diffs/route.ts",
    "kind": "api-route",
-   "lines": 184,
-   "bytes": 6059,
+   "lines": 188,
+   "bytes": 6241,
    "client": false,
    "exports": [
     {
@@ -32199,7 +32969,7 @@
     },
     {
      "tag": "sql",
-     "line": 147
+     "line": 148
     }
    ],
    "calls": [
@@ -32250,52 +33020,52 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 86
+     "line": 87
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 94
+     "line": 95
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 102
+     "line": 103
     },
     {
      "arg": "{ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 111
+     "line": 112
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 122
+     "line": 123
     },
     {
      "arg": "{ error: 'Invalid diffId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 130
+     "line": 131
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 160
+     "line": 161
     },
     {
      "arg": "{ error: 'Diff not found or already reviewed', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 165
+     "line": 166
     },
     {
      "arg": "{ data: { reviewed: true } }",
      "opts": "",
-     "line": 175
+     "line": 176
     },
     {
      "arg": "{ error: 'Failed to review diff', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 178
+     "line": 182
     }
    ],
    "route": "/api/admin/sources/[profileId]/diffs",
@@ -32309,8 +33079,8 @@
   {
    "file": "app/api/admin/sources/[profileId]/expand-topics/route.ts",
    "kind": "api-route",
-   "lines": 237,
-   "bytes": 8322,
+   "lines": 241,
+   "bytes": 8504,
    "client": false,
    "exports": [
     {
@@ -32351,15 +33121,15 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 120
+     "line": 121
     },
     {
      "tag": "sql",
-     "line": 145
+     "line": 146
     },
     {
      "tag": "sql",
-     "line": 198
+     "line": 199
     }
    ],
    "calls": [
@@ -32378,7 +33148,8 @@
     "emitEventStart",
     "userActor",
     "sql.json",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -32387,77 +33158,77 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 51
+     "line": 52
     },
     {
      "arg": "{ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 60
+     "line": 61
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 71
+     "line": 72
     },
     {
      "arg": "{ error: 'Valid solicitationId (UUID) is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 80
+     "line": 81
     },
     {
      "arg": "{ error: 'topicNumbers must be an array of strings', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 93
+     "line": 94
     },
     {
      "arg": "{ error: 'solicitationNumber must be a string', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 108
+     "line": 109
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 128
+     "line": 129
     },
     {
      "arg": "{ error: 'Source profile not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 134
+     "line": 135
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 155
+     "line": 156
     },
     {
      "arg": "{ error: 'Solicitation not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 161
+     "line": 162
     },
     {
      "arg": "{ error: 'Failed to enqueue topic expansion job', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 212
+     "line": 213
     },
     {
      "arg": "{ data: { jobId: job.id } }",
      "opts": "{ status: 201 }",
-     "line": 228
+     "line": 229
     },
     {
      "arg": "{ error: 'Failed to enqueue topic expansion job', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 231
+     "line": 235
     }
    ],
    "route": "/api/admin/sources/[profileId]/expand-topics",
@@ -32757,8 +33528,8 @@
   {
    "file": "app/api/admin/sources/[profileId]/route.ts",
    "kind": "api-route",
-   "lines": 165,
-   "bytes": 5827,
+   "lines": 169,
+   "bytes": 6009,
    "client": false,
    "exports": [
     {
@@ -32799,11 +33570,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 98
+     "line": 99
     },
     {
      "tag": "sql",
-     "line": 137
+     "line": 138
     }
    ],
    "calls": [
@@ -32827,57 +33598,57 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 34
+     "line": 35
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 42
+     "line": 43
     },
     {
      "arg": "{ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 51
+     "line": 52
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 62
+     "line": 63
     },
     {
      "arg": "{ error: 'No valid fields to update', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 89
+     "line": 90
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 106
+     "line": 107
     },
     {
      "arg": "{ error: 'Source profile not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 109
+     "line": 110
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 149
+     "line": 150
     },
     {
      "arg": "{ data: { updated: true } }",
      "opts": "",
-     "line": 156
+     "line": 157
     },
     {
      "arg": "{ error: 'Failed to update source profile', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 159
+     "line": 163
     }
    ],
    "route": "/api/admin/sources/[profileId]",
@@ -32890,8 +33661,8 @@
   {
    "file": "app/api/admin/sources/[profileId]/scout/route.ts",
    "kind": "api-route",
-   "lines": 108,
-   "bytes": 3306,
+   "lines": 112,
+   "bytes": 3488,
    "client": false,
    "exports": [
     {
@@ -32932,11 +33703,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 59
+     "line": 60
     },
     {
      "tag": "sql",
-     "line": 83
+     "line": 84
     }
    ],
    "calls": [
@@ -32947,6 +33718,7 @@
     "userActor",
     "sql.json",
     "emitEventEnd",
+    "String",
     "console.error"
    ],
    "jsx": [],
@@ -32956,37 +33728,37 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 52
+     "line": 53
     },
     {
      "arg": "{ error: 'Source profile not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 65
+     "line": 66
     },
     {
      "arg": "{ data: { jobId: job.id } }",
      "opts": "{ status: 201 }",
-     "line": 99
+     "line": 100
     },
     {
      "arg": "{ error: 'Failed to enqueue scout job', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 102
+     "line": 106
     }
    ],
    "route": "/api/admin/sources/[profileId]/scout",
@@ -32999,8 +33771,8 @@
   {
    "file": "app/api/admin/sources/[profileId]/visit/route.ts",
    "kind": "api-route",
-   "lines": 151,
-   "bytes": 5793,
+   "lines": 155,
+   "bytes": 5975,
    "client": false,
    "exports": [
     {
@@ -33041,15 +33813,15 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 79
+     "line": 80
     },
     {
      "tag": "sql",
-     "line": 108
+     "line": 109
     },
     {
      "tag": "sql",
-     "line": 129
+     "line": 130
     }
    ],
    "calls": [
@@ -33080,57 +33852,57 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 34
+     "line": 35
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 39
+     "line": 40
     },
     {
      "arg": "{ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 45
+     "line": 46
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 53
+     "line": 54
     },
     {
      "arg": "{ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 58
+     "line": 59
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 87
+     "line": 88
     },
     {
      "arg": "{ error: 'Source profile not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 90
+     "line": 91
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 124
+     "line": 125
     },
     {
      "arg": "{ data: { visitId: visit.id } }",
      "opts": "",
-     "line": 145
+     "line": 146
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 148
+     "line": 152
     }
    ],
    "route": "/api/admin/sources/[profileId]/visit",
@@ -33143,8 +33915,8 @@
   {
    "file": "app/api/admin/sources/route.ts",
    "kind": "api-route",
-   "lines": 160,
-   "bytes": 6285,
+   "lines": 164,
+   "bytes": 6467,
    "client": false,
    "exports": [
     {
@@ -33202,7 +33974,7 @@
     },
     {
      "tag": "sql",
-     "line": 131
+     "line": 132
     }
    ],
    "calls": [
@@ -33257,47 +34029,47 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 75
+     "line": 76
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 79
+     "line": 80
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 84
+     "line": 85
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 91
+     "line": 92
     },
     {
      "arg": "{ error: 'Missing required fields: name, siteType, baseUrl', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 100
+     "line": 101
     },
     {
      "arg": "{ error: `Invalid siteType. Must be one of: ${validSiteTypes.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 108
+     "line": 109
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 147
+     "line": 148
     },
     {
      "arg": "{ data: { id: row.id, name: row.name } }",
      "opts": "",
-     "line": 154
+     "line": 155
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 157
+     "line": 161
     }
    ],
    "route": "/api/admin/sources",
@@ -33311,8 +34083,8 @@
   {
    "file": "app/api/admin/storage/route.ts",
    "kind": "api-route",
-   "lines": 540,
-   "bytes": 19805,
+   "lines": 510,
+   "bytes": 19180,
    "client": false,
    "exports": [
     {
@@ -33366,15 +34138,6 @@
      ]
     },
     {
-     "spec": "@aws-sdk/client-s3",
-     "names": [
-      "ListObjectsV2Command",
-      "DeleteObjectCommand",
-      "DeleteObjectsCommand",
-      "HeadObjectCommand"
-     ]
-    },
-    {
      "spec": "@/auth",
      "names": [
       "auth"
@@ -33401,18 +34164,22 @@
     {
      "spec": "@/lib/storage/s3-client",
      "names": [
-      "s3",
       "BUCKET",
       "putObject",
-      "getSignedGetUrl"
+      "getSignedGetUrl",
+      "listObjects",
+      "listObjectsDeep",
+      "objectStat",
+      "deleteObject",
+      "deleteObjects"
      ]
     }
    ],
-   "tryCount": 12,
+   "tryCount": 11,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 220
+     "line": 216
     }
    ],
    "calls": [
@@ -33425,11 +34192,9 @@
     "searchParams.get",
     "prefixIsValid",
     "getSignedGetUrl",
-    "s3.send",
-    "(response.Contents ?? [])\n      .filter((obj) => obj.Key !== prefix).map",
-    "(response.Contents ?? []).filter",
-    "obj.LastModified.toISOString",
-    "(response.CommonPrefixes ?? []).map",
+    "listObjects",
+    "listed.objects.map",
+    "o.lastModified.toISOString",
     "console.error",
     "request.formData",
     "msg.includes",
@@ -33459,17 +34224,21 @@
     "request.json",
     "getSignedPutUrl",
     "oldKey.endsWith",
-    "obj.Key.slice",
+    "listObjectsDeep",
+    "obj.key.slice",
     "copyObject",
+    "deleteObjects",
     "contents.map",
     "deleteObject",
+    "objectStat",
     "body.key.split('/').pop",
     "body.key.split",
     "filename.toLowerCase().endsWith",
     "filename.toLowerCase",
     "getObjectBuffer",
     "(size / 1024 / 1024).toFixed",
-    "key.endsWith"
+    "key.endsWith",
+    "(await listObjectsDeep(key)).map"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -33478,217 +34247,217 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 58
+     "line": 66
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 65
+     "line": 73
     },
     {
      "arg": "{ error: 'Key must start with an allowed prefix', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 77
+     "line": 85
     },
     {
      "arg": "{ data: { url } }",
      "opts": "",
-     "line": 83
+     "line": 91
     },
     {
      "arg": "{ error: 'Prefix must start with an allowed prefix', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 89
+     "line": 97
     },
     {
      "arg": "{ data: { objects, prefixes } }",
      "opts": "",
-     "line": 115
+     "line": 111
     },
     {
      "arg": "{ error: 'Failed to list storage objects', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 118
+     "line": 114
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 130
+     "line": 126
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 137
+     "line": 133
     },
     {
      "arg": "{ error: `Upload failed: ${msg.includes('size') ? 'File too large for server limit' : 'Invalid multipart body — check file size and format'}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 150
+     "line": 146
     },
     {
      "arg": "{ error: 'A file field is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 158
+     "line": 154
     },
     {
      "arg": "{ error: `File exceeds ${MAX_UPLOAD_BYTES / 1024 / 1024}MB limit`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 413 }",
-     "line": 165
+     "line": 161
     },
     {
      "arg": "{ error: 'Uploads are only allowed to writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 173
+     "line": 169
     },
     {
      "arg": "{ error: 'Invalid folder name', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 187
+     "line": 183
     },
     {
      "arg": "{ data: { key: folderKey, folder: true } }",
      "opts": "",
-     "line": 200
+     "line": 196
     },
     {
      "arg": "{ error: 'File must have a name', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 206
+     "line": 202
     },
     {
      "arg": "{ data: { key, size: file.size, sbirIngest: sbirResult } }",
      "opts": "{ status: 201 }",
-     "line": 265
+     "line": 261
     },
     {
      "arg": "{ error: 'Failed to upload file', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 271
+     "line": 267
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 283
+     "line": 279
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 287
+     "line": 283
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 294
+     "line": 290
     },
     {
      "arg": "{ error: 'filename is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 298
+     "line": 294
     },
     {
      "arg": "{ error: 'Uploads are only allowed to writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 303
+     "line": 299
     },
     {
      "arg": "{\n      data: { url, key, expiresIn: 900 },\n    }",
      "opts": "",
-     "line": 311
+     "line": 307
     },
     {
      "arg": "{ error: 'Failed to generate upload URL', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 316
+     "line": 312
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 325
+     "line": 321
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 329
+     "line": 325
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 337
+     "line": 333
     },
     {
      "arg": "{ error: 'oldKey and newKey are required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 344
+     "line": 340
     },
     {
      "arg": "{ error: 'Rename only allowed on writable prefixes', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 347
+     "line": 343
     },
     {
      "arg": "{ data: { renamed: true, oldKey, newKey } }",
      "opts": "",
-     "line": 350
+     "line": 346
     },
     {
      "arg": "{ data: { renamed: true, oldKey, newKey } }",
      "opts": "",
-     "line": 384
+     "line": 372
     },
     {
      "arg": "{ error: 'Invalid key or read-only prefix', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 389
+     "line": 377
     },
     {
      "arg": "{ error: 'File not found in storage — upload may have failed', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 396
+     "line": 383
     },
     {
      "arg": "{\n      data: {\n        key: body.key,\n        size,\n        confirmed: true,\n        sbirIngest: sbirResult,\n        ...(tooLargeForAutoIngest ? {\n          notice: `File is ${(size / 1024 / 1024).toFixed(0)}MB — too large for auto-ingest (limit ${MAX_AUTO_INGEST_BYTES / 1024 / 1024}MB). Use POST /api/admin/sbir-data/ingest to process it.`,\n        } : {}),\n      },\n    }",
      "opts": "",
-     "line": 442
+     "line": 426
     },
     {
      "arg": "{ error: 'Failed to confirm upload', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 455
+     "line": 439
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 464
+     "line": 448
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 471
+     "line": 455
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 482
+     "line": 466
     },
     {
      "arg": "{ error: 'key is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 490
+     "line": 474
     },
     {
      "arg": "{ error: 'Deletes are only allowed on writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 496
+     "line": 480
     },
     {
      "arg": "{ data: { deleted: true } }",
      "opts": "",
-     "line": 531
+     "line": 501
     },
     {
      "arg": "{ error: 'Failed to delete file', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 534
+     "line": 504
     }
    ],
    "route": "/api/admin/storage",
@@ -34649,8 +35418,8 @@
   {
    "file": "app/api/admin/tenants/[tenantId]/agent-config/route.ts",
    "kind": "api-route",
-   "lines": 217,
-   "bytes": 9027,
+   "lines": 221,
+   "bytes": 9229,
    "client": false,
    "exports": [
     {
@@ -34718,15 +35487,11 @@
     },
     {
      "tag": "sql",
-     "line": 163
+     "line": 164
     },
     {
      "tag": "sql",
-     "line": 178
-    },
-    {
-     "tag": "sql",
-     "line": 185
+     "line": 179
     },
     {
      "tag": "sql",
@@ -34746,7 +35511,11 @@
     },
     {
      "tag": "sql",
-     "line": 191
+     "line": 190
+    },
+    {
+     "tag": "sql",
+     "line": 192
     }
    ],
    "calls": [
@@ -34767,7 +35536,8 @@
     "Object.keys",
     "setClauses.push",
     "setClauses.reduce",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -34836,22 +35606,22 @@
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 165
+     "line": 166
     },
     {
      "arg": "{\n        data: {\n          tenantId,\n          monthlyBudget: updated?.monthlyBudget != null ? parseFloat(updated.monthlyBudget) : null,\n          rateLimitPerHour: updated?.rateLimitPerHour ?? null,\n          perCallCeiling: updated?.perCallCeiling != null ? parseFloat(updated.perCallCeiling) : null,\n        },\n      }",
      "opts": "",
-     "line": 200
-    },
-    {
-     "arg": "{ error: 'Failed to update agent config', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 210
+     "line": 201
     },
     {
      "arg": "{ error: 'Failed to update agent config', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
      "line": 214
+    },
+    {
+     "arg": "{ error: 'Failed to update agent config', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 218
     }
    ],
    "route": "/api/admin/tenants/[tenantId]/agent-config",
@@ -35130,8 +35900,8 @@
   {
    "file": "app/api/admin/tenants/[tenantId]/route.ts",
    "kind": "api-route",
-   "lines": 276,
-   "bytes": 9696,
+   "lines": 280,
+   "bytes": 9898,
    "client": false,
    "exports": [
     {
@@ -35211,11 +35981,7 @@
     },
     {
      "tag": "sql",
-     "line": 213
-    },
-    {
-     "tag": "sql",
-     "line": 235
+     "line": 214
     },
     {
      "tag": "sql",
@@ -35251,11 +36017,15 @@
     },
     {
      "tag": "sql",
-     "line": 246
+     "line": 244
     },
     {
      "tag": "sql",
-     "line": 249
+     "line": 247
+    },
+    {
+     "tag": "sql",
+     "line": 250
     }
    ],
    "calls": [
@@ -35277,7 +36047,8 @@
     "Object.keys",
     "setClauses.push",
     "setClauses.reduce",
-    "emitEventEnd"
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -35356,22 +36127,22 @@
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 217
+     "line": 218
     },
     {
      "arg": "{ data: { tenant: updated } }",
      "opts": "",
-     "line": 260
+     "line": 261
     },
     {
      "arg": "{ error: 'Failed to update tenant', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 263
+     "line": 267
     },
     {
      "arg": "{ error: 'Failed to update tenant', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 270
+     "line": 274
     }
    ],
    "route": "/api/admin/tenants/[tenantId]",
@@ -35385,8 +36156,8 @@
   {
    "file": "app/api/admin/tenants/route.ts",
    "kind": "api-route",
-   "lines": 251,
-   "bytes": 10460,
+   "lines": 260,
+   "bytes": 10867,
    "client": false,
    "exports": [
     {
@@ -35437,7 +36208,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -35486,7 +36257,8 @@
     "validEmail",
     "createTenantWithAdmin",
     "applicationAcceptedEmail",
-    "sendEmail",
+    "send",
+    "adminEmail.toLowerCase",
     "String(s ?? '').replace",
     "String",
     "safe"
@@ -35548,12 +36320,12 @@
     {
      "arg": "{\n      data: {\n        tenantId: created.tenantId,\n        slug: created.slug,\n        name,\n        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null, emailSent },\n        cardsBackfilled,\n      },\n    }",
      "opts": "{ status: 201 }",
-     "line": 234
+     "line": 243
     },
     {
      "arg": "{ error: 'Tenant creation failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 245
+     "line": 254
     }
    ],
    "route": "/api/admin/tenants",
@@ -36848,8 +37620,8 @@
   {
    "file": "app/api/applications/route.ts",
    "kind": "api-route",
-   "lines": 229,
-   "bytes": 9354,
+   "lines": 237,
+   "bytes": 9825,
    "client": false,
    "exports": [
     {
@@ -36898,7 +37670,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -36980,7 +37752,7 @@
     "randomUUID",
     "adminNewApplicationAlert",
     "input.techSummary.slice",
-    "sendEmail",
+    "send",
     "createTask",
     "console.error"
    ],
@@ -37016,17 +37788,17 @@
     {
      "arg": "{ data: { id: rows[0].id } }",
      "opts": "{ status: 201 }",
-     "line": 208
+     "line": 216
     },
     {
      "arg": "{\n          error:\n            'An application with this email already exists. If you need to update your submission, email eric@rfppipeline.com.',\n          code: 'DUPLICATE_EMAIL',\n        }",
      "opts": "{ status: 409 }",
-     "line": 213
+     "line": 221
     },
     {
      "arg": "{ error: 'Something went wrong. Please try again or email eric@rfppipeline.com.', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 223
+     "line": 231
     }
    ],
    "route": "/api/applications",
@@ -37164,8 +37936,8 @@
   {
    "file": "app/api/auth/forgot-password/route.ts",
    "kind": "api-route",
-   "lines": 103,
-   "bytes": 3829,
+   "lines": 114,
+   "bytes": 4567,
    "client": false,
    "exports": [
     {
@@ -37196,7 +37968,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -37229,7 +38001,7 @@
     "Date.now",
     "generateResetToken",
     "encodeURIComponent",
-    "sendEmail",
+    "send",
     "emitEventSingle",
     "systemActor",
     "console.error"
@@ -37246,12 +38018,12 @@
     {
      "arg": "{ data: { sent: true } }",
      "opts": "",
-     "line": 94
+     "line": 105
     },
     {
      "arg": "{ error: 'Internal error', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 97
+     "line": 108
     }
    ],
    "route": "/api/auth/forgot-password",
@@ -46478,8 +47250,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts",
    "kind": "api-route",
-   "lines": 587,
-   "bytes": 20514,
+   "lines": 591,
+   "bytes": 20702,
    "client": false,
    "exports": [
     {
@@ -46557,23 +47329,23 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 211
+     "line": 212
     },
     {
      "tag": "sql",
-     "line": 255
+     "line": 256
     },
     {
      "tag": "sql",
-     "line": 269
+     "line": 270
     },
     {
      "tag": "sql",
-     "line": 305
+     "line": 306
     },
     {
      "tag": "sql",
-     "line": 331
+     "line": 332
     }
    ],
    "calls": [
@@ -46631,137 +47403,137 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 106
+     "line": 107
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 119
+     "line": 120
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 126
+     "line": 127
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 134
+     "line": 135
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 143
+     "line": 144
     },
     {
      "arg": "{ error: 'Invalid proposal id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 151
+     "line": 152
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 162
+     "line": 163
     },
     {
      "arg": "{ error: 'Invalid section id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 169
+     "line": 170
     },
     {
      "arg": "{ error: 'AI service not configured', code: 'AI_ERROR' }",
      "opts": "{ status: 503 }",
-     "line": 177
+     "line": 178
     },
     {
      "arg": "guardErr.toResponseBody()",
      "opts": "{ status: guardErr.httpStatus }",
-     "line": 190
+     "line": 191
     },
     {
      "arg": "{ error: 'AI budget check failed', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 193
+     "line": 194
     },
     {
      "arg": "{ error: 'Failed to fetch proposal', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 219
+     "line": 220
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 227
+     "line": 228
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 237
+     "line": 238
     },
     {
      "arg": "{ error: 'Proposal has no linked solicitation', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 243
+     "line": 244
     },
     {
      "arg": "{ error: 'Section not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 261
+     "line": 262
     },
     {
      "arg": "{ error: 'Failed to fetch sections', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 287
+     "line": 288
     },
     {
      "arg": "{ error: 'No content to check — section is empty', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 294
+     "line": 295
     },
     {
      "arg": "{ error: 'No compliance data for this solicitation', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 322
+     "line": 323
     },
     {
      "arg": "{ error: 'Failed to fetch compliance data', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 417
+     "line": 418
     },
     {
      "arg": "{\n        data: {\n          sectionId: sectionId || null,\n          totalVariables: 0,\n          passed: 0,\n          failed: 0,\n          partial: 0,\n          notApplicable: 0,\n          checks: [],\n        },\n      }",
      "opts": "",
-     "line": 424
+     "line": 425
     },
     {
      "arg": "{ error: 'AI returned no response', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 483
+     "line": 484
     },
     {
      "arg": "{ error: 'AI returned unexpected format', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 496
+     "line": 497
     },
     {
      "arg": "{ error: 'AI returned unparseable response', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 504
+     "line": 505
     },
     {
      "arg": "{ error: 'AI service unavailable', code: 'AI_ERROR' }",
      "opts": "{ status: 502 }",
-     "line": 510
+     "line": 511
     },
     {
      "arg": "{\n      data: {\n        sectionId: sectionId || null,\n        totalVariables: complianceVariables.length,\n        passed,\n        failed,\n        partial,\n        notApplicable,\n        checks: structuredChecks,\n      },\n    }",
      "opts": "",
-     "line": 568
+     "line": 569
     },
     {
      "arg": "{ error: 'Compliance check failed', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 581
+     "line": 585
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance",
@@ -46774,8 +47546,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts",
    "kind": "api-route",
-   "lines": 199,
-   "bytes": 6840,
+   "lines": 203,
+   "bytes": 7028,
    "client": false,
    "exports": [
     {
@@ -46827,19 +47599,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 101
+     "line": 102
     },
     {
      "tag": "sql",
-     "line": 122
+     "line": 123
     },
     {
      "tag": "sql",
-     "line": 136
+     "line": 137
     },
     {
      "tag": "sql",
-     "line": 167
+     "line": 168
     }
    ],
    "calls": [
@@ -46865,62 +47637,62 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 53
+     "line": 54
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 62
+     "line": 63
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 71
+     "line": 72
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 83
+     "line": 84
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 113
+     "line": 114
     },
     {
      "arg": "{ error: 'Section not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 129
+     "line": 130
     },
     {
      "arg": "{\n          data: { sections_queued: 0, message: 'No empty sections to draft' },\n        }",
      "opts": "",
-     "line": 146
+     "line": 147
     },
     {
      "arg": "{\n        data: { sections_queued: sectionsQueued },\n      }",
      "opts": "",
-     "line": 180
+     "line": 181
     },
     {
      "arg": "{ error: 'AI draft queuing failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 186
+     "line": 187
     },
     {
      "arg": "{ error: 'AI draft failed', code: 'AI_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 193
+     "line": 197
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft",
@@ -48386,8 +49158,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts",
    "kind": "api-route",
-   "lines": 524,
-   "bytes": 21286,
+   "lines": 535,
+   "bytes": 21735,
    "client": false,
    "exports": [
     {
@@ -48454,7 +49226,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -48498,15 +49270,15 @@
     },
     {
      "tag": "sql",
-     "line": 268
+     "line": 269
     },
     {
      "tag": "sql",
-     "line": 285
+     "line": 286
     },
     {
      "tag": "sql",
-     "line": 491
+     "line": 499
     }
    ],
    "calls": [
@@ -48545,7 +49317,8 @@
     "sql.array",
     "coerceJsonb",
     "collaboratorInviteEmail",
-    "sendEmail",
+    "send",
+    "email.toLowerCase",
     "String",
     "emitEventSingle",
     "emitEventEnd",
@@ -48613,92 +49386,92 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 175
+     "line": 176
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 187
+     "line": 188
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 191
+     "line": 192
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 196
+     "line": 197
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 200
+     "line": 201
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 206
+     "line": 207
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 222
+     "line": 223
     },
     {
      "arg": "{ error: 'Valid email is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 246
+     "line": 247
     },
     {
      "arg": "{ error: 'Name exceeds maximum length (200 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 250
+     "line": 251
     },
     {
      "arg": "{ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 254
+     "line": 255
     },
     {
      "arg": "{ error: 'Role must be contributor or external', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 258
+     "line": 259
     },
     {
      "arg": "{ error: 'Permission must be view, comment, or edit', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 262
+     "line": 263
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 275
+     "line": 276
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 278
+     "line": 279
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 292
+     "line": 293
     },
     {
      "arg": "{ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 295
+     "line": 296
     },
     {
      "arg": "{\n      data: {\n        id: collaboratorId,\n        userId: finalUserId,\n        email,\n        name,\n        role: collabRole,\n        assignedSections,\n        permission,\n        isNewUser,\n      },\n    }",
      "opts": "",
-     "line": 504
+     "line": 512
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 518
+     "line": 529
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators",
@@ -49544,8 +50317,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts",
    "kind": "api-route",
-   "lines": 364,
-   "bytes": 12597,
+   "lines": 360,
+   "bytes": 12918,
    "client": false,
    "exports": [
     {
@@ -49615,16 +50388,9 @@
      ]
     },
     {
-     "spec": "@aws-sdk/client-s3",
-     "names": [
-      "ListObjectsV2Command"
-     ]
-    },
-    {
      "spec": "@/lib/storage/s3-client",
      "names": [
-      "s3",
-      "BUCKET"
+      "listObjects"
      ]
     },
     {
@@ -49638,11 +50404,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 64
+     "line": 66
     },
     {
      "tag": "sql",
-     "line": 167
+     "line": 163
     }
    ],
    "calls": [
@@ -49657,11 +50423,12 @@
     "hasRoleAtLeast",
     "url.searchParams.get",
     "dropboxPrefix",
-    "s3.send",
-    "(response.Contents || []).map",
-    "key.split('/').pop",
-    "key.split",
-    "obj.LastModified.toISOString",
+    "listObjects",
+    "listed.objects.slice(0, 100).map",
+    "listed.objects.slice",
+    "obj.key.split('/').pop",
+    "obj.key.split",
+    "obj.lastModified.toISOString",
     "request.formData",
     "formData.get",
     "file.name\n      .replace(/[^a-zA-Z0-9._-]/g, '_').slice",
@@ -49683,192 +50450,192 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 30
+     "line": 32
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 41
+     "line": 43
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
+     "line": 48
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 50
+     "line": 52
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 56
+     "line": 58
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 71
+     "line": 73
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 74
+     "line": 76
     },
     {
      "arg": "{ error: 'Invalid userId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 82
+     "line": 84
     },
     {
      "arg": "{ data: { files, userId: targetUserId } }",
      "opts": "",
-     "line": 108
+     "line": 104
     },
     {
      "arg": "{ data: { files: [], userId: targetUserId } }",
      "opts": "",
-     "line": 111
+     "line": 107
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 115
+     "line": 111
     },
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 132
+     "line": 128
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 144
+     "line": 140
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 149
+     "line": 145
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 153
+     "line": 149
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 159
+     "line": 155
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 174
+     "line": 170
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 177
+     "line": 173
     },
     {
      "arg": "{ error: 'Proposal is locked — uploads are disabled', code: 'LOCKED' }",
      "opts": "{ status: 423 }",
-     "line": 182
+     "line": 178
     },
     {
      "arg": "{ error: 'Proposal is in a terminal stage — uploads are disabled', code: 'STAGE_LOCKED' }",
      "opts": "{ status: 423 }",
-     "line": 185
+     "line": 181
     },
     {
      "arg": "{ error: 'Expected multipart form data', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 193
+     "line": 189
     },
     {
      "arg": "{ error: 'File field is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 198
+     "line": 194
     },
     {
      "arg": "{ error: 'File too large (max 50MB)', code: 'PAYLOAD_TOO_LARGE' }",
      "opts": "{ status: 413 }",
-     "line": 203
+     "line": 199
     },
     {
      "arg": "{ error: 'File upload failed', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 222
+     "line": 218
     },
     {
      "arg": "{\n      data: {\n        key,\n        filename: safeFilename,\n        size: buffer.length,\n      },\n    }",
      "opts": "",
-     "line": 246
+     "line": 242
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 255
+     "line": 251
     },
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 273
+     "line": 269
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 285
+     "line": 281
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 290
+     "line": 286
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 294
+     "line": 290
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 300
+     "line": 296
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 307
+     "line": 303
     },
     {
      "arg": "{ error: 'File key is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 312
+     "line": 308
     },
     {
      "arg": "{ error: 'Invalid file key', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 318
+     "line": 314
     },
     {
      "arg": "{ error: 'Can only delete your own files', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 325
+     "line": 321
     },
     {
      "arg": "{ error: 'File deletion failed', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 332
+     "line": 328
     },
     {
      "arg": "{ data: { deleted: true } }",
      "opts": "",
-     "line": 355
+     "line": 351
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 358
+     "line": 354
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox",
@@ -50280,8 +51047,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts",
    "kind": "api-route",
-   "lines": 647,
-   "bytes": 21076,
+   "lines": 655,
+   "bytes": 21470,
    "client": false,
    "exports": [
     {
@@ -50381,27 +51148,27 @@
     },
     {
      "tag": "sql",
-     "line": 286
+     "line": 287
     },
     {
      "tag": "sql",
-     "line": 394
+     "line": 395
     },
     {
      "tag": "sql",
-     "line": 500
+     "line": 505
     },
     {
      "tag": "sql",
-     "line": 578
+     "line": 583
     },
     {
      "tag": "sql",
-     "line": 589
+     "line": 594
     },
     {
      "tag": "sql",
-     "line": 617
+     "line": 622
     }
    ],
    "calls": [
@@ -50513,187 +51280,187 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 229
+     "line": 230
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 244
+     "line": 245
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 251
+     "line": 252
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 259
+     "line": 260
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 267
+     "line": 268
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 276
+     "line": 277
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 293
+     "line": 294
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 296
+     "line": 297
     },
     {
      "arg": "{ error: 'Cannot modify gates on a locked proposal', code: 'PROPOSAL_LOCKED' }",
      "opts": "{ status: 423 }",
-     "line": 303
+     "line": 304
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 319
+     "line": 320
     },
     {
      "arg": "{ error: 'stage is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 331
+     "line": 332
     },
     {
      "arg": "{ error: `stage must be one of: ${proposalGates.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 342
+     "line": 343
     },
     {
      "arg": "{ error: 'stage exceeds maximum length (100 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 349
+     "line": 350
     },
     {
      "arg": "{ error: `requirementType must be one of: ${VALID_REQUIREMENT_TYPES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 356
+     "line": 357
     },
     {
      "arg": "{ error: 'label is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 363
+     "line": 364
     },
     {
      "arg": "{ error: 'label exceeds maximum length (500 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 370
+     "line": 371
     },
     {
      "arg": "{ error: 'description exceeds maximum length (2000 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 377
+     "line": 378
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 403
+     "line": 404
     },
     {
      "arg": "{\n      data: {\n        id: requirement.id,\n        proposalId,\n        stage,\n        requirementType,\n        label,\n        description,\n        isMet: false,\n        createdAt: requirement.createdAt,\n      },\n    }",
      "opts": "{ status: 201 }",
-     "line": 410
+     "line": 411
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 424
+     "line": 428
     },
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 443
+     "line": 448
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 458
+     "line": 463
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 465
+     "line": 470
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 473
+     "line": 478
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 481
+     "line": 486
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 490
+     "line": 495
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 507
+     "line": 512
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 510
+     "line": 515
     },
     {
      "arg": "{ error: 'Cannot modify gates on a locked proposal', code: 'PROPOSAL_LOCKED' }",
      "opts": "{ status: 423 }",
-     "line": 517
+     "line": 522
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 532
+     "line": 537
     },
     {
      "arg": "{ error: 'Valid requirementId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 540
+     "line": 545
     },
     {
      "arg": "{ error: 'isMet must be a boolean', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 547
+     "line": 552
     },
     {
      "arg": "{ error: 'evidence exceeds maximum size (10KB)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 560
+     "line": 565
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 603
+     "line": 608
     },
     {
      "arg": "{ error: 'Requirement not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 608
+     "line": 613
     },
     {
      "arg": "{\n      data: {\n        id: requirementId,\n        isMet,\n        metBy: isMet ? sessionUser.id : null,\n        metAt: isMet ? new Date().toISOString() : null,\n      },\n    }",
      "opts": "",
-     "line": 631
+     "line": 636
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 641
+     "line": 649
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/gates",
@@ -50888,8 +51655,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts",
    "kind": "api-route",
-   "lines": 511,
-   "bytes": 19657,
+   "lines": 527,
+   "bytes": 20520,
    "client": false,
    "exports": [
     {
@@ -50964,47 +51731,47 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 72
+     "line": 73
     },
     {
      "tag": "sql",
-     "line": 136
+     "line": 137
     },
     {
      "tag": "sql",
-     "line": 163
+     "line": 164
     },
     {
      "tag": "sql",
-     "line": 185
+     "line": 186
     },
     {
      "tag": "sql",
-     "line": 283
+     "line": 288
     },
     {
      "tag": "sql",
-     "line": 364
+     "line": 369
     },
     {
      "tag": "sql",
-     "line": 390
+     "line": 395
     },
     {
      "tag": "sql",
-     "line": 413
+     "line": 418
     },
     {
      "tag": "sql",
-     "line": 429
+     "line": 434
     },
     {
      "tag": "sql",
-     "line": 440
+     "line": 445
     },
     {
      "tag": "sql",
-     "line": 444
+     "line": 449
     }
    ],
    "calls": [
@@ -51028,7 +51795,8 @@
     "unlockDeadline.setDate",
     "unlockDeadline.getDate",
     "unlockDeadline.toISOString",
-    "sendEmail",
+    "send",
+    "member.email.toLowerCase",
     "emitEventSingle"
    ],
    "jsx": [],
@@ -51038,152 +51806,152 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 39
+     "line": 40
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 48
+     "line": 49
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 52
+     "line": 53
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 58
+     "line": 59
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 89
+     "line": 90
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 93
+     "line": 94
     },
     {
      "arg": "{ error: 'Workspace is already locked', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 97
+     "line": 98
     },
     {
      "arg": "{ error: 'Can only lock at final stage', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 102
+     "line": 103
     },
     {
      "arg": "{ error: 'Further locks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 110
+     "line": 111
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 152
+     "line": 153
     },
     {
      "arg": "{ error: 'Lock state already changed', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 157
+     "line": 158
     },
     {
      "arg": "{\n      data: {\n        locked: true,\n        lockCount: newLockCount,\n        lockedAt: new Date().toISOString(),\n        downloadAvailable: true,\n        harvest: harvestResult,\n        stage: autoAdvanceToSubmitted ? 'submitted' : proposal.stage,\n      },\n    }",
      "opts": "",
-     "line": 210
+     "line": 211
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 222
+     "line": 226
     },
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 241
+     "line": 246
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 253
+     "line": 258
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 257
+     "line": 262
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 263
+     "line": 268
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 269
+     "line": 274
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 300
+     "line": 305
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 304
+     "line": 309
     },
     {
      "arg": "{ error: 'Workspace is not locked', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 308
+     "line": 313
     },
     {
      "arg": "{ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 322
+     "line": 327
     },
     {
      "arg": "{ error: 'RFP close date has passed. Unlocks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 329
+     "line": 334
     },
     {
      "arg": "{ error: 'Additional unlocks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 338
+     "line": 343
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 379
+     "line": 384
     },
     {
      "arg": "{ error: 'Lock state already changed', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 384
+     "line": 389
     },
     {
      "arg": "{\n      data: {\n        locked: false,\n        lockCount: proposal.lockCount,\n        stage: proposal.stage === 'submitted' ? 'final' : proposal.stage,\n        unlockDeadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null,\n      },\n    }",
      "opts": "",
-     "line": 495
+     "line": 508
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 505
+     "line": 521
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/lock",
@@ -51365,8 +52133,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts",
    "kind": "api-route",
-   "lines": 412,
-   "bytes": 15654,
+   "lines": 416,
+   "bytes": 15836,
    "client": false,
    "exports": [
     {
@@ -51460,19 +52228,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 127
+     "line": 128
     },
     {
      "tag": "sql",
-     "line": 313
+     "line": 314
     },
     {
      "tag": "sql",
-     "line": 323
+     "line": 324
     },
     {
      "tag": "sql",
-     "line": 376
+     "line": 377
     }
    ],
    "calls": [
@@ -51510,87 +52278,87 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 45
+     "line": 46
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 60
+     "line": 61
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 68
+     "line": 69
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 77
+     "line": 78
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 84
+     "line": 85
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 93
+     "line": 94
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 106
+     "line": 107
     },
     {
      "arg": "{ error: `outcome must be one of: ${VALID_OUTCOMES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 114
+     "line": 115
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 143
+     "line": 144
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 150
+     "line": 151
     },
     {
      "arg": "{ error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' }",
      "opts": "{ status: 409 }",
-     "line": 158
+     "line": 159
     },
     {
      "arg": "{ error: 'Outcome can only be recorded for submitted or final proposals', code: 'INVALID_STAGE' }",
      "opts": "{ status: 422 }",
-     "line": 165
+     "line": 166
     },
     {
      "arg": "{ error: 'Proposal was modified by another user', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 275
+     "line": 276
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 282
+     "line": 283
     },
     {
      "arg": "{\n      data: {\n        proposalId,\n        outcome,\n        atomsUpdated,\n        stage: 'archived',\n        contractStarted,\n      },\n    }",
      "opts": "",
-     "line": 389
+     "line": 390
     },
     {
      "arg": "{ error: 'Proposal was modified by another user', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 400
+     "line": 404
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 406
+     "line": 410
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/outcome",
@@ -55961,8 +56729,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts",
    "kind": "api-route",
-   "lines": 547,
-   "bytes": 18890,
+   "lines": 551,
+   "bytes": 19078,
    "client": false,
    "exports": [
     {
@@ -56049,39 +56817,39 @@
     },
     {
      "tag": "sql",
-     "line": 288
+     "line": 289
     },
     {
      "tag": "sql",
-     "line": 337
+     "line": 338
     },
     {
      "tag": "sql",
-     "line": 342
+     "line": 343
     },
     {
      "tag": "sql",
-     "line": 347
+     "line": 348
     },
     {
      "tag": "sql",
-     "line": 351
+     "line": 352
     },
     {
      "tag": "sql",
-     "line": 356
+     "line": 357
     },
     {
      "tag": "sql",
-     "line": 455
+     "line": 459
     },
     {
      "tag": "sql",
-     "line": 476
+     "line": 480
     },
     {
      "tag": "sql",
-     "line": 507
+     "line": 511
     }
    ],
    "calls": [
@@ -56170,152 +56938,152 @@
     {
      "arg": "{ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 178
+     "line": 179
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 187
+     "line": 188
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 201
+     "line": 202
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 209
+     "line": 210
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 217
+     "line": 218
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 226
+     "line": 227
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 239
+     "line": 240
     },
     {
      "arg": "{ error: 'Admin role required for status changes', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 264
+     "line": 265
     },
     {
      "arg": "{ error: 'Notes exceed maximum length (5000 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 272
+     "line": 273
     },
     {
      "arg": "{ error: 'Nothing to update', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 279
+     "line": 280
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 297
+     "line": 298
     },
     {
      "arg": "{ error: 'Supporting document not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 301
+     "line": 302
     },
     {
      "arg": "{ error: 'Cannot mark as uploaded without an attached file', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 311
+     "line": 312
     },
     {
      "arg": "{ error: `Cannot transition from '${existingDoc.status}' to '${newStatus}'`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 318
+     "line": 319
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 368
+     "line": 369
     },
     {
      "arg": "{ data: { id: docId, status: newStatus ?? 'unchanged' } }",
      "opts": "",
-     "line": 377
+     "line": 378
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 380
+     "line": 384
     },
     {
      "arg": "{ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 398
+     "line": 402
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 407
+     "line": 411
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 420
+     "line": 424
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 427
+     "line": 431
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 435
+     "line": 439
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 444
+     "line": 448
     },
     {
      "arg": "{ error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 462
+     "line": 466
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 469
+     "line": 473
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 486
+     "line": 490
     },
     {
      "arg": "{ error: 'Supporting document not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 490
+     "line": 494
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 523
+     "line": 527
     },
     {
      "arg": "{ data: { id: docId, status: 'missing' } }",
      "opts": "",
-     "line": 538
+     "line": 542
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 541
+     "line": 545
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]",
@@ -56330,8 +57098,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts",
    "kind": "api-route",
-   "lines": 501,
-   "bytes": 17319,
+   "lines": 505,
+   "bytes": 17507,
    "client": false,
    "exports": [
     {
@@ -56422,23 +57190,23 @@
     },
     {
      "tag": "sql",
-     "line": 338
+     "line": 339
     },
     {
      "tag": "sql",
-     "line": 358
+     "line": 359
     },
     {
      "tag": "sql",
-     "line": 391
+     "line": 392
     },
     {
      "tag": "sql",
-     "line": 422
+     "line": 423
     },
     {
      "tag": "sql",
-     "line": 458
+     "line": 459
     }
    ],
    "calls": [
@@ -56467,7 +57235,8 @@
     "(validCategories as readonly string[]).includes",
     "body.requirementLabel.trim",
     "customerProposalPath",
-    "getSignedPutUrl"
+    "getSignedPutUrl",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -56536,117 +57305,117 @@
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 201
+     "line": 202
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 210
+     "line": 211
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 224
+     "line": 225
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 231
+     "line": 232
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 239
+     "line": 240
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 248
+     "line": 249
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 268
+     "line": 269
     },
     {
      "arg": "{ error: 'filename is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 276
+     "line": 277
     },
     {
      "arg": "{ error: 'filename exceeds maximum length (255 characters)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 283
+     "line": 284
     },
     {
      "arg": "{ error: 'Unsupported file type', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 312
+     "line": 313
     },
     {
      "arg": "{ error: 'File size exceeds maximum (50 MB)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 321
+     "line": 322
     },
     {
      "arg": "{ error: 'requirementLabel exceeds maximum length (500 characters)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 329
+     "line": 330
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 345
+     "line": 346
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 349
+     "line": 350
     },
     {
      "arg": "{ error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 365
+     "line": 366
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 372
+     "line": 373
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 400
+     "line": 401
     },
     {
      "arg": "{ error: 'Supporting doc slot not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 405
+     "line": 406
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 431
+     "line": 432
     },
     {
      "arg": "{ error: 'Storage error', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 453
+     "line": 454
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 473
+     "line": 474
     },
     {
      "arg": "{\n      data: {\n        uploadUrl,\n        docId: targetDocId,\n        storageKey,\n      },\n    }",
      "opts": "{ status: 201 }",
-     "line": 486
+     "line": 487
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 495
+     "line": 499
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs",
@@ -56660,8 +57429,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/create/route.ts",
    "kind": "api-route",
-   "lines": 811,
-   "bytes": 34213,
+   "lines": 824,
+   "bytes": 34944,
    "client": false,
    "exports": [
     {
@@ -56789,39 +57558,39 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 168
+     "line": 169
     },
     {
      "tag": "sql",
-     "line": 201
+     "line": 202
     },
     {
      "tag": "sql",
-     "line": 292
+     "line": 293
     },
     {
      "tag": "sql",
-     "line": 308
+     "line": 309
     },
     {
      "tag": "sql",
-     "line": 547
+     "line": 548
     },
     {
      "tag": "sql",
-     "line": 580
+     "line": 581
     },
     {
      "tag": "sql",
-     "line": 673
+     "line": 674
     },
     {
      "tag": "sql",
-     "line": 689
+     "line": 690
     },
     {
      "tag": "sql",
-     "line": 697
+     "line": 698
     }
    ],
    "calls": [
@@ -56875,7 +57644,8 @@
     "emitEventEnd",
     "emitEventSingle",
     "artifacts.map",
-    "sendEmail",
+    "send",
+    "admin.email.toLowerCase",
     "resolveGatePolicy",
     "launchProjectCollaboration"
    ],
@@ -56886,87 +57656,87 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 68
+     "line": 69
     },
     {
      "arg": "{ error: 'tenant_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 80
+     "line": 81
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 85
+     "line": 86
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 91
+     "line": 92
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 97
+     "line": 98
     },
     {
      "arg": "{ error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' }",
      "opts": "{ status: 402 }",
-     "line": 112
+     "line": 113
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 125
+     "line": 126
     },
     {
      "arg": "{ error: 'topicId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 130
+     "line": 131
     },
     {
      "arg": "{ error: 'Invalid topicId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 133
+     "line": 134
     },
     {
      "arg": "{ error: `gate_config values must be from: ${DB_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 149
+     "line": 150
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 184
+     "line": 185
     },
     {
      "arg": "{ error: 'Topic not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 188
+     "line": 189
     },
     {
      "arg": "{ error: 'Topic has no linked solicitation', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 192
+     "line": 193
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 209
+     "line": 210
     },
     {
      "arg": "{ error: 'Proposal already exists for this topic', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 212
+     "line": 213
     },
     {
      "arg": "{\n      data: {\n        proposalId: proposal.id,\n        sectionCount,\n      },\n    }",
      "opts": "",
-     "line": 797
+     "line": 807
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 805
+     "line": 818
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/create",
@@ -58485,8 +59255,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/team/route.ts",
    "kind": "api-route",
-   "lines": 351,
-   "bytes": 13573,
+   "lines": 362,
+   "bytes": 14071,
    "client": false,
    "exports": [
     {
@@ -58559,27 +59329,27 @@
     },
     {
      "tag": "sql",
-     "line": 168
+     "line": 169
     },
     {
      "tag": "sql",
-     "line": 181
+     "line": 182
     },
     {
      "tag": "sql",
-     "line": 206
+     "line": 207
     },
     {
      "tag": "sql",
-     "line": 217
+     "line": 218
     },
     {
      "tag": "sql",
-     "line": 251
+     "line": 252
     },
     {
      "tag": "sql",
-     "line": 268
+     "line": 269
     }
    ],
    "calls": [
@@ -58606,7 +59376,7 @@
     "emitEventEnd",
     "String",
     "collaboratorInviteEmail",
-    "sendEmail"
+    "send"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -58655,102 +59425,102 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 99
+     "line": 100
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 111
+     "line": 112
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 115
+     "line": 116
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 121
+     "line": 122
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 127
+     "line": 128
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 135
+     "line": 136
     },
     {
      "arg": "{ error: 'Valid email is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 143
+     "line": 144
     },
     {
      "arg": "{ error: 'Name exceeds maximum length (200 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 147
+     "line": 148
     },
     {
      "arg": "{ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 151
+     "line": 152
     },
     {
      "arg": "{ error: 'Role must be tenant_admin, tenant_user, partner_user, or manager', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 155
+     "line": 156
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 172
+     "line": 173
     },
     {
      "arg": "{ error: 'A Manager must be an existing RFP Pipeline partner. Ask them to register first, or invite them as an External Partner collaborator instead.', code: 'NOT_A_PARTNER' }",
      "opts": "{ status: 422 }",
-     "line": 175
+     "line": 176
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 188
+     "line": 189
     },
     {
      "arg": "{ data: { id: partner.id, email, name: partner.name, role: 'manager' } }",
      "opts": "",
-     "line": 197
+     "line": 198
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 211
+     "line": 212
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 225
+     "line": 226
     },
     {
      "arg": "{ error: 'User is already a team member', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 228
+     "line": 229
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 260
+     "line": 261
     },
     {
      "arg": "{\n      data: {\n        id: userId,\n        email,\n        name,\n        role: memberRole,\n      },\n    }",
      "opts": "",
-     "line": 335
+     "line": 343
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 345
+     "line": 356
     }
    ],
    "route": "/api/portal/[tenantSlug]/team",
@@ -60513,8 +61283,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts",
    "kind": "api-route",
-   "lines": 108,
-   "bytes": 6561,
+   "lines": 115,
+   "bytes": 6872,
    "client": false,
    "exports": [
     {
@@ -60574,7 +61344,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -60604,7 +61374,7 @@
     "inviteVaultMember",
     "collaboratorInviteEmail",
     "email.split",
-    "sendEmail",
+    "send",
     "revokeVaultMember"
    ],
    "jsx": [],
@@ -60664,37 +61434,37 @@
     {
      "arg": "{\n      data: { id: member.id, email: member.email, userId: member.userId, status: member.status, createdAt: member.createdAt },\n      emailSent, tempPassword: emailSent ? undefined : member.tempPassword,\n    }",
      "opts": "{ status: 201 }",
-     "line": 80
+     "line": 87
     },
     {
      "arg": "{ error: 'Failed to invite member', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 86
+     "line": 93
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'BAD_REQUEST' }",
      "opts": "{ status: 400 }",
-     "line": 97
+     "line": 104
     },
     {
      "arg": "{ error: 'memberId is required', code: 'BAD_REQUEST' }",
      "opts": "{ status: 400 }",
-     "line": 99
+     "line": 106
     },
     {
      "arg": "{ error: 'Member not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 101
+     "line": 108
     },
     {
      "arg": "{ data: { revoked: true } }",
      "opts": "",
-     "line": 102
+     "line": 109
     },
     {
      "arg": "{ error: 'Failed to revoke member', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 105
+     "line": 112
     }
    ],
    "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/members",
@@ -61613,6 +62383,125 @@
    "route": "/api/waitlist",
    "methods": [
     "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/webhooks/postmark/route.ts",
+   "kind": "api-route",
+   "lines": 198,
+   "bytes": 8223,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "crypto",
+     "names": [
+      "timingSafeEqual"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "systemActor"
+     ]
+    },
+    {
+     "spec": "@/lib/email",
+     "names": [
+      "findSend",
+      "suppress",
+      "LedgerSend"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "Buffer.from",
+    "timingSafeEqual",
+    "url.searchParams.get",
+    "request.headers.get",
+    "auth.startsWith",
+    "Buffer.from(auth.slice(6), 'base64').toString",
+    "auth.slice",
+    "decoded.indexOf",
+    "decoded.slice",
+    "console.error",
+    "NextResponse.json",
+    "presentedSecret",
+    "secretMatches",
+    "request.json",
+    "String",
+    "findSend",
+    "Boolean",
+    "emitEventSingle",
+    "systemActor",
+    "HARD_BOUNCE_TYPES.has",
+    "suppress"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Webhook secret not configured', code: 'POSTMARK_NOT_CONFIGURED' }",
+     "opts": "{ status: 503 }",
+     "line": 91
+    },
+    {
+     "arg": "{ error: 'Unauthorized', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 99
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 106
+    },
+    {
+     "arg": "{ data: { handled: 'Delivery', resolved: base.resolved } }",
+     "opts": "",
+     "line": 141
+    },
+    {
+     "arg": "{ data: { handled: 'Bounce', hard, resolved: base.resolved } }",
+     "opts": "",
+     "line": 168
+    },
+    {
+     "arg": "{ data: { handled: 'SpamComplaint', resolved: base.resolved } }",
+     "opts": "",
+     "line": 187
+    },
+    {
+     "arg": "{ error: 'Failed to record outcome', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 192
+    },
+    {
+     "arg": "{ data: { handled: null, recordType: recordType || null } }",
+     "opts": "",
+     "line": 196
+    }
+   ],
+   "route": "/api/webhooks/postmark",
+   "methods": [
     "POST"
    ],
    "runtime": null,
@@ -62645,8 +63534,8 @@
   {
    "file": "app/portal/[tenantSlug]/billing/page.tsx",
    "kind": "page",
-   "lines": 120,
-   "bytes": 3471,
+   "lines": 134,
+   "bytes": 4344,
    "client": false,
    "exports": [
     {
@@ -62705,7 +63594,7 @@
     },
     {
      "tag": "sql",
-     "line": 84
+     "line": 92
     }
    ],
    "calls": [
@@ -64124,8 +65013,8 @@
   {
    "file": "app/portal/[tenantSlug]/manage/page.tsx",
    "kind": "page",
-   "lines": 164,
-   "bytes": 7695,
+   "lines": 172,
+   "bytes": 8179,
    "client": false,
    "exports": [
     {
@@ -64186,43 +65075,43 @@
     },
     {
      "tag": "sql",
-     "line": 59
+     "line": 61
     },
     {
      "tag": "sql",
-     "line": 73
+     "line": 80
     },
     {
      "tag": "sql",
-     "line": 86
+     "line": 93
     },
     {
      "tag": "sql",
-     "line": 97
+     "line": 104
     },
     {
      "tag": "sql",
-     "line": 114
+     "line": 121
     },
     {
      "tag": "sql",
-     "line": 115
+     "line": 122
     },
     {
      "tag": "sql",
-     "line": 116
+     "line": 123
     },
     {
      "tag": "sql",
-     "line": 117
+     "line": 124
     },
     {
      "tag": "sql",
-     "line": 118
+     "line": 125
     },
     {
      "tag": "sql",
-     "line": 119
+     "line": 126
     }
    ],
    "calls": [
@@ -69040,8 +69929,8 @@
   {
    "file": "components/canvas/canvas-editor.tsx",
    "kind": "component",
-   "lines": 1283,
-   "bytes": 57223,
+   "lines": 1290,
+   "bytes": 57808,
    "client": true,
    "exports": [
     {
@@ -70207,8 +71096,8 @@
   {
    "file": "components/canvas/fluid-document-view.tsx",
    "kind": "component",
-   "lines": 650,
-   "bytes": 37214,
+   "lines": 661,
+   "bytes": 38062,
    "client": true,
    "exports": [
     {
@@ -70411,7 +71300,8 @@
     "dirty.has",
     "scrollTo",
     "toggleLock",
-    "overlayClass"
+    "overlayClass",
+    "overlays.has"
    ],
    "jsx": [
     "CanvasOverlayBar",
@@ -72928,8 +73818,8 @@
   {
    "file": "components/portal/billing-panel.tsx",
    "kind": "component",
-   "lines": 332,
-   "bytes": 11578,
+   "lines": 340,
+   "bytes": 12019,
    "client": true,
    "exports": [
     {
@@ -73802,8 +74692,8 @@
   {
    "file": "components/portal/manage-console.tsx",
    "kind": "component",
-   "lines": 295,
-   "bytes": 15348,
+   "lines": 296,
+   "bytes": 15413,
    "client": true,
    "exports": [
     {
@@ -78449,8 +79339,8 @@
   {
    "file": "components/ui/drawer.tsx",
    "kind": "component",
-   "lines": 101,
-   "bytes": 3223,
+   "lines": 129,
+   "bytes": 5076,
    "client": true,
    "exports": [
     {
@@ -78539,8 +79429,8 @@
   {
    "file": "components/ui/nav-shell.tsx",
    "kind": "component",
-   "lines": 67,
-   "bytes": 2450,
+   "lines": 68,
+   "bytes": 2482,
    "client": true,
    "exports": [
     {
@@ -89579,6 +90469,487 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/email/drivers/gmail.ts",
+   "kind": "lib",
+   "lines": 150,
+   "bytes": 6190,
+   "client": false,
+   "exports": [
+    {
+     "name": "gmailDriver",
+     "form": "const",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "googleapis",
+     "names": [
+      "google"
+     ]
+    },
+    {
+     "spec": "../types",
+     "names": [
+      "DriverResult",
+      "EmailDriver",
+      "ResolvedMessage"
+     ]
+    },
+    {
+     "spec": "../sender-identity",
+     "names": [
+      "formatFrom",
+      "isDefaultPlatformSender"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "oauth2.setCredentials",
+    "console.error",
+    "Date.now().toString",
+    "Date.now",
+    "[\n    `From: ${formatFrom(message.sender)}`,\n    `To: ${message.to}`,\n    `Subject: ${message.subject}`,\n    message.sender.replyTo ? `Reply-To: ${message.sender.replyTo}` : '',\n    'MIME-Version: 1.0',\n    `Content-Type: multipart/alternative; boundary=\"${boundary}\"`,\n    '',\n    `--${boundary}`,\n    'Content-Type: text/html; charset=UTF-8',\n    'Content-Transfer-Encoding: 7bit',\n    '',\n    message.html,\n    '',\n    `--${boundary}--`,\n  ].filter",
+    "formatFrom",
+    "lines.join",
+    "getAuth",
+    "google.gmail",
+    "Buffer.from(buildMimeMessage(message))\n          .toString('base64')\n          .replace(/\\+/g, '-')\n          .replace(/\\//g, '_').replace",
+    "Buffer.from(buildMimeMessage(message))\n          .toString('base64')\n          .replace(/\\+/g, '-').replace",
+    "Buffer.from(buildMimeMessage(message))\n          .toString('base64').replace",
+    "Buffer.from(buildMimeMessage(message)).toString",
+    "Buffer.from",
+    "buildMimeMessage",
+    "gmail.users.messages.send",
+    "String",
+    "fetch",
+    "JSON.stringify",
+    "isDefaultPlatformSender",
+    "res.json().catch",
+    "res.json"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/email/drivers/postmark.ts",
+   "kind": "lib",
+   "lines": 108,
+   "bytes": 5137,
+   "client": false,
+   "exports": [
+    {
+     "name": "postmarkDriver",
+     "form": "const",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "../types",
+     "names": [
+      "DriverResult",
+      "EmailDriver",
+      "ResolvedMessage"
+     ]
+    },
+    {
+     "spec": "../sender-identity",
+     "names": [
+      "formatFrom"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "Object.entries(meta).slice",
+    "Object.entries",
+    "k.slice",
+    "String(v).slice",
+    "String",
+    "(process.env.POSTMARK_API_BASE || DEFAULT_BASE).replace",
+    "fetch",
+    "JSON.stringify",
+    "formatFrom",
+    "trimMetadata",
+    "res.json().catch",
+    "res.json",
+    "Number",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/email/index.ts",
+   "kind": "lib",
+   "lines": 207,
+   "bytes": 8840,
+   "client": false,
+   "exports": [
+    {
+     "name": "EmailKind",
+     "form": "re-export"
+    },
+    {
+     "name": "EmailDriver",
+     "form": "re-export"
+    },
+    {
+     "name": "OutboundMessage",
+     "form": "re-export"
+    },
+    {
+     "name": "ResolvedMessage",
+     "form": "re-export"
+    },
+    {
+     "name": "SenderIdentity",
+     "form": "re-export"
+    },
+    {
+     "name": "SendResult",
+     "form": "re-export"
+    },
+    {
+     "name": "SendStatus",
+     "form": "re-export"
+    },
+    {
+     "name": "resolveSender",
+     "form": "re-export"
+    },
+    {
+     "name": "suppress",
+     "form": "re-export"
+    },
+    {
+     "name": "suppressionFor",
+     "form": "re-export"
+    },
+    {
+     "name": "findSend",
+     "form": "re-export"
+    },
+    {
+     "name": "LedgerSend",
+     "form": "re-export"
+    },
+    {
+     "name": "htmlToText",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "send",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "crypto",
+     "names": [
+      "randomUUID"
+     ]
+    },
+    {
+     "spec": "./drivers/gmail",
+     "names": [
+      "gmailDriver"
+     ]
+    },
+    {
+     "spec": "./drivers/postmark",
+     "names": [
+      "postmarkDriver"
+     ]
+    },
+    {
+     "spec": "./ledger",
+     "names": [
+      "confirm",
+      "recordSuppressed",
+      "reserve",
+      "suppressionFor"
+     ]
+    },
+    {
+     "spec": "./sender-identity",
+     "names": [
+      "resolveSender"
+     ]
+    },
+    {
+     "spec": "./types",
+     "names": [
+      "EmailDriver",
+      "OutboundMessage",
+      "ResolvedMessage",
+      "SendResult"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "console.error",
+    "Object.keys(DRIVERS).join",
+    "Object.keys",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .replace(/\\n{3,}/g, '\\n\\n').trim",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/[ \\t]+\\n/g, '\\n').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\").replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ')\n    .replace(/<[^>]+>/g, '').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')\n    .replace(/<li\\b[^>]*>/gi, '· ').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    })\n    .replace(/<br\\s*\\/?>/gi, '\\n').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi, (_m, href, label) => {\n      const text = String(label).replace(/<[^>]+>/g, '').trim();\n      return text && text !== href ? `${text} (${href})` : String(href);\n    }).replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '').replace",
+    "html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '').replace",
+    "html.replace",
+    "String(label).replace(/<[^>]+>/g, '').trim",
+    "String(label).replace",
+    "String",
+    "randomUUID",
+    "message.to.trim",
+    "EMAIL_SHAPE.test",
+    "refuse",
+    "resolveSender",
+    "htmlToText",
+    "suppressionFor",
+    "recordSuppressed",
+    "driverFor",
+    "reserve",
+    "driver.send",
+    "confirm"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/email/ledger.ts",
+   "kind": "lib",
+   "lines": 237,
+   "bytes": 10164,
+   "client": false,
+   "exports": [
+    {
+     "name": "Reservation",
+     "form": "type"
+    },
+    {
+     "name": "normalizeAddress",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "suppressionFor",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "reserve",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "confirm",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "recordSuppressed",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "LedgerSend",
+     "form": "type"
+    },
+    {
+     "name": "findSend",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "suppress",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "spec": "./types",
+     "names": [
+      "SendStatus"
+     ]
+    }
+   ],
+   "tryCount": 6,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 51
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 82
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 96
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 127
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 158
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 200
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 226
+    }
+   ],
+   "calls": [
+    "email.trim().toLowerCase",
+    "email.trim",
+    "normalizeAddress",
+    "console.error",
+    "sqlBypass.json",
+    "String"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/email/sender-identity.ts",
+   "kind": "lib",
+   "lines": 104,
+   "bytes": 4887,
+   "client": false,
+   "exports": [
+    {
+     "name": "isDefaultPlatformSender",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "SenderRequest",
+     "form": "type"
+    },
+    {
+     "name": "resolveSender",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "formatFrom",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "./types",
+     "names": [
+      "SenderIdentity"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "platformAddress",
+    "platformName",
+    "req.onBehalfOfName.trim",
+    "req.replyTo.trim",
+    "stream",
+    "RFC5322_SPECIALS.test",
+    "sender.fromName.replace"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/email/types.ts",
+   "kind": "lib",
+   "lines": 167,
+   "bytes": 6628,
+   "client": false,
+   "exports": [
+    {
+     "name": "EmailKind",
+     "form": "type"
+    },
+    {
+     "name": "SendStatus",
+     "form": "type"
+    },
+    {
+     "name": "SenderIdentity",
+     "form": "type"
+    },
+    {
+     "name": "OutboundMessage",
+     "form": "type"
+    },
+    {
+     "name": "SendResult",
+     "form": "type"
+    },
+    {
+     "name": "EmailDriver",
+     "form": "type"
+    },
+    {
+     "name": "ResolvedMessage",
+     "form": "type"
+    },
+    {
+     "name": "DriverResult",
+     "form": "type"
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/email-templates.ts",
    "kind": "lib",
    "lines": 385,
@@ -89635,87 +91006,6 @@
     "layout",
     "topics\n    .map(\n      (t) => `\n  <tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #f1f5f9;\">\n      <a href=\"${escapeHtml(t.url)}\" style=\"color:${BRAND_BLUE};text-decoration:none;font-weight:600;font-size:14px;\">${escapeHtml(t.title)}</a>\n      <br>\n      <span style=\"font-size:13px;color:#64748b;\">${escapeHtml(t.agency)} &middot; Closes ${escapeHtml(t.closeDate)}</span>\n    </td>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #f1f5f9;text-align:right;vertical-align:top;\">\n      <span style=\"display:inline-block;background:${t.matchScore >= 80 ? '#dcfce7' : t.matchScore >= 60 ? '#fef9c3' : '#f1f5f9'};color:${t.matchScore >= 80 ? '#166534' : t.matchScore >= 60 ? '#854d0e' : '#475569'};font-size:13px;font-weight:700;padding:4px 10px;border-radius:12px;\">${t.matchScore}%</span>\n    </td>\n  </tr>`,\n    ).join",
     "topics.map"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "lib/email.ts",
-   "kind": "lib",
-   "lines": 243,
-   "bytes": 7405,
-   "client": false,
-   "exports": [
-    {
-     "name": "SendEmailParams",
-     "form": "type"
-    },
-    {
-     "name": "SendEmailResult",
-     "form": "type"
-    },
-    {
-     "name": "sendEmail",
-     "form": "function",
-     "async": true
-    },
-    {
-     "name": "CalendarEventParams",
-     "form": "type"
-    },
-    {
-     "name": "createCalendarEvent",
-     "form": "function",
-     "async": true
-    },
-    {
-     "name": "createDeadlineReminder",
-     "form": "function",
-     "async": true
-    }
-   ],
-   "imports": [
-    {
-     "spec": "googleapis",
-     "names": [
-      "google"
-     ]
-    }
-   ],
-   "tryCount": 4,
-   "sqlTags": [],
-   "calls": [
-    "oauth2.setCredentials",
-    "console.error",
-    "Date.now().toString",
-    "Date.now",
-    "[\n    `From: ${from}`,\n    `To: ${params.to}`,\n    `Subject: ${params.subject}`,\n    params.replyTo ? `Reply-To: ${params.replyTo}` : '',\n    'MIME-Version: 1.0',\n    `Content-Type: multipart/alternative; boundary=\"${boundary}\"`,\n    '',\n    `--${boundary}`,\n    'Content-Type: text/html; charset=UTF-8',\n    'Content-Transfer-Encoding: 7bit',\n    '',\n    params.html,\n    '',\n    `--${boundary}--`,\n  ].filter",
-    "lines.join",
-    "getAuth",
-    "google.gmail",
-    "Buffer.from(buildMimeMessage(params))\n        .toString('base64')\n        .replace(/\\+/g, '-')\n        .replace(/\\//g, '_').replace",
-    "Buffer.from(buildMimeMessage(params))\n        .toString('base64')\n        .replace(/\\+/g, '-').replace",
-    "Buffer.from(buildMimeMessage(params))\n        .toString('base64').replace",
-    "Buffer.from(buildMimeMessage(params)).toString",
-    "Buffer.from",
-    "buildMimeMessage",
-    "gmail.users.messages.send",
-    "String",
-    "fetch",
-    "JSON.stringify",
-    "res.json().catch",
-    "res.json",
-    "google.calendar",
-    "calendar.events.insert",
-    "params.start.toISOString",
-    "params.end.toISOString",
-    "params.attendees.map",
-    "createCalendarEvent",
-    "[\n      params.tenantName ? `Customer: ${params.tenantName}` : '',\n      params.topicNumber ? `Topic: ${params.topicNumber}` : '',\n      'RFP Pipeline automated deadline reminder',\n    ].filter(Boolean).join",
-    "[\n      params.tenantName ? `Customer: ${params.tenantName}` : '',\n      params.topicNumber ? `Topic: ${params.topicNumber}` : '',\n      'RFP Pipeline automated deadline reminder',\n    ].filter",
-    "params.closeDate.getTime"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -89903,8 +91193,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 224,
-   "bytes": 11644,
+   "lines": 257,
+   "bytes": 13776,
    "client": false,
    "exports": [
     {
@@ -89953,8 +91243,8 @@
   {
    "file": "lib/events.ts",
    "kind": "lib",
-   "lines": 279,
-   "bytes": 9247,
+   "lines": 330,
+   "bytes": 11590,
    "client": false,
    "exports": [
     {
@@ -90011,6 +91301,11 @@
      "name": "emitEventSingle",
      "form": "function",
      "async": true
+    },
+    {
+     "name": "withEventBracket",
+     "form": "function",
+     "async": true
     }
    ],
    "imports": [
@@ -90027,7 +91322,7 @@
      ]
     }
    ],
-   "tryCount": 3,
+   "tryCount": 4,
    "sqlTags": [
     {
      "tag": "sql",
@@ -90059,7 +91354,11 @@
     "serializeError",
     "startTimestamps.get",
     "startTimestamps.delete",
-    "evaluateAutomationRules"
+    "evaluateAutomationRules",
+    "emitEventStart",
+    "fn",
+    "emitEventEnd",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -91267,6 +92566,57 @@
     "viaIpinfo",
     "viaIpApi",
     "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/google-calendar.ts",
+   "kind": "lib",
+   "lines": 112,
+   "bytes": 4004,
+   "client": false,
+   "exports": [
+    {
+     "name": "CalendarEventParams",
+     "form": "type"
+    },
+    {
+     "name": "createCalendarEvent",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "createDeadlineReminder",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "googleapis",
+     "names": [
+      "google"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "oauth2.setCredentials",
+    "console.error",
+    "getAuth",
+    "google.calendar",
+    "calendar.events.insert",
+    "params.start.toISOString",
+    "params.end.toISOString",
+    "params.attendees.map",
+    "createCalendarEvent",
+    "[\n      params.tenantName ? `Customer: ${params.tenantName}` : '',\n      params.topicNumber ? `Topic: ${params.topicNumber}` : '',\n      'RFP Pipeline automated deadline reminder',\n    ].filter(Boolean).join",
+    "[\n      params.tenantName ? `Customer: ${params.tenantName}` : '',\n      params.topicNumber ? `Topic: ${params.topicNumber}` : '',\n      'RFP Pipeline automated deadline reminder',\n    ].filter",
+    "params.closeDate.getTime"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -95534,8 +96884,8 @@
   {
    "file": "lib/partner/manager-request.ts",
    "kind": "lib",
-   "lines": 142,
-   "bytes": 8410,
+   "lines": 149,
+   "bytes": 8758,
    "client": false,
    "exports": [
     {
@@ -95576,7 +96926,7 @@
     {
      "spec": "@/lib/email",
      "names": [
-      "sendEmail"
+      "send"
      ]
     },
     {
@@ -95606,15 +96956,15 @@
     },
     {
      "tag": "sqlBypass",
-     "line": 100
+     "line": 107
     },
     {
      "tag": "sqlBypass",
-     "line": 112
+     "line": 119
     },
     {
      "tag": "sqlBypass",
-     "line": 127
+     "line": 134
     }
    ],
    "calls": [
@@ -95624,7 +96974,7 @@
     "console.error",
     "encodeURIComponent",
     "managerRequestEmail",
-    "sendEmail",
+    "send",
     "sqlBypass.begin"
    ],
    "jsx": [],
@@ -96859,8 +98209,8 @@
   {
    "file": "lib/process/launch-template.ts",
    "kind": "lib",
-   "lines": 136,
-   "bytes": 5332,
+   "lines": 186,
+   "bytes": 7803,
    "client": false,
    "exports": [
     {
@@ -96891,19 +98241,28 @@
      ]
     }
    ],
-   "tryCount": 2,
+   "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 57
+     "line": 59
     },
     {
      "tag": "sql",
-     "line": 119
+     "line": 123
+    },
+    {
+     "tag": "sql",
+     "line": 125
+    },
+    {
+     "tag": "sql",
+     "line": 169
     }
    ],
    "calls": [
     "console.error",
+    "UUID_RE.test",
     "tpl.triggerKey.split",
     "sql.json"
    ],
@@ -101450,8 +102809,8 @@
   {
    "file": "lib/storage/s3-client.ts",
    "kind": "lib",
-   "lines": 292,
-   "bytes": 11931,
+   "lines": 368,
+   "bytes": 15326,
    "client": false,
    "exports": [
     {
@@ -101532,6 +102891,21 @@
      "name": "listObjects",
      "form": "function",
      "async": true
+    },
+    {
+     "name": "listObjectsDeep",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "objectStat",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "deleteObjects",
+     "form": "function",
+     "async": true
     }
    ],
    "imports": [
@@ -101546,6 +102920,7 @@
       "DeleteObjectCommand",
       "CopyObjectCommand",
       "ListObjectsV2Command",
+      "DeleteObjectsCommand",
       "PutObjectCommandInput"
      ]
     },
@@ -101569,7 +102944,7 @@
      ]
     }
    ],
-   "tryCount": 14,
+   "tryCount": 17,
    "sqlTags": [],
    "calls": [
     "join",
@@ -101605,7 +102980,13 @@
     "(res.Contents ?? [])\n    .filter(o => o.Key && o.Key !== prefix).map",
     "(res.Contents ?? []).filter",
     "(res.CommonPrefixes ?? [])\n    .map(p => p.Prefix!).filter",
-    "(res.CommonPrefixes ?? []).map"
+    "(res.CommonPrefixes ?? []).map",
+    "walk",
+    "out.push",
+    "prefix.replace",
+    "deleteObject",
+    "keys.slice(i, i + 1000).map",
+    "keys.slice"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -109116,8 +110497,8 @@
   {
    "file": "middleware.ts",
    "kind": "middleware",
-   "lines": 293,
-   "bytes": 12250,
+   "lines": 325,
+   "bytes": 14505,
    "client": false,
    "exports": [
     {
@@ -109202,17 +110583,17 @@
     {
      "arg": "{ error: 'unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 243
+     "line": 275
     },
     {
      "arg": "{ error: 'password change required', code: 'PASSWORD_CHANGE_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 264
+     "line": 296
     },
     {
      "arg": "{ error: 'forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 281
+     "line": 313
     }
    ]
   },
@@ -111894,6 +113275,75 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 11,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-email-spine.mts",
+   "kind": "script",
+   "lines": 266,
+   "bytes": 13869,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "node:child_process",
+     "names": [
+      "spawn",
+      "ChildProcess"
+     ]
+    },
+    {
+     "spec": "node:crypto",
+     "names": [
+      "randomUUID"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "Number",
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "randomUUID().slice",
+    "randomUUID",
+    "spawn",
+    "String",
+    "emulator.stderr.on",
+    "process.stderr.write",
+    "fetch",
+    "setTimeout",
+    "JSON.stringify",
+    "POST",
+    "startEmulator",
+    "ok",
+    "send",
+    "addr",
+    "no",
+    "fetch(`http://127.0.0.1:${PORT}/__emulator/health`).then",
+    "r.json",
+    "deliverWebhook",
+    "bouncer.toLowerCase",
+    "/diverged/.test",
+    "emulator.kill",
+    "owner.end",
+    "main()\n  .then(async () => {\n    await cleanup();\n    console.log();\n    if (bad === 0) console.log('✓ Email spine holds end to end: send · ledger · idempotency · webhook · suppression.');\n    else console.error(`✗ ${bad} claim(s) failed.`);\n    process.exit(bad === 0 ? 0 : 1);\n  }).catch",
+    "main().then",
+    "main",
+    "cleanup",
+    "cleanup().catch"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
    "jsonResponses": []
   },
   {
@@ -120953,8 +122403,8 @@
   {
    "file": "scripts/probe-page-scale.mts",
    "kind": "script",
-   "lines": 64,
-   "bytes": 2954,
+   "lines": 144,
+   "bytes": 7601,
    "client": false,
    "exports": [],
    "imports": [
@@ -120977,17 +122427,28 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 22
+     "line": 41
     },
     {
      "tag": "sql",
-     "line": 27
+     "line": 78
+    },
+    {
+     "tag": "sql",
+     "line": 137
     }
    ],
    "calls": [
     "console.log",
     "launch",
+    "process.exit",
     "signIn",
+    "ctx0.request.post",
+    "res.json().catch",
+    "res.json",
+    "ctx0.close",
+    "res.ok",
+    "res.status",
     "ctx.pages",
     "page.setViewportSize",
     "page.goto",
@@ -121005,9 +122466,9 @@
     "ratio.toFixed",
     "ctx.close",
     "console.error",
+    "sql`DELETE FROM tenant_documents WHERE id = ${scratchId}::uuid`.catch",
     "browser.close",
-    "sql.end",
-    "process.exit"
+    "sql.end"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -121187,8 +122648,8 @@
   {
    "file": "scripts/probe-structural-nodes.mts",
    "kind": "script",
-   "lines": 107,
-   "bytes": 5967,
+   "lines": 126,
+   "bytes": 7200,
    "client": false,
    "exports": [],
    "imports": [
@@ -125918,8 +127379,8 @@
   {
    "file": "vitest.config.ts",
    "kind": "other",
-   "lines": 19,
-   "bytes": 718,
+   "lines": 24,
+   "bytes": 1127,
    "client": false,
    "exports": [
     {

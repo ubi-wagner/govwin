@@ -37,6 +37,57 @@ const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER || 'postgresql
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
 
 const inv = JSON.parse(fs.readFileSync(path.join(REPO, 'docs/frontend-inventory.json'), 'utf8'));
+
+/**
+ * THE INVENTORY IS A GENERATED ARTIFACT, AND NOTHING FORCES IT TO BE CURRENT.
+ *
+ * This whole reconciliation reads its route list from `docs/frontend-inventory.json` rather than
+ * from disk. That is the right design — the inventory is the manifest a sweep has to touch, and
+ * re-deriving it here would be a second answer to the same question. But it makes every verdict
+ * below only as fresh as the last `inventory-frontend.mjs` run, and there is no reason a person
+ * adding a route would think to run it first.
+ *
+ * It has already happened: `/api/webhooks/postmark` was added, this reconciliation ran clean, and
+ * the route simply was not in the file — a day-old inventory reported an UNSURFACED route as
+ * nothing at all. A lens that cannot see a thing does not report it missing; it reports silence,
+ * which reads exactly like a pass.
+ *
+ * So: count the route files on disk, compare, and exit 2 as a HARNESS DEFECT rather than printing a
+ * verdict this run has not earned. The same rule `verify-api-contract` and `verify-surfaces` follow.
+ */
+{
+  const walkRoutes = (dir, out = []) => {
+    if (!fs.existsSync(dir)) return out;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const p2 = path.join(dir, e.name);
+      if (e.isDirectory()) walkRoutes(p2, out);
+      else if (e.name === 'route.ts' || e.name === 'route.tsx') out.push(p2);
+    }
+    return out;
+  };
+  const onDisk = new Set(walkRoutes(path.join(REPO, 'frontend/app')).map((f) => f.replace(REPO + '/frontend/', '')));
+  const inInventory = new Set((inv.records ?? [])
+    .map((r) => r.file ?? '')
+    .filter((f) => /(^|\/)route\.tsx?$/.test(f)));
+  const missing = [...onDisk].filter((f) => !inInventory.has(f));
+  if (inInventory.size === 0) {
+    console.error('HARNESS DEFECT: docs/frontend-inventory.json lists no route files at all — its');
+    console.error('  shape has changed and this staleness guard is reading the wrong field. Fix the');
+    console.error('  guard before trusting anything below it.');
+    process.exit(2);
+  }
+  if (missing.length) {
+    console.error(`HARNESS DEFECT: ${missing.length} API route(s) exist on disk and are ABSENT from`);
+    console.error('  docs/frontend-inventory.json, which is where this reconciliation gets its route');
+    console.error('  list. Every verdict below would be silent about them — which reads exactly like');
+    console.error('  a pass. Regenerate first:');
+    console.error('      node frontend/scripts/inventory-frontend.mjs');
+    for (const f of missing.slice(0, 10)) console.error(`    · ${f}`);
+    if (missing.length > 10) console.error(`    · …and ${missing.length - 10} more`);
+    process.exit(2);
+  }
+}
 const cat = JSON.parse(fs.readFileSync(path.join(REPO, 'docs/ui-catalog.json'), 'utf8'));
 
 /**
@@ -170,6 +221,7 @@ const tailMatch = (n) => [...uiTails].find((t) => n.endsWith(t)) ?? null;
 /** Routes the UI legitimately never calls, with the reason. Annotated, never silently dropped. */
 const EXTERNAL_CALLER = [
   [/^\/api\/stripe\/webhook/, 'Stripe is the caller — an inbound webhook has no UI'],
+  [/^\/api\/webhooks\/postmark/, 'Postmark is the caller — delivery outcomes arrive on their own connection, with POSTMARK_WEBHOOK_SECRET as the authorization'],
   [/^\/api\/auth\//, 'NextAuth owns these; the client calls them through the library, not by URL'],
   [/^\/api\/health/, 'load balancer / Railway probe'],
   [/^\/api\/admin\/(reconcile-cards|agent-gates\/sweep)/, 'headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)'],

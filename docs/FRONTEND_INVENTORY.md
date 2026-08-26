@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 250 | 40,143 |
+| api-route | 251 | 40,520 |
 | app-boundary | 5 | 132 |
-| app-component | 26 | 8,845 |
+| app-component | 26 | 8,919 |
 | auth | 2 | 241 |
-| component | 162 | 41,310 |
+| component | 162 | 41,366 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 454 |
-| lib | 286 | 56,768 |
-| middleware | 1 | 293 |
-| other | 4 | 152 |
-| page | 116 | 17,454 |
-| script | 183 | 23,810 |
+| lib | 292 | 57,827 |
+| middleware | 1 | 325 |
+| other | 4 | 157 |
+| page | 116 | 17,476 |
+| script | 184 | 24,175 |
 | server-action | 1 | 45 |
-| test | 192 | 25,301 |
-| **total** | **1315** | **224,812** |
+| test | 202 | 26,779 |
+| **total** | **1333** | **228,280** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -242,7 +242,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/admin/sources/[profileId]/regions/[regionId]` | DELETE | app/api/admin/sources/[profileId]/regions/[regionId]/route.ts | rfp_admin | auth | — | 1×sql | 1 |
 | `/api/admin/sources/[profileId]/scout` | POST | app/api/admin/sources/[profileId]/scout/route.ts | rfp_admin | auth | — | 2×sql | 1 |
 | `/api/admin/sources/[profileId]/visit` | POST | app/api/admin/sources/[profileId]/visit/route.ts | rfp_admin | auth | — | 3×sql | 5 |
-| `/api/admin/storage` | DELETE GET PATCH POST PUT | app/api/admin/storage/route.ts | rfp_admin | auth | — | 1×sql | 12 |
+| `/api/admin/storage` | DELETE GET PATCH POST PUT | app/api/admin/storage/route.ts | rfp_admin | auth | — | 1×sql | 11 |
 | `/api/admin/system` | GET | app/api/admin/system/route.ts | master_admin | withHandler | — | — | 0 |
 | `/api/admin/tasks` | GET POST | app/api/admin/tasks/route.ts | rfp_admin | auth | — | — | 3 |
 | `/api/admin/template-stable` | GET | app/api/admin/template-stable/route.ts | rfp_admin | auth | — | 1×sql | 2 |
@@ -408,6 +408,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/tools/[name]` | POST | app/api/tools/[name]/route.ts | — (public) | withHandler | — | — | 0 |
 | `/api/uploads/[...key]` | GET | app/api/uploads/[...key]/route.ts | — (public) | — | — | — | 1 |
 | `/api/waitlist` | GET POST | app/api/waitlist/route.ts | — (public) | — | — | 1×sql | 4 |
+| `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
 ## 4. Components — 162 files
@@ -608,7 +609,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 286 files
+## 6. Library modules — 292 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -662,11 +663,16 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/documents/lock-document.ts | server | lockDocumentAndPromote | — | **none** |
 | lib/documents/starter.ts | server | DOC_TYPES, isDocType, isBlankPreset, starterFromPreset, starterFromTemplate, countNodes | — | vitest |
 | lib/email-templates.ts | server | applicationAcceptedEmail, applicationRejectedEmail, welcomeOnboardedEmail, adminNewApplicationAlert, spotlightDigestEmail, collaboratorInviteEmail +1 | — | **none** |
-| lib/email.ts | server | sendEmail, createCalendarEvent, createDeadlineReminder | — | vitest |
+| lib/email/drivers/gmail.ts | server | gmailDriver | — | vitest |
+| lib/email/drivers/postmark.ts | server | postmarkDriver | — | vitest |
+| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +8 | — | **none** |
+| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +1 | 7 | vitest |
+| lib/email/sender-identity.ts | server | isDefaultPlatformSender, resolveSender, formatFrom | — | vitest |
+| lib/email/types.ts | server | — | — | vitest |
 | lib/embeddings.ts | server | EMBED_DIM, activeEmbedModel, embeddingsEnabled, embedContentHash, toVectorLiteral, isUsableVector +3 | — | vitest |
 | lib/errors.ts | server | AppError, UnauthenticatedError, ForbiddenError, NotFoundError, ConflictError, ClaimConflictError +7 | — | vitest |
 | lib/event-labels.ts | server | describeEvent, eventHref, isNotifyWorthyPhase | — | vitest |
-| lib/events.ts | server | userActor, systemActor, pipelineActor, agentActor, emitEventStart, emitEventEnd +1 | 4 | vitest |
+| lib/events.ts | server | userActor, systemActor, pipelineActor, agentActor, emitEventStart, emitEventEnd +2 | 4 | vitest |
 | lib/export/artifact-export.ts | server | EXPORT_FORMATS, CONTENT_TYPE, resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, assembleFittedArtifactCanvas | — | vitest |
 | lib/export/canvas-html.ts | server | renderChartSvg, renderShapeSvg, canvasBaseCss, renderCanvasBodyHtml, renderCanvasToHtml, renderCanvasPreviewHtml | — | vitest |
 | lib/export/chromium.ts | server | resolveChromiumExecutable | — | **none** |
@@ -679,6 +685,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/export/xlsx-exporter.ts | server | exportToXlsx | — | vitest |
 | lib/extract-topics.ts | server | extractTopicsForSolicitation | 3 | **none** |
 | lib/geoip.ts | server | isPublicIp, lookupIp | — | **none** |
+| lib/google-calendar.ts | server | createCalendarEvent, createDeadlineReminder | — | **none** |
 | lib/guardrail-defaults.ts | server | recommendedGuardrails | — | vitest |
 | lib/hooks/use-container-scale.ts | client | useContainerScale | — | **none** |
 | lib/hooks/use-tool.ts | client | useTool | — | **none** |
@@ -688,7 +695,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/import/pdf-reader.ts | server | readPdf | — | **none** |
 | lib/import/pptx-reader.ts | server | readPptx, parseSlideTables | — | vitest |
 | lib/import/text-reader.ts | server | stripInlineMarkdown, readText, parseMarkdown | — | vitest |
-| lib/import/types.ts | server | inferCategory, inferCategoryFromFilename | — | **none** |
+| lib/import/types.ts | server | inferCategory, inferCategoryFromFilename | — | vitest |
 | lib/import/xlsx-reader.ts | server | readXlsx | — | **none** |
 | lib/ingest/assessment.ts | server | INGEST_MANAGER_STEP, parseIngestAssessment | — | vitest |
 | lib/ingest/ingest-topic-files.ts | server | SolicitationNotFoundError, ingestTopicFilesForSolicitation | 6 | vitest |
@@ -734,7 +741,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/page-content/site-chrome.ts | server | siteChrome | — | **none** |
 | lib/page-content/team.ts | server | team | — | **none** |
 | lib/page-content/theExpert.ts | server | theExpert | — | **none** |
-| lib/page-content/types.ts | server | — | — | **none** |
+| lib/page-content/types.ts | server | — | — | vitest |
 | lib/page-content/value.ts | server | value | — | **none** |
 | lib/partner/create-partner-org.ts | server | createPartnerOrg | 1 | **none** |
 | lib/partner/manager-request.ts | server | createManagerRequest, resolveManagerRequest | 7 | vitest |
@@ -754,7 +761,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/portal-workflow.ts | server | GATE_CLOSERS, projectTodoTiming, resolveTodoAssignee, rebaselineConfig, canEditWorkflow, getGuardrailLimits +10 | 10 | vitest |
 | lib/process/force-advance.ts | server | forceAdvanceProcess | 4 | vitest |
 | lib/process/health.ts | server | HEARTBEAT_STALE_MS, classifyProcessHealth, healthSortWeight, filterAndSortProcesses | — | vitest |
-| lib/process/launch-template.ts | server | launchTemplate | 2 | vitest |
+| lib/process/launch-template.ts | server | launchTemplate | 4 | vitest |
 | lib/process/project-collaboration.ts | server | launchProjectCollaboration | — | vitest |
 | lib/promo-codes.ts | server | DEFAULT_MAX_USES, DEFAULT_EXPIRY_DAYS, MAX_BATCH, generateCode, codeState, issuePromoCodes +2 | 3 | vitest |
 | lib/proposal-access.ts | server | hasProposalVisibility, resolveUserAccess | 8 | vitest |
@@ -803,7 +810,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/site-chrome.ts | server | DEFAULT_CHROME, getSiteChrome, mobileNavFromChrome | — | **none** |
 | lib/spotlight/default-buckets.ts | server | DEFAULT_BUCKETS, seedDefaultBuckets | — | vitest |
 | lib/storage/paths.ts | server | rfpAdminInboxPath, rfpAdminDiscardedPath, rfpPipelinePath, customerPath, customerProposalPath, customerPinnedPath +2 | — | vitest |
-| lib/storage/s3-client.ts | server | LOCAL, BUCKET, localContentType, localReadObject, localWriteObject, s3 +9 | — | vitest |
+| lib/storage/s3-client.ts | server | LOCAL, BUCKET, localContentType, localReadObject, localWriteObject, s3 +12 | — | vitest |
 | lib/stripe.ts | server | stripe, PROPOSAL_P2_LINKED_CENTS, getAmountCents, getOrCreateStripeCustomer, createCheckoutSession, createCustomerPortalSession | 2 | vitest |
 | lib/tasks/completers.ts | server | taskChain, taskCompleterKind, formFields, uploadHref, taskHref | — | vitest |
 | lib/tasks/tasks.ts | server | listOpenTasksForActor, listOpenAdminTriageTasks, createTask, completeTask, closeTasksForEntity | 11 | vitest |
@@ -930,11 +937,11 @@ statement is per-layer, not one number.
 |---|---:|---|---:|
 | pages | 116 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 130 | verify-api-contract | see that lens's own accounting |
-| API routes (write verbs) | 190 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 286 | vitest 149 · sweep-mold-quality 39 | 98 |
+| API routes (write verbs) | 191 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
+| lib modules | 292 | vitest 155 · sweep-mold-quality 39 | 98 |
 | components | 188 | only transitively, via a page that renders them | not measured |
 
-**The write verbs are the real gap.** 190 routes expose a POST/PATCH/PUT/DELETE and no lens
+**The write verbs are the real gap.** 191 routes expose a POST/PATCH/PUT/DELETE and no lens
 walks them: `verify-api-contract` is GET-only by construction (calling every write verb would
 mutate the box it is measuring), and `verify-db-crud` proves a hand-picked set of invariants
 rather than enumerating routes. That is a defensible design and an unstated scope — written
@@ -967,6 +974,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/ingest/materialize.ts` — 223 lines
 - `lib/tools/opportunity-bulk-add-topics.ts` — 214 lines
 - `lib/extract-topics.ts` — 209 lines
+- `lib/email/index.ts` — 207 lines
 - `lib/tools/curation-memory.ts` — 204 lines
 - `lib/provisioning/release-portal.ts` — 200 lines
 - `lib/tools/opportunity-add-topic.ts` — 198 lines
@@ -993,6 +1001,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/geoip.ts` — 125 lines
 - `lib/page-content/homepage.ts` — 123 lines
 - `lib/tools/index.ts` — 116 lines
+- `lib/google-calendar.ts` — 112 lines
 - `lib/partner/create-partner-org.ts` — 111 lines
 - `lib/proposal-full-draft.ts` — 108 lines
 - `lib/tasks/update-task.ts` — 108 lines
@@ -1007,7 +1016,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/page-content/value.ts` — 91 lines
 - `lib/template-stable-sync.ts` — 90 lines
 - `lib/export/pdf-exporter.ts` — 85 lines
-- `lib/import/types.ts` — 83 lines
 - `lib/documents/duplicate-past-proposal.ts` — 75 lines
 - `lib/library/starter-offer.ts` — 75 lines
 - `lib/import/xlsx-reader.ts` — 73 lines
@@ -1039,7 +1047,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/page-content/site-chrome.ts` — 24 lines
 - `lib/pdf-node-globals.ts` — 24 lines
 - `lib/page-content/apply.ts` — 22 lines
-- `lib/page-content/types.ts` — 20 lines
 
 ## 9. Static signals — CANDIDATES, not findings
 

@@ -390,7 +390,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx",
-   "secondDoor": "/api/admin/applications/[id]/accept (both call sendEmail())",
+   "secondDoor": "/api/admin/applications/[id]/accept (both call send())",
    "nearMiss": true
   },
   {
@@ -428,6 +428,17 @@
    "nearMiss": false
   },
   {
+   "route": "/api/webhooks/postmark",
+   "file": "app/api/webhooks/postmark/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "Postmark is the caller — delivery outcomes arrive on their own connection, with POSTMARK_WEBHOOK_SECRET as the authorization",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
    "route": "/blog/feed.xml",
    "file": "app/blog/feed.xml/route.ts",
    "methods": [
@@ -456,7 +467,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 213
+   "rows": 215
   },
   {
    "name": "deploy_baseline",

@@ -246,3 +246,40 @@ green on the fixed build.
   to be unreachable — only unexercised.
 - **A shared domain function is a claim to check.** "Second door" is inferred from a shared import;
   one entry (`proposals/create`) shares a side-effect rather than its main job.
+
+---
+
+## The staleness guard (added 2026-08-26)
+
+**This reconciliation reads its route list from `docs/frontend-inventory.json`, and nothing forced
+that file to be current.** That is the right design — the inventory is the manifest a sweep has to
+touch, and re-deriving the list here would be a second answer to the same question. But it made
+every verdict only as fresh as the last `inventory-frontend.mjs` run, and there is no reason a
+person adding a route would think to run it first.
+
+It happened during the email build. `/api/webhooks/postmark` was added, this reconciliation ran, and
+came back with exactly the six UNSURFACED routes it had before — because the route was not in the
+file at all. The inventory was a day old.
+
+**A lens that cannot see a thing does not report it missing. It reports silence, which reads exactly
+like a pass.** That is the same failure shape as B125 (213 write verbs outside every lens while
+three greens read like a verified API), arriving through a different door.
+
+So the reconciler now counts `route.ts` files on disk, compares against the inventory's records, and
+**exits 2 as a HARNESS DEFECT** rather than printing a verdict this run has not earned — the rule
+`verify-api-contract` and `verify-surfaces` already follow. Red-first: removing one record from the
+inventory produced
+
+```
+HARNESS DEFECT: 1 API route(s) exist on disk and are ABSENT from
+  docs/frontend-inventory.json … Regenerate first:
+      node frontend/scripts/inventory-frontend.mjs
+    · app/api/webhooks/postmark/route.ts
+```
+
+and exit 2; restoring it went green. The guard's own first version read the wrong JSON field and
+found zero route files — and refused to report anyway, which is the behaviour that made the mistake
+cheap.
+
+`/api/webhooks/postmark` is now annotated in `EXTERNAL_CALLER`: Postmark is the caller, delivery
+outcomes arrive on their own connection, and `POSTMARK_WEBHOOK_SECRET` is the authorization.
