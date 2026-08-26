@@ -73,10 +73,12 @@ async function engineState(proposalId) {
   const [ver] = await sql`
     SELECT count(*)::int AS n FROM canvas_versions v
     JOIN proposal_sections s ON s.id = v.section_id WHERE s.proposal_id = ${proposalId}::uuid`;
+  // `content_source` is on proposal_sections, NOT canvas_versions (mig 163) — this query named
+  // `v.content_source` and threw on the very first run of this script. The column records how the
+  // SECTION's current content got there, so an AI-landed section is the section-level fact.
   const [ai] = await sql`
-    SELECT count(*)::int AS n FROM canvas_versions v
-    JOIN proposal_sections s ON s.id = v.section_id
-    WHERE s.proposal_id = ${proposalId}::uuid AND v.content_source = 'ai_revision'`;
+    SELECT count(*)::int AS n FROM proposal_sections s
+    WHERE s.proposal_id = ${proposalId}::uuid AND s.content_source = 'ai_revision'`;
   return { instances: pi.n, openTasks: tasks.n, events: ev.n, invocations: inv.n, versions: ver.n, aiRevisions: ai.n };
 }
 

@@ -1,0 +1,127 @@
+{
+ "target": {
+  "id": "86346914-80d4-4f91-8608-2ca2f4c5b98b",
+  "slug": "immobileyes",
+  "title": "[fixture:isolation] AFWERX Open Topic — Autonomous Perception Payload"
+ },
+ "shots": [
+  {
+   "flow": "studio",
+   "label": "at-rest",
+   "file": "studio__001-at-rest.jpg"
+  },
+  {
+   "flow": "studio",
+   "label": "requested",
+   "file": "studio__002-requested.jpg",
+   "note": "immediately after firing"
+  },
+  {
+   "flow": "studio",
+   "label": "after-polling",
+   "file": "studio__003-after-polling.jpg",
+   "note": "reloaded once the engine settled"
+  },
+  {
+   "flow": "ai-actions",
+   "label": "panel",
+   "file": "ai-actions__004-panel.jpg"
+  },
+  {
+   "flow": "automation",
+   "label": "policy-at-rest",
+   "file": "automation__005-policy-at-rest.jpg"
+  },
+  {
+   "flow": "admin-agents",
+   "label": "roster",
+   "file": "admin-agents__006-roster.jpg",
+   "route": "/admin/agents"
+  },
+  {
+   "flow": "admin-agents",
+   "label": "workflow-monitor",
+   "file": "admin-agents__007-workflow-monitor.jpg",
+   "route": "/admin/workflows"
+  },
+  {
+   "flow": "admin-agents",
+   "label": "process-monitor",
+   "file": "admin-agents__008-process-monitor.jpg",
+   "route": "/admin/process"
+  }
+ ],
+ "timeline": [
+  {
+   "at": "at-rest",
+   "instances": 179,
+   "openTasks": 16,
+   "events": 3900,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  },
+  {
+   "at": "requested",
+   "instances": 179,
+   "openTasks": 16,
+   "events": 3902,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  },
+  {
+   "at": "+4000ms",
+   "instances": 179,
+   "openTasks": 16,
+   "events": 3902,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  },
+  {
+   "at": "+6000ms",
+   "instances": 180,
+   "openTasks": 16,
+   "events": 3917,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  },
+  {
+   "at": "+8000ms",
+   "instances": 180,
+   "openTasks": 16,
+   "events": 3922,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  },
+  {
+   "at": "+10000ms",
+   "instances": 180,
+   "openTasks": 16,
+   "events": 3922,
+   "invocations": 16,
+   "versions": 3,
+   "aiRevisions": 0
+  }
+ ],
+ "before": {
+  "instances": 179,
+  "openTasks": 16,
+  "events": 3899,
+  "invocations": 16,
+  "versions": 3,
+  "aiRevisions": 0
+ },
+ "after": {
+  "instances": 180,
+  "openTasks": 16,
+  "events": 3923,
+  "invocations": 16,
+  "versions": 3,
+  "aiRevisions": 0
+ },
+ "findings": []
+}
