@@ -64,7 +64,9 @@ class OutboundMessage:
     subject: str
     html: str
     text: str | None          # generated from html when absent — some gateways score text-less mail
+    kind: str                 # 'transactional' | 'correspondence' — selects the driver
     sender: SenderIdentity    # resolved, never assembled at the call site (see below)
+    correlation_id: str       # OURS, stable, carried for the life of the message (see below)
     idempotency_key: str      # the trigger event id; a replay must not re-send
     tags: list[str]           # e.g. ['nudge', 'delivery'] — provider-side filtering + analytics
     metadata: dict[str, str]  # tenant_id, task_id … echoed back on webhooks
@@ -72,7 +74,7 @@ class OutboundMessage:
 @dataclass(frozen=True)
 class SendResult:
     provider: str             # 'gmail' | 'postmark'
-    message_id: str | None
+    message_id: str | None    # the RFC 5322 Message-ID — RECORDED, see the correlation contract
     accepted: bool
     error: str | None
     suppressed: bool = False  # refused before sending, not a failure
@@ -82,13 +84,30 @@ class SendResult:
 week is the system working. Collapsing it into `error` would make the suppression list look like an
 outage in every dashboard that counts failures.
 
-### Drivers
+### Drivers — selected PER MESSAGE, not globally
 
-- **`gmail`** — the existing delegated-mailbox path, kept so the switch is reversible and so a
-  Postmark outage has a fallback that is already known to work.
-- **`postmark`** — the new default.
+`OutboundMessage` carries a `kind`, and the driver is resolved from it:
 
-Selected by `EMAIL_DRIVER`, exactly as `STORAGE_DRIVER=local|s3` already works for object storage.
+| kind | driver | what it is |
+|---|---|---|
+| `transactional` | **Postmark** | milestone alerts, task nudges, deliverable reminders, workflow notifications |
+| `correspondence` | **Gmail** | a human emailing a human — sent as that person |
+
+**This is not a compromise between two vendors; they solve different problems.** Postmark is the
+notification system, Gmail is the mailbox.
+
+*Why correspondence cannot go through Postmark:* Gmail sending puts the message in the sender's
+**Sent folder** and threads the reply into their **inbox**. Postmark does neither — a customer email
+sent that way vanishes from the sender's own history and its reply arrives as a webhook. No amount
+of `Reply-To` configuration fixes that.
+
+*Why notifications cannot go through Gmail:* Workspace caps around 2,000 recipients/day per mailbox
+and API sends count against it — delivery-management nudges across the tenant base walk into that.
+No bounce webhooks, no suppression list, and a single OAuth refresh-token expiry silently takes down
+every notification in the platform. The failure mode is invisible from the sending side.
+
+`EMAIL_DRIVER` remains the **transactional default**, so Postmark → Gmail is still one variable away
+if Postmark has an outage.
 
 ### The boundary test
 
@@ -131,6 +150,42 @@ rather than a rewrite — `from_address` becomes tenant-derived and nothing else
 `services/cms/src/sender_identity.py` already has `resolve_sender()`; it grows a `reply_to` and a
 `stream`.
 
+### `Reply-To` is resolved per message, and that matters more than it looks
+
+Two incompatible needs, reconciled by making it part of the resolved identity rather than a global:
+
+| the message | `Reply-To` | why |
+|---|---|---|
+| collaborator invite, review request | the **human** | a reply should reach a person |
+| ToDo nudge with a closed loop | a **system address** | the reply has to come back to the platform |
+
+**External managers make this concrete rather than hypothetical.** Partner managers sit on domains
+you do not control — `pjackson@ecinnovates.com`, `sgaffney@ybi.org`. The platform must never send
+**as** those addresses; it sends as itself and points the reply at them:
+
+```
+From:     "Paul Jackson via RFP Pipeline" <notifications@rfppipeline.com>
+Reply-To: pjackson@ecinnovates.com
+```
+
+Note the asymmetry with your own domain: sending as `eric@rfppipeline.com` through Postmark *is*
+DMARC-aligned, because `rfppipeline.com` is verified. The reason Eric's own correspondence still
+goes through Gmail is the Sent folder and threading, not alignment.
+
+### The closed-loop position, decided
+
+**Automation that requires a closed loop will not let the customer set `Reply-To`.** A participant in
+a closed loop needs a platform identity — an account — not merely an email address.
+
+That is a security property before it is a commercial one: **inbound email cannot authenticate
+anybody.** A `From` header is trivially forged, so a reply that mutates state is either carrying a
+bearer token or is unauthenticated input. This platform already has a doctrine for untrusted input —
+agent output is *advisory → guardrail → land-or-review*, never an auto-write — and inbound mail is
+the same shape.
+
+**So: an inbound reply may ASSOCIATE, never COMPLETE.** It can thread onto the ToDo, appear in the
+activity feed, and notify the owner. Completing the ToDo requires an authenticated session.
+
 ---
 
 ## Suppression
@@ -159,12 +214,39 @@ operator should not have to log into a vendor dashboard to answer that.
 
 ---
 
-## Idempotency
+## The correlation contract — set from day one
 
-`idempotency_key` is the `trigger_event_id` the listener already threads through for dedup. The
-driver enforces it, so a replayed or retried event cannot double-send. Postmark has no native
-idempotency, so this is a small `email_sends` ledger keyed on `(idempotency_key)` — which doubles as
-the local send log.
+**Every outbound message carries a correlation id, and the provider's `Message-ID` is recorded
+against it at send time.** This costs almost nothing now and is *impossible to retrofit*: you cannot
+add a token to mail that has already been sent.
+
+```sql
+CREATE TABLE email_sends (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  correlation_id       uuid NOT NULL,          -- ours; the originating event
+  idempotency_key      text NOT NULL UNIQUE,   -- a replay cannot double-send
+  provider             text NOT NULL,
+  provider_message_id  text,                   -- RFC 5322 Message-ID, for reply threading
+  kind                 text NOT NULL,
+  to_email             text NOT NULL,
+  template             text,
+  sent_at              timestamptz NOT NULL DEFAULT now()
+);
+```
+
+One table, three jobs:
+
+1. **Idempotency** — `UNIQUE (idempotency_key)`. Postmark has no native idempotency, so this is it.
+   The key is the `trigger_event_id` the listener already threads through.
+2. **Webhook association** — Postmark echoes `metadata` back, so a delivery or bounce resolves to the
+   correlation and therefore to the workflow step that caused the send.
+3. **Reply association, later** — an inbound reply carries `In-Reply-To: <original Message-ID>` by
+   RFC, automatically, from every mail client. Matching that against `provider_message_id` resolves
+   the reply to its originating nudge **with no token in the body and no plus-addressing**. The
+   CRM's existing `sweep_inbox` is already the right place to do it.
+
+**Nothing reads (3) yet, and it is still built now.** The alternative is a future feature that can
+only work for mail sent after it shipped.
 
 ---
 
@@ -209,7 +291,40 @@ To be set in Railway on the **CRM service** (`rfp-crm`), which owns sending.
 | `EMAIL_FROM_NAME` | `RFP Pipeline` | fallback when no tenant identity resolves |
 
 **Domain:** `rfppipeline.com`, authenticated in Postmark with DKIM and a custom Return-Path. DNS
-records come from Postmark once the domain is added.
+records come from Postmark once the domain is added. **Verify the domain, not individual sender
+signatures** — domain verification allows any address at `rfppipeline.com` without registering each
+one.
+
+**Two Postmark servers: production and staging.** Each has its own `POSTMARK_SERVER_TOKEN`, activity
+log and reputation. A leaked staging token then cannot send as production, and test traffic cannot
+pollute the log that answers "did this customer actually get it?".
+
+### The DNS detail that breaks mail which already worked
+
+Google and Postmark will both send as `rfppipeline.com`, so **both must appear in a single SPF
+record**:
+
+```
+v=spf1 include:_spf.google.com include:spf.mtasv.net ~all
+```
+
+A domain may have exactly **one** SPF record. Publishing a second one is a `permerror` that fails
+**both** senders — which is the classic way adding an email provider breaks the mail that was already
+working. DKIM is unaffected: Google signs with its selector, Postmark with its own, and DMARC passes
+on either.
+
+### How few sending addresses
+
+Every sending address accrues reputation separately, and recipient-side filters and corporate
+allow-lists key on the address. Three, with distinct reply expectations — not fifteen by topic:
+
+- **`notifications@`** — automated; differentiation comes from the *display name* (option C), not
+  from a different address
+- **`support@`** — a real monitored mailbox
+- **`billing@`** — if invoicing is ever sent
+
+A monitored fallback inbox is worth having **before the first nudge goes out**: when a `Reply-To`
+person has left the company, their replies have to land somewhere.
 
 ---
 
@@ -227,8 +342,11 @@ place.
 
 - **Per-tenant sending domains (option D).** The interface is shaped for it; the DNS onboarding flow
   and per-tenant reputation warming are a separate piece of work.
-- **Inbound / reply parsing.** Postmark supports it and `sweep_inbox` already exists on the Gmail
-  side. Replying-to-complete-a-task is an appealing idea and a different design.
+- **Inbound reply parsing.** The *hooks* ship now — `provider_message_id` is recorded, so a future
+  `In-Reply-To` match resolves any reply to its originating nudge. What is deferred is the consumer.
+  When it is built, an inbound reply **associates but never completes**: inbound email cannot
+  authenticate anyone, so it is untrusted input under the same advisory-not-auto-write doctrine the
+  agent fabric already follows.
 - **Marketing / broadcast.** Postmark's separate broadcast stream exists precisely so this can be
   added later without contaminating transactional reputation. Nothing here sends it.
 - **Open and click tracking.** Available; deliberately deferred. It has privacy implications for
@@ -238,9 +356,11 @@ place.
 
 ## Build order
 
-1. The `send()` seam + `OutboundMessage`/`SendResult`, with the Gmail driver behind it and every
-   existing call site converted. **No behaviour change** — this step is provably a refactor, and the
-   existing tests are the proof.
+1. The `send()` seam + `OutboundMessage`/`SendResult` **including `kind`, `correlation_id` and the
+   `email_sends` ledger**, with the Gmail driver behind it and every existing call site converted.
+   **No behaviour change to what is sent** — this step is provably a refactor, and the existing tests
+   are the proof. The correlation contract lands here rather than later because mail sent before it
+   exists can never be associated with anything.
 2. The boundary test, so step 1 cannot be undone by accident.
 3. The Postmark driver, `EMAIL_DRIVER` switch, suppression table and send ledger.
 4. The webhook endpoint, the three new event types, their labels.
