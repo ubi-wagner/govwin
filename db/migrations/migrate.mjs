@@ -154,6 +154,19 @@ async function run() {
       console.log(`[migrate] ✓ ${file}`);
     } catch (err) {
       console.error(`[migrate] ✗ ${file} FAILED:`, err.message);
+      // 42501 here almost always means the runner is connected as the APPLICATION role, not the
+      // owner. It is the easiest mistake to make in the sandbox: `scripts/sandbox-env.sh` sets
+      // DATABASE_URL to `govtech_app` (correct — that is what the app runs as, and what any test of
+      // RLS must use) and the owner to DATABASE_URL_OWNER, while this runner reads DATABASE_URL.
+      // Most migrations then apply fine, because they only touch tables the app role can write, and
+      // the first one that needs an owner privilege fails with a message about the wrong table.
+      if (err.code === '42501') {
+        console.error('[migrate]');
+        console.error('[migrate] That is a PRIVILEGE error, and the usual cause is the connection:');
+        console.error(`[migrate]   connected as: ${(CONN.match(/\/\/([^:]+)/) || [, '?'])[1]}`);
+        console.error('[migrate] Migrations run as the OWNER. In the sandbox:');
+        console.error('[migrate]   DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs');
+      }
       await sql.end();
       process.exit(1);
     }
