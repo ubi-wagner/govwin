@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 251 | 40,520 |
+| api-route | 261 | 41,097 |
 | app-boundary | 5 | 132 |
-| app-component | 26 | 8,919 |
+| app-component | 26 | 8,926 |
 | auth | 2 | 241 |
-| component | 162 | 41,366 |
+| component | 163 | 41,516 |
 | e2e | 81 | 9,864 |
-| layout | 6 | 454 |
-| lib | 292 | 57,827 |
+| layout | 6 | 461 |
+| lib | 303 | 60,145 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
-| page | 116 | 17,476 |
+| page | 118 | 17,883 |
 | script | 184 | 24,175 |
 | server-action | 1 | 45 |
-| test | 202 | 26,779 |
-| **total** | **1333** | **228,280** |
+| test | 211 | 28,180 |
+| **total** | **1366** | **233,147** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -120,6 +120,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/portal/[tenantSlug]/contracts` | app/portal/[tenantSlug]/contracts/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link | yes |
 | `/portal/[tenantSlug]/contracts/[contractId]` | app/portal/[tenantSlug]/contracts/[contractId]/page.tsx | server | [tenantSlug] [contractId] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link | yes |
 | `/portal/[tenantSlug]/dashboard` | app/portal/[tenantSlug]/dashboard/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Cockpit | yes |
+| `/portal/[tenantSlug]/delivery` | app/portal/[tenantSlug]/delivery/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link | yes |
+| `/portal/[tenantSlug]/delivery/[projectId]` | app/portal/[tenantSlug]/delivery/[projectId]/page.tsx | server | [tenantSlug] [projectId] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link, Measure, DeliverableRow | yes |
 | `/portal/[tenantSlug]/documents` | app/portal/[tenantSlug]/documents/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link, StatusBadge, SupportingDocActions | yes |
 | `/portal/[tenantSlug]/documents/[documentId]` | app/portal/[tenantSlug]/documents/[documentId]/page.tsx | server | [tenantSlug] [documentId] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | DocumentLockBar, CanvasEditorPage | yes |
 | `/portal/[tenantSlug]/documents/new` | app/portal/[tenantSlug]/documents/new/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, getTenantBySlug | NewDocumentChooser | yes |
@@ -304,6 +306,16 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/portal/[tenantSlug]/cards/[opportunityId]/pin` | DELETE POST | app/api/portal/[tenantSlug]/cards/[opportunityId]/pin/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 2×sql | 3 |
 | `/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit` | POST | app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, withTenant, getTenantBySlug | — | 3 |
 | `/api/portal/[tenantSlug]/dashboard` | GET | app/api/portal/[tenantSlug]/dashboard/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 7×sql | 2 |
+| `/api/portal/[tenantSlug]/delivery/projects` | GET POST | app/api/portal/[tenantSlug]/delivery/projects/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]` | GET | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/route.ts | partner_user | — | — | — | 1 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline` | GET PATCH POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts | partner_user | — | — | — | 4 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins` | GET POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables` | GET POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]` | PATCH POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]/route.ts | partner_user | — | — | — | 4 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents` | GET POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones` | GET PATCH POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts | partner_user | — | — | — | 5 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup` | GET | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts | partner_user | — | — | — | 1 |
+| `/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs` | GET POST | app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts | partner_user | — | — | — | 3 |
 | `/api/portal/[tenantSlug]/documents` | POST | app/api/portal/[tenantSlug]/documents/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 2×sql | 7 |
 | `/api/portal/[tenantSlug]/documents/[documentId]/export` | POST | app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 1×sql | 7 |
 | `/api/portal/[tenantSlug]/documents/[documentId]/lock` | POST | app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 1×sql | 4 |
@@ -411,7 +423,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
-## 4. Components — 162 files
+## 4. Components — 163 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -476,6 +488,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | components/cards/card-format.ts | server | toneClass, stageMeta, complianceProgress, bucketLabel | — | n/a |
 | components/cards/opportunity-card.tsx | client | OpportunityCard | — | n/a |
 | components/command/command-tabs.tsx | client | CommandTabs | — | n/a |
+| components/delivery/deliverable-row.tsx | client | DeliverableRow | — | n/a |
 | components/marketing/agency-mark.tsx | server | resolveAgency, AgencyMark, default | — | n/a |
 | components/marketing/application-form.tsx | client | ApplicationForm | — | n/a |
 | components/marketing/cms-card.tsx | server | CmsCard | — | n/a |
@@ -609,7 +622,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 292 files
+## 6. Library modules — 303 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -658,6 +671,16 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/crypto.ts | server | encryptApiKey, decryptApiKey, keyHint | — | **none** |
 | lib/curation/republish.ts | server | republishSolicitationCards, activateLateTopicIfReady | 4 | vitest |
 | lib/db.ts | server | enterTenant, enterBypass, sqlBypass, sql, getTenantBySlug, verifyTenantAccess +3 | 6 | vitest |
+| lib/delivery/access.ts | server | deliveryScope, canAccessProject, listProjectsForActor, listAssignees, canAssign | 5 | vitest |
+| lib/delivery/baseline.ts | server | setBaseline, rebaseline, milestoneVariance, noteSlip | 4 | vitest |
+| lib/delivery/clins.ts | server | listClins, createClin | 2 | **none** |
+| lib/delivery/dates.ts | server | isoDate, daysBetween, varianceLabel | — | vitest |
+| lib/delivery/gate.ts | server | deliveryGate | — | **none** |
+| lib/delivery/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +1 | 14 | vitest |
+| lib/delivery/projects.ts | server | createProject, getProject, listSourceDocuments, readiness, addSourceDocument | 7 | **none** |
+| lib/delivery/provenance.ts | server | TRUST_ORDER, trustRank, outranks, recordProvenance, provenanceFor, badgeFor | 2 | vitest |
+| lib/delivery/rollup.ts | server | pct, rollup | 4 | vitest |
+| lib/delivery/wbs.ts | server | listWbs, createWbsNode, WORKPLAN_COLUMNS, WORKPLAN_READONLY_COLUMNS, toWorkplanCanvas | 4 | vitest |
 | lib/documents/atomize-on-export.ts | server | atomizeDocumentOnExport | 2 | **none** |
 | lib/documents/duplicate-past-proposal.ts | server | duplicatePastProposalAtoms | — | **none** |
 | lib/documents/lock-document.ts | server | lockDocumentAndPromote | — | **none** |
@@ -672,7 +695,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/embeddings.ts | server | EMBED_DIM, activeEmbedModel, embeddingsEnabled, embedContentHash, toVectorLiteral, isUsableVector +3 | — | vitest |
 | lib/errors.ts | server | AppError, UnauthenticatedError, ForbiddenError, NotFoundError, ConflictError, ClaimConflictError +7 | — | vitest |
 | lib/event-labels.ts | server | describeEvent, eventHref, isNotifyWorthyPhase | — | vitest |
-| lib/events.ts | server | userActor, systemActor, pipelineActor, agentActor, emitEventStart, emitEventEnd +2 | 4 | vitest |
+| lib/event-namespaces.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES | — | vitest |
+| lib/events.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES, EventNamespace, userActor, systemActor, pipelineActor +5 | 4 | vitest |
 | lib/export/artifact-export.ts | server | EXPORT_FORMATS, CONTENT_TYPE, resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, assembleFittedArtifactCanvas | — | vitest |
 | lib/export/canvas-html.ts | server | renderChartSvg, renderShapeSvg, canvasBaseCss, renderCanvasBodyHtml, renderCanvasToHtml, renderCanvasPreviewHtml | — | vitest |
 | lib/export/chromium.ts | server | resolveChromiumExecutable | — | **none** |
@@ -748,7 +772,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/partner/own-org.ts | server | ensurePartnerOwnOrgProvisioned | 1 | **none** |
 | lib/partner/precheck.ts | server | classifyPrecheck, runPrecheck | — | vitest |
 | lib/partner/registration.ts | server | validateRegistration, submitPartnerRegistration | 1 | vitest |
-| lib/partner/rollup.ts | server | tenantRollupStats | 1 | **none** |
+| lib/partner/rollup.ts | server | tenantRollupStats | 1 | vitest |
 | lib/partner/scope.ts | server | partnerOwnOrg, partnerScopeTenants, partnerCanEnter, emailActiveAsTenantAdmin | 4 | vitest |
 | lib/partner/todos.ts | server | getPartnerStableTodos | 1 | vitest |
 | lib/paywall.ts | server | isProposalPaywallBypassed | — | vitest |
@@ -809,7 +833,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/section-standards.ts | server | inferSectionType | — | vitest |
 | lib/site-chrome.ts | server | DEFAULT_CHROME, getSiteChrome, mobileNavFromChrome | — | **none** |
 | lib/spotlight/default-buckets.ts | server | DEFAULT_BUCKETS, seedDefaultBuckets | — | vitest |
-| lib/storage/paths.ts | server | rfpAdminInboxPath, rfpAdminDiscardedPath, rfpPipelinePath, customerPath, customerProposalPath, customerPinnedPath +2 | — | vitest |
+| lib/storage/paths.ts | server | rfpAdminInboxPath, rfpAdminDiscardedPath, rfpPipelinePath, customerPath, customerProposalPath, customerPinnedPath +3 | — | vitest |
 | lib/storage/s3-client.ts | server | LOCAL, BUCKET, localContentType, localReadObject, localWriteObject, s3 +12 | — | vitest |
 | lib/stripe.ts | server | stripe, PROPOSAL_P2_LINKED_CENTS, getAmountCents, getOrCreateStripeCustomer, createCheckoutSession, createCustomerPortalSession | 2 | vitest |
 | lib/tasks/completers.ts | server | taskChain, taskCompleterKind, formFields, uploadHref, taskHref | — | vitest |
@@ -935,13 +959,13 @@ statement is per-layer, not one number.
 
 | layer | population | reached by | not reached |
 |---|---:|---|---:|
-| pages | 116 | verify-surfaces (admin + portal trees) | 35 |
-| API routes (GET) | 130 | verify-api-contract | see that lens's own accounting |
-| API routes (write verbs) | 191 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 292 | vitest 155 · sweep-mold-quality 39 | 98 |
-| components | 188 | only transitively, via a page that renders them | not measured |
+| pages | 118 | verify-surfaces (admin + portal trees) | 35 |
+| API routes (GET) | 139 | verify-api-contract | see that lens's own accounting |
+| API routes (write verbs) | 199 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
+| lib modules | 303 | vitest 164 · sweep-mold-quality 39 | 100 |
+| components | 189 | only transitively, via a page that renders them | not measured |
 
-**The write verbs are the real gap.** 191 routes expose a POST/PATCH/PUT/DELETE and no lens
+**The write verbs are the real gap.** 199 routes expose a POST/PATCH/PUT/DELETE and no lens
 walks them: `verify-api-contract` is GET-only by construction (calling every write verb would
 mutate the box it is measuring), and `verify-db-crud` proves a hand-picked set of invariants
 rather than enumerating routes. That is a defensible design and an unstated scope — written
@@ -965,6 +989,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/template-bridge.ts` — 257 lines
 - `lib/proposal/volume-facts.ts` — 248 lines
 - `lib/api-helpers.ts` — 246 lines
+- `lib/delivery/projects.ts` — 244 lines
 - `lib/tools/opportunity-update-topic.ts` — 239 lines
 - `lib/amendments.ts` — 238 lines
 - `lib/page-content/pricing.ts` — 238 lines
@@ -979,6 +1004,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/provisioning/release-portal.ts` — 200 lines
 - `lib/tools/opportunity-add-topic.ts` — 198 lines
 - `lib/atomize-capture.ts` — 192 lines
+- `lib/delivery/clins.ts` — 192 lines
 - `lib/tools/memory-search.ts` — 191 lines
 - `lib/analytics-admin.ts` — 188 lines
 - `lib/automation/triggers.ts` — 187 lines
@@ -1021,8 +1047,8 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/import/xlsx-reader.ts` — 73 lines
 - `lib/pdf-parse-quiet.ts` — 72 lines
 - `lib/export/chromium.ts` — 68 lines
+- `lib/delivery/gate.ts` — 67 lines
 - `lib/proposal-package-review.ts` — 64 lines
-- `lib/partner/rollup.ts` — 63 lines
 - `lib/hooks/use-tool.ts` — 60 lines
 - `lib/memberships.ts` — 58 lines
 - `lib/page-content/about.ts` — 58 lines
@@ -1054,6 +1080,21 @@ Each row is something the parser noticed. **None is a verdict.** CLAUDE.md is ex
 new harness's first output describes the harness; verify every row against the source before
 acting on it. Legitimate exceptions exist in every category (a public marketing page has no
 gate by design; an admin cross-tenant console reads `sqlBypass` on purpose).
+
+### `portal-route-no-tenant-AUTHORISATION` — 10
+
+| file | where | note |
+|---|---|---|
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/clins | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/documents | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts | /api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/delivery/projects/route.ts | /api/portal/[tenantSlug]/delivery/projects | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 
 ### `api-no-gate-at-either-layer` — 8
 

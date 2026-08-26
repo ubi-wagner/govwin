@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 251,
-   "lines": 40520
+   "files": 261,
+   "lines": 41097
   },
   {
    "kind": "app-boundary",
@@ -15,7 +15,7 @@
   {
    "kind": "app-component",
    "files": 26,
-   "lines": 8919
+   "lines": 8926
   },
   {
    "kind": "auth",
@@ -24,8 +24,8 @@
   },
   {
    "kind": "component",
-   "files": 162,
-   "lines": 41366
+   "files": 163,
+   "lines": 41516
   },
   {
    "kind": "e2e",
@@ -35,12 +35,12 @@
   {
    "kind": "layout",
    "files": 6,
-   "lines": 454
+   "lines": 461
   },
   {
    "kind": "lib",
-   "files": 292,
-   "lines": 57827
+   "files": 303,
+   "lines": 60145
   },
   {
    "kind": "middleware",
@@ -54,8 +54,8 @@
   },
   {
    "kind": "page",
-   "files": 116,
-   "lines": 17476
+   "files": 118,
+   "lines": 17883
   },
   {
    "kind": "script",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 202,
-   "lines": 26779
+   "files": 211,
+   "lines": 28180
   }
  ],
  "records": [
@@ -3510,6 +3510,586 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/delivery-assignment-boundary.test.ts",
+   "kind": "test",
+   "lines": 174,
+   "bytes": 7900,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "deliveryScope",
+      "canAccessProject",
+      "listProjectsForActor",
+      "canAssign"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "Object.assign",
+    "queries.push",
+    "strings.raw.join(' ? ').replace(/\\s+/g, ' ').trim",
+    "strings.raw.join(' ? ').replace",
+    "strings.raw.join",
+    "Promise.reject",
+    "Promise.resolve",
+    "vi.mock",
+    "beforeEach",
+    "describe",
+    "it",
+    "expect(deliveryScope({ role, userId: USER }), role).toEqual",
+    "expect",
+    "deliveryScope",
+    "expect(deliveryScope({ role: 'tenant_user', userId: USER })).toEqual",
+    "expect(deliveryScope({ role: 'partner_user', userId: USER })).toEqual",
+    "expect(deliveryScope({ role: 'partner_admin', userId: USER })).toEqual",
+    "expect(deliveryScope({ role: 'auditor', userId: USER })).toEqual",
+    "expect(deliveryScope({ role: '', userId: USER })).toEqual",
+    "listProjectsForActor",
+    "lastQuery",
+    "expect(q, 'without this join the query returns EVERY project at the tenant, and every RLS '\n      + 'assertion still passes').toMatch",
+    "expect(q).toMatch",
+    "expect(lastQuery(), `${role}: defense-in-depth — the query must still be correct on a `\n        + 'connection whose RLS context was not set').toMatch",
+    "expect(out).toEqual",
+    "expect(queries, 'a refusal must not reach the database — an empty result from a query that ran '\n      + 'is indistinguishable from one that was scoped out').toEqual",
+    "expect(listProjectsForActor({ userId: USER, role: 'tenant_admin', tenantId: TENANT }))\n        .resolves.toEqual",
+    "expect(canAccessProject({ userId: USER, role: 'tenant_admin', tenantId: TENANT }, PROJECT))\n        .resolves.toBe",
+    "canAccessProject",
+    "expect(allowed).toBe",
+    "expect(lastQuery()).toMatch",
+    "expect(lastQuery()).not.toMatch",
+    "expect(queries).toEqual",
+    "expect(canAssign('tenant_admin')).toBe",
+    "canAssign",
+    "expect(canAssign('rfp_admin')).toBe",
+    "expect(canAssign('tenant_user')).toBe",
+    "expect(canAssign('partner_user')).toBe",
+    "expect(canAssign('partner_admin')).toBe",
+    "expect(canAssign('nonsense')).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-baseline.test.ts",
+   "kind": "test",
+   "lines": 206,
+   "bytes": 9003,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/baseline",
+     "names": [
+      "setBaseline",
+      "rebaseline"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "state.queries.push",
+    "strings.raw.join(' ? ').replace(/\\s+/g, ' ').trim",
+    "strings.raw.join(' ? ').replace",
+    "strings.raw.join",
+    "Promise.reject",
+    "Promise.resolve",
+    "state.results.shift",
+    "Object.assign",
+    "fn",
+    "vi.mock",
+    "vi.fn",
+    "importOriginal",
+    "docs.map",
+    "beforeEach",
+    "db.state.queries.join",
+    "describe",
+    "it",
+    "queueProject",
+    "setBaseline",
+    "expect(r.ok).toBe",
+    "expect",
+    "expect(r.data.baselinedAt).toBe",
+    "expect(r.status).toBe",
+    "expect(r.code).toBe",
+    "expect(r.error, 'the message has to say what to do instead').toMatch",
+    "expect(allQueries(), 'nothing may be written on a refusal').not.toMatch",
+    "allQueries",
+    "expect(r.error).toMatch",
+    "expect(allQueries()).not.toMatch",
+    "expect(allQueries()).toMatch",
+    "expect(db.state.queries, 'a role refusal must not reach the database').toEqual",
+    "baselined",
+    "rebaseline",
+    "db.state.queries.filter((q) => /^UPDATE/i.test(q)).join",
+    "db.state.queries.filter",
+    "/^UPDATE/i.test",
+    "expect(writes).toMatch",
+    "expect(writes, 'the baseline is not part of this operation').not.toMatch",
+    "expect(writes).not.toMatch",
+    "expect(db.state.queries).toEqual",
+    "db.state.queries.filter((q) => /delivery_milestones/i.test(q)).join",
+    "/delivery_milestones/i.test",
+    "expect(r.data.shiftedDays).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-dates.test.ts",
+   "kind": "test",
+   "lines": 92,
+   "bytes": 3937,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/dates",
+     "names": [
+      "isoDate",
+      "daysBetween",
+      "varianceLabel"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "expect(isoDate(APR28)).toBe",
+    "expect",
+    "isoDate",
+    "expect(String(APR28).slice(0, 10)).not.toBe",
+    "String(APR28).slice",
+    "String",
+    "expect(isoDate(APR28)).not.toBe",
+    "expect(isoDate('2026-04-28')).toBe",
+    "expect(isoDate('2026-04-28T13:45:00.000Z')).toBe",
+    "expect(isoDate(null)).toBeNull",
+    "expect(isoDate(undefined)).toBeNull",
+    "expect(isoDate('')).toBeNull",
+    "expect(isoDate('Tue Apr 28')).toBeNull",
+    "expect(daysBetween(APR28, MAY12)).toBe",
+    "daysBetween",
+    "expect(daysBetween(MAY12, APR28)).toBe",
+    "expect(daysBetween(APR28, APR28)).toBe",
+    "expect(daysBetween(null, MAY12)).toBeNull",
+    "expect(daysBetween(APR28, null)).toBeNull",
+    "expect(daysBetween('Tue Apr 28', MAY12)).toBeNull",
+    "expect(Number.isNaN(out as number), `daysBetween(${JSON.stringify(bad)}, …)`).toBe",
+    "Number.isNaN",
+    "JSON.stringify",
+    "expect(varianceLabel(14)).toEqual",
+    "varianceLabel",
+    "expect(varianceLabel(-3)).toEqual",
+    "expect(varianceLabel(1)?.text).toBe",
+    "expect(varianceLabel(-1)?.text).toBe",
+    "expect(varianceLabel(0)).toBeNull",
+    "expect(varianceLabel(null)).toBeNull"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-deliverables.test.ts",
+   "kind": "test",
+   "lines": 224,
+   "bytes": 10502,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/milestones",
+     "names": [
+      "markMilestoneMet",
+      "uploadDeliverable",
+      "acceptDeliverable"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "state.queries.push",
+    "strings.raw.join(' ? ').replace(/\\s+/g, ' ').trim",
+    "strings.raw.join(' ? ').replace",
+    "strings.raw.join",
+    "Promise.resolve",
+    "state.results.shift",
+    "Object.assign",
+    "vi.mock",
+    "vi.fn",
+    "importOriginal",
+    "beforeEach",
+    "vi.mocked(emitEventSingle).mockClear",
+    "vi.mocked",
+    "db.state.queries.filter((q) => /^UPDATE|^INSERT/i.test(q)).join",
+    "db.state.queries.filter",
+    "/^UPDATE|^INSERT/i.test",
+    "db.state.queries.join",
+    "describe",
+    "it",
+    "markMilestoneMet",
+    "expect(r.ok).toBe",
+    "expect",
+    "expect(r.status).toBe",
+    "expect(r.code).toBe",
+    "expect(r.error).toMatch",
+    "expect(r.error, 'the message has to say WHY a present file is not enough').toMatch",
+    "expect(writes(), 'nothing may be written on a refusal').toBe",
+    "writes",
+    "markMilestoneMet(ADMIN, PROJECT, MILESTONE).catch",
+    "expect(probe).toMatch",
+    "expect(probe, 'a present storage_key must not satisfy the gate').not.toMatch",
+    "expect(writes()).toMatch",
+    "expect(payload.varianceDays).toBe",
+    "expect(db.state.queries).toEqual",
+    "okReads",
+    "uploadDeliverable",
+    "Buffer.from",
+    "expect(writes(), 'uploading must never accept').not.toMatch",
+    "expect(payload.replacedAcceptance, 'the event has to record that an acceptance was revoked').toBe",
+    "Buffer.alloc",
+    "String",
+    "db.state.queries.find",
+    "/storage_key =/i.test",
+    "expect(key).toMatch",
+    "acceptDeliverable",
+    "expect(cas).toMatch",
+    "expect(writes()).not.toMatch",
+    "expect(all()).toMatch",
+    "all"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-provenance.test.ts",
+   "kind": "test",
+   "lines": 161,
+   "bytes": 6697,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "beforeEach"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/provenance",
+     "names": [
+      "TRUST_ORDER",
+      "trustRank",
+      "outranks",
+      "badgeFor",
+      "recordProvenance",
+      "FieldProvenance"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "vi.hoisted",
+    "Object.assign",
+    "state.queries.push",
+    "strings.raw.join(' ? ').replace(/\\s+/g, ' ').trim",
+    "strings.raw.join(' ? ').replace",
+    "strings.raw.join",
+    "Promise.resolve",
+    "vi.mock",
+    "vi.fn",
+    "beforeEach",
+    "describe",
+    "it",
+    "expect([...TRUST_ORDER]).toEqual",
+    "expect",
+    "expect(trustRank('hitl')).toBeLessThan",
+    "trustRank",
+    "expect(trustRank('pattern_match')).toBeLessThan",
+    "expect(trustRank('nonsense')).toBeGreaterThanOrEqual",
+    "expect(outranks('ai', 'ai')).toBe",
+    "outranks",
+    "expect(outranks('hitl', 'ai')).toBe",
+    "expect(outranks('default', 'hitl')).toBe",
+    "expect(outranks('default', null)).toBe",
+    "recordProvenance",
+    "expect(wrote, method).toBe",
+    "expect(sqlMock.state.queries, 'a refusal must not reach the database').toEqual",
+    "expect(wrote).toBe",
+    "expect(await recordProvenance({\n      tenantId: 't', projectId: 'p', targetTable: 'delivery_clins', targetId: 'c', field: 'pop_end',\n      method: 'default',\n    })).toBe",
+    "expect(await recordProvenance({\n      tenantId: 't', projectId: 'p', targetTable: 'delivery_clins', targetId: 'c', field: 'pop_end',\n      method: 'hitl',\n    })).toBe",
+    "sqlMock.state.queries.join",
+    "expect(q).toMatch",
+    "badgeFor",
+    "expect(b.tone).toBe",
+    "expect(b.label).toBe",
+    "cite",
+    "expect(b.detail).toBe",
+    "expect(badgeFor(cite({ method: 'hitl' }), true).label).toBe",
+    "expect(badgeFor(cite({ method: 'override' }), true).tone).toBe",
+    "expect(b.label).toMatch",
+    "expect(b.detail).toBeNull"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-rollup-measures.test.ts",
+   "kind": "test",
+   "lines": 40,
+   "bytes": 1614,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/rollup",
+     "names": [
+      "pct"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "expect(pct(0, 0), 'nothing planned is NOT nought percent spent').toBeNull",
+    "expect",
+    "pct",
+    "expect(pct(5, 0)).toBeNull",
+    "expect(pct(0, 1000)).toBe",
+    "expect(pct(0, 0)).toBeNull",
+    "expect(pct(1, -10)).toBeNull",
+    "expect(pct(1, Number.NaN)).toBeNull",
+    "expect(pct(1, Number.POSITIVE_INFINITY)).toBeNull",
+    "expect(pct(1, 3)).toBe",
+    "expect(pct(800, 2000)).toBe",
+    "expect(pct(2, 202)).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-workplan-canvas.test.ts",
+   "kind": "test",
+   "lines": 141,
+   "bytes": 7099,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/types/canvas-document",
+     "names": [
+      "CANVAS_PRESETS",
+      "validateStandaloneCanvas",
+      "validateCanvasAgainstSpec",
+      "CanvasDocument",
+      "CanvasNode"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/wbs",
+     "names": [
+      "toWorkplanCanvas",
+      "WORKPLAN_COLUMNS",
+      "WORKPLAN_READONLY_COLUMNS",
+      "WbsNode"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "String(i).padStart",
+    "String",
+    "Array.from",
+    "'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat",
+    "describe",
+    "it",
+    "toWorkplanCanvas",
+    "node",
+    "expect(table.content.headers).toEqual",
+    "expect",
+    "expect(table.content.rows).toHaveLength",
+    "expect(table.content.rows[0][0]).toBe",
+    "expect(table.content.rows[0][1]).toBe",
+    "expect(row[3]).toBe",
+    "expect(row[6]).toBe",
+    "expect(meta.workplan.readonlyColumns).toEqual",
+    "expect(WORKPLAN_COLUMNS[i]).toMatch",
+    "expect(meta.workplan.rowIds).toEqual",
+    "nodes.map",
+    "expect(row[2]).toBe",
+    "validateStandaloneCanvas",
+    "expect(violations.map((v) => v.code)).not.toContain",
+    "violations.map",
+    "expect(violations, 'a large project is not a violation').toEqual",
+    "validateCanvasAgainstSpec",
+    "longLetter",
+    "expect(violations.map((v) => v.code)).toContain"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/deployment-migrations.test.ts",
+   "kind": "test",
+   "lines": 113,
+   "bytes": 5653,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "path.resolve",
+    "process.cwd",
+    "fs.readFileSync",
+    "path.join",
+    "read",
+    "describe",
+    "it",
+    "ENTRYPOINT.indexOf",
+    "expect(migrateAt, 'the entrypoint no longer runs migrations').toBeGreaterThan",
+    "expect",
+    "expect(serverAt).toBeGreaterThan",
+    "expect(migrateAt, 'migrations must run BEFORE the server, or the app serves a schema it does '\n      + 'not match').toBeLessThan",
+    "expect(ENTRYPOINT.split('\\n').slice(0, 3).join('\\n')).toMatch",
+    "ENTRYPOINT.split('\\n').slice(0, 3).join",
+    "ENTRYPOINT.split('\\n').slice",
+    "ENTRYPOINT.split",
+    "expect(ENTRYPOINT).toMatch",
+    "expect(\n      ENTRYPOINT,\n      'the migration invocation must override DATABASE_URL with the owner connection',\n    ).toMatch",
+    "expect(FRONTEND_DOCKERFILE).toMatch",
+    "CMS_DOCKERFILE.split('\\n').find",
+    "CMS_DOCKERFILE.split",
+    "l.startsWith",
+    "expect(cmd, 'the CRM Dockerfile has no CMD').toBeTruthy",
+    "expect(cmd.indexOf('db/run.sh')).toBeGreaterThan",
+    "cmd.indexOf",
+    "expect(cmd.indexOf('db/run.sh')).toBeLessThan",
+    "expect(cmd).toMatch",
+    "expect(CMS_DOCKERFILE).toMatch",
+    "expect(WF).toMatch",
+    "expect(WF, 'a push trigger would race the in-deployment migration').not.toMatch"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/document-furniture.test.ts",
    "kind": "test",
    "lines": 445,
@@ -4472,8 +5052,8 @@
   {
    "file": "__tests__/event-contract.test.ts",
    "kind": "test",
-   "lines": 182,
-   "bytes": 9891,
+   "lines": 185,
+   "bytes": 10109,
    "client": false,
    "exports": [],
    "imports": [
@@ -4483,6 +5063,13 @@
       "describe",
       "it",
       "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "EVENT_NAMESPACES",
+      "FORBIDDEN_NAMESPACES"
      ]
     },
     {
@@ -4665,6 +5252,112 @@
     "expect(isNotifyWorthyPhase('end')).toBe",
     "expect(isNotifyWorthyPhase(null)).toBe",
     "expect(isNotifyWorthyPhase('start')).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/event-namespace-registry.test.ts",
+   "kind": "test",
+   "lines": 245,
+   "bytes": 12483,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "@/lib/event-namespaces",
+     "names": [
+      "EVENT_NAMESPACES",
+      "FORBIDDEN_NAMESPACES"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "path.resolve",
+    "process.cwd",
+    "fs.readFileSync",
+    "path.join",
+    "fs.existsSync",
+    "[...EVENT_NAMESPACES].sort",
+    "text.matchAll",
+    "found.add",
+    "[...found].filter((w) => CANON.includes(w) || w === 'project').sort",
+    "[...found].filter",
+    "CANON.includes",
+    "describe",
+    "it",
+    "expect(CANON).toEqual",
+    "expect",
+    "expect([...FORBIDDEN_NAMESPACES].sort()).toEqual",
+    "[...FORBIDDEN_NAMESPACES].sort",
+    "fs.readdirSync",
+    "e.name.startsWith",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "read",
+    "/['\"]finder['\"]\\s*,\\s*['\"]capture['\"]\\s*,\\s*['\"]identity['\"]/.test",
+    "offenders.push",
+    "expect(\n      offenders,\n      'these files write the registry out again instead of importing EVENT_NAMESPACES from '\n      + '@/lib/events. A copy is a copy whether or not it agrees today.',\n    ).toEqual",
+    "src.split('\\n').filter",
+    "src.split",
+    "/^\\s*import\\s/.test",
+    "expect(\n      imports,\n      'lib/event-namespaces.ts must stay a leaf. Any import here can reach a client bundle '\n      + 'through event-stream-client.tsx and break the build in a way no unit test can see.',\n    ).toEqual",
+    "src.match",
+    "expect(block, 'pipeline/src/events.py does not export EVENT_NAMESPACES').toBeTruthy",
+    "expect(extractSet(block![1]), 'the Python registry disagrees with the TypeScript one').toEqual",
+    "extractSet",
+    "e.name.endsWith",
+    "/[\"']finder[\"']\\s*,\\s*[\"']capture[\"']\\s*,\\s*[\"']identity[\"']/.test",
+    "expect(\n      offenders,\n      'these files write the registry out again instead of importing it from pipeline/src/events.py',\n    ).toEqual",
+    "fs.readdirSync(migDir)\n      .filter((f) => /namespace/i.test(f) && f.endsWith('.sql')).sort",
+    "fs.readdirSync(migDir).filter",
+    "/namespace/i.test",
+    "f.endsWith",
+    "expect(namespaceMigrations.length, 'no namespace migration found').toBeGreaterThan",
+    "expect(check, `${newest} does not define system_events_namespace_chk`).toBeTruthy",
+    "expect(\n      extractSet(check![1]),\n      `${newest}'s CHECK disagrees with the code registry. The CHECK wins — it is what actually `\n      + 'refuses an insert; the code merely logs.',\n    ).toEqual",
+    "exists",
+    "all.some",
+    "all.slice(i, i + 3).join",
+    "all.slice",
+    "/finder/.test",
+    "/capture/.test",
+    "/identity/.test",
+    "expect(\n          new RegExp(`\\\\b${ns}\\\\b`).test(src),\n          `${doc} enumerates the event-namespace registry but never mentions '${ns}'. `\n          + 'A doc listing seven when there are eight is how the next copy gets written wrong.',\n        ).toBe",
+    "new RegExp(`\\\\b${ns}\\\\b`).test",
+    "all.forEach",
+    "line.match",
+    "m[1].toLowerCase",
+    "Number",
+    "Number.isFinite",
+    "expect(\n          stated,\n          `${doc}:${i + 1} states ${stated} namespaces; the registry has ${CANON.length}:\\n    `\n          + line.trim().slice(0, 160),\n        ).toBe",
+    "line.trim().slice",
+    "line.trim"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -5611,11 +6304,17 @@
   {
    "file": "__tests__/integration/smoke.test.ts",
    "kind": "test",
-   "lines": 709,
-   "bytes": 25189,
+   "lines": 711,
+   "bytes": 25283,
    "client": false,
    "exports": [],
    "imports": [
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "EVENT_NAMESPACES"
+     ]
+    },
     {
      "spec": "vitest",
      "names": [
@@ -18091,8 +18790,8 @@
   {
    "file": "app/admin/events/event-stream-client.tsx",
    "kind": "app-component",
-   "lines": 312,
-   "bytes": 13126,
+   "lines": 319,
+   "bytes": 13677,
    "client": true,
    "exports": [
     {
@@ -18106,6 +18805,12 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/lib/event-namespaces",
+     "names": [
+      "EVENT_NAMESPACES"
+     ]
+    },
     {
      "spec": "next/navigation",
      "names": [
@@ -38667,8 +39372,8 @@
   {
    "file": "app/api/events/route.ts",
    "kind": "api-route",
-   "lines": 215,
-   "bytes": 7406,
+   "lines": 220,
+   "bytes": 7665,
    "client": false,
    "exports": [
     {
@@ -38687,6 +39392,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "EVENT_NAMESPACES"
      ]
     },
     {
@@ -38714,15 +39425,15 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 64
+     "line": 65
     },
     {
      "tag": "sql",
-     "line": 78
+     "line": 79
     },
     {
      "tag": "sql",
-     "line": 180
+     "line": 185
     }
    ],
    "calls": [
@@ -38737,7 +39448,7 @@
     "hasRoleAtLeast",
     "console.error",
     "request.json",
-    "ALLOWED_NAMESPACES.includes",
+    "(EVENT_NAMESPACES as readonly string[]).includes",
     "/^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$/.test",
     "sql.json"
    ],
@@ -38748,87 +39459,87 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 37
+     "line": 38
     },
     {
      "arg": "{ data: { events: [] } }",
      "opts": "",
-     "line": 58
+     "line": 59
     },
     {
      "arg": "{ data: { events: [] } }",
      "opts": "",
-     "line": 76
+     "line": 77
     },
     {
      "arg": "{ data: { events } }",
      "opts": "",
-     "line": 89
+     "line": 90
     },
     {
      "arg": "{ error: 'Event query failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 92
+     "line": 93
     },
     {
      "arg": "{ error: 'Event stream failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 99
+     "line": 100
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 111
+     "line": 112
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 123
+     "line": 124
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 139
+     "line": 140
     },
     {
      "arg": "{ error: 'namespace (string) is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 146
+     "line": 147
     },
     {
      "arg": "{ error: 'type (string) is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 152
+     "line": 153
     },
     {
      "arg": "{ error: 'Invalid namespace', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 163
+     "line": 168
     },
     {
      "arg": "{ error: 'Invalid type — expected entity.action_past_tense (e.g. finder.tenant_created)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 172
+     "line": 177
     },
     {
      "arg": "{ data: { eventId: event.id } }",
      "opts": "{ status: 201 }",
-     "line": 196
+     "line": 201
     },
     {
      "arg": "{ error: 'Event emission failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 202
+     "line": 207
     },
     {
      "arg": "{ error: 'Event emission failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 209
+     "line": 214
     }
    ],
    "route": "/api/events",
@@ -43057,6 +43768,1110 @@
    "route": "/api/portal/[tenantSlug]/dashboard",
    "methods": [
     "GET"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts",
+   "kind": "api-route",
+   "lines": 69,
+   "bytes": 3249,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "PATCH",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject",
+      "readiness"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/baseline",
+     "names": [
+      "setBaseline",
+      "rebaseline",
+      "milestoneVariance",
+      "RebaselineInput"
+     ]
+    }
+   ],
+   "tryCount": 4,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "Promise.all",
+    "readiness",
+    "milestoneVariance",
+    "console.error",
+    "setBaseline",
+    "request.json",
+    "rebaseline"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 21
+    },
+    {
+     "arg": "{\n      data: { baselinedAt: project.baselinedAt, readiness: ready, variance },\n    }",
+     "opts": "",
+     "line": 27
+    },
+    {
+     "arg": "{ error: 'Failed to read the baseline', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 32
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 43
+    },
+    {
+     "arg": "{ data: { baseline: result.data } }",
+     "opts": "",
+     "line": 44
+    },
+    {
+     "arg": "{ error: 'Failed to set the baseline', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 47
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 59
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 62
+    },
+    {
+     "arg": "{ data: { rebaseline: result.data } }",
+     "opts": "",
+     "line": 63
+    },
+    {
+     "arg": "{ error: 'Failed to rebaseline', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 66
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts",
+   "kind": "api-route",
+   "lines": 58,
+   "bytes": 2640,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/clins",
+     "names": [
+      "createClin",
+      "listClins",
+      "ClinInput"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/provenance",
+     "names": [
+      "provenanceFor"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "listClins",
+    "provenanceFor",
+    "console.error",
+    "request.json",
+    "createClin"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 23
+    },
+    {
+     "arg": "{ data: { clins, provenance } }",
+     "opts": "",
+     "line": 31
+    },
+    {
+     "arg": "{ error: 'Failed to list CLINs', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 46
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 50
+    },
+    {
+     "arg": "{ data: { clin: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 52
+    },
+    {
+     "arg": "{ error: 'Failed to create the CLIN', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 55
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]/route.ts",
+   "kind": "api-route",
+   "lines": 60,
+   "bytes": 2917,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "PATCH",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/milestones",
+     "names": [
+      "acceptDeliverable",
+      "uploadDeliverable"
+     ]
+    }
+   ],
+   "tryCount": 4,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "request.formData",
+    "NextResponse.json",
+    "form.get",
+    "uploadDeliverable",
+    "Buffer.from",
+    "file.arrayBuffer",
+    "console.error",
+    "request.json",
+    "acceptDeliverable"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 20
+    },
+    {
+     "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 24
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 30
+    },
+    {
+     "arg": "{ data: { deliverable: result.data } }",
+     "opts": "",
+     "line": 31
+    },
+    {
+     "arg": "{ error: 'Failed to upload the deliverable', code: 'STORAGE_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 46
+    },
+    {
+     "arg": "{ error: \"action must be 'accept'\", code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 49
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 53
+    },
+    {
+     "arg": "{ data: { deliverable: result.data } }",
+     "opts": "",
+     "line": 54
+    },
+    {
+     "arg": "{ error: 'Failed to accept the deliverable', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 57
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]",
+   "methods": [
+    "PATCH",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts",
+   "kind": "api-route",
+   "lines": 53,
+   "bytes": 2531,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/milestones",
+     "names": [
+      "createDeliverable",
+      "listDeliverables"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "listDeliverables",
+    "console.error",
+    "request.json",
+    "createDeliverable"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 20
+    },
+    {
+     "arg": "{ data: { deliverables: await listDeliverables(gate.actor.tenantId, projectId) } }",
+     "opts": "",
+     "line": 22
+    },
+    {
+     "arg": "{ error: 'Failed to load deliverables', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 25
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 37
+    },
+    {
+     "arg": "{ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 40
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 46
+    },
+    {
+     "arg": "{ data: { deliverable: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 47
+    },
+    {
+     "arg": "{ error: 'Failed to add the deliverable', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 50
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts",
+   "kind": "api-route",
+   "lines": 71,
+   "bytes": 3333,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "addSourceDocument",
+      "listSourceDocuments",
+      "getProject",
+      "SourceKind"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "listSourceDocuments",
+    "console.error",
+    "request.formData",
+    "String",
+    "form.get",
+    "Math.round",
+    "Buffer.from",
+    "file.arrayBuffer",
+    "addSourceDocument"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 26
+    },
+    {
+     "arg": "{ data: { documents } }",
+     "opts": "",
+     "line": 29
+    },
+    {
+     "arg": "{ error: 'Failed to list documents', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 32
+    },
+    {
+     "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 44
+    },
+    {
+     "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 49
+    },
+    {
+     "arg": "{ error: `That file is ${Math.round(file.size / 1e6)} MB; the limit is 40 MB`, code: 'PAYLOAD_TOO_LARGE' }",
+     "opts": "{ status: 413 }",
+     "line": 52
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 63
+    },
+    {
+     "arg": "{ data: { document: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 65
+    },
+    {
+     "arg": "{ error: 'Failed to upload the document', code: 'STORAGE_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 68
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts",
+   "kind": "api-route",
+   "lines": 78,
+   "bytes": 3744,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "PATCH",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/milestones",
+     "names": [
+      "createMilestone",
+      "listMilestones",
+      "listDeliverables",
+      "markMilestoneMet"
+     ]
+    }
+   ],
+   "tryCount": 5,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "Promise.all",
+    "listMilestones",
+    "listDeliverables",
+    "console.error",
+    "request.json",
+    "createMilestone",
+    "markMilestoneMet"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 21
+    },
+    {
+     "arg": "{ data: { milestones, deliverables } }",
+     "opts": "",
+     "line": 27
+    },
+    {
+     "arg": "{ error: 'Failed to load milestones', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 30
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 42
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 45
+    },
+    {
+     "arg": "{ data: { milestone: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 46
+    },
+    {
+     "arg": "{ error: 'Failed to add the milestone', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 49
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 61
+    },
+    {
+     "arg": "{ error: \"Provide milestoneId and action:'met'\", code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 64
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 71
+    },
+    {
+     "arg": "{ data: { milestone: result.data } }",
+     "opts": "",
+     "line": 72
+    },
+    {
+     "arg": "{ error: 'Failed to close the milestone', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 75
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts",
+   "kind": "api-route",
+   "lines": 31,
+   "bytes": 1446,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/rollup",
+     "names": [
+      "rollup"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "rollup",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 23
+    },
+    {
+     "arg": "{ data: await rollup(gate.actor.tenantId, projectId) }",
+     "opts": "",
+     "line": 25
+    },
+    {
+     "arg": "{ error: 'Failed to compute progress', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 28
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup",
+   "methods": [
+    "GET"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/route.ts",
+   "kind": "api-route",
+   "lines": 45,
+   "bytes": 2198,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject",
+      "listSourceDocuments",
+      "readiness"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/clins",
+     "names": [
+      "listClins"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "listAssignees"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/provenance",
+     "names": [
+      "provenanceFor"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "Promise.all",
+    "listSourceDocuments",
+    "listClins",
+    "listAssignees",
+    "readiness",
+    "provenanceFor",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 24
+    },
+    {
+     "arg": "{ data: { project, documents, clins, assignees, readiness: ready, provenance } }",
+     "opts": "",
+     "line": 39
+    },
+    {
+     "arg": "{ error: 'Failed to load the delivery project', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 42
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]",
+   "methods": [
+    "GET"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts",
+   "kind": "api-route",
+   "lines": 59,
+   "bytes": 2540,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/clins",
+     "names": [
+      "listClins"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/wbs",
+     "names": [
+      "createWbsNode",
+      "listWbs",
+      "toWorkplanCanvas",
+      "WbsInput"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "getProject",
+    "NextResponse.json",
+    "Promise.all",
+    "listWbs",
+    "listClins",
+    "toWorkplanCanvas",
+    "console.error",
+    "request.json",
+    "createWbsNode"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 24
+    },
+    {
+     "arg": "{ data: { nodes, canvas } }",
+     "opts": "",
+     "line": 32
+    },
+    {
+     "arg": "{ error: 'Failed to load the work breakdown', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 35
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 47
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 51
+    },
+    {
+     "arg": "{ data: { node: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 53
+    },
+    {
+     "arg": "{ error: 'Failed to add the task', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 56
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/route.ts",
+   "kind": "api-route",
+   "lines": 48,
+   "bytes": 2146,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/gate",
+     "names": [
+      "deliveryGate"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "listProjectsForActor"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "createProject"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "deliveryGate",
+    "listProjectsForActor",
+    "NextResponse.json",
+    "console.error",
+    "request.json",
+    "createProject"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ data: { projects } }",
+     "opts": "",
+     "line": 21
+    },
+    {
+     "arg": "{ error: 'Failed to list delivery projects', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 24
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 36
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 40
+    },
+    {
+     "arg": "{ data: { project: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 42
+    },
+    {
+     "arg": "{ error: 'Failed to create the delivery workspace', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 45
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/delivery/projects",
+   "methods": [
+    "GET",
+    "POST"
    ],
    "runtime": null,
    "dynamic": false
@@ -64256,6 +66071,264 @@
    ]
   },
   {
+   "file": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx",
+   "kind": "page",
+   "lines": 291,
+   "bytes": 13266,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "DeliveryProjectPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect",
+      "notFound"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "getTenantBySlug",
+      "verifyTenantAccess",
+      "enterTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "deliveryScope",
+      "listAssignees"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/projects",
+     "names": [
+      "getProject",
+      "listSourceDocuments",
+      "readiness"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/clins",
+     "names": [
+      "listClins"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/milestones",
+     "names": [
+      "listMilestones",
+      "listDeliverables"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/provenance",
+     "names": [
+      "provenanceFor",
+      "badgeFor"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/rollup",
+     "names": [
+      "rollup"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/dates",
+     "names": [
+      "isoDate",
+      "daysBetween",
+      "varianceLabel"
+     ]
+    },
+    {
+     "spec": "@/components/delivery/deliverable-row",
+     "names": [
+      "DeliverableRow"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "canAssign"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "redirect",
+    "isRole",
+    "getTenantBySlug",
+    "verifyTenantAccess",
+    "deliveryScope",
+    "enterTenant",
+    "canAssign",
+    "getProject",
+    "notFound",
+    "Promise.all",
+    "listSourceDocuments",
+    "listClins",
+    "listMilestones",
+    "listDeliverables",
+    "readiness",
+    "listAssignees",
+    "rollup",
+    "provenanceFor",
+    "byMilestone.get",
+    "list.push",
+    "byMilestone.set",
+    "new Date(project.baselinedAt).toLocaleDateString",
+    "ready.missing.join",
+    "clins.map",
+    "badgeFor",
+    "Boolean",
+    "isoDate",
+    "milestones.map",
+    "varianceLabel",
+    "daysBetween",
+    "items.map",
+    "String",
+    "docs.map",
+    "new Date(d.uploadedAt).toLocaleDateString"
+   ],
+   "jsx": [
+    "Link",
+    "Measure",
+    "DeliverableRow"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/portal/[tenantSlug]/delivery/[projectId]",
+   "dynamic": true,
+   "params": [
+    "[tenantSlug]",
+    "[projectId]"
+   ]
+  },
+  {
+   "file": "app/portal/[tenantSlug]/delivery/page.tsx",
+   "kind": "page",
+   "lines": 116,
+   "bytes": 5065,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "DeliveryPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "getTenantBySlug",
+      "verifyTenantAccess",
+      "enterTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/access",
+     "names": [
+      "listProjectsForActor",
+      "deliveryScope",
+      "canAssign"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "redirect",
+    "isRole",
+    "getTenantBySlug",
+    "verifyTenantAccess",
+    "deliveryScope",
+    "enterTenant",
+    "listProjectsForActor",
+    "canAssign",
+    "projects.map",
+    "new Date(p.baselinedAt).toLocaleDateString",
+    "new Date(p.createdAt).toLocaleDateString"
+   ],
+   "jsx": [
+    "Link"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/portal/[tenantSlug]/delivery",
+   "dynamic": true,
+   "params": [
+    "[tenantSlug]"
+   ]
+  },
+  {
    "file": "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
    "kind": "page",
    "lines": 115,
@@ -64623,8 +66696,8 @@
   {
    "file": "app/portal/[tenantSlug]/layout.tsx",
    "kind": "layout",
-   "lines": 195,
-   "bytes": 9706,
+   "lines": 202,
+   "bytes": 10377,
    "client": false,
    "exports": [
     {
@@ -72367,6 +74440,69 @@
     "Link",
     "Tabs"
    ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/delivery/deliverable-row.tsx",
+   "kind": "component",
+   "lines": 150,
+   "bytes": 5487,
+   "client": true,
+   "exports": [
+    {
+     "name": "DeliverableView",
+     "form": "type"
+    },
+    {
+     "name": "DeliverableRow",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState",
+      "useRef"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    },
+    {
+     "spec": "@/lib/toast",
+     "names": [
+      "toast"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "useRouter",
+    "useState",
+    "useRef",
+    "Boolean",
+    "confirm",
+    "setBusy",
+    "body.append",
+    "fetch",
+    "res.json().catch",
+    "res.json",
+    "toast",
+    "router.refresh",
+    "JSON.stringify",
+    "upload",
+    "fileRef.current.click",
+    "accept"
+   ],
+   "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -90214,6 +92350,1105 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/delivery/access.ts",
+   "kind": "lib",
+   "lines": 182,
+   "bytes": 8083,
+   "client": false,
+   "exports": [
+    {
+     "name": "DeliveryActor",
+     "form": "type"
+    },
+    {
+     "name": "DeliveryScope",
+     "form": "type"
+    },
+    {
+     "name": "deliveryScope",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "canAccessProject",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "DeliveryProjectRow",
+     "form": "type"
+    },
+    {
+     "name": "listProjectsForActor",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "listAssignees",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "canAssign",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "isRole",
+      "Role"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 88
+    },
+    {
+     "tag": "sql",
+     "line": 95
+    },
+    {
+     "tag": "sql",
+     "line": 137
+    },
+    {
+     "tag": "sql",
+     "line": 144
+    },
+    {
+     "tag": "sql",
+     "line": 166
+    }
+   ],
+   "calls": [
+    "isRole",
+    "hasRoleAtLeast",
+    "deliveryScope",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/baseline.ts",
+   "kind": "lib",
+   "lines": 329,
+   "bytes": 14678,
+   "client": false,
+   "exports": [
+    {
+     "name": "BaselineResult",
+     "form": "type"
+    },
+    {
+     "name": "setBaseline",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "RebaselineInput",
+     "form": "type"
+    },
+    {
+     "name": "RebaselineResult",
+     "form": "type"
+    },
+    {
+     "name": "rebaseline",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "MilestoneVariance",
+     "form": "type"
+    },
+    {
+     "name": "milestoneVariance",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "noteSlip",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "withEventBracket",
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAssign",
+      "canAccessProject",
+      "DeliveryActor"
+     ]
+    },
+    {
+     "spec": "./projects",
+     "names": [
+      "readiness",
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 51
+    },
+    {
+     "tag": "sql",
+     "line": 195
+    },
+    {
+     "tag": "sql",
+     "line": 218
+    },
+    {
+     "tag": "sql",
+     "line": 304
+    }
+   ],
+   "calls": [
+    "canAssign",
+    "canAccessProject",
+    "String(project.baselinedAt).slice",
+    "String",
+    "readiness",
+    "ready.missing.join",
+    "withEventBracket",
+    "userActor",
+    "sql.begin",
+    "auditLog",
+    "console.error",
+    "(input.reason ?? '').trim",
+    "Number.isInteger",
+    "Math.abs",
+    "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+    "Date.parse",
+    "Math.round",
+    "emitEventSingle"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/clins.ts",
+   "kind": "lib",
+   "lines": 192,
+   "bytes": 7498,
+   "client": false,
+   "exports": [
+    {
+     "name": "Clin",
+     "form": "type"
+    },
+    {
+     "name": "FieldCitation",
+     "form": "type"
+    },
+    {
+     "name": "ClinInput",
+     "form": "type"
+    },
+    {
+     "name": "listClins",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "createClin",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "DeliveryActor"
+     ]
+    },
+    {
+     "spec": "./provenance",
+     "names": [
+      "recordProvenance",
+      "ProvenanceMethod"
+     ]
+    },
+    {
+     "spec": "./projects",
+     "names": [
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 66
+    },
+    {
+     "tag": "sql",
+     "line": 113
+    }
+   ],
+   "calls": [
+    "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+    "Number.isNaN",
+    "d.getTime",
+    "console.error",
+    "canAssign",
+    "canAccessProject",
+    "(input.clinNumber ?? '').trim",
+    "(input.title ?? '').trim",
+    "asDate",
+    "Number.isFinite",
+    "recordCitations",
+    "emitEventSingle",
+    "userActor",
+    "auditLog",
+    "Object.entries",
+    "CITABLE_FIELDS.has",
+    "recordProvenance"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/dates.ts",
+   "kind": "lib",
+   "lines": 81,
+   "bytes": 3705,
+   "client": false,
+   "exports": [
+    {
+     "name": "isoDate",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "daysBetween",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "varianceLabel",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "String",
+    "ISO_SHAPE.test",
+    "Number.isNaN",
+    "d.getTime",
+    "d.toISOString().slice",
+    "d.toISOString",
+    "isoDate",
+    "Date.parse",
+    "Number.isFinite",
+    "Math.round"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/gate.ts",
+   "kind": "lib",
+   "lines": 67,
+   "bytes": 3180,
+   "client": false,
+   "exports": [
+    {
+     "name": "GateResult",
+     "form": "type"
+    },
+    {
+     "name": "deliveryGate",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "getTenantBySlug",
+      "verifyTenantAccess",
+      "enterTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "Role"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "deliveryScope",
+      "DeliveryActor"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "isRole",
+    "getTenantBySlug",
+    "verifyTenantAccess",
+    "deliveryScope",
+    "enterTenant"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 39
+    },
+    {
+     "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 44
+    },
+    {
+     "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 49
+    },
+    {
+     "arg": "{ error: 'Delivery workspaces are not available to this role', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 57
+    }
+   ]
+  },
+  {
+   "file": "lib/delivery/milestones.ts",
+   "kind": "lib",
+   "lines": 417,
+   "bytes": 19103,
+   "client": false,
+   "exports": [
+    {
+     "name": "Milestone",
+     "form": "type"
+    },
+    {
+     "name": "Deliverable",
+     "form": "type"
+    },
+    {
+     "name": "listMilestones",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "listDeliverables",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "createMilestone",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "markMilestoneMet",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "createDeliverable",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "uploadDeliverable",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "acceptDeliverable",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "crypto",
+     "names": [
+      "randomUUID"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "@/lib/storage/s3-client",
+     "names": [
+      "putObject"
+     ]
+    },
+    {
+     "spec": "@/lib/storage/paths",
+     "names": [
+      "customerDeliveryPath"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "DeliveryActor"
+     ]
+    },
+    {
+     "spec": "./projects",
+     "names": [
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 7,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 62
+    },
+    {
+     "tag": "sql",
+     "line": 76
+    },
+    {
+     "tag": "sql",
+     "line": 119
+    },
+    {
+     "tag": "sql",
+     "line": 120
+    },
+    {
+     "tag": "sql",
+     "line": 126
+    },
+    {
+     "tag": "sql",
+     "line": 169
+    },
+    {
+     "tag": "sql",
+     "line": 183
+    },
+    {
+     "tag": "sql",
+     "line": 242
+    },
+    {
+     "tag": "sql",
+     "line": 249
+    },
+    {
+     "tag": "sql",
+     "line": 303
+    },
+    {
+     "tag": "sql",
+     "line": 310
+    },
+    {
+     "tag": "sql",
+     "line": 320
+    },
+    {
+     "tag": "sql",
+     "line": 375
+    },
+    {
+     "tag": "sql",
+     "line": 387
+    }
+   ],
+   "calls": [
+    "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+    "Number.isNaN",
+    "new Date(`${v}T00:00:00Z`).getTime",
+    "console.error",
+    "canAssign",
+    "canAccessProject",
+    "(input.title ?? '').trim",
+    "asDate",
+    "auditLog",
+    "outstanding.slice(0, 3).map((d) => d.title).join",
+    "outstanding.slice(0, 3).map",
+    "outstanding.slice",
+    "Math.round",
+    "Date.parse",
+    "String",
+    "String(row.baselineDate).slice",
+    "emitEventSingle",
+    "userActor",
+    "(input.filename ?? '').trim",
+    "filename.split('.').pop().toLowerCase",
+    "filename.split('.').pop",
+    "filename.split",
+    "filename.includes",
+    "ALLOWED_EXT.has",
+    "[...ALLOWED_EXT].join",
+    "customerDeliveryPath",
+    "randomUUID",
+    "putObject",
+    "Boolean"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/projects.ts",
+   "kind": "lib",
+   "lines": 244,
+   "bytes": 10521,
+   "client": false,
+   "exports": [
+    {
+     "name": "SourceKind",
+     "form": "type"
+    },
+    {
+     "name": "DeliveryProject",
+     "form": "type"
+    },
+    {
+     "name": "SourceDocument",
+     "form": "type"
+    },
+    {
+     "name": "Fail",
+     "form": "type"
+    },
+    {
+     "name": "Ok",
+     "form": "type"
+    },
+    {
+     "name": "createProject",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "getProject",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "listSourceDocuments",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "Readiness",
+     "form": "type"
+    },
+    {
+     "name": "readiness",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "addSourceDocument",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "crypto",
+     "names": [
+      "randomUUID"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "@/lib/storage/s3-client",
+     "names": [
+      "putObject"
+     ]
+    },
+    {
+     "spec": "@/lib/storage/paths",
+     "names": [
+      "customerDeliveryPath"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "DeliveryActor"
+     ]
+    }
+   ],
+   "tryCount": 4,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 81
+    },
+    {
+     "tag": "sql",
+     "line": 90
+    },
+    {
+     "tag": "sql",
+     "line": 97
+    },
+    {
+     "tag": "sql",
+     "line": 124
+    },
+    {
+     "tag": "sql",
+     "line": 137
+    },
+    {
+     "tag": "sql",
+     "line": 208
+    },
+    {
+     "tag": "sql",
+     "line": 218
+    }
+   ],
+   "calls": [
+    "canAssign",
+    "(input.name ?? '').trim",
+    "emitEventSingle",
+    "userActor",
+    "randomUUID",
+    "auditLog",
+    "console.error",
+    "canAccessProject",
+    "listSourceDocuments",
+    "docs.some",
+    "missing.push",
+    "(input.filename ?? '').trim",
+    "filename.split('.').pop().toLowerCase",
+    "filename.split('.').pop",
+    "filename.split",
+    "filename.includes",
+    "ALLOWED_EXT.has",
+    "[...ALLOWED_EXT].join",
+    "customerDeliveryPath",
+    "putObject"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/provenance.ts",
+   "kind": "lib",
+   "lines": 193,
+   "bytes": 8319,
+   "client": false,
+   "exports": [
+    {
+     "name": "TRUST_ORDER",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "ProvenanceMethod",
+     "form": "type"
+    },
+    {
+     "name": "trustRank",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "outranks",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "ProvenanceRecord",
+     "form": "type"
+    },
+    {
+     "name": "recordProvenance",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "FieldProvenance",
+     "form": "type"
+    },
+    {
+     "name": "provenanceFor",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "ProvenanceBadge",
+     "form": "type"
+    },
+    {
+     "name": "badgeFor",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 86
+    },
+    {
+     "tag": "sql",
+     "line": 137
+    }
+   ],
+   "calls": [
+    "(TRUST_ORDER as readonly string[]).indexOf",
+    "trustRank",
+    "(TRUST_ORDER as readonly string[]).includes",
+    "console.error",
+    "Object.fromEntries",
+    "rows.map"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/rollup.ts",
+   "kind": "lib",
+   "lines": 247,
+   "bytes": 11741,
+   "client": false,
+   "exports": [
+    {
+     "name": "Measures",
+     "form": "type"
+    },
+    {
+     "name": "ClinRollup",
+     "form": "type"
+    },
+    {
+     "name": "ProjectRollup",
+     "form": "type"
+    },
+    {
+     "name": "pct",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "rollup",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 87
+    },
+    {
+     "tag": "sql",
+     "line": 137
+    },
+    {
+     "tag": "sql",
+     "line": 149
+    },
+    {
+     "tag": "sql",
+     "line": 156
+    }
+   ],
+   "calls": [
+    "Number.isFinite",
+    "Math.round",
+    "wbs.map",
+    "deliverables.map",
+    "Number",
+    "pct",
+    "clinRows.map",
+    "measuresFor",
+    "wbsBy.get",
+    "delBy.get",
+    "clins.push",
+    "wbs.reduce",
+    "f",
+    "sum",
+    "deliverables.reduce",
+    "String",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/wbs.ts",
+   "kind": "lib",
+   "lines": 221,
+   "bytes": 9272,
+   "client": false,
+   "exports": [
+    {
+     "name": "WbsNode",
+     "form": "type"
+    },
+    {
+     "name": "listWbs",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "WbsInput",
+     "form": "type"
+    },
+    {
+     "name": "createWbsNode",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "WORKPLAN_COLUMNS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "WORKPLAN_READONLY_COLUMNS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "toWorkplanCanvas",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "crypto",
+     "names": [
+      "randomUUID"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/types/canvas-document",
+     "names": [
+      "CANVAS_PRESETS",
+      "CanvasDocument",
+      "CanvasNode"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "DeliveryActor"
+     ]
+    },
+    {
+     "spec": "./projects",
+     "names": [
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 48
+    },
+    {
+     "tag": "sql",
+     "line": 122
+    },
+    {
+     "tag": "sql",
+     "line": 125
+    },
+    {
+     "tag": "sql",
+     "line": 133
+    }
+   ],
+   "calls": [
+    "console.error",
+    "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+    "Number.isNaN",
+    "new Date(`${v}T00:00:00Z`).getTime",
+    "canAssign",
+    "canAccessProject",
+    "(input.code ?? '').trim",
+    "(input.title ?? '').trim",
+    "asDate",
+    "Number.isFinite",
+    "auditLog",
+    "clins.map",
+    "Number(v).toFixed",
+    "Number",
+    "randomUUID",
+    "nodes.map",
+    "clinNumber.get",
+    "money"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/documents/atomize-on-export.ts",
    "kind": "lib",
    "lines": 92,
@@ -91193,8 +94428,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 257,
-   "bytes": 13776,
+   "lines": 289,
+   "bytes": 15472,
    "client": false,
    "exports": [
     {
@@ -91229,6 +94464,7 @@
     "str",
     "humanizeType",
     "(ms / 1000).toFixed",
+    "`CLIN ${str(payload.clinNumber) ?? ''} added${str(payload.title) ? ` — ${str(payload.title)}` : ''}`.trim",
     "Number",
     "type.endsWith",
     "entry",
@@ -91241,12 +94477,55 @@
    "jsonResponses": []
   },
   {
-   "file": "lib/events.ts",
+   "file": "lib/event-namespaces.ts",
    "kind": "lib",
-   "lines": 330,
-   "bytes": 11590,
+   "lines": 40,
+   "bytes": 2209,
    "client": false,
    "exports": [
+    {
+     "name": "EVENT_NAMESPACES",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "EventNamespace",
+     "form": "type"
+    },
+    {
+     "name": "FORBIDDEN_NAMESPACES",
+     "form": "const",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/events.ts",
+   "kind": "lib",
+   "lines": 344,
+   "bytes": 12341,
+   "client": false,
+   "exports": [
+    {
+     "name": "EVENT_NAMESPACES",
+     "form": "re-export"
+    },
+    {
+     "name": "FORBIDDEN_NAMESPACES",
+     "form": "re-export"
+    },
+    {
+     "name": "EventNamespace",
+     "form": "re-export"
+    },
     {
      "name": "ActorType",
      "form": "type"
@@ -91320,25 +94599,31 @@
      "names": [
       "createLogger"
      ]
+    },
+    {
+     "spec": "@/lib/event-namespaces",
+     "names": [
+      "EVENT_NAMESPACES"
+     ]
     }
    ],
    "tryCount": 4,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 125
+     "line": 139
     },
     {
      "tag": "sql",
-     "line": 178
+     "line": 192
     },
     {
      "tag": "sql",
-     "line": 201
+     "line": 215
     },
     {
      "tag": "sql",
-     "line": 235
+     "line": 249
     }
    ],
    "calls": [
@@ -102699,8 +105984,8 @@
   {
    "file": "lib/storage/paths.ts",
    "kind": "lib",
-   "lines": 286,
-   "bytes": 10643,
+   "lines": 304,
+   "bytes": 11601,
    "client": false,
    "exports": [
     {
@@ -102763,6 +106048,11 @@
     },
     {
      "name": "assertKeyBelongsToTenant",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "customerDeliveryPath",
      "form": "function",
      "async": false
     },
@@ -109545,8 +112835,8 @@
   {
    "file": "lib/types/canvas-document.ts",
    "kind": "lib",
-   "lines": 2164,
-   "bytes": 102789,
+   "lines": 2205,
+   "bytes": 105250,
    "client": false,
    "exports": [
     {
@@ -127438,6 +130728,66 @@
    "file": "app/api/invite/route.ts",
    "route": "/api/invite",
    "note": "no in-file gate AND no middleware PATH_MIN_ROLE prefix — verify (a deliberately public route is legitimate)"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/route.ts",
+   "route": "/api/portal/[tenantSlug]/delivery/projects",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
   },
   {
    "sig": "api-no-gate-at-either-layer",

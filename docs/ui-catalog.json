@@ -1,13 +1,13 @@
 {
  "totals": {
   "routes": 118,
-  "components": 184,
-  "handlers": 1480,
-  "binding": 1239,
-  "fetches": 329,
+  "components": 185,
+  "handlers": 1483,
+  "binding": 1242,
+  "fetches": 331,
   "forms": 24,
-  "inputs": 458,
-  "buttons": 688,
+  "inputs": 459,
+  "buttons": 690,
   "orphans": 1
  },
  "records": [
@@ -5045,7 +5045,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx",
-   "lines": 294,
+   "lines": 291,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5054,7 +5054,8 @@
    ],
    "renders": [
     "Link",
-    "Measure"
+    "Measure",
+    "DeliverableRow"
    ],
    "handlers": [],
    "fetches": [],
@@ -5062,7 +5063,9 @@
    "inputs": 0,
    "buttons": 0,
    "links": 1,
-   "localImports": [],
+   "localImports": [
+    "@/components/delivery/deliverable-row"
+   ],
    "route": "/portal/[tenantSlug]/delivery/[projectId]",
    "renderedBy": [],
    "reachableFrom": [
@@ -12228,6 +12231,59 @@
    ],
    "bindingHandlers": 0,
    "passedHandlers": 1
+  },
+  {
+   "file": "components/delivery/deliverable-row.tsx",
+   "lines": 150,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "DeliverableRow"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 122
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 127
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 140
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/deliverables/${deliverable.id}`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/deliverables/${deliverable.id}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 2,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/delivery/[projectId]"
+   ],
+   "bindingHandlers": 3,
+   "passedHandlers": 0
   },
   {
    "file": "components/marketing/agency-mark.tsx",

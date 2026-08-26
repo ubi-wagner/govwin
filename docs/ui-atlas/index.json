@@ -418,11 +418,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 3,
+    "buttons": 7,
     "links": 22,
-    "inputs": 0,
+    "inputs": 3,
     "forms": 0,
-    "text": 1268,
+    "text": 1350,
     "h1": "Foundation"
    },
    "declared": {

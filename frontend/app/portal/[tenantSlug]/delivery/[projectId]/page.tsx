@@ -10,6 +10,8 @@ import { listMilestones, listDeliverables } from '@/lib/delivery/milestones';
 import { provenanceFor, badgeFor } from '@/lib/delivery/provenance';
 import { rollup } from '@/lib/delivery/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/delivery/dates';
+import { DeliverableRow } from '@/components/delivery/deliverable-row';
+import { canAssign } from '@/lib/delivery/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +70,8 @@ export default async function DeliveryProjectPage({
   enterTenant(tenantId);
 
   const actor = { userId: su.id, role, tenantId };
+  // Accept is tenant_admin+; upload is open to any assigned employee (see DeliverableRow).
+  const canAccept = canAssign(role);
   // `getProject` runs the assignment check. Unreachable answers 404 rather than 403 — a 403 would
   // confirm the project exists to someone with no business knowing.
   const project = await getProject(actor, projectId);
@@ -235,24 +239,18 @@ export default async function DeliveryProjectPage({
                     </span>
                   </div>
                   {items.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-sm">
+                    <ul className="mt-3 space-y-2 text-sm">
                       {items.map((d) => (
-                        <li key={d.id} className="flex flex-wrap items-center gap-2">
-                          <span className="text-gray-900">{d.title}</span>
-                          {d.acceptedAt ? (
-                            <span className="rounded bg-green-50 px-1.5 py-0.5 text-[11px] text-green-800 ring-1 ring-inset ring-green-600/20">
-                              accepted
-                            </span>
-                          ) : d.storageKey ? (
-                            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30">
-                              uploaded — not accepted
-                            </span>
-                          ) : (
-                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 ring-1 ring-inset ring-gray-500/20">
-                              nothing uploaded
-                            </span>
-                          )}
-                        </li>
+                        <DeliverableRow
+                          key={d.id}
+                          deliverable={{
+                            id: d.id, title: d.title, filename: d.filename,
+                            storageKey: d.storageKey,
+                            acceptedAt: d.acceptedAt ? String(d.acceptedAt) : null,
+                          }}
+                          basePath={`/api/portal/${tenantSlug}/delivery/projects/${projectId}`}
+                          canAccept={canAccept}
+                        />
                       ))}
                     </ul>
                   )}

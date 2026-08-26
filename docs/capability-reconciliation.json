@@ -279,6 +279,103 @@
    "nearMiss": false
   },
   {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call listSourceDocuments())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts",
+   "methods": [
+    "GET"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/delivery/projects",
+   "file": "app/api/portal/[tenantSlug]/delivery/projects/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/delivery/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/activity",
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts",
    "methods": [
@@ -452,6 +549,10 @@
  ],
  "tailCalled": [
   {
+   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]",
+   "tail": "/deliverables/:p"
+  },
+  {
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]",
    "tail": "/proposals/:p"
   },
@@ -467,7 +568,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 215
+   "rows": 217
   },
   {
    "name": "deploy_baseline",
@@ -724,6 +825,12 @@
    "namedInUi": true,
    "viaEnumerator": true,
    "everRan": true
+  },
+  {
+   "template": "on_contract_started",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": false
   },
   {
    "template": "on_full_draft_requested",

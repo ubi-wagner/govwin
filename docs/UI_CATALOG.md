@@ -10,12 +10,12 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 | | count |
 |---|---:|
 | addressable routes | 118 |
-| components | 184 |
-| event handlers (total) | 1480 |
-| …of which BIND behaviour (on a DOM element) | 1239 |
+| components | 185 |
+| event handlers (total) | 1483 |
+| …of which BIND behaviour (on a DOM element) | 1242 |
 | …of which PASS a prop to a child component | 241 |
-| `fetch` call sites | 329 |
-| `<form>` · `<input>` · `<button>` | 24 · 458 · 688 |
+| `fetch` call sites | 331 |
+| `<form>` · `<input>` · `<button>` | 24 · 459 · 690 |
 | components NO route can reach (orphans) | **1** |
 
 ## 1. Routes — the addressable surface
@@ -108,7 +108,7 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/contracts/[contractId]` | app/portal/[tenantSlug]/contracts/[contractId]/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/dashboard` | app/portal/[tenantSlug]/dashboard/page.tsx | server | 0 | 0 | 0/0/0 | Cockpit |
 | `/portal/[tenantSlug]/delivery` | app/portal/[tenantSlug]/delivery/page.tsx | server | 0 | 0 | 0/0/0 | Link |
-| `/portal/[tenantSlug]/delivery/[projectId]` | app/portal/[tenantSlug]/delivery/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure |
+| `/portal/[tenantSlug]/delivery/[projectId]` | app/portal/[tenantSlug]/delivery/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure, DeliverableRow |
 | `/portal/[tenantSlug]/documents` | app/portal/[tenantSlug]/documents/page.tsx | server | 0 | 0 | 0/0/0 | Link, StatusBadge, SupportingDocActions |
 | `/portal/[tenantSlug]/documents/[documentId]` | app/portal/[tenantSlug]/documents/[documentId]/page.tsx | server | 0 | 0 | 0/0/0 | DocumentLockBar, CanvasEditorPage |
 | `/portal/[tenantSlug]/documents/new` | app/portal/[tenantSlug]/documents/new/page.tsx | server | 0 | 0 | 0/0/0 | NewDocumentChooser |
@@ -231,6 +231,7 @@ tree carries far more, listed per component in §2.
 | components/canvas/slide-editor.tsx | client | 7/2 | 0 | /admin/documents/[documentId], /admin/site/docs/[type]/[slug], /admin/templates/[templateId]/edit +3 |
 | components/cards/opportunity-card.tsx | client | 0/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/command/command-tabs.tsx | client | 0/1 | 1 | /admin/command, /portal/[tenantSlug]/command |
+| components/delivery/deliverable-row.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/delivery/[projectId] |
 | components/marketing/agency-mark.tsx | server | 0/0 | 0 | /customers |
 | components/marketing/application-form.tsx | client | 8/4 | 1 | /apply |
 | components/marketing/cms-card.tsx | server | 0/0 | 0 | /about, /features |
@@ -337,8 +338,8 @@ tree carries far more, listed per component in §2.
 
 | handler | count | distinct files |
 |---|---:|---:|
-| `onClick` | 705 | 149 |
-| `onChange` | 448 | 101 |
+| `onClick` | 707 | 150 |
+| `onChange` | 449 | 102 |
 | `onClose` | 39 | 11 |
 | `onKeyDown` | 24 | 16 |
 | `onSubmit` | 21 | 18 |
@@ -594,6 +595,8 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/atoms/select` | 1 |
 | `POST ep.upload` | 1 |
 | `POST '/api/command/seen'` | 1 |
+| `POST :p/deliverables/:p` | 1 |
+| `PATCH :p/deliverables/:p` | 1 |
 | `POST '/api/applications'` | 1 |
 | `POST '/api/waitlist'` | 1 |
 | `GET /api/portal/:p/agents/usage?period=:p` | 1 |
