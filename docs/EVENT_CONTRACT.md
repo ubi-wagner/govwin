@@ -65,7 +65,7 @@ Regex: `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`.
 
 ## 4. Namespace registry
 
-Exactly **seven** event namespaces. **Never** `admin`, `cms`, or `spotlight`.
+Exactly **eight** event namespaces. **Never** `admin`, `cms`, or `spotlight`.
 
 | Namespace | Owns |
 |---|---|
@@ -76,10 +76,17 @@ Exactly **seven** event namespaces. **Never** `admin`, `cms`, or `spotlight`.
 | `library` | Content: atoms, documents, templates, vaults, foundations, starter sets, CMS content. |
 | `system` | Infra: email delivery, files, workflow engine (`workflow.*`), agent memory, rules, content publishing. |
 | `tool` | Tool/agent invocations (`tool:invoke` bracket, `agent.invoked`, `memory.stored`, …). |
+| `project` | **Post-award delivery**: workspace creation, baseline set/rebaseline, milestone due/met, deliverable upload/acceptance. Added in migration 217 — `proposal` is the PRE-award workspace and does not own this. |
 
 > Note: names like `solicitation`, `volume`, `opportunity`, `compliance`, `ingest`, `memory` are the
 > **entity prefix of a type** (e.g. `finder:solicitation.approved`) or *tool* namespaces — they are
 > **not** event namespaces. The registry above is the whole set.
+
+> **The registry lives in FOUR places, and only one of them fails.** `system_events_namespace_chk`
+> in the database raises `23514` on an unregistered namespace — that is the enforcement. The
+> frontend's `KNOWN_NAMESPACES` only logs a warning and inserts anyway; the event-contract test and
+> this table are the other two. Adding a namespace without widening the CHECK first means every
+> emit throws into whatever best-effort catch surrounds it, leaving no trace at all.
 
 ## 5. tenantId + actor conventions
 

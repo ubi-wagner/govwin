@@ -174,6 +174,38 @@ export function describeEvent(ev: EventLike): string {
     }
   }
 
+  // Post-award delivery (migration 217). EVERY type here needs a case, or it reaches a customer's
+  // Activity feed as a de-punctuated identifier — which is B136 ("Shadow descended") happening
+  // again in a new namespace. The fallback humanizer produces "clin created", which is not wrong
+  // so much as it is nobody's sentence.
+  if (namespace === 'project') {
+    const project = str(payload.name) ?? 'the delivery workspace';
+    switch (type) {
+      case 'project.created':
+        return `Delivery workspace opened: ${project}`;
+      case 'source_document.uploaded': {
+        const kind = payload.kind === 'executed_contract' ? 'Executed contract' : 'As-submitted proposal';
+        return `${kind} uploaded${str(payload.filename) ? ` — ${str(payload.filename)}` : ''}`;
+      }
+      case 'clin.created':
+        return `CLIN ${str(payload.clinNumber) ?? ''} added${str(payload.title) ? ` — ${str(payload.title)}` : ''}`.trim();
+      case 'baseline.set':
+        return phase === 'start' ? 'Freezing the contract baseline' : 'Contract baseline set';
+      case 'project.rebaselined':
+        return phase === 'start' ? 'Rebaselining the delivery plan' : 'Delivery plan rebaselined';
+      case 'milestone.due':
+        return `Milestone due: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.met':
+        return `Milestone met: ${str(payload.title) ?? 'a milestone'}`;
+      case 'deliverable.uploaded':
+        return `Deliverable uploaded: ${str(payload.title) ?? str(payload.filename) ?? 'a deliverable'}`;
+      case 'deliverable.accepted':
+        return `Deliverable accepted: ${str(payload.title) ?? 'a deliverable'}`;
+      default:
+        break;
+    }
+  }
+
   // Closed-loop system events (email/notification delivery, failures)
   if (namespace === 'system') {
     if (type === 'content_pipeline.post.publish_completed') {

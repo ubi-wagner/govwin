@@ -29,7 +29,15 @@ const log = createLogger('events');
 // event-contract guard enforces this for LITERAL call sites; this runtime set catches DYNAMIC
 // namespaces (computed at call time) the static check can't see. Non-fatal by contract — emitters
 // never throw — so an unregistered namespace only logs a warning (drift signal, not a break).
-const KNOWN_NAMESPACES = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool']);
+// EIGHT namespaces. `project` = post-award delivery: baselines, milestone gates, deliverable
+// acceptance. None of the other seven owns that — `proposal` is the PRE-award workspace,
+// `capture` is the customer lifecycle up to purchase, `system` is infra.
+//
+// This set only WARNS. The enforcement is `system_events_namespace_chk` in the database
+// (migration 217), which raises 23514 on an unregistered namespace. Changing the registry means
+// changing four places: that CHECK, this set, the event-contract test, and docs/EVENT_CONTRACT.md.
+const KNOWN_NAMESPACES = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
+  'project']);
 function warnUnknownNamespace(namespace: string, type: string): void {
   if (!KNOWN_NAMESPACES.has(namespace)) {
     log.warn({ namespace, type }, 'event uses an unregistered namespace (see docs/EVENT_CONTRACT.md)');

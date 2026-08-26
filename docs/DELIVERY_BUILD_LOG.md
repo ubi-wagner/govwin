@@ -131,4 +131,123 @@ tables, 45 tenant-owned tables partitioning cleanly across 7 contexts.
 
 ---
 
-*D2 onward appended as built.*
+## D2 · The anchor — projects, artifacts, CLINs with provenance
+
+**Shipped:** `lib/delivery/{projects,clins,provenance,gate}.ts`, four API routes,
+`lib/storage/paths.ts` → `customerDeliveryPath`, migration 217,
+`__tests__/delivery-provenance.test.ts` (14).
+
+### The `project` namespace had to come forward, and the design undercounted it
+
+D6 was going to register the namespace. It could not wait: `project.created` is the first thing
+`createProject` emits, and the audit-coverage test requires every write route to leave a trail.
+
+The design called this "a deliberate three-file change: the test's `REGISTRY`, `lib/events.ts`'s
+`KNOWN_NAMESPACES`, and `docs/EVENT_CONTRACT.md`". **It is four**, and it missed the only one that
+fails rather than warns:
+
+| place | behaviour on an unregistered namespace |
+|---|---|
+| `system_events_namespace_chk` (DB) | **raises 23514** — fail-closed |
+| `lib/events.ts` `KNOWN_NAMESPACES` | logs a warning, then inserts anyway |
+| `__tests__/event-contract.test.ts` | fails the suite |
+| `docs/EVENT_CONTRACT.md` §4 | documentation |
+
+Without the CHECK widened first, every `project:` emit would throw at the database and the
+surrounding best-effort catch would swallow it — a workspace that created itself correctly and left
+no trace that it had. Migration 217 widens it, and the constraint now carries a `COMMENT` naming all
+four places so the next person changing the registry finds them.
+
+### The anchor rule, and where it is actually enforced
+
+The uploaded executed contract and as-submitted proposal are the anchor **even when we authored the
+proposal**: what lives in `proposals`/`proposal_sections` is a working copy that stayed editable
+after submission, so a deliverable tracing to it traces to something that can still change.
+
+But requiring both files at creation would mean nobody can open the workspace to see what is being
+asked of them, which turns the ToDo into a dead end. The line is the **baseline**: `readiness()` is
+the single place the two-artifact rule is enforced, and freezing a skeleton against documents that
+are not there is the failure worth preventing.
+
+### Provenance: the two cases that carry the weight
+
+`badgeFor` has four tones, and two of them are the reason the module exists:
+
+- **No provenance row reads `Unverified`, not neutral.** Silence about where a number came from is
+  the same claim as "we made it up", and rendering it as ordinary is how a default becomes
+  indistinguishable from a fact.
+- **A citation with no value is a DEFERRAL** — `Set elsewhere`, with the excerpt. "The delivery
+  schedule is set out in the Task Order" is not a missing PoP end date; it is the contract telling
+  you where the answer lives. **Absence is a finding.**
+
+`recordProvenance` refuses `verified` or `pattern_match` with no source document, which is what
+stops "Read from source" appearing against a source nobody can open. The upsert only wins when the
+new method **outranks** the incumbent, compared at the WRITE — a read-time comparison would leave
+two rows to disagree — and a re-assertion of the same method is not a promotion, so a repeated `ai`
+guess cannot creep upward by being written twice.
+
+### FK-before-write, scoped to the project
+
+`createWbsNode` validates `parentId` and `clinId` **within this project** before inserting. A parent
+from a different project satisfies the FK — it is a real row — and would quietly graft one
+contract's plan onto another's. RLS would not catch it either, because both rows can belong to the
+same tenant.
+
+---
+
+## D3 · The WBS and the `workplan` canvas
+
+**Shipped:** `lib/delivery/wbs.ts`, the `workplan` canvas format and its exemption,
+`__tests__/delivery-workplan-canvas.test.ts` (9).
+
+Tables are the source of truth; the canvas is an editing surface over them. The four things this
+capability must do — rollup, RLS, assignment, baseline comparison — are SQL operations, and none can
+be done against a JSONB blob without projecting it back into tables anyway. What the canvas
+contributes is the **interaction model**, which is the valuable half. The honest cost: no
+`canvas_versions` history for free, so baseline and audit are explicit in tables.
+
+Row ids live in `metadata.workplan.rowIds`, positionally aligned with the table's rows — not
+smuggled into cell text, where a person could see and edit them. Baseline columns render beside the
+current plan (variance is the number a PM actually reads) and are marked read-only, because the
+database refuses to move them and an editable-looking cell would be a lie the UI tells until the
+save fails.
+
+### The exemption is structural first, and guarded second
+
+A workplan declares `max_pages: null, max_slides: null`, the same way `spreadsheet` does, so in the
+normal path the floor has **nothing to check** rather than being skipped by a special case. The
+`isWorkplan` guard in `validateCanvasAgainstSpec` covers the one remaining route — a spec supplied
+from somewhere else, a proposal's, applied by a caller that did not look at the format — and it
+exempts the SIZE caps only. The font floor and the image rule still apply.
+
+That distinction matters: a blanket early return would have silently dropped the font check too,
+and would have looked identical in every test that only asserts "no page violation".
+
+### The test asserts the exemption in BOTH directions
+
+An exemption is a check that does nothing on purpose, which is the same shape as a check that does
+nothing by accident — how `/admin/storage` shipped a red error banner past every lens (B131). So:
+
+1. a 400-row workplan produces no page violation — a large project is not a violation
+2. it stays exempt even when a page cap is supplied from elsewhere
+3. **the exemption does not leak** — the same oversized content in a `letter` canvas still violates
+4. a workplan still honours a font floor
+
+Assertion 3 is what makes 1 and 2 mean anything. Without it, an exemption that disabled the page cap
+for *every* format would satisfy them both and look correct.
+
+### The harness was wrong again, and the same rule caught it
+
+Assertion 3 **failed** on first run — reporting the exemption as leaking against code where it does
+not. The fixture used `type: 'paragraph'`, which is not a canvas node type; the real name is
+`text_block`. `getNodeText` returned `''` for every node, the ruler counted zero pages, and the
+"leak test" was measuring an empty document.
+
+Third harness defect this session, all three caught before they became a bug report. *A new
+instrument's first output describes the instrument.*
+
+`tsc` 0 · vitest **2,057** (2,034 after D1).
+
+---
+
+*D4 onward appended as built.*

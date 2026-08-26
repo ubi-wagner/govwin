@@ -32,7 +32,10 @@ const FRONTEND = path.join(__dirname, '..');
 const SCAN_DIRS = ['app', 'lib', 'components'].map((d) => path.join(FRONTEND, d));
 
 // The authoritative event-namespace registry (docs/EVENT_CONTRACT.md §Namespace registry).
-const REGISTRY = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool']);
+const REGISTRY = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool',
+  // Post-award delivery (migration 217). The DB CHECK is the enforcement; this set and
+  // lib/events.ts must agree with it or an emit that passes here throws at the insert.
+  'project']);
 const FORBIDDEN = new Set(['admin', 'cms', 'spotlight']);
 const TYPE_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
