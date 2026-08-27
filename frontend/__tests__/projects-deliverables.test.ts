@@ -57,12 +57,35 @@ const all = () => db.state.queries.join(' ');
 
 // ── the milestone gate ───────────────────────────────────────────────────────────────────────
 
+
+/**
+ * ── THE QUEUE GREW A ROW: THE TASK GATE COMES FIRST (mig 218) ────────────────────────────────
+ * `markMilestoneMet` now asks TWO questions before it closes anything: is the work done (open
+ * tasks) and has the customer accepted the evidence (unaccepted deliverables). They are separate
+ * refusals with separate messages because they are different problems with different next actions.
+ *
+ * That means the mock's result queue starts one entry earlier. Every case below leads with `[]` —
+ * "no open tasks" — so these cases keep testing what they were written to test. The new gate has
+ * its own case, first.
+ */
 describe('markMilestoneMet', () => {
+  it('REFUSES while a TASK on it is not done — the work, before the acceptance', async () => {
+    db.state.results = [[{ title: 'CDR slide package' }, { title: 'Vendor lead times' }]];
+    const r = await markMilestoneMet(ADMIN, PROJECT, MILESTONE);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('TASKS_OUTSTANDING');
+      expect(r.status).toBe(409);
+      // It names them. "The milestone is not ready" tells nobody what to go and do.
+      expect(r.error).toContain('CDR slide package');
+    }
+  });
+
   it('REFUSES while a deliverable on it is unaccepted, and names them', async () => {
     // The headline. A milestone whose deliverables nobody approved is not met — it is a milestone
     // we believe we have finished, which is a different claim and the one that gets contractors
     // into trouble.
-    db.state.results = [[{ title: 'Q1 technical report' }, { title: 'Test plan' }]];
+    db.state.results = [[], [{ title: 'Q1 technical report' }, { title: 'Test plan' }]];
     const r = await markMilestoneMet(ADMIN, PROJECT, MILESTONE);
     expect(r.ok).toBe(false);
     if (!r.ok) {
@@ -76,29 +99,33 @@ describe('markMilestoneMet', () => {
   });
 
   it('the outstanding check keys on accepted_at, not on the file being there', async () => {
-    db.state.results = [[]];
+    db.state.results = [[], []];
     await markMilestoneMet(ADMIN, PROJECT, MILESTONE).catch(() => {});
-    const probe = db.state.queries[0] ?? '';
+    // Selected by WHAT IT READS, not by position. It used to be `queries[0]`, and adding the
+    // open-tasks gate in front of it silently repointed this assertion at a different query — the
+    // check would have kept passing while testing the wrong statement.
+    const probe = db.state.queries.find((q: string) => /project_deliverables/i.test(q)) ?? '';
+    expect(probe, 'the deliverables gate ran at all').not.toBe('');
     expect(probe).toMatch(/accepted_at IS NULL/i);
     expect(probe, 'a present storage_key must not satisfy the gate').not.toMatch(/storage_key IS NOT NULL/i);
   });
 
   it('closes by compare-and-swap, so a double-click cannot stamp two met_at values', async () => {
-    db.state.results = [[], [{ id: MILESTONE, title: 'Kickoff', baselineDate: '2026-03-01', metAt: '2026-03-10T00:00:00.000Z', status: 'met' }]];
+    db.state.results = [[], [], [{ id: MILESTONE, title: 'Kickoff', baselineDate: '2026-03-01', metAt: '2026-03-10T00:00:00.000Z', status: 'met' }]];
     const r = await markMilestoneMet(ADMIN, PROJECT, MILESTONE);
     expect(r.ok).toBe(true);
     expect(writes()).toMatch(/status = 'pending'/i);
   });
 
   it('carries the variance in the event rather than leaving a reader to subtract two dates', async () => {
-    db.state.results = [[], [{ id: MILESTONE, title: 'Kickoff', baselineDate: '2026-03-01', metAt: '2026-03-10T00:00:00.000Z', status: 'met' }]];
+    db.state.results = [[], [], [{ id: MILESTONE, title: 'Kickoff', baselineDate: '2026-03-01', metAt: '2026-03-10T00:00:00.000Z', status: 'met' }]];
     await markMilestoneMet(ADMIN, PROJECT, MILESTONE);
     const payload = vi.mocked(emitEventSingle).mock.calls[0][0].payload as Record<string, unknown>;
     expect(payload.varianceDays).toBe(9);
   });
 
   it('answers a clear 409 when the milestone is not pending', async () => {
-    db.state.results = [[], []];
+    db.state.results = [[], [], []];
     const r = await markMilestoneMet(ADMIN, PROJECT, MILESTONE);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('NOT_PENDING');

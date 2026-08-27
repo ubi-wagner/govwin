@@ -352,6 +352,18 @@
    "nearMiss": true
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/wbs",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts",
    "methods": [
@@ -553,6 +565,10 @@
    "tail": "/deliverables/:p"
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
+   "tail": "/tasks/:p"
+  },
+  {
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]",
    "tail": "/proposals/:p"
   },
@@ -568,7 +584,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 217
+   "rows": 218
   },
   {
    "name": "deploy_baseline",
@@ -708,13 +724,13 @@
    "archetype": "ops_digest",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "outcome_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "packaging_specialist",
@@ -786,7 +802,7 @@
    "archetype": "social_scheduler",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "stylist",
@@ -884,7 +900,7 @@
    "template": "on_proposal_outcome_recorded",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_proposal_section_edited",
@@ -948,10 +964,13 @@
   "atom.archived",
   "atom.curated",
   "atom.restored",
+  "contract.started",
   "document.created",
   "document.exported",
   "document.updated",
+  "outcome.attributed",
   "portal.stage_advanced",
+  "project.collaboration_requested",
   "task.assigned",
   "template.applied"
  ]

@@ -78,3 +78,40 @@ describe('Projects transactions stay inside the tenant context', () => {
     expect(bad).toEqual([]);
   });
 });
+
+/**
+ * ── THE THIRD WAY THE `lib/db.ts` PROXY BITES: A FRAGMENT IN A VALUE POSITION ────────────────
+ * The Proxy intercepts the tagged-template CALL. So a nested ``sql`now()` `` written inside an
+ * interpolation is NOT a SQL fragment — it is a **Promise**, which postgres.js then tries to
+ * serialise as a value:
+ *
+ *     completed_at = ${next === 'done' ? sql`now()` : null}
+ *     → RangeError: Invalid time value  → 500 {"error":"Failed to update the task"}
+ *
+ * Every task in the checklist failed to tick off, on a route whose envelope was textbook. It is the
+ * same root as the other two traps in this file — `sql` is a Proxy and only the call is routed —
+ * and `lib/db.ts`'s own header says fragment-composing needs an explicit client.
+ *
+ * Plain JavaScript values need no client at all, so the fix is to compute them in JS. This guard
+ * says so rather than leaving the next author to rediscover it through a 500.
+ */
+describe('the Projects tree never nests a sql template inside a value', () => {
+  const NESTED = /\$\{[^{}]*\bsql`/;
+
+  it('has no `${… sql`…`}` interpolation', () => {
+    const strip = (src: string) => src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+    // The detector must see the defect and leave the fix alone.
+    expect(NESTED.test(strip('completed_at = ${next === "done" ? sql`now()` : null},'))).toBe(true);
+    expect(NESTED.test(strip('completed_at = ${completedAt},'))).toBe(false);
+    expect(NESTED.test(strip('metrics = ${sql.json(m)},'))).toBe(false);
+
+    const offenders = ROOTS.flatMap((r) => walk(join(ROOT, r)))
+      .filter((f) => NESTED.test(strip(readFileSync(f, 'utf8'))))
+      .map((f) => relative(ROOT, f));
+    expect(offenders, 'compute the value in JS — a nested sql`` is a Promise, not a fragment')
+      .toEqual([]);
+  });
+});

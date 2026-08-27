@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 261,
-   "lines": 41102
+   "files": 263,
+   "lines": 41243
   },
   {
    "kind": "app-boundary",
@@ -24,8 +24,8 @@
   },
   {
    "kind": "component",
-   "files": 163,
-   "lines": 41518
+   "files": 164,
+   "lines": 41711
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 304,
-   "lines": 60295
+   "files": 305,
+   "lines": 60800
   },
   {
    "kind": "middleware",
@@ -55,12 +55,12 @@
   {
    "kind": "page",
    "files": 118,
-   "lines": 17883
+   "lines": 17933
   },
   {
    "kind": "script",
-   "files": 185,
-   "lines": 24616
+   "files": 186,
+   "lines": 24986
   },
   {
    "kind": "server-action",
@@ -70,7 +70,7 @@
   {
    "kind": "test",
    "files": 216,
-   "lines": 28682
+   "lines": 28719
   }
  ],
  "records": [
@@ -9204,8 +9204,8 @@
   {
    "file": "__tests__/projects-tenant-transactions.test.ts",
    "kind": "test",
-   "lines": 81,
-   "bytes": 4194,
+   "lines": 118,
+   "bytes": 6031,
    "client": false,
    "exports": [],
    "imports": [
@@ -9264,7 +9264,15 @@
     "/\\bwithTenant\\s*\\(/.test",
     "/from '@\\/lib\\/rls'/.test",
     "bad.push",
-    "expect(bad).toEqual"
+    "expect(bad).toEqual",
+    "src\n      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "expect(NESTED.test(strip('completed_at = ${next === \"done\" ? sql`now()` : null},'))).toBe",
+    "NESTED.test",
+    "expect(NESTED.test(strip('completed_at = ${completedAt},'))).toBe",
+    "expect(NESTED.test(strip('metrics = ${sql.json(m)},'))).toBe",
+    "ROOTS.flatMap((r) => walk(join(ROOT, r)))\n      .filter((f) => NESTED.test(strip(readFileSync(f, 'utf8')))).map",
+    "ROOTS.flatMap((r) => walk(join(ROOT, r))).filter",
+    "expect(offenders, 'compute the value in JS — a nested sql`` is a Promise, not a fragment').toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -48384,8 +48392,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
    "kind": "api-route",
-   "lines": 78,
-   "bytes": 3707,
+   "lines": 114,
+   "bytes": 5761,
    "client": false,
    "exports": [
     {
@@ -48431,6 +48439,14 @@
       "listDeliverables",
       "markMilestoneMet"
      ]
+    },
+    {
+     "spec": "@/lib/projects/milestone-tasks",
+     "names": [
+      "listMilestoneTasks",
+      "rescheduleMilestone",
+      "resequence"
+     ]
     }
    ],
    "tryCount": 5,
@@ -48442,9 +48458,12 @@
     "Promise.all",
     "listMilestones",
     "listDeliverables",
+    "listMilestoneTasks",
     "console.error",
     "request.json",
     "createMilestone",
+    "resequence",
+    "rescheduleMilestone",
     "markMilestoneMet"
    ],
    "jsx": [],
@@ -48454,62 +48473,92 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 20
+     "line": 28
     },
     {
-     "arg": "{ data: { milestones, deliverables } }",
+     "arg": "{ data: { milestones, deliverables, tasks } }",
      "opts": "",
-     "line": 26
+     "line": 35
     },
     {
      "arg": "{ error: 'Failed to load milestones', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 30
+     "line": 39
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 41
+     "line": 50
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 44
+     "line": 53
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 45
+     "line": 54
     },
     {
      "arg": "{ error: 'Failed to add the milestone', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 49
+     "line": 58
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 60
+     "line": 73
     },
     {
-     "arg": "{ error: \"Provide milestoneId and action:'met'\", code: 'VALIDATION_ERROR' }",
+     "arg": "{ error: seq.error, code: seq.code }",
+     "opts": "{ status: seq.status }",
+     "line": 77
+    },
+    {
+     "arg": "{ data: seq.data }",
+     "opts": "",
+     "line": 78
+    },
+    {
+     "arg": "{ error: \"Provide milestoneId and one of action:'met' | 'reschedule' | 'resequence'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 63
+     "line": 82
+    },
+    {
+     "arg": "{ error: 'forecastDate is required to reschedule', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 90
+    },
+    {
+     "arg": "{ error: moved.error, code: moved.code }",
+     "opts": "{ status: moved.status }",
+     "line": 93
+    },
+    {
+     "arg": "{ data: moved.data }",
+     "opts": "",
+     "line": 94
+    },
+    {
+     "arg": "{ error: \"action must be 'met', 'reschedule' or 'resequence'\", code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 98
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 70
+     "line": 106
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "",
-     "line": 71
+     "line": 107
     },
     {
      "arg": "{ error: 'Failed to close the milestone', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 75
+     "line": 111
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
@@ -48686,6 +48735,194 @@
    "route": "/api/portal/[tenantSlug]/projects/[projectId]",
    "methods": [
     "GET"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts",
+   "kind": "api-route",
+   "lines": 41,
+   "bytes": 1815,
+   "client": false,
+   "exports": [
+    {
+     "name": "PATCH",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/gate",
+     "names": [
+      "withProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/milestone-tasks",
+     "names": [
+      "setTaskStatus"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "withProject",
+    "request.json",
+    "NextResponse.json",
+    "setTaskStatus",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 22
+    },
+    {
+     "arg": "{ error: \"status must be 'open', 'done' or 'blocked'\", code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 26
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 33
+    },
+    {
+     "arg": "{ data: { task: result.data } }",
+     "opts": "",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Failed to update the task', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 38
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
+   "methods": [
+    "PATCH"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
+   "kind": "api-route",
+   "lines": 64,
+   "bytes": 3039,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/gate",
+     "names": [
+      "withProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/project",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/milestone-tasks",
+     "names": [
+      "createMilestoneTask",
+      "listMilestoneTasks"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "withProject",
+    "getProject",
+    "NextResponse.json",
+    "listMilestoneTasks",
+    "console.error",
+    "request.json",
+    "createMilestoneTask"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 21
+    },
+    {
+     "arg": "{ data: { tasks: await listMilestoneTasks(gate.actor.tenantId, projectId) } }",
+     "opts": "",
+     "line": 23
+    },
+    {
+     "arg": "{ error: 'Failed to load the task list', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 27
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 41
+    },
+    {
+     "arg": "{ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 44
+    },
+    {
+     "arg": "{ error: result.error, code: result.code }",
+     "opts": "{ status: result.status }",
+     "line": 56
+    },
+    {
+     "arg": "{ data: { task: result.data } }",
+     "opts": "{ status: 201 }",
+     "line": 57
+    },
+    {
+     "arg": "{ error: 'Failed to add the task', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 61
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
+   "methods": [
+    "GET",
+    "POST"
    ],
    "runtime": null,
    "dynamic": false
@@ -68018,8 +68255,8 @@
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
    "kind": "page",
-   "lines": 291,
-   "bytes": 13251,
+   "lines": 341,
+   "bytes": 15921,
    "client": false,
    "exports": [
     {
@@ -68097,6 +68334,12 @@
      ]
     },
     {
+     "spec": "@/lib/projects/milestone-tasks",
+     "names": [
+      "listMilestoneTasks"
+     ]
+    },
+    {
      "spec": "@/lib/projects/provenance",
      "names": [
       "provenanceFor",
@@ -68131,6 +68374,12 @@
      ]
     },
     {
+     "spec": "@/components/projects/milestone-checklist",
+     "names": [
+      "MilestoneChecklist"
+     ]
+    },
+    {
      "spec": "@/lib/projects/access",
      "names": [
       "canAssign"
@@ -68155,12 +68404,15 @@
     "listClins",
     "listMilestones",
     "listDeliverables",
+    "listMilestoneTasks",
     "readiness",
     "listAssignees",
     "rollup",
     "provenanceFor",
-    "byMilestone.get",
+    "tasksByMilestone.get",
     "list.push",
+    "tasksByMilestone.set",
+    "byMilestone.get",
     "byMilestone.set",
     "new Date(project.baselinedAt).toLocaleDateString",
     "ready.missing.join",
@@ -68173,14 +68425,18 @@
     "milestones.map",
     "varianceLabel",
     "daysBetween",
-    "items.map",
+    "Object.entries(m.completionMetrics).map",
+    "Object.entries",
     "String",
+    "(tasksByMilestone.get(m.id) ?? []).map",
+    "items.map",
     "docs.map",
     "new Date(d.uploadedAt).toLocaleDateString"
    ],
    "jsx": [
     "Link",
     "Measure",
+    "MilestoneChecklist",
     "DeliverableRow"
    ],
    "snakeRowTypes": [],
@@ -79846,6 +80102,73 @@
     "upload",
     "fileRef.current.click",
     "accept"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/projects/milestone-checklist.tsx",
+   "kind": "component",
+   "lines": 193,
+   "bytes": 7061,
+   "client": true,
+   "exports": [
+    {
+     "name": "ChecklistTask",
+     "form": "type"
+    },
+    {
+     "name": "MilestoneChecklist",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    },
+    {
+     "spec": "@/lib/toast",
+     "names": [
+      "toast"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "useRouter",
+    "useState",
+    "window.prompt('What is blocking it?').trim",
+    "window.prompt",
+    "setBusy",
+    "fetch",
+    "JSON.stringify",
+    "res.json().catch",
+    "res.json",
+    "toast",
+    "router.refresh",
+    "title.trim",
+    "setTitle",
+    "setDue",
+    "setAdding",
+    "tasks.filter",
+    "tasks.map",
+    "setStatus",
+    "String(t.dueDate).slice",
+    "String",
+    "addTask"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -93714,8 +94037,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 289,
-   "bytes": 15468,
+   "lines": 327,
+   "bytes": 17744,
    "client": false,
    "exports": [
     {
@@ -101382,10 +101705,172 @@
    ]
   },
   {
+   "file": "lib/projects/milestone-tasks.ts",
+   "kind": "lib",
+   "lines": 415,
+   "bytes": 19907,
+   "client": false,
+   "exports": [
+    {
+     "name": "MilestoneTask",
+     "form": "type"
+    },
+    {
+     "name": "shiftDate",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "listMilestoneTasks",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "createMilestoneTask",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "setTaskStatus",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "MilestoneChainRow",
+     "form": "type"
+    },
+    {
+     "name": "resequence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "rescheduleMilestone",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "ProjectActor"
+     ]
+    },
+    {
+     "spec": "./dates",
+     "names": [
+      "isoDate"
+     ]
+    },
+    {
+     "spec": "./project",
+     "names": [
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 5,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 86
+    },
+    {
+     "tag": "sql",
+     "line": 135
+    },
+    {
+     "tag": "sql",
+     "line": 144
+    },
+    {
+     "tag": "sql",
+     "line": 153
+    },
+    {
+     "tag": "sql",
+     "line": 218
+    },
+    {
+     "tag": "sql",
+     "line": 230
+    },
+    {
+     "tag": "sql",
+     "line": 283
+    },
+    {
+     "tag": "sql",
+     "line": 300
+    },
+    {
+     "tag": "sql",
+     "line": 345
+    },
+    {
+     "tag": "sql",
+     "line": 366
+    },
+    {
+     "tag": "sql",
+     "line": 374
+    },
+    {
+     "tag": "sql",
+     "line": 384
+    }
+   ],
+   "calls": [
+    "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+    "Number.isNaN",
+    "new Date(`${v}T00:00:00Z`).getTime",
+    "isoDate",
+    "Date.parse",
+    "Number.isFinite",
+    "new Date(ms + days * 86_400_000).toISOString().slice",
+    "new Date(ms + days * 86_400_000).toISOString",
+    "console.error",
+    "canAssign",
+    "canAccessProject",
+    "(input.title ?? '').trim",
+    "asDate",
+    "['tenant_admin', 'tenant_user'].includes",
+    "auditLog",
+    "['open', 'done', 'blocked'].includes",
+    "(blockedReason ?? '').trim",
+    "emitEventSingle",
+    "userActor",
+    "shiftDate",
+    "Math.round"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/projects/milestones.ts",
    "kind": "lib",
-   "lines": 428,
-   "bytes": 19792,
+   "lines": 480,
+   "bytes": 22767,
    "client": false,
    "exports": [
     {
@@ -101491,59 +101976,63 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 63
+     "line": 73
     },
     {
      "tag": "sql",
-     "line": 77
+     "line": 88
     },
     {
      "tag": "sql",
-     "line": 120
+     "line": 131
     },
     {
      "tag": "sql",
-     "line": 121
+     "line": 132
     },
     {
      "tag": "sql",
-     "line": 127
+     "line": 138
     },
     {
      "tag": "sql",
-     "line": 170
+     "line": 198
     },
     {
      "tag": "sql",
-     "line": 184
+     "line": 212
     },
     {
      "tag": "sql",
-     "line": 247
+     "line": 226
     },
     {
      "tag": "sql",
-     "line": 254
+     "line": 299
     },
     {
      "tag": "sql",
-     "line": 308
+     "line": 306
     },
     {
      "tag": "sql",
-     "line": 315
+     "line": 360
     },
     {
      "tag": "sql",
-     "line": 325
+     "line": 367
     },
     {
      "tag": "sql",
-     "line": 386
+     "line": 377
     },
     {
      "tag": "sql",
-     "line": 398
+     "line": 438
+    },
+    {
+     "tag": "sql",
+     "line": 450
     }
    ],
    "calls": [
@@ -101556,9 +102045,15 @@
     "(input.title ?? '').trim",
     "asDate",
     "auditLog",
+    "Array.isArray",
+    "(completion.note ?? '').trim",
+    "openTasks.slice(0, 3).map((t) => t.title).join",
+    "openTasks.slice(0, 3).map",
+    "openTasks.slice",
     "outstanding.slice(0, 3).map((d) => d.title).join",
     "outstanding.slice(0, 3).map",
     "outstanding.slice",
+    "sql.json",
     "daysBetween",
     "emitEventSingle",
     "userActor",
@@ -118337,6 +118832,140 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-milestone-construct.mts",
+   "kind": "script",
+   "lines": 289,
+   "bytes": 16063,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page",
+      "APIRequestContext"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 81
+    },
+    {
+     "tag": "sql",
+     "line": 110
+    },
+    {
+     "tag": "sql",
+     "line": 131
+    },
+    {
+     "tag": "sql",
+     "line": 148
+    },
+    {
+     "tag": "sql",
+     "line": 161
+    },
+    {
+     "tag": "sql",
+     "line": 209
+    },
+    {
+     "tag": "sql",
+     "line": 218
+    },
+    {
+     "tag": "sql",
+     "line": 234
+    },
+    {
+     "tag": "sql",
+     "line": 265
+    },
+    {
+     "tag": "sql",
+     "line": 267
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "ok",
+    "no",
+    "'═'.repeat",
+    "Math.max",
+    "new Date(Date.now() + n * 86_400_000).toISOString().slice",
+    "new Date(Date.now() + n * 86_400_000).toISOString",
+    "Date.now",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "req.fetch",
+    "method.toUpperCase",
+    "r.text",
+    "JSON.parse",
+    "r.status",
+    "path.reduce",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "login",
+    "phase",
+    "api",
+    "A",
+    "String",
+    "pick",
+    "day",
+    "new Date(v as string).toISOString().slice",
+    "new Date(v as string).toISOString",
+    "iso",
+    "before.every",
+    "/not done/i.test",
+    "String((early.json as { error?: string }).error).slice",
+    "d.text.slice",
+    "saved.note.includes",
+    "String(saved?.note).slice",
+    "JSON.stringify",
+    "String(ev.payload.note).slice",
+    "describeEvent",
+    "/\\s{2,}/.test",
+    "label.includes",
+    "ctx2.newPage",
+    "String((e as Error).message).slice",
+    "ctx2.close",
+    "ctx.close",
+    "browser.close",
+    "sql.end",
+    "main()\n  .then(cleanup, async (e) => {\n    console.error('\\ndrive failed:', (e as Error)?.message ?? e);\n    bad += 1;\n    await cleanup().catch(() => {});\n  }).then",
+    "main().then",
+    "main",
+    "cleanup().catch",
+    "cleanup"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 10,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-navair-build.mts",
    "kind": "script",
    "lines": 456,
@@ -119511,8 +120140,8 @@
   {
    "file": "scripts/drive-project-lifecycle.mts",
    "kind": "script",
-   "lines": 423,
-   "bytes": 24497,
+   "lines": 504,
+   "bytes": 29528,
    "client": false,
    "exports": [],
    "imports": [
@@ -119529,81 +120158,95 @@
      "names": [
       "postgres"
      ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync"
+     ]
     }
    ],
-   "tryCount": 2,
+   "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 93
+     "line": 120
     },
     {
      "tag": "sql",
-     "line": 102
+     "line": 132
     },
     {
      "tag": "sql",
-     "line": 117
+     "line": 141
     },
     {
      "tag": "sql",
-     "line": 130
+     "line": 158
     },
     {
      "tag": "sql",
-     "line": 135
+     "line": 170
     },
     {
      "tag": "sql",
-     "line": 144
+     "line": 173
     },
     {
      "tag": "sql",
-     "line": 153
+     "line": 176
     },
     {
      "tag": "sql",
-     "line": 164
+     "line": 177
     },
     {
      "tag": "sql",
-     "line": 193
+     "line": 179
     },
     {
      "tag": "sql",
-     "line": 199
+     "line": 180
     },
     {
      "tag": "sql",
-     "line": 214
+     "line": 187
     },
     {
      "tag": "sql",
-     "line": 248
+     "line": 203
     },
     {
      "tag": "sql",
-     "line": 264
+     "line": 208
     },
     {
      "tag": "sql",
-     "line": 269
+     "line": 217
     },
     {
      "tag": "sql",
-     "line": 299
+     "line": 226
     },
     {
      "tag": "sql",
-     "line": 322
+     "line": 237
     },
     {
      "tag": "sql",
-     "line": 331
+     "line": 266
     },
     {
      "tag": "sql",
-     "line": 334
+     "line": 272
+    },
+    {
+     "tag": "sql",
+     "line": 287
+    },
+    {
+     "tag": "sql",
+     "line": 321
     },
     {
      "tag": "sql",
@@ -119611,27 +120254,55 @@
     },
     {
      "tag": "sql",
-     "line": 339
+     "line": 342
     },
     {
      "tag": "sql",
-     "line": 375
+     "line": 372
     },
     {
      "tag": "sql",
-     "line": 379
+     "line": 395
     },
     {
      "tag": "sql",
-     "line": 380
+     "line": 404
     },
     {
      "tag": "sql",
-     "line": 384
+     "line": 407
     },
     {
      "tag": "sql",
-     "line": 393
+     "line": 410
+    },
+    {
+     "tag": "sql",
+     "line": 412
+    },
+    {
+     "tag": "sql",
+     "line": 448
+    },
+    {
+     "tag": "sql",
+     "line": 452
+    },
+    {
+     "tag": "sql",
+     "line": 458
+    },
+    {
+     "tag": "sql",
+     "line": 461
+    },
+    {
+     "tag": "sql",
+     "line": 465
+    },
+    {
+     "tag": "sql",
+     "line": 474
     }
    ],
    "calls": [
@@ -119660,11 +120331,14 @@
     "r.text",
     "JSON.parse",
     "r.status",
+    "readFileSync",
+    "fromArc",
     "phase",
     "chromium.launch",
     "browser.newContext",
     "ctx.newPage",
     "login",
+    "arc.proposalId.slice",
     "api",
     "A",
     "Boolean",
@@ -119701,7 +120375,7 @@
    ],
    "jsx": [],
    "snakeRowTypes": [],
-   "ownClientSql": 25,
+   "ownClientSql": 34,
    "jsonResponses": []
   },
   {
@@ -131422,6 +132096,18 @@
    "sig": "portal-route-no-tenant-AUTHORISATION",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts",
    "route": "/api/portal/[tenantSlug]/projects/[projectId]",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
    "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
   },
   {

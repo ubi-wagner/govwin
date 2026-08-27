@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **217** — migs 215–217 the outbound-email ledger + the post-award delivery spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **218** — mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
 proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
@@ -214,6 +214,22 @@ tenant, and **assignment is app-enforced** in one predicate (`lib/projects/acces
 request context carries a tenant, not a user — `partner_user` is refused the capability outright, which
 is what removes cross-tenant from it entirely. `contract:started` raises a ToDo; it deliberately does
 NOT create the project.
+
+**The MILESTONE is the project-management construct** (mig 218): a dated segment — `starts_on →
+forecast_date` — with an owner, a **task checklist** (`project_milestone_tasks`: person *or* role,
+due date, open|done|blocked-with-a-reason) and a **completion record** (`completion_note` + open
+jsonb `completion_metrics`). One shape, two cases: **one milestone is a dated ToDo list with nudges;
+N milestones are that in series.** There is no "simple mode" — the small case is the large one with
+a length of one. Serial dates are a DEFAULT (`resequence` fills a start from the previous end + 1
+day; a pinned start is respected, overlap is legal); `reschedule` moves the end and, by default,
+everything LATER by the same delta — the current plan only, never `baseline_date`, because variance
+is the distance between the two. Completion is gated twice with separate messages:
+`TASKS_OUTSTANDING` (the work) then `DELIVERABLES_OUTSTANDING` (the customer's signature). **Adding
+tasks and closing a milestone are tenant_admin; ticking one off is open to any member who can reach
+the project** — a checklist only a manager may tick is a status report. `_run_project_nudges`
+(lifecycle scheduler, daily) emits `project:milestone.due_soon|overdue` / `task.due_soon|overdue`
+plus one grouped `project_nudge` mail, hard-bounded by per-row `nudges_sent` + `last_nudged_at`;
+blocked tasks are not nudged. Proven by `scripts/drive-milestone-construct.mts`.
 
 **EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
 `services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
@@ -485,6 +501,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/projects-dates.test.ts`
   guards the idiom across the Projects tree, and any fixture for date code must be a real `Date` —
   a test fed ISO strings passes against the broken code.
+- **A nested ``sql`…` `` inside a value is a PROMISE, not a fragment — the THIRD Proxy trap.**
+  `completed_at = ${x ? sql`now()` : null}` makes postgres.js throw `RangeError: Invalid time
+  value` serialising it, and the route answers a textbook 500 — every task in a checklist failed to
+  tick off this way. Only the tagged-template CALL is routed; fragment-composing needs an explicit
+  client. Compute plain values in JS instead.
+  `__tests__/projects-tenant-transactions.test.ts` guards all three Proxy traps.
 - **`sql.begin` FORWARDS PAST the tenant context — the second way to lose `app.tenant_id`.**
   `lib/db.ts`'s `sql` is a Proxy and only the tagged-template CALL is routed; `sql.begin` (and
   `sql.json/array/…`) go straight to the raw pool. A tenant-scoped transaction written as

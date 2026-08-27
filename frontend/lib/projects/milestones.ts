@@ -29,10 +29,20 @@ export interface Milestone {
   clinId: string | null;
   wbsNodeId: string | null;
   title: string;
+  /** The start of the segment. Serial by default (the previous milestone's end + 1 day) but
+   *  pinnable — see `lib/projects/milestone-tasks.ts`. Planning, not a promise: it is NOT
+   *  baselined, so a rebaseline does not argue with a work breakdown. */
+  startsOn: string | null;
   baselineDate: string | null;
   forecastDate: string | null;
   status: string;
   metAt: string | null;
+  ownerUserId: string | null;
+  /** What a person wants to say about how it went. "met" alone is unreadable six months later. */
+  completionNote: string | null;
+  /** Whatever this milestone actually measured — units, tests, hours. Open jsonb because the shape
+   *  varies per contract, and a column per metric would be a schema change per customer. */
+  completionMetrics: Record<string, unknown> | null;
   sortIndex: number;
 }
 
@@ -61,8 +71,9 @@ function asDate(v: unknown): { ok: true; value: string | null } | { ok: false } 
 export async function listMilestones(tenantId: string, projectId: string): Promise<Milestone[]> {
   try {
     return await sql<Milestone[]>`
-      SELECT id, project_id, clin_id, wbs_node_id, title, baseline_date, forecast_date,
-             status, met_at, sort_index
+      SELECT id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+             forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
+             sort_index
         FROM project_milestones
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
        ORDER BY sort_index, forecast_date NULLS LAST`;
@@ -130,8 +141,9 @@ export async function createMilestone(
       VALUES
         (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.clinId ?? null},
          ${input.wbsNodeId ?? null}, ${title}, ${forecast.value}, ${input.sortIndex ?? 0})
-      RETURNING id, project_id, clin_id, wbs_node_id, title, baseline_date, forecast_date,
-                status, met_at, sort_index`;
+      RETURNING id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+                forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
+                sort_index`;
 
     await auditLog({
       tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_created',
@@ -158,6 +170,7 @@ export async function markMilestoneMet(
   actor: ProjectActor,
   projectId: string,
   milestoneId: string,
+  completion: { note?: string | null; metrics?: Record<string, unknown> | null } = {},
 ): Promise<Ok<Milestone> | Fail> {
   if (!canAssign(actor.role)) {
     return { ok: false, status: 403, error: 'Only a tenant admin can close a milestone', code: 'FORBIDDEN' };
@@ -166,7 +179,36 @@ export async function markMilestoneMet(
     return { ok: false, status: 404, error: 'Project not found', code: 'NOT_FOUND' };
   }
 
+  // Metrics are an OBJECT or nothing. A scalar or an array reaches mig 218's CHECK as a
+  // constraint name; refusing it here reaches the caller as a sentence.
+  const metrics = completion.metrics ?? null;
+  if (metrics !== null && (typeof metrics !== 'object' || Array.isArray(metrics))) {
+    return {
+      ok: false, status: 400, code: 'VALIDATION_ERROR',
+      error: 'metrics must be an object of named measurements, e.g. { unitsShipped: 12 }',
+    };
+  }
+  const note = (completion.note ?? '').trim() || null;
+
   try {
+    // ── THE WORK, THEN THE ACCEPTANCE — two refusals, deliberately separate ────────────────
+    // An open task means the work is not finished. An unaccepted deliverable means the customer
+    // has not signed for it. They are different problems with different next actions, so they get
+    // different messages rather than one "milestone not ready".
+    const openTasks = await sql<{ title: string }[]>`
+      SELECT title FROM project_milestone_tasks
+       WHERE milestone_id = ${milestoneId}::uuid AND tenant_id = ${actor.tenantId}::uuid
+         AND status <> 'done'
+       ORDER BY sort_index`;
+    if (openTasks.length) {
+      return {
+        ok: false, status: 409, code: 'TASKS_OUTSTANDING',
+        error: `${openTasks.length} task(s) on this milestone are not done: `
+          + `${openTasks.slice(0, 3).map((t) => t.title).join(', ')}`
+          + `${openTasks.length > 3 ? ', …' : ''}.`,
+      };
+    }
+
     const outstanding = await sql<{ title: string }[]>`
       SELECT d.title FROM project_deliverables d
        WHERE d.milestone_id = ${milestoneId}::uuid AND d.tenant_id = ${actor.tenantId}::uuid
@@ -183,11 +225,18 @@ export async function markMilestoneMet(
 
     const [row] = await sql<Milestone[]>`
       UPDATE project_milestones
-         SET status = 'met', met_at = now(), updated_at = now()
+         SET status = 'met', met_at = now(), updated_at = now(),
+             completion_note = ${note},
+             completion_metrics = ${metrics === null ? null
+               // `sql.json`, never `JSON.stringify(...)::jsonb` — the latter reads back as a
+               // STRING and then char-iterates (CLAUDE.md's jsonb rule). The cast is to
+               // postgres.js's JSONValue, which does not admit a bare index signature.
+               : sql.json(metrics as Record<string, never>)}
        WHERE id = ${milestoneId}::uuid AND project_id = ${projectId}::uuid
          AND tenant_id = ${actor.tenantId}::uuid AND status = 'pending'
-      RETURNING id, project_id, clin_id, wbs_node_id, title, baseline_date, forecast_date,
-                status, met_at, sort_index`;
+      RETURNING id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+                forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
+                sort_index`;
     if (!row) {
       return {
         ok: false, status: 409, code: 'NOT_PENDING',
@@ -210,7 +259,10 @@ export async function markMilestoneMet(
       type: 'milestone.met',
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
-      payload: { projectId, milestoneId, title: row.title, varianceDays: variance },
+      payload: {
+        projectId, milestoneId, title: row.title, varianceDays: variance,
+        ...(note ? { note } : {}), ...(metrics ? { metrics } : {}),
+      },
     });
     await auditLog({
       tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_met',

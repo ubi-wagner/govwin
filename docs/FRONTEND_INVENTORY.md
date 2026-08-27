@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 261 | 41,102 |
+| api-route | 263 | 41,243 |
 | app-boundary | 5 | 132 |
 | app-component | 26 | 8,926 |
 | auth | 2 | 241 |
-| component | 163 | 41,518 |
+| component | 164 | 41,711 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 304 | 60,295 |
+| lib | 305 | 60,800 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
-| page | 118 | 17,883 |
-| script | 185 | 24,616 |
+| page | 118 | 17,933 |
+| script | 186 | 24,986 |
 | server-action | 1 | 45 |
-| test | 216 | 28,682 |
-| **total** | **1373** | **234,247** |
+| test | 216 | 28,719 |
+| **total** | **1378** | **235,543** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -134,7 +134,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/portal/[tenantSlug]/processes` | app/portal/[tenantSlug]/processes/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | ProcessesClient | yes |
 | `/portal/[tenantSlug]/profile` | app/portal/[tenantSlug]/profile/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | ProfileEditor | yes |
 | `/portal/[tenantSlug]/projects` | app/portal/[tenantSlug]/projects/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link | yes |
-| `/portal/[tenantSlug]/projects/[projectId]` | app/portal/[tenantSlug]/projects/[projectId]/page.tsx | server | [tenantSlug] [projectId] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link, Measure, DeliverableRow | yes |
+| `/portal/[tenantSlug]/projects/[projectId]` | app/portal/[tenantSlug]/projects/[projectId]/page.tsx | server | [tenantSlug] [projectId] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link, Measure, MilestoneChecklist, DeliverableRow | yes |
 | `/portal/[tenantSlug]/proposals` | app/portal/[tenantSlug]/proposals/page.tsx | server | [tenantSlug] | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | Link, ArchivedProposals | yes |
 | `/portal/[tenantSlug]/proposals/[proposalId]` | app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx | server | [tenantSlug] [proposalId] | partner_user | auth | verifyProposalAccess, resolveUserAccess, enterTenant, getTenantBySlug | OpportunityCard, AssignTaskForm, AmendmentBanner, ArchivePortalButton, ProposalStudio, StrategyPanel, ProposalWorkspace | yes |
 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx | server | [tenantSlug] [proposalId] [sectionId] | partner_user | auth | verifyProposalAccess, resolveUserAccess, enterTenant, getTenantBySlug | SectionAssignBar, SectionAssistBar, CanvasEditorPage | yes |
@@ -337,6 +337,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/portal/[tenantSlug]/projects/[projectId]/documents` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts | partner_user | — | — | — | 3 |
 | `/api/portal/[tenantSlug]/projects/[projectId]/milestones` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts | partner_user | — | — | — | 5 |
 | `/api/portal/[tenantSlug]/projects/[projectId]/rollup` | GET | app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts | partner_user | — | — | — | 1 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/tasks` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts | partner_user | — | — | — | 2 |
 | `/api/portal/[tenantSlug]/projects/[projectId]/wbs` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts | partner_user | — | — | — | 3 |
 | `/api/portal/[tenantSlug]/proposals` | GET | app/api/portal/[tenantSlug]/proposals/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, withTenant, getTenantBySlug | — | 2 |
 | `/api/portal/[tenantSlug]/proposals/[proposalId]` | GET | app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, resolveUserAccess, enterTenant, getTenantBySlug | 4×sql | 5 |
@@ -423,7 +425,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
-## 4. Components — 163 files
+## 4. Components — 164 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -563,6 +565,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | components/portal/vaults/nooks-index.tsx | client | NooksIndex | — | n/a |
 | components/portal/volume-layout-gauge.tsx | client | VolumeLayoutGauge | — | n/a |
 | components/projects/deliverable-row.tsx | client | DeliverableRow | — | n/a |
+| components/projects/milestone-checklist.tsx | client | MilestoneChecklist | — | n/a |
 | components/proposal/section-assign-bar.tsx | client | SectionAssignBar | — | n/a |
 | components/proposal/section-assist-bar.tsx | client | SectionAssistBar | — | n/a |
 | components/rfp-curation/amendments-panel.tsx | client | AmendmentsPanel | — | n/a |
@@ -622,7 +625,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 304 files
+## 6. Library modules — 305 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -782,7 +785,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/projects/clins.ts | server | listClins, createClin | 2 | **none** |
 | lib/projects/dates.ts | server | isoDate, daysBetween, varianceLabel | — | vitest |
 | lib/projects/gate.ts | server | projectGate, withProject | — | **none** |
-| lib/projects/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +1 | 14 | vitest |
+| lib/projects/milestone-tasks.ts | server | shiftDate, listMilestoneTasks, createMilestoneTask, setTaskStatus, resequence, rescheduleMilestone | 12 | **none** |
+| lib/projects/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +1 | 15 | vitest |
 | lib/projects/money.ts | server | usd, spentOf | — | vitest |
 | lib/projects/project.ts | server | createProject, getProject, listSourceDocuments, readiness, addSourceDocument | 7 | **none** |
 | lib/projects/provenance.ts | server | TRUST_ORDER, trustRank, outranks, recordProvenance, provenanceFor, badgeFor | 2 | vitest |
@@ -961,12 +965,12 @@ statement is per-layer, not one number.
 | layer | population | reached by | not reached |
 |---|---:|---|---:|
 | pages | 118 | verify-surfaces (admin + portal trees) | 35 |
-| API routes (GET) | 139 | verify-api-contract | see that lens's own accounting |
-| API routes (write verbs) | 199 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 304 | vitest 169 · sweep-mold-quality 39 | 96 |
-| components | 189 | only transitively, via a page that renders them | not measured |
+| API routes (GET) | 140 | verify-api-contract | see that lens's own accounting |
+| API routes (write verbs) | 201 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
+| lib modules | 305 | vitest 169 · sweep-mold-quality 39 | 97 |
+| components | 190 | only transitively, via a page that renders them | not measured |
 
-**The write verbs are the real gap.** 199 routes expose a POST/PATCH/PUT/DELETE and no lens
+**The write verbs are the real gap.** 201 routes expose a POST/PATCH/PUT/DELETE and no lens
 walks them: `verify-api-contract` is GET-only by construction (calling every write verb would
 mutate the box it is measuring), and `verify-db-crud` proves a hand-picked set of invariants
 rather than enumerating routes. That is a defensible design and an unstated scope — written
@@ -978,6 +982,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/tools/source-scout.ts` — 553 lines
 - `lib/import/pdf-reader.ts` — 523 lines
 - `lib/content-admin.ts` — 515 lines
+- `lib/projects/milestone-tasks.ts` — 415 lines
 - `lib/email-templates.ts` — 385 lines
 - `lib/pdf/page-capture.ts` — 363 lines
 - `lib/cms.ts` — 357 lines
@@ -1078,7 +1083,7 @@ new harness's first output describes the harness; verify every row against the s
 acting on it. Legitimate exceptions exist in every category (a public marketing page has no
 gate by design; an admin cross-tenant console reads `sqlBypass` on purpose).
 
-### `portal-route-no-tenant-AUTHORISATION` — 10
+### `portal-route-no-tenant-AUTHORISATION` — 12
 
 | file | where | note |
 |---|---|---|
@@ -1090,6 +1095,8 @@ gate by design; an admin cross-tenant console reads `sqlBypass` on purpose).
 | app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/milestones | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 | app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/rollup | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 | app/api/portal/[tenantSlug]/projects/[projectId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
+| app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/tasks | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 | app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/wbs | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 | app/api/portal/[tenantSlug]/projects/route.ts | /api/portal/[tenantSlug]/projects | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 

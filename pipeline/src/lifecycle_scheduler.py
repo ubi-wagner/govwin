@@ -246,6 +246,13 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
     except Exception as e:
         logger.error("start nudges setup failed: %s", e)
 
+    # 5. Project milestone + task nudges — the only automation in the Projects capability. A dated
+    #    checklist that never tells anyone it is due is a spreadsheet with extra steps.
+    try:
+        await _run_project_nudges(conn)
+    except Exception as e:
+        logger.error("project nudges setup failed: %s", e)
+
     logger.info("=== Daily lifecycle jobs complete ===")
 
 
@@ -366,6 +373,190 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
             )
         except Exception as exc:
             logger.error("start nudge sweep: end emit failed: %s", exc)
+
+
+async def _run_project_nudges(conn: asyncpg.Connection) -> None:
+    """Project milestones and tasks approaching — or past — their date.
+
+    THE AUTOMATION THAT MAKES A MILESTONE MORE THAN A ROW. A dated segment of work with a checklist
+    is only project management if something tells the owner it is coming due and keeps telling them
+    when it is late. Everything else in the Projects capability is HITL; this is the one part that
+    runs on its own.
+
+    Two populations, one sweep:
+
+      MILESTONES  status='pending' with a forecast_date inside the window, or already past it
+                  → project:milestone.due_soon / project:milestone.overdue
+      TASKS       status='open' with a due_date inside the window, or past it
+                  → project:task.due_soon / project:task.overdue
+
+    HARD-BOUNDED, for the same reason the start nudge is (RANK-9). At most `max_nudges_per_gate`
+    per row (mig 218 `nudges_sent`) and never more often than SPACING_DAYS (`last_nudged_at`). A
+    nudge that can repeat without limit is a nudge people filter, and a filtered nudge is worse than
+    none because the sender believes it landed.
+
+    One grouped `system:notification.requested` per sweep carries the email, gated by the tenant's
+    own preference — the same delivery path as the digest and the start nudge, so there is one mail
+    seam and not three.
+
+    Best-effort: it never raises into the scheduler loop. The scheduler connects as the owner, so
+    these cross-tenant reads and writes need no per-tenant RLS context.
+    """
+    WINDOW_DAYS = 7   # "due soon" means this week — a month's warning is noise
+    SPACING_DAYS = 3  # never re-nudge the same row more often than this
+    try:
+        max_nudges = await conn.fetchval("SELECT max_nudges_per_gate FROM automation_framework WHERE id = 1")
+        max_nudges = int(max_nudges) if max_nudges else 3
+    except Exception:
+        max_nudges = 3
+
+    start_ms = time.monotonic()
+    start_id = ""
+    try:
+        start_id = await emit_event(
+            conn, namespace="project", type="nudge_sweep.completed", phase="start",
+            actor_type="system", actor_id="lifecycle_scheduler", payload={},
+        )
+    except Exception as exc:
+        logger.error("project nudge sweep: start emit failed: %s", exc)
+
+    nudged = 0
+    per_tenant: dict[str, list] = {}
+    try:
+        # ── milestones ────────────────────────────────────────────────────────────────────────
+        # `forecast_date` is the CURRENT plan, not the baseline: a nudge is about what we now
+        # expect, and nudging against a frozen promise would shout about every rebaselined date.
+        milestones = await conn.fetch(
+            """
+            SELECT m.id::text AS id, m.tenant_id::text AS tenant_id, m.project_id::text AS project_id,
+                   m.title, m.forecast_date,
+                   (m.forecast_date - CURRENT_DATE)::int AS days_out,
+                   p.name AS project_name
+              FROM project_milestones m
+              JOIN projects p ON p.id = m.project_id
+             WHERE m.status = 'pending'
+               AND m.forecast_date IS NOT NULL
+               AND m.forecast_date <= CURRENT_DATE + $1::int
+               AND m.nudges_sent < $2::int
+               AND (m.last_nudged_at IS NULL OR m.last_nudged_at < now() - ($3::int || ' days')::interval)
+               -- `projects` has no archived_at (mig 216 predates the archive contract for this
+               -- table); a project that is finished carries status='closed'. Nudging a closed
+               -- project is the fastest way to teach someone to filter this sender.
+               AND p.status <> 'closed'
+             ORDER BY m.forecast_date
+             LIMIT 500
+            """,
+            WINDOW_DAYS, max_nudges, SPACING_DAYS,
+        )
+        for r in milestones:
+            overdue = r["days_out"] < 0
+            try:
+                await emit_event(
+                    conn, namespace="project",
+                    type="milestone.overdue" if overdue else "milestone.due_soon",
+                    phase="single", actor_type="system", actor_id="lifecycle_scheduler",
+                    tenant_id=r["tenant_id"], parent_event_id=start_id or None,
+                    payload={
+                        "projectId": r["project_id"], "milestoneId": r["id"], "title": r["title"],
+                        "project": r["project_name"],
+                        "dueOn": r["forecast_date"].isoformat() if r["forecast_date"] else None,
+                        **({"daysLate": -r["days_out"]} if overdue else {"daysOut": r["days_out"]}),
+                    },
+                )
+                await conn.execute(
+                    "UPDATE project_milestones SET nudges_sent = nudges_sent + 1, last_nudged_at = now() "
+                    "WHERE id = $1::uuid", r["id"],
+                )
+                per_tenant.setdefault(r["tenant_id"], []).append({
+                    "kind": "milestone", "title": r["title"], "project": r["project_name"],
+                    "dueOn": r["forecast_date"].isoformat() if r["forecast_date"] else None,
+                    "overdue": overdue,
+                })
+                nudged += 1
+            except Exception as ce:
+                logger.error("milestone nudge failed for %s: %s", r["id"], ce)
+
+        # ── tasks ─────────────────────────────────────────────────────────────────────────────
+        # A blocked task is NOT nudged. Somebody already said why it cannot move, and telling them
+        # again weekly is how a nudge stream becomes noise nobody reads.
+        tasks = await conn.fetch(
+            """
+            SELECT t.id::text AS id, t.tenant_id::text AS tenant_id, t.project_id::text AS project_id,
+                   t.milestone_id::text AS milestone_id, t.title, t.due_date,
+                   (t.due_date - CURRENT_DATE)::int AS days_out,
+                   t.assignee_user_id::text AS assignee_user_id, p.name AS project_name
+              FROM project_milestone_tasks t
+              JOIN projects p ON p.id = t.project_id
+             WHERE t.status = 'open'
+               AND t.due_date IS NOT NULL
+               AND t.due_date <= CURRENT_DATE + $1::int
+               AND t.nudges_sent < $2::int
+               AND (t.last_nudged_at IS NULL OR t.last_nudged_at < now() - ($3::int || ' days')::interval)
+               -- `projects` has no archived_at (mig 216 predates the archive contract for this
+               -- table); a project that is finished carries status='closed'. Nudging a closed
+               -- project is the fastest way to teach someone to filter this sender.
+               AND p.status <> 'closed'
+             ORDER BY t.due_date
+             LIMIT 500
+            """,
+            WINDOW_DAYS, max_nudges, SPACING_DAYS,
+        )
+        for r in tasks:
+            overdue = r["days_out"] < 0
+            try:
+                await emit_event(
+                    conn, namespace="project",
+                    type="task.overdue" if overdue else "task.due_soon",
+                    phase="single", actor_type="system", actor_id="lifecycle_scheduler",
+                    tenant_id=r["tenant_id"], parent_event_id=start_id or None,
+                    payload={
+                        "projectId": r["project_id"], "milestoneId": r["milestone_id"],
+                        "taskId": r["id"], "title": r["title"], "project": r["project_name"],
+                        "assigneeUserId": r["assignee_user_id"],
+                        "dueOn": r["due_date"].isoformat() if r["due_date"] else None,
+                        **({"daysLate": -r["days_out"]} if overdue else {"daysOut": r["days_out"]}),
+                    },
+                )
+                await conn.execute(
+                    "UPDATE project_milestone_tasks SET nudges_sent = nudges_sent + 1, "
+                    "last_nudged_at = now() WHERE id = $1::uuid", r["id"],
+                )
+                per_tenant.setdefault(r["tenant_id"], []).append({
+                    "kind": "task", "title": r["title"], "project": r["project_name"],
+                    "dueOn": r["due_date"].isoformat() if r["due_date"] else None,
+                    "overdue": overdue,
+                })
+                nudged += 1
+            except Exception as ce:
+                logger.error("task nudge failed for %s: %s", r["id"], ce)
+
+        if per_tenant:
+            try:
+                await emit_event(
+                    conn, namespace="system", type="notification.requested", phase="single",
+                    actor_type="system", actor_id="lifecycle_scheduler", tenant_id=None,
+                    parent_event_id=start_id or None,
+                    payload={"channel": "email", "template": "project_nudge",
+                             "tenant_ids": list(per_tenant.keys()),
+                             "tenant_pref": "notify_on_new_priority_opp",
+                             "digest": per_tenant},
+                )
+            except Exception as ee:
+                logger.error("project nudge email emit failed: %s", ee)
+        logger.info("project nudges: %d row(s) across %d tenant(s)", nudged, len(per_tenant))
+    except Exception as e:
+        logger.error("project nudges failed: %s", e)
+    finally:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="project", type="nudge_sweep.completed", phase="end",
+                parent_event_id=start_id or None, actor_type="system", actor_id="lifecycle_scheduler",
+                payload={"rowsNudged": nudged, "tenantsNotified": len(per_tenant),
+                         "durationMs": duration_ms},
+            )
+        except Exception as exc:
+            logger.error("project nudge sweep: end emit failed: %s", exc)
 
 
 async def _run_weekly_jobs(conn: asyncpg.Connection) -> None:

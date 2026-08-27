@@ -165,6 +165,57 @@ async function main() {
       (${tenant.id}, ${msCdr.id}, 'Updated test plan', CURRENT_DATE - 30,
        NULL, NULL, NULL, NULL, NULL, NULL, 3)`;
 
+  // ── THE MILESTONE CONSTRUCT (mig 218) ───────────────────────────────────────────────────────
+  // Serial starts, a checklist per milestone, and a completion record on the one that is met. This
+  // is what makes the smallest useful case visible in a screenshot: a milestone with a task list is
+  // a dated ToDo list for the team, and the plan is that shape repeated in series.
+  await sql`
+    UPDATE project_milestones SET starts_on = CURRENT_DATE - 120 WHERE id = ${msKickoff.id}`;
+  await sql`
+    UPDATE project_milestones
+       SET starts_on = CURRENT_DATE - 112,
+           completion_note = NULL
+     WHERE id = ${msCdr.id}`;
+  // The met milestone carries what it measured — the reason `completion_metrics` is an open jsonb.
+  await sql`
+    UPDATE project_milestones
+       SET completion_note = 'Kickoff held on site; SOW agreed with the CO with two wording changes.',
+           completion_metrics = ${sql.json({ attendees: 9, sowRevisions: 2, daysToAgree: 4 })}
+     WHERE id = ${msKickoff.id}`;
+
+  // sort_index is the ORDER A PERSON READS, which is the order the work happens — not a function
+  // of the due date. The first version derived it from the offset and the list came out backwards.
+  const CHECKLIST = [
+    [msKickoff.id, 'Confirm CO attendance', -118, 'done'],
+    [msKickoff.id, 'Circulate draft SOW', -116, 'done'],
+    [msCdr.id, 'Thermal margin analysis', -22, 'done'],
+    [msCdr.id, 'CDR slide package', -18, 'open'],
+    [msCdr.id, 'Vendor lead times confirmed', -12, 'blocked'],
+  ];
+  for (const [i, [milestoneId, title, offset, status]] of CHECKLIST.entries()) {
+    await sql`
+      INSERT INTO project_milestone_tasks
+        (tenant_id, project_id, milestone_id, title, assignee_user_id, due_date, status,
+         blocked_reason, completed_at, completed_by, sort_index)
+      VALUES (${tenant.id}, ${project.id}, ${milestoneId}, ${title}, ${user.id},
+              CURRENT_DATE + ${offset}::int, ${status},
+              ${status === 'blocked' ? 'Supplier has not confirmed the actuator lead time.' : null},
+              ${status === 'done' ? sql`now() - interval '10 days'` : null},
+              ${status === 'done' ? user.id : null},
+              ${i})`;
+  }
+
+  // Serial fill, the same rule `resequence` applies: a milestone with no pinned start begins the
+  // day after the previous one ends. Seeded here so the screenshot shows a CHAIN — the unsequenced
+  // state is covered by drive-milestone-construct.mts, not by leaving the fixture half-built.
+  await sql`
+    UPDATE project_milestones m
+       SET starts_on = prev.forecast_date + 1
+      FROM (SELECT id, forecast_date, sort_index FROM project_milestones
+             WHERE project_id = ${project.id}) prev
+     WHERE m.project_id = ${project.id} AND m.starts_on IS NULL
+       AND prev.sort_index = m.sort_index - 1 AND prev.forecast_date IS NOT NULL`;
+
   await sql`UPDATE projects SET baselined_at = now() - interval '110 days' WHERE id = ${project.id}`;
 
   console.log(`✓ seeded "${NAME}" for tenant '${tenant.slug}'`);

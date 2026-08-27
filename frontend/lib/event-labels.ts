@@ -195,8 +195,46 @@ export function describeEvent(ev: EventLike): string {
         return phase === 'start' ? 'Rebaselining the project plan' : 'Project plan rebaselined';
       case 'milestone.due':
         return `Milestone due: ${str(payload.title) ?? 'a milestone'}`;
-      case 'milestone.met':
-        return `Milestone met: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.met': {
+        // The completion RECORD, not just the fact. "Milestone met" six months later tells a
+        // reader nothing; the variance and the note are why anyone opens the feed.
+        const what = str(payload.title) ?? 'a milestone';
+        const v = typeof payload.varianceDays === 'number' ? payload.varianceDays : null;
+        const when = v === null || v === 0 ? ''
+          : v > 0 ? ` — ${v} day${v === 1 ? '' : 's'} late` : ` — ${-v} day${v === -1 ? '' : 's'} early`;
+        const note = str(payload.note);
+        return `Milestone met: ${what}${when}${note ? ` · ${note}` : ''}`;
+      }
+      case 'milestone.rescheduled': {
+        const what = str(payload.title) ?? 'a milestone';
+        const d = typeof payload.deltaDays === 'number' ? payload.deltaDays : null;
+        const by = d === null || d === 0 ? ''
+          : d > 0 ? ` — pushed out ${d} day${d === 1 ? '' : 's'}` : ` — pulled in ${-d} day${d === -1 ? '' : 's'}`;
+        const also = typeof payload.cascaded === 'number' && payload.cascaded > 0
+          ? `, and ${payload.cascaded} later milestone${payload.cascaded === 1 ? '' : 's'} with it` : '';
+        return `Milestone rescheduled: ${what}${by}${also}`;
+      }
+      case 'milestone.due_soon':
+        return `Milestone due ${str(payload.dueOn) ?? 'soon'}: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.overdue': {
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        return `Milestone overdue${late ? ` by ${late} day${late === 1 ? '' : 's'}` : ''}: `
+          + `${str(payload.title) ?? 'a milestone'}`;
+      }
+      case 'task.completed':
+        return `Task done: ${str(payload.title) ?? 'a task'}`;
+      case 'task.blocked':
+        return `Task blocked: ${str(payload.title) ?? 'a task'}`
+          + `${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
+      case 'task.reopened':
+        return `Task reopened: ${str(payload.title) ?? 'a task'}`;
+      case 'task.due_soon':
+        return `Task due ${str(payload.dueOn) ?? 'soon'}: ${str(payload.title) ?? 'a task'}`;
+      case 'task.overdue': {
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        return `Task overdue${late ? ` by ${late} day${late === 1 ? '' : 's'}` : ''}: `
+          + `${str(payload.title) ?? 'a task'}`;
+      }
       case 'deliverable.uploaded':
         return `Deliverable uploaded: ${str(payload.title) ?? str(payload.filename) ?? 'a deliverable'}`;
       case 'deliverable.accepted':

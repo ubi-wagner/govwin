@@ -595,6 +595,31 @@ TEMPLATES.update({
     # `system:notification.failed` instead of sending mail. That has happened twice (the 052
     # regression, then eight more found by audit join 7), which is why the template is written in
     # the same change as the workflow that names it.
+    # ── The project nudge (M2) ──────────────────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS THE SWEEP THAT NAMES IT. B141: eight NOTIFY steps named a
+    # template that existed nowhere, so the mail emitted `notification.failed` instead of sending —
+    # twice. A template referenced by a code path and defined nowhere is a silent no-send.
+    #
+    # One mail per tenant per sweep, grouping every milestone and task that came due or went late.
+    # Per-row mail would be the fastest possible way to teach someone to filter this sender.
+    'project_nudge': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Coming due on your projects</h2>
+        <p>{_e(str(p.get('summary') or 'Some project work is due soon or already late.'))}</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            {''.join(
+                f'<p style="margin:6px 0;font-size:14px;color:#475569;">'
+                f'<strong>{_e(str(i.get("title") or "Untitled"))}</strong>'
+                f'{" &mdash; " + _e(str(i.get("project"))) if i.get("project") else ""}'
+                f'<br><span style="color:{"#b91c1c" if i.get("overdue") else "#475569"};">'
+                f'{"overdue" if i.get("overdue") else "due"} {_e(str(i.get("dueOn") or ""))}'
+                f' &middot; {_e(str(i.get("kind") or "item"))}</span></p>'
+                for i in (p.get('items') or [])[:20]
+            ) or '<p style="margin:4px 0;font-size:14px;color:#475569;">Nothing outstanding.</p>'}
+        </div>
+        <p style="font-size:13px;color:#64748b;">You are seeing this because you own or are assigned
+        to this work. Ticking a task off, or closing the milestone, stops the reminder.</p>
+        {_button('Open your projects', p.get('workspaceUrl', '/portal'))}
+    '''),
     'project_setup_ready': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Congratulations &mdash; you won</h2>
         <p><strong>{_e(str(p.get('title') or 'Your proposal'))}</strong> has been recorded as awarded,

@@ -7,11 +7,13 @@ import { projectScope, listAssignees } from '@/lib/projects/access';
 import { getProject, listSourceDocuments, readiness } from '@/lib/projects/project';
 import { listClins } from '@/lib/projects/clins';
 import { listMilestones, listDeliverables } from '@/lib/projects/milestones';
+import { listMilestoneTasks } from '@/lib/projects/milestone-tasks';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
 import { usd, spentOf } from '@/lib/projects/money';
 import { DeliverableRow } from '@/components/projects/deliverable-row';
+import { MilestoneChecklist } from '@/components/projects/milestone-checklist';
 import { canAssign } from '@/lib/projects/access';
 
 export const dynamic = 'force-dynamic';
@@ -78,11 +80,12 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
     listDeliverables(tenantId, projectId),
+    listMilestoneTasks(tenantId, projectId),
     readiness(tenantId, projectId),
     listAssignees(tenantId, projectId),
     rollup(tenantId, projectId),
@@ -90,6 +93,15 @@ export default async function ProjectPage({
 
   const prov: Record<string, Awaited<ReturnType<typeof provenanceFor>>> = {};
   for (const c of clins) prov[c.id] = await provenanceFor(tenantId, 'project_clins', c.id);
+
+  // Tasks by milestone — the checklist half of the construct. A milestone is a dated segment of
+  // work; without its list, the page shows only the date.
+  const tasksByMilestone = new Map<string, typeof tasks>();
+  for (const t of tasks) {
+    const list = tasksByMilestone.get(t.milestoneId) ?? [];
+    list.push(t);
+    tasksByMilestone.set(t.milestoneId, list);
+  }
 
   const byMilestone = new Map<string, typeof deliverables>();
   for (const d of deliverables) {
@@ -238,6 +250,44 @@ export default async function ProjectPage({
                       )}
                     </span>
                   </div>
+
+                  {/* The segment. A start and an end, because a milestone is a stretch of work and
+                      not an instant — and because the chain of them IS the plan. */}
+                  {(isoDate(m.startsOn) || isoDate(m.forecastDate)) && (
+                    <div className="mt-1 text-xs text-gray-500 tabular-nums">
+                      {isoDate(m.startsOn) ?? '—'} → {isoDate(m.forecastDate) ?? '—'}
+                    </div>
+                  )}
+
+                  {/* The completion RECORD. "met" on its own is unreadable six months later. */}
+                  {m.status === 'met' && (m.completionNote || m.completionMetrics) && (
+                    <div className="mt-2 rounded border border-green-200 bg-green-50 p-2 text-xs text-green-900">
+                      {m.completionNote && <div>{m.completionNote}</div>}
+                      {m.completionMetrics && (
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
+                          {Object.entries(m.completionMetrics).map(([k, v]) => (
+                            <span key={k}>
+                              <span className="text-green-700">{k}</span>{' '}
+                              <span className="font-medium">{String(v)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <MilestoneChecklist
+                    milestoneId={m.id}
+                    tasks={(tasksByMilestone.get(m.id) ?? []).map((t) => ({
+                      id: t.id, title: t.title, detail: t.detail,
+                      assigneeEmail: t.assigneeEmail ?? null, assigneeRole: t.assigneeRole,
+                      dueDate: isoDate(t.dueDate), status: t.status,
+                      blockedReason: t.blockedReason,
+                    }))}
+                    basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                    canManage={canAccept}
+                    milestoneMet={m.status === 'met'}
+                  />
                   {items.length > 0 && (
                     <ul className="mt-3 space-y-2 text-sm">
                       {items.map((d) => (

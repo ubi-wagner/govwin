@@ -1063,3 +1063,124 @@ number.
 
 ---
 
+## M1–M3 · The milestone construct — one shape, two cases
+
+**Operator's outline, 2026-08-27:** *"a simple milestone construct which is extendable. A project
+with one milestone can be a simple complex ToDo and task completion list for employees. It still has
+simple automation built into the completion date and notifications and nudges. Make it 1:N with
+serial dates and milestone completion notes or metrics."*
+
+**Shipped:** mig 218 (`project_milestone_tasks` + `starts_on`/`owner_user_id`/`completion_note`/
+`completion_metrics`/nudge watermark on `project_milestones`), `lib/projects/milestone-tasks.ts`,
+two routes, `components/projects/milestone-checklist.tsx`, `_run_project_nudges` in the lifecycle
+scheduler, the `project_nudge` mail renderer, six new `project:*` labels, and
+`scripts/drive-milestone-construct.mts` (28 assertions).
+
+### The shape, and why there is no "simple mode"
+
+```
+project 1:N milestone      a dated segment: starts_on → forecast_date, an owner, a checklist
+             1:N task      title · assignee (a person OR a role) · due · open|done|blocked
+             completion    a note and open jsonb metrics — "met" alone is unreadable later
+             automation    due-soon / overdue → event + notification + nudge, hard-bounded
+```
+
+**One milestone is a dated ToDo list with nudges. N milestones are that, in series.** The small case
+is not a stripped-down mode of the large one; it IS the large one with a length of one, which is
+what makes it extendable rather than configurable. There is no `is_simple` flag anywhere in the
+capability.
+
+### Serial dates are a default, not a constraint
+
+`starts_on` defaults to the previous milestone's end + 1 day, so a plan entered as four dates reads
+as a chain. It is a default: a pinned start is respected, and overlap is legal — real plans overlap
+and a schema forbidding it would be wrong more often than it helped. The database enforces only what
+is always true: a segment cannot end before it starts.
+
+`reschedule` moves the end date and, by default, **everything after it by the same delta**. That is
+what serial means in practice — slipping phase 2 by three weeks slips 3 and 4 unless someone says
+otherwise. It moves the CURRENT plan and never `baseline_date`; variance is the distance between the
+promise and the plan, so a cascade that touched the baseline would erase the number the reschedule
+exists to reveal. Proven, not asserted:
+
+```
+✓ phase 2 starts the day after phase 1 ends — 2026-09-27 (phase 1 ends 2026-09-26)
+✓ phase 3 slipped by the same 14 days — 2026-11-25 → 2026-12-09
+✓ phase 1, which is EARLIER, did not move
+✓ no baseline_date moved
+```
+
+### The checklist gates completion, and completion is a record
+
+Two refusals, deliberately separate messages: **`TASKS_OUTSTANDING`** (the work is not finished) and
+**`DELIVERABLES_OUTSTANDING`** (the customer has not accepted it). Different problems, different
+next actions. A blocked task still blocks, and blocking requires a reason — a blocked task nobody
+explained is one nobody can unblock, and it sits in the list looking like progress.
+
+Completion carries a note and metrics, and both reach the event a person reads months later:
+
+```
+Milestone met: phase 1 · Plan agreed at the kickoff; two wording changes to the SOW.
+```
+
+Metrics are an open jsonb OBJECT (`{ attendees: 9, sowRevisions: 2 }`), enforced by a CHECK and by
+`sql.json` on the write — a column per metric would be a schema change per customer, and a string
+written as jsonb reads back as a string and char-iterates.
+
+### Who may do what — and this is the point of the feature
+
+Adding tasks and closing a milestone are `tenant_admin`. **Ticking a task off is open to any member
+who can reach the project.** A checklist only a manager may tick is a status report they maintain on
+everyone else's behalf, which is the thing this replaces.
+
+### The automation
+
+`_run_project_nudges` runs in the daily block beside the start-nudge sweep and follows its shape
+exactly: bracketed start/end (the `finally` guarantees the `end` — it fired even on the run that
+failed), per-row `nudges_sent`/`last_nudged_at` watermarks, and ONE grouped
+`system:notification.requested` per sweep rather than a mail per row. Measured:
+
+```
+milestone.overdue ×1 · task.overdue ×1 · watermarks set on 2 rows · mail: project_nudge → 1 tenant
+nudges_sent 2 → 2 on an immediate re-run   (the spacing bound)
+9 → 9 at the cap with spacing long past    (the ceiling)
+```
+
+Blocked tasks are **not** nudged: somebody already said why it cannot move, and repeating it weekly
+is how a nudge stream becomes noise. The `project_nudge` renderer was written in the same change as
+the sweep that names it — B141 twice over is what a template referenced by code and defined nowhere
+costs.
+
+### Three defects the work turned up, and one harness lie
+
+1. **`sql` fragments in a value position 500'd every task tick.**
+   `completed_at = ${next === 'done' ? sql`now()` : null}` — the `lib/db.ts` Proxy intercepts the
+   tagged-template CALL, so a nested ``sql`…` `` is a **Promise**, not a fragment, and postgres.js
+   throws `RangeError: Invalid time value` serialising it. Third distinct way that Proxy bites
+   (after `enterTenant` across an await and `sql.begin`), same root: only the call is routed. Fixed
+   by computing the values in JS; guarded in `projects-tenant-transactions.test.ts`, red-first.
+2. **The sweep queried `projects.archived_at`, which does not exist** — mig 216 predates the archive
+   contract for that table. Caught on the first live run by the query failing loudly rather than
+   returning nothing, and repointed at `status <> 'closed'`.
+3. **The seed ordered the checklist by `abs(dueOffset)`**, so it rendered backwards. Visible only in
+   the screenshot.
+
+And the lie: my first bound check counted nudge events in a 20-second window that **overlapped the
+previous sweep**, and reported `SPACING NOT HELD`. The watermark is the honest measure; the clock
+window was measuring the clock. Instrument before the finding, again.
+
+### The pass
+
+`tsc` 0 · vitest **216 files / 2,145** · `next build` 0 · surfaces 80/80 · api-contract 140 GETs,
+0 no-actor, reachability clean · write-contract **227/227** · ui-vs-db · db-crud · project isolation
+13 · rollup 9 · RLS posture **68 policies / 45 force-RLS tables** (the new table is in it) ·
+spine audit 0 dead triggers / 0 templates with no renderer · capability UNSURFACED still 6 ·
+`drive-milestone-construct` 28/28.
+
+`projects-deliverables.test.ts` needed rebasing: the new task gate runs BEFORE the deliverables gate,
+so the mock's result queue starts an entry earlier. One of its probes selected the query by
+POSITION (`queries[0]`) and would have kept passing while asserting against a different statement —
+it now selects by what the query reads.
+
+---
+

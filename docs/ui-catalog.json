@@ -1,13 +1,13 @@
 {
  "totals": {
   "routes": 118,
-  "components": 185,
-  "handlers": 1483,
-  "binding": 1242,
-  "fetches": 331,
+  "components": 186,
+  "handlers": 1490,
+  "binding": 1249,
+  "fetches": 333,
   "forms": 24,
-  "inputs": 459,
-  "buttons": 690,
+  "inputs": 461,
+  "buttons": 695,
   "orphans": 1
  },
  "records": [
@@ -5818,7 +5818,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
-   "lines": 291,
+   "lines": 341,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5828,6 +5828,7 @@
    "renders": [
     "Link",
     "Measure",
+    "MilestoneChecklist",
     "DeliverableRow"
    ],
    "handlers": [],
@@ -5837,7 +5838,8 @@
    "buttons": 0,
    "links": 1,
    "localImports": [
-    "@/components/projects/deliverable-row"
+    "@/components/projects/deliverable-row",
+    "@/components/projects/milestone-checklist"
    ],
    "route": "/portal/[tenantSlug]/projects/[projectId]",
    "renderedBy": [],
@@ -17758,6 +17760,83 @@
     "/portal/[tenantSlug]/projects/[projectId]"
    ],
    "bindingHandlers": 3,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/milestone-checklist.tsx",
+   "lines": 193,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "MilestoneChecklist"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 113
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 136
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 151
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 159
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 166
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 173
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 182
+    }
+   ],
+   "fetches": [
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/tasks/${task.id}`"
+    },
+    {
+     "method": "POST",
+     "url": "`${basePath}/tasks`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 2,
+   "buttons": 5,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 7,
    "passedHandlers": 0
   },
   {
