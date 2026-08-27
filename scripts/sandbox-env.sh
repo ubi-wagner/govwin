@@ -125,8 +125,9 @@ export GOVWIN_RUN_DIR="/home/user/.govwin/run"
 # a last-resort default for anyone running a script without sourcing this file.
 export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 export RFP_ADMIN_PW="${RFP_ADMIN_PW:-$SANDBOX_PASSWORD}"
-# lighthouse is NOT in the reset script's target list, so it keeps its seeded password.
-export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"
+# (LIGHTHOUSE_PW is set ONCE, below, next to TENANT_PW. It used to be exported HERE first, to a
+# literal `LighthouseAdmin`, which pinned it — so the later `${LIGHTHOUSE_PW:-$TENANT_PW}` was a
+# no-op and the comment above it described an intent the code did not implement. See there.)
 # …and LIGHTHOUSE_PW belongs to `eric@lighthouse.com` ONLY. The lighthouse COLLABORATOR is a
 # different account with a different seeded password (`seed_dev_accounts.mjs`: COLLAB_PW), and this
 # file exported the first without the second — so a harness reaching for "the lighthouse password"
@@ -137,7 +138,23 @@ export TENANT_PW="${TENANT_PW:-DemoPass123!}"
 # The lighthouse tenant_admin is driven by BOTH suites and they resolved its password differently —
 # the branch drives via passwordFor()/TENANT_PW, e2e/auth.setup.ts via LIGHTHOUSE_PW. Pointing the
 # second at the first means running one suite cannot silently break the other.
+#
+# ⚠️ THIS LINE WAS DEAD. An earlier `export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"` ~10
+# lines above pinned the variable first, so `:-` here never fired and the file shipped
+# `LIGHTHOUSE_PW=LighthouseAdmin` against an account whose password is TENANT_PW. That is why
+# `drive-end-to-end.mjs` — which passes the password POSITIONALLY to drive-buy-and-build — died at
+# stage 3 on `login?error=invalid`, twice, reading as a broken purchase flow. Fourth occurrence of
+# one-account-two-passwords (B146/B147). One export, one place.
 export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-$TENANT_PW}"
+# ONE CREDENTIAL, ONE PLACE — and `BUYER_PW` was the third spelling of it.
+#
+# `run-branch-drives.sh` exports `BUYER_PW="${BUYER_PW:-$TENANT_PW}"`, so inside the SUITE the buy
+# drive authenticates. Run standalone — which is exactly how `drive-end-to-end.mjs` documents
+# itself — nothing set it, and `drive-buy-and-build.mjs` fell back to a private literal
+# (`Passw0rd!2026`) that no account has. The arc died at stage 3 on `login?error=invalid`, which
+# reads as a broken purchase flow and is two files disagreeing about one value. B146/B147, third
+# occurrence. The runner's line still wins if it is set first; this makes the plain invocation work.
+export BUYER_PW="${BUYER_PW:-$TENANT_PW}"
 
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
 

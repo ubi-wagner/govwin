@@ -34,13 +34,29 @@
  */
 import { chromium, type Page, type APIRequestContext } from 'playwright';
 import postgres from 'postgres';
+import { readFileSync } from 'node:fs';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const DB = process.env.DATABASE_URL_OWNER;
 const TENANT_PW = process.env.TENANT_PW || 'DemoPass123!';
-const TENANT = 'foundation';
-const ACTOR = 'kate.ulepic@foundation3dp.com';
+
+/**
+ * ── THE SEAM WITH THE PRE-AWARD ARC ──────────────────────────────────────────────────────────
+ * `drive-end-to-end.mjs` runs the first half — a government PDF nobody wrote for us → ingest →
+ * curate → push → discover → buy → provision → author → lock → package → download — and journals
+ * the ids it produced. This drive runs the second half.
+ *
+ * Run alone, it SYNTHESISES a submitted proposal with SQL, which is honest but proves nothing
+ * about the joint: a proposal I inserted is not a proposal the product authored and locked. When
+ * the arc's journal is present it is used instead, so the two halves are ONE continuous artifact
+ * and the award is recorded against a build that actually went through the mill.
+ *
+ * Which mode it is in is printed, loudly, because a reader has to know whether the seam was
+ * crossed or stepped over.
+ */
+const RUN_DIR = process.env.GOVWIN_RUN_DIR || `${process.env.HOME}/.govwin/run`;
+const ARC_JOURNAL = `${RUN_DIR}/e2e-arc.json`;
 
 if (!DB) { console.error('DATABASE_URL_OWNER required — source scripts/sandbox-env.sh'); process.exit(2); }
 // Quoted camelCase aliases everywhere below: a bare postgres() client has no `toCamel`, and a
@@ -89,7 +105,30 @@ async function api(req: APIRequestContext, method: 'get' | 'post' | 'patch', pat
 
 const created: { proposalId?: string; projectId?: string; contractId?: string } = {};
 
+/** The arc's own artifact, if it ran. `null` means "synthesise one and say so". */
+async function fromArc(): Promise<{ proposalId: string; tenantSlug: string; actor: string } | null> {
+  try {
+    const j = JSON.parse(readFileSync(ARC_JOURNAL, 'utf8')) as
+      { ids?: { proposal?: string; buyer?: string }; stages?: Record<string, { ok?: boolean }> };
+    const proposalId = j.ids?.proposal;
+    const buyer = j.ids?.buyer;
+    if (!proposalId || !buyer) return null;
+    // Only continue from an arc that actually FINISHED authoring — half an arc hands over a
+    // proposal in a state the award path was never meant to see, and the failure would read as a
+    // defect in this half.
+    if (j.stages?.package?.ok !== true && j.stages?.lock?.ok !== true) return null;
+    const [row] = await sql<{ slug: string }[]>`
+      SELECT t.slug FROM proposals p JOIN tenants t ON t.id = p.tenant_id
+       WHERE p.id = ${proposalId}::uuid`;
+    if (!row) return null;
+    return { proposalId, tenantSlug: row.slug, actor: buyer };
+  } catch { return null; }
+}
+
 async function main() {
+  const arc = await fromArc();
+  const TENANT = arc?.tenantSlug ?? 'foundation';
+  const ACTOR = arc?.actor ?? 'kate.ulepic@foundation3dp.com';
   const [tenant] = await sql<{ id: string }[]>`SELECT id FROM tenants WHERE slug = ${TENANT}`;
   if (!tenant) { console.error(`no '${TENANT}' tenant`); process.exit(2); }
   const tenantId = tenant.id;
@@ -113,15 +152,49 @@ async function main() {
 
   // ══ 1 · HITL — a person records the award ═══════════════════════════════════════════════════
   phase('1 · HITL: the award');
-  // The one precondition a person cannot conjure: something to win. An UNLOCKED, un-awarded build.
-  const [prop] = await sql<{ id: string; title: string }[]>`
-    INSERT INTO proposals (tenant_id, opportunity_id, title, stage, is_locked)
-    SELECT ${tenantId}::uuid, o.id, ${'E2E award probe ' + process.pid}, 'submitted', false
-      FROM opportunities o ORDER BY o.id LIMIT 1
-    RETURNING id, title`;
-  if (!prop) { console.error('  CANT-RUN — no opportunity to hang a proposal off'); process.exit(2); }
-  created.proposalId = prop.id;
-  ok('a submitted build exists to win', prop.title);
+  // The build to win. From the arc when it ran; synthesised otherwise, and SAID either way.
+  let prop: { id: string; title: string } | undefined;
+  if (arc) {
+    [prop] = await sql<{ id: string; title: string }[]>`
+      SELECT id, title FROM proposals WHERE id = ${arc.proposalId}::uuid`;
+    if (!prop) { console.error('  CANT-RUN — the arc journal names a proposal that is gone'); process.exit(2); }
+    ok('CONTINUING THE ARC — this build was ingested, authored, locked and packaged by the product',
+      `${prop.title} (${arc.proposalId.slice(0, 8)})`);
+
+    // ── RE-RUNNABLE, and the reset is PRINTED ───────────────────────────────────────────────
+    // Recording an outcome archives the proposal, and the route then answers 409
+    // ALREADY_ARCHIVED — correct product behaviour, and it makes this drive a one-shot against
+    // any given arc artifact. A drive that can only run once is a drive that stops being run
+    // (this suite's own header says as much), so an already-awarded artifact is rolled back to
+    // the state the arc left it in, out loud, as setup.
+    const [state] = await sql<{ stage: string }[]>`
+      SELECT stage FROM proposals WHERE id = ${arc.proposalId}::uuid`;
+    if (state?.stage === 'archived') {
+      const old = await sql<{ id: string }[]>`
+        SELECT id FROM contracts WHERE proposal_id = ${arc.proposalId}::uuid`;
+      for (const c of old) {
+        await sql`DELETE FROM tasks WHERE entity_id = ${c.id}::uuid AND task_type = 'project_setup'`;
+        await sql`DELETE FROM projects WHERE contract_id = ${c.id}::uuid`;
+      }
+      await sql`DELETE FROM contracts WHERE proposal_id = ${arc.proposalId}::uuid`;
+      await sql`
+        UPDATE proposals SET stage = 'submitted', archived_at = NULL, updated_at = now()
+         WHERE id = ${arc.proposalId}::uuid`;
+      console.log(`  · SETUP: this artifact was already awarded by an earlier run — rolled back to`);
+      console.log(`    'submitted' and removed ${old.length} contract(s) so the award can be driven again.`);
+    }
+  } else {
+    [prop] = await sql<{ id: string; title: string }[]>`
+      INSERT INTO proposals (tenant_id, opportunity_id, title, stage, is_locked)
+      SELECT ${tenantId}::uuid, o.id, ${'E2E award probe ' + process.pid}, 'submitted', false
+        FROM opportunities o ORDER BY o.id LIMIT 1
+      RETURNING id, title`;
+    if (!prop) { console.error('  CANT-RUN — no opportunity to hang a proposal off'); process.exit(2); }
+    created.proposalId = prop.id;   // ours to remove; the arc's is NOT
+    console.log('  · STANDALONE — no arc journal, so the build to win is SYNTHESISED. This proves');
+    console.log('    the post-award half and says nothing about the joint with the pre-award arc.');
+    ok('a submitted build exists to win', prop.title);
+  }
 
   const award = await api(req, 'post', `/api/portal/${TENANT}/proposals/${prop.id}/outcome`,
     { outcome: 'awarded', notes: 'E2E: the customer won.' });
@@ -377,6 +450,14 @@ async function cleanup() {
     }
     if (created.contractId) {
       await sql`DELETE FROM tasks WHERE entity_id = ${created.contractId}::uuid AND task_type = 'project_setup'`;
+      // Delete by the FK, not by the one id this run remembers. The award route UPSERTS one
+      // contract per proposal, so a re-run against the same arc artifact reuses it — and any
+      // project a PREVIOUS run left behind still points at it. Deleting only `created.projectId`
+      // then hitting `projects_contract_id_fkey` is a cleanup that fails on its second run and
+      // reports it as a broken link in the product.
+      const orphans = await sql<{ id: string }[]>`
+        DELETE FROM projects WHERE contract_id = ${created.contractId}::uuid RETURNING id`;
+      if (orphans.length) footprint.push(`${orphans.length} project(s) still on the contract`);
       await sql`DELETE FROM contracts WHERE id = ${created.contractId}::uuid`;
       footprint.push('1 contract + its ToDo');
     }

@@ -992,3 +992,74 @@ Every mutating drive ran between a `pg_dump` and a verified `pg_restore`.
 
 ---
 
+## P4 · The other half of "end to end" — the pre-award arc, and the seam
+
+I drove the post-award arc live and called it end-to-end. It was half of one.
+
+`drive-end-to-end.mjs` runs the first half — *a government PDF nobody wrote for us* → ingest ·
+curate · push · discover · buy · provision · author · lock · package · download — and
+`run-branch-drives.sh` **names it in its own header as the thing the branch drives complement while
+never actually listing it.** It was run by hand or not at all, which is precisely how a drive stops
+being run. And `drive-project-lifecycle.mts` started by INSERTING a submitted proposal with SQL: a
+proposal I invented is not a proposal the product authored and locked, so the joint between the
+halves was never crossed by anything.
+
+### It could not run standalone, and the reason was a credential shadowing itself
+
+Stage 3 died twice on `login?error=invalid`, which reads as a broken purchase flow. It was two
+files disagreeing about one value — for the **fourth** time (B146/B147):
+
+* `run-branch-drives.sh` exports `BUYER_PW="${BUYER_PW:-$TENANT_PW}"`, so inside the suite the buy
+  drive authenticates. `sandbox-env.sh` did not export it at all, so a standalone run — the exact
+  invocation `drive-end-to-end.mjs` documents — fell back to a private literal in
+  `drive-buy-and-build.mjs` that no account has.
+* Worse, and the actual killer: `sandbox-env.sh` exported `LIGHTHOUSE_PW` **twice**. The first,
+  ten lines earlier, pinned it to a literal `LighthouseAdmin`; the second, whose comment says it
+  exists so that "running one suite cannot silently break the other", was therefore a **no-op**.
+  The file shipped `LIGHTHOUSE_PW=LighthouseAdmin` against an account whose password is
+  `TENANT_PW`. The comment described an intent the code did not implement.
+
+One export, one place. Both fixed; the arc then ran green on the first attempt.
+
+### The seam, crossed
+
+`drive-project-lifecycle.mts` now reads the arc's journal and continues from **the build the
+product actually made** — and says which mode it is in, loudly, because a reader has to know
+whether the seam was crossed or stepped over:
+
+```
+✓ CONTINUING THE ARC — this build was ingested, authored, locked and packaged by the product
+```
+
+It is also re-runnable: recording an outcome archives the proposal and the route then answers
+`409 ALREADY_ARCHIVED` — correct product behaviour that made this a one-shot. An already-awarded
+artifact is now rolled back to the state the arc left it in, as printed setup. (Its cleanup had the
+matching bug: it deleted the project it remembered rather than every project on the contract, so
+the second run died on `projects_contract_id_fkey` and reported it as a broken product link.)
+
+### What the joined arc proves
+
+One continuous artifact, from a government PDF to a met milestone:
+
+```
+ingest → curate → push → discover → buy → provision → author → lock → package → download
+       → award → the engine raises a ToDo → a person opens the project → CLINs · WBS · milestones
+       → the baseline freezes ONCE → upload is not acceptance → the milestone closes carrying a
+         real variance → the person closes the ToDo the engine raised
+```
+
+And with the whole arc's history behind it the fabric is properly awake — **12 archetypes, 30
+`tool:agent.invoked` events** in the window: `curator`, `library_seed_suggester`, `research_scout`,
+`packaging_specialist`, `section_drafter`, `pp_matcher`, `cost_estimator`, `proposal_architect`,
+`capture_strategist`, `color_team_reviewer`, `outcome_analyst`, `outcome_tracker`. Against a
+synthesised proposal only two woke. The difference is the point: agents respond to history, and a
+drive that starts from a fixture cannot see them.
+
+`end-to-end` is now registered in the suite, ahead of `project-lifecycle`, so the two run as one
+arc by default: **41 passed · 0 failed · 0 could-not-run**.
+
+The `project` namespace still has **0 consumers** — that gap is unchanged and still printed as a
+number.
+
+---
+

@@ -375,6 +375,13 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   select for what its consumer NEEDS**, not for what is merely nearest: `ORDER BY created_at` picks
   the stable seeded tenant, `ORDER BY slug` picks whatever a fixture just named. And **one
   credential, one place** — `scripts/sandbox-reset-passwords.mjs` is that place.
+- **One credential, ONE export — and check that the second one is not already shadowed.**
+  `scripts/sandbox-reset-passwords.mjs` writes the passwords; `scripts/sandbox-env.sh` resolves
+  them. That file exported `LIGHTHOUSE_PW` TWICE — the first to a literal, which pinned it, so the
+  second (`${LIGHTHOUSE_PW:-$TENANT_PW}`, whose comment says it exists to stop two suites
+  disagreeing) never fired. And `BUYER_PW` was exported only by `run-branch-drives.sh`, so a
+  drive run the way its own header documents fell back to a literal no account has. Both surface
+  as `login?error=invalid`, which reads as a broken product flow. Fourth occurrence (B146/B147).
 - **A preflight that finds a violation must FAIL the run.** `run-branch-drives.sh` printed
   `✗ CROSS-TENANT REFERENCES FOUND — 18 row(s)` and then `39 passed · 0 failed`, exiting 0 (B145).
   Its own header already says a drive that cannot run "is still a FAILURE here — it is uncovered,

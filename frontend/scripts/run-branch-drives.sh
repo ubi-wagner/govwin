@@ -243,6 +243,13 @@ DRIVES=(
   # under every future run. Its self-test counts the world, builds, asserts each piece is real and
   # usable, disposes, and asserts the world is identical again. Validate the instrument, then use it.
   "scenario-factory|scripts/drive-scenario-factory.mts"
+  # The PRE-AWARD arc — a government PDF nobody wrote for us through ingest · curate · push ·
+  # discover · buy · provision · author · lock · package · download. The header at the top of
+  # this file has always named it as the thing these branch drives complement, and it was
+  # never actually in the list: run by hand or not at all, which is how a drive quietly stops
+  # being run. Paired with `project-lifecycle` below it is one continuous artifact, because
+  # that drive reads this one's journal and continues from the build it authored.
+  "end-to-end|scripts/drive-end-to-end.mjs"
   # Needs a real Office engine (see OFFICE_DRIVES). Measures the deck writer's declared node
   # heights against what LibreOffice actually renders — the gap that hid B121, where delivered
   # decks were missing table rows and bullets because the bytes were complete and only the
