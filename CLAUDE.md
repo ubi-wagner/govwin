@@ -478,6 +478,16 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/projects-dates.test.ts`
   guards the idiom across the Projects tree, and any fixture for date code must be a real `Date` —
   a test fed ISO strings passes against the broken code.
+- **`sql.begin` FORWARDS PAST the tenant context — the second way to lose `app.tenant_id`.**
+  `lib/db.ts`'s `sql` is a Proxy and only the tagged-template CALL is routed; `sql.begin` (and
+  `sql.json/array/…`) go straight to the raw pool. A tenant-scoped transaction written as
+  `sql.begin` therefore runs with the GUC unset, RLS matches nothing, and **every statement updates
+  zero rows** — which a compare-and-swap reads as a lost race. That is how `setBaseline` answered
+  `409 "baselined by someone else a moment ago"` on the FIRST call, for a project nobody had
+  baselined, invisibly to five lenses (mocked units · owner-client isolation drive · envelope
+  graders that see a textbook 409). Use `withTenant(tenantId, tx => …)` (`lib/rls.ts`) for a
+  tenant transaction, `sqlBypass` for an admin one. `__tests__/projects-tenant-transactions.test.ts`
+  guards the Projects tree and the portal API.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
   On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).

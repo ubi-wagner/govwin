@@ -18,6 +18,7 @@
  * which code path arrives.
  */
 import { sql, auditLog } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { withEventBracket, emitEventSingle, userActor } from '@/lib/events';
 import { canAssign, canAccessProject, type ProjectActor } from './access';
 import { isoDate } from './dates';
@@ -87,13 +88,19 @@ export async function setBaseline(
         payload: { projectId, name: project.name },
       },
       async () => {
-        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts),
-        // and those files carry NO eslint-disable — the rule is not configured in this project,
-        // so naming it in a disable comment is itself a build error:
-        //   Error: Definition for rule '@typescript-eslint/no-explicit-any' was not found.
-        // postgres.js's TransactionSql type is not callable as a tagged template under this
-        // config, and every transaction in the tree annotates it the same way.
-        const out = await sql.begin(async (tx: any) => {
+        // ── `withTenant`, NOT `sql.begin` — the escape that made the baseline UNSETTABLE ──────
+        // `lib/db.ts`'s `sql` is a Proxy: only the tagged-template CALL is routed through the
+        // tenant context. `sql.begin` forwards straight to the raw `govtech_app` pool, where
+        // `app.tenant_id` is unset — so every statement inside the transaction matched ZERO rows
+        // under RLS, the CAS on `projects` found nothing, and the route answered
+        //     409 "This project was baselined by someone else a moment ago."
+        // on the FIRST attempt, for a project nobody had ever baselined. The unit tests mock the
+        // DB, the isolation lens uses the owner client, and no lens had ever POSTed this route as
+        // a real actor — the end-to-end drive caught it on its first complete run.
+        // `withTenant` is the explicit client `lib/db.ts`'s own header tells you to use here.
+        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts) —
+        // postgres.js's TransactionSql type is not callable as a tagged template under this config.
+        const out = await withTenant(actor.tenantId, async (tx: any) => {
           // NULL → value on every row. The trigger permits exactly this transition; a second call
           // would be value → different and is refused above with a legible message.
           const wbs = await tx`
@@ -246,13 +253,19 @@ export async function rebaseline(
         payload: { projectId, shiftDays, reason },
       },
       async () => {
-        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts),
-        // and those files carry NO eslint-disable — the rule is not configured in this project,
-        // so naming it in a disable comment is itself a build error:
-        //   Error: Definition for rule '@typescript-eslint/no-explicit-any' was not found.
-        // postgres.js's TransactionSql type is not callable as a tagged template under this
-        // config, and every transaction in the tree annotates it the same way.
-        const out = await sql.begin(async (tx: any) => {
+        // ── `withTenant`, NOT `sql.begin` — the escape that made the baseline UNSETTABLE ──────
+        // `lib/db.ts`'s `sql` is a Proxy: only the tagged-template CALL is routed through the
+        // tenant context. `sql.begin` forwards straight to the raw `govtech_app` pool, where
+        // `app.tenant_id` is unset — so every statement inside the transaction matched ZERO rows
+        // under RLS, the CAS on `projects` found nothing, and the route answered
+        //     409 "This project was baselined by someone else a moment ago."
+        // on the FIRST attempt, for a project nobody had ever baselined. The unit tests mock the
+        // DB, the isolation lens uses the owner client, and no lens had ever POSTed this route as
+        // a real actor — the end-to-end drive caught it on its first complete run.
+        // `withTenant` is the explicit client `lib/db.ts`'s own header tells you to use here.
+        // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts) —
+        // postgres.js's TransactionSql type is not callable as a tagged template under this config.
+        const out = await withTenant(actor.tenantId, async (tx: any) => {
           // ONLY the planned_* columns. The baseline_* columns are not in this statement at all —
           // and if a future edit added them, the trigger would refuse the write rather than let it
           // through quietly.

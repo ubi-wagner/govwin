@@ -32,17 +32,17 @@ WHY NOT AUTO-CREATE, WHICH IS THE OBVIOUS THING TO DO:
     did.* An auto-created project would look exactly like a sourced one.
 
 STEPS:
-    1. todo_setup_project (TODO)
-       Raises a `project_setup` task for tenant_admin against the contract.
-       10-day timeout: award-to-kickoff is measured in weeks, not hours, and a
-       gate that expires before the work is plausible is a gate that trains
-       people to ignore it.
+    1. notify_project_setup (NOTIFY)
+       template=project_setup_ready. FIRST, deliberately: step 2 PARKS the
+       instance, and the engine runs steps in order — so a notification placed
+       after the gate is queued behind the gate it announces. Tell them, then
+       park.
 
-    2. notify_project_setup (NOTIFY)
-       template=project_setup_ready. INDEPENDENT (no depends_on) — a failed
-       notification must not leave the ToDo unraised, and a failed ToDo must not
-       leave the admin uninformed. Either one alone still lands the customer in
-       the right place.
+    2. todo_setup_project (TODO)
+       Raises a `project_setup` task for tenant_admin against the contract, and
+       parks the instance until a human completes it. 10-day timeout:
+       award-to-kickoff is measured in weeks, not hours, and a gate that expires
+       before the work is plausible is a gate that trains people to ignore it.
 
 HITL GATES:
     - The whole workflow IS the gate. Nothing downstream advances until a human
@@ -87,24 +87,16 @@ class OnContractStarted(Workflow):
     )
 
     steps = [
-        # The gate. A person opens the workspace and uploads the executed contract and the
-        # as-submitted proposal; nothing about the project is real until they do.
-        Step(
-            name="todo_setup_project",
-            step_type=StepType.TODO,
-            action="todo",
-            task_type='"project_setup"',
-            task_title='"Set up project"',
-            assignee_role='"tenant_admin"',
-            entity_type='"contract"',
-            entity_ref="payload.contractId",
-            # Ten days. Award-to-kickoff is measured in weeks; a gate that expires before the work
-            # is plausible is a gate people learn to ignore.
-            timeout_minutes=14400,
-        ),
-        # INDEPENDENT of the ToDo, deliberately. A failed notification must not leave the ToDo
-        # unraised, and a failed ToDo must not leave the admin uninformed — either one alone still
-        # lands the customer in the right place.
+        # FIRST, and that ordering is the whole point.
+        #
+        # A TODO step PARKS the instance (manager.py: status='paused' until a human completes it),
+        # and the engine runs steps in order — so a NOTIFY placed after the gate is queued BEHIND
+        # the gate it announces. This file used to claim the two were "INDEPENDENT"; they were not,
+        # and the end-to-end drive caught it: the instance reached `paused` with the notification
+        # never attempted, so the customer would have been told they had won only after they had
+        # already found out and done the setup themselves.
+        #
+        # Tell them, then park.
         Step(
             name="notify_project_setup",
             step_type=StepType.NOTIFY,
@@ -117,5 +109,21 @@ class OnContractStarted(Workflow):
                 "proposal_id": "payload.proposalId",
                 "title": "payload.title",
             },
+        ),
+        # THEN the gate, which parks the instance until a person acts. They open the project and
+        # upload the executed contract and the as-submitted proposal; nothing about the project is
+        # real until they do.
+        Step(
+            name="todo_setup_project",
+            step_type=StepType.TODO,
+            action="todo",
+            task_type='"project_setup"',
+            task_title='"Set up project"',
+            assignee_role='"tenant_admin"',
+            entity_type='"contract"',
+            entity_ref="payload.contractId",
+            # Ten days. Award-to-kickoff is measured in weeks; a gate that expires before the work
+            # is plausible is a gate people learn to ignore.
+            timeout_minutes=14400,
         ),
     ]

@@ -36,6 +36,22 @@ const { db } = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/db', () => ({ sql: db.sqlMock, auditLog: vi.fn(async () => {}) }));
+/**
+ * `withTenant` is mocked to hand the fake `tx` straight through.
+ *
+ * The real one runs `SELECT set_config('app.tenant_id', …)` as its first statement, which this
+ * harness's queued-results model would consume as if it were the first business query — shifting
+ * every result by one and failing a test about something else entirely. That is a coupling to
+ * plumbing, not to behaviour.
+ *
+ * The plumbing has its own proof, twice over: `__tests__/projects-tenant-transactions.test.ts`
+ * fails if this module ever reaches for `sql.begin` again, and
+ * `scripts/drive-project-lifecycle.mts` sets a baseline through the real route against a live
+ * database with RLS on — which is what caught the escape in the first place.
+ */
+vi.mock('@/lib/rls', () => ({
+  withTenant: async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => fn(db.sqlMock),
+}));
 vi.mock('@/lib/events', () => ({
   withEventBracket: async (
     _p: unknown,

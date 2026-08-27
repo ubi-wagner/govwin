@@ -800,3 +800,111 @@ instrument-before-the-finding rule earning its keep:
 
 ---
 
+## P2 · The end-to-end drive — HITL, agents, automation, live
+
+**Shipped:** `frontend/scripts/drive-project-lifecycle.mts` (44 assertions across 10 phases),
+`__tests__/projects-tenant-transactions.test.ts`, and fixes in `lib/projects/baseline.ts`,
+`pipeline/src/workflows/on_contract_started.py` and the proposal-outcome route.
+
+Every lens in this repo asks about a surface at rest. None asks the only question a customer has:
+**does the thing happen.** An award is recorded — is there a task in someone's queue? Does the
+Python engine, a separate process polling a shared table, notice? Does the baseline freeze? Does
+acceptance close a milestone? Does the variance survive into the record a person reads months later?
+
+That chain crosses three runtimes, two trust boundaries and one human gate. It found three defects
+on its first complete run, and **each one had been green in every lens.**
+
+### 1 · The baseline could not be set. At all.
+
+```
+POST …/projects/<id>/baseline
+409  "This project was baselined by someone else a moment ago."
+```
+
+— on the FIRST attempt, for a project nobody had ever baselined.
+
+`lib/db.ts`'s `sql` is a Proxy, and its own header says only the tagged-template CALL is routed
+through the tenant context: *"`sql.json/array/begin/…` forward to rawSql. So … `sql.begin` routes
+must use an explicit client."* `baseline.ts` used `sql.begin`. It ran on the raw `govtech_app` pool
+with `app.tenant_id` **unset**, so RLS matched nothing, every statement in the transaction updated
+zero rows, and the compare-and-swap on `projects` read its empty result as a lost race.
+
+Why nothing saw it: the unit tests mock the database; `verify-project-isolation` drives the tables
+with the OWNER client, which is not subject to the policy; `verify-api-contract` grades envelopes
+and a 409 carrying `{error, code}` is textbook; `verify-write-contract` asserts precisely that a
+client error answers 4xx with both fields. Five green lenses over a capability whose central
+operation was impossible.
+
+This is the same family as the `enterWith`-across-an-`await` defect one commit earlier — a tenant
+context that looks present and is not — by a completely different mechanism. `withTenant` fixes it;
+`__tests__/projects-tenant-transactions.test.ts` fails on `sql.begin(` anywhere in the Projects tree
+or the portal API. Red-first against `HEAD`: it fires on `baseline.ts` and is clean on the fix.
+
+### 2 · The notification was queued behind the gate it announces
+
+`OnContractStarted` declared its two steps as TODO-then-NOTIFY and its docstring called them
+"INDEPENDENT — a failed ToDo must not leave the admin uninformed."
+
+They are not independent. **A TODO step PARKS the instance** (`manager.py`: `status='paused'` until
+a human completes it) and the engine runs steps in order, so the NOTIFY never ran:
+
+```
+created process instance … for workflow OnContractStarted
+[_create_task] … (project_setup) … step todo_setup_project
+workflow instance … finished with status=paused          ← notify never attempted
+```
+
+The customer would have been told they had won **after** they had already found out and done the
+setup themselves. Reordered: tell them, then park. The docstring now describes what happens rather
+than what was intended.
+
+### 3 · …and it would have been sent with no tenant
+
+The same NOTIFY step maps `tenant_id: payload.tenantId`, and the emitter's payload never had one —
+`tenantId` is a column on the event row, and `processor.resolve_input` understands only
+`payload.*` / `result.*` / `step.*.result.*`. It cannot reach the event's own columns. So the
+notification would have dispatched with a null tenant and the CRM would have had nobody to mail.
+Fixed at the emitter, where the workflow can actually see it.
+
+Both now verified live: `system:notification.requested` fires with
+`template=project_setup_ready` and a real `tenant_id`.
+
+### What the drive proves, and what it refuses to claim
+
+```
+✓ a person records outcome=awarded through the real route
+✓ a contract entity appears · capture:contract.started reaches the event table
+✓ the engine (separate process) creates the instance and raises a ToDo for tenant_admin
+✓ the NOTIFY reports an outcome rather than vanishing
+✓ the project opens · both anchor artifacts upload · a CLIN is entered WITH a citation
+✓ the citation is recorded as provenance, not dropped
+✓ a child WBS node inherits its CLIN · the baseline freezes 2 nodes and 1 milestone
+✓ a SECOND baseline is refused, naming a real ISO date
+✓ project:baseline.set opens a bracket AND closes it, carrying what was frozen
+✓ the milestone REFUSES to close while its deliverable is unaccepted
+✓ acceptance closes it, and milestone.met carries varianceDays = -45 — a number, not a null
+✓ the rollup reads 100% deliverables and a MEASURED zero cost
+✓ the human closes the ToDo the engine raised
+✓ the award woke outcome_tracker and outcome_analyst (4 tool:agent.invoked)
+✓ a second tenant lists 0 of our projects and is refused 404 at our id
+```
+
+**STATED GAP: 0 workflow templates and 0 agents consume the `project` namespace.** Its events are
+emitted, bracketed and readable; the award side of the bridge is wired and the post-award side is
+not. The drive prints that as a number so it cannot pass for coverage.
+
+The CRM service is not running in this sandbox, so `notification.requested` is proven and the
+send itself is not — that consumer is `rfp-crm`, and this drive stops at the boundary it can see.
+
+### Three of the drive's own findings were the drive's fault
+
+Recorded because the instrument-before-the-finding rule is the only reason they were not filed as
+product defects: `process_instances.template_name` is `workflow_name`; `agent_task_queue` has
+`agent_role`, not `archetype`; and — the interesting one — a `withEventBracket` end event carries
+the RESULT as its payload and correlates to its start by `parent_event_id`, so filtering both
+phases on `payload->>'projectId'` reported **"1 start / 0 end"**, a bracket that looked unclosed and
+was not. An agent probe that reads only `agent_task_queue` also reports "no agents" for a run in
+which an agent did work, because a declarative `AI_INVOKE` runs INLINE in the engine.
+
+---
+
