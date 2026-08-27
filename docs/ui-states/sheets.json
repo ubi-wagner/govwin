@@ -2,7 +2,7 @@
  {
   "lane": "panel",
   "part": 1,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-1.png",
   "routes": [
    "/admin/command",
@@ -26,7 +26,7 @@
  {
   "lane": "panel",
   "part": 2,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-2.png",
   "routes": [
    "/admin/events",
@@ -37,22 +37,26 @@
    "/admin/pipeline",
    "/admin/pipeline",
    "/admin/pipeline",
+   "/admin/pipeline",
    "/admin/process",
    "/admin/process",
-   "/admin/processes",
-   "/admin/processes",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation",
-   "/admin/rfp-curation"
+   "/admin/process",
+   "/admin/process",
+   "/admin/process",
+   "/admin/process",
+   "/admin/processes"
   ]
  },
  {
   "lane": "panel",
   "part": 3,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-3.png",
   "routes": [
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
+   "/admin/rfp-curation",
    "/admin/rfp-curation",
    "/admin/rfp-curation",
    "/admin/rfp-curation",
@@ -64,19 +68,19 @@
    "/admin/site/docs/[type]/[slug]",
    "/admin/site/docs/[type]/[slug]",
    "/admin/site/docs/[type]/[slug]",
-   "/admin/sources",
-   "/admin/sources",
-   "/admin/sources",
-   "/admin/sources",
-   "/admin/sources/[profileId]"
+   "/admin/sources"
   ]
  },
  {
   "lane": "panel",
   "part": 4,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-4.png",
   "routes": [
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources",
+   "/admin/sources/[profileId]",
    "/admin/sources/[profileId]",
    "/admin/storage",
    "/admin/storage",
@@ -88,24 +92,20 @@
    "/admin/template-stable",
    "/admin/template-stable",
    "/admin/template-stable",
-   "/admin/template-stable",
-   "/admin/template-stable",
-   "/admin/template-stable",
-   "/admin/templates",
-   "/admin/templates/[templateId]/edit"
+   "/admin/template-stable"
   ]
  },
  {
   "lane": "panel",
   "part": 5,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-5.png",
   "routes": [
+   "/admin/template-stable",
+   "/admin/template-stable",
+   "/admin/templates",
    "/admin/templates/[templateId]/edit",
-   "/admin/workflows",
-   "/admin/workflows",
-   "/admin/workflows",
-   "/admin/workflows",
+   "/admin/templates/[templateId]/edit",
    "/admin/workflows",
    "/partner",
    "/portal/[tenantSlug]/activity",
@@ -122,7 +122,7 @@
  {
   "lane": "panel",
   "part": 6,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-6.png",
   "routes": [
    "/portal/[tenantSlug]/activity",
@@ -146,7 +146,7 @@
  {
   "lane": "panel",
   "part": 7,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-7.png",
   "routes": [
    "/portal/[tenantSlug]/buckets",
@@ -170,7 +170,7 @@
  {
   "lane": "panel",
   "part": 8,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-8.png",
   "routes": [
    "/portal/[tenantSlug]/cards",
@@ -194,7 +194,7 @@
  {
   "lane": "panel",
   "part": 9,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-9.png",
   "routes": [
    "/portal/[tenantSlug]/library/foundation/[foundationId]",
@@ -218,7 +218,7 @@
  {
   "lane": "panel",
   "part": 10,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-10.png",
   "routes": [
    "/portal/[tenantSlug]/processes",
@@ -229,10 +229,10 @@
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/processes",
-   "/portal/[tenantSlug]/processes",
-   "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
    "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]",
@@ -242,11 +242,9 @@
  {
   "lane": "panel",
   "part": 11,
-  "parts": 12,
+  "parts": 11,
   "file": "states-panel-11.png",
   "routes": [
-   "/portal/[tenantSlug]/proposals/[proposalId]",
-   "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
@@ -260,15 +258,7 @@
    "/portal/[tenantSlug]/todos",
    "/portal/[tenantSlug]/todos",
    "/portal/[tenantSlug]/todos",
-   "/portal/[tenantSlug]/vaults/[vaultId]"
-  ]
- },
- {
-  "lane": "panel",
-  "part": 12,
-  "parts": 12,
-  "file": "states-panel-12.png",
-  "routes": [
+   "/portal/[tenantSlug]/vaults/[vaultId]",
    "/resources",
    "/resources"
   ]
@@ -376,6 +366,32 @@
   ]
  },
  {
+  "lane": "validation",
+  "part": 1,
+  "parts": 1,
+  "file": "states-validation-1.png",
+  "routes": [
+   "/admin/documents",
+   "/admin/tenants",
+   "/portal/[tenantSlug]/manage",
+   "/portal/[tenantSlug]/manage"
+  ]
+ },
+ {
+  "lane": "confirm",
+  "part": 1,
+  "parts": 1,
+  "file": "states-confirm-1.png",
+  "routes": [
+   "/admin/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/processes",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team",
+   "/portal/[tenantSlug]/team"
+  ]
+ },
+ {
   "lane": "toast",
   "part": 1,
   "parts": 2,
@@ -396,7 +412,7 @@
    "/admin/site/docs/[type]/[slug]",
    "/admin/site/docs/[type]/[slug]",
    "/admin/site/docs/[type]/[slug]",
-   "/portal/[tenantSlug]/delivery/[projectId]"
+   "/portal/[tenantSlug]/projects/[projectId]"
   ]
  },
  {
@@ -405,7 +421,7 @@
   "parts": 2,
   "file": "states-toast-2.png",
   "routes": [
-   "/portal/[tenantSlug]/delivery/[projectId]",
+   "/portal/[tenantSlug]/projects/[projectId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
@@ -413,31 +429,6 @@
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/templates",
    "/portal/[tenantSlug]/templates"
-  ]
- },
- {
-  "lane": "validation",
-  "part": 1,
-  "parts": 1,
-  "file": "states-validation-1.png",
-  "routes": [
-   "/admin/documents",
-   "/admin/tenants",
-   "/portal/[tenantSlug]/manage",
-   "/portal/[tenantSlug]/manage"
-  ]
- },
- {
-  "lane": "confirm",
-  "part": 1,
-  "parts": 1,
-  "file": "states-confirm-1.png",
-  "routes": [
-   "/portal/[tenantSlug]/processes",
-   "/portal/[tenantSlug]/processes",
-   "/portal/[tenantSlug]/team",
-   "/portal/[tenantSlug]/team",
-   "/portal/[tenantSlug]/team"
   ]
  }
 ]

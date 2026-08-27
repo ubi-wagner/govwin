@@ -773,7 +773,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
@@ -800,7 +800,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
@@ -823,11 +823,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 200,
+    "buttons": 193,
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 20260,
+    "text": 20669,
     "h1": "Foundation"
    },
    "declared": {
@@ -854,7 +854,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 1847,
+    "text": 1849,
     "h1": "Foundation"
    },
    "declared": {
@@ -881,7 +881,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5062,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -908,7 +908,7 @@
     "links": 21,
     "inputs": 12,
     "forms": 0,
-    "text": 3234,
+    "text": 3236,
     "h1": "Foundation"
    },
    "declared": {
@@ -935,7 +935,7 @@
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 1235,
+    "text": 1237,
     "h1": "Foundation"
    },
    "declared": {
@@ -962,7 +962,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 668,
+    "text": 670,
     "h1": "Foundation"
    },
    "declared": {
@@ -989,7 +989,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2936,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -1016,7 +1016,7 @@
     "links": 31,
     "inputs": 3,
     "forms": 0,
-    "text": 3130,
+    "text": 3131,
     "h1": "Foundation"
    },
    "declared": {
@@ -1043,7 +1043,7 @@
     "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 534,
+    "text": 536,
     "h1": "Foundation"
    },
    "declared": {
@@ -1070,7 +1070,7 @@
     "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 468,
+    "text": 470,
     "h1": "Foundation"
    },
    "declared": {
@@ -1097,67 +1097,13 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 6,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/delivery/[projectId]",
-   "url": "/portal/foundation/delivery/32f2c56a-7cd1-44cc-a497-65babfe8b5a5",
-   "file": "tenant__portal-tenantSlug-delivery-projectId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/delivery/32f2c56a-7cd1-44cc-a497-65babfe8b5a5",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 7,
-    "links": 22,
-    "inputs": 3,
-    "forms": 0,
-    "text": 1355,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/delivery",
-   "url": "/portal/foundation/delivery",
-   "file": "tenant__portal-tenantSlug-delivery.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/delivery",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 23,
-    "inputs": 0,
-    "forms": 0,
-    "text": 479,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -1178,7 +1124,7 @@
     "links": 23,
     "inputs": 2,
     "forms": 0,
-    "text": 944,
+    "text": 946,
     "h1": "Foundation"
    },
    "declared": {
@@ -1205,7 +1151,7 @@
     "links": 186,
     "inputs": 0,
     "forms": 0,
-    "text": 14524,
+    "text": 14526,
     "h1": "Foundation"
    },
    "declared": {
@@ -1232,7 +1178,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5062,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -1259,7 +1205,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5062,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -1286,7 +1232,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5062,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -1313,7 +1259,7 @@
     "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 749,
+    "text": 751,
     "h1": "Foundation"
    },
    "declared": {
@@ -1340,7 +1286,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
@@ -1367,7 +1313,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2936,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -1394,7 +1340,7 @@
     "links": 22,
     "inputs": 35,
     "forms": 0,
-    "text": 1816,
+    "text": 1818,
     "h1": "Foundation"
    },
    "declared": {
@@ -1421,7 +1367,7 @@
     "links": 37,
     "inputs": 0,
     "forms": 0,
-    "text": 1018,
+    "text": 1020,
     "h1": "Foundation"
    },
    "declared": {
@@ -1444,11 +1390,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 71,
+    "buttons": 75,
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 2811,
+    "text": 2961,
     "h1": "Foundation"
    },
    "declared": {
@@ -1475,13 +1421,67 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 831,
+    "text": 832,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects/[projectId]",
+   "url": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "file": "tenant__portal-tenantSlug-projects-projectId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 7,
+    "links": 22,
+    "inputs": 3,
+    "forms": 0,
+    "text": 1357,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects",
+   "url": "/portal/foundation/projects",
+   "file": "tenant__portal-tenantSlug-projects.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 411,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -1502,7 +1502,7 @@
     "links": 21,
     "inputs": 7,
     "forms": 1,
-    "text": 34026,
+    "text": 34028,
     "h1": "Foundation"
    },
    "declared": {
@@ -1529,7 +1529,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 2291,
+    "text": 2293,
     "h1": "Foundation"
    },
    "declared": {
@@ -1556,7 +1556,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 1078,
+    "text": 1080,
     "h1": "Foundation"
    },
    "declared": {
@@ -1583,7 +1583,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2936,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -1610,7 +1610,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2936,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -1637,7 +1637,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 1,
-    "text": 1191,
+    "text": 1193,
     "h1": "Foundation"
    },
    "declared": {
@@ -1664,7 +1664,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 3065,
+    "text": 3067,
     "h1": "Foundation"
    },
    "declared": {
@@ -1691,7 +1691,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 1219,
+    "text": 1221,
     "h1": "Foundation"
    },
    "declared": {
@@ -1718,7 +1718,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 627,
+    "text": 629,
     "h1": "Foundation"
    },
    "declared": {
@@ -1745,7 +1745,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
@@ -1772,7 +1772,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 923,
+    "text": 925,
     "h1": "Foundation"
    },
    "declared": {
@@ -2069,7 +2069,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 1566,
+    "text": 1565,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2096,7 +2096,7 @@
     "links": 31,
     "inputs": 3,
     "forms": 0,
-    "text": 1704,
+    "text": 1703,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2184,33 +2184,6 @@
     "buttons": 0,
     "inputs": 0,
     "links": 6,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/delivery",
-   "url": "/portal/immobileyes/delivery",
-   "file": "tenant2__portal-tenantSlug-delivery.png",
-   "status": 200,
-   "finalUrl": "/portal/immobileyes/delivery",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 21,
-    "inputs": 0,
-    "forms": 0,
-    "text": 534,
-    "h1": "Immobileyes Inc."
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -2447,7 +2420,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 1566,
+    "text": 1565,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2528,13 +2501,40 @@
     "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 1494,
+    "text": 1493,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/projects",
+   "url": "/portal/immobileyes/projects",
+   "file": "tenant2__portal-tenantSlug-projects.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/projects",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 532,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -2636,7 +2636,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 1566,
+    "text": 1565,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2663,7 +2663,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 1566,
+    "text": 1565,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2879,7 +2879,7 @@
     "links": 41,
     "inputs": 8,
     "forms": 0,
-    "text": 13833,
+    "text": 13871,
     "h1": "AI Tools & Agents"
    },
    "declared": {
@@ -2889,10 +2889,8 @@
     "forms": 0,
     "handlers": 0
    },
-   "ok": false,
-   "errors": [
-    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-mi"
-   ]
+   "ok": true,
+   "errors": []
   },
   {
    "lane": "admin",
@@ -2904,11 +2902,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 33,
+    "buttons": 39,
     "links": 49,
     "inputs": 0,
     "forms": 0,
-    "text": 3513,
+    "text": 3868,
     "h1": "Analytics"
    },
    "declared": {
@@ -3151,7 +3149,7 @@
     "links": 69,
     "inputs": 0,
     "forms": 0,
-    "text": 4017,
+    "text": 3908,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -3201,11 +3199,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 259,
+    "buttons": 449,
     "links": 52,
     "inputs": 3,
     "forms": 1,
-    "text": 39463,
+    "text": 68730,
     "h1": "Event Stream"
    },
    "declared": {
@@ -3340,7 +3338,7 @@
     "links": 69,
     "inputs": 0,
     "forms": 0,
-    "text": 4029,
+    "text": 3920,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -3367,7 +3365,7 @@
     "links": 51,
     "inputs": 0,
     "forms": 0,
-    "text": 2098,
+    "text": 2128,
     "h1": "Pipeline Monitor"
    },
    "declared": {
@@ -3394,7 +3392,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 3844,
+    "text": 4515,
     "h1": "Process Monitor"
    },
    "declared": {
@@ -3525,11 +3523,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 12,
+    "buttons": 14,
     "links": 54,
     "inputs": 3,
     "forms": 0,
-    "text": 1778,
+    "text": 1880,
     "h1": "Purchases"
    },
    "declared": {
@@ -3745,7 +3743,7 @@
     "links": 98,
     "inputs": 0,
     "forms": 0,
-    "text": 4274,
+    "text": 4281,
     "h1": "Site Content"
    },
    "declared": {
@@ -3853,7 +3851,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 10079,
+    "text": 10424,
     "h1": "System Health"
    },
    "declared": {
@@ -3880,7 +3878,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 2214,
+    "text": 2222,
     "h1": "System State"
    },
    "declared": {
@@ -3988,7 +3986,7 @@
     "links": 56,
     "inputs": 3,
     "forms": 0,
-    "text": 3358,
+    "text": 3250,
     "h1": "Foundation"
    },
    "declared": {
@@ -4065,11 +4063,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 16,
+    "buttons": 21,
     "links": 63,
     "inputs": 20,
     "forms": 3,
-    "text": 3129,
+    "text": 3526,
     "h1": "Workflow Monitor"
    },
    "declared": {
@@ -4148,11 +4146,11 @@
   "/portal/[tenantSlug]/vaults/[vaultId]": [
    "tenant: no [vaultId]"
   ],
-  "/portal/[tenantSlug]/delivery/[projectId]": [
-   "tenant2: no [projectId]"
-  ],
   "/portal/[tenantSlug]/portals/[portalId]": [
    "tenant2: no [portalId]"
+  ],
+  "/portal/[tenantSlug]/projects/[projectId]": [
+   "tenant2: no [projectId]"
   ],
   "/admin/documents/[documentId]": [
    "admin: no [documentId]"

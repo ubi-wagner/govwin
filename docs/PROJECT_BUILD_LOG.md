@@ -908,3 +908,87 @@ which an agent did work, because a declarative `AI_INVOKE` runs INLINE in the en
 
 ---
 
+## P3 · Every lens on the renamed tree — and the intermittent, explained
+
+The rename touched 8 tables, 20 route handlers, 13 modules and every doc, so the whole instrument
+set ran again. It also finally cornered the React #418 that had been recorded twice as
+*"observed, unreproduced."*
+
+### The partner console re-provisioned its own org on every render
+
+`/partner` threw `Minified React error #418` for the third time — the second on that route — during
+a 153-page atlas sweep. Two facts, measured rather than guessed, closed it:
+
+* the Entrepreneurs' Center org held **0 spotlight buckets** and had **12
+  `finder:tenant.provisioned` events in two hours**;
+* two of those events were **three seconds apart, from one page load**.
+
+`ensurePartnerOwnOrgProvisioned` runs on every `/partner` render and is meant to no-op after the
+first. Its gate was *"does this org have zero spotlight buckets"* — a fair proxy back when a new org
+was seeded with buckets. **#189 removed seeded buckets**, because a bucket is the customer's own
+ranking lens and the product imposes none. Nothing in this file changed. The condition simply became
+permanently true, and every render re-ran `backfillTenant` + `scoreTenantCards` +
+`copyStarterSetToTenant` + `backfillTenantTemplates` — four write-heavy operations — and emitted an
+event asserting a first-time act that had already happened.
+
+A server component that MUTATES during render is the textbook cause of a hydration mismatch: Next
+renders the page twice (the HTML pass and the RSC pass), and the second pass saw state the first had
+just written. Which is exactly what the two events three seconds apart show.
+
+The gate now reads the **record of the act** — the `tenant.provisioned` event the function itself
+writes. After the fix: **153 shots, 153 clean, 0 broken**, and no `tenant.provisioned` event fired
+during the sweep at all.
+
+> **The rule this leaves behind:** a gate that infers *"have we done X"* from a side effect ANOTHER
+> feature owns is a gate that another team can switch off without touching this code. Gate on the
+> record of the act. `__tests__/partner-own-org-gate.test.ts` asserts both the behaviour and the
+> shape — it must read `tenant.provisioned`, and it must NOT read `tenant_spotlight_buckets`.
+
+I have not reproduced #418 on a dev build where React names the component, so the causal link is
+strong and circumstantial rather than proven: the write-on-render was real and is gone, the route
+was broken and is clean, and the events stopped. If it recurs, a dev-build capture is the next step.
+
+### And the branch suite disagreed with itself depending on whether the engine was running
+
+`scenario-factory` failed the full suite with `LEAKED: instances 178→179`. The leaked row was an
+`OnSourceChangeDetected` instance at PLATFORM scope — nothing to do with the factory, which had
+disposed its own 6,164 rows cleanly. Stopping the workflow engine and re-running the identical
+drive made it pass; restarting the engine made it fail again.
+
+**A global `count(*) FROM process_instances` is not a property this drive controls.** The engine is
+a separate process polling the same table, and in production it is always running — so the check
+was measuring the box. It is now scoped to `tenant_id IS NOT NULL`, and platform-scope drift is
+PRINTED rather than asserted, because it is information the reader wants and not a leak the drive
+caused.
+
+(The fix's own first version broke the suite differently — a backtick inside a SQL comment inside a
+JS tagged template closes the template. Second occurrence this session.)
+
+### The pass
+
+| instrument | result |
+|---|---|
+| `verify-surfaces` | 80/80 clean · 0 broken |
+| `verify-api-contract` | 139 GETs · 119 graded · 0 no-actor · reachability clean |
+| `verify-write-contract` | 225/225 called |
+| `verify-ui-vs-db` | every number matches, Projects block included |
+| `verify-db-crud` | green, fixture restored |
+| `verify-project-isolation` · `verify-project-rollup` | 13 + 9 assertions |
+| `verify-email-ledger-rls` | 8 assertions |
+| `check-rls-posture` | 67 policies · 44 force-RLS · 53 tables partition cleanly |
+| `audit-automation-spine` | 0 dead triggers · 0 dead waits · 0 unclosed brackets · 119 actions resolve |
+| `reconcile-capability` | UNSURFACED still the pre-existing 6 — no Projects route among them |
+| `capture-ui-atlas` | **153 shots · 153 clean · 0 broken** |
+| `drive-ui-states` | **272 states · 126 routes · 6 lanes** · 2 navigation aborts, reported |
+| `run-branch-drives.sh` | **40 passed · 0 failed · 0 could-not-run** (incl. the new `project-lifecycle`) |
+| build | `tsc` 0 · vitest **216 files / 2,143** · `next build` 0 |
+
+The agent fabric was visibly alive throughout the states sweep — `opportunity_analyst` ×10,
+`scoring_strategist` ×10, plus `formatter`, `compliance_reviewer`, `packaging_specialist` and
+`redaction_guard` — which is the "agents" half of end-to-end exercised through the UI rather than
+asserted from a registry.
+
+Every mutating drive ran between a `pg_dump` and a verified `pg_restore`.
+
+---
+

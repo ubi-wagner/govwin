@@ -229,7 +229,7 @@ async function finish() {
       + 'fixture-only, now removed.');
   }
   console.log();
-  if (bad === 0) console.log('✓ Delivery isolation holds, and the baseline refuses to move.');
+  if (bad === 0) console.log('✓ Project isolation holds, and the baseline refuses to move.');
   else console.error(`✗ ${bad} claim(s) in migration 216 do not hold on this database.`);
   await app.end(); await owner.end();
   process.exit(bad === 0 ? 0 : 1);

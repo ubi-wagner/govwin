@@ -279,100 +279,100 @@
    "nearMiss": false
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/baseline",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
    "methods": [
     "GET",
     "PATCH",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/clins",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts",
    "methods": [
     "GET",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts",
    "methods": [
     "GET",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/documents",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts",
    "methods": [
     "GET",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call listSourceDocuments())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
    "methods": [
     "GET",
     "PATCH",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/rollup",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts",
    "methods": [
     "GET"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/wbs",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts",
    "methods": [
     "GET",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects",
-   "file": "app/api/portal/[tenantSlug]/delivery/projects/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects",
+   "file": "app/api/portal/[tenantSlug]/projects/route.ts",
    "methods": [
     "GET",
     "POST"
    ],
    "reason": null,
-   "duplicatedBy": "app/portal/[tenantSlug]/delivery/page.tsx",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
    "nearMiss": true
   },
   {
@@ -549,7 +549,7 @@
  ],
  "tailCalled": [
   {
-   "route": "/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
    "tail": "/deliverables/:p"
   },
   {

@@ -35,7 +35,17 @@ async function census() {
            (SELECT count(*)::int FROM proposal_compliance_matrix) AS matrix,
            (SELECT count(*)::int FROM proposal_collaborators)     AS collaborators,
            (SELECT count(*)::int FROM tasks)                      AS tasks,
-           (SELECT count(*)::int FROM process_instances)          AS instances,
+           -- TENANT-SCOPED only. A global count of process_instances is not a property this
+           -- factory controls: the workflow engine is a separate process polling the same table,
+           -- and it creates PLATFORM-scope instances (tenant_id IS NULL) in response to whatever
+           -- else the box is doing. With the engine running this drive failed on
+           --     LEAKED: instances 178→179
+           -- for an OnSourceChangeDetected row that had nothing to do with the factory; with the
+           -- engine stopped, the identical run passed. The check was measuring the box.
+           --
+           -- Platform drift is still REPORTED below — as a note, because it is information, not a
+           -- leak this drive caused.
+           (SELECT count(*)::int FROM process_instances WHERE tenant_id IS NOT NULL) AS instances,
            (SELECT count(*)::int FROM library_atoms)              AS atoms`;
   return r;
 }
@@ -108,6 +118,14 @@ async function main() {
   const leaked = diff(before, after);
   A('the world is exactly as it was found', leaked.length === 0,
     leaked.length ? `LEAKED: ${leaked.join(', ')}` : 'no residue');
+
+  // The platform half, reported and never asserted. If the engine did something while this ran,
+  // say so — silence would leave a reader wondering whether the tenant-scoped clean is the whole
+  // story. It is not; it is the half this drive is responsible for.
+  const [{ n: platformNow }] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM process_instances WHERE tenant_id IS NULL`;
+  console.log(`  · platform-scope process_instances now: ${platformNow} `
+    + '(engine-owned, not this drive\'s — reported, not asserted)');
 
   if (!built) A('scenario built at all', false);
   console.log(`\n${ok ? '✅ the factory builds and disposes cleanly' : '❌ FAILURES ABOVE'}\n`);

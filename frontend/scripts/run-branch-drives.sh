@@ -249,6 +249,11 @@ DRIVES=(
   # rendered page was not.
   "deck-overlap|scripts/probe-deck-overlap.mts"
   "award-to-contract|scripts/drive-award-to-contract.mts"
+  # The post-award branch, all the way through: award → the engine raises a ToDo → a human
+  # opens the project → CLINs/WBS/milestones → the baseline freezes ONCE → upload is not
+  # acceptance → the milestone closes and its variance survives into the event record. It is
+  # the drive that caught a baseline nobody could set, behind five green lenses.
+  "project-lifecycle|scripts/drive-project-lifecycle.mts"
   # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
   # table reported as a failing amendment flow rather than a missing argument. Resolved below.
   "amendment|scripts/drive-amendment.mjs|SOLICITATION"

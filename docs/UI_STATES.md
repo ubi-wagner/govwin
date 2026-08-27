@@ -18,13 +18,13 @@ list, an expander reveals a row, a card selects and swaps the pane beside it.
 
 | state | captured | what it is |
 |---|---:|---|
-| `panel` | 178 | a tab, filter, expander or card selection that replaced the main panel |
+| `panel` | 176 | a tab, filter, expander or card selection that replaced the main panel |
 | `open` | 39 | an overlay as it first appears |
 | `toast` | 24 | whatever the toast bus published |
 | `filled` | 23 | every field populated (never submitted — that would be a create) |
-| `confirm` | 5 | a native confirm()/prompt() intercepted, recorded and DISMISSED |
+| `confirm` | 6 | a native confirm()/prompt() intercepted, recorded and DISMISSED |
 | `validation` | 4 | the primary submit pressed with the form EMPTY |
-| **total** | **273** | across **126 routes** driven, in **5 lanes** (anon 2 · tenant 94 · tenant2 79 · admin 97 · partner 1) |
+| **total** | **272** | across **126 routes** driven, in **5 lanes** (anon 2 · tenant 92 · tenant2 79 · admin 98 · partner 1) |
 
 Plus **52** viewport captures (phone 390 · tablet 820 · desktop 1440), including the mobile nav drawer as a real overlay — a state the desktop pass structurally cannot reach.
 
@@ -55,76 +55,76 @@ odd one visible.
 | `states-panel-9.png` | 16 |
 | `states-panel-10.png` | 16 |
 | `states-panel-11.png` | 16 |
-| `states-panel-12.png` | 2 |
 | `states-open-1.png` | 16 |
 | `states-open-2.png` | 16 |
 | `states-open-3.png` | 7 |
 | `states-filled-1.png` | 16 |
 | `states-filled-2.png` | 7 |
+| `states-validation-1.png` | 4 |
+| `states-confirm-1.png` | 6 |
 | `states-toast-1.png` | 16 |
 | `states-toast-2.png` | 8 |
-| `states-validation-1.png` | 4 |
-| `states-confirm-1.png` | 5 |
 
 ## Every state captured
 
 | kind | lane | route | trigger | image |
 |---|---|---|---|---|
-| panel | admin | `/admin/command` | "Admin18" | `admin__admin-command__176-panel-Admin18.jpg` |
-| panel | admin | `/admin/command` | "Tenant4" | `admin__admin-command__177-panel-Tenant4.jpg` |
-| panel | admin | `/admin/command` | "System" | `admin__admin-command__178-panel-System.jpg` |
+| panel | admin | `/admin/command` | "Admin18" | `admin__admin-command__174-panel-Admin18.jpg` |
+| panel | admin | `/admin/command` | "Tenant4" | `admin__admin-command__175-panel-Tenant4.jpg` |
+| panel | admin | `/admin/command` | "System" | `admin__admin-command__176-panel-System.jpg` |
+| panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__177-panel-Dismiss.jpg` |
+| panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__178-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__179-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__180-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__181-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__182-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__183-panel-Dismiss.jpg` |
 | panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__184-panel-Dismiss.jpg` |
-| panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__185-panel-Dismiss.jpg` |
-| panel | admin | `/admin/dashboard` | "Dismiss" | `admin__admin-dashboard__186-panel-Dismiss.jpg` |
-| panel | admin | `/admin/dashboard` | "Acknowledge" | `admin__admin-dashboard__187-panel-Acknowledge.jpg` |
-| panel | admin | `/admin/dashboard` | "Acknowledge" | `admin__admin-dashboard__188-panel-Acknowledge.jpg` |
-| panel | admin | `/admin/events` | "1h" | `admin__admin-events__192-panel-1h.jpg` |
-| panel | admin | `/admin/events` | "6h" | `admin__admin-events__193-panel-6h.jpg` |
-| panel | admin | `/admin/events` | "24h" | `admin__admin-events__194-panel-24h.jpg` |
-| panel | admin | `/admin/events` | "7d" | `admin__admin-events__195-panel-7d.jpg` |
-| panel | admin | `/admin/events` | "30d" | `admin__admin-events__196-panel-30d.jpg` |
+| panel | admin | `/admin/dashboard` | "Acknowledge" | `admin__admin-dashboard__185-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/dashboard` | "Acknowledge" | `admin__admin-dashboard__186-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/events` | "1h" | `admin__admin-events__190-panel-1h.jpg` |
+| panel | admin | `/admin/events` | "6h" | `admin__admin-events__191-panel-6h.jpg` |
+| panel | admin | `/admin/events` | "24h" | `admin__admin-events__192-panel-24h.jpg` |
+| panel | admin | `/admin/events` | "7d" | `admin__admin-events__193-panel-7d.jpg` |
+| panel | admin | `/admin/events` | "30d" | `admin__admin-events__194-panel-30d.jpg` |
+| panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__204-panel-metadata-result.jpg` |
+| panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__205-panel-metadata-result.jpg` |
 | panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__206-panel-metadata-result.jpg` |
 | panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__207-panel-metadata-result.jpg` |
 | panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__208-panel-metadata-result.jpg` |
 | panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__209-panel-metadata-result.jpg` |
 | panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__210-panel-metadata-result.jpg` |
-| panel | admin | `/admin/pipeline` | "metadata + result" | `admin__admin-pipeline__211-panel-metadata-result.jpg` |
+| panel | admin | `/admin/process` | "details" | `admin__admin-process__211-panel-details.jpg` |
 | panel | admin | `/admin/process` | "details" | `admin__admin-process__212-panel-details.jpg` |
 | panel | admin | `/admin/process` | "details" | `admin__admin-process__213-panel-details.jpg` |
-| panel | admin | `/admin/processes` | "Awaiting 1" | `admin__admin-processes__214-panel-Awaiting-1.jpg` |
-| panel | admin | `/admin/processes` | "Running 2" | `admin__admin-processes__215-panel-Running-2.jpg` |
-| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__218-panel-Acknowledge.jpg` |
-| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__219-panel-Acknowledge.jpg` |
-| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__220-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/process` | "details" | `admin__admin-process__214-panel-details.jpg` |
+| panel | admin | `/admin/process` | "details" | `admin__admin-process__215-panel-details.jpg` |
+| panel | admin | `/admin/process` | "details" | `admin__admin-process__216-panel-details.jpg` |
+| panel | admin | `/admin/processes` | "Awaiting 1" | `admin__admin-processes__217-panel-Awaiting-1.jpg` |
 | panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__221-panel-Acknowledge.jpg` |
 | panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__222-panel-Acknowledge.jpg` |
 | panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__223-panel-Acknowledge.jpg` |
 | panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__224-panel-Acknowledge.jpg` |
 | panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__225-panel-Acknowledge.jpg` |
-| panel | admin | `/admin/rfp-curation/[solId]` | "← Back to Triage Queue" | `admin__admin-rfp-curation-solId__216-panel-Back-to-Triage-Queue.jpg` |
-| panel | admin | `/admin/rfp-curation/[solId]/topic/[topicId]` | "Edit Topic" | `admin__admin-rfp-curation-solId-topic-topicId__217-panel-Edit-Topic.jpg` |
-| panel | admin | `/admin/site/[pageKey]` | "Show version history" | `admin__admin-site-pageKey__227-panel-Show-version-history.jpg` |
-| panel | admin | `/admin/site/[pageKey]` | "+ Add block" | `admin__admin-site-pageKey__228-panel-Add-block.jpg` |
-| panel | admin | `/admin/site/docs/[type]/[slug]` | "Hide details" | `admin__admin-site-docs-type-slug__230-panel-Hide-details.jpg` |
-| panel | admin | `/admin/site/docs/[type]/[slug]` | "Hide panel" | `admin__admin-site-docs-type-slug__236-panel-Hide-panel.jpg` |
-| panel | admin | `/admin/site/docs/[type]/[slug]` | "HHeading" | `admin__admin-site-docs-type-slug__237-panel-HHeading.jpg` |
-| panel | admin | `/admin/sources` | "▶Admin Notes" | `admin__admin-sources__240-panel-Admin-Notes.jpg` |
-| panel | admin | `/admin/sources` | "▶Visit Instructions" | `admin__admin-sources__241-panel-Visit-Instructions.jpg` |
-| panel | admin | `/admin/sources` | "▶Admin Notes" | `admin__admin-sources__242-panel-Admin-Notes.jpg` |
-| panel | admin | `/admin/sources` | "▶Visit Instructions" | `admin__admin-sources__243-panel-Visit-Instructions.jpg` |
-| panel | admin | `/admin/sources/[profileId]` | "Edit" | `admin__admin-sources-profileId__238-panel-Edit.jpg` |
-| panel | admin | `/admin/sources/[profileId]` | "Edit" | `admin__admin-sources-profileId__239-panel-Edit.jpg` |
-| panel | admin | `/admin/storage` | "Customer Storage(read-only)" | `admin__admin-storage__244-panel-Customer-Storage-read-only.jpg` |
-| panel | admin | `/admin/storage` | "Reference Library" | `admin__admin-storage__245-panel-Reference-Library.jpg` |
-| panel | admin | `/admin/system-state` | "View all" | `admin__admin-system-state__246-panel-View-all.jpg` |
-| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__247-panel-Push-new-version.jpg` |
-| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__248-panel-Push-new-version.jpg` |
-| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__249-panel-Push-new-version.jpg` |
+| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__226-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__227-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/rfp-curation` | "Acknowledge" | `admin__admin-rfp-curation__228-panel-Acknowledge.jpg` |
+| panel | admin | `/admin/rfp-curation/[solId]` | "← Back to Triage Queue" | `admin__admin-rfp-curation-solId__219-panel-Back-to-Triage-Queue.jpg` |
+| panel | admin | `/admin/rfp-curation/[solId]/topic/[topicId]` | "Edit Topic" | `admin__admin-rfp-curation-solId-topic-topicId__220-panel-Edit-Topic.jpg` |
+| panel | admin | `/admin/site/[pageKey]` | "Show version history" | `admin__admin-site-pageKey__230-panel-Show-version-history.jpg` |
+| panel | admin | `/admin/site/[pageKey]` | "+ Add block" | `admin__admin-site-pageKey__231-panel-Add-block.jpg` |
+| panel | admin | `/admin/site/docs/[type]/[slug]` | "Hide details" | `admin__admin-site-docs-type-slug__233-panel-Hide-details.jpg` |
+| panel | admin | `/admin/site/docs/[type]/[slug]` | "Hide panel" | `admin__admin-site-docs-type-slug__239-panel-Hide-panel.jpg` |
+| panel | admin | `/admin/site/docs/[type]/[slug]` | "HHeading" | `admin__admin-site-docs-type-slug__240-panel-HHeading.jpg` |
+| panel | admin | `/admin/sources` | "▶Admin Notes" | `admin__admin-sources__243-panel-Admin-Notes.jpg` |
+| panel | admin | `/admin/sources` | "▶Visit Instructions" | `admin__admin-sources__244-panel-Visit-Instructions.jpg` |
+| panel | admin | `/admin/sources` | "▶Admin Notes" | `admin__admin-sources__245-panel-Admin-Notes.jpg` |
+| panel | admin | `/admin/sources` | "▶Visit Instructions" | `admin__admin-sources__246-panel-Visit-Instructions.jpg` |
+| panel | admin | `/admin/sources/[profileId]` | "Edit" | `admin__admin-sources-profileId__241-panel-Edit.jpg` |
+| panel | admin | `/admin/sources/[profileId]` | "Edit" | `admin__admin-sources-profileId__242-panel-Edit.jpg` |
+| panel | admin | `/admin/storage` | "Customer Storage(read-only)" | `admin__admin-storage__247-panel-Customer-Storage-read-only.jpg` |
+| panel | admin | `/admin/storage` | "Reference Library" | `admin__admin-storage__248-panel-Reference-Library.jpg` |
+| panel | admin | `/admin/system-state` | "View all" | `admin__admin-system-state__249-panel-View-all.jpg` |
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__250-panel-Push-new-version.jpg` |
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__251-panel-Push-new-version.jpg` |
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__252-panel-Push-new-version.jpg` |
@@ -132,15 +132,14 @@ odd one visible.
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__254-panel-Push-new-version.jpg` |
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__255-panel-Push-new-version.jpg` |
 | panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__256-panel-Push-new-version.jpg` |
-| panel | admin | `/admin/templates` | "+ New Template" | `admin__admin-templates__259-panel-New-Template.jpg` |
-| panel | admin | `/admin/templates/[templateId]/edit` | "Grid" | `admin__admin-templates-templateId-edit__257-panel-Grid.jpg` |
-| panel | admin | `/admin/templates/[templateId]/edit` | "Hide panel" | `admin__admin-templates-templateId-edit__258-panel-Hide-panel.jpg` |
-| panel | admin | `/admin/workflows` | "Workflow Map34 workflows · discovery + build" | `admin__admin-workflows__268-panel-Workflow-Map34-workflows-discovery-build.jpg` |
-| panel | admin | `/admin/workflows` | "Steps" | `admin__admin-workflows__269-panel-Steps.jpg` |
-| panel | admin | `/admin/workflows` | "Cancel" | `admin__admin-workflows__270-panel-Cancel.jpg` |
-| panel | admin | `/admin/workflows` | "Steps" | `admin__admin-workflows__271-panel-Steps.jpg` |
-| panel | admin | `/admin/workflows` | "Cancel" | `admin__admin-workflows__272-panel-Cancel.jpg` |
-| panel | partner | `/partner` | "+ Add a company" | `partner__partner__273-panel-Add-a-company.jpg` |
+| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__257-panel-Push-new-version.jpg` |
+| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__258-panel-Push-new-version.jpg` |
+| panel | admin | `/admin/template-stable` | "Push new version" | `admin__admin-template-stable__259-panel-Push-new-version.jpg` |
+| panel | admin | `/admin/templates` | "+ New Template" | `admin__admin-templates__262-panel-New-Template.jpg` |
+| panel | admin | `/admin/templates/[templateId]/edit` | "Grid" | `admin__admin-templates-templateId-edit__260-panel-Grid.jpg` |
+| panel | admin | `/admin/templates/[templateId]/edit` | "Hide panel" | `admin__admin-templates-templateId-edit__261-panel-Hide-panel.jpg` |
+| panel | admin | `/admin/workflows` | "Workflow Map34 workflows · discovery + build" | `admin__admin-workflows__271-panel-Workflow-Map34-workflows-discovery-build.jpg` |
+| panel | partner | `/partner` | "+ Add a company" | `partner__partner__272-panel-Add-a-company.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/activity` | "Proposal" | `tenant__portal-tenantSlug-activity__003-panel-Proposal.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/activity` | "Library" | `tenant__portal-tenantSlug-activity__004-panel-Library.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/activity` | "Capture" | `tenant__portal-tenantSlug-activity__005-panel-Capture.jpg` |
@@ -149,20 +148,20 @@ odd one visible.
 | panel | tenant | `/portal/[tenantSlug]/activity` | "Finder" | `tenant__portal-tenantSlug-activity__008-panel-Finder.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/activity` | "System" | `tenant__portal-tenantSlug-activity__009-panel-System.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/activity` | "1h" | `tenant__portal-tenantSlug-activity__010-panel-1h.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Proposal" | `tenant2__portal-tenantSlug-activity__097-panel-Proposal.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Library" | `tenant2__portal-tenantSlug-activity__098-panel-Library.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Capture" | `tenant2__portal-tenantSlug-activity__099-panel-Capture.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Tool" | `tenant2__portal-tenantSlug-activity__100-panel-Tool.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "System" | `tenant2__portal-tenantSlug-activity__101-panel-System.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/activity` | "1h" | `tenant2__portal-tenantSlug-activity__102-panel-1h.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Proposal" | `tenant2__portal-tenantSlug-activity__095-panel-Proposal.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Library" | `tenant2__portal-tenantSlug-activity__096-panel-Library.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Capture" | `tenant2__portal-tenantSlug-activity__097-panel-Capture.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "Tool" | `tenant2__portal-tenantSlug-activity__098-panel-Tool.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "System" | `tenant2__portal-tenantSlug-activity__099-panel-System.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/activity` | "1h" | `tenant2__portal-tenantSlug-activity__100-panel-1h.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/agents` | "7d" | `tenant__portal-tenantSlug-agents__011-panel-7d.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/agents` | "7d" | `tenant2__portal-tenantSlug-agents__103-panel-7d.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/agents` | "7d" | `tenant2__portal-tenantSlug-agents__101-panel-7d.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/atoms` | "All" | `tenant__portal-tenantSlug-atoms__014-panel-All.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/atoms` | "Foundations" | `tenant__portal-tenantSlug-atoms__015-panel-Foundations.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/atoms` | "Atoms" | `tenant__portal-tenantSlug-atoms__016-panel-Atoms.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/atoms` | "Review" | `tenant__portal-tenantSlug-atoms__017-panel-Review.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/atoms` | "Upload package" | `tenant__portal-tenantSlug-atoms__018-panel-Upload-package.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/atoms` | "Atoms" | `tenant2__portal-tenantSlug-atoms__106-panel-Atoms.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/atoms` | "Atoms" | `tenant2__portal-tenantSlug-atoms__104-panel-Atoms.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/buckets` | "Rank →" | `tenant__portal-tenantSlug-buckets__019-panel-Rank.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/buckets` | "✎" | `tenant__portal-tenantSlug-buckets__020-panel.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/buckets` | "✕" | `tenant__portal-tenantSlug-buckets__021-panel.jpg` |
@@ -178,6 +177,8 @@ odd one visible.
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__031-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant__portal-tenantSlug-cards__032-panel-Not-interested.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__033-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__105-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__106-panel-Not-interested.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__107-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__108-panel-Not-interested.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__109-panel-Pin-to-pursue.jpg` |
@@ -185,35 +186,33 @@ odd one visible.
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__111-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__112-panel-Not-interested.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__113-panel-Pin-to-pursue.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__114-panel-Not-interested.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__115-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "To-dos4" | `tenant__portal-tenantSlug-command__034-panel-To-dos4.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "Workflows2" | `tenant__portal-tenantSlug-command__035-panel-Workflows2.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "Activity" | `tenant__portal-tenantSlug-command__036-panel-Activity.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/command` | "To-dos" | `tenant2__portal-tenantSlug-command__116-panel-To-dos.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/command` | "Workflows" | `tenant2__portal-tenantSlug-command__117-panel-Workflows.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/command` | "Activity" | `tenant2__portal-tenantSlug-command__118-panel-Activity.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/documents/new` | "▦Slide deck16:9 slides — pitch, briefing, ca" | `tenant__portal-tenantSlug-documents-new__046-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/documents/new` | "▦Slide deck16:9 slides — pitch, briefing, ca" | `tenant2__portal-tenantSlug-documents-new__126-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "Grid" | `tenant2__portal-tenantSlug-library-foundation-foundationI__127-panel-Grid.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "+ From Library" | `tenant2__portal-tenantSlug-library-foundation-foundationI__128-panel-From-Library.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "Hide panel" | `tenant2__portal-tenantSlug-library-foundation-foundationI__129-panel-Hide-panel.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "HHeading" | `tenant2__portal-tenantSlug-library-foundation-foundationI__130-panel-HHeading.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "⊞Table" | `tenant2__portal-tenantSlug-library-foundation-foundationI__131-panel-Table.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/portals` | "Advance stage" | `tenant__portal-tenantSlug-portals__067-panel-Advance-stage.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/portals` | "Advance stage" | `tenant__portal-tenantSlug-portals__068-panel-Advance-stage.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/command` | "To-dos" | `tenant2__portal-tenantSlug-command__114-panel-To-dos.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/command` | "Workflows" | `tenant2__portal-tenantSlug-command__115-panel-Workflows.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/command` | "Activity" | `tenant2__portal-tenantSlug-command__116-panel-Activity.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/documents/new` | "▦Slide deck16:9 slides — pitch, briefing, ca" | `tenant__portal-tenantSlug-documents-new__044-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/documents/new` | "▦Slide deck16:9 slides — pitch, briefing, ca" | `tenant2__portal-tenantSlug-documents-new__124-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "Grid" | `tenant2__portal-tenantSlug-library-foundation-foundationI__125-panel-Grid.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "+ From Library" | `tenant2__portal-tenantSlug-library-foundation-foundationI__126-panel-From-Library.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "Hide panel" | `tenant2__portal-tenantSlug-library-foundation-foundationI__127-panel-Hide-panel.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "HHeading" | `tenant2__portal-tenantSlug-library-foundation-foundationI__128-panel-HHeading.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/library/foundation/[foundationId]` | "⊞Table" | `tenant2__portal-tenantSlug-library-foundation-foundationI__129-panel-Table.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/portals` | "Advance stage" | `tenant__portal-tenantSlug-portals__065-panel-Advance-stage.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/portals` | "Advance stage" | `tenant__portal-tenantSlug-portals__066-panel-Advance-stage.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "×" | `tenant__portal-tenantSlug-portals-portalId__061-panel.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "+ add to-do" | `tenant__portal-tenantSlug-portals-portalId__062-panel-add-to-do.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "×" | `tenant__portal-tenantSlug-portals-portalId__063-panel.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "+ add to-do" | `tenant__portal-tenantSlug-portals-portalId__064-panel-add-to-do.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "×" | `tenant__portal-tenantSlug-portals-portalId__065-panel.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/portals/[portalId]` | "+ add to-do" | `tenant__portal-tenantSlug-portals-portalId__066-panel-add-to-do.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__068-panel-Steps.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__070-panel-Steps.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__071-panel-Steps.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__072-panel-Steps.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__073-panel-Steps.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__074-panel-Steps.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__075-panel-Steps.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__076-panel-Steps.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__077-panel-Steps.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/processes` | "Steps" | `tenant__portal-tenantSlug-processes__078-panel-Steps.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__146-panel-Steps.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__147-panel-Steps.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__148-panel-Steps.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__149-panel-Steps.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__150-panel-Steps.jpg` |
@@ -222,127 +221,126 @@ odd one visible.
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__153-panel-Steps.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__154-panel-Steps.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__155-panel-Steps.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__156-panel-Steps.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/processes` | "Steps" | `tenant2__portal-tenantSlug-processes__157-panel-Steps.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/profile` | "Edit" | `tenant__portal-tenantSlug-profile__079-panel-Edit.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/profile` | "Edit" | `tenant2__portal-tenantSlug-profile__158-panel-Edit.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]` | "Assign a task" | `tenant__portal-tenantSlug-proposals-proposalId__080-panel-Assign-a-task.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Assign a task" | `tenant2__portal-tenantSlug-proposals-proposalId__159-panel-Assign-a-task.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Run all 3 automatically" | `tenant2__portal-tenantSlug-proposals-proposalId__160-panel-Run-all-3-automatically.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Advance to Final →" | `tenant2__portal-tenantSlug-proposals-proposalId__161-panel-Advance-to-Final.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "All Sections" | `tenant2__portal-tenantSlug-proposals-proposalId__162-panel-All-Sections.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "My Sections" | `tenant2__portal-tenantSlug-proposals-proposalId__163-panel-My-Sections.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✓Comp 1/1" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__081-panel-Comp-1-1.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Atoms" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__082-panel-Atoms.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Grid" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__083-panel-Grid.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Hide panel" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__084-panel-Hide-panel.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Grid" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__169-panel-Grid.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/templates` | "Refreshed ✕" | `tenant__portal-tenantSlug-templates__088-panel-Refreshed.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/templates` | "Refreshed ✕" | `tenant2__portal-tenantSlug-templates__170-panel-Refreshed.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/todos` | "＋ New to-do / broadcast" | `tenant__portal-tenantSlug-todos__090-panel-New-to-do-broadcast.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/profile` | "Edit" | `tenant__portal-tenantSlug-profile__075-panel-Edit.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/profile` | "Edit" | `tenant2__portal-tenantSlug-profile__156-panel-Edit.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]` | "Assign a task" | `tenant__portal-tenantSlug-proposals-proposalId__078-panel-Assign-a-task.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Assign a task" | `tenant2__portal-tenantSlug-proposals-proposalId__157-panel-Assign-a-task.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Run all 3 automatically" | `tenant2__portal-tenantSlug-proposals-proposalId__158-panel-Run-all-3-automatically.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "Advance to Final →" | `tenant2__portal-tenantSlug-proposals-proposalId__159-panel-Advance-to-Final.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "All Sections" | `tenant2__portal-tenantSlug-proposals-proposalId__160-panel-All-Sections.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]` | "My Sections" | `tenant2__portal-tenantSlug-proposals-proposalId__161-panel-My-Sections.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✓Comp 1/1" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__079-panel-Comp-1-1.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Atoms" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__080-panel-Atoms.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Grid" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__081-panel-Grid.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Hide panel" | `tenant__portal-tenantSlug-proposals-proposalId-sections-__082-panel-Hide-panel.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Grid" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__167-panel-Grid.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/templates` | "Refreshed ✕" | `tenant__portal-tenantSlug-templates__086-panel-Refreshed.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/templates` | "Refreshed ✕" | `tenant2__portal-tenantSlug-templates__168-panel-Refreshed.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/todos` | "＋ New to-do / broadcast" | `tenant__portal-tenantSlug-todos__088-panel-New-to-do-broadcast.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__089-panel-Dismiss.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__090-panel-Dismiss.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__091-panel-Dismiss.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__092-panel-Dismiss.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__093-panel-Dismiss.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/todos` | "Dismiss" | `tenant__portal-tenantSlug-todos__094-panel-Dismiss.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/todos` | "＋ New to-do / broadcast" | `tenant2__portal-tenantSlug-todos__172-panel-New-to-do-broadcast.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/vaults/[vaultId]` | "＋ Add artifact" | `tenant2__portal-tenantSlug-vaults-vaultId__173-panel-Add-artifact.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/todos` | "＋ New to-do / broadcast" | `tenant2__portal-tenantSlug-todos__170-panel-New-to-do-broadcast.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/vaults/[vaultId]` | "＋ Add artifact" | `tenant2__portal-tenantSlug-vaults-vaultId__171-panel-Add-artifact.jpg` |
 | panel | anon | `/resources` | "Resources" | `anon__resources__001-panel-Resources.jpg` |
 | panel | anon | `/resources` | "Blog Posts" | `anon__resources__002-panel-Blog-Posts.jpg` |
-| open | admin | `/admin/documents` | "New Document" | `admin__admin-documents__189-open-New-Document.jpg` |
-| open | admin | `/admin/site/[pageKey]` | "Preview" | `admin__admin-site-pageKey__229-open-Preview.jpg` |
-| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__260-open-Preview.jpg` |
-| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__261-open-Preview.jpg` |
-| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__262-open-Preview.jpg` |
-| open | admin | `/admin/tenants` | "+ New partner org" | `admin__admin-tenants__263-open-New-partner-org.jpg` |
-| open | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__265-open-New-Company.jpg` |
+| open | admin | `/admin/documents` | "New Document" | `admin__admin-documents__187-open-New-Document.jpg` |
+| open | admin | `/admin/site/[pageKey]` | "Preview" | `admin__admin-site-pageKey__232-open-Preview.jpg` |
+| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__263-open-Preview.jpg` |
+| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__264-open-Preview.jpg` |
+| open | admin | `/admin/templates` | "Preview" | `admin__admin-templates__265-open-Preview.jpg` |
+| open | admin | `/admin/tenants` | "+ New partner org" | `admin__admin-tenants__266-open-New-partner-org.jpg` |
+| open | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__268-open-New-Company.jpg` |
 | open | tenant | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant__portal-tenantSlug-atoms__012-open-Create-canvas.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant2__portal-tenantSlug-atoms__104-open-Create-canvas.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant2__portal-tenantSlug-atoms__102-open-Create-canvas.jpg` |
 | open | tenant | `/portal/[tenantSlug]/dashboard` | "4✓To-dos" | `tenant__portal-tenantSlug-dashboard__037-open-4-To-dos.jpg` |
 | open | tenant | `/portal/[tenantSlug]/dashboard` | "23⬆Library" | `tenant__portal-tenantSlug-dashboard__038-open-23-Library.jpg` |
 | open | tenant | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant__portal-tenantSlug-dashboard__039-open-9-Opportunities.jpg` |
 | open | tenant | `/portal/[tenantSlug]/dashboard` | "2▦Buckets" | `tenant__portal-tenantSlug-dashboard__041-open-2-Buckets.jpg` |
 | open | tenant | `/portal/[tenantSlug]/dashboard` | "↻Activity" | `tenant__portal-tenantSlug-dashboard__043-open-Activity.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "✓To-dos" | `tenant2__portal-tenantSlug-dashboard__119-open-To-dos.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "99+⬆Library" | `tenant2__portal-tenantSlug-dashboard__120-open-99-Library.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant2__portal-tenantSlug-dashboard__121-open-9-Opportunities.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "▦Buckets" | `tenant2__portal-tenantSlug-dashboard__123-open-Buckets.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "↻Activity" | `tenant2__portal-tenantSlug-dashboard__125-open-Activity.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant__portal-tenantSlug-manage__047-open-1Subscribenone.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "2Spotlight2 buckets · 9 OPPs" | `tenant__portal-tenantSlug-manage__049-open-2Spotlight2-buckets-9-OPPs.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "3Buy4 portals" | `tenant__portal-tenantSlug-manage__051-open-3Buy4-portals.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant__portal-tenantSlug-manage__052-open-Account.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "2▦Buckets" | `tenant__portal-tenantSlug-manage__054-open-2-Buckets.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "4👥Users" | `tenant__portal-tenantSlug-manage__056-open-4-Users.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "4🏗Portals" | `tenant__portal-tenantSlug-manage__058-open-4-Portals.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__059-open-Automation.jpg` |
-| open | tenant | `/portal/[tenantSlug]/manage` | "🤖AI usage" | `tenant__portal-tenantSlug-manage__062-open-AI-usage.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant2__portal-tenantSlug-manage__132-open-1Subscribenone.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "2Spotlight0 buckets · 9 OPPs" | `tenant2__portal-tenantSlug-manage__134-open-2Spotlight0-buckets-9-OPPs.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "3Buy0 portals" | `tenant2__portal-tenantSlug-manage__136-open-3Buy0-portals.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant2__portal-tenantSlug-manage__137-open-Account.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "▦Buckets" | `tenant2__portal-tenantSlug-manage__139-open-Buckets.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "1👥Users" | `tenant2__portal-tenantSlug-manage__141-open-1-Users.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "🏗Portals" | `tenant2__portal-tenantSlug-manage__143-open-Portals.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__144-open-Automation.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/manage` | "🤖AI usage" | `tenant2__portal-tenantSlug-manage__147-open-AI-usage.jpg` |
-| open | tenant | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant__portal-tenantSlug-vaults__095-open-New-nook.jpg` |
-| open | tenant2 | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant2__portal-tenantSlug-vaults__174-open-New-nook.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "✓To-dos" | `tenant2__portal-tenantSlug-dashboard__117-open-To-dos.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "99+⬆Library" | `tenant2__portal-tenantSlug-dashboard__118-open-99-Library.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant2__portal-tenantSlug-dashboard__119-open-9-Opportunities.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "▦Buckets" | `tenant2__portal-tenantSlug-dashboard__121-open-Buckets.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/dashboard` | "↻Activity" | `tenant2__portal-tenantSlug-dashboard__123-open-Activity.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant__portal-tenantSlug-manage__045-open-1Subscribenone.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "2Spotlight2 buckets · 9 OPPs" | `tenant__portal-tenantSlug-manage__047-open-2Spotlight2-buckets-9-OPPs.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "3Buy4 portals" | `tenant__portal-tenantSlug-manage__049-open-3Buy4-portals.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant__portal-tenantSlug-manage__050-open-Account.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "2▦Buckets" | `tenant__portal-tenantSlug-manage__052-open-2-Buckets.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "4👥Users" | `tenant__portal-tenantSlug-manage__054-open-4-Users.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "4🏗Portals" | `tenant__portal-tenantSlug-manage__056-open-4-Portals.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__057-open-Automation.jpg` |
+| open | tenant | `/portal/[tenantSlug]/manage` | "🤖AI usage" | `tenant__portal-tenantSlug-manage__060-open-AI-usage.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant2__portal-tenantSlug-manage__130-open-1Subscribenone.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "2Spotlight0 buckets · 9 OPPs" | `tenant2__portal-tenantSlug-manage__132-open-2Spotlight0-buckets-9-OPPs.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "3Buy0 portals" | `tenant2__portal-tenantSlug-manage__134-open-3Buy0-portals.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant2__portal-tenantSlug-manage__135-open-Account.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "▦Buckets" | `tenant2__portal-tenantSlug-manage__137-open-Buckets.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "1👥Users" | `tenant2__portal-tenantSlug-manage__139-open-1-Users.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "🏗Portals" | `tenant2__portal-tenantSlug-manage__141-open-Portals.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__142-open-Automation.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/manage` | "🤖AI usage" | `tenant2__portal-tenantSlug-manage__145-open-AI-usage.jpg` |
+| open | tenant | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant__portal-tenantSlug-vaults__093-open-New-nook.jpg` |
+| open | tenant2 | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant2__portal-tenantSlug-vaults__172-open-New-nook.jpg` |
+| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__195-toast-Watch.jpg` |
+| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__196-toast-Watch.jpg` |
 | toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__197-toast-Watch.jpg` |
-| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__198-toast-Watch.jpg` |
+| toast | admin | `/admin/opportunities` | "🔔 Watching" | `admin__admin-opportunities__198-toast-Watching.jpg` |
 | toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__199-toast-Watch.jpg` |
-| toast | admin | `/admin/opportunities` | "🔔 Watching" | `admin__admin-opportunities__200-toast-Watching.jpg` |
+| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__200-toast-Watch.jpg` |
 | toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__201-toast-Watch.jpg` |
 | toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__202-toast-Watch.jpg` |
 | toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__203-toast-Watch.jpg` |
-| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__204-toast-Watch.jpg` |
-| toast | admin | `/admin/opportunities` | "Watch" | `admin__admin-opportunities__205-toast-Watch.jpg` |
-| toast | admin | `/admin/rfp-curation` | "Claim" | `admin__admin-rfp-curation__226-toast-Claim.jpg` |
-| toast | admin | `/admin/site/docs/[type]/[slug]` | "Save draft" | `admin__admin-site-docs-type-slug__231-toast-Save-draft.jpg` |
-| toast | admin | `/admin/site/docs/[type]/[slug]` | "Atoms" | `admin__admin-site-docs-type-slug__232-toast-Atoms.jpg` |
-| toast | admin | `/admin/site/docs/[type]/[slug]` | "Groups" | `admin__admin-site-docs-type-slug__233-toast-Groups.jpg` |
-| toast | admin | `/admin/site/docs/[type]/[slug]` | "Provenance" | `admin__admin-site-docs-type-slug__234-toast-Provenance.jpg` |
-| toast | admin | `/admin/site/docs/[type]/[slug]` | "Grid" | `admin__admin-site-docs-type-slug__235-toast-Grid.jpg` |
-| toast | tenant | `/portal/[tenantSlug]/delivery/[projectId]` | "Accept" | `tenant__portal-tenantSlug-delivery-projectId__044-toast-Accept.jpg` |
-| toast | tenant | `/portal/[tenantSlug]/delivery/[projectId]` | "Upload file" | `tenant__portal-tenantSlug-delivery-projectId__045-toast-Upload-file.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Check compliance" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__164-toast-Check-compliance.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Research this section" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__165-toast-Research-this-section.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✗Comp 0/1" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__166-toast-Comp-0-1.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✓ Accept & Lock" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__167-toast-Accept-Lock.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "⊟ Panel" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__168-toast-Panel.jpg` |
-| toast | tenant | `/portal/[tenantSlug]/templates` | "Use this template" | `tenant__portal-tenantSlug-templates__089-toast-Use-this-template.jpg` |
-| toast | tenant2 | `/portal/[tenantSlug]/templates` | "Use this template" | `tenant2__portal-tenantSlug-templates__171-toast-Use-this-template.jpg` |
-| filled | admin | `/admin/documents` | "New Document" | `admin__admin-documents__191-filled-New-Document.jpg` |
-| filled | admin | `/admin/tenants` | "+ New partner org" | `admin__admin-tenants__264-filled-New-partner-org.jpg` |
-| filled | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__267-filled-New-Company.jpg` |
+| toast | admin | `/admin/rfp-curation` | "Claim" | `admin__admin-rfp-curation__229-toast-Claim.jpg` |
+| toast | admin | `/admin/site/docs/[type]/[slug]` | "Save draft" | `admin__admin-site-docs-type-slug__234-toast-Save-draft.jpg` |
+| toast | admin | `/admin/site/docs/[type]/[slug]` | "Atoms" | `admin__admin-site-docs-type-slug__235-toast-Atoms.jpg` |
+| toast | admin | `/admin/site/docs/[type]/[slug]` | "Groups" | `admin__admin-site-docs-type-slug__236-toast-Groups.jpg` |
+| toast | admin | `/admin/site/docs/[type]/[slug]` | "Provenance" | `admin__admin-site-docs-type-slug__237-toast-Provenance.jpg` |
+| toast | admin | `/admin/site/docs/[type]/[slug]` | "Grid" | `admin__admin-site-docs-type-slug__238-toast-Grid.jpg` |
+| toast | tenant | `/portal/[tenantSlug]/projects/[projectId]` | "Accept" | `tenant__portal-tenantSlug-projects-projectId__076-toast-Accept.jpg` |
+| toast | tenant | `/portal/[tenantSlug]/projects/[projectId]` | "Upload file" | `tenant__portal-tenantSlug-projects-projectId__077-toast-Upload-file.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Check compliance" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__162-toast-Check-compliance.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "Research this section" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__163-toast-Research-this-section.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✗Comp 0/1" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__164-toast-Comp-0-1.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "✓ Accept & Lock" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__165-toast-Accept-Lock.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | "⊟ Panel" | `tenant2__portal-tenantSlug-proposals-proposalId-sections-__166-toast-Panel.jpg` |
+| toast | tenant | `/portal/[tenantSlug]/templates` | "Use this template" | `tenant__portal-tenantSlug-templates__087-toast-Use-this-template.jpg` |
+| toast | tenant2 | `/portal/[tenantSlug]/templates` | "Use this template" | `tenant2__portal-tenantSlug-templates__169-toast-Use-this-template.jpg` |
+| filled | admin | `/admin/documents` | "New Document" | `admin__admin-documents__189-filled-New-Document.jpg` |
+| filled | admin | `/admin/tenants` | "+ New partner org" | `admin__admin-tenants__267-filled-New-partner-org.jpg` |
+| filled | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__270-filled-New-Company.jpg` |
 | filled | tenant | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant__portal-tenantSlug-atoms__013-filled-Create-canvas.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant2__portal-tenantSlug-atoms__105-filled-Create-canvas.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/atoms` | "＋ Create canvas" | `tenant2__portal-tenantSlug-atoms__103-filled-Create-canvas.jpg` |
 | filled | tenant | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant__portal-tenantSlug-dashboard__040-filled-9-Opportunities.jpg` |
 | filled | tenant | `/portal/[tenantSlug]/dashboard` | "2▦Buckets" | `tenant__portal-tenantSlug-dashboard__042-filled-2-Buckets.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant2__portal-tenantSlug-dashboard__122-filled-9-Opportunities.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/dashboard` | "▦Buckets" | `tenant2__portal-tenantSlug-dashboard__124-filled-Buckets.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant__portal-tenantSlug-manage__048-filled-1Subscribenone.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "2Spotlight2 buckets · 9 OPPs" | `tenant__portal-tenantSlug-manage__050-filled-2Spotlight2-buckets-9-OPPs.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant__portal-tenantSlug-manage__053-filled-Account.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "2▦Buckets" | `tenant__portal-tenantSlug-manage__055-filled-2-Buckets.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "4👥Users" | `tenant__portal-tenantSlug-manage__057-filled-4-Users.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__061-filled-Automation.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant2__portal-tenantSlug-manage__133-filled-1Subscribenone.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "2Spotlight0 buckets · 9 OPPs" | `tenant2__portal-tenantSlug-manage__135-filled-2Spotlight0-buckets-9-OPPs.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant2__portal-tenantSlug-manage__138-filled-Account.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "▦Buckets" | `tenant2__portal-tenantSlug-manage__140-filled-Buckets.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "1👥Users" | `tenant2__portal-tenantSlug-manage__142-filled-1-Users.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__146-filled-Automation.jpg` |
-| filled | tenant | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant__portal-tenantSlug-vaults__096-filled-New-nook.jpg` |
-| filled | tenant2 | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant2__portal-tenantSlug-vaults__175-filled-New-nook.jpg` |
-| validation | admin | `/admin/documents` | "New Document" | `admin__admin-documents__190-validation-New-Document.jpg` |
-| validation | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__266-validation-New-Company.jpg` |
-| validation | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__060-validation-Automation.jpg` |
-| validation | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__145-validation-Automation.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/dashboard` | "9◎Opportunities" | `tenant2__portal-tenantSlug-dashboard__120-filled-9-Opportunities.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/dashboard` | "▦Buckets" | `tenant2__portal-tenantSlug-dashboard__122-filled-Buckets.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant__portal-tenantSlug-manage__046-filled-1Subscribenone.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "2Spotlight2 buckets · 9 OPPs" | `tenant__portal-tenantSlug-manage__048-filled-2Spotlight2-buckets-9-OPPs.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant__portal-tenantSlug-manage__051-filled-Account.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "2▦Buckets" | `tenant__portal-tenantSlug-manage__053-filled-2-Buckets.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "4👥Users" | `tenant__portal-tenantSlug-manage__055-filled-4-Users.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__059-filled-Automation.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "1Subscribenone" | `tenant2__portal-tenantSlug-manage__131-filled-1Subscribenone.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "2Spotlight0 buckets · 9 OPPs" | `tenant2__portal-tenantSlug-manage__133-filled-2Spotlight0-buckets-9-OPPs.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "⚙Account" | `tenant2__portal-tenantSlug-manage__136-filled-Account.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "▦Buckets" | `tenant2__portal-tenantSlug-manage__138-filled-Buckets.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "1👥Users" | `tenant2__portal-tenantSlug-manage__140-filled-1-Users.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__144-filled-Automation.jpg` |
+| filled | tenant | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant__portal-tenantSlug-vaults__094-filled-New-nook.jpg` |
+| filled | tenant2 | `/portal/[tenantSlug]/vaults` | "＋ New nook" | `tenant2__portal-tenantSlug-vaults__173-filled-New-nook.jpg` |
+| validation | admin | `/admin/documents` | "New Document" | `admin__admin-documents__188-validation-New-Document.jpg` |
+| validation | admin | `/admin/tenants` | "+ New Company" | `admin__admin-tenants__269-validation-New-Company.jpg` |
+| validation | tenant | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant__portal-tenantSlug-manage__058-validation-Automation.jpg` |
+| validation | tenant2 | `/portal/[tenantSlug]/manage` | "⚡Automation" | `tenant2__portal-tenantSlug-manage__143-validation-Automation.jpg` |
+| confirm | admin | `/admin/processes` | "Advance" | `admin__admin-processes__218-confirm-Advance.jpg` |
+| confirm | tenant | `/portal/[tenantSlug]/processes` | "Move to next gate" | `tenant__portal-tenantSlug-processes__067-confirm-Move-to-next-gate.jpg` |
 | confirm | tenant | `/portal/[tenantSlug]/processes` | "Move to next gate" | `tenant__portal-tenantSlug-processes__069-confirm-Move-to-next-gate.jpg` |
-| confirm | tenant | `/portal/[tenantSlug]/processes` | "Move to next gate" | `tenant__portal-tenantSlug-processes__071-confirm-Move-to-next-gate.jpg` |
+| confirm | tenant | `/portal/[tenantSlug]/team` | "Deactivate" | `tenant__portal-tenantSlug-team__083-confirm-Deactivate.jpg` |
+| confirm | tenant | `/portal/[tenantSlug]/team` | "Deactivate" | `tenant__portal-tenantSlug-team__084-confirm-Deactivate.jpg` |
 | confirm | tenant | `/portal/[tenantSlug]/team` | "Deactivate" | `tenant__portal-tenantSlug-team__085-confirm-Deactivate.jpg` |
-| confirm | tenant | `/portal/[tenantSlug]/team` | "Deactivate" | `tenant__portal-tenantSlug-team__086-confirm-Deactivate.jpg` |
-| confirm | tenant | `/portal/[tenantSlug]/team` | "Deactivate" | `tenant__portal-tenantSlug-team__087-confirm-Deactivate.jpg` |
 
 ## Native dialogs, verbatim
 
@@ -352,6 +350,7 @@ Every one intercepted and **dismissed** — the drive never accepts a destructiv
 |---|---|
 | `/portal/[tenantSlug]/processes` | Override the "Review Gate" gate and move this process to its next step? |
 | `/portal/[tenantSlug]/team` | Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime. |
+| `/admin/processes` | Advance the "Schedule Login Reminder" gate to the next step? |
 
 ## Viewport captures
 

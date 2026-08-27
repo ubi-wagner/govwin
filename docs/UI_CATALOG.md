@@ -107,8 +107,6 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/contracts` | app/portal/[tenantSlug]/contracts/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/contracts/[contractId]` | app/portal/[tenantSlug]/contracts/[contractId]/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/dashboard` | app/portal/[tenantSlug]/dashboard/page.tsx | server | 0 | 0 | 0/0/0 | Cockpit |
-| `/portal/[tenantSlug]/delivery` | app/portal/[tenantSlug]/delivery/page.tsx | server | 0 | 0 | 0/0/0 | Link |
-| `/portal/[tenantSlug]/delivery/[projectId]` | app/portal/[tenantSlug]/delivery/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure, DeliverableRow |
 | `/portal/[tenantSlug]/documents` | app/portal/[tenantSlug]/documents/page.tsx | server | 0 | 0 | 0/0/0 | Link, StatusBadge, SupportingDocActions |
 | `/portal/[tenantSlug]/documents/[documentId]` | app/portal/[tenantSlug]/documents/[documentId]/page.tsx | server | 0 | 0 | 0/0/0 | DocumentLockBar, CanvasEditorPage |
 | `/portal/[tenantSlug]/documents/new` | app/portal/[tenantSlug]/documents/new/page.tsx | server | 0 | 0 | 0/0/0 | NewDocumentChooser |
@@ -122,6 +120,8 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/portals/[portalId]` | app/portal/[tenantSlug]/portals/[portalId]/page.tsx | server | 0 | 0 | 0/0/0 | WorkflowSetupClient |
 | `/portal/[tenantSlug]/processes` | app/portal/[tenantSlug]/processes/page.tsx | server | 0 | 0 | 0/0/0 | ProcessesClient |
 | `/portal/[tenantSlug]/profile` | app/portal/[tenantSlug]/profile/page.tsx | server | 0 | 0 | 0/0/0 | ProfileEditor |
+| `/portal/[tenantSlug]/projects` | app/portal/[tenantSlug]/projects/page.tsx | server | 0 | 0 | 0/0/0 | Link |
+| `/portal/[tenantSlug]/projects/[projectId]` | app/portal/[tenantSlug]/projects/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure, DeliverableRow |
 | `/portal/[tenantSlug]/proposals` | app/portal/[tenantSlug]/proposals/page.tsx | server | 0 | 0 | 0/0/0 | Link, ArchivedProposals |
 | `/portal/[tenantSlug]/proposals/[proposalId]` | app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx | server | 0 | 0 | 0/0/0 | OpportunityCard, AssignTaskForm, AmendmentBanner, ArchivePortalButton, ProposalStudio, StrategyPanel +1 |
 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx | server | 0 | 0 | 0/0/0 | SectionAssignBar, SectionAssistBar, CanvasEditorPage |
@@ -231,7 +231,6 @@ tree carries far more, listed per component in §2.
 | components/canvas/slide-editor.tsx | client | 7/2 | 0 | /admin/documents/[documentId], /admin/site/docs/[type]/[slug], /admin/templates/[templateId]/edit +3 |
 | components/cards/opportunity-card.tsx | client | 0/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/command/command-tabs.tsx | client | 0/1 | 1 | /admin/command, /portal/[tenantSlug]/command |
-| components/delivery/deliverable-row.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/delivery/[projectId] |
 | components/marketing/agency-mark.tsx | server | 0/0 | 0 | /customers |
 | components/marketing/application-form.tsx | client | 8/4 | 1 | /apply |
 | components/marketing/cms-card.tsx | server | 0/0 | 0 | /about, /features |
@@ -306,6 +305,7 @@ tree carries far more, listed per component in §2.
 | components/portal/vaults/nook-detail.tsx | client | 10/0 | 6 | /portal/[tenantSlug]/vaults/[vaultId], /vaults/[vaultId] |
 | components/portal/vaults/nooks-index.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/vaults |
 | components/portal/volume-layout-gauge.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
+| components/projects/deliverable-row.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
 | components/proposal/section-assign-bar.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
 | components/proposal/section-assist-bar.tsx | client | 3/0 | 5 | /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
 | components/rfp-curation/amendments-panel.tsx | client | 14/0 | 4 | /admin/rfp-curation/[solId] |
@@ -595,8 +595,6 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/atoms/select` | 1 |
 | `POST ep.upload` | 1 |
 | `POST '/api/command/seen'` | 1 |
-| `POST :p/deliverables/:p` | 1 |
-| `PATCH :p/deliverables/:p` | 1 |
 | `POST '/api/applications'` | 1 |
 | `POST '/api/waitlist'` | 1 |
 | `GET /api/portal/:p/agents/usage?period=:p` | 1 |
@@ -685,6 +683,8 @@ tree carries far more, listed per component in §2.
 | `GET /api/portal/:p/vaults` | 1 |
 | `POST /api/portal/:p/vaults` | 1 |
 | `GET /api/portal/:p/proposals/:p/artifacts/:p/layout` | 1 |
+| `POST :p/deliverables/:p` | 1 |
+| `PATCH :p/deliverables/:p` | 1 |
 | `PATCH /api/portal/:p/proposals/:p/sections/:p/assign` | 1 |
 | `POST /api/admin/rfp-curation/:p/amendments/:p` | 1 |
 | `GET /api/admin/rfp-curation/:p/annotations` | 1 |

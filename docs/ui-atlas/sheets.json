@@ -72,8 +72,6 @@
   "file": "sheet-tenant-2.png",
   "routes": [
    "/portal/[tenantSlug]/dashboard",
-   "/portal/[tenantSlug]/delivery",
-   "/portal/[tenantSlug]/delivery/[projectId]",
    "/portal/[tenantSlug]/documents",
    "/portal/[tenantSlug]/documents/new",
    "/portal/[tenantSlug]/library",
@@ -85,6 +83,8 @@
    "/portal/[tenantSlug]/portals/[portalId]",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/projects",
+   "/portal/[tenantSlug]/projects/[projectId]",
    "/portal/[tenantSlug]/proposals",
    "/portal/[tenantSlug]/proposals/[proposalId]"
   ]
@@ -136,7 +136,6 @@
   "file": "sheet-tenant2-2.png",
   "routes": [
    "/portal/[tenantSlug]/dashboard",
-   "/portal/[tenantSlug]/delivery",
    "/portal/[tenantSlug]/documents",
    "/portal/[tenantSlug]/documents/new",
    "/portal/[tenantSlug]/library",
@@ -148,6 +147,7 @@
    "/portal/[tenantSlug]/portals",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/projects",
    "/portal/[tenantSlug]/proposals",
    "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]"
@@ -239,21 +239,21 @@
   ]
  },
  {
-  "lane": "collab",
-  "part": 1,
-  "parts": 1,
-  "file": "sheet-collab-1.png",
-  "routes": [
-   "/vaults"
-  ]
- },
- {
   "lane": "partner",
   "part": 1,
   "parts": 1,
   "file": "sheet-partner-1.png",
   "routes": [
    "/partner"
+  ]
+ },
+ {
+  "lane": "collab",
+  "part": 1,
+  "parts": 1,
+  "file": "sheet-collab-1.png",
+  "routes": [
+   "/vaults"
   ]
  }
 ]

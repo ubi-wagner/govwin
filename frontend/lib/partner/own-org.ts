@@ -6,9 +6,24 @@
  * pipeline (cards) + the starter library — exactly like the client-company create/accept paths, so
  * the partner's own org lands with a ranked pipeline + a populated library to run grants against.
  *
- * Idempotent + gated: the whole block runs only when the org has zero buckets (i.e. first visit),
- * so it is safe to call on every /partner render. Best-effort — the console must render even if
- * provisioning fails.
+ * Idempotent + gated. **The gate is the `finder:tenant.provisioned` event this function itself
+ * writes**, and that is a deliberate correction: it used to be "zero spotlight buckets", which was
+ * a fair proxy while a new org was seeded with buckets — and #189 removed seeded buckets, because a
+ * bucket is the customer's own ranking lens and the product imposes none.
+ *
+ * So the condition became permanently true. Every single `/partner` render re-ran the whole block:
+ * `backfillTenant` + `scoreTenantCards` + `copyStarterSetToTenant` + `backfillTenantTemplates`,
+ * four write-heavy operations, plus a `tenant.provisioned` event asserting a first-time act that
+ * had already happened. A 153-page atlas sweep left **12 of those events in two hours** against an
+ * org with 0 buckets. It is also the most plausible cause of the intermittent React #418 on
+ * `/partner`: a server component whose render MUTATES shared state can produce different output on
+ * the HTML pass and the RSC pass.
+ *
+ * The lesson generalises past this file: a gate that infers "have we done X" from a side effect
+ * someone else owns is a gate that another team can switch off without touching this code. Gate on
+ * the RECORD OF THE ACT.
+ *
+ * Best-effort — the console must render even if provisioning fails.
  */
 import { sqlBypass } from '@/lib/db';
 import { backfillTenant } from '@/lib/opportunity-bridge';
@@ -28,11 +43,16 @@ export async function ensurePartnerOwnOrgProvisioned(
 ): Promise<boolean> {
   if (!tenantId || !userId) return false;
   try {
-    const [b] = await sqlBypass<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}::uuid`;
-    if (b && b.n > 0) return false; // already provisioned
+    const [done] = await sqlBypass<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM system_events
+       WHERE namespace = 'finder' AND type = 'tenant.provisioned'
+         AND payload->>'tenantId' = ${tenantId}
+       LIMIT 1`;
+    if (done && done.n > 0) return false; // already provisioned — see the header
   } catch (e) {
-    console.error('[partner/own-org] bucket-count probe failed:', e);
+    // Fail CLOSED on the probe: a provisioning run we cannot prove is needed is one we do not do.
+    // The alternative — running it "just in case" on every render — is the defect this replaced.
+    console.error('[partner/own-org] provisioned-probe failed:', e);
     return false;
   }
 

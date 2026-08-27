@@ -4378,8 +4378,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -4394,6 +4392,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -5044,64 +5044,6 @@
    "passedHandlers": 0
   },
   {
-   "file": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx",
-   "lines": 291,
-   "client": false,
-   "kind": "page",
-   "exports": [
-    "dynamic",
-    "DeliveryProjectPage"
-   ],
-   "renders": [
-    "Link",
-    "Measure",
-    "DeliverableRow"
-   ],
-   "handlers": [],
-   "fetches": [],
-   "forms": 0,
-   "inputs": 0,
-   "buttons": 0,
-   "links": 1,
-   "localImports": [
-    "@/components/delivery/deliverable-row"
-   ],
-   "route": "/portal/[tenantSlug]/delivery/[projectId]",
-   "renderedBy": [],
-   "reachableFrom": [
-    "/portal/[tenantSlug]/delivery/[projectId]"
-   ],
-   "bindingHandlers": 0,
-   "passedHandlers": 0
-  },
-  {
-   "file": "app/portal/[tenantSlug]/delivery/page.tsx",
-   "lines": 116,
-   "client": false,
-   "kind": "page",
-   "exports": [
-    "dynamic",
-    "DeliveryPage"
-   ],
-   "renders": [
-    "Link"
-   ],
-   "handlers": [],
-   "fetches": [],
-   "forms": 0,
-   "inputs": 0,
-   "buttons": 0,
-   "links": 1,
-   "localImports": [],
-   "route": "/portal/[tenantSlug]/delivery",
-   "renderedBy": [],
-   "reachableFrom": [
-    "/portal/[tenantSlug]/delivery"
-   ],
-   "bindingHandlers": 0,
-   "passedHandlers": 0
-  },
-  {
    "file": "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
    "lines": 115,
    "client": false,
@@ -5264,8 +5206,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -5280,6 +5220,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -5870,6 +5812,64 @@
    "renderedBy": [],
    "reachableFrom": [
     "/portal/[tenantSlug]/profile"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "lines": 291,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "ProjectPage"
+   ],
+   "renders": [
+    "Link",
+    "Measure",
+    "DeliverableRow"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 1,
+   "localImports": [
+    "@/components/projects/deliverable-row"
+   ],
+   "route": "/portal/[tenantSlug]/projects/[projectId]",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/portal/[tenantSlug]/projects/page.tsx",
+   "lines": 116,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "ProjectsPage"
+   ],
+   "renders": [
+    "Link"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 1,
+   "localImports": [],
+   "route": "/portal/[tenantSlug]/projects",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
@@ -8898,8 +8898,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -8914,6 +8912,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -12240,59 +12240,6 @@
    "passedHandlers": 1
   },
   {
-   "file": "components/delivery/deliverable-row.tsx",
-   "lines": 150,
-   "client": true,
-   "kind": "component",
-   "exports": [
-    "DeliverableRow"
-   ],
-   "renders": [],
-   "handlers": [
-    {
-     "on": "onChange",
-     "element": "input",
-     "binds": true,
-     "line": 122
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 127
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 140
-    }
-   ],
-   "fetches": [
-    {
-     "method": "POST",
-     "url": "`${basePath}/deliverables/${deliverable.id}`"
-    },
-    {
-     "method": "PATCH",
-     "url": "`${basePath}/deliverables/${deliverable.id}`"
-    }
-   ],
-   "forms": 0,
-   "inputs": 1,
-   "buttons": 2,
-   "links": 0,
-   "localImports": [],
-   "renderedBy": [
-    "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx"
-   ],
-   "reachableFrom": [
-    "/portal/[tenantSlug]/delivery/[projectId]"
-   ],
-   "bindingHandlers": 3,
-   "passedHandlers": 0
-  },
-  {
    "file": "components/marketing/agency-mark.tsx",
    "lines": 131,
    "client": false,
@@ -15226,8 +15173,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -15242,6 +15187,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -16589,8 +16536,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -16605,6 +16550,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -17758,6 +17705,59 @@
     "/portal/[tenantSlug]/proposals/[proposalId]"
    ],
    "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/deliverable-row.tsx",
+   "lines": 150,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "DeliverableRow"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 122
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 127
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 140
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/deliverables/${deliverable.id}`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/deliverables/${deliverable.id}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 2,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 3,
    "passedHandlers": 0
   },
   {
@@ -20427,8 +20427,6 @@
     "/portal/[tenantSlug]/command",
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -20442,6 +20440,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
@@ -20590,8 +20590,6 @@
     "/portal/[tenantSlug]/contracts/[contractId]",
     "/portal/[tenantSlug]/contracts",
     "/portal/[tenantSlug]/dashboard",
-    "/portal/[tenantSlug]/delivery/[projectId]",
-    "/portal/[tenantSlug]/delivery",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/documents/new",
     "/portal/[tenantSlug]/documents",
@@ -20606,6 +20604,8 @@
     "/portal/[tenantSlug]/portals",
     "/portal/[tenantSlug]/processes",
     "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
     "/portal/[tenantSlug]/proposals/[proposalId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/portal/[tenantSlug]/proposals",
