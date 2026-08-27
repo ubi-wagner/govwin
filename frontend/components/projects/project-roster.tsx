@@ -72,8 +72,11 @@ export function ProjectRoster({
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">On this project</div>
       <ul className="flex flex-wrap gap-2 text-sm">
         {assignees.map((a) => (
-          <li key={a.userId} className="flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-gray-800">
-            {a.name || a.email || a.userId.slice(0, 8)}
+          <li key={a.userId} className="flex max-w-full items-center gap-1 rounded bg-gray-100 px-2 py-1 text-gray-800">
+            {/* A work address is longer than a phone is wide; whole, one chip becomes the row. */}
+            <span title={a.email ?? undefined} className="truncate">
+              {a.name || a.email || a.userId.slice(0, 8)}
+            </span>
             {canManage && (
               <button
                 type="button"

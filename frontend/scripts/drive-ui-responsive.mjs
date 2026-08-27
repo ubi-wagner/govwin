@@ -24,6 +24,7 @@
  *   cd frontend && node scripts/drive-ui-responsive.mjs
  */
 import { chromium } from 'playwright';
+import postgres from 'postgres';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -49,7 +50,13 @@ const LANES = [
   },
   {
     id: 'tenant', email: 'kate.ulepic@foundation3dp.com', pw: TENANT_PW,
-    routes: ['/portal/foundation/dashboard', '/portal/foundation/cards', '/portal/foundation/atoms', '/portal/foundation/proposals'],
+    // The PROJECT workspace is the densest page a tenant has — a plan, a checklist with inline
+    // edit rows, deliverables and comment threads — and it had never been photographed below `lg`
+    // at all, because this lane did not list it. A surface no viewport pass reaches is uncovered,
+    // not passing. `PROJECT_ROUTE` is resolved from the database at run time (below), because a
+    // hard-coded project id rots the first time the sandbox is reseeded.
+    routes: ['/portal/foundation/dashboard', '/portal/foundation/cards', '/portal/foundation/atoms',
+             '/portal/foundation/proposals', '/portal/foundation/projects', 'PROJECT_ROUTE'],
   },
   { id: 'anon', email: null, routes: ['/', '/pricing', '/login', '/federal-rd-101'] },
 ];
@@ -90,6 +97,34 @@ async function horizontalOverflow(page, viewportWidth) {
     }
     return { over: Math.round(over), worst };
   }, viewportWidth);
+}
+
+/**
+ * Resolve the placeholder routes from the live database.
+ *
+ * A hard-coded project id rots the first time the sandbox is reseeded, and a route that 404s
+ * photographs an empty page that looks like a clean pass. If the row is not there the placeholder
+ * is DROPPED and said so out loud — an unreachable route is uncovered, not passing.
+ */
+const DB = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+if (DB) {
+  const sql = postgres(DB, { max: 2, onnotice: () => {} });
+  try {
+    const [proj] = await sql`
+      SELECT p.id, t.slug FROM projects p JOIN tenants t ON t.id = p.tenant_id
+       WHERE t.slug = 'foundation' ORDER BY p.created_at LIMIT 1`;
+    for (const lane of LANES) {
+      const i = lane.routes.indexOf('PROJECT_ROUTE');
+      if (i < 0) continue;
+      if (proj) lane.routes[i] = `/portal/${proj.slug}/projects/${proj.id}`;
+      else { lane.routes.splice(i, 1); console.log('  · no project row — the workspace is UNPHOTOGRAPHED this run'); }
+    }
+  } finally { await sql.end(); }
+} else {
+  for (const lane of LANES) {
+    const i = lane.routes.indexOf('PROJECT_ROUTE');
+    if (i >= 0) { lane.routes.splice(i, 1); console.log('  · no DATABASE_URL — the project workspace is UNPHOTOGRAPHED this run'); }
+  }
 }
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });

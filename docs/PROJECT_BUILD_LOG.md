@@ -1768,3 +1768,87 @@ reaches people through the ToDo and the email regardless.
 the full lifecycle drive green, footprint removed.
 
 ---
+
+## M — The Projects UI on a phone
+
+### It had never been photographed there
+
+`drive-ui-responsive.mjs` shoots four tenant routes at 390 / 820 / 1440. The project workspace was
+not one of them, so the densest page a tenant has — a plan, a checklist with inline edit rows,
+deliverables, and now comment threads — had **never been rendered below the `lg` breakpoint by any
+instrument**. A surface no viewport pass reaches is uncovered, not passing.
+
+It is in the lane now, with the project id resolved from the database at run time: a hard-coded id
+rots the first time the sandbox is reseeded, and a route that 404s photographs an empty page that
+looks like a clean result. If the row is missing the placeholder is dropped and **said out loud**.
+
+### And a page at rest is still not the UI
+
+The responsive pass photographs each route AT REST and asserts the body never scrolls sideways.
+Both matter; neither reaches this page, because every dense thing on it is behind a click — the task
+edit row's four controls, the comment composer, the file input. `probe-project-mobile.mts` opens
+them all and then measures. Its verdict at 390px, before any change:
+
+**No overflow. No clipping.** Structurally sound, and the screenshot showed why that is not the same
+as usable:
+
+- One `flex-wrap` line carried the title, the due date, the assignee chip and two buttons, so a
+  single task wrapped into four ragged lines with nothing marking where one ended and the next
+  began. Two identical tasks looked structurally different depending on title length.
+- `ml-auto` threw Edit and Block onto a line of their own, under an unrelated row, where they read
+  as belonging to whatever was above them.
+- `kate.ulepic@foundation3dp.com` is wider than a phone, so one chip became the row.
+- The four-field edit panel put each control on its own line — a four-field edit became a scroll.
+
+### The house idiom, applied
+
+The codebase already had the answer, used 92 times: a `min-w-0 flex-1` content column that owns its
+own wrapping, `truncate` on identifiers, `flex-col sm:flex-row` to stack. So:
+
+- **The row became a column.** A fixed control, a content column with the title on its own line and
+  a meta group that wraps as one unit, and actions that never leave the top line.
+- **Identifiers truncate with a `title`** — `max-w-[11rem] truncate sm:max-w-none`, so the phone
+  gets an ellipsis and every width above `sm` gets the whole thing back.
+- **The edit panel is `grid-cols-2 sm:flex`** — the controls pair naturally, because they are two
+  pairs: who/when, and expected/reference.
+- **The deliverable row** stacks its actions below the title on a phone and restores `ml-auto`
+  above `sm`; a mention chip gets `break-all`, since one unbreakable token wider than the viewport
+  is the classic way a body forces the page sideways.
+
+Nothing changed above `sm`. The tablet and desktop captures are the layout that was already there.
+
+### The instrument disagreed with a decision, and the instrument was wrong
+
+The clipping check then fired on **five chips I had just truncated on purpose**. Reporting a
+deliberate, recoverable truncation as a defect achieves one thing: it teaches whoever runs the probe
+to skip that line.
+
+So the question narrowed to the one that matters — *is the clipped text reachable at all?* A `title`
+carrying it means yes; nothing carrying it means a word is simply gone, and the page photographs as
+tidy either way. That is **stronger** than the naive version, not weaker: a `truncate` added later
+without a title now fails, where before it would have been lost in the noise of five false ones.
+
+### Two writers, one file
+
+The probe writes `project-mobile.json` rather than appending to `responsive.json`, and
+`write-ui-docs.mjs` reads it as a third index. `drive-ui-responsive.mjs` rewrites its index whole on
+every run, so anything merged in would vanish the next time it ran — and the images would then read
+as orphans the doc generator offers to prune. Missing on disk resolves to `{shots: []}`, which is
+honest: the probe has not been run here.
+
+```
+── phone · 390px ──   ✓ nothing runs past the viewport with every panel open
+                      ✓ no text is clipped with no way to recover it
+── tablet · 820px ──  ✓ both, and the single-line layout is restored above sm
+
+docs/UI_STATES.md — 272 states · 20 sheets · 64 viewports · no orphaned images
+```
+
+The 61 controls under the 44px touch target are **reported, never failed** — 54 of them are the nav
+rail's own 208×36 links, which is the app-wide convention, and failing a number that is mostly
+somebody else's design decision is how a check gets silenced.
+
+`tsc` 0 · vitest 219 files / 2,204 · surfaces 82/82 · api-contract clean · responsive pass: no
+sideways scroll at any width, nav semantics correct.
+
+---

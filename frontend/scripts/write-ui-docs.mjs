@@ -41,6 +41,15 @@ const atlasSheets = readJson(path.join(ATLAS, 'sheets.json'), 'the atlas sheets'
 const states = readJson(path.join(STATES, 'index.json'), 'the states index');
 const stateSheets = readJson(path.join(STATES, 'sheets.json'), 'the states sheets');
 const responsive = readJson(path.join(STATES, 'responsive.json'), 'the responsive index');
+/**
+ * The dense-state phone probe writes its OWN index rather than appending to `responsive.json`.
+ *
+ * Two writers on one file is how the second one's entries quietly vanish: `drive-ui-responsive.mjs`
+ * rewrites `responsive.json` whole on every run, so anything the probe had merged in would be gone
+ * the next time the responsive pass ran — and the images would then read as orphans that never
+ * existed. Missing on disk is `{shots:[]}`, which is honest: the probe has not been run here.
+ */
+const projectMobile = readJson(path.join(STATES, 'project-mobile.json'), 'the project-mobile index');
 
 const count = (rows, key) => rows.reduce((m, r) => (m[r[key]] = (m[r[key]] ?? 0) + 1, m), {});
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|');
@@ -222,20 +231,21 @@ S.push('## Viewport captures');
 S.push('');
 S.push('| lane | route | viewport | image |');
 S.push('|---|---|---|---|');
-for (const s of responsive.shots) {
-  S.push(`| ${s.lane} | \`${esc(s.route)}\` | ${s.viewport}${/nav-open/.test(s.file) ? ' · **nav open**' : ''} | \`${s.file}\` |`);
+for (const s of [...responsive.shots, ...(projectMobile.shots ?? [])]) {
+  S.push(`| ${s.lane} | \`${esc(s.route)}\` | ${s.viewport}${/nav-open/.test(s.file) ? ' · **nav open**' : ''}${/-open\./.test(s.file) ? ' · **panels open**' : ''} | \`${s.file}\` |`);
 }
 S.push('');
 fs.writeFileSync(path.join(REPO, 'docs/UI_STATES.md'), `${S.join('\n')}\n`);
 
 console.log(`✓ docs/UI_ATLAS.md  — ${atlas.shots.length} shot(s) · ${atlasSheets.length} sheet(s) · ${broken.length} broken`);
 console.log(`✓ docs/UI_STATES.md — ${states.shots.length} state(s) across ${states.routesDriven} route(s) `
-  + `· ${stateSheets.length} sheet(s) · ${responsive.shots.length} viewport(s) · ${states.findings?.length ?? 0} finding(s)`);
+  + `· ${stateSheets.length} sheet(s) · ${responsive.shots.length + (projectMobile.shots?.length ?? 0)} viewport(s) `
+  + `· ${states.findings?.length ?? 0} finding(s)`);
 
 // ── prune ────────────────────────────────────────────────────────────────────────────────────
 // A screenshot no index references is evidence from a run that no longer exists, sitting in the same
 // directory as evidence that does. They are indistinguishable by looking.
-const referenced = new Set([...states.shots, ...responsive.shots].map((s) => s.file)
+const referenced = new Set([...states.shots, ...responsive.shots, ...(projectMobile.shots ?? [])].map((s) => s.file)
   .concat(stateSheets.map((s) => s.file)));
 const orphans = fs.readdirSync(STATES).filter((f) => /\.(jpg|png)$/.test(f) && !referenced.has(f));
 if (!orphans.length) console.log('  no orphaned state images');

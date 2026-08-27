@@ -1,0 +1,18 @@
+{
+ "shots": [
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/[projectId]",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__project-workspace__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/[projectId]",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "probe__project-workspace__vp-tablet-open.jpg"
+  }
+ ]
+}

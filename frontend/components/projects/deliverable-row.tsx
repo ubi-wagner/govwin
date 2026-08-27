@@ -121,7 +121,11 @@ export function DeliverableRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-2">
+    // Same shape as a checklist row: a `min-w-0` content column that owns its own wrapping, and
+    // an action group that stays put. `ml-auto` inside a wrapping row throws the verbs onto a line
+    // of their own at phone width, where they read as belonging to whatever is above them.
+    <li className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span className="text-gray-900">{deliverable.title}</span>
 
       {accepted ? (
@@ -139,18 +143,22 @@ export function DeliverableRow({
       )}
 
       {deliverable.filename && (
-        <span className="text-xs text-gray-500">{deliverable.filename}</span>
+        <span title={deliverable.filename} className="max-w-[12rem] truncate text-xs text-gray-500 sm:max-w-none">
+          {deliverable.filename}
+        </span>
       )}
       {authored && (
         <a
           href={`/portal/${tenantSlug}/documents/${deliverable.documentId}`}
-          className="text-xs text-blue-700 hover:underline"
+          title={deliverable.documentTitle ?? 'Open the document'}
+          className="max-w-[12rem] truncate text-xs text-blue-700 hover:underline sm:max-w-none"
         >
           {deliverable.documentTitle || 'Open the document'}
         </a>
       )}
+      </div>
 
-      <span className="ml-auto flex items-center gap-2">
+      <span className="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:flex-nowrap">
         <input
           ref={fileRef}
           type="file"

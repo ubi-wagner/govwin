@@ -26,7 +26,7 @@ list, an expander reveals a row, a card selects and swaps the pane beside it.
 | `validation` | 4 | the primary submit pressed with the form EMPTY |
 | **total** | **272** | across **126 routes** driven, in **5 lanes** (anon 2 · tenant 92 · tenant2 79 · admin 98 · partner 1) |
 
-Plus **52** viewport captures (phone 390 · tablet 820 · desktop 1440), including the mobile nav drawer as a real overlay — a state the desktop pass structurally cannot reach.
+Plus **62** viewport captures (phone 390 · tablet 820 · desktop 1440), including the mobile nav drawer as a real overlay — a state the desktop pass structurally cannot reach.
 
 ## Findings — reported, not swallowed
 
@@ -357,45 +357,55 @@ Every one intercepted and **dismissed** — the drive never accepts a destructiv
 | lane | route | viewport | image |
 |---|---|---|---|
 | admin | `/admin/dashboard` | phone | `admin__admin-dashboard__vp-phone.jpg` |
-| admin | `/admin/dashboard` | phone · **nav open** | `admin__admin-dashboard__vp-phone-nav-open.jpg` |
+| admin | `/admin/dashboard` | phone · **nav open** · **panels open** | `admin__admin-dashboard__vp-phone-nav-open.jpg` |
 | admin | `/admin/dashboard` | tablet | `admin__admin-dashboard__vp-tablet.jpg` |
-| admin | `/admin/dashboard` | tablet · **nav open** | `admin__admin-dashboard__vp-tablet-nav-open.jpg` |
+| admin | `/admin/dashboard` | tablet · **nav open** · **panels open** | `admin__admin-dashboard__vp-tablet-nav-open.jpg` |
 | admin | `/admin/dashboard` | desktop | `admin__admin-dashboard__vp-desktop.jpg` |
 | admin | `/admin/tenants` | phone | `admin__admin-tenants__vp-phone.jpg` |
-| admin | `/admin/tenants` | phone · **nav open** | `admin__admin-tenants__vp-phone-nav-open.jpg` |
+| admin | `/admin/tenants` | phone · **nav open** · **panels open** | `admin__admin-tenants__vp-phone-nav-open.jpg` |
 | admin | `/admin/tenants` | tablet | `admin__admin-tenants__vp-tablet.jpg` |
-| admin | `/admin/tenants` | tablet · **nav open** | `admin__admin-tenants__vp-tablet-nav-open.jpg` |
+| admin | `/admin/tenants` | tablet · **nav open** · **panels open** | `admin__admin-tenants__vp-tablet-nav-open.jpg` |
 | admin | `/admin/tenants` | desktop | `admin__admin-tenants__vp-desktop.jpg` |
 | admin | `/admin/rfp-curation` | phone | `admin__admin-rfp-curation__vp-phone.jpg` |
-| admin | `/admin/rfp-curation` | phone · **nav open** | `admin__admin-rfp-curation__vp-phone-nav-open.jpg` |
+| admin | `/admin/rfp-curation` | phone · **nav open** · **panels open** | `admin__admin-rfp-curation__vp-phone-nav-open.jpg` |
 | admin | `/admin/rfp-curation` | tablet | `admin__admin-rfp-curation__vp-tablet.jpg` |
-| admin | `/admin/rfp-curation` | tablet · **nav open** | `admin__admin-rfp-curation__vp-tablet-nav-open.jpg` |
+| admin | `/admin/rfp-curation` | tablet · **nav open** · **panels open** | `admin__admin-rfp-curation__vp-tablet-nav-open.jpg` |
 | admin | `/admin/rfp-curation` | desktop | `admin__admin-rfp-curation__vp-desktop.jpg` |
 | admin | `/admin/events` | phone | `admin__admin-events__vp-phone.jpg` |
-| admin | `/admin/events` | phone · **nav open** | `admin__admin-events__vp-phone-nav-open.jpg` |
+| admin | `/admin/events` | phone · **nav open** · **panels open** | `admin__admin-events__vp-phone-nav-open.jpg` |
 | admin | `/admin/events` | tablet | `admin__admin-events__vp-tablet.jpg` |
-| admin | `/admin/events` | tablet · **nav open** | `admin__admin-events__vp-tablet-nav-open.jpg` |
+| admin | `/admin/events` | tablet · **nav open** · **panels open** | `admin__admin-events__vp-tablet-nav-open.jpg` |
 | admin | `/admin/events` | desktop | `admin__admin-events__vp-desktop.jpg` |
 | tenant | `/portal/foundation/dashboard` | phone | `tenant__portal-foundation-dashboard__vp-phone.jpg` |
-| tenant | `/portal/foundation/dashboard` | phone · **nav open** | `tenant__portal-foundation-dashboard__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/dashboard` | phone · **nav open** · **panels open** | `tenant__portal-foundation-dashboard__vp-phone-nav-open.jpg` |
 | tenant | `/portal/foundation/dashboard` | tablet | `tenant__portal-foundation-dashboard__vp-tablet.jpg` |
-| tenant | `/portal/foundation/dashboard` | tablet · **nav open** | `tenant__portal-foundation-dashboard__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/dashboard` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-dashboard__vp-tablet-nav-open.jpg` |
 | tenant | `/portal/foundation/dashboard` | desktop | `tenant__portal-foundation-dashboard__vp-desktop.jpg` |
 | tenant | `/portal/foundation/cards` | phone | `tenant__portal-foundation-cards__vp-phone.jpg` |
-| tenant | `/portal/foundation/cards` | phone · **nav open** | `tenant__portal-foundation-cards__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/cards` | phone · **nav open** · **panels open** | `tenant__portal-foundation-cards__vp-phone-nav-open.jpg` |
 | tenant | `/portal/foundation/cards` | tablet | `tenant__portal-foundation-cards__vp-tablet.jpg` |
-| tenant | `/portal/foundation/cards` | tablet · **nav open** | `tenant__portal-foundation-cards__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/cards` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-cards__vp-tablet-nav-open.jpg` |
 | tenant | `/portal/foundation/cards` | desktop | `tenant__portal-foundation-cards__vp-desktop.jpg` |
 | tenant | `/portal/foundation/atoms` | phone | `tenant__portal-foundation-atoms__vp-phone.jpg` |
-| tenant | `/portal/foundation/atoms` | phone · **nav open** | `tenant__portal-foundation-atoms__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/atoms` | phone · **nav open** · **panels open** | `tenant__portal-foundation-atoms__vp-phone-nav-open.jpg` |
 | tenant | `/portal/foundation/atoms` | tablet | `tenant__portal-foundation-atoms__vp-tablet.jpg` |
-| tenant | `/portal/foundation/atoms` | tablet · **nav open** | `tenant__portal-foundation-atoms__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/atoms` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-atoms__vp-tablet-nav-open.jpg` |
 | tenant | `/portal/foundation/atoms` | desktop | `tenant__portal-foundation-atoms__vp-desktop.jpg` |
 | tenant | `/portal/foundation/proposals` | phone | `tenant__portal-foundation-proposals__vp-phone.jpg` |
-| tenant | `/portal/foundation/proposals` | phone · **nav open** | `tenant__portal-foundation-proposals__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/proposals` | phone · **nav open** · **panels open** | `tenant__portal-foundation-proposals__vp-phone-nav-open.jpg` |
 | tenant | `/portal/foundation/proposals` | tablet | `tenant__portal-foundation-proposals__vp-tablet.jpg` |
-| tenant | `/portal/foundation/proposals` | tablet · **nav open** | `tenant__portal-foundation-proposals__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/proposals` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-proposals__vp-tablet-nav-open.jpg` |
 | tenant | `/portal/foundation/proposals` | desktop | `tenant__portal-foundation-proposals__vp-desktop.jpg` |
+| tenant | `/portal/foundation/projects` | phone | `tenant__portal-foundation-projects__vp-phone.jpg` |
+| tenant | `/portal/foundation/projects` | phone · **nav open** · **panels open** | `tenant__portal-foundation-projects__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/projects` | tablet | `tenant__portal-foundation-projects__vp-tablet.jpg` |
+| tenant | `/portal/foundation/projects` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-projects__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/projects` | desktop | `tenant__portal-foundation-projects__vp-desktop.jpg` |
+| tenant | `/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722` | phone | `tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-phone.jpg` |
+| tenant | `/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722` | phone · **nav open** · **panels open** | `tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-phone-nav-open.jpg` |
+| tenant | `/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722` | tablet | `tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-tablet.jpg` |
+| tenant | `/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722` | tablet · **nav open** · **panels open** | `tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-tablet-nav-open.jpg` |
+| tenant | `/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722` | desktop | `tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-desktop.jpg` |
 | anon | `/` | phone | `anon__x__vp-phone.jpg` |
 | anon | `/` | tablet | `anon__x__vp-tablet.jpg` |
 | anon | `/` | desktop | `anon__x__vp-desktop.jpg` |
@@ -408,4 +418,6 @@ Every one intercepted and **dismissed** — the drive never accepts a destructiv
 | anon | `/federal-rd-101` | phone | `anon__federal-rd-101__vp-phone.jpg` |
 | anon | `/federal-rd-101` | tablet | `anon__federal-rd-101__vp-tablet.jpg` |
 | anon | `/federal-rd-101` | desktop | `anon__federal-rd-101__vp-desktop.jpg` |
+| tenant | `/portal/foundation/projects/[projectId]` | phone · **panels open** | `probe__project-workspace__vp-phone-open.jpg` |
+| tenant | `/portal/foundation/projects/[projectId]` | tablet · **panels open** | `probe__project-workspace__vp-tablet-open.jpg` |
 

@@ -385,6 +385,17 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   (1977 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **The project workspace is the densest tenant page, and it was never photographed below `lg`.**
+  `drive-ui-responsive.mjs` shoots 390/820/1440 but its tenant lane did not list it (now it does,
+  with the project id resolved from the DB — a hard-coded id rots on reseed and a 404 photographs
+  as a clean page). Even that is not enough: the responsive pass shoots each route AT REST, and
+  every dense thing on that page is behind a click. `probe-project-mobile.mts` OPENS them — the
+  task edit row, the comment composer, the file input — then measures overflow, tap size and
+  clipping. Its rule on clipping is the one worth carrying: **a deliberate `truncate` with a
+  `title` is not a defect; clipped text with no way to recover it is.** The naive version fired on
+  five chips truncated on purpose, which only teaches a reader to skip the line. It writes its own
+  `project-mobile.json` — `responsive.json` is rewritten whole each run, so a second writer's
+  entries would vanish and its images would read as orphans.
 - **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
   `drive-ui-responsive.mjs`) opens every overlay and walks it — open → validation → filled → close —
   intercepts every native `confirm()`/`prompt()` (recording the message, always DISMISSING), catches

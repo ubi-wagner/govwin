@@ -321,6 +321,86 @@
    "kind": "viewport"
   },
   {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-projects__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-projects__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-projects__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-projects__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-projects__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-phone.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "viewport": "phone",
+   "width": 390,
+   "file": "tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-phone-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-tablet.jpg",
+   "kind": "viewport"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "viewport": "tablet",
+   "width": 820,
+   "file": "tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-tablet-nav-open.jpg",
+   "kind": "nav-drawer-open"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "viewport": "desktop",
+   "width": 1440,
+   "file": "tenant__portal-foundation-projects-e9c0a1ea-26c4-484c-__vp-desktop.jpg",
+   "kind": "viewport"
+  },
+  {
    "lane": "anon",
    "route": "/",
    "viewport": "phone",

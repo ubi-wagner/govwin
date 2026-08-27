@@ -175,47 +175,70 @@ export function MilestoneChecklist({
 
       <ul className="space-y-1.5 text-sm">
         {tasks.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-start gap-2">
+          // ── THE ROW IS A COLUMN ON A PHONE ────────────────────────────────────────────────
+          // It used to be one `flex-wrap` line carrying the title, the date, the assignee chip and
+          // two buttons. At 390px that wraps into four ragged lines with nothing marking where one
+          // task ends and the next begins, and `ml-auto` throws the verbs onto a line of their own
+          // under an unrelated row. The house idiom fixes it: a fixed control, a `min-w-0 flex-1`
+          // content column that OWNS its wrapping, and actions that never leave the top line.
+          <li key={t.id}>
+            <div className="flex items-start gap-2">
             <button
               type="button"
               aria-label={t.status === 'done' ? `Reopen ${t.title}` : `Mark ${t.title} done`}
               disabled={busy !== null || milestoneMet}
               onClick={() => void setStatus(t, t.status === 'done' ? 'open' : 'done')}
-              className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border ${DOT[t.status]} disabled:opacity-50`}
+              className={`mt-1 h-4 w-4 shrink-0 rounded-full border ${DOT[t.status]} disabled:opacity-50`}
             />
-            <span className={t.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'}>
-              {t.title}
-            </span>
-            {t.dueDate && (
-              <span className="text-xs text-gray-500">due {String(t.dueDate).slice(0, 10)}</span>
-            )}
-            {(t.assigneeEmail || t.assigneeRole) && (
-              <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
-                {t.assigneeEmail ?? t.assigneeRole}
+            <div className="min-w-0 flex-1 space-y-1">
+              <span className={`block ${t.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                {t.title}
               </span>
-            )}
-            {/* The assignee's own forecast, shown only when it DISAGREES with the promise. Agreement
-                is the normal case and needs no ink; the gap is the whole signal. */}
-            {slipDays(t.dueDate, t.estimatedCompletion) > 0 && t.status !== 'done' && (
-              <span
-                title={`Assignee expects ${String(t.estimatedCompletion).slice(0, 10)}`}
-                className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30"
-              >
-                expects {slipDays(t.dueDate, t.estimatedCompletion)}d late
-              </span>
-            )}
-            {t.status === 'blocked' && (
-              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30">
-                blocked — {t.blockedReason}
-              </span>
-            )}
-            {(t.attachments ?? []).map((a) => (
-              <span key={a.id} className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
-                📎 {a.filename}
-              </span>
-            ))}
+              {/* The meta line: everything ABOUT the task, wrapping as one group rather than each
+                  fragment competing with the title for the same line. */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {t.dueDate && (
+                  <span className="text-xs text-gray-500">due {String(t.dueDate).slice(0, 10)}</span>
+                )}
+                {(t.assigneeEmail || t.assigneeRole) && (
+                  // `max-w` + `truncate`: a work address is longer than a phone is wide, and left
+                  // whole it pushes everything else onto its own line. The title attribute keeps
+                  // the full value one hover (or long-press) away.
+                  <span
+                    title={t.assigneeEmail ?? t.assigneeRole ?? ''}
+                    className="max-w-[11rem] truncate rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 sm:max-w-none"
+                  >
+                    {t.assigneeEmail ?? t.assigneeRole}
+                  </span>
+                )}
+                {/* The assignee's own forecast, shown only when it DISAGREES with the promise.
+                    Agreement is the normal case and needs no ink; the gap is the whole signal. */}
+                {slipDays(t.dueDate, t.estimatedCompletion) > 0 && t.status !== 'done' && (
+                  <span
+                    title={`Assignee expects ${String(t.estimatedCompletion).slice(0, 10)}`}
+                    className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30"
+                  >
+                    expects {slipDays(t.dueDate, t.estimatedCompletion)}d late
+                  </span>
+                )}
+                {t.status === 'blocked' && (
+                  <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30">
+                    blocked — {t.blockedReason}
+                  </span>
+                )}
+                {(t.attachments ?? []).map((a) => (
+                  <span
+                    key={a.id}
+                    title={a.filename}
+                    className="max-w-[11rem] truncate rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 sm:max-w-none"
+                  >
+                    📎 {a.filename}
+                  </span>
+                ))}
+              </div>
+            </div>
             {!milestoneMet && t.status !== 'done' && (
-              <span className="ml-auto flex items-center gap-1.5">
+              <span className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   disabled={busy !== null}
@@ -234,10 +257,15 @@ export function MilestoneChecklist({
                 </button>
               </span>
             )}
+            </div>
 
             {editing === t.id && (
-              <div className="w-full rounded border border-gray-200 bg-gray-50 p-2">
-                <div className="flex flex-wrap items-end gap-2">
+              <div className="mt-1.5 rounded border border-gray-200 bg-gray-50 p-2">
+                {/* Two columns on a phone, a single row once there is width for one. `flex-wrap`
+                    alone put each control on its own line at 390px, turning a four-field edit into
+                    a scroll; the controls pair naturally because they are two pairs — who/when,
+                    and expected/reference. */}
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end">
                   <label className="text-[11px] text-gray-600">
                     Owner
                     <select
@@ -245,7 +273,7 @@ export function MilestoneChecklist({
                       aria-label={`Owner of ${t.title}`}
                       onChange={(e) => void edit(t.id, { assigneeUserId: e.target.value || null })}
                       disabled={busy !== null}
-                      className="mt-0.5 block rounded border border-gray-300 px-1.5 py-1 text-xs"
+                      className="mt-0.5 block w-full rounded border border-gray-300 px-1.5 py-1 text-xs sm:w-auto"
                     >
                       <option value="">Unassigned</option>
                       {members.map((m) => <option key={m.id} value={m.id}>{m.email}</option>)}
@@ -259,7 +287,7 @@ export function MilestoneChecklist({
                       aria-label={`Due date of ${t.title}`}
                       onBlur={(e) => { if (e.target.value !== (t.dueDate ? String(t.dueDate).slice(0, 10) : '')) void edit(t.id, { dueDate: e.target.value || null }); }}
                       disabled={busy !== null}
-                      className="mt-0.5 block rounded border border-gray-300 px-1.5 py-1 text-xs"
+                      className="mt-0.5 block w-full rounded border border-gray-300 px-1.5 py-1 text-xs sm:w-auto"
                     />
                   </label>
                   <label className="text-[11px] text-gray-600" title="Your own forecast — it may run past the due date, and saying so early is the point">
@@ -270,7 +298,7 @@ export function MilestoneChecklist({
                       aria-label={`Expected completion of ${t.title}`}
                       onBlur={(e) => { if (e.target.value !== (t.estimatedCompletion ? String(t.estimatedCompletion).slice(0, 10) : '')) void edit(t.id, { estimatedCompletion: e.target.value || null }); }}
                       disabled={busy !== null}
-                      className="mt-0.5 block rounded border border-gray-300 px-1.5 py-1 text-xs"
+                      className="mt-0.5 block w-full rounded border border-gray-300 px-1.5 py-1 text-xs sm:w-auto"
                     />
                   </label>
                   <label className="text-[11px] text-gray-600">
@@ -280,7 +308,7 @@ export function MilestoneChecklist({
                       aria-label={`Attach a reference to ${t.title}`}
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(t.id, f); e.target.value = ''; }}
                       disabled={busy !== null}
-                      className="mt-0.5 block w-44 text-[11px]"
+                      className="mt-0.5 block w-full text-[11px] sm:w-44"
                     />
                   </label>
                 </div>
@@ -301,20 +329,23 @@ export function MilestoneChecklist({
 
       {canManage && !milestoneMet && (
         adding ? (
+          // `min-w-[14rem]` on the title made this row wider than a phone before it could wrap, so
+          // the date and the buttons each landed on their own line. Full width below `sm`, the
+          // original row above it.
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What needs doing?"
               aria-label="Task title"
-              className="min-w-[14rem] flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+              className="w-full rounded border border-gray-300 px-2 py-1 text-sm sm:min-w-[14rem] sm:flex-1"
             />
             <input
               type="date"
               value={due}
               onChange={(e) => setDue(e.target.value)}
               aria-label="Task due date"
-              className="rounded border border-gray-300 px-2 py-1 text-sm"
+              className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm sm:flex-none"
             />
             <button
               type="button"

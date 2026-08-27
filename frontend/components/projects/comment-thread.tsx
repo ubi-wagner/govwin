@@ -39,7 +39,9 @@ function withMentions(text: string) {
   const parts = text.split(/(^|[\s(\[<])(@[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g);
   return parts.map((part, i) =>
     part.startsWith('@')
-      ? <span key={i} className="rounded bg-blue-50 px-1 font-medium text-blue-800">{part}</span>
+      // `break-all` on the chip only: a mention is one long unbreakable token, and a token wider
+      // than the viewport is the classic way a body forces the page sideways.
+      ? <span key={i} className="break-all rounded bg-blue-50 px-1 font-medium text-blue-800">{part}</span>
       : <span key={i}>{part}</span>);
 }
 
@@ -110,7 +112,9 @@ export function CommentThread({
   const line = (c: ThreadComment, isReply: boolean) => (
     <li key={c.id} className={isReply ? 'ml-5 border-l border-gray-200 pl-3' : ''}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-xs font-medium text-gray-900">{who(c)}</span>
+        <span title={who(c)} className="max-w-[13rem] truncate text-xs font-medium text-gray-900 sm:max-w-none">
+          {who(c)}
+        </span>
         {/* Never `Date.now()` during render — a clock read makes output a function of WHEN it
             rendered, React throws #418 and hydration fails for the subtree at HTTP 200. */}
         <span className="text-[11px] text-gray-500"><TimeAgo iso={c.createdAt ?? ''} /></span>
@@ -193,7 +197,10 @@ export function CommentThread({
               placeholder="Say something. @email to notify someone on this project."
               className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
             />
-            <div className="mt-1 flex items-center gap-2">
+            {/* Wrapping, and the feedback below the button rather than beside it: "Not on this
+                project, so not notified: …" is a sentence, and at phone width a sentence sharing a
+                line with a button is a sentence nobody reads. */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <button
                 type="button"
                 disabled={busy || !draft.trim()}
