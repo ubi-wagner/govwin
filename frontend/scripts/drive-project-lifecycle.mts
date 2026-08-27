@@ -573,6 +573,59 @@ async function main() {
     'the metrics round-trip as an OBJECT — jsonb, not a string that char-iterates',
     JSON.stringify(rec?.metrics));
 
+  // ══ 7e · CANVAS DELIVERABLES — a report, a deck, a workbook, a PDF ══════════════════════════
+  //
+  // The build portal's authoring stack, applied to a contract deliverable: the same presets, the
+  // same `tenant_documents` row, the same editor, the same export to docx · pptx · xlsx · pdf.
+  phase('7e · deliverables authored in-product, and exported');
+
+  const authoredDel = await api(req, 'post', P + '/deliverables', {
+    milestoneId: workPhase, title: 'Monthly technical report', requiredBy: iso(110),
+  });
+  const authoredId = ((authoredDel.json.data as Json)?.deliverable as Json)?.id as string | undefined;
+  A(authoredDel.status === 201, 'a second deliverable is declared', `${authoredDel.status}`);
+
+  const notYet = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'accept' });
+  A(notYet.status === 409 && String((notYet.json as Json).code) === 'NOTHING_ATTACHED',
+    'it cannot be accepted with nothing attached — file OR document',
+    `${notYet.status} ${String((notYet.json as Json).code)}`);
+
+  const drafted = await api(req, 'patch', P + `/deliverables/${authoredId}`, {
+    action: 'author', preset: 'letter', title: 'Monthly technical report — March',
+  });
+  A(drafted.status === 201, 'a report is drafted in-product', `${drafted.status}`);
+  const docId = ((drafted.json.data as Json)?.document as Json)?.documentId as string | undefined;
+  A(Boolean(docId), 'and it is a real tenant_documents row the canvas editor opens');
+
+  const twiceDrafted = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'author', preset: 'deck' });
+  A(twiceDrafted.status === 409 && String((twiceDrafted.json as Json).code) === 'ALREADY_AUTHORED',
+    'asking twice hands back a refusal, not a second draft nobody will find',
+    `${twiceDrafted.status}`);
+
+  // The EXPORT — the same route the build portal uses, in every format it offers.
+  const [docRow] = await sql<{ canvas: unknown }[]>`
+    SELECT canvas FROM tenant_documents WHERE id = ${docId ?? null}::uuid`;
+  A(Boolean(docRow), 'the canvas is stored');
+  // A byte COUNT is not evidence a file is that format — an error page is bytes too. Check the
+  // magic number: `%PDF` for pdf, `PK` (a zip) for the three OOXML formats.
+  const MAGIC: Record<string, string> = { pdf: '%PDF', docx: 'PK', pptx: 'PK', xlsx: 'PK' };
+  for (const fmt of ['docx', 'pdf', 'pptx', 'xlsx'] as const) {
+    const exp = await req.fetch(`${BASE}/api/portal/${TENANT}/documents/${docId}/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      data: { document: docRow?.canvas, format: fmt },
+    });
+    const buf = await exp.body();
+    const head = buf.subarray(0, 4).toString('latin1');
+    A(exp.status() === 200 && head.startsWith(MAGIC[fmt]),
+      `it exports as .${fmt} through the SAME route a proposal volume uses`,
+      `${exp.status()} · ${buf.length} bytes · starts ${JSON.stringify(head)}`);
+  }
+
+  // Authoring is not acceptance — the rule survives the new path.
+  const acceptedDoc = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'accept' });
+  A(acceptedDoc.status === 200, 'and once authored, a tenant_admin can accept it', `${acceptedDoc.status}`);
+
   // ══ 7c · DB → UI → DB: the page states what the tables hold ════════════════════════════════
   //
   // The whole point of "full DB to UI and back again". Everything above wrote through the API; this

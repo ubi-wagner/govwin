@@ -314,9 +314,12 @@ export default async function ProjectPage({
                             id: d.id, title: d.title, filename: d.filename,
                             storageKey: d.storageKey,
                             acceptedAt: d.acceptedAt ? String(d.acceptedAt) : null,
+                            documentId: d.documentId ?? null,
+                            documentTitle: d.documentTitle ?? null,
                           }}
                           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
                           canAccept={canAccept}
+                          tenantSlug={tenantSlug}
                         />
                       ))}
                     </ul>

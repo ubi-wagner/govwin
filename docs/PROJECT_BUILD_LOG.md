@@ -1350,3 +1350,75 @@ with no renderer · the full lifecycle drive green.
 
 ---
 
+
+## G2 — Canvas deliverables: the report, the deck, the workbook and the PDF
+
+*"the canvas system is great here as well because reports and slide deck and xls and pdf deliverables
+can be implemented here nearly the same as the proposal build portal"*
+
+### One column, not a second subsystem
+
+The build portal already has everything a project needs to produce a deliverable: `tenant_documents`
+holds a `CanvasDocument`, the canvas editor edits it, the compliance floor measures it, and
+`…/documents/[id]/export` renders **docx · pptx · xlsx · pdf**. None of that is proposal-specific.
+What was missing was one column saying *this deliverable IS that document* — mig 220,
+`project_deliverables.document_id`.
+
+A parallel authoring path for projects would have meant a second editor to keep in step with the
+first and a second export pipeline to keep correct — the same argument that made project ToDos a
+projection onto the platform queue rather than a queue of their own.
+
+```
+project_deliverables.document_id ──▶ tenant_documents (CanvasDocument)
+                                        ↓ the SAME editor, floor and exporters
+                                     docx · pptx · xlsx · pdf
+```
+
+`ON DELETE SET NULL`, deliberately, and not CASCADE: deleting the document must not delete the
+**deliverable**. The obligation to produce it survives losing the draft — that is the whole reason a
+deliverable is a row rather than a file. A partial unique index keeps one document behind at most one
+obligation, so accepting one can never look like evidence for another.
+
+### Attaching widened; accepting did not
+
+`storage_key` (an uploaded file) and `document_id` (an authored canvas) are two ways to **attach**
+evidence. Neither is acceptance. `accepted_at` remains the separate, deliberate act by a
+`tenant_admin`, because a deck someone wrote is not a deliverable the customer has signed for — the
+same two-facts rule the upload path has always carried.
+
+What that changed is the refusal: `NOTHING_UPLOADED` → **`NOTHING_ATTACHED`**, with a message naming
+both ways out. "Upload one first" is wrong advice to give someone whose deliverable is a report they
+are meant to write here. The CAS predicate widened to an `OR` of the two attachments — an `AND` would
+make an authored document unacceptable, and a missing arm would let an empty deliverable close a
+milestone. Both halves are asserted, including a case proving a deliverable backed **only** by a
+document accepts.
+
+### Proven, as the actors
+
+```
+✓ it cannot be accepted with nothing attached — file OR document — 409 NOTHING_ATTACHED
+✓ a report is drafted in-product — 201
+✓ asking twice hands back a refusal, not a second draft nobody will find — 409
+✓ it exports as .docx … 200 ·  8,604 bytes · starts "PK"
+✓ it exports as .pdf  … 200 ·    865 bytes · starts "%PDF"
+✓ it exports as .pptx … 200 · 45,368 bytes · starts "PK"
+✓ it exports as .xlsx … 200 ·  5,336 bytes · starts "PK"
+✓ and once authored, a tenant_admin can accept it — 200
+```
+
+The export assertion checks **magic numbers**, not byte counts: a non-zero length proves the route
+answered, not that anything can open what came back. `%PDF` and the `PK` local-file header are the
+least a reader needs.
+
+**Two failures worth recording.** The `author` action 400'd persistently against a `.next/standalone`
+that did not exist while a server from an hour earlier kept serving the old route — the fix was
+`rm -rf .next && next build`, and the lesson is to verify `BUILD_ID present · standalone present` and
+grep the built route for the new literal before believing a 4xx. And an edit to the deliverable route
+silently did not apply: the body is nested inside `withProject`, so it is indented six spaces, not
+four, and a patch written against four matched nothing.
+
+`tsc` 0 · vitest 216 files / **2,146** · api-contract 141 GETs, reachability clean · write-contract
+230/230 · surfaces 82/82 · spine audit 0 dead triggers, 119 step actions resolve, 0 templates with no
+renderer.
+
+---

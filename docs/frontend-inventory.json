@@ -5,7 +5,7 @@
   {
    "kind": "api-route",
    "files": 264,
-   "lines": 41357
+   "lines": 41371
   },
   {
    "kind": "app-boundary",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 165,
-   "lines": 41830
+   "lines": 41882
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 306,
-   "lines": 61115
+   "files": 307,
+   "lines": 61435
   },
   {
    "kind": "middleware",
@@ -55,12 +55,12 @@
   {
    "kind": "page",
    "files": 118,
-   "lines": 17950
+   "lines": 17953
   },
   {
    "kind": "script",
    "files": 186,
-   "lines": 25228
+   "lines": 25337
   },
   {
    "kind": "server-action",
@@ -48193,8 +48193,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts",
    "kind": "api-route",
-   "lines": 60,
-   "bytes": 2905,
+   "lines": 74,
+   "bytes": 3647,
    "client": false,
    "exports": [
     {
@@ -48225,7 +48225,8 @@
      "spec": "@/lib/projects/milestones",
      "names": [
       "acceptDeliverable",
-      "uploadDeliverable"
+      "uploadDeliverable",
+      "authorDeliverable"
      ]
     }
    ],
@@ -48241,6 +48242,7 @@
     "file.arrayBuffer",
     "console.error",
     "request.json",
+    "authorDeliverable",
     "acceptDeliverable"
    ],
    "jsx": [],
@@ -48278,24 +48280,34 @@
      "line": 45
     },
     {
-     "arg": "{ error: \"action must be 'accept'\", code: 'VALIDATION_ERROR' }",
+     "arg": "{ error: made.error, code: made.code }",
+     "opts": "{ status: made.status }",
+     "line": 54
+    },
+    {
+     "arg": "{ data: { document: made.data } }",
+     "opts": "{ status: 201 }",
+     "line": 55
+    },
+    {
+     "arg": "{ error: \"action must be 'accept' or 'author'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 48
+     "line": 59
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 52
+     "line": 66
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "",
-     "line": 53
+     "line": 67
     },
     {
      "arg": "{ error: 'Failed to accept the deliverable', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 57
+     "line": 71
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
@@ -68447,8 +68459,8 @@
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
    "kind": "page",
-   "lines": 358,
-   "bytes": 16801,
+   "lines": 361,
+   "bytes": 16981,
    "client": false,
    "exports": [
     {
@@ -80254,8 +80266,8 @@
   {
    "file": "components/projects/deliverable-row.tsx",
    "kind": "component",
-   "lines": 150,
-   "bytes": 5486,
+   "lines": 202,
+   "bytes": 7885,
    "client": true,
    "exports": [
     {
@@ -80289,7 +80301,7 @@
      ]
     }
    ],
-   "tryCount": 2,
+   "tryCount": 3,
    "sqlTags": [],
    "calls": [
     "useRouter",
@@ -80306,6 +80318,7 @@
     "router.refresh",
     "JSON.stringify",
     "upload",
+    "author",
     "fileRef.current.click",
     "accept"
    ],
@@ -94312,8 +94325,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 335,
-   "bytes": 18163,
+   "lines": 338,
+   "bytes": 18358,
    "client": false,
    "exports": [
     {
@@ -101870,8 +101883,8 @@
   {
    "file": "lib/projects/closeout.ts",
    "kind": "lib",
-   "lines": 181,
-   "bytes": 8435,
+   "lines": 185,
+   "bytes": 8654,
    "client": false,
    "exports": [
     {
@@ -101913,6 +101926,12 @@
      ]
     },
     {
+     "spec": "./todos",
+     "names": [
+      "closeTodosUnder"
+     ]
+    },
+    {
      "spec": "./project",
      "names": [
       "Fail",
@@ -101924,27 +101943,27 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 36
+     "line": 37
     },
     {
      "tag": "sql",
-     "line": 40
+     "line": 41
     },
     {
      "tag": "sql",
-     "line": 45
+     "line": 46
     },
     {
      "tag": "sql",
-     "line": 102
+     "line": 103
     },
     {
      "tag": "sql",
-     "line": 118
+     "line": 119
     },
     {
      "tag": "sql",
-     "line": 154
+     "line": 158
     }
    ],
    "calls": [
@@ -101959,6 +101978,7 @@
     "blockers",
     "naming",
     "sql.json",
+    "closeTodosUnder",
     "emitEventSingle",
     "userActor",
     "auditLog",
@@ -102123,8 +102143,8 @@
   {
    "file": "lib/projects/milestone-tasks.ts",
    "kind": "lib",
-   "lines": 432,
-   "bytes": 21010,
+   "lines": 451,
+   "bytes": 22114,
    "client": false,
    "exports": [
     {
@@ -102196,6 +102216,13 @@
      ]
     },
     {
+     "spec": "./todos",
+     "names": [
+      "raiseTaskTodo",
+      "closeTaskTodos"
+     ]
+    },
+    {
      "spec": "./project",
      "names": [
       "Fail",
@@ -102207,55 +102234,59 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 86
+     "line": 87
     },
     {
      "tag": "sql",
-     "line": 135
+     "line": 136
     },
     {
      "tag": "sql",
-     "line": 144
+     "line": 145
     },
     {
      "tag": "sql",
-     "line": 157
+     "line": 158
     },
     {
      "tag": "sql",
-     "line": 170
+     "line": 171
     },
     {
      "tag": "sql",
-     "line": 235
+     "line": 192
     },
     {
      "tag": "sql",
-     "line": 247
+     "line": 248
     },
     {
      "tag": "sql",
-     "line": 300
+     "line": 260
     },
     {
      "tag": "sql",
-     "line": 317
+     "line": 319
     },
     {
      "tag": "sql",
-     "line": 362
+     "line": 336
     },
     {
      "tag": "sql",
-     "line": 383
+     "line": 381
     },
     {
      "tag": "sql",
-     "line": 391
+     "line": 402
     },
     {
      "tag": "sql",
-     "line": 401
+     "line": 410
+    },
+    {
+     "tag": "sql",
+     "line": 420
     }
    ],
    "calls": [
@@ -102274,10 +102305,12 @@
     "asDate",
     "['tenant_admin', 'tenant_user'].includes",
     "auditLog",
+    "raiseTaskTodo",
     "['open', 'done', 'blocked'].includes",
     "(blockedReason ?? '').trim",
     "emitEventSingle",
     "userActor",
+    "closeTaskTodos",
     "shiftDate",
     "Math.round"
    ],
@@ -102289,8 +102322,8 @@
   {
    "file": "lib/projects/milestones.ts",
    "kind": "lib",
-   "lines": 480,
-   "bytes": 22767,
+   "lines": 585,
+   "bytes": 27972,
    "client": false,
    "exports": [
     {
@@ -102335,6 +102368,11 @@
      "name": "acceptDeliverable",
      "form": "function",
      "async": true
+    },
+    {
+     "name": "authorDeliverable",
+     "form": "function",
+     "async": true
     }
    ],
    "imports": [
@@ -102342,6 +102380,14 @@
      "spec": "crypto",
      "names": [
       "randomUUID"
+     ]
+    },
+    {
+     "spec": "@/lib/documents/starter",
+     "names": [
+      "starterFromPreset",
+      "isBlankPreset",
+      "countNodes"
      ]
     },
     {
@@ -102385,6 +102431,12 @@
      ]
     },
     {
+     "spec": "./todos",
+     "names": [
+      "closeTodosUnder"
+     ]
+    },
+    {
      "spec": "./project",
      "names": [
       "Fail",
@@ -102392,67 +102444,79 @@
      ]
     }
    ],
-   "tryCount": 7,
+   "tryCount": 8,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 73
+     "line": 79
     },
     {
      "tag": "sql",
-     "line": 88
+     "line": 94
     },
     {
      "tag": "sql",
-     "line": 131
+     "line": 139
     },
     {
      "tag": "sql",
-     "line": 132
+     "line": 140
     },
     {
      "tag": "sql",
-     "line": 138
+     "line": 146
     },
     {
      "tag": "sql",
-     "line": 198
+     "line": 206
     },
     {
      "tag": "sql",
-     "line": 212
+     "line": 220
     },
     {
      "tag": "sql",
-     "line": 226
+     "line": 234
     },
     {
      "tag": "sql",
-     "line": 299
+     "line": 312
     },
     {
      "tag": "sql",
-     "line": 306
+     "line": 319
     },
     {
      "tag": "sql",
-     "line": 360
+     "line": 374
     },
     {
      "tag": "sql",
-     "line": 367
+     "line": 381
     },
     {
      "tag": "sql",
-     "line": 377
+     "line": 391
     },
     {
      "tag": "sql",
-     "line": 438
+     "line": 453
     },
     {
      "tag": "sql",
-     "line": 450
+     "line": 466
+    },
+    {
+     "tag": "sql",
+     "line": 531
+    },
+    {
+     "tag": "sql",
+     "line": 555
+    },
+    {
+     "tag": "sql",
+     "line": 563
     }
    ],
    "calls": [
@@ -102475,6 +102539,7 @@
     "outstanding.slice",
     "sql.json",
     "daysBetween",
+    "closeTodosUnder",
     "emitEventSingle",
     "userActor",
     "(input.filename ?? '').trim",
@@ -102487,7 +102552,11 @@
     "customerProjectPath",
     "randomUUID",
     "putObject",
-    "Boolean"
+    "Boolean",
+    "(input.preset ?? 'letter').trim",
+    "isBlankPreset",
+    "starterFromPreset",
+    "countNodes"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -102847,6 +102916,98 @@
     "deliverables.reduce",
     "String",
     "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/projects/todos.ts",
+   "kind": "lib",
+   "lines": 189,
+   "bytes": 8417,
+   "client": false,
+   "exports": [
+    {
+     "name": "raiseTaskTodo",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "closeTaskTodos",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "closeTodosUnder",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "@/lib/tasks/tasks",
+     "names": [
+      "createTask",
+      "completeTask"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "Role"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "ProjectActor"
+     ]
+    },
+    {
+     "spec": "./dates",
+     "names": [
+      "isoDate"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 132
+    },
+    {
+     "tag": "sql",
+     "line": 166
+    },
+    {
+     "tag": "sql",
+     "line": 172
+    }
+   ],
+   "calls": [
+    "isoDate",
+    "createTask",
+    "asTaskActor",
+    "console.error",
+    "emitEventSingle",
+    "userActor",
+    "completeTask"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -120560,8 +120721,8 @@
   {
    "file": "scripts/drive-project-lifecycle.mts",
    "kind": "script",
-   "lines": 746,
-   "bytes": 45018,
+   "lines": 855,
+   "bytes": 51358,
    "client": false,
    "exports": [],
    "imports": [
@@ -120586,7 +120747,7 @@
      ]
     }
    ],
-   "tryCount": 4,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
@@ -120694,75 +120855,91 @@
     },
     {
      "tag": "sql",
-     "line": 512
+     "line": 479
     },
     {
      "tag": "sql",
-     "line": 533
+     "line": 513
     },
     {
      "tag": "sql",
-     "line": 562
+     "line": 555
     },
     {
      "tag": "sql",
-     "line": 571
+     "line": 568
     },
     {
      "tag": "sql",
-     "line": 574
+     "line": 606
     },
     {
      "tag": "sql",
-     "line": 577
+     "line": 642
     },
     {
      "tag": "sql",
-     "line": 579
+     "line": 671
     },
     {
      "tag": "sql",
-     "line": 610
+     "line": 680
     },
     {
      "tag": "sql",
-     "line": 615
+     "line": 683
     },
     {
      "tag": "sql",
-     "line": 639
+     "line": 686
     },
     {
      "tag": "sql",
-     "line": 651
+     "line": 688
     },
     {
      "tag": "sql",
-     "line": 666
+     "line": 719
     },
     {
      "tag": "sql",
-     "line": 690
+     "line": 724
     },
     {
      "tag": "sql",
-     "line": 694
+     "line": 748
     },
     {
      "tag": "sql",
-     "line": 700
+     "line": 760
     },
     {
      "tag": "sql",
-     "line": 703
+     "line": 775
     },
     {
      "tag": "sql",
-     "line": 707
+     "line": 799
     },
     {
      "tag": "sql",
-     "line": 716
+     "line": 803
+    },
+    {
+     "tag": "sql",
+     "line": 809
+    },
+    {
+     "tag": "sql",
+     "line": 812
+    },
+    {
+     "tag": "sql",
+     "line": 816
+    },
+    {
+     "tag": "sql",
+     "line": 825
     }
    ],
    "calls": [
@@ -120824,10 +121001,20 @@
     "Number",
     "t.text.slice",
     "taskIds.push",
-    "empCtx.newPage",
-    "String((e as Error).message).slice",
-    "empCtx.close",
+    "todos.every",
     "JSON.stringify",
+    "qCtx.newPage",
+    "todos.some",
+    "mine.includes",
+    "String((e as Error).message).slice",
+    "qCtx.close",
+    "empCtx.newPage",
+    "empCtx.close",
+    "exp.body",
+    "buf.subarray(0, 4).toString",
+    "buf.subarray",
+    "exp.status",
+    "head.startsWith",
     "uiPage.goto",
     "uiPage.waitForLoadState('networkidle').catch",
     "uiPage.waitForLoadState",
@@ -120865,7 +121052,7 @@
    ],
    "jsx": [],
    "snakeRowTypes": [],
-   "ownClientSql": 44,
+   "ownClientSql": 48,
    "jsonResponses": []
   },
   {

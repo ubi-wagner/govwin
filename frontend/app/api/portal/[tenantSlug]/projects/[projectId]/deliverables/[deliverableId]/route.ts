@@ -7,7 +7,7 @@
  */
 import { NextResponse } from 'next/server';
 import { withProject } from '@/lib/projects/gate';
-import { acceptDeliverable, uploadDeliverable } from '@/lib/projects/milestones';
+import { acceptDeliverable, uploadDeliverable, authorDeliverable } from '@/lib/projects/milestones';
 
 export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug: string; projectId: string; deliverableId: string }> }) {
   try {
@@ -40,12 +40,26 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
     const { tenantSlug, projectId, deliverableId } = await ctx.params;
     return await withProject(tenantSlug, async (gate) => {
 
-      let body: { action?: string };
+      let body: { action?: string; preset?: string; title?: string | null };
       try { body = await request.json(); }
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
+      // `author` starts the canvas document that satisfies this deliverable — the same presets,
+      // editor, compliance floor and docx/pptx/xlsx/pdf export the build portal uses. It ATTACHES
+      // evidence; it does not accept it.
+      if (body?.action === 'author') {
+        const made = await authorDeliverable(gate.actor, projectId, deliverableId, {
+          preset: body.preset, title: body.title ?? null,
+        });
+        if (!made.ok) return NextResponse.json({ error: made.error, code: made.code }, { status: made.status });
+        return NextResponse.json({ data: { document: made.data } }, { status: 201 });
+      }
+
       if (body?.action !== 'accept') {
-        return NextResponse.json({ error: "action must be 'accept'", code: 'VALIDATION_ERROR' }, { status: 400 });
+        return NextResponse.json(
+          { error: "action must be 'accept' or 'author'", code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
       }
 
       const result = await acceptDeliverable(gate.actor, projectId, deliverableId);

@@ -26,20 +26,29 @@ export interface DeliverableView {
   filename: string | null;
   storageKey: string | null;
   acceptedAt: string | null;
+  /** An AUTHORED canvas document backing this deliverable — the same editor, compliance floor and
+   *  docx/pptx/xlsx/pdf export the build portal uses. A sibling of the uploaded file, not a
+   *  replacement: both attach evidence, and neither is acceptance. */
+  documentId?: string | null;
+  documentTitle?: string | null;
 }
 
 export function DeliverableRow({
-  deliverable, basePath, canAccept,
+  deliverable, basePath, canAccept, tenantSlug,
 }: {
   deliverable: DeliverableView;
   basePath: string;
   canAccept: boolean;
+  tenantSlug: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<'upload' | 'accept' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const accepted = Boolean(deliverable.acceptedAt);
-  const uploaded = Boolean(deliverable.storageKey);
+  const authored = Boolean(deliverable.documentId);
+  // "Attached" is the honest word now: a deliverable is satisfied by an uploaded file OR a document
+  // written here. Acceptance is still the separate act.
+  const uploaded = Boolean(deliverable.storageKey) || authored;
 
   async function upload(file: File) {
     // A replacement clears acceptance server-side. Saying so first is the difference between a
@@ -67,6 +76,26 @@ export function DeliverableRow({
       setBusy(null);
       if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  /** Start the canvas document that satisfies this deliverable, then open the editor on it. */
+  async function author(preset: string) {
+    setBusy('upload');
+    try {
+      const res = await fetch(`${basePath}/deliverables/${deliverable.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'author', preset }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(json?.error ?? 'Could not start the document', 'error'); return; }
+      const id = json?.data?.document?.documentId;
+      toast('Document started', 'success');
+      if (id) window.location.href = `/portal/${tenantSlug}/documents/${id}`;
+      else router.refresh();
+    } catch {
+      toast('Could not start the document', 'error');
+    } finally { setBusy(null); }
   }
 
   async function accept() {
@@ -105,12 +134,20 @@ export function DeliverableRow({
         </span>
       ) : (
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 ring-1 ring-inset ring-gray-500/20">
-          nothing uploaded
+          nothing attached
         </span>
       )}
 
       {deliverable.filename && (
         <span className="text-xs text-gray-500">{deliverable.filename}</span>
+      )}
+      {authored && (
+        <a
+          href={`/portal/${tenantSlug}/documents/${deliverable.documentId}`}
+          className="text-xs text-blue-700 hover:underline"
+        >
+          {deliverable.documentTitle || 'Open the document'}
+        </a>
       )}
 
       <span className="ml-auto flex items-center gap-2">
@@ -121,6 +158,21 @@ export function DeliverableRow({
           aria-label={`Upload a file for ${deliverable.title}`}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }}
         />
+        {!authored && !accepted && (
+          <select
+            aria-label={`Draft a document for ${deliverable.title}`}
+            disabled={busy !== null}
+            defaultValue=""
+            onChange={(e) => { const v = e.target.value; if (v) void author(v); e.target.value = ''; }}
+            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 disabled:opacity-50"
+          >
+            <option value="">Draft…</option>
+            <option value="letter">Report</option>
+            <option value="deck">Slide deck</option>
+            <option value="sheet">Workbook</option>
+            <option value="flier">One-pager</option>
+          </select>
+        )}
         <button
           type="button"
           disabled={busy !== null}

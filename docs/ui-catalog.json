@@ -2,11 +2,11 @@
  "totals": {
   "routes": 118,
   "components": 187,
-  "handlers": 1493,
-  "binding": 1252,
-  "fetches": 335,
+  "handlers": 1494,
+  "binding": 1253,
+  "fetches": 336,
   "forms": 24,
-  "inputs": 462,
+  "inputs": 463,
   "buttons": 697,
   "orphans": 1
  },
@@ -5818,7 +5818,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
-   "lines": 358,
+   "lines": 361,
    "client": false,
    "kind": "page",
    "exports": [
@@ -17713,7 +17713,7 @@
   },
   {
    "file": "components/projects/deliverable-row.tsx",
-   "lines": 150,
+   "lines": 202,
    "client": true,
    "kind": "component",
    "exports": [
@@ -17725,19 +17725,25 @@
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 122
+     "line": 159
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 166
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 127
+     "line": 179
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 140
+     "line": 192
     }
    ],
    "fetches": [
@@ -17748,12 +17754,16 @@
     {
      "method": "PATCH",
      "url": "`${basePath}/deliverables/${deliverable.id}`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/deliverables/${deliverable.id}`"
     }
    ],
    "forms": 0,
-   "inputs": 1,
+   "inputs": 2,
    "buttons": 2,
-   "links": 0,
+   "links": 1,
    "localImports": [],
    "renderedBy": [
     "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
@@ -17761,7 +17771,7 @@
    "reachableFrom": [
     "/portal/[tenantSlug]/projects/[projectId]"
    ],
-   "bindingHandlers": 3,
+   "bindingHandlers": 4,
    "passedHandlers": 0
   },
   {

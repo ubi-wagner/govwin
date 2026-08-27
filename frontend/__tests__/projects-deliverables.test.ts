@@ -205,18 +205,42 @@ describe('acceptDeliverable — the second fact', () => {
     expect(db.state.queries).toEqual([]);
   });
 
-  it('refuses when there is no file to accept', async () => {
-    db.state.results = [[], [{ storageKey: null, acceptedAt: null }]];
+  /**
+   * ── EVIDENCE IS NOW A FILE **OR** AN AUTHORED DOCUMENT (mig 220) ───────────────────────────
+   * A deliverable can be satisfied by an upload or by a canvas document written in-product, so the
+   * refusal is `NOTHING_ATTACHED` rather than `NOTHING_UPLOADED` — and its message has to name both
+   * ways out, because "upload one first" is wrong advice to give someone whose deliverable is a
+   * report they are meant to write here.
+   *
+   * What did NOT widen is acceptance. Authoring attaches evidence exactly as uploading does; the
+   * separate, deliberate `accepted_at` act is untouched, which is the whole point of this file.
+   */
+  it('refuses when there is nothing attached to accept — neither file nor document', async () => {
+    db.state.results = [[], [{ storageKey: null, documentId: null, acceptedAt: null }]];
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.code).toBe('NOTHING_UPLOADED');
-      expect(r.error).toMatch(/Upload one first/);
+      expect(r.code).toBe('NOTHING_ATTACHED');
+      expect(r.error, 'the message must name BOTH ways to attach evidence')
+        .toMatch(/Upload a file or author the document/i);
     }
   });
 
+  it('a deliverable backed only by an AUTHORED DOCUMENT is acceptable', async () => {
+    // The half that would silently regress: if the CAS still demanded a `storage_key`, a report
+    // written in the canvas editor could never be accepted, and the refusal would say there is
+    // nothing attached — while the document sits right there on the row.
+    db.state.results = [[{
+      id: DELIVERABLE, title: 'Q1 technical report', acceptedAt: '2026-03-02',
+      filename: null, storageKey: null, documentId: '77777777-7777-4777-8777-777777777777',
+    }]];
+    const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.documentId).toBe('77777777-7777-4777-8777-777777777777');
+  });
+
   it('refuses a double-accept', async () => {
-    db.state.results = [[], [{ storageKey: 'k', acceptedAt: '2026-03-01T00:00:00.000Z' }]];
+    db.state.results = [[], [{ storageKey: 'k', documentId: null, acceptedAt: '2026-03-01T00:00:00.000Z' }]];
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('ALREADY_ACCEPTED');
@@ -230,7 +254,9 @@ describe('acceptDeliverable — the second fact', () => {
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(true);
     const cas = db.state.queries[0];
-    expect(cas).toMatch(/storage_key IS NOT NULL/i);
+    // The evidence arm is an OR of the two attachments — an AND here would make an authored
+    // document unacceptable, and a missing arm would let an empty deliverable close a milestone.
+    expect(cas).toMatch(/d\.storage_key IS NOT NULL OR d\.document_id IS NOT NULL/i);
     expect(cas).toMatch(/accepted_at IS NULL/i);
   });
 

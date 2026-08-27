@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 264 | 41,357 |
+| api-route | 264 | 41,371 |
 | app-boundary | 5 | 132 |
 | app-component | 26 | 8,926 |
 | auth | 2 | 241 |
-| component | 165 | 41,830 |
+| component | 165 | 41,882 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 306 | 61,115 |
+| lib | 307 | 61,435 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
-| page | 118 | 17,950 |
-| script | 186 | 25,228 |
+| page | 118 | 17,953 |
+| script | 186 | 25,337 |
 | server-action | 1 | 45 |
 | test | 216 | 28,746 |
-| **total** | **1381** | **236,377** |
+| **total** | **1382** | **236,875** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -627,7 +627,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 306 files
+## 6. Library modules — 307 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -788,12 +788,13 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/projects/closeout.ts | server | closeProject, reopenProject | 6 | **none** |
 | lib/projects/dates.ts | server | isoDate, daysBetween, varianceLabel | — | vitest |
 | lib/projects/gate.ts | server | projectGate, withProject | — | **none** |
-| lib/projects/milestone-tasks.ts | server | shiftDate, listMilestoneTasks, createMilestoneTask, setTaskStatus, resequence, rescheduleMilestone | 13 | **none** |
-| lib/projects/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +1 | 15 | vitest |
+| lib/projects/milestone-tasks.ts | server | shiftDate, listMilestoneTasks, createMilestoneTask, setTaskStatus, resequence, rescheduleMilestone | 14 | **none** |
+| lib/projects/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +2 | 18 | vitest |
 | lib/projects/money.ts | server | usd, spentOf | — | vitest |
 | lib/projects/project.ts | server | createProject, getProject, listSourceDocuments, readiness, addSourceDocument | 7 | **none** |
 | lib/projects/provenance.ts | server | TRUST_ORDER, trustRank, outranks, recordProvenance, provenanceFor, badgeFor | 2 | vitest |
 | lib/projects/rollup.ts | server | pct, rollup | 4 | vitest |
+| lib/projects/todos.ts | server | raiseTaskTodo, closeTaskTodos, closeTodosUnder | 3 | vitest |
 | lib/projects/wbs.ts | server | listWbs, createWbsNode, WORKPLAN_COLUMNS, WORKPLAN_READONLY_COLUMNS, toWorkplanCanvas | 4 | vitest |
 | lib/promo-codes.ts | server | DEFAULT_MAX_USES, DEFAULT_EXPIRY_DAYS, MAX_BATCH, generateCode, codeState, issuePromoCodes +2 | 3 | vitest |
 | lib/proposal-access.ts | server | hasProposalVisibility, resolveUserAccess | 8 | vitest |
@@ -970,7 +971,7 @@ statement is per-layer, not one number.
 | pages | 118 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 141 | verify-api-contract | see that lens's own accounting |
 | API routes (write verbs) | 203 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 306 | vitest 169 · sweep-mold-quality 39 | 98 |
+| lib modules | 307 | vitest 170 · sweep-mold-quality 39 | 98 |
 | components | 191 | only transitively, via a page that renders them | not measured |
 
 **The write verbs are the real gap.** 203 routes expose a POST/PATCH/PUT/DELETE and no lens
@@ -985,7 +986,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/tools/source-scout.ts` — 553 lines
 - `lib/import/pdf-reader.ts` — 523 lines
 - `lib/content-admin.ts` — 515 lines
-- `lib/projects/milestone-tasks.ts` — 432 lines
+- `lib/projects/milestone-tasks.ts` — 451 lines
 - `lib/email-templates.ts` — 385 lines
 - `lib/pdf/page-capture.ts` — 363 lines
 - `lib/cms.ts` — 357 lines
@@ -1016,9 +1017,9 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/analytics-admin.ts` — 188 lines
 - `lib/automation/triggers.ts` — 187 lines
 - `lib/tenants/create-tenant.ts` — 187 lines
+- `lib/projects/closeout.ts` — 185 lines
 - `lib/proposal-visual-review.ts` — 185 lines
 - `lib/tools/library-search-atoms.ts` — 182 lines
-- `lib/projects/closeout.ts` — 181 lines
 - `lib/page-content/howItWorks.ts` — 176 lines
 - `lib/tools/memory-write.ts` — 175 lines
 - `lib/proposal-archive.ts` — 174 lines

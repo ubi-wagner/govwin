@@ -597,7 +597,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 219
+   "rows": 220
   },
   {
    "name": "deploy_baseline",

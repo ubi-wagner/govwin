@@ -241,6 +241,22 @@ the project** — a checklist only a manager may tick is a status report. `_run_
 plus one grouped `project_nudge` mail, hard-bounded by per-row `nudges_sent` + `last_nudged_at`;
 blocked tasks are not nudged. Proven by `scripts/drive-milestone-construct.mts`.
 
+**The project portal reuses the build portal's infrastructure rather than growing a parallel one.**
+*ToDos / email / nudges:* assigned checklist work is **PROJECTED** onto the platform `tasks` spine
+(`lib/projects/todos.ts`) — the same queue `/todos`, the bell, the Command Center and the shared
+nudge sweeper already serve — exactly as `editPortalWorkflow` re-projects a proposal's guardrail plan
+onto live `tasks` rows. **The checklist is the source of truth and the ToDo follows it**; the
+projection never writes back (a mirror that can move what it mirrors is a second writer). Assignment
+emits `system:notification.requested` (`project_task_assigned`) through the one email seam, with the
+renderer shipped in the same change — and `_run_project_nudges` therefore skips *assigned* tasks,
+because two reminders for one task teaches people to filter both. *Deliverables:* mig 220's
+`project_deliverables.document_id` points at a `tenant_documents` CanvasDocument, so a report, deck,
+workbook or PDF is authored in the **same editor**, measured by the **same compliance floor** and
+rendered by the **same** docx·pptx·xlsx·pdf exporters as a proposal volume — `ON DELETE SET NULL`,
+because losing the draft must not delete the obligation. Attaching widened to *file **or** document*
+(`NOTHING_ATTACHED`, an `OR` in the accept CAS); **acceptance did not** — `accepted_at` is still the
+separate tenant_admin act.
+
 **EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
 `services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
 `email_suppressions` (mig 215; docs/EMAIL_INTERFACE_DESIGN.md, as-built docs/EMAIL_BUILD_LOG.md). Never

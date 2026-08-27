@@ -245,6 +245,9 @@ export function describeEvent(ev: EventLike): string {
       }
       case 'deliverable.uploaded':
         return `Deliverable uploaded: ${str(payload.title) ?? str(payload.filename) ?? 'a deliverable'}`;
+      case 'deliverable.authored':
+        return `Deliverable drafted in-product: ${str(payload.title) ?? 'a document'}`
+          + `${str(payload.preset) ? ` (${str(payload.preset)})` : ''}`;
       case 'deliverable.accepted':
         return `Deliverable accepted: ${str(payload.title) ?? 'a deliverable'}`;
       default:

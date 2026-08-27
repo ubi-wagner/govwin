@@ -15,6 +15,7 @@
  * deliberately skips anything already met (see `lib/projects/baseline.ts`).
  */
 import { randomUUID } from 'crypto';
+import { starterFromPreset, isBlankPreset, countNodes } from '@/lib/documents/starter';
 import { sql, auditLog } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
@@ -50,6 +51,10 @@ export interface Milestone {
 export interface Deliverable {
   id: string;
   milestoneId: string;
+  /** An AUTHORED canvas document backing this deliverable (mig 220). A sibling of `storageKey`, not
+   *  a replacement: both are ways to ATTACH evidence, and neither is acceptance. */
+  documentId?: string | null;
+  documentTitle?: string | null;
   title: string;
   requiredBy: string | null;
   storageKey: string | null;
@@ -89,9 +94,11 @@ export async function listDeliverables(tenantId: string, projectId: string): Pro
     return await sql<Deliverable[]>`
       SELECT d.id, d.milestone_id, d.title, d.required_by, d.storage_key, d.filename,
              d.content_type, d.byte_size, d.uploaded_by, d.uploaded_at,
-             d.accepted_at, d.accepted_by, d.sort_index
+             d.accepted_at, d.accepted_by, d.sort_index,
+             d.document_id, td.title AS document_title
         FROM project_deliverables d
         JOIN project_milestones m ON m.id = d.milestone_id
+        LEFT JOIN tenant_documents td ON td.id = d.document_id
        WHERE m.project_id = ${projectId}::uuid AND d.tenant_id = ${tenantId}::uuid
        ORDER BY d.sort_index, d.title`;
   } catch (err) {
@@ -314,7 +321,8 @@ export async function createDeliverable(
       VALUES (${actor.tenantId}::uuid, ${input.milestoneId}::uuid, ${title}, ${required.value},
               ${input.sortIndex ?? 0})
       RETURNING id, milestone_id, title, required_by, storage_key, filename, content_type,
-                byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index`;
+                byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index,
+                document_id`;
 
     await auditLog({
       tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_created',
@@ -390,7 +398,8 @@ export async function uploadDeliverable(
              accepted_at = NULL, accepted_by = NULL
        WHERE id = ${deliverableId}::uuid AND tenant_id = ${actor.tenantId}::uuid
       RETURNING id, milestone_id, title, required_by, storage_key, filename, content_type,
-                byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index`;
+                byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index,
+                document_id`;
     // The row was there a statement ago; if it is not now, something removed it mid-upload. Say so
     // rather than returning `{ ok: true, data: undefined }` — which type-checks (postgres.js rows
     // are not `| undefined` without noUncheckedIndexedAccess) and reaches the client as `{}`.
@@ -448,19 +457,21 @@ export async function acceptDeliverable(
        WHERE d.milestone_id = m.id
          AND d.id = ${deliverableId}::uuid AND m.project_id = ${projectId}::uuid
          AND d.tenant_id = ${actor.tenantId}::uuid
-         AND d.storage_key IS NOT NULL AND d.accepted_at IS NULL
+         AND (d.storage_key IS NOT NULL OR d.document_id IS NOT NULL)
+         AND d.accepted_at IS NULL
       RETURNING d.id, d.milestone_id, d.title, d.required_by, d.storage_key, d.filename,
                 d.content_type, d.byte_size, d.uploaded_by, d.uploaded_at,
-                d.accepted_at, d.accepted_by, d.sort_index`;
+                d.accepted_at, d.accepted_by, d.sort_index, d.document_id`;
     if (!row) {
-      const [why] = await sql<{ storageKey: string | null; acceptedAt: string | null }[]>`
-        SELECT storage_key, accepted_at FROM project_deliverables
+      const [why] = await sql<{ storageKey: string | null; documentId: string | null; acceptedAt: string | null }[]>`
+        SELECT storage_key, document_id, accepted_at FROM project_deliverables
          WHERE id = ${deliverableId}::uuid AND tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
       if (!why) return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
-      if (!why.storageKey) {
+      if (!why.storageKey && !why.documentId) {
         return {
-          ok: false, status: 409, code: 'NOTHING_UPLOADED',
-          error: 'There is no file on this deliverable to accept. Upload one first.',
+          ok: false, status: 409, code: 'NOTHING_ATTACHED',
+          error: 'There is nothing on this deliverable to accept. Upload a file or author the '
+            + 'document first.',
         };
       }
       return { ok: false, status: 409, code: 'ALREADY_ACCEPTED', error: 'That deliverable is already accepted.' };
@@ -481,5 +492,93 @@ export async function acceptDeliverable(
   } catch (err) {
     console.error('[projects/milestones] acceptDeliverable failed:', err);
     return { ok: false, status: 500, error: 'Failed to accept the deliverable', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Author a deliverable in-product: create the canvas document that satisfies it.
+ *
+ * ── THE SAME CANVAS THE BUILD PORTAL USES ────────────────────────────────────────────────────
+ * A `tenant_documents` row holding a `CanvasDocument`, made from the same presets
+ * (`flier | letter | deck | sheet`), edited in the same editor, measured by the same compliance
+ * floor, and exported by the same route to **docx · pptx · xlsx · pdf**. A report, a deck, a
+ * workbook and a PDF for a contract deliverable are the same artifacts a proposal volume is — the
+ * only thing that was missing was a column saying which deliverable a document belongs to.
+ *
+ * ── AUTHORING IS NOT ACCEPTANCE, STILL ───────────────────────────────────────────────────────
+ * This attaches evidence, exactly as uploading a file does. `accepted_at` remains the separate,
+ * deliberate act by a tenant_admin, because a deck someone wrote is not a deliverable the customer
+ * has signed for.
+ */
+export async function authorDeliverable(
+  actor: ProjectActor,
+  projectId: string,
+  deliverableId: string,
+  input: { preset?: string; title?: string | null },
+): Promise<Ok<{ deliverableId: string; documentId: string; title: string; docType: string }> | Fail> {
+  if (!(await canAccessProject(actor, projectId))) {
+    return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
+  }
+  const preset = (input.preset ?? 'letter').trim();
+  if (!isBlankPreset(preset)) {
+    return {
+      ok: false, status: 400, code: 'VALIDATION_ERROR',
+      error: "preset must be one of: flier, letter, deck, sheet",
+    };
+  }
+
+  try {
+    const [existing] = await sql<{ id: string; title: string; documentId: string | null }[]>`
+      SELECT d.id, d.title, d.document_id FROM project_deliverables d
+        JOIN project_milestones m ON m.id = d.milestone_id
+       WHERE d.id = ${deliverableId}::uuid AND m.project_id = ${projectId}::uuid
+         AND d.tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
+    if (!existing) return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
+    if (existing.documentId) {
+      // Not an error to ask twice — hand back the document that already exists rather than
+      // silently making a second draft nobody will find.
+      return {
+        ok: false, status: 409, code: 'ALREADY_AUTHORED',
+        error: 'This deliverable already has a document. Open it rather than starting a second draft.',
+      };
+    }
+
+    // The id is generated first so the canvas can key its own `document_id` to the row, exactly as
+    // the standalone documents route does.
+    const documentId = randomUUID();
+    const starter = starterFromPreset(preset, {
+      documentId,
+      actorId: actor.userId,
+      title: (input.title ?? '').trim() || existing.title,
+    });
+
+    await sql`
+      INSERT INTO tenant_documents
+        (id, tenant_id, title, doc_type, canvas, node_count, version, created_by)
+      VALUES
+        (${documentId}::uuid, ${actor.tenantId}::uuid, ${starter.title}, ${starter.docType},
+         ${sql.json(starter.canvas as unknown as Parameters<typeof sql.json>[0])},
+         ${countNodes(starter.canvas)}, 1, ${actor.userId}::uuid)`;
+
+    await sql`
+      UPDATE project_deliverables SET document_id = ${documentId}::uuid
+       WHERE id = ${deliverableId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
+
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'deliverable.authored',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, deliverableId, documentId, title: starter.title, preset },
+    });
+    await auditLog({
+      tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_authored',
+      entityType: 'project_deliverable', entityId: deliverableId,
+      metadata: { projectId, documentId, preset },
+    });
+    return { ok: true, data: { deliverableId, documentId, title: starter.title, docType: starter.docType } };
+  } catch (err) {
+    console.error('[projects/milestones] authorDeliverable failed:', err);
+    return { ok: false, status: 500, error: 'Failed to start the document', code: 'DB_ERROR' };
   }
 }

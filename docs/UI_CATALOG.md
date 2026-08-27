@@ -11,11 +11,11 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 |---|---:|
 | addressable routes | 118 |
 | components | 187 |
-| event handlers (total) | 1493 |
-| …of which BIND behaviour (on a DOM element) | 1252 |
+| event handlers (total) | 1494 |
+| …of which BIND behaviour (on a DOM element) | 1253 |
 | …of which PASS a prop to a child component | 241 |
-| `fetch` call sites | 335 |
-| `<form>` · `<input>` · `<button>` | 24 · 462 · 697 |
+| `fetch` call sites | 336 |
+| `<form>` · `<input>` · `<button>` | 24 · 463 · 697 |
 | components NO route can reach (orphans) | **1** |
 
 ## 1. Routes — the addressable surface
@@ -305,7 +305,7 @@ tree carries far more, listed per component in §2.
 | components/portal/vaults/nook-detail.tsx | client | 10/0 | 6 | /portal/[tenantSlug]/vaults/[vaultId], /vaults/[vaultId] |
 | components/portal/vaults/nooks-index.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/vaults |
 | components/portal/volume-layout-gauge.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
-| components/projects/deliverable-row.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/deliverable-row.tsx | client | 4/0 | 3 | /portal/[tenantSlug]/projects/[projectId] |
 | components/projects/milestone-checklist.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
 | components/projects/project-roster.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
 | components/proposal/section-assign-bar.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
@@ -341,7 +341,7 @@ tree carries far more, listed per component in §2.
 | handler | count | distinct files |
 |---|---:|---:|
 | `onClick` | 714 | 152 |
-| `onChange` | 452 | 104 |
+| `onChange` | 453 | 104 |
 | `onClose` | 39 | 11 |
 | `onKeyDown` | 24 | 16 |
 | `onSubmit` | 21 | 18 |
