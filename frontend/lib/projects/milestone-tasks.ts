@@ -148,6 +148,23 @@ export async function createMilestoneTask(
       if (!member) {
         return { ok: false, status: 400, error: 'That assignee is not a member of this company', code: 'VALIDATION_ERROR' };
       }
+      // ── AND THEY MUST BE ON THE PROJECT ────────────────────────────────────────────────────
+      // Assignment is the access mechanism for an employee (see lib/projects/access.ts). Handing
+      // work to somebody who cannot open the project is a silent dead end: the task exists, they
+      // never see it, and the manager believes it is in hand. Refusing with the fix in the sentence
+      // is better than granting project access as a side effect of a task form — an access decision
+      // hidden inside an unrelated action is how a boundary quietly stops meaning anything.
+      const [onProject] = await sql<{ userId: string }[]>`
+        SELECT user_id FROM project_assignments
+         WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
+           AND user_id = ${input.assigneeUserId}::uuid LIMIT 1`;
+      if (!onProject) {
+        return {
+          ok: false, status: 409, code: 'NOT_ON_PROJECT',
+          error: 'That person is not on this project, so they would never see the task. '
+            + 'Add them to the project first.',
+        };
+      }
     }
 
     const [row] = await sql<MilestoneTask[]>`

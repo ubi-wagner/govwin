@@ -58,7 +58,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **218** — mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **219** — mig 219 project close-out; mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
 proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
@@ -213,7 +213,17 @@ denominator is `null` → **"not measured"**, never a confident `0%`. Access is 
 tenant, and **assignment is app-enforced** in one predicate (`lib/projects/access.ts`) because the
 request context carries a tenant, not a user — `partner_user` is refused the capability outright, which
 is what removes cross-tenant from it entirely. `contract:started` raises a ToDo; it deliberately does
-NOT create the project.
+NOT create the project. **Staffing is a real route** (`…/projects/[id]/assignees`) — it had to be
+built, because `project_assignments` was only ever written by `createProject` for its creator, so no
+employee could be let in at all; no lens saw it, since a route nobody wrote has no row on either
+side of the capability join. Assigning work to someone not on the project is refused
+(`NOT_ON_PROJECT`) rather than granting access as a side effect of a task form, and the last
+assignee cannot be removed. **Close-out** (mig 219) is milestone completion one scale up — a note +
+jsonb metrics, a CHECK binding `status='closed'` to `closed_at`, three separate refusals
+(`MILESTONES_OUTSTANDING` · `TASKS_OUTSTANDING` · `DELIVERABLES_OUTSTANDING`), and a reopen that
+KEEPS the note. The whole arc — award → engine → ToDo → project → plan → staffing → work → phase
+completion → close-out → reopen, each act by the actor who performs it, with a DB→UI→DB
+reconciliation on the rendered page — is `scripts/drive-project-lifecycle.mts`.
 
 **The MILESTONE is the project-management construct** (mig 218): a dated segment — `starts_on →
 forecast_date` — with an owner, a **task checklist** (`project_milestone_tasks`: person *or* role,

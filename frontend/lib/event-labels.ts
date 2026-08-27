@@ -221,6 +221,14 @@ export function describeEvent(ev: EventLike): string {
         return `Milestone overdue${late ? ` by ${late} day${late === 1 ? '' : 's'}` : ''}: `
           + `${str(payload.title) ?? 'a milestone'}`;
       }
+      case 'project.closed': {
+        const n = typeof payload.milestones === 'number' ? payload.milestones : null;
+        const note = str(payload.note);
+        return `Project closed out${n ? ` — ${n} milestone${n === 1 ? '' : 's'}` : ''}`
+          + `${note ? ` · ${note}` : ''}`;
+      }
+      case 'project.reopened':
+        return `Project reopened${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
       case 'task.completed':
         return `Task done: ${str(payload.title) ?? 'a task'}`;
       case 'task.blocked':

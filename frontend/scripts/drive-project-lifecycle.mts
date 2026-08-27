@@ -313,6 +313,65 @@ async function main() {
   A(del.status === 201 || del.status === 200, 'a deliverable is declared against the milestone', `${del.status}`);
   const deliverableId = ((del.json.data as Json)?.deliverable as Json)?.id as string | undefined;
 
+
+  // ══ 4b · the MILESTONE CONSTRUCT — a serial plan with checklists ════════════════════════════
+  //
+  // Two more milestones, so the plan is a CHAIN and not a single date, and a checklist on each. A
+  // milestone with a task list is the smallest useful project; this is that shape repeated.
+  phase('4b · HITL: a serial plan, and the people who will work it');
+
+  const ms2 = await api(req, 'post', P + '/milestones', { title: 'Prototype demonstration', clinId, forecastDate: iso(120), sortIndex: 2 });
+  const ms3 = await api(req, 'post', P + '/milestones', { title: 'Final report', clinId, forecastDate: iso(180), sortIndex: 3 });
+  A(ms2.status === 201 && ms3.status === 201, 'two more phases', `${ms2.status}/${ms3.status}`);
+  const ms2id = ((ms2.json.data as Json)?.milestone as Json)?.id as string | undefined;
+
+  const seq = await api(req, 'patch', P + '/milestones', { action: 'resequence' });
+  A(seq.status === 200, 'the plan is sequenced', `${seq.status}`);
+  const chain = await sql<{ title: string; startsOn: string | null; forecastDate: string | null }[]>`
+    SELECT title, starts_on AS "startsOn", forecast_date AS "forecastDate"
+      FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
+  const d10 = (v: unknown) => (v ? new Date(v as string).toISOString().slice(0, 10) : null);
+  A(d10(chain[1]?.startsOn) === iso(46), 'phase 2 starts the day after phase 1 ends',
+    `${d10(chain[1]?.startsOn)} (phase 1 ends ${d10(chain[0]?.forecastDate)})`);
+  A(d10(chain[2]?.startsOn) === iso(121), 'phase 3 starts the day after phase 2 ends', `${d10(chain[2]?.startsOn)}`);
+
+  // A slip moves what FOLLOWS. That is what makes the dates serial rather than a list.
+  const beforeSlip = chain.map((c) => d10(c.forecastDate));
+  const slip = await api(req, 'patch', P + '/milestones', { action: 'reschedule', milestoneId: ms2id, forecastDate: iso(134) });
+  A(slip.status === 200 && ((slip.json.data as Json)?.deltaDays as number) === 14,
+    'phase 2 slips 14 days', `${slip.status} delta=${(slip.json.data as Json)?.deltaDays}`);
+  const afterSlip = await sql<{ forecastDate: string | null; baselineDate: string | null }[]>`
+    SELECT forecast_date AS "forecastDate", baseline_date AS "baselineDate"
+      FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
+  A(d10(afterSlip[2]?.forecastDate) === iso(194), 'phase 3 slips with it', `${beforeSlip[2]} → ${d10(afterSlip[2]?.forecastDate)}`);
+  A(d10(afterSlip[0]?.forecastDate) === beforeSlip[0], 'the EARLIER phase does not move');
+
+  // ── STAFFING: assignment is the access mechanism, so it comes before the work ──────────────
+  // `/team` returns the roster as a BARE ARRAY under `data` — read the route, do not assume the
+  // envelope's inner shape.
+  const roster = await api(req, 'get', `/api/portal/${TENANT}/team`);
+  const members = (Array.isArray(roster.json.data) ? roster.json.data : []) as Json[];
+  const assignee = members.find((m) => String(m.role) === 'tenant_user' && m.id !== undefined) ?? members[0];
+  A(roster.status === 200 && Boolean(assignee), 'the roster route offers someone to staff with',
+    `${roster.status} · ${members.length} member(s)`);
+
+  // Handing work to someone who is NOT on the project is refused — they would never see it.
+  const premature = await api(req, 'post', P + '/tasks', {
+    milestoneId, title: 'work for someone who cannot see it', assigneeUserId: assignee?.id ?? null,
+  });
+  A(premature.status === 409 && String((premature.json as Json).code) === 'NOT_ON_PROJECT',
+    'assigning work to someone not on the project is refused, with the fix in the sentence',
+    `${premature.status} ${String((premature.json as Json).code)}`);
+
+  const staffed = await api(req, 'post', P + '/assignees', { userId: assignee?.id });
+  A(staffed.status === 201, 'the admin staffs the project through the portal', `${staffed.status}`);
+  const rosterNow = await api(req, 'get', P + '/assignees');
+  const onProject = ((rosterNow.json.data as Json)?.assignees ?? []) as Json[];
+  A(onProject.some((a) => a.userId === assignee?.id), 'and the roster shows them',
+    `${onProject.length} on the project`);
+
+
+
   // ══ 5 · the baseline freezes, once ═════════════════════════════════════════════════════════
   phase('5 · the baseline — the one number that cannot be recomputed');
   const base = await api(req, 'post', P + '/baseline', {});
@@ -344,9 +403,12 @@ async function main() {
      WHERE namespace = 'project' AND type = 'baseline.set' AND phase = 'end'
        AND parent_event_id = ${start?.id ?? null}::uuid`;
   A(Boolean(close), 'and CLOSED it — a start with no end is B139, the class the spine audit exists for');
-  A(close?.wbs === '2' && close?.ms === '1',
+  const [{ msCount }] = await sql<{ msCount: number }[]>`
+    SELECT count(*)::int AS "msCount" FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid`;
+  A(close?.wbs === '2' && close?.ms === String(msCount),
     'the end event carries what was frozen, not an empty object',
-    close ? `wbsNodes=${close.wbs} milestones=${close.ms}` : 'no end row');
+    close ? `wbsNodes=${close.wbs} milestones=${close.ms} (plan holds ${msCount})` : 'no end row');
 
   // ══ 6 · HITL — the work is delivered and ACCEPTED ══════════════════════════════════════════
   phase('6 · HITL: upload is not acceptance');
@@ -385,6 +447,111 @@ async function main() {
   A(project?.deliverablesPct === 100, 'deliverables read 100% — 1 of 1 accepted', String(project?.deliverablesPct));
   A(project?.costPct === 0, 'cost reads a MEASURED zero (nothing spent), not "not measured"', String(project?.costPct));
   A(!('percentComplete' in (project ?? {})), 'no blended percentage is exposed');
+
+  // ══ 7b · the CHECKLIST gates the milestone, and completion is a RECORD ═════════════════════
+  //
+  // Everything here is done by the people who would do it: the assigned member ticks the work off,
+  // the admin closes the phase. No status is set by hand.
+  phase('7b · HITL: the work is ticked off, then the phase closes with a record');
+
+  // The NEXT phase, not the one phase 6 already closed. A checklist belongs to work not yet done,
+  // and pointing it at a met milestone made "the phase closes" fail as NOT_PENDING while the
+  // assertion above it passed for the wrong reason.
+  const workPhase = ms2id;
+  const taskIds: string[] = [];
+  for (const [title, due] of [['Rig build complete', iso(100)], ['Demo script rehearsed', iso(115)]] as const) {
+    const t = await api(req, 'post', P + '/tasks', {
+      milestoneId: workPhase, title, dueDate: due, assigneeUserId: assignee?.id ?? null,
+    });
+    if (t.status !== 201) no('a task could not be added', `${t.status} ${t.text.slice(0, 90)}`);
+    else taskIds.push(((t.json.data as Json)?.task as Json)?.id as string);
+  }
+  A(taskIds.length === 2, 'the milestone gets a checklist, assigned to someone who is ON the project',
+    `${taskIds.length} task(s)`);
+
+  const tooEarly = await api(req, 'patch', P + '/milestones', { action: 'met', milestoneId: workPhase });
+  A(tooEarly.status === 409 && String((tooEarly.json as Json).code) === 'TASKS_OUTSTANDING',
+    'the phase will not close while its checklist is open',
+    `${tooEarly.status} ${String((tooEarly.json as Json).code)}`);
+
+  // THE EMPLOYEE, not the admin. Ticking work off is not a management act, and if this only worked
+  // for a tenant_admin the checklist would be a status report a manager keeps for everyone else.
+  let employeeTicked = 0;
+  if (assignee?.email) {
+    const empCtx = await browser.newContext();
+    const empPage = await empCtx.newPage();
+    try {
+      await login(empPage, String(assignee.email), TENANT_PW);
+      for (const id of taskIds) {
+        const r = await api(empCtx.request, 'patch', P + `/tasks/${id}`, { status: 'done' });
+        if (r.status === 200) employeeTicked += 1;
+      }
+      A(employeeTicked === taskIds.length,
+        'the ASSIGNED EMPLOYEE ticks their own work off — not the admin',
+        `${assignee.email} closed ${employeeTicked}/${taskIds.length}`);
+      const cannot = await api(empCtx.request, 'post', P + '/tasks', { milestoneId: workPhase, title: 'not mine to add' });
+      A(cannot.status === 403 || cannot.status === 404, '…and cannot ADD work to the plan', `${cannot.status}`);
+    } catch (e) {
+      // An employee who cannot sign in is a FINDING, not a skip: this is the half of the feature
+      // that is not the manager's, and leaving it unmeasured would report the manager's half twice.
+      no('the assigned employee could not sign in', String((e as Error).message).slice(0, 70));
+    }
+    await empCtx.close();
+  } else {
+    no('no member to assign work to — the employee half of the checklist is UNMEASURED');
+  }
+
+  const metrics = { attendees: 11, actionItems: 6, sowRevisions: 1 };
+  const closed = await api(req, 'patch', P + '/milestones', {
+    action: 'met', milestoneId: workPhase,
+    note: 'Demonstration flown; both objectives met on the first attempt.',
+    metrics,
+  });
+  A(closed.status === 200, 'with the work done the phase closes', `${closed.status}`);
+
+  const [rec] = await sql<{ note: string | null; metrics: Record<string, unknown> | null; status: string }[]>`
+    SELECT completion_note AS note, completion_metrics AS metrics, status
+      FROM project_milestones WHERE id = ${workPhase ?? null}::uuid`;
+  A(rec?.status === 'met', 'the row is met');
+  A(typeof rec?.metrics === 'object' && (rec?.metrics as { attendees?: number })?.attendees === 11,
+    'the metrics round-trip as an OBJECT — jsonb, not a string that char-iterates',
+    JSON.stringify(rec?.metrics));
+
+  // ══ 7c · DB → UI → DB: the page states what the tables hold ════════════════════════════════
+  //
+  // The whole point of "full DB to UI and back again". Everything above wrote through the API; this
+  // reads the RENDERED PAGE as a person sees it and reconciles it against the rows — the rule being
+  // that the expectation is the page's own query, not one I believe equivalent.
+  phase('7c · DB → UI → DB reconciliation on the rendered workspace');
+
+  const uiPage = await ctx.newPage();
+  await uiPage.goto(`${BASE}/portal/${TENANT}/projects/${created.projectId}`, { waitUntil: 'domcontentloaded' });
+  await uiPage.waitForLoadState('networkidle').catch(() => {});
+  await uiPage.waitForTimeout(1200);
+  const body = (await uiPage.locator('body').innerText()).replace(/\s+/g, ' ');
+
+  const [counts] = await sql<{ ms: number; done: number; tasks: number }[]>`
+    SELECT (SELECT count(*)::int FROM project_milestones WHERE project_id = ${created.projectId}::uuid) AS ms,
+           (SELECT count(*)::int FROM project_milestone_tasks
+             WHERE project_id = ${created.projectId}::uuid AND status = 'done') AS done,
+           (SELECT count(*)::int FROM project_milestone_tasks
+             WHERE project_id = ${created.projectId}::uuid) AS tasks`;
+  A(body.includes(`${counts.done} of ${counts.tasks} done`),
+    'the checklist counter on the page equals the rows',
+    `page expects "${counts.done} of ${counts.tasks} done"`);
+  A(body.includes('Demonstration flown; both objectives met on the first attempt.'),
+    'the completion NOTE reaches the page');
+  A(/attendees\s+11/.test(body), 'and so do the metrics', 'attendees 11');
+  for (const c of chain) A(body.includes(c.title), `the plan shows "${c.title}"`);
+  A(!/\bNaN\b|Invalid Date/.test(body), 'no NaN and no Invalid Date anywhere on the workspace');
+
+  // And back again: what the page shows is what the API returns, so a reader of either is reading
+  // the same thing.
+  const viaApi = await api(req, 'get', P + '/milestones');
+  const apiTasks = ((viaApi.json.data as Json)?.tasks ?? []) as Json[];
+  A(apiTasks.length === counts.tasks, 'the API returns the same task count the page rendered',
+    `api=${apiTasks.length} db=${counts.tasks}`);
+  await uiPage.close();
 
   // ══ 8 · HITL — closing the gate the automation opened ══════════════════════════════════════
   phase('8 · HITL: completing the ToDo the engine raised');
@@ -426,6 +593,81 @@ async function main() {
   }
 
   // ══ 10 · isolation still holds after all of that ═══════════════════════════════════════════
+  // ══ 11 · CLOSE-OUT — the end of the project's life, recorded ═══════════════════════════════
+  //
+  // Three refusals before it will close, because they are three different problems: a phase still
+  // running, work added after a phase was met, and evidence the customer has not accepted. Then the
+  // close-out itself, which is milestone completion one scale up — a note and metrics.
+  phase('11 · HITL: close-out, and the three things that block it');
+
+  const tooSoon = await api(req, 'patch', P, { action: 'close' });
+  A(tooSoon.status === 409 && String((tooSoon.json as Json).code) === 'MILESTONES_OUTSTANDING',
+    'a project with phases still running will not close',
+    `${tooSoon.status} ${String((tooSoon.json as Json).code)}`);
+
+  // Close the two remaining phases the way a person would.
+  for (const m of chain.slice(1)) {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM project_milestones
+       WHERE project_id = ${created.projectId}::uuid AND title = ${m.title} LIMIT 1`;
+    if (row) await api(req, 'patch', P + '/milestones', { action: 'met', milestoneId: row.id, note: `${m.title} complete.` });
+  }
+  const [{ pending }] = await sql<{ pending: number }[]>`
+    SELECT count(*)::int AS pending FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid AND status = 'pending'`;
+  A(pending === 0, 'every phase is met', `${pending} still pending`);
+
+  // Work added AFTER a phase was met is the gap the milestone gate structurally cannot catch —
+  // it ran before this task existed.
+  const late = await api(req, 'post', P + '/tasks', { milestoneId: workPhase, title: 'Return government property' });
+  A(late.status === 201, 'a task can be added after its phase closed', `${late.status}`);
+  const lateId = ((late.json.data as Json)?.task as Json)?.id as string | undefined;
+  const blockedByLate = await api(req, 'patch', P, { action: 'close' });
+  A(blockedByLate.status === 409 && String((blockedByLate.json as Json).code) === 'TASKS_OUTSTANDING',
+    'and it BLOCKS close-out — the milestone gate ran before it existed',
+    `${blockedByLate.status} ${String((blockedByLate.json as Json).code)}`);
+  if (lateId) await api(req, 'patch', P + `/tasks/${lateId}`, { status: 'done' });
+
+  const closeout = { invoicesPaid: 4, finalCost: 512000, propertyReturned: true };
+  const shut = await api(req, 'patch', P, {
+    action: 'close',
+    note: 'Final invoice paid; government property returned and receipted.',
+    metrics: closeout,
+  });
+  A(shut.status === 200, 'the project closes out', `${shut.status} ${shut.text.slice(0, 90)}`);
+
+  const [pr] = await sql<{ status: string; closedAt: string | null; note: string | null; metrics: Record<string, unknown> | null }[]>`
+    SELECT status, closed_at AS "closedAt", closeout_note AS note, closeout_metrics AS metrics
+      FROM projects WHERE id = ${created.projectId}::uuid`;
+  A(pr?.status === 'closed' && Boolean(pr?.closedAt),
+    'the status and the stamp agree — the CHECK makes them inseparable', `${pr?.status} @ ${pr?.closedAt}`);
+  A((pr?.metrics as { invoicesPaid?: number })?.invoicesPaid === 4,
+    'the close-out metrics round-trip as an object', JSON.stringify(pr?.metrics));
+
+  const twice = await api(req, 'patch', P, { action: 'close' });
+  A(twice.status === 409 && String((twice.json as Json).code) === 'ALREADY_CLOSED',
+    'closing twice is refused by compare-and-swap, not by a second stamp', `${twice.status}`);
+
+  const [closedEv] = await sql<{ payload: Record<string, unknown> }[]>`
+    SELECT payload FROM system_events
+     WHERE namespace = 'project' AND type = 'project.closed' AND payload->>'projectId' = ${created.projectId}
+     ORDER BY created_at DESC LIMIT 1`;
+  A(Boolean(closedEv), '`project:project.closed` was emitted');
+  if (closedEv) {
+    const { describeEvent } = await import('../lib/event-labels.ts');
+    const label = describeEvent({ namespace: 'project', type: 'project.closed', phase: 'single', payload: closedEv.payload } as never);
+    A(label.startsWith('Project closed out') && !/\s{2,}/.test(label), 'and it reads as a sentence', label);
+  }
+
+  // Close-out REOPENS in the real world. The note is kept: it described what happened when it was
+  // written, and the reopen is a correction to it, not a deletion of it.
+  const reopened = await api(req, 'patch', P, { action: 'reopen', reason: 'Final invoice disputed by DFAS' });
+  A(reopened.status === 200, 'a closed project can be reopened', `${reopened.status}`);
+  const [pr2] = await sql<{ status: string; closedAt: string | null; note: string | null }[]>`
+    SELECT status, closed_at AS "closedAt", closeout_note AS note FROM projects WHERE id = ${created.projectId}::uuid`;
+  A(pr2?.status === 'active' && pr2?.closedAt === null, 'the stamp is cleared with the status', `${pr2?.status}`);
+  A(typeof pr2?.note === 'string', 'and the close-out note is KEPT, not erased', String(pr2?.note).slice(0, 50));
+
   phase('10 · a second tenant sees none of it');
   const ctx2 = await browser.newContext();
   const page2 = await ctx2.newPage();

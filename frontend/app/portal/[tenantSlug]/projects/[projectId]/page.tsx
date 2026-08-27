@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant, sql } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { projectScope, listAssignees } from '@/lib/projects/access';
 import { getProject, listSourceDocuments, readiness } from '@/lib/projects/project';
@@ -14,6 +14,7 @@ import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
 import { usd, spentOf } from '@/lib/projects/money';
 import { DeliverableRow } from '@/components/projects/deliverable-row';
 import { MilestoneChecklist } from '@/components/projects/milestone-checklist';
+import { ProjectRoster } from '@/components/projects/project-roster';
 import { canAssign } from '@/lib/projects/access';
 
 export const dynamic = 'force-dynamic';
@@ -80,12 +81,19 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
     listDeliverables(tenantId, projectId),
     listMilestoneTasks(tenantId, projectId),
+    // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
+    // re-checks membership, so this list is convenience, not the boundary.
+    sql<{ id: string; email: string; name: string | null }[]>`
+      SELECT u.id, u.email, u.name FROM users u
+        JOIN user_memberships m ON m.user_id = u.id AND m.tenant_id = ${tenantId}::uuid
+       WHERE m.status = 'active' AND u.is_active = true AND u.role <> 'partner_user'
+       ORDER BY u.email`,
     readiness(tenantId, projectId),
     listAssignees(tenantId, projectId),
     rollup(tenantId, projectId),
@@ -166,6 +174,15 @@ export default async function ProjectPage({
           Shown side by side and never averaged — budget spent against schedule elapsed is the
           comparison that carries the signal.
         </p>
+      </section>
+
+      <section className="mb-8">
+        <ProjectRoster
+          assignees={assignees.map((a) => ({ userId: a.userId, email: a.email, name: a.name }))}
+          candidates={candidates}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canManage={canAccept}
+        />
       </section>
 
       <section className="mb-8">

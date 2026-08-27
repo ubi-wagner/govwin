@@ -279,6 +279,19 @@
    "nearMiss": false
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
+   "methods": [
+    "DELETE",
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/baseline",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
    "methods": [
@@ -584,7 +597,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 218
+   "rows": 219
   },
   {
    "name": "deploy_baseline",
@@ -846,7 +859,7 @@
    "template": "on_contract_started",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_full_draft_requested",

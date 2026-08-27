@@ -1184,3 +1184,103 @@ it now selects by what the query reads.
 
 ---
 
+## F1 · The full lifecycle, driven as the actors — and the gap that only that could find
+
+**Operator's ask:** *"Run a full project creation through milestone completions and close out and
+HITL and automation and agentic support. Full DB to UI and back again verification as actors in the
+system, no by hand work."*
+
+`drive-project-lifecycle.mts` now runs twelve phases end to end, with the live Python engine polling
+and the Claude emulator answering, and **every act performed by the person who would perform it**:
+
+```
+0  the engine has OnContractStarted registered            (else exit 2 — a harness that reports
+                                                           "the automation did not fire" when the
+                                                           automation was not running is reporting
+                                                           on itself)
+1  HITL       a tenant_admin records outcome=awarded through the real route
+2  AUTOMATION the engine instantiates the workflow → a `project_setup` ToDo → a NOTIFY outcome
+3  HITL       the project is opened; BOTH anchors uploaded as multipart, not inserted
+4  HITL       CLIN with a citation → provenance · WBS parent + child · milestone · deliverable
+4b HITL       two more phases · resequence · a 14-day slip that cascades · STAFFING
+5             the baseline freezes once; the bracket closes carrying what it froze
+6  HITL       an assigned employee uploads; only the admin accepts; then the phase can close
+7             the three measures
+7b HITL       the checklist — created by the admin, TICKED OFF BY THE EMPLOYEE — then completion
+              with a note and metrics
+7c            DB → UI → DB: the rendered page reconciled against the rows, and back to the API
+8  HITL       the human closes the ToDo the engine raised
+9  AGENTS     measured, not assumed
+11 HITL       close-out: three refusals, the close, the double-close, the reopen
+10            a second tenant sees none of it
+```
+
+### The gap: you could not staff a project
+
+`lib/projects/access.ts` says assignment is the whole access mechanism for an employee. The **only**
+`project_assignments` row anyone ever got was the one `createProject` writes for its creator. There
+was no route, no button, no other insert — **no employee could ever be let into a project** — while
+the empty state on `/projects` told them to *"ask a tenant admin to add you"*, describing a
+capability that did not exist.
+
+No lens could have caught it. `reconcile-capability` joins routes to callers, and **a route nobody
+wrote has no row on either side**; the surface lens renders a page that works; the contract lenses
+grade envelopes that are correct. It surfaced the first time a drive stopped acting as the manager
+and tried to act as the EMPLOYEE — and could not tick off work that had been assigned to them.
+
+Shipped with it: `POST/GET/DELETE …/assignees`, the roster on the workspace, and two rules that fall
+out of taking the boundary seriously —
+
+* **assigning work to someone not on the project is refused** (`NOT_ON_PROJECT`) with the fix in the
+  sentence, rather than granting project access as a side effect of a task form. An access decision
+  hidden inside an unrelated action is how a boundary stops meaning anything.
+* **the last assignee cannot be removed** — an unstaffed project is one nobody can open, *including
+  to re-staff it*.
+
+### Close-out (mig 219)
+
+`projects` grew `closed_at` / `closed_by` / `closeout_note` / `closeout_metrics`, with a CHECK making
+the status and the stamp inseparable — the same rule mig 218 puts on a done task. Close-out is
+milestone completion one scale up, deliberately the same shape, and it refuses on three separate
+grounds because they are three different next actions:
+
+```
+✓ a project with phases still running will not close      MILESTONES_OUTSTANDING
+✓ a task added AFTER its phase was met blocks close-out   TASKS_OUTSTANDING
+    (the gap the milestone gate structurally cannot catch — it ran before the task existed)
+✓ evidence the customer has not accepted blocks it        DELIVERABLES_OUTSTANDING
+✓ closing twice is refused by compare-and-swap, not a second stamp
+✓ a closed project reopens — and the close-out note is KEPT, because the reopen is a correction
+  to what it says, not a deletion of it
+```
+
+### DB → UI → DB
+
+Phase 7c reads the **rendered page** and reconciles it against the rows: the checklist counter, the
+completion note, the metrics, every phase title, and no `NaN`/`Invalid Date` anywhere — then asks
+the API for the same numbers, so a reader of either is reading the same thing.
+
+### What the agents do
+
+`outcome_tracker` and `outcome_analyst` wake on the award and run against the emulator. **Zero
+workflows and zero agents consume the `project` namespace** — its events are emitted, bracketed and
+readable, so the award side of the bridge is wired and the post-award side is not. Reported as a
+number so it cannot pass for coverage.
+
+### Three harness defects, each caught before it became a finding
+
+* the drive asserted `milestones=1` on the baseline bracket — written before phase 4b added two more.
+  Now derived from what the plan actually holds.
+* phase 7b reused the milestone phase 6 had already closed, so *"the phase closes"* failed
+  `NOT_PENDING` while the assertion above it passed **for the wrong reason** — the task gate answered
+  a question phase 6 was asking about deliverables. The checklist now belongs to the next phase,
+  which is also the honest sequence: you plan work you have not done.
+* it read the roster from `/members`; the route is `/team` and it returns a **bare array** under
+  `data`. Read the route, do not assume the envelope's inner shape.
+
+`tsc` 0 · vitest **216 files / 2,145** · `next build` 0 · surfaces 80/80 · api-contract **141 GETs**
+0 no-actor reachability clean · write-contract **230/230** · capability UNSURFACED still the
+pre-existing 6 · the drive **green, all twelve phases**.
+
+---
+

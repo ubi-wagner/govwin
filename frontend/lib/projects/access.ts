@@ -33,7 +33,7 @@
  * decision is what removes cross-tenant from this capability entirely. Relying on "nobody will
  * assign one" would make the exclusion a convention; refusing the role makes it a rule.
  */
-import { sql } from '@/lib/db';
+import { sql, auditLog } from '@/lib/db';
 import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
 
 export interface ProjectActor {
@@ -178,4 +178,113 @@ export async function listAssignees(tenantId: string, projectId: string): Promis
 /** Only a tenant_admin (or a descended admin) may change who is on a project. */
 export function canAssign(role: string): boolean {
   return isRole(role) && role !== 'partner_user' && hasRoleAtLeast(role as Role, 'tenant_admin');
+}
+
+/**
+ * ── STAFFING A PROJECT — the half of the access model that had no way in ─────────────────────
+ * `deliveryScope`/`canAccessProject` above say assignment is the whole access mechanism for an
+ * employee, and until now the ONLY `project_assignments` row anyone got was the one
+ * `createProject` writes for its creator. There was no route, no button, and no other insert: an
+ * employee could never be let into a project, and the empty state on `/projects` told them to *"ask
+ * a tenant admin to add you"* — describing a capability that did not exist.
+ *
+ * It survived every lens because it is a MISSING route, not an unsurfaced one: `reconcile-
+ * capability` joins routes to callers, and a route that was never written has no row on either
+ * side. It surfaced the first time a drive tried to act as the employee rather than as the manager.
+ */
+export interface AssignmentResult { userId: string; email: string | null }
+
+export async function assignMember(
+  actor: ProjectActor,
+  projectId: string,
+  userId: string,
+): Promise<{ ok: true; data: AssignmentResult } | { ok: false; status: number; error: string; code: string }> {
+  if (!canAssign(actor.role)) {
+    return { ok: false, status: 403, error: 'Only a tenant admin can staff a project', code: 'FORBIDDEN' };
+  }
+  if (!(await canAccessProject(actor, projectId))) {
+    return { ok: false, status: 404, error: 'Project not found', code: 'NOT_FOUND' };
+  }
+  try {
+    // The member must belong to THIS tenant. The FK to `users` is global, so without this a user id
+    // from another company would satisfy it and be granted access to this project's contract.
+    const [member] = await sql<{ id: string; email: string | null }[]>`
+      SELECT u.id, u.email FROM users u
+        JOIN user_memberships m ON m.user_id = u.id AND m.tenant_id = ${actor.tenantId}::uuid
+       WHERE u.id = ${userId}::uuid AND m.status = 'active' AND u.is_active = true LIMIT 1`;
+    if (!member) {
+      return { ok: false, status: 400, error: 'That person is not an active member of this company', code: 'VALIDATION_ERROR' };
+    }
+    // A `partner_user` is refused the capability outright (see the module header); staffing one
+    // onto a project would be the back door around that.
+    const [role] = await sql<{ role: string }[]>`SELECT role FROM users WHERE id = ${userId}::uuid`;
+    if (role?.role === 'partner_user') {
+      return {
+        ok: false, status: 403, code: 'FORBIDDEN',
+        error: 'Projects have no collaborator surface — a partner user cannot be staffed onto one.',
+      };
+    }
+
+    await sql`
+      INSERT INTO project_assignments (tenant_id, project_id, user_id, assigned_by)
+      VALUES (${actor.tenantId}::uuid, ${projectId}::uuid, ${userId}::uuid, ${actor.userId}::uuid)
+      ON CONFLICT (project_id, user_id) DO NOTHING`;
+
+    await auditLog({
+      tenantId: actor.tenantId, userId: actor.userId, action: 'project.member_assigned',
+      entityType: 'project', entityId: projectId, metadata: { assigned: userId, email: member.email },
+    });
+    return { ok: true, data: { userId, email: member.email } };
+  } catch (err) {
+    console.error('[projects/access] assignMember failed:', err);
+    return { ok: false, status: 500, error: 'Failed to staff the project', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Take someone off a project.
+ *
+ * **The last person cannot be removed.** An unstaffed project is one nobody can open — not even to
+ * re-staff it, because reaching the roster requires reaching the project. The refusal is the cheap
+ * way to make that unreachable state unreachable.
+ */
+export async function unassignMember(
+  actor: ProjectActor,
+  projectId: string,
+  userId: string,
+): Promise<{ ok: true; data: { removed: string } } | { ok: false; status: number; error: string; code: string }> {
+  if (!canAssign(actor.role)) {
+    return { ok: false, status: 403, error: 'Only a tenant admin can change who is on a project', code: 'FORBIDDEN' };
+  }
+  if (!(await canAccessProject(actor, projectId))) {
+    return { ok: false, status: 404, error: 'Project not found', code: 'NOT_FOUND' };
+  }
+  try {
+    const [{ n }] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM project_assignments
+       WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
+    if (n <= 1) {
+      return {
+        ok: false, status: 409, code: 'LAST_ASSIGNEE',
+        error: 'That is the only person on this project. Add someone else before removing them — '
+          + 'an unstaffed project is one nobody can open, including to re-staff it.',
+      };
+    }
+    const rows = await sql<{ userId: string }[]>`
+      DELETE FROM project_assignments
+       WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
+         AND user_id = ${userId}::uuid
+      RETURNING user_id`;
+    if (!rows.length) {
+      return { ok: false, status: 404, error: 'That person is not on this project', code: 'NOT_FOUND' };
+    }
+    await auditLog({
+      tenantId: actor.tenantId, userId: actor.userId, action: 'project.member_unassigned',
+      entityType: 'project', entityId: projectId, metadata: { removed: userId },
+    });
+    return { ok: true, data: { removed: userId } };
+  } catch (err) {
+    console.error('[projects/access] unassignMember failed:', err);
+    return { ok: false, status: 500, error: 'Failed to change the roster', code: 'DB_ERROR' };
+  }
 }

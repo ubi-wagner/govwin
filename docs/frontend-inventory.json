@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 263,
-   "lines": 41243
+   "files": 264,
+   "lines": 41357
   },
   {
    "kind": "app-boundary",
@@ -24,8 +24,8 @@
   },
   {
    "kind": "component",
-   "files": 164,
-   "lines": 41711
+   "files": 165,
+   "lines": 41830
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 305,
-   "lines": 60800
+   "files": 306,
+   "lines": 61115
   },
   {
    "kind": "middleware",
@@ -55,12 +55,12 @@
   {
    "kind": "page",
    "files": 118,
-   "lines": 17933
+   "lines": 17950
   },
   {
    "kind": "script",
    "files": 186,
-   "lines": 24986
+   "lines": 25228
   },
   {
    "kind": "server-action",
@@ -70,7 +70,7 @@
   {
    "kind": "test",
    "files": 216,
-   "lines": 28719
+   "lines": 28746
   }
  ],
  "records": [
@@ -8868,8 +8868,8 @@
   {
    "file": "__tests__/projects-deliverables.test.ts",
    "kind": "test",
-   "lines": 224,
-   "bytes": 10502,
+   "lines": 251,
+   "bytes": 12060,
    "client": false,
    "exports": [],
    "imports": [
@@ -8924,13 +8924,17 @@
     "markMilestoneMet",
     "expect(r.ok).toBe",
     "expect",
-    "expect(r.status).toBe",
     "expect(r.code).toBe",
+    "expect(r.status).toBe",
+    "expect(r.error).toContain",
     "expect(r.error).toMatch",
     "expect(r.error, 'the message has to say WHY a present file is not enough').toMatch",
     "expect(writes(), 'nothing may be written on a refusal').toBe",
     "writes",
     "markMilestoneMet(ADMIN, PROJECT, MILESTONE).catch",
+    "db.state.queries.find",
+    "/project_deliverables/i.test",
+    "expect(probe, 'the deliverables gate ran at all').not.toBe",
     "expect(probe).toMatch",
     "expect(probe, 'a present storage_key must not satisfy the gate').not.toMatch",
     "expect(writes()).toMatch",
@@ -8943,7 +8947,6 @@
     "expect(payload.replacedAcceptance, 'the event has to record that an acceptance was revoked').toBe",
     "Buffer.alloc",
     "String",
-    "db.state.queries.find",
     "/storage_key =/i.test",
     "expect(key).toMatch",
     "acceptDeliverable",
@@ -47807,6 +47810,144 @@
    "dynamic": false
   },
   {
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
+   "kind": "api-route",
+   "lines": 75,
+   "bytes": 3878,
+   "client": false,
+   "exports": [
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "DELETE",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/gate",
+     "names": [
+      "withProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/project",
+     "names": [
+      "getProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/access",
+     "names": [
+      "assignMember",
+      "unassignMember",
+      "listAssignees"
+     ]
+    }
+   ],
+   "tryCount": 4,
+   "sqlTags": [],
+   "calls": [
+    "withProject",
+    "getProject",
+    "NextResponse.json",
+    "listAssignees",
+    "console.error",
+    "request.json",
+    "assignMember",
+    "new URL(request.url).searchParams.get",
+    "unassignMember"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 28
+    },
+    {
+     "arg": "{ data: { assignees: await listAssignees(gate.actor.tenantId, projectId) } }",
+     "opts": "",
+     "line": 30
+    },
+    {
+     "arg": "{ error: 'Failed to load the roster', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 44
+    },
+    {
+     "arg": "{ error: 'userId is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 46
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 49
+    },
+    {
+     "arg": "{ data: { assignee: r.data } }",
+     "opts": "{ status: 201 }",
+     "line": 50
+    },
+    {
+     "arg": "{ error: 'Failed to staff the project', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 54
+    },
+    {
+     "arg": "{ error: 'userId is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 64
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 67
+    },
+    {
+     "arg": "{ data: r.data }",
+     "opts": "",
+     "line": 68
+    },
+    {
+     "arg": "{ error: 'Failed to change the roster', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 72
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
+   "methods": [
+    "DELETE",
+    "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
    "kind": "api-route",
    "lines": 69,
@@ -48648,12 +48789,17 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts",
    "kind": "api-route",
-   "lines": 45,
-   "bytes": 2183,
+   "lines": 84,
+   "bytes": 4296,
    "client": false,
    "exports": [
     {
      "name": "GET",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "PATCH",
      "form": "function",
      "async": true
     }
@@ -48669,6 +48815,13 @@
      "spec": "@/lib/projects/gate",
      "names": [
       "withProject"
+     ]
+    },
+    {
+     "spec": "@/lib/projects/closeout",
+     "names": [
+      "closeProject",
+      "reopenProject"
      ]
     },
     {
@@ -48698,7 +48851,7 @@
      ]
     }
    ],
-   "tryCount": 1,
+   "tryCount": 3,
    "sqlTags": [],
    "calls": [
     "withProject",
@@ -48710,7 +48863,10 @@
     "listAssignees",
     "readiness",
     "provenanceFor",
-    "console.error"
+    "console.error",
+    "request.json",
+    "reopenProject",
+    "closeProject"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -48719,22 +48875,58 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ data: { project, documents, clins, assignees, readiness: ready, provenance } }",
      "opts": "",
-     "line": 38
+     "line": 39
     },
     {
      "arg": "{ error: 'Failed to load the project', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 42
+     "line": 43
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 62
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 66
+    },
+    {
+     "arg": "{ data: { project: r.data } }",
+     "opts": "",
+     "line": 67
+    },
+    {
+     "arg": "{ error: \"action must be 'close' or 'reopen'\", code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 70
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 76
+    },
+    {
+     "arg": "{ data: { project: r.data } }",
+     "opts": "",
+     "line": 77
+    },
+    {
+     "arg": "{ error: 'Failed to update the project', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 81
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]",
    "methods": [
-    "GET"
+    "GET",
+    "PATCH"
    ],
    "runtime": null,
    "dynamic": false
@@ -68255,8 +68447,8 @@
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
    "kind": "page",
-   "lines": 341,
-   "bytes": 15921,
+   "lines": 358,
+   "bytes": 16801,
    "client": false,
    "exports": [
     {
@@ -68295,7 +68487,8 @@
      "names": [
       "getTenantBySlug",
       "verifyTenantAccess",
-      "enterTenant"
+      "enterTenant",
+      "sql"
      ]
     },
     {
@@ -68380,6 +68573,12 @@
      ]
     },
     {
+     "spec": "@/components/projects/project-roster",
+     "names": [
+      "ProjectRoster"
+     ]
+    },
+    {
      "spec": "@/lib/projects/access",
      "names": [
       "canAssign"
@@ -68387,7 +68586,12 @@
     }
    ],
    "tryCount": 0,
-   "sqlTags": [],
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 92
+    }
+   ],
    "calls": [
     "auth",
     "redirect",
@@ -68417,6 +68621,7 @@
     "new Date(project.baselinedAt).toLocaleDateString",
     "ready.missing.join",
     "spentOf",
+    "assignees.map",
     "clins.map",
     "badgeFor",
     "Boolean",
@@ -68436,6 +68641,7 @@
    "jsx": [
     "Link",
     "Measure",
+    "ProjectRoster",
     "MilestoneChecklist",
     "DeliverableRow"
    ],
@@ -80169,6 +80375,75 @@
     "String(t.dueDate).slice",
     "String",
     "addTask"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/projects/project-roster.tsx",
+   "kind": "component",
+   "lines": 119,
+   "bytes": 4419,
+   "client": true,
+   "exports": [
+    {
+     "name": "RosterMember",
+     "form": "type"
+    },
+    {
+     "name": "Candidate",
+     "form": "type"
+    },
+    {
+     "name": "ProjectRoster",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    },
+    {
+     "spec": "@/lib/toast",
+     "names": [
+      "toast"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "useRouter",
+    "useState",
+    "assignees.map",
+    "candidates.filter",
+    "on.has",
+    "setBusy",
+    "fetch",
+    "JSON.stringify",
+    "res.json().catch",
+    "res.json",
+    "toast",
+    "setPick",
+    "router.refresh",
+    "confirm",
+    "encodeURIComponent",
+    "a.userId.slice",
+    "remove",
+    "available.map",
+    "add"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -94037,8 +94312,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 327,
-   "bytes": 17744,
+   "lines": 335,
+   "bytes": 18163,
    "client": false,
    "exports": [
     {
@@ -101226,8 +101501,8 @@
   {
    "file": "lib/projects/access.ts",
    "kind": "lib",
-   "lines": 182,
-   "bytes": 7991,
+   "lines": 291,
+   "bytes": 13396,
    "client": false,
    "exports": [
     {
@@ -101266,13 +101541,28 @@
      "name": "canAssign",
      "form": "function",
      "async": false
+    },
+    {
+     "name": "AssignmentResult",
+     "form": "type"
+    },
+    {
+     "name": "assignMember",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "unassignMember",
+     "form": "function",
+     "async": true
     }
    ],
    "imports": [
     {
      "spec": "@/lib/db",
      "names": [
-      "sql"
+      "sql",
+      "auditLog"
      ]
     },
     {
@@ -101284,7 +101574,7 @@
      ]
     }
    ],
-   "tryCount": 3,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
@@ -101305,13 +101595,36 @@
     {
      "tag": "sql",
      "line": 166
+    },
+    {
+     "tag": "sql",
+     "line": 211
+    },
+    {
+     "tag": "sql",
+     "line": 220
+    },
+    {
+     "tag": "sql",
+     "line": 228
+    },
+    {
+     "tag": "sql",
+     "line": 263
+    },
+    {
+     "tag": "sql",
+     "line": 273
     }
    ],
    "calls": [
     "isRole",
     "hasRoleAtLeast",
     "projectScope",
-    "console.error"
+    "console.error",
+    "canAssign",
+    "canAccessProject",
+    "auditLog"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -101555,6 +101868,109 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/projects/closeout.ts",
+   "kind": "lib",
+   "lines": 181,
+   "bytes": 8435,
+   "client": false,
+   "exports": [
+    {
+     "name": "CloseoutResult",
+     "form": "type"
+    },
+    {
+     "name": "closeProject",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "reopenProject",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "auditLog"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "./access",
+     "names": [
+      "canAccessProject",
+      "canAssign",
+      "ProjectActor"
+     ]
+    },
+    {
+     "spec": "./project",
+     "names": [
+      "Fail",
+      "Ok"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 36
+    },
+    {
+     "tag": "sql",
+     "line": 40
+    },
+    {
+     "tag": "sql",
+     "line": 45
+    },
+    {
+     "tag": "sql",
+     "line": 102
+    },
+    {
+     "tag": "sql",
+     "line": 118
+    },
+    {
+     "tag": "sql",
+     "line": 154
+    }
+   ],
+   "calls": [
+    "Promise.all",
+    "rows.slice(0, 3).map((r) => r.title).join",
+    "rows.slice(0, 3).map",
+    "rows.slice",
+    "canAssign",
+    "canAccessProject",
+    "Array.isArray",
+    "(completion.note ?? '').trim",
+    "blockers",
+    "naming",
+    "sql.json",
+    "emitEventSingle",
+    "userActor",
+    "auditLog",
+    "console.error",
+    "(reason ?? '').trim"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/projects/dates.ts",
    "kind": "lib",
    "lines": 81,
@@ -101707,8 +102123,8 @@
   {
    "file": "lib/projects/milestone-tasks.ts",
    "kind": "lib",
-   "lines": 415,
-   "bytes": 19907,
+   "lines": 432,
+   "bytes": 21010,
    "client": false,
    "exports": [
     {
@@ -101803,19 +102219,19 @@
     },
     {
      "tag": "sql",
-     "line": 153
+     "line": 157
     },
     {
      "tag": "sql",
-     "line": 218
+     "line": 170
     },
     {
      "tag": "sql",
-     "line": 230
+     "line": 235
     },
     {
      "tag": "sql",
-     "line": 283
+     "line": 247
     },
     {
      "tag": "sql",
@@ -101823,19 +102239,23 @@
     },
     {
      "tag": "sql",
-     "line": 345
+     "line": 317
     },
     {
      "tag": "sql",
-     "line": 366
+     "line": 362
     },
     {
      "tag": "sql",
-     "line": 374
+     "line": 383
     },
     {
      "tag": "sql",
-     "line": 384
+     "line": 391
+    },
+    {
+     "tag": "sql",
+     "line": 401
     }
    ],
    "calls": [
@@ -120140,8 +120560,8 @@
   {
    "file": "scripts/drive-project-lifecycle.mts",
    "kind": "script",
-   "lines": 504,
-   "bytes": 29528,
+   "lines": 746,
+   "bytes": 45018,
    "client": false,
    "exports": [],
    "imports": [
@@ -120166,7 +120586,7 @@
      ]
     }
    ],
-   "tryCount": 3,
+   "tryCount": 4,
    "sqlTags": [
     {
      "tag": "sql",
@@ -120246,63 +120666,103 @@
     },
     {
      "tag": "sql",
-     "line": 321
+     "line": 330
     },
     {
      "tag": "sql",
-     "line": 337
+     "line": 343
     },
     {
      "tag": "sql",
-     "line": 342
+     "line": 380
     },
     {
      "tag": "sql",
-     "line": 372
+     "line": 396
     },
     {
      "tag": "sql",
-     "line": 395
+     "line": 401
     },
     {
      "tag": "sql",
-     "line": 404
+     "line": 406
     },
     {
      "tag": "sql",
-     "line": 407
+     "line": 434
     },
     {
      "tag": "sql",
-     "line": 410
+     "line": 512
     },
     {
      "tag": "sql",
-     "line": 412
+     "line": 533
     },
     {
      "tag": "sql",
-     "line": 448
+     "line": 562
     },
     {
      "tag": "sql",
-     "line": 452
+     "line": 571
     },
     {
      "tag": "sql",
-     "line": 458
+     "line": 574
     },
     {
      "tag": "sql",
-     "line": 461
+     "line": 577
     },
     {
      "tag": "sql",
-     "line": 465
+     "line": 579
     },
     {
      "tag": "sql",
-     "line": 474
+     "line": 610
+    },
+    {
+     "tag": "sql",
+     "line": 615
+    },
+    {
+     "tag": "sql",
+     "line": 639
+    },
+    {
+     "tag": "sql",
+     "line": 651
+    },
+    {
+     "tag": "sql",
+     "line": 666
+    },
+    {
+     "tag": "sql",
+     "line": 690
+    },
+    {
+     "tag": "sql",
+     "line": 694
+    },
+    {
+     "tag": "sql",
+     "line": 700
+    },
+    {
+     "tag": "sql",
+     "line": 703
+    },
+    {
+     "tag": "sql",
+     "line": 707
+    },
+    {
+     "tag": "sql",
+     "line": 716
     }
    ],
    "calls": [
@@ -120350,14 +120810,44 @@
     "new Date(today.getTime() + d * 86_400_000).toISOString",
     "today.getTime",
     "iso",
+    "new Date(v as string).toISOString().slice",
+    "new Date(v as string).toISOString",
+    "d10",
+    "chain.map",
+    "Array.isArray",
+    "members.find",
+    "onProject.some",
     "/\\b(NaN|Invalid Date|[A-Z][a-z]{2} [A-Z][a-z]{2} \\d)/.test",
     "String(again.json.error ?? '').slice",
     "up.status",
     "Number.isFinite",
     "Number",
+    "t.text.slice",
+    "taskIds.push",
+    "empCtx.newPage",
+    "String((e as Error).message).slice",
+    "empCtx.close",
+    "JSON.stringify",
+    "uiPage.goto",
+    "uiPage.waitForLoadState('networkidle').catch",
+    "uiPage.waitForLoadState",
+    "uiPage.waitForTimeout",
+    "(await uiPage.locator('body').innerText()).replace",
+    "uiPage.locator('body').innerText",
+    "uiPage.locator",
+    "body.includes",
+    "/attendees\\s+11/.test",
+    "/\\bNaN\\b|Invalid Date/.test",
+    "uiPage.close",
     "[...inline.map((i) => `${i.agentRole}×${i.n}`), ...queued.map((q) => q.agentRole)].join",
     "inline.map",
     "queued.map",
+    "chain.slice",
+    "shut.text.slice",
+    "describeEvent",
+    "label.startsWith",
+    "/\\s{2,}/.test",
+    "String(pr2?.note).slice",
     "ctx2.newPage",
     "list.some",
     "ctx2.close",
@@ -120375,7 +120865,7 @@
    ],
    "jsx": [],
    "snakeRowTypes": [],
-   "ownClientSql": 34,
+   "ownClientSql": 44,
    "jsonResponses": []
   },
   {
@@ -132049,6 +132539,12 @@
    "file": "app/api/invite/route.ts",
    "route": "/api/invite",
    "note": "no in-file gate AND no middleware PATH_MIN_ROLE prefix — verify (a deliberately public route is legitimate)"
+  },
+  {
+   "sig": "portal-route-no-tenant-AUTHORISATION",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
+   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
   },
   {
    "sig": "portal-route-no-tenant-AUTHORISATION",

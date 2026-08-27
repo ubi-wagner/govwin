@@ -1,13 +1,13 @@
 {
  "totals": {
   "routes": 118,
-  "components": 186,
-  "handlers": 1490,
-  "binding": 1249,
-  "fetches": 333,
+  "components": 187,
+  "handlers": 1493,
+  "binding": 1252,
+  "fetches": 335,
   "forms": 24,
-  "inputs": 461,
-  "buttons": 695,
+  "inputs": 462,
+  "buttons": 697,
   "orphans": 1
  },
  "records": [
@@ -5818,7 +5818,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
-   "lines": 341,
+   "lines": 358,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5828,6 +5828,7 @@
    "renders": [
     "Link",
     "Measure",
+    "ProjectRoster",
     "MilestoneChecklist",
     "DeliverableRow"
    ],
@@ -5839,7 +5840,8 @@
    "links": 1,
    "localImports": [
     "@/components/projects/deliverable-row",
-    "@/components/projects/milestone-checklist"
+    "@/components/projects/milestone-checklist",
+    "@/components/projects/project-roster"
    ],
    "route": "/portal/[tenantSlug]/projects/[projectId]",
    "renderedBy": [],
@@ -17837,6 +17839,59 @@
     "/portal/[tenantSlug]/projects/[projectId]"
    ],
    "bindingHandlers": 7,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/project-roster.tsx",
+   "lines": 119,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "ProjectRoster"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 82
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 97
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 109
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/assignees`"
+    },
+    {
+     "method": "DELETE",
+     "url": "`${basePath}/assignees?userId=${encodeURIComponent(userId)}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 2,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 3,
    "passedHandlers": 0
   },
   {

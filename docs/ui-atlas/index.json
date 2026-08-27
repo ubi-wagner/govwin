@@ -3122,7 +3122,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
@@ -3149,7 +3149,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
@@ -3172,11 +3172,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 185,
+    "buttons": 189,
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 20397,
+    "text": 21789,
     "h1": "Foundation"
    },
    "declared": {
@@ -3203,7 +3203,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 2048,
+    "text": 2047,
     "h1": "Foundation"
    },
    "declared": {
@@ -3230,7 +3230,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5065,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -3257,7 +3257,7 @@
     "links": 21,
     "inputs": 12,
     "forms": 0,
-    "text": 3431,
+    "text": 3787,
     "h1": "Foundation"
    },
    "declared": {
@@ -3284,7 +3284,7 @@
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 1238,
+    "text": 1237,
     "h1": "Foundation"
    },
    "declared": {
@@ -3311,7 +3311,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 671,
+    "text": 670,
     "h1": "Foundation"
    },
    "declared": {
@@ -3338,7 +3338,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2938,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -3365,7 +3365,7 @@
     "links": 31,
     "inputs": 3,
     "forms": 0,
-    "text": 3132,
+    "text": 3134,
     "h1": "Foundation"
    },
    "declared": {
@@ -3392,7 +3392,7 @@
     "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 537,
+    "text": 536,
     "h1": "Foundation"
    },
    "declared": {
@@ -3419,7 +3419,7 @@
     "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 471,
+    "text": 470,
     "h1": "Foundation"
    },
    "declared": {
@@ -3446,7 +3446,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
@@ -3473,7 +3473,7 @@
     "links": 23,
     "inputs": 2,
     "forms": 0,
-    "text": 947,
+    "text": 946,
     "h1": "Foundation"
    },
    "declared": {
@@ -3500,7 +3500,7 @@
     "links": 186,
     "inputs": 0,
     "forms": 0,
-    "text": 14527,
+    "text": 14526,
     "h1": "Foundation"
    },
    "declared": {
@@ -3527,7 +3527,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5065,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -3554,7 +3554,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5065,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -3581,7 +3581,7 @@
     "links": 21,
     "inputs": 27,
     "forms": 0,
-    "text": 5065,
+    "text": 5064,
     "h1": "Foundation"
    },
    "declared": {
@@ -3635,7 +3635,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
@@ -3662,7 +3662,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2938,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -3689,7 +3689,7 @@
     "links": 22,
     "inputs": 35,
     "forms": 0,
-    "text": 1819,
+    "text": 1818,
     "h1": "Foundation"
    },
    "declared": {
@@ -3716,7 +3716,7 @@
     "links": 37,
     "inputs": 0,
     "forms": 0,
-    "text": 1021,
+    "text": 1020,
     "h1": "Foundation"
    },
    "declared": {
@@ -3739,11 +3739,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 80,
+    "buttons": 95,
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 3186,
+    "text": 3788,
     "h1": "Foundation"
    },
    "declared": {
@@ -3770,7 +3770,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 833,
+    "text": 832,
     "h1": "Foundation"
    },
    "declared": {
@@ -3786,18 +3786,18 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/projects/[projectId]",
-   "url": "/portal/foundation/projects/b0e5c8db-16c0-4685-9b74-898b0bcbd856",
+   "url": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
    "file": "tenant__portal-tenantSlug-projects-projectId.png",
    "status": 200,
-   "finalUrl": "/portal/foundation/projects/b0e5c8db-16c0-4685-9b74-898b0bcbd856",
+   "finalUrl": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 16,
+    "buttons": 18,
     "links": 22,
-    "inputs": 3,
+    "inputs": 4,
     "forms": 0,
-    "text": 1991,
+    "text": 2097,
     "h1": "Foundation"
    },
    "declared": {
@@ -3824,7 +3824,7 @@
     "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 412,
+    "text": 411,
     "h1": "Foundation"
    },
    "declared": {
@@ -3851,7 +3851,7 @@
     "links": 21,
     "inputs": 7,
     "forms": 1,
-    "text": 34029,
+    "text": 34028,
     "h1": "Foundation"
    },
    "declared": {
@@ -3878,7 +3878,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 2294,
+    "text": 2293,
     "h1": "Foundation"
    },
    "declared": {
@@ -3905,7 +3905,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 1081,
+    "text": 1080,
     "h1": "Foundation"
    },
    "declared": {
@@ -3932,7 +3932,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2938,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -3959,7 +3959,7 @@
     "links": 28,
     "inputs": 3,
     "forms": 0,
-    "text": 2938,
+    "text": 2937,
     "h1": "Foundation"
    },
    "declared": {
@@ -3986,7 +3986,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 1,
-    "text": 1194,
+    "text": 1193,
     "h1": "Foundation"
    },
    "declared": {
@@ -4013,7 +4013,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 3068,
+    "text": 3067,
     "h1": "Foundation"
    },
    "declared": {
@@ -4036,11 +4036,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 16,
-    "links": 27,
+    "buttons": 24,
+    "links": 31,
     "inputs": 0,
     "forms": 0,
-    "text": 1518,
+    "text": 2034,
     "h1": "Foundation"
    },
    "declared": {
@@ -4067,7 +4067,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 630,
+    "text": 629,
     "h1": "Foundation"
    },
    "declared": {
@@ -4094,7 +4094,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
@@ -4121,7 +4121,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 926,
+    "text": 927,
     "h1": "Foundation"
    },
    "declared": {
