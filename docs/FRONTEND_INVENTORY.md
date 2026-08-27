@@ -17,17 +17,17 @@
 | app-boundary | 5 | 132 |
 | app-component | 26 | 8,926 |
 | auth | 2 | 241 |
-| component | 163 | 41,516 |
+| component | 163 | 41,518 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 303 | 60,161 |
+| lib | 304 | 60,262 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
 | page | 118 | 17,883 |
 | script | 184 | 24,175 |
 | server-action | 1 | 45 |
-| test | 211 | 28,240 |
-| **total** | **1366** | **233,223** |
+| test | 214 | 28,471 |
+| **total** | **1370** | **233,557** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -622,7 +622,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 303 files
+## 6. Library modules — 304 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -675,8 +675,9 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/delivery/baseline.ts | server | setBaseline, rebaseline, milestoneVariance, noteSlip | 4 | vitest |
 | lib/delivery/clins.ts | server | listClins, createClin | 2 | **none** |
 | lib/delivery/dates.ts | server | isoDate, daysBetween, varianceLabel | — | vitest |
-| lib/delivery/gate.ts | server | deliveryGate | — | **none** |
+| lib/delivery/gate.ts | server | deliveryGate, withDelivery | — | **none** |
 | lib/delivery/milestones.ts | server | listMilestones, listDeliverables, createMilestone, markMilestoneMet, createDeliverable, uploadDeliverable +1 | 14 | vitest |
+| lib/delivery/money.ts | server | usd, spentOf | — | vitest |
 | lib/delivery/projects.ts | server | createProject, getProject, listSourceDocuments, readiness, addSourceDocument | 7 | **none** |
 | lib/delivery/provenance.ts | server | TRUST_ORDER, trustRank, outranks, recordProvenance, provenanceFor, badgeFor | 2 | vitest |
 | lib/delivery/rollup.ts | server | pct, rollup | 4 | vitest |
@@ -962,7 +963,7 @@ statement is per-layer, not one number.
 | pages | 118 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 139 | verify-api-contract | see that lens's own accounting |
 | API routes (write verbs) | 199 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 303 | vitest 164 · sweep-mold-quality 39 | 100 |
+| lib modules | 304 | vitest 165 · sweep-mold-quality 39 | 100 |
 | components | 189 | only transitively, via a page that renders them | not measured |
 
 **The write verbs are the real gap.** 199 routes expose a POST/PATCH/PUT/DELETE and no lens
@@ -1029,6 +1030,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/tools/index.ts` — 116 lines
 - `lib/google-calendar.ts` — 112 lines
 - `lib/partner/create-partner-org.ts` — 111 lines
+- `lib/delivery/gate.ts` — 110 lines
 - `lib/proposal-full-draft.ts` — 108 lines
 - `lib/tasks/update-task.ts` — 108 lines
 - `lib/portal-workflow-recommend.ts` — 104 lines
@@ -1047,7 +1049,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/import/xlsx-reader.ts` — 73 lines
 - `lib/pdf-parse-quiet.ts` — 72 lines
 - `lib/export/chromium.ts` — 68 lines
-- `lib/delivery/gate.ts` — 67 lines
 - `lib/proposal-package-review.ts` — 64 lines
 - `lib/hooks/use-tool.ts` — 60 lines
 - `lib/memberships.ts` — 58 lines

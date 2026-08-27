@@ -332,7 +332,7 @@ tree carries far more, listed per component in §2.
 | components/ui/modal.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/portals, /portal/[tenantSlug]/manage |
 | components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +80 |
 | components/ui/tabs.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId], /admin/command, /portal/[tenantSlug]/command |
-| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +2 |
+| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +5 |
 
 ## 3. Handler census — what kind of interaction, and how much of it
 

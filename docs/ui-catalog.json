@@ -7455,7 +7455,7 @@
   },
   {
    "file": "components/admin/diff-history.tsx",
-   "lines": 173,
+   "lines": 189,
    "client": true,
    "kind": "component",
    "exports": [
@@ -7467,7 +7467,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 159
+     "line": 175
     }
    ],
    "fetches": [
@@ -7480,7 +7480,9 @@
    "inputs": 0,
    "buttons": 1,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/sources/[profileId]/source-detail-client.tsx"
    ],
@@ -8027,13 +8029,14 @@
   },
   {
    "file": "components/admin/recent-sessions.tsx",
-   "lines": 118,
+   "lines": 107,
    "client": true,
    "kind": "component",
    "exports": [
     "RecentSessions"
    ],
    "renders": [
+    "TimeAgo",
     "SessionRow"
    ],
    "handlers": [
@@ -8041,7 +8044,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 53
+     "line": 42
     }
    ],
    "fetches": [],
@@ -8049,7 +8052,9 @@
    "inputs": 0,
    "buttons": 1,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/analytics/page.tsx"
    ],
@@ -8189,7 +8194,7 @@
   },
   {
    "file": "components/admin/source-card-actions.tsx",
-   "lines": 610,
+   "lines": 624,
    "client": true,
    "kind": "component",
    "exports": [
@@ -8205,91 +8210,91 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 309
+     "line": 321
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 327
+     "line": 339
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 347
+     "line": 359
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 356
+     "line": 368
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 363
+     "line": 375
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 369
+     "line": 381
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 384
+     "line": 396
     },
     {
      "on": "onDragOver",
      "element": "div",
      "binds": true,
-     "line": 395
+     "line": 407
     },
     {
      "on": "onDragLeave",
      "element": "div",
      "binds": true,
-     "line": 399
+     "line": 411
     },
     {
      "on": "onDrop",
      "element": "div",
      "binds": true,
-     "line": 400
+     "line": 412
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 416
+     "line": 428
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 417
+     "line": 429
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 423
+     "line": 435
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 573
+     "line": 587
     },
     {
      "on": "onRefresh",
      "element": "SourceCard",
      "binds": false,
-     "line": 582
+     "line": 596
     }
    ],
    "fetches": [
@@ -8314,7 +8319,9 @@
    "inputs": 2,
    "buttons": 8,
    "links": 2,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/sources/page.tsx"
    ],
@@ -16240,19 +16247,21 @@
   },
   {
    "file": "components/portal/proposal-timeline.tsx",
-   "lines": 151,
+   "lines": 140,
    "client": true,
    "kind": "component",
    "exports": [
     "ProposalTimeline"
    ],
-   "renders": [],
+   "renders": [
+    "TimeAgo"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 132
+     "line": 121
     }
    ],
    "fetches": [],
@@ -16260,7 +16269,9 @@
    "inputs": 0,
    "buttons": 1,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "components/portal/proposal-workspace.tsx"
    ],
@@ -19800,37 +19811,45 @@
   },
   {
    "file": "components/scout/candidate-queue.tsx",
-   "lines": 199,
+   "lines": 193,
    "client": true,
    "kind": "component",
    "exports": [
     "ScoutCandidateQueue"
    ],
-   "renders": [],
+   "renders": [
+    "TimeAgo"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 110
+     "line": 104
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 150
+     "line": 144
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 154
+     "line": 148
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 161
+     "line": 155
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 159
     },
     {
      "on": "onClick",
@@ -19848,19 +19867,13 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 177
+     "line": 175
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 181
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 185
+     "line": 179
     }
    ],
    "fetches": [
@@ -19877,7 +19890,9 @@
    "inputs": 2,
    "buttons": 7,
    "links": 1,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/scouts/page.tsx"
    ],
@@ -20673,14 +20688,20 @@
     "app/admin/processes/admin-processes-client.tsx",
     "app/admin/system-state/system-state-client.tsx",
     "app/admin/workflows/workflow-monitor-client.tsx",
-    "app/portal/[tenantSlug]/activity/activity-stream-client.tsx"
+    "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
+    "components/admin/recent-sessions.tsx",
+    "components/portal/proposal-timeline.tsx",
+    "components/scout/candidate-queue.tsx"
    ],
    "reachableFrom": [
     "/admin/process",
     "/admin/processes",
     "/admin/system-state",
     "/admin/workflows",
-    "/portal/[tenantSlug]/activity"
+    "/portal/[tenantSlug]/activity",
+    "/admin/analytics",
+    "/portal/[tenantSlug]/proposals/[proposalId]",
+    "/admin/scouts"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0

@@ -112,8 +112,20 @@ async function bindings() {
   const [card] = await sql`
     SELECT c.id FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
     WHERE t.slug = 'foundation' AND c.archived_at IS NULL LIMIT 1`;
+  // `[cardId]` names TWO different entities in this tree — an opportunity card under /cards, and a
+  // TEMPLATE card under /template-cards. One binding for both fed a template route an opportunity
+  // id, and its (correct) 404 read as a route that could not see its own data. A shared parameter
+  // name is not a shared entity.
+  const [tcard] = await sql`
+    SELECT tc.id FROM tenant_template_cards tc JOIN tenants t ON t.id = tc.tenant_id
+    WHERE t.slug = 'foundation' LIMIT 1`.catch(() => [undefined]);
   const [task] = await sql`SELECT id FROM tasks LIMIT 1`;
-  const [inst] = await sql`SELECT id FROM process_instances LIMIT 1`;
+  // Scoped to `foundation`, like every other tenant-lane binding. It was `LIMIT 1` over the whole
+  // table, which picked an `rfp-pipeline` instance — so the tenant lane graded a 404 that was
+  // CORRECT ISOLATION and told us nothing about whether the route can see its own data.
+  const [inst] = await sql`
+    SELECT pi.id FROM process_instances pi JOIN tenants t ON t.id = pi.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY pi.created_at DESC LIMIT 1`;
   const [sol] = await sql`SELECT id FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`;
   const [opp] = await sql`SELECT id FROM opportunities LIMIT 1`;
   const [tenant] = await sql`SELECT id FROM tenants WHERE slug = 'foundation'`;
@@ -132,6 +144,7 @@ async function bindings() {
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, artifactId: art?.id,
     atomId: atom?.id, bucketId: bucket?.id, cardId: card?.id, taskId: task?.id,
     instanceId: inst?.id, solId: sol?.id, opportunityId: opp?.id, tenantId: tenant?.id,
+    templateCardId: tcard?.id,
     portalId: portal?.id, templateId: tmpl?.id, profileId: src?.id, userId: usr?.id,
   };
 }
@@ -187,7 +200,34 @@ function grade(status, text, ctype = '') {
 
 const exempted = [];
 
-async function call(page, url, route) {
+/**
+ * ── REACHABILITY: a 404 AT A REAL ID IS A FINDING, NOT A PASS ────────────────────────────────
+ * The envelope grader above is deliberately blind to status — a 404 with `{error, code}` is the
+ * contract working. That blindness has a hole, and it swallowed an entire capability.
+ *
+ * `deliveryGate` entered the tenant context from inside an awaited function, where
+ * `AsyncLocalStorage.enterWith` does not reach the caller's continuation. Every delivery route ran
+ * with `app.tenant_id` unset, RLS matched nothing, and all twenty handlers answered:
+ *
+ *     GET   …/projects             → 200 {"data":{"projects":[]}}
+ *     GET   …/projects/[id]/clins  → 404 {"error":"Project not found","code":"NOT_FOUND"}
+ *
+ * Textbook envelopes, every one. This lens graded them GREEN, and so did `verify-write-contract`,
+ * whose whole assertion is that a client error answers 4xx with both fields. Five green lenses and
+ * a dead API, found by looking at a screenshot of a red toast.
+ *
+ * The missing question is not about shape: **the ids in these URLs were bound from real rows this
+ * actor owns.** A route that answers "not found" at an id its own tenant holds cannot see its own
+ * data. Only the tenant lane is graded this way, because only its bindings are known to belong to
+ * the actor (`bindings()` scopes proposals, atoms, buckets, cards, users and delivery projects to
+ * `foundation`); the admin lane binds platform-wide rows where a 404 can be legitimate.
+ */
+const REACHABILITY_EXEMPT = new Map([
+  // Add a route here ONLY with a reason a 404 at a real, actor-owned id is CORRECT.
+]);
+const unreachable = [];
+
+async function call(page, url, route, lane) {
   const why = NOT_JSON_ROUTES.get(route);
   if (why) { exempted.push({ route, why }); return true; }
   const r = { url, status: null, ok: false, note: '' };
@@ -204,6 +244,14 @@ async function call(page, url, route) {
     r.status = res.status;
     const g = grade(res.status, res.text, res.ctype);
     r.ok = g.ok; r.note = g.note;
+    // Reachability — see the block above. Dynamic segments only: a 404 on a STATIC route is a
+    // route that does not exist for this actor, which is a different (and legitimate) fact.
+    if (lane === 'tenant' && res.status === 404 && /\[/.test(route)
+        && !REACHABILITY_EXEMPT.has(route)) {
+      unreachable.push({ route, url, note: (() => {
+        try { return JSON.parse(res.text)?.error ?? ''; } catch { return ''; }
+      })() });
+    }
   } catch (e) {
     r.note = String(e.message).slice(0, 60);
   }
@@ -226,7 +274,13 @@ async function login(ctx, email, pw) {
 
 console.log(`· serving ${BASE} · binding ids from ${DB.replace(/:[^:@/]*@/, ':***@')}`);
 const B = await bindings();
-const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[k] ?? `[${k}]`);
+// Per-route binding overrides, for parameter names that mean different entities in different
+// subtrees. `[cardId]` is the only one so far; the collision cost a phantom finding.
+const BIND_OVERRIDES = [[/^\/api\/portal\/\[tenantSlug\]\/template-cards\//, { cardId: 'templateCardId' }]];
+const bind = (r) => {
+  const over = BIND_OVERRIDES.find(([re]) => re.test(r))?.[1] ?? {};
+  return r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[over[k] ?? k] ?? `[${k}]`);
+};
 const addressable = (r) => !/\[/.test(bind(r));
 const unbound = [];
 
@@ -263,7 +317,7 @@ try {
     let n = 0;
     for (const route of mine) {
       if (!addressable(route)) { unbound.push(route); continue; }
-      await call(p, bind(route), route); n += 1;
+      await call(p, bind(route), route, lane); n += 1;
     }
     console.log(`  (${n} route(s) called)`);
     await ctx.close();
@@ -300,9 +354,18 @@ if (accounted !== ALL_ROUTES.length) {
   process.exit(2);
 }
 
+if (unreachable.length) {
+  console.log(`\n✗ ${unreachable.length} route(s) answered 404 AT AN ID THIS TENANT OWNS:`);
+  for (const u of unreachable) console.log(`  · ${u.route}  →  ${u.url}  ${u.note ? `"${u.note}"` : ''}`);
+  console.log('  Every id above was bound from a real `foundation` row. A route that cannot find its');
+  console.log("  own tenant's data is not refusing a caller — it is not seeing the data. That is how");
+  console.log('  twenty delivery handlers ran unscoped behind twenty textbook `{error,code}` envelopes.');
+  console.log('  If a 404 here is genuinely correct, add the route to REACHABILITY_EXEMPT with a reason.');
+}
+
 if (bad.length) {
   console.log('\n✗ envelope violations (the SOP: {data} on success · {error,code} on failure):');
   for (const r of bad) console.log(`  · ${r.url} — ${r.note}`);
-  process.exit(1);
 }
-console.log('\n✓ every reachable GET honours the response contract.');
+if (bad.length || unreachable.length) process.exit(1);
+console.log('\n✓ every reachable GET honours the response contract, and answers at an id its tenant owns.');

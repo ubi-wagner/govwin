@@ -455,6 +455,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   → "Invalid time value" 500; `proposals/[p]/document` → `r.volume_name` undefined → every section's
   volume grouping silently dropped from the assembled doc). Declare the `sql<typeof rows>` field names
   **camelCase**, matching the runtime, and read them camelCase.
+- **`enterTenant()` does NOT survive an `await` boundary back to its caller — and an unscoped route
+  answers a TEXTBOOK envelope.** `AsyncLocalStorage.enterWith` sets the store for the remainder of
+  the CURRENT execution; a route that `await`s a gate resumes in a different microtask, in the
+  context captured *before* the await, so a helper that enters on the caller's behalf has already
+  lost it. (Calling it synchronously immediately before the consumer, no await between, DOES work —
+  it is the await that loses it.) Symptom: RLS matches nothing, every read is empty, and the route
+  answers `200 {"data":{"items":[]}}` or `404 {"error":…,"code":…}` — which `verify-api-contract`
+  and `verify-write-contract` both grade GREEN, because both only ask about SHAPE. That is how all
+  20 delivery handlers ran unscoped behind perfect envelopes. **Scope the handler, don't enter for
+  it**: `runInTenant(tenantId, () => handler())` (`store.run()`), as `lib/delivery/gate.ts`
+  `withDelivery` does — or call `enterTenant` in the route's OWN frame. `verify-api-contract` now
+  fails a tenant-lane 404 at an id bound from a row that tenant owns.
 - **A `date`/`timestamptz` column arrives as a JavaScript `Date`, not a string — the #2 crash
   class, and the one no lens can see.** `String(d).slice(0, 10)` is `"Tue Apr 28"`, so
   `Date.parse(that + 'T00:00:00Z')` is **NaN** — and NaN survives a `!== 0` check, then picks a

@@ -711,3 +711,91 @@ that is a judgement, not a measurement. `/admin/site` produced no states this ru
 the drive reported); the atlas renders it 200. And `/partner` threw once and has not since.
 
 ---
+## D10 · The API was dead, and five green lenses said otherwise
+
+Found by pressing a button in a screenshot.
+
+`drive-ui-states` captured a toast on the delivery workspace, `kind: toast · trigger: "Accept"`. The
+toast was **red**, and it said **"Deliverable not found"** — on a deliverable rendered directly above
+it, with a file attached and an id straight out of the page.
+
+### Every delivery route ran with no tenant context
+
+```
+GET   …/delivery/projects                    → 200 {"data":{"projects":[]}}   a tenant with two
+GET   …/delivery/projects/[id]/clins         → 404 {"error":"Project not found","code":"NOT_FOUND"}
+GET   …/delivery/projects/[id]/milestones    → 404  same
+GET   …/delivery/projects/[id]/rollup        → 404  same
+GET   …/delivery/projects/[id]/documents     → 404  same
+GET   …/delivery/projects/[id]/wbs           → 404  same
+GET   …/delivery/projects/[id]/deliverables  → 404  same
+PATCH …/deliverables/[id]                    → 404  the red toast
+```
+
+**All twenty handlers.** `deliveryGate` called `enterTenant()` from inside itself.
+`AsyncLocalStorage.enterWith` sets the store for the remainder of the CURRENT execution — a route
+that `await`s the gate resumes in a *different* microtask, in the context captured before the await,
+so the store was gone before the handler's first query. RLS matched nothing and every read came back
+empty.
+
+The mechanism is worth stating exactly, because a first attempt to reproduce it FAILED: moving
+`enterTenant` into the wrapper, called synchronously immediately before `handler(gate)`, works
+perfectly — same frame, no await between. **It is the `await` boundary that loses the store, not the
+nesting.** `lib/db.ts` already said so in a comment on `verifyProposalAccess` ("context does not flow
+child→parent"), and so did this file's own header — which described returning-not-wrapping as
+deliberate while the code below it did the opposite.
+
+The PAGES were unaffected: they call `enterTenant` in their own frame. So the workspace rendered
+perfectly, with correct numbers, while its entire API returned nothing.
+
+### Why every lens passed — and this is the part worth keeping
+
+| lens | what it asked | why it could not see this |
+|---|---|---|
+| `verify-api-contract` | is the envelope `{data}` / `{error,code}`? | a 404 with both fields is **textbook**. It graded them green. |
+| `verify-write-contract` | does a client error answer 4xx with both fields? | a blanket 404 on every verb is *exactly* what it wants. |
+| `verify-surfaces` | does the page render? | it did — the pages don't use the API. |
+| `verify-ui-vs-db` | is the stated number the held number? | it was — same reason. |
+| `reconcile-capability` | is anything unsurfaced? | the routes ARE called, by a page that works. |
+
+Five green lenses and a dead capability. None of them is broken; the question "does this route return
+its own tenant's data" was in no lens's scope.
+
+### The fix, and the guard
+
+`withDelivery(tenantSlug, handler)` runs the handler inside `runInTenant` — `store.run()`, the
+primitive that actually scopes a callback. There is no way to hold the actor without being inside the
+context. All 20 handlers converted; `__tests__/delivery-gate-scoping.test.ts` fails if a route
+imports the raw gate, if any handler is unwrapped, or if the gate reaches for `enterTenant` again.
+
+A wrapper rather than "each route calls `enterTenant` itself", because `lib/delivery/access.ts` says
+it plainly of the assignment predicate and it is just as true here — *a boundary applied by
+convention at N call sites is applied at N−1 of them the first time someone is in a hurry.* Here it
+was applied at **0 of 20**.
+
+### And the lens gap, closed
+
+`verify-api-contract` now asks a second question of the tenant lane: **a 404 at an id bound from a
+real row this tenant owns is a finding, not a pass.** The envelope grader stays deliberately blind to
+status — a 404 with `{error, code}` IS the contract working — so reachability is a separate check
+with its own `REACHABILITY_EXEMPT` list and its own reason-required rule.
+
+**Red first, on the exact pre-fix gate rebuilt and served:** 8 delivery GETs flagged. On the fixed
+gate: clean.
+
+Its first run produced two findings that were **not** product defects, and chasing them down is the
+instrument-before-the-finding rule earning its keep:
+
+* `/api/portal/…/processes/[instanceId]` — `instanceId` was bound `SELECT id FROM process_instances
+  LIMIT 1`, which picked an `rfp-pipeline` row. A foundation actor 404ing on another tenant's
+  instance is **correct isolation**. Now bound to a foundation instance, which also means the route
+  is finally graded against data it should be able to see.
+* `/api/portal/…/template-cards/[cardId]` — `[cardId]` names **two different entities** in this tree:
+  an opportunity card under `/cards` and a template card under `/template-cards`. One binding served
+  both, so a template route was handed an opportunity id and its correct 404 read as a defect. **A
+  shared parameter name is not a shared entity.**
+
+`tsc` 0 · vitest 214 files / 2,135 · five lenses green · the delivery API returns its own data.
+
+---
+

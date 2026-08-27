@@ -9,20 +9,20 @@
  * is zero" are different facts, and a project with nothing planned is not 0% spent.
  */
 import { NextResponse } from 'next/server';
-import { deliveryGate } from '@/lib/delivery/gate';
+import { withDelivery } from '@/lib/delivery/gate';
 import { getProject } from '@/lib/delivery/projects';
 import { rollup } from '@/lib/delivery/rollup';
 
 export async function GET(_request: Request, ctx: { params: Promise<{ tenantSlug: string; projectId: string }> }) {
   try {
     const { tenantSlug, projectId } = await ctx.params;
-    const gate = await deliveryGate(tenantSlug);
-    if ('error' in gate) return gate.error;
+    return await withDelivery(tenantSlug, async (gate) => {
 
-    if (!(await getProject(gate.actor, projectId))) {
-      return NextResponse.json({ error: 'Project not found', code: 'NOT_FOUND' }, { status: 404 });
-    }
-    return NextResponse.json({ data: await rollup(gate.actor.tenantId, projectId) });
+      if (!(await getProject(gate.actor, projectId))) {
+        return NextResponse.json({ error: 'Project not found', code: 'NOT_FOUND' }, { status: 404 });
+      }
+      return NextResponse.json({ data: await rollup(gate.actor.tenantId, projectId) });
+    });
   } catch (err) {
     console.error('[api/portal/delivery/rollup GET]', err);
     return NextResponse.json({ error: 'Failed to compute progress', code: 'DB_ERROR' }, { status: 500 });

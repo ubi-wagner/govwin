@@ -288,7 +288,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -300,7 +300,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -312,7 +312,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -324,7 +324,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call listSourceDocuments())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -337,7 +337,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -348,7 +348,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -360,7 +360,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx (both call getProject())",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {
@@ -372,7 +372,7 @@
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/delivery/page.tsx",
-   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call deliveryGate())",
+   "secondDoor": "/api/portal/[tenantSlug]/delivery/projects/[projectId] (both call withDelivery())",
    "nearMiss": true
   },
   {

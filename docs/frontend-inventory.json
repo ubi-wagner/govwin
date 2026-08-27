@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 163,
-   "lines": 41516
+   "lines": 41518
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 303,
-   "lines": 60161
+   "files": 304,
+   "lines": 60262
   },
   {
    "kind": "middleware",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 211,
-   "lines": 28240
+   "files": 214,
+   "lines": 28471
   }
  ],
  "records": [
@@ -3098,6 +3098,75 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/client-clock-in-render.test.ts",
+   "kind": "test",
+   "lines": 95,
+   "bytes": 4931,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join",
+      "relative"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readdirSync(dir, { withFileTypes: true }).flatMap",
+    "readdirSync",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx$/.test",
+    "re.exec",
+    "src.indexOf",
+    "out.push",
+    "src.slice",
+    "describe",
+    "it",
+    "statSync(dir).isDirectory",
+    "statSync",
+    "readFileSync",
+    "/^['\"]use client['\"]/m.test",
+    "topLevelFunctions",
+    "READS_CLOCK.test",
+    "RELATIVE_STRING.test",
+    "new RegExp(`\\\\{[^{}\\\\n]*\\\\b${fn.name}\\\\(`).test",
+    "offenders.push",
+    "relative",
+    "topLevelFunctions(src).some",
+    "expect(detect(bad), 'the detector must see an unsafe helper').toBe",
+    "expect",
+    "detect",
+    "expect(detect(safe), 'the detector must leave a now-parameterised helper alone').toBe",
+    "expect(offenders, 'use <TimeAgo iso={x}/> or relativeFrom(x, useClientNow()) from components/ui/time-ago').toEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/color-team-scope-rollup.test.ts",
    "kind": "test",
    "lines": 129,
@@ -3839,6 +3908,125 @@
     "expect(writes()).not.toMatch",
     "expect(all()).toMatch",
     "all"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-gate-scoping.test.ts",
+   "kind": "test",
+   "lines": 79,
+   "bytes": 4137,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join",
+      "relative"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readdirSync(dir, { withFileTypes: true }).flatMap",
+    "readdirSync",
+    "e.isDirectory",
+    "routes",
+    "describe",
+    "statSync(API).isDirectory",
+    "statSync",
+    "it",
+    "expect(files.length).toBeGreaterThanOrEqual",
+    "expect",
+    "files\n      .map((f) => ({ rel: relative(ROOT, f), src: readFileSync(f, 'utf8') }))\n      .filter(({ src }) => /\\bdeliveryGate\\b/.test(src)).map",
+    "files\n      .map((f) => ({ rel: relative(ROOT, f), src: readFileSync(f, 'utf8') })).filter",
+    "files.map",
+    "relative",
+    "readFileSync",
+    "/\\bdeliveryGate\\b/.test",
+    "expect(offenders, 'use withDelivery(tenantSlug, async (gate) => …) from lib/delivery/gate').toEqual",
+    "src.match",
+    "bad.push",
+    "expect(bad).toEqual",
+    "gate.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "gate.replace",
+    "expect(/\\benterTenant\\(/.test(code), 'enterTenant() from inside an awaited gate does not reach the caller').toBe",
+    "/\\benterTenant\\(/.test",
+    "expect(/\\brunInTenant\\(/.test(code), 'the handler must be RUN inside the context').toBe",
+    "/\\brunInTenant\\(/.test"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/delivery-money.test.ts",
+   "kind": "test",
+   "lines": 57,
+   "bytes": 2268,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/delivery/money",
+     "names": [
+      "usd",
+      "spentOf"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "expect(usd('1100000.00')).toBe",
+    "expect",
+    "usd",
+    "expect(usd('805000')).toBe",
+    "expect(usd('1100000.00')).not.toBe",
+    "expect(usd('1234.56')).toBe",
+    "expect(usd('0.49')).toBe",
+    "expect(usd(1100000)).toBe",
+    "expect(usd(0)).toBe",
+    "expect(usd('-4000')).toBe",
+    "expect(usd(bad), `usd(${JSON.stringify(bad)})`).toBeNull",
+    "JSON.stringify",
+    "expect(spentOf('805000', '1750000')).toBe",
+    "spentOf",
+    "expect(spentOf('805000', null)).toBeNull",
+    "expect(spentOf(null, '1750000')).toBeNull"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -43797,7 +43985,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/baseline/route.ts",
    "kind": "api-route",
    "lines": 69,
-   "bytes": 3249,
+   "bytes": 3210,
    "client": false,
    "exports": [
     {
@@ -43826,7 +44014,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -43849,7 +44037,7 @@
    "tryCount": 4,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "Promise.all",
@@ -43867,12 +44055,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 21
+     "line": 20
     },
     {
-     "arg": "{\n      data: { baselinedAt: project.baselinedAt, readiness: ready, variance },\n    }",
+     "arg": "{\n        data: { baselinedAt: project.baselinedAt, readiness: ready, variance },\n      }",
      "opts": "",
-     "line": 27
+     "line": 26
     },
     {
      "arg": "{ error: 'Failed to read the baseline', code: 'DB_ERROR' }",
@@ -43882,12 +44070,12 @@
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 43
+     "line": 42
     },
     {
      "arg": "{ data: { baseline: result.data } }",
      "opts": "",
-     "line": 44
+     "line": 43
     },
     {
      "arg": "{ error: 'Failed to set the baseline', code: 'DB_ERROR' }",
@@ -43897,17 +44085,17 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 59
+     "line": 58
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 62
+     "line": 61
     },
     {
      "arg": "{ data: { rebaseline: result.data } }",
      "opts": "",
-     "line": 63
+     "line": 62
     },
     {
      "arg": "{ error: 'Failed to rebaseline', code: 'DB_ERROR' }",
@@ -43928,7 +44116,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/clins/route.ts",
    "kind": "api-route",
    "lines": 58,
-   "bytes": 2640,
+   "bytes": 2624,
    "client": false,
    "exports": [
     {
@@ -43952,7 +44140,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -43979,7 +44167,7 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "listClins",
@@ -43995,12 +44183,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 23
+     "line": 22
     },
     {
      "arg": "{ data: { clins, provenance } }",
      "opts": "",
-     "line": 31
+     "line": 30
     },
     {
      "arg": "{ error: 'Failed to list CLINs', code: 'DB_ERROR' }",
@@ -44010,17 +44198,17 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
+     "line": 45
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 50
+     "line": 49
     },
     {
      "arg": "{ data: { clin: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 52
+     "line": 51
     },
     {
      "arg": "{ error: 'Failed to create the CLIN', code: 'DB_ERROR' }",
@@ -44040,7 +44228,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/[deliverableId]/route.ts",
    "kind": "api-route",
    "lines": 60,
-   "bytes": 2917,
+   "bytes": 2909,
    "client": false,
    "exports": [
     {
@@ -44064,7 +44252,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44078,7 +44266,7 @@
    "tryCount": 4,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "request.formData",
     "NextResponse.json",
     "form.get",
@@ -44096,22 +44284,22 @@
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 20
+     "line": 19
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 24
+     "line": 23
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 30
+     "line": 29
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "",
-     "line": 31
+     "line": 30
     },
     {
      "arg": "{ error: 'Failed to upload the deliverable', code: 'STORAGE_ERROR' }",
@@ -44121,22 +44309,22 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
+     "line": 45
     },
     {
      "arg": "{ error: \"action must be 'accept'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 49
+     "line": 48
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 53
+     "line": 52
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "",
-     "line": 54
+     "line": 53
     },
     {
      "arg": "{ error: 'Failed to accept the deliverable', code: 'DB_ERROR' }",
@@ -44156,7 +44344,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/deliverables/route.ts",
    "kind": "api-route",
    "lines": 53,
-   "bytes": 2531,
+   "bytes": 2513,
    "client": false,
    "exports": [
     {
@@ -44180,7 +44368,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44200,7 +44388,7 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "listDeliverables",
@@ -44215,12 +44403,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 20
+     "line": 19
     },
     {
      "arg": "{ data: { deliverables: await listDeliverables(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 22
+     "line": 21
     },
     {
      "arg": "{ error: 'Failed to load deliverables', code: 'DB_ERROR' }",
@@ -44230,22 +44418,22 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 37
+     "line": 36
     },
     {
      "arg": "{ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 40
+     "line": 39
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 46
+     "line": 45
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 47
+     "line": 46
     },
     {
      "arg": "{ error: 'Failed to add the deliverable', code: 'DB_ERROR' }",
@@ -44265,7 +44453,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/documents/route.ts",
    "kind": "api-route",
    "lines": 71,
-   "bytes": 3333,
+   "bytes": 3337,
    "client": false,
    "exports": [
     {
@@ -44289,7 +44477,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44305,7 +44493,7 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "listSourceDocuments",
@@ -44325,12 +44513,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 26
+     "line": 25
     },
     {
      "arg": "{ data: { documents } }",
      "opts": "",
-     "line": 29
+     "line": 28
     },
     {
      "arg": "{ error: 'Failed to list documents', code: 'DB_ERROR' }",
@@ -44340,27 +44528,27 @@
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 44
+     "line": 43
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 49
+     "line": 48
     },
     {
      "arg": "{ error: `That file is ${Math.round(file.size / 1e6)} MB; the limit is 40 MB`, code: 'PAYLOAD_TOO_LARGE' }",
      "opts": "{ status: 413 }",
-     "line": 52
+     "line": 51
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 63
+     "line": 62
     },
     {
      "arg": "{ data: { document: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 65
+     "line": 64
     },
     {
      "arg": "{ error: 'Failed to upload the document', code: 'STORAGE_ERROR' }",
@@ -44380,7 +44568,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/milestones/route.ts",
    "kind": "api-route",
    "lines": 78,
-   "bytes": 3744,
+   "bytes": 3721,
    "client": false,
    "exports": [
     {
@@ -44409,7 +44597,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44431,7 +44619,7 @@
    "tryCount": 5,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "Promise.all",
@@ -44449,12 +44637,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 21
+     "line": 20
     },
     {
      "arg": "{ data: { milestones, deliverables } }",
      "opts": "",
-     "line": 27
+     "line": 26
     },
     {
      "arg": "{ error: 'Failed to load milestones', code: 'DB_ERROR' }",
@@ -44464,17 +44652,17 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 42
+     "line": 41
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 45
+     "line": 44
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 46
+     "line": 45
     },
     {
      "arg": "{ error: 'Failed to add the milestone', code: 'DB_ERROR' }",
@@ -44484,22 +44672,22 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 61
+     "line": 60
     },
     {
      "arg": "{ error: \"Provide milestoneId and action:'met'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 64
+     "line": 63
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 71
+     "line": 70
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "",
-     "line": 72
+     "line": 71
     },
     {
      "arg": "{ error: 'Failed to close the milestone', code: 'DB_ERROR' }",
@@ -44520,7 +44708,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/rollup/route.ts",
    "kind": "api-route",
    "lines": 31,
-   "bytes": 1446,
+   "bytes": 1429,
    "client": false,
    "exports": [
     {
@@ -44539,7 +44727,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44558,7 +44746,7 @@
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "rollup",
@@ -44571,12 +44759,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 23
+     "line": 22
     },
     {
      "arg": "{ data: await rollup(gate.actor.tenantId, projectId) }",
      "opts": "",
-     "line": 25
+     "line": 24
     },
     {
      "arg": "{ error: 'Failed to compute progress', code: 'DB_ERROR' }",
@@ -44595,7 +44783,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/route.ts",
    "kind": "api-route",
    "lines": 45,
-   "bytes": 2198,
+   "bytes": 2205,
    "client": false,
    "exports": [
     {
@@ -44614,7 +44802,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44647,7 +44835,7 @@
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "Promise.all",
@@ -44665,12 +44853,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 24
+     "line": 23
     },
     {
      "arg": "{ data: { project, documents, clins, assignees, readiness: ready, provenance } }",
      "opts": "",
-     "line": 39
+     "line": 38
     },
     {
      "arg": "{ error: 'Failed to load the delivery project', code: 'DB_ERROR' }",
@@ -44689,7 +44877,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/[projectId]/wbs/route.ts",
    "kind": "api-route",
    "lines": 59,
-   "bytes": 2540,
+   "bytes": 2522,
    "client": false,
    "exports": [
     {
@@ -44713,7 +44901,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44741,7 +44929,7 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "getProject",
     "NextResponse.json",
     "Promise.all",
@@ -44759,12 +44947,12 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 24
+     "line": 23
     },
     {
      "arg": "{ data: { nodes, canvas } }",
      "opts": "",
-     "line": 32
+     "line": 31
     },
     {
      "arg": "{ error: 'Failed to load the work breakdown', code: 'DB_ERROR' }",
@@ -44774,17 +44962,17 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 47
+     "line": 46
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 51
+     "line": 50
     },
     {
      "arg": "{ data: { node: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 53
+     "line": 52
     },
     {
      "arg": "{ error: 'Failed to add the task', code: 'DB_ERROR' }",
@@ -44804,7 +44992,7 @@
    "file": "app/api/portal/[tenantSlug]/delivery/projects/route.ts",
    "kind": "api-route",
    "lines": 48,
-   "bytes": 2146,
+   "bytes": 2116,
    "client": false,
    "exports": [
     {
@@ -44828,7 +45016,7 @@
     {
      "spec": "@/lib/delivery/gate",
      "names": [
-      "deliveryGate"
+      "withDelivery"
      ]
     },
     {
@@ -44847,7 +45035,7 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "deliveryGate",
+    "withDelivery",
     "listProjectsForActor",
     "NextResponse.json",
     "console.error",
@@ -44861,7 +45049,7 @@
     {
      "arg": "{ data: { projects } }",
      "opts": "",
-     "line": 21
+     "line": 20
     },
     {
      "arg": "{ error: 'Failed to list delivery projects', code: 'DB_ERROR' }",
@@ -44871,17 +45059,17 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 36
+     "line": 35
     },
     {
      "arg": "{ error: result.error, code: result.code }",
      "opts": "{ status: result.status }",
-     "line": 40
+     "line": 39
     },
     {
      "arg": "{ data: { project: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 42
+     "line": 41
     },
     {
      "arg": "{ error: 'Failed to create the delivery workspace', code: 'DB_ERROR' }",
@@ -66095,7 +66283,7 @@
    "file": "app/portal/[tenantSlug]/delivery/[projectId]/page.tsx",
    "kind": "page",
    "lines": 291,
-   "bytes": 13266,
+   "bytes": 13273,
    "client": false,
    "exports": [
     {
@@ -66194,6 +66382,13 @@
      ]
     },
     {
+     "spec": "@/lib/delivery/money",
+     "names": [
+      "usd",
+      "spentOf"
+     ]
+    },
+    {
      "spec": "@/components/delivery/deliverable-row",
      "names": [
       "DeliverableRow"
@@ -66233,10 +66428,12 @@
     "byMilestone.set",
     "new Date(project.baselinedAt).toLocaleDateString",
     "ready.missing.join",
+    "spentOf",
     "clins.map",
     "badgeFor",
     "Boolean",
     "isoDate",
+    "usd",
     "milestones.map",
     "varianceLabel",
     "daysBetween",
@@ -70413,8 +70610,8 @@
   {
    "file": "components/admin/diff-history.tsx",
    "kind": "component",
-   "lines": 173,
-   "bytes": 5809,
+   "lines": 189,
+   "bytes": 6877,
    "client": true,
    "exports": [
     {
@@ -70434,16 +70631,25 @@
       "useCallback",
       "useState"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "useClientNow"
+     ]
     }
    ],
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
-    "now.getTime",
+    "d.toISOString().slice(0, 16).replace",
+    "d.toISOString().slice",
+    "d.toISOString",
     "d.getTime",
     "Math.floor",
     "d.toLocaleDateString",
     "useState",
+    "useClientNow",
     "useCallback",
     "setReviewingId",
     "fetch",
@@ -70940,8 +71146,8 @@
   {
    "file": "components/admin/recent-sessions.tsx",
    "kind": "component",
-   "lines": 118,
-   "bytes": 5221,
+   "lines": 107,
+   "bytes": 4882,
    "client": true,
    "exports": [
     {
@@ -70962,15 +71168,18 @@
      "names": [
       "VisitorSession"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "TimeAgo"
+     ]
     }
    ],
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
     "new Date(iso).toLocaleString",
-    "Date.now",
-    "new Date(iso).getTime",
-    "Number.isNaN",
     "Math.round",
     "Math.floor",
     "/edg/i.test",
@@ -70983,7 +71192,6 @@
     "[s.city, s.region, s.country].filter",
     "setOpen",
     "browserFromUA",
-    "relTime",
     "s.ipHash.slice",
     "fmtTime",
     "s.events.map",
@@ -70991,6 +71199,7 @@
     "sessions.map"
    ],
    "jsx": [
+    "TimeAgo",
     "SessionRow"
    ],
    "snakeRowTypes": [],
@@ -71108,8 +71317,8 @@
   {
    "file": "components/admin/source-card-actions.tsx",
    "kind": "component",
-   "lines": 610,
-   "bytes": 20670,
+   "lines": 624,
+   "bytes": 21536,
    "client": true,
    "exports": [
     {
@@ -71138,19 +71347,28 @@
       "useRef",
       "useState"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "useClientNow"
+     ]
     }
    ],
    "tryCount": 5,
    "sqlTags": [],
    "calls": [
     "d.toLocaleDateString",
-    "now.getTime",
+    "d.toISOString().slice(0, 16).replace",
+    "d.toISOString().slice",
+    "d.toISOString",
     "d.getTime",
     "Math.floor",
     "formatDate",
     "cron.split",
     "hour.padStart",
     "min.padStart",
+    "useClientNow",
     "useState",
     "useRef",
     "useCallback",
@@ -78142,8 +78360,8 @@
   {
    "file": "components/portal/proposal-timeline.tsx",
    "kind": "component",
-   "lines": 151,
-   "bytes": 5446,
+   "lines": 140,
+   "bytes": 5042,
    "client": true,
    "exports": [
     {
@@ -78164,15 +78382,18 @@
      "names": [
       "describeEventLabel"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "TimeAgo"
+     ]
     }
    ],
    "tryCount": 0,
    "sqlTags": [],
    "calls": [
     "describeEventLabel",
-    "Date.now",
-    "new Date(iso).getTime",
-    "Math.floor",
     "useState",
     "setExpandedIds",
     "next.has",
@@ -78182,12 +78403,13 @@
     "expandedIds.has",
     "describeEvent",
     "new Date(ev.createdAt).toLocaleString",
-    "relativeTime",
     "JSON.stringify",
     "Object.keys",
     "toggleExpand"
    ],
-   "jsx": [],
+   "jsx": [
+    "TimeAgo"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -81068,8 +81290,8 @@
   {
    "file": "components/scout/candidate-queue.tsx",
    "kind": "component",
-   "lines": 199,
-   "bytes": 9490,
+   "lines": 193,
+   "bytes": 9259,
    "client": true,
    "exports": [
     {
@@ -81092,14 +81314,17 @@
      "names": [
       "toast"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "TimeAgo"
+     ]
     }
    ],
    "tryCount": 2,
    "sqlTags": [],
    "calls": [
-    "Math.floor",
-    "Date.now",
-    "new Date(iso).getTime",
     "v.trim",
     "useState",
     "useCallback",
@@ -81118,14 +81343,15 @@
     "rawStr",
     "candidates.filter",
     "pending.map",
-    "rel",
     "Math.round",
     "ed.agency.trim",
     "ed.title.trim",
     "act",
     "startReleaseNew"
    ],
-   "jsx": [],
+   "jsx": [
+    "TimeAgo"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -92741,8 +92967,8 @@
   {
    "file": "lib/delivery/gate.ts",
    "kind": "lib",
-   "lines": 67,
-   "bytes": 3180,
+   "lines": 110,
+   "bytes": 5763,
    "client": false,
    "exports": [
     {
@@ -92751,6 +92977,11 @@
     },
     {
      "name": "deliveryGate",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "withDelivery",
      "form": "function",
      "async": true
     }
@@ -92772,8 +93003,13 @@
      "spec": "@/lib/db",
      "names": [
       "getTenantBySlug",
-      "verifyTenantAccess",
-      "enterTenant"
+      "verifyTenantAccess"
+     ]
+    },
+    {
+     "spec": "@/lib/tenant-context",
+     "names": [
+      "runInTenant"
      ]
     },
     {
@@ -92800,7 +93036,9 @@
     "getTenantBySlug",
     "verifyTenantAccess",
     "deliveryScope",
-    "enterTenant"
+    "deliveryGate",
+    "runInTenant",
+    "handler"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -92809,27 +93047,27 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 34
+     "line": 57
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 39
+     "line": 62
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 44
+     "line": 67
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 49
+     "line": 72
     },
     {
      "arg": "{ error: 'Delivery workspaces are not available to this role', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 57
+     "line": 80
     }
    ]
   },
@@ -93025,6 +93263,41 @@
     "randomUUID",
     "putObject",
     "Boolean"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/delivery/money.ts",
+   "kind": "lib",
+   "lines": 58,
+   "bytes": 2664,
+   "client": false,
+   "exports": [
+    {
+     "name": "usd",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "spentOf",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "NUMERIC.test",
+    "value.trim",
+    "Number",
+    "Number.isFinite",
+    "Math.abs(n).toLocaleString",
+    "Math.abs",
+    "usd"
    ],
    "jsx": [],
    "snakeRowTypes": [],

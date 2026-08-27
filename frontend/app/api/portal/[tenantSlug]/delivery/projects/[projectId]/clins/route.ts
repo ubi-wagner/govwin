@@ -8,7 +8,7 @@
  *          nobody can open.
  */
 import { NextResponse } from 'next/server';
-import { deliveryGate } from '@/lib/delivery/gate';
+import { withDelivery } from '@/lib/delivery/gate';
 import { getProject } from '@/lib/delivery/projects';
 import { createClin, listClins, type ClinInput } from '@/lib/delivery/clins';
 import { provenanceFor } from '@/lib/delivery/provenance';
@@ -16,19 +16,19 @@ import { provenanceFor } from '@/lib/delivery/provenance';
 export async function GET(_request: Request, ctx: { params: Promise<{ tenantSlug: string; projectId: string }> }) {
   try {
     const { tenantSlug, projectId } = await ctx.params;
-    const gate = await deliveryGate(tenantSlug);
-    if ('error' in gate) return gate.error;
+    return await withDelivery(tenantSlug, async (gate) => {
 
-    if (!(await getProject(gate.actor, projectId))) {
-      return NextResponse.json({ error: 'Project not found', code: 'NOT_FOUND' }, { status: 404 });
-    }
+      if (!(await getProject(gate.actor, projectId))) {
+        return NextResponse.json({ error: 'Project not found', code: 'NOT_FOUND' }, { status: 404 });
+      }
 
-    const clins = await listClins(gate.actor.tenantId, projectId);
-    const provenance: Record<string, Awaited<ReturnType<typeof provenanceFor>>> = {};
-    for (const clin of clins) {
-      provenance[clin.id] = await provenanceFor(gate.actor.tenantId, 'delivery_clins', clin.id);
-    }
-    return NextResponse.json({ data: { clins, provenance } });
+      const clins = await listClins(gate.actor.tenantId, projectId);
+      const provenance: Record<string, Awaited<ReturnType<typeof provenanceFor>>> = {};
+      for (const clin of clins) {
+        provenance[clin.id] = await provenanceFor(gate.actor.tenantId, 'delivery_clins', clin.id);
+      }
+      return NextResponse.json({ data: { clins, provenance } });
+    });
   } catch (err) {
     console.error('[api/portal/delivery/clins GET]', err);
     return NextResponse.json({ error: 'Failed to list CLINs', code: 'DB_ERROR' }, { status: 500 });
@@ -38,18 +38,18 @@ export async function GET(_request: Request, ctx: { params: Promise<{ tenantSlug
 export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug: string; projectId: string }> }) {
   try {
     const { tenantSlug, projectId } = await ctx.params;
-    const gate = await deliveryGate(tenantSlug);
-    if ('error' in gate) return gate.error;
+    return await withDelivery(tenantSlug, async (gate) => {
 
-    let body: ClinInput;
-    try { body = await request.json(); }
-    catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+      let body: ClinInput;
+      try { body = await request.json(); }
+      catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
-    const result = await createClin(gate.actor, projectId, body ?? ({} as ClinInput));
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
-    }
-    return NextResponse.json({ data: { clin: result.data } }, { status: 201 });
+      const result = await createClin(gate.actor, projectId, body ?? ({} as ClinInput));
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      }
+      return NextResponse.json({ data: { clin: result.data } }, { status: 201 });
+    });
   } catch (err) {
     console.error('[api/portal/delivery/clins POST]', err);
     return NextResponse.json({ error: 'Failed to create the CLIN', code: 'DB_ERROR' }, { status: 500 });
