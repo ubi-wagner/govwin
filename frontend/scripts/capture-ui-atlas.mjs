@@ -52,7 +52,7 @@ const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'docs/ui-catalog.json
  * the catalog is the manifest of what a person can DO — but it makes every screenshot only as fresh
  * as the last `catalog-ui.mjs` run, and nobody adding a page thinks to run it first.
  *
- * It has already happened: two delivery pages were added, this atlas ran, wrote 111 screenshots and
+ * It has already happened: two project pages were added, this atlas ran, wrote 111 screenshots and
  * reported them all clean — and photographed NEITHER of the new pages, because a day-old catalog
  * did not contain them. The only reason it surfaced at all is the accounting check at the bottom of
  * this file, which noticed its own arithmetic was off.
@@ -168,7 +168,7 @@ async function bindings(slug) {
   const [collab] = await sql`SELECT id FROM proposal_collaborators LIMIT 1`;
   // Delivery (migration 216). Scoped to the lane's own tenant like every binding here — a project
   // from another tenant drives the page's correct 404 and photographs a not-found as the feature.
-  const [project] = await sql`SELECT d.id FROM delivery_projects d JOIN tenants t ON t.id=d.tenant_id WHERE t.slug=${slug} ORDER BY d.created_at DESC LIMIT 1`;
+  const [project] = await sql`SELECT d.id FROM projects d JOIN tenants t ON t.id=d.tenant_id WHERE t.slug=${slug} ORDER BY d.created_at DESC LIMIT 1`;
   return {
     tenantSlug: slug, proposalId: prop?.id, sectionId: sect?.id, opportunityId: prop?.opportunity_id,
     solId: sol?.id, topicId: topic?.id, spotlightId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,

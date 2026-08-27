@@ -145,13 +145,13 @@ export default async function PortalLayout({
             {/* Contracts — the awards won. Without this the entity was reachable ONLY through the
                 contract_kickoff ToDo's deep-link, so dismissing that ToDo lost it (bug log B50). */}
             {!isPartner && <PortalNavLink href={`${basePath}/contracts`}>Contracts</PortalNavLink>}
-            {/* Delivery — post-award execution: CLINs, schedule, deliverables. Hidden from
-                partner_user because delivery v1 has no collaborator surface at all (which is what
+            {/* Projects — post-award execution: CLINs, schedule, deliverables. Hidden from
+                partner_user because Projects v1 has no collaborator surface at all (which is what
                 removes cross-tenant from the capability); a plain tenant_user sees the link and a
                 list scoped to what they are ASSIGNED, which may be empty. Showing the link to an
                 unassigned employee is deliberate — an empty list with an explanation beats a
-                missing rail item, which reads as "this company does not do delivery". */}
-            {!isPartner && <PortalNavLink href={`${basePath}/delivery`}>Delivery</PortalNavLink>}
+                missing rail item, which reads as "this company does not run projects". */}
+            {!isPartner && <PortalNavLink href={`${basePath}/projects`}>Projects</PortalNavLink>}
             {!isPartner && <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>}
             {/* Collaboration vaults ("nooks") — segregated per-partner branch libraries (admin). */}
             {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}

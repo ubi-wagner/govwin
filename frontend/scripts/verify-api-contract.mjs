@@ -134,10 +134,10 @@ async function bindings() {
   const [src] = await sql`SELECT id FROM source_profiles LIMIT 1`.catch(() => [undefined]);
   const [usr] = await sql`
     SELECT u.id FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE t.slug = 'foundation' LIMIT 1`;
-  // Delivery (migration 216). Without this the five delivery GETs land in `unbound` — reported,
+  // Projects (migration 216). Without this the project GETs land in `unbound` — reported,
   // which is the honest outcome, but uncovered rather than passing. A seeded project binds them.
   const [proj] = await sql`
-    SELECT d.id FROM delivery_projects d JOIN tenants t ON t.id = d.tenant_id
+    SELECT d.id FROM projects d JOIN tenants t ON t.id = d.tenant_id
     WHERE t.slug = 'foundation' ORDER BY d.created_at LIMIT 1`.catch(() => [undefined]);
   return {
     projectId: proj?.id,
@@ -205,8 +205,8 @@ const exempted = [];
  * The envelope grader above is deliberately blind to status — a 404 with `{error, code}` is the
  * contract working. That blindness has a hole, and it swallowed an entire capability.
  *
- * `deliveryGate` entered the tenant context from inside an awaited function, where
- * `AsyncLocalStorage.enterWith` does not reach the caller's continuation. Every delivery route ran
+ * `projectGate` entered the tenant context from inside an awaited function, where
+ * `AsyncLocalStorage.enterWith` does not reach the caller's continuation. Every project route ran
  * with `app.tenant_id` unset, RLS matched nothing, and all twenty handlers answered:
  *
  *     GET   …/projects             → 200 {"data":{"projects":[]}}
@@ -219,7 +219,7 @@ const exempted = [];
  * The missing question is not about shape: **the ids in these URLs were bound from real rows this
  * actor owns.** A route that answers "not found" at an id its own tenant holds cannot see its own
  * data. Only the tenant lane is graded this way, because only its bindings are known to belong to
- * the actor (`bindings()` scopes proposals, atoms, buckets, cards, users and delivery projects to
+ * the actor (`bindings()` scopes proposals, atoms, buckets, cards, users and projects to
  * `foundation`); the admin lane binds platform-wide rows where a 404 can be legitimate.
  */
 const REACHABILITY_EXEMPT = new Map([
@@ -359,7 +359,7 @@ if (unreachable.length) {
   for (const u of unreachable) console.log(`  · ${u.route}  →  ${u.url}  ${u.note ? `"${u.note}"` : ''}`);
   console.log('  Every id above was bound from a real `foundation` row. A route that cannot find its');
   console.log("  own tenant's data is not refusing a caller — it is not seeing the data. That is how");
-  console.log('  twenty delivery handlers ran unscoped behind twenty textbook `{error,code}` envelopes.');
+  console.log('  twenty project handlers ran unscoped behind twenty textbook `{error,code}` envelopes.');
   console.log('  If a 404 here is genuinely correct, add the route to REACHABILITY_EXEMPT with a reason.');
 }
 

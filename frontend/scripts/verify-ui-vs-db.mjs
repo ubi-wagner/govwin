@@ -142,33 +142,33 @@ try {
   }
   // ══ 1c · THE DELIVERY WORKSPACE — three measures, and the words "not measured" ═══════════
   //
-  // This lens had NO expectation for delivery, which under this repo's own rule means the surface
+  // This lens had NO expectation for Projects, which under this repo's own rule means the surface
   // was uncovered rather than passing — and it is the surface where two visible defects (a `NaN`
   // variance and a period of performance whose ends read identically) survived every other lens.
   //
-  // Source: lib/delivery/rollup.ts — the deliverables query is copied from it, GROUP BY and all,
+  // Source: lib/projects/rollup.ts — the deliverables query is copied from it, GROUP BY and all,
   // and summed in JS exactly as `rollup()` sums it. A flattened `COUNT(*)` here would be a
   // predicate I BELIEVE equivalent, which is how this lens manufactures confident wrong findings.
-  console.log('\n══ 1c · the delivery workspace vs the rows behind it ══');
+  console.log('\n══ 1c · the project workspace vs the rows behind it ══');
   {
     const [proj] = await sql`
-      SELECT id, name FROM delivery_projects
+      SELECT id, name FROM projects
        WHERE tenant_id = ${tid} ORDER BY created_at DESC LIMIT 1`;
     if (!proj) {
       // Uncovered is not passing: say so, and fail, rather than skipping into a silent green.
-      A('a delivery project exists at foundation to reconcile against', false,
-        'seed one: node scripts/seed-delivery-scenario.mjs');
+      A('a project exists at foundation to reconcile against', false,
+        'seed one: node scripts/seed-project-scenario.mjs');
     } else {
-      const body = await text(p, `/portal/foundation/delivery/${proj.id}`);
+      const body = await text(p, `/portal/foundation/projects/${proj.id}`);
 
       // rollup.ts:137-147, verbatim.
       const delRows = await sql`
         SELECT COALESCE(m.clin_id, n.clin_id) AS clin_id,
                COUNT(*) FILTER (WHERE d.accepted_at IS NOT NULL)::int AS accepted,
                COUNT(*)::int                                          AS total
-          FROM delivery_deliverables d
-          JOIN delivery_milestones m ON m.id = d.milestone_id
-          LEFT JOIN delivery_wbs_nodes n ON n.id = m.wbs_node_id
+          FROM project_deliverables d
+          JOIN project_milestones m ON m.id = d.milestone_id
+          LEFT JOIN project_wbs_nodes n ON n.id = m.wbs_node_id
          WHERE m.project_id = ${proj.id}::uuid AND d.tenant_id = ${tid}::uuid
          GROUP BY COALESCE(m.clin_id, n.clin_id)`;
       const dbAccepted = delRows.reduce((a, r) => a + r.accepted, 0);
@@ -188,9 +188,9 @@ try {
       A('a project WITH deliverables does not report all three measures unmeasured',
         !(dbTotal > 0 && notMeasured >= 3), `"not measured" ×${notMeasured}, ${dbTotal} deliverable(s)`);
 
-      // lib/delivery/access.ts listAssignees, verbatim predicate.
+      // lib/projects/access.ts listAssignees, verbatim predicate.
       const [{ n: dbAssigned }] = await sql`
-        SELECT count(*)::int AS n FROM delivery_assignments a JOIN users u ON u.id = a.user_id
+        SELECT count(*)::int AS n FROM project_assignments a JOIN users u ON u.id = a.user_id
          WHERE a.project_id = ${proj.id}::uuid AND a.tenant_id = ${tid}::uuid`;
       const uiAssigned = num(body, /(\d+) assigned/);
       if (dbAssigned > 0) {
@@ -200,9 +200,9 @@ try {
       // Money, as a person reads it — and as the same number the table holds. The page used to
       // render the raw `numeric` string (`1100000.00`), which this lens scored CLEAN because the
       // value matched; it was the *presentation* that was unreadable. So the expectation is now
-      // both: the DB's number, formatted the way lib/delivery/money.ts formats it.
+      // both: the DB's number, formatted the way lib/projects/money.ts formats it.
       const [funded] = await sql`
-        SELECT funded_amount FROM delivery_clins
+        SELECT funded_amount FROM project_clins
          WHERE project_id = ${proj.id}::uuid AND tenant_id = ${tid}::uuid AND funded_amount IS NOT NULL
          ORDER BY sort_index LIMIT 1`;
       if (funded) {

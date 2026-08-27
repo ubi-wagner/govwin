@@ -119,7 +119,7 @@ async function bindings() {
   // Delivery (migration 216). TENANT-SCOPED for the reason directly above — a project bound from
   // another tenant would drive the page's CORRECT 404 and score it as a broken surface.
   const [project] = await sql`
-    SELECT d.id FROM delivery_projects d JOIN tenants t ON t.id = d.tenant_id
+    SELECT d.id FROM projects d JOIN tenants t ON t.id = d.tenant_id
     WHERE t.slug = 'foundation' ORDER BY d.created_at DESC, d.id ASC LIMIT 1`.catch(() => [undefined]);
   const [vault] = await sql`
     SELECT p.id FROM proposals p JOIN tenants t ON t.id = p.tenant_id

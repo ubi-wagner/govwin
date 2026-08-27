@@ -196,21 +196,21 @@ trigger+step templates, the start→end event gate, and the two stateless reconc
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
 orchestration pattern.
 
-**Post-award DELIVERY is the second half of the customer's life** (mig 216 · 8 tables · the `project`
-event namespace, mig 217; canonical **docs/DELIVERY_MANAGEMENT_DESIGN.md**, as-built
-**docs/DELIVERY_BUILD_LOG.md**). It anchors on **two UPLOADED files** — the executed contract and the
+**Post-award PROJECTS are the second half of the customer's life** (mig 216 · 8 tables · the `project`
+event namespace, mig 217; canonical **docs/PROJECT_MANAGEMENT_DESIGN.md**, as-built
+**docs/PROJECT_BUILD_LOG.md**). It anchors on **two UPLOADED files** — the executed contract and the
 proposal *as submitted* — never on `proposals`/`proposal_sections`, because what lives in the proposal
-spine is a working copy that stayed editable after submission; `delivery_projects.contract_id` is
-navigation, not truth. From there: CLINs (every field carrying a `delivery_provenance` badge on the
+spine is a working copy that stayed editable after submission; `projects.contract_id` is
+navigation, not truth. From there: CLINs (every field carrying a `project_provenance` badge on the
 ingest-provenance trust order — a value with no source reads **Unverified**, a citation with no value
 reads **Set elsewhere**), a WBS whose children inherit their CLIN, and milestones + deliverables where
 **uploading is not accepting** (any assigned employee attaches a file; only a tenant_admin accepts, and
 a replaced file REVOKES acceptance). The **baseline freezes once** — enforced by a trigger (`23001`),
 not a convention — and `rebaseline` moves the *current plan* and never the baseline, which is the one
 number that cannot be recomputed. Progress is **three measures side by side and never blended**
-(`lib/delivery/rollup.ts`): cost, duration-weighted schedule, deliverables — and a measure with no
+(`lib/projects/rollup.ts`): cost, duration-weighted schedule, deliverables — and a measure with no
 denominator is `null` → **"not measured"**, never a confident `0%`. Access is two layers: RLS scopes by
-tenant, and **assignment is app-enforced** in one predicate (`lib/delivery/access.ts`) because the
+tenant, and **assignment is app-enforced** in one predicate (`lib/projects/access.ts`) because the
 request context carries a tenant, not a user — `partner_user` is refused the capability outright, which
 is what removes cross-tenant from it entirely. `contract:started` raises a ToDo; it deliberately does
 NOT create the project.
@@ -463,9 +463,9 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it is the await that loses it.) Symptom: RLS matches nothing, every read is empty, and the route
   answers `200 {"data":{"items":[]}}` or `404 {"error":…,"code":…}` — which `verify-api-contract`
   and `verify-write-contract` both grade GREEN, because both only ask about SHAPE. That is how all
-  20 delivery handlers ran unscoped behind perfect envelopes. **Scope the handler, don't enter for
-  it**: `runInTenant(tenantId, () => handler())` (`store.run()`), as `lib/delivery/gate.ts`
-  `withDelivery` does — or call `enterTenant` in the route's OWN frame. `verify-api-contract` now
+  20 project handlers ran unscoped behind perfect envelopes. **Scope the handler, don't enter for
+  it**: `runInTenant(tenantId, () => handler())` (`store.run()`), as `lib/projects/gate.ts`
+  `withProject` does — or call `enterTenant` in the route's OWN frame. `verify-api-contract` now
   fails a tenant-lane 404 at an id bound from a row that tenant owns.
 - **A `date`/`timestamptz` column arrives as a JavaScript `Date`, not a string — the #2 crash
   class, and the one no lens can see.** `String(d).slice(0, 10)` is `"Tue Apr 28"`, so
@@ -474,9 +474,9 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `NaN > 0` is false. In an event payload it is worse: `JSON.stringify(NaN)` is `null`, so the
   record reads "no baseline" forever, with nothing to notice. It has shipped **three times** — a
   page, an event payload, and a 409 message that told a person their project was baselined on
-  `Tue Apr 28`, no year. Use `isoDate()` / `daysBetween()` (`lib/delivery/dates.ts`) or
-  `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/delivery-dates.test.ts`
-  guards the idiom across the delivery tree, and any fixture for date code must be a real `Date` —
+  `Tue Apr 28`, no year. Use `isoDate()` / `daysBetween()` (`lib/projects/dates.ts`) or
+  `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/projects-dates.test.ts`
+  guards the idiom across the Projects tree, and any fixture for date code must be a real `Date` —
   a test fed ISO strings passes against the broken code.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
@@ -516,7 +516,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
   proposal (pre-award workspace), library (content), system (infra), tool (invocations),
-  project (post-award delivery — baselines, milestone gates, deliverables; mig 217)
+  project (post-award Projects — baselines, milestone gates, deliverables; mig 217)
 - The registry lives in THREE runtimes and cannot be consolidated further — `EVENT_NAMESPACES`
   in `frontend/lib/event-namespaces.ts` (a **zero-import leaf**, re-exported by `lib/events.ts`;
   it is a leaf because a client component importing `lib/events` pulls `node:async_hooks` into the

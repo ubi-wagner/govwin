@@ -588,24 +588,24 @@ async def resolve_profile_variables(
 # absence meant rfp_admin stopped being notified (the 052 regression). _layout()
 # takes only the body; defensive p.get(...) guarantees a render. (Launch Review #2.)
 TEMPLATES.update({
-    # ── Post-award delivery (D6) ─────────────────────────────────────────────────────────────
+    # ── Post-award projects (D6) ─────────────────────────────────────────────────────────────
     #
     # The award bridge's NOTIFY step names this template. A NOTIFY naming a template that exists
     # nowhere does not error — `render_template()` returns None and the listener emits
     # `system:notification.failed` instead of sending mail. That has happened twice (the 052
     # regression, then eight more found by audit join 7), which is why the template is written in
     # the same change as the workflow that names it.
-    'delivery_setup_ready': lambda p: _layout(f'''
+    'project_setup_ready': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Congratulations &mdash; you won</h2>
         <p><strong>{_e(str(p.get('title') or 'Your proposal'))}</strong> has been recorded as awarded,
-        and a delivery workspace is ready to set up.</p>
+        and a project is ready to set up.</p>
         <p>Two documents start it off: the <strong>executed contract</strong> and the
         <strong>proposal as submitted</strong>. Everything the workspace tracks &mdash; CLINs,
         milestones, deliverables &mdash; is measured against those two files, so the workspace asks
         for them before it will let you baseline the schedule.</p>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
             <p style="margin:4px 0;font-size:14px;color:#475569;">A task has been added to your
-            queue: <strong>Set up delivery workspace</strong>.</p>
+            queue: <strong>Set up project</strong>.</p>
         </div>
         {_button('Set up the workspace', p.get('workspaceUrl', '/portal'))}
     '''),

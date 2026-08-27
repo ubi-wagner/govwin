@@ -529,7 +529,7 @@ automation listener, the audit surface, and the spine correlation below.
 ### 6.2 Namespaces → templates → instances (carrying the opportunity)
 
 There are now **8 canonical namespaces**: V9 §8.2's seven (`finder | capture | identity | proposal |
-library | system | tool`) plus **`project`** — post-award delivery, added by migration 217.
+library | system | tool`) plus **`project`** — post-award Projects, added by migration 217.
 They are reconciled across TypeScript, Python, the SQL CHECK and the docs by
 `frontend/__tests__/event-namespace-registry.test.ts`. The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
 templates** on boot (each writes a `process_templates` row with `active` + `trigger_key`), up from 9 in
@@ -631,7 +631,7 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
   parent≠child, **`document_cocoons`**, **`taxonomy_terms`** UNIQUE `(dimension, value)`.
 - **`proposal_compliance_matrix`** (pre-exists mig 001) — now *populated*.
 
-### 7.x The outbound-email ledger and the post-award delivery spine (migs 215 → 217)
+### 7.x The outbound-email ledger and the post-award Projects spine (migs 215 → 217)
 
 Two capabilities landed after 184 and both add tables rather than change the existing spine.
 
@@ -643,9 +643,9 @@ Two capabilities landed after 184 and both add tables rather than change the exi
   policy at all**: every insert goes through the seam under an explicit bypass, so an app-context writer
   cannot forge a send record. One row is RESERVED *before* dispatch and confirmed after, which is what
   makes a crash mid-send visible instead of invisible.
-- **mig 216 — delivery.** Eight tables: `delivery_projects`, `delivery_assignments`,
-  `delivery_source_documents`, `delivery_clins`, `delivery_wbs_nodes`, `delivery_milestones`,
-  `delivery_deliverables`, `delivery_provenance`. Every one carries `tenant_id` **NOT NULL and directly**
+- **mig 216 — Projects.** Eight tables: `projects`, `project_assignments`,
+  `project_source_documents`, `project_clins`, `project_wbs_nodes`, `project_milestones`,
+  `project_deliverables`, `project_provenance`. Every one carries `tenant_id` **NOT NULL and directly**
   — never by lineage through a parent — with force-RLS and a `tenant_isolation` policy, because a policy
   that has to join to find its tenant is a policy that can be joined around. Baseline immutability is a
   **trigger** raising `23001`, not an app rule: an app-layer rule protects only the writers that exist
@@ -655,11 +655,11 @@ Two capabilities landed after 184 and both add tables rather than change the exi
 - **mig 217 — the `project` namespace.** Widens `system_events_namespace_chk` to 8. See §6.2.
 
 Assignment — *which employees* of a tenant see a project — is **app-enforced** in one predicate
-(`lib/delivery/access.ts`), because the per-request context carries `app.tenant_id` and nothing else;
+(`lib/projects/access.ts`), because the per-request context carries `app.tenant_id` and nothing else;
 expressing it in RLS would mean putting a user id into the request context for every table in the
 database to serve one feature. That belt is load-bearing exactly as CLAUDE.md says of platform rows:
 a reader that omits it leaks, and RLS will not catch it. `partner_user` is refused the capability
-outright, which is what removes cross-tenant from delivery entirely.
+outright, which is what removes cross-tenant from Projects entirely.
 
 ### Table drops & the drop rule (migs 121, 125)
 

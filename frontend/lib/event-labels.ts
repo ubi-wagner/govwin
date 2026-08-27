@@ -174,15 +174,15 @@ export function describeEvent(ev: EventLike): string {
     }
   }
 
-  // Post-award delivery (migration 217). EVERY type here needs a case, or it reaches a customer's
+  // Post-award projects (migration 217). EVERY type here needs a case, or it reaches a customer's
   // Activity feed as a de-punctuated identifier — which is B136 ("Shadow descended") happening
   // again in a new namespace. The fallback humanizer produces "clin created", which is not wrong
   // so much as it is nobody's sentence.
   if (namespace === 'project') {
-    const project = str(payload.name) ?? 'the delivery workspace';
+    const project = str(payload.name) ?? 'the project workspace';
     switch (type) {
       case 'project.created':
-        return `Delivery workspace opened: ${project}`;
+        return `Project workspace opened: ${project}`;
       case 'source_document.uploaded': {
         const kind = payload.kind === 'executed_contract' ? 'Executed contract' : 'As-submitted proposal';
         return `${kind} uploaded${str(payload.filename) ? ` — ${str(payload.filename)}` : ''}`;
@@ -192,7 +192,7 @@ export function describeEvent(ev: EventLike): string {
       case 'baseline.set':
         return phase === 'start' ? 'Freezing the contract baseline' : 'Contract baseline set';
       case 'project.rebaselined':
-        return phase === 'start' ? 'Rebaselining the delivery plan' : 'Delivery plan rebaselined';
+        return phase === 'start' ? 'Rebaselining the project plan' : 'Project plan rebaselined';
       case 'milestone.due':
         return `Milestone due: ${str(payload.title) ?? 'a milestone'}`;
       case 'milestone.met':

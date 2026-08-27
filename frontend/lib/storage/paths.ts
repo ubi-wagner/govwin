@@ -273,21 +273,21 @@ export function assertKeyBelongsToTenant(key: string, tenantSlug: string): void 
 }
 
 /**
- * A file inside a delivery project's folder — the executed contract, the as-submitted proposal, and
+ * A file inside a project's folder — the executed contract, the as-submitted proposal, and
  * every deliverable uploaded against a milestone.
  *
  * Under the same `customers/<slug>/` prefix as everything else, so `assertKeyBelongsToTenant` covers
- * it with no new rule. Delivery artifacts are deliberately NOT filed under `proposals/<id>/`: the
+ * it with no new rule. Project artifacts are deliberately NOT filed under `proposals/<id>/`: the
  * executed contract is the anchor precisely because it is not the working copy, and putting it in
  * the proposal's folder would blur exactly the distinction the provenance model depends on.
  */
-export function customerDeliveryPath(tenantSlug: string, projectId: string, filename: string): string {
+export function customerProjectPath(tenantSlug: string, projectId: string, filename: string): string {
   assertTenantSlug(tenantSlug);
-  assertUuid(projectId, 'delivery project id');
+  assertUuid(projectId, 'project id');
   if (!filename || filename.includes('..')) {
-    throw new Error(`[storage/paths] invalid delivery filename: ${JSON.stringify(filename)}`);
+    throw new Error(`[storage/paths] invalid project filename: ${JSON.stringify(filename)}`);
   }
-  return `customers/${tenantSlug}/delivery/${projectId}/${filename}`;
+  return `customers/${tenantSlug}/projects/${projectId}/${filename}`;
 }
 
 /**

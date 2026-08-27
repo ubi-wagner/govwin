@@ -190,8 +190,8 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     max_pages: null, max_slides: null,
   },
   /**
-   * The delivery WORKPLAN — a WBS grid whose cells are bound to `delivery_wbs_nodes` rows rather
-   * than to a document blob (docs/DELIVERY_MANAGEMENT_DESIGN.md).
+   * The delivery WORKPLAN — a WBS grid whose cells are bound to `project_wbs_nodes` rows rather
+   * than to a document blob (docs/PROJECT_MANAGEMENT_DESIGN.md).
    *
    * ── WHY IT HAS NO PAGE OR SLIDE CAP, AND WHY THAT IS NOT A HOLE ─────────────────────────────
    * The compliance floor exists because an agency page limit is a HARD constraint: a volume one

@@ -6,18 +6,18 @@ Workflow: OnContractStarted
 TRIGGER:    capture:contract.started:single
             Condition: payload.contractId is present (a contract entity exists).
 
-PURPOSE:    The ONE bridge from the proposal spine into post-award delivery.
+PURPOSE:    The ONE bridge from the proposal spine into post-award projects.
 
             When a proposal's outcome is recorded as awarded, the outcome route
             creates a `contracts` row and emits `capture:contract.started`. This
-            workflow turns that into a human ToDo — "Set up delivery workspace"
+            workflow turns that into a human ToDo — "Set up project"
             — and routes the tenant admin to it.
 
-            It does NOT create the delivery project.
+            It does NOT create the project.
 
 WHY NOT AUTO-CREATE, WHICH IS THE OBVIOUS THING TO DO:
-    A delivery workspace is ANCHORED to two uploaded artifacts — the executed
-    contract and the as-submitted proposal (docs/DELIVERY_MANAGEMENT_DESIGN.md).
+    A project is ANCHORED to two uploaded artifacts — the executed
+    contract and the as-submitted proposal (docs/PROJECT_MANAGEMENT_DESIGN.md).
     Not a pointer to `proposals`, even though we authored it: what lives there
     is a working copy that stayed editable after submission, so a deliverable
     tracing to it traces to something that can still change.
@@ -32,14 +32,14 @@ WHY NOT AUTO-CREATE, WHICH IS THE OBVIOUS THING TO DO:
     did.* An auto-created project would look exactly like a sourced one.
 
 STEPS:
-    1. todo_setup_delivery (TODO)
-       Raises a `delivery_setup` task for tenant_admin against the contract.
+    1. todo_setup_project (TODO)
+       Raises a `project_setup` task for tenant_admin against the contract.
        10-day timeout: award-to-kickoff is measured in weeks, not hours, and a
        gate that expires before the work is plausible is a gate that trains
        people to ignore it.
 
-    2. notify_delivery_setup (NOTIFY)
-       template=delivery_setup_ready. INDEPENDENT (no depends_on) — a failed
+    2. notify_project_setup (NOTIFY)
+       template=project_setup_ready. INDEPENDENT (no depends_on) — a failed
        notification must not leave the ToDo unraised, and a failed ToDo must not
        leave the admin uninformed. Either one alone still lands the customer in
        the right place.
@@ -50,7 +50,7 @@ HITL GATES:
 
 ERROR HANDLING:
     - ToDo failure: the notification still fires (independent), and the contract
-      row already exists — the customer can reach delivery from the portal.
+      row already exists — the customer can reach Projects from the portal.
     - Notification failure: the ToDo still stands in the work-item ledger with
       its own nudge schedule.
     - Neither dead-ends: there is no downstream step waiting on either.
@@ -70,14 +70,14 @@ INSTANCES:
     - Admin Pipeline: N/A.
 
 CHANGE LOG:
-    D6 — Initial implementation: the award bridge into delivery management.
+    D6 — Initial implementation: the award bridge into project management.
 ================================================================================
 """
 from workflows.base import Workflow, Step, StepType, EventTrigger
 
 
 class OnContractStarted(Workflow):
-    description = "Raise the delivery-workspace setup ToDo when a proposal is awarded"
+    description = "Raise the project setup ToDo when a proposal is awarded"
 
     trigger = EventTrigger(
         namespace="capture",
@@ -88,13 +88,13 @@ class OnContractStarted(Workflow):
 
     steps = [
         # The gate. A person opens the workspace and uploads the executed contract and the
-        # as-submitted proposal; nothing about delivery is real until they do.
+        # as-submitted proposal; nothing about the project is real until they do.
         Step(
-            name="todo_setup_delivery",
+            name="todo_setup_project",
             step_type=StepType.TODO,
             action="todo",
-            task_type='"delivery_setup"',
-            task_title='"Set up delivery workspace"',
+            task_type='"project_setup"',
+            task_title='"Set up project"',
             assignee_role='"tenant_admin"',
             entity_type='"contract"',
             entity_ref="payload.contractId",
@@ -106,12 +106,12 @@ class OnContractStarted(Workflow):
         # unraised, and a failed ToDo must not leave the admin uninformed — either one alone still
         # lands the customer in the right place.
         Step(
-            name="notify_delivery_setup",
+            name="notify_project_setup",
             step_type=StepType.NOTIFY,
             action="system.notify",
             input_map={
                 "channel": '"email"',
-                "template": '"delivery_setup_ready"',
+                "template": '"project_setup_ready"',
                 "tenant_id": "payload.tenantId",
                 "contract_id": "payload.contractId",
                 "proposal_id": "payload.proposalId",
