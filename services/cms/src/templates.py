@@ -657,6 +657,38 @@ TEMPLATES.update({
         workspace, or resolving the thread, clears it.</p>
         {_button('Open the conversation', p.get('workspaceUrl', '/portal'))}
     '''),
+    # ── The review request and its answer (H2) ──────────────────────────────────────────────
+    # BOTH written in the same change as lib/projects/reviews.ts, which names them. A template a
+    # code path names and nothing defines emits `notification.failed` instead of sending — B141,
+    # twice in this repo's history.
+    'project_review_requested': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Please review this</h2>
+        <p>You have been asked to review a {_e(str(p.get('kind') or 'deliverable'))}
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''}.</p>
+        {'<div style="background:#f8fafc;border-left:3px solid ' + BRAND_NAVY + ';border-radius:4px;padding:16px;margin:16px 0;">'
+         '<p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">' + _e(str(p.get('note'))) + '</p></div>'
+         if p.get('note') else ''}
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {'Wanted by <strong>' + _e(str(p.get('dueOn'))) + '</strong>.' if p.get('dueOn') else 'No date set.'}
+            Approve it, or <strong>reject it with a reason</strong> &mdash; the reason is what tells
+            whoever wrote it what to change.</p>
+        </div>
+        {_button('Open the review', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # The ANSWER goes back to whoever asked. A decision nobody hears about is the meeting this
+    # feature replaces.
+    'project_review_decided': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{'#b91c1c' if p.get('decision') == 'rejected' else BRAND_NAVY};">
+        {'Rejected' if p.get('decision') == 'rejected' else 'Approved'}</h2>
+        <p>The {_e(str(p.get('kind') or 'deliverable'))} you sent for review
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''} was
+        <strong>{_e(str(p.get('decision') or 'decided'))}</strong>.</p>
+        {'<div style="background:#fef2f2;border-left:3px solid #b91c1c;border-radius:4px;padding:16px;margin:16px 0;">'
+         '<p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">' + _e(str(p.get('reason'))) + '</p></div>'
+         if p.get('reason') else ''}
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
     'project_setup_ready': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Congratulations &mdash; you won</h2>
         <p><strong>{_e(str(p.get('title') or 'Your proposal'))}</strong> has been recorded as awarded,

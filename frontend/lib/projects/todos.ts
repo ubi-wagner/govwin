@@ -142,6 +142,12 @@ export async function raiseTaskTodo(
  * already scoped. It can reach nothing it did not create. `completed_by` records the person whose
  * action retired it, so the audit trail still names somebody.
  */
+/**
+ * Every `task_type` this module projects. The retire path is scoped to it, so a widening here is
+ * the ONE place that decides what these sweeps can reach.
+ */
+const PROJECTED_TASK_TYPES = ['project_task', 'project_comment', 'project_review'] as const;
+
 async function retireProjectedTodos(
   actor: ProjectActor,
   ids: string[],
@@ -157,10 +163,35 @@ async function retireProjectedTodos(
            updated_at = now()
      WHERE id = ANY(${ids}::uuid[])
        AND tenant_id = ${actor.tenantId}::uuid
-       AND task_type IN ('project_task', 'project_comment')
+       AND task_type = ANY(${PROJECTED_TASK_TYPES as unknown as string[]})
        AND status IN ('open', 'in_progress')
     RETURNING id`;
   return rows.length;
+}
+
+/**
+ * Retire whatever projected ToDos point at one entity.
+ *
+ * The general form. `closeTaskTodos` and `closeCommentTodos` are this with their entity type
+ * filled in — kept as named wrappers because the call sites read better, not because they do
+ * anything different. A fourth copy for reviews would have been three too many.
+ */
+export async function retireTodosByEntity(
+  actor: ProjectActor,
+  entityType: string,
+  entityId: string,
+  why: Record<string, unknown> = {},
+): Promise<number> {
+  try {
+    const open = await sql<{ id: string }[]>`
+      SELECT id FROM tasks
+       WHERE entity_type = ${entityType} AND entity_id = ${entityId}::uuid
+         AND tenant_id = ${actor.tenantId}::uuid AND status = 'open'`;
+    return await retireProjectedTodos(actor, open.map((t) => t.id), why);
+  } catch (err) {
+    console.error(`[projects/todos] retireTodosByEntity(${entityType}) failed:`, err);
+    return 0;
+  }
 }
 
 /**
@@ -174,16 +205,7 @@ export async function closeTaskTodos(
   taskId: string,
   why: Record<string, unknown> = {},
 ): Promise<number> {
-  try {
-    const open = await sql<{ id: string }[]>`
-      SELECT id FROM tasks
-       WHERE entity_type = 'project_milestone_task' AND entity_id = ${taskId}::uuid
-         AND tenant_id = ${actor.tenantId}::uuid AND status = 'open'`;
-    return await retireProjectedTodos(actor, open.map((t) => t.id), why);
-  } catch (err) {
-    console.error('[projects/todos] closeTaskTodos failed:', err);
-    return 0;
-  }
+  return retireTodosByEntity(actor, 'project_milestone_task', taskId, why);
 }
 
 /** Retire the mention ToDo(s) on one comment — the thread is answered. */
@@ -192,16 +214,7 @@ export async function closeCommentTodos(
   commentId: string,
   why: Record<string, unknown> = {},
 ): Promise<number> {
-  try {
-    const open = await sql<{ id: string }[]>`
-      SELECT id FROM tasks
-       WHERE entity_type = 'project_comment' AND entity_id = ${commentId}::uuid
-         AND tenant_id = ${actor.tenantId}::uuid AND status = 'open'`;
-    return await retireProjectedTodos(actor, open.map((t) => t.id), why);
-  } catch (err) {
-    console.error('[projects/todos] closeCommentTodos failed:', err);
-    return 0;
-  }
+  return retireTodosByEntity(actor, 'project_comment', commentId, why);
 }
 
 /**

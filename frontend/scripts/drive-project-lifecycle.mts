@@ -593,8 +593,10 @@ async function main() {
   // each one is driven through the real route as the real actor.
   phase('7f · the plan\'s own rules: scope, dates, dependencies, references');
 
-  // Its OWN employee session. The one further down is opened inside a later block and closed
-  // there; borrowing it across the boundary is how a drive starts depending on its own ordering.
+  // Its OWN employee session, held open across 7f–7h DELIBERATELY and closed once at the end of
+  // 7h. The one further down is opened inside a later block and closed there; borrowing THAT one
+  // across the boundary is how a drive starts depending on its own ordering — which is exactly
+  // what happened when 7h first reached for it after 7f had already closed it.
   const empCtx7f = await browser.newContext();
   const empPage7f = await empCtx7f.newPage();
   let asEmployee = req;
@@ -843,8 +845,6 @@ async function main() {
   A(Boolean(resolvedRow?.resolvedBy && resolvedRow?.resolvedAt),
     'recorded as WHO and WHEN — six months later, "true" answers nothing');
 
-  await empCtx7f.close();
-
   // ── AND STANDING WORK GATES CLOSE-OUT, NOT A MILESTONE ────────────────────────────────────
   // The design claim, checked rather than asserted in prose: `markMilestoneMet` is scoped by
   // milestone_id, so standing work never blocks a phase; `closeProject` is scoped by project_id,
@@ -924,9 +924,83 @@ async function main() {
       `${exp.status()} · ${buf.length} bytes · starts ${JSON.stringify(head)}`);
   }
 
-  // Authoring is not acceptance — the rule survives the new path.
+  // ══ 7h · THE REVIEW GATE — somebody said no, because X ═════════════════════════════════════
+  //
+  // The state that did not exist: a deliverable was either accepted or silently not, so a
+  // rejection happened in a meeting and the row went on looking like something nobody had got
+  // round to. Driven as the full loop — ask → reject → fix → re-ask → approve → accept — because
+  // each step only means anything if the next one is reachable.
+  phase('7h · review: ask, reject with a reason, fix, approve, then accept');
+
+  const reviewAsked = await api(asEmployee, 'post', P + '/reviews', {
+    entityType: 'deliverable', entityId: authoredId, reviewerUserId: assignee?.id ?? null,
+    note: 'Check the CLIN references before this goes out.', dueOn: iso(20),
+  });
+  A(reviewAsked.status === 201, 'an EMPLOYEE can ask a colleague to review a deliverable',
+    `${reviewAsked.status} ${reviewAsked.text.slice(0, 80)}`);
+  const reviewId = ((reviewAsked.json.data as Json)?.review as Json)?.id as string | undefined;
+
+  const reviewTwice = await api(req, 'post', P + '/reviews', {
+    entityType: 'deliverable', entityId: authoredId, reviewerUserId: assignee?.id ?? null,
+  });
+  A(reviewTwice.status === 409 && String((reviewTwice.json as Json).code) === 'REVIEW_ALREADY_OPEN',
+    'a SECOND open review is refused — three reviewers is three people believing they decide',
+    `${reviewTwice.status} ${String((reviewTwice.json as Json).code)}`);
+
+  // ── AN OPEN REVIEW BLOCKS ACCEPTANCE ──────────────────────────────────────────────────────
+  const whileOpen = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'accept' });
+  A(whileOpen.status === 409 && String((whileOpen.json as Json).code) === 'REVIEW_PENDING',
+    'and while it is out for review, it cannot be accepted',
+    `${whileOpen.status} ${String((whileOpen.json as Json).code)}`);
+
+  // ── A REJECTION MUST SAY WHY ──────────────────────────────────────────────────────────────
+  const silent = await api(req, 'patch', P + `/reviews/${reviewId}`, { decision: 'rejected' });
+  A(silent.status === 400, 'a rejection with no reason is refused — the whole point of the table',
+    `${silent.status}`);
+
+  const rejected = await api(req, 'patch', P + `/reviews/${reviewId}`, {
+    decision: 'rejected', reason: 'Section 3 cites CLIN 0002 where the SOW says 0001.',
+  });
+  A(rejected.status === 200, 'a rejection WITH a reason is recorded', `${rejected.status}`);
+
+  const [rejRow] = await sql<{ status: string; reason: string | null; decidedBy: string | null }[]>`
+    SELECT status, reason, decided_by AS "decidedBy" FROM project_reviews
+     WHERE id = ${reviewId ?? null}::uuid`;
+  A(rejRow?.status === 'rejected' && /CLIN 0002/.test(rejRow?.reason ?? ''),
+    'and the reason is on the record, not in somebody&apos;s inbox'.replace('&apos;', "'"),
+    (rejRow?.reason ?? '—').slice(0, 50));
+
+  // ── A REJECTION KEEPS BLOCKING UNTIL SOMETHING SUPERSEDES IT ──────────────────────────────
+  const whileRejected = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'accept' });
+  A(whileRejected.status === 409 && String((whileRejected.json as Json).code) === 'REVIEW_REJECTED',
+    'a rejected deliverable still cannot be accepted — and the refusal repeats the reason',
+    `${whileRejected.status} ${String((whileRejected.json as Json).code)}`);
+  A(/CLIN 0002/.test(String((whileRejected.json as Json).error ?? '')),
+    'so whoever tries to accept it learns what is wrong without going to look');
+
+  // ── FIX, RE-ASK, APPROVE ──────────────────────────────────────────────────────────────────
+  const reAsked = await api(asEmployee, 'post', P + '/reviews', {
+    entityType: 'deliverable', entityId: authoredId, reviewerUserId: assignee?.id ?? null,
+    note: 'CLIN reference corrected.',
+  });
+  A(reAsked.status === 201, 'a fresh review supersedes the rejection — reject is a loop, not a wall',
+    `${reAsked.status}`);
+  const reviewId2 = ((reAsked.json.data as Json)?.review as Json)?.id as string | undefined;
+
+  const approved = await api(req, 'patch', P + `/reviews/${reviewId2}`, { decision: 'approved' });
+  A(approved.status === 200, 'the reviewer approves', `${approved.status}`);
+
+  const [afterApprove] = await sql<{ acceptedAt: string | null }[]>`
+    SELECT accepted_at AS "acceptedAt" FROM project_deliverables WHERE id = ${authoredId ?? null}::uuid`;
+  A(afterApprove?.acceptedAt === null,
+    'APPROVING IS NOT ACCEPTING — the reviewer is satisfied; the obligation is not yet met');
+
+  // Authoring is not acceptance — the rule survives the new path, and now so does approving.
   const acceptedDoc = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'accept' });
-  A(acceptedDoc.status === 200, 'and once authored, a tenant_admin can accept it', `${acceptedDoc.status}`);
+  A(acceptedDoc.status === 200, 'and once approved, a tenant_admin can accept it', `${acceptedDoc.status}`);
+
+  // The employee session opened in 7f has now served 7f, 7g and 7h; this is the last use of it.
+  await empCtx7f.close();
 
   // ══ 7c · DB → UI → DB: the page states what the tables hold ════════════════════════════════
   //

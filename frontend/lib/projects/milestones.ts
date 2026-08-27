@@ -24,6 +24,7 @@ import { customerProjectPath } from '@/lib/storage/paths';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { daysBetween, isoDate } from './dates';
 import { closeTodosUnder } from './todos';
+import { blockingReview } from './reviews';
 import type { Fail, Ok } from './project';
 
 export interface Milestone {
@@ -449,6 +450,26 @@ export async function acceptDeliverable(
   }
 
   try {
+    // ── AN OPEN OR REJECTED REVIEW BLOCKS ACCEPTANCE (mig 223) ──────────────────────────────
+    // Checked BEFORE the compare-and-swap, so the refusal names the review rather than coming back
+    // as a generic conflict. Only the LATEST review counts: a rejection a fresh request superseded
+    // is history, not a standing objection — that is what makes reject → fix → re-request →
+    // approve a loop instead of a dead end. A deliverable nobody ever sent for review accepts
+    // exactly as it did before, so nothing that worked stops working.
+    const blocker = await blockingReview(actor.tenantId, 'deliverable', deliverableId);
+    if (blocker) {
+      return blocker.status === 'pending'
+        ? {
+          ok: false, status: 409, code: 'REVIEW_PENDING',
+          error: 'That is still out for review. Decide or withdraw the review before accepting it.',
+        }
+        : {
+          ok: false, status: 409, code: 'REVIEW_REJECTED',
+          error: `A reviewer rejected it: ${blocker.reason ?? 'no reason recorded'}. `
+            + 'Fix it and ask for a fresh review.',
+        };
+    }
+
     // CAS on `storage_key IS NOT NULL AND accepted_at IS NULL` — one statement that refuses both
     // "nothing to accept" and a double-accept, without a read-then-write race between them.
     const [row] = await sql<Deliverable[]>`

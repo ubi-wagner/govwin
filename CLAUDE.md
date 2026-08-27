@@ -302,6 +302,19 @@ check that can see it — LibreOffice opens what our exporters wrote, pdf.js rea
 refuses a verdict it cannot earn: a blank-canvas **self-test** must read as blank, and a plain `.txt`
 **control** must convert, or it exits 2.
 
+**The REVIEW GATE (mig 223)** — `project_reviews`, polymorphic over deliverable · document ·
+milestone. **Approving is NOT accepting**, closing the same separation from a third direction: a
+review says an internal reader is satisfied, `accepted_at` says the obligation is met. What it does
+is GATE that act — an open review refuses acceptance `REVIEW_PENDING`, a rejected one refuses
+`REVIEW_REJECTED` **repeating the reason**, and only the LATEST review counts, which is what makes
+reject → fix → re-request → approve a loop rather than a wall. A deliverable never sent for review
+accepts exactly as before. **A rejection MUST carry a reason** (CHECK, whitespace included) — "not
+yet accepted" and "rejected, for these reasons" are different states and only one tells the next
+person what to do. Requesting is open to anyone on the project; DECIDING is the named reviewer or a
+tenant_admin (a gate anyone can open is not a gate); WITHDRAWING is whoever asked. One pending review
+per entity by partial unique index. `blockingReview` returns a BLOCKER on a database error — a gate
+that cannot read its own state must never fail open.
+
 **EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
 `services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
 `email_suppressions` (mig 215; docs/EMAIL_INTERFACE_DESIGN.md, as-built docs/EMAIL_BUILD_LOG.md). Never
@@ -385,6 +398,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   (1977 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and
+  `**/*.tsx`; **`.mts` matches neither**, so only the 66 harnesses pulled in transitively as imports
+  are seen. Verified both ways: `tsc --listFiles` does not load `drive-project-lifecycle.mts`, and a
+  duplicate `const` injected into it produces zero errors — which is how the same defect reached run
+  time twice in one sitting after a full rebuild each time. Adding `.mts` to the include surfaces
+  **121 pre-existing type errors**, and a check that fails 121 times on its first run gets turned
+  off, so that is a decision, not a quick fix. `node scripts/check-harness-syntax.mjs` is the part
+  that pays now: 269 files parsed and BOUND in a second, catching syntax and declared-twice, making
+  **no claim about types**. Its first version used `esbuild.transformSync` and, red-tested against
+  the exact defect, reported a clean run — a per-file transform does no cross-scope binding. Rebuilt
+  on the TypeScript binder. *An instrument that cannot detect the thing it exists for is worse than
+  none, because it reports a clean run.*
 - **The project workspace is the densest tenant page, and it was never photographed below `lg`.**
   `drive-ui-responsive.mjs` shoots 390/820/1440 but its tenant lane did not list it (now it does,
   with the project id resolved from the DB — a hard-coded id rots on reseed and a 404 photographs

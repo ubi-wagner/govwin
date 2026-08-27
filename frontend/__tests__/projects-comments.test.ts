@@ -222,7 +222,12 @@ describe('resolving closes the queue behind it', () => {
     const retire = db.state.queries.find((q) => /UPDATE tasks/i.test(q)) ?? '';
     expect(retire, 'the ToDos are retired').not.toBe('');
     expect(retire).toMatch(/status = 'completed'/i);
-    expect(retire, 'narrowed to what this module projects').toMatch(/task_type IN \('project_task', 'project_comment'\)/i);
+    // The list moved from inline literals to ONE `PROJECTED_TASK_TYPES` constant passed as a
+    // parameter, so the sweep's reach is decided in a single place rather than repeated per
+    // caller. The assertion follows the contract the code has, not the shape it used to have.
+    // `\s*` because the mock renders each placeholder as ` ? ` — matching the raw spacing would
+    // be asserting on the harness's join, not on the statement.
+    expect(retire, 'narrowed to what this module projects').toMatch(/task_type = ANY\(\s*\?\s*\)/i);
     expect(retire, 'and to this tenant').toMatch(/tenant_id = \?/);
   });
 

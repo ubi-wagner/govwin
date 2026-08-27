@@ -1852,3 +1852,126 @@ somebody else's design decision is how a check gets silenced.
 sideways scroll at any width, nav semantics correct.
 
 ---
+
+## H2 — Somebody looked at this and said no, because X
+
+Migration **223**: `project_reviews`.
+
+### The state that did not exist
+
+A deliverable was either accepted or silently not. There was no way to record that a person read it
+and found it wrong, and no way to say why — so the rejection happened in a meeting or an email, and
+the row went on looking like something nobody had got round to. **"Not yet accepted" and "rejected,
+for these reasons" are different states, and only one of them tells the next person what to do.**
+
+Rejection is therefore first-class, and the reason is enforced by a CHECK — including against
+whitespace, because `'   '` is not a reason.
+
+### Approving is not accepting
+
+The separation this module runs on, now closed from a third direction. Uploading a file is not
+accepting it; authoring a document is not accepting it; and **a reviewer approving is not accepting
+either**. A review says an internal reader is satisfied; `accepted_at` says the obligation is met —
+a different claim, made by a tenant_admin, and the one that closes a CLIN.
+
+What a review *does* is gate that act:
+
+| latest review | acceptance |
+|---|---|
+| none ever | proceeds exactly as before — nothing that worked stops working |
+| **pending** | `409 REVIEW_PENDING` — it is still being looked at |
+| **rejected** | `409 REVIEW_REJECTED`, **repeating the reason** so nobody has to go and find it |
+| approved | proceeds |
+| withdrawn | proceeds — the request was taken back |
+
+Only the **latest** review counts, which is what makes reject → fix → re-request → approve a *loop*
+rather than a dead end.
+
+### Who may do what, and why they differ
+
+**Requesting is open to anyone on the project** — asking a colleague to check something is
+collaboration, the same act as an @mention. **Deciding belongs to the named reviewer or a
+tenant_admin**, because a gate anyone can open is not a gate. **Withdrawing belongs to whoever
+asked**, so a request made in error cannot hold a deliverable hostage.
+
+One pending review per thing, enforced by a partial unique index: three open reviews is three people
+each believing they are the decider, and the unique violation is caught and turned into
+`REVIEW_ALREADY_OPEN` rather than a 500.
+
+### The gate does not fail open
+
+`blockingReview` returns a blocker on a database error rather than `null`. Reporting "nothing in the
+way" when the gate cannot read its own state would turn a connection blip into an acceptance nobody
+reviewed. Red-tested: flipping it to `null` fails the case that exists for it.
+
+### Proven
+
+Nine schema invariants against real Postgres in a rolled-back transaction, 23 unit assertions, and
+the whole loop as the actors:
+
+```
+✓ an EMPLOYEE can ask a colleague to review a deliverable — 201
+✓ a SECOND open review is refused — 409 REVIEW_ALREADY_OPEN
+✓ and while it is out for review, it cannot be accepted — 409 REVIEW_PENDING
+✓ a rejection with no reason is refused — 400
+✓ a rejection WITH a reason is recorded — 200
+✓ and the reason is on the record, not in somebody's inbox
+✓ a rejected deliverable still cannot be accepted — 409 REVIEW_REJECTED
+✓ so whoever tries to accept it learns what is wrong without going to look
+✓ a fresh review supersedes the rejection — reject is a loop, not a wall — 201
+✓ APPROVING IS NOT ACCEPTING — the reviewer is satisfied; the obligation is not yet met
+✓ and once approved, a tenant_admin can accept it — 200
+```
+
+Red-first, three defects injected: the gate failing open, a rejection ceasing to block, and a
+rejection allowed to be silent. Each fails exactly the case written for it.
+
+---
+
+## The verification backbone had a hole in it, and I had been reporting through it
+
+**`npx tsc --noEmit` never checked a single drive.** `tsconfig.json` includes `**/*.ts` and
+`**/*.tsx`; **`.mts` matches neither.** Only the 66 harnesses pulled in transitively as imports are
+seen; the drives themselves are not.
+
+Verified in both directions rather than read off the config: `tsc --listFiles` does not load
+`drive-project-lifecycle.mts`, and a duplicate `const` injected into it produces **zero** errors.
+
+This is not theoretical, and it is mine: **twice in one sitting** a duplicate `const` inside a
+drive's `main()` passed `tsc` clean and then failed under esbuild at run time — each time after a
+full rebuild and a server restart, to learn something a binder knows instantly. Every "tsc 0" I have
+reported covered the app and not the harnesses.
+
+**Adding `.mts` to the include surfaces 121 pre-existing type errors.** A check that fails 121 times
+on its first run is one somebody turns off that afternoon, so that is recorded for the X review
+rather than done here.
+
+`scripts/check-harness-syntax.mjs` is the part that pays today: 269 harness files, parsed and bound,
+in about a second. It makes **no claim about types** — pretending otherwise is how the 121 get
+ignored.
+
+**Its first version did not work.** It used `esbuild.transformSync`, on the reasoning that esbuild is
+what reported the bug. Red-tested against the exact defect, it reported a clean run: a per-file
+transform does no cross-scope binding. Rebuilt on the TypeScript binder, filtered to the
+declared-twice diagnostic family plus every syntax error, it catches it:
+
+```
+✗ 2 problem(s) that will fail the moment the harness is run:
+  · scripts/drive-project-lifecycle.mts:758 — TS2451: Cannot redeclare block-scoped variable 'asked'.
+```
+
+An instrument that cannot detect the thing it exists for is worse than none, because it reports a
+clean run.
+
+### And the repo's own lesson, repeating
+
+Fixing the fixtures, `both refusals ride ONE compare-and-swap` failed — because it read
+`db.state.queries[0]`, and the review gate's read had moved into that slot. **The same file already
+carries a comment about this exact mistake**, made when the open-tasks gate was added in front of the
+deliverables gate. Selected by what it *is* now, in both places.
+
+`tsc` 0 · vitest 221 files / **2,229** · harness syntax 269/269 · surfaces 82/82 · api-contract
+clean · write-contract clean · spine audit 0 dead triggers · lifecycle drive green · mobile probe
+clean at 390 and 820 with every panel open.
+
+---

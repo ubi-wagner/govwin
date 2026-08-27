@@ -222,7 +222,8 @@ describe('acceptDeliverable — the second fact', () => {
    * separate, deliberate `accepted_at` act is untouched, which is the whole point of this file.
    */
   it('refuses when there is nothing attached to accept — neither file nor document', async () => {
-    db.state.results = [[], [{ storageKey: null, documentId: null, acceptedAt: null }]];
+    // Leads with `[]`: the review gate reads first now, and "no review" is this case's state.
+    db.state.results = [[], [], [{ storageKey: null, documentId: null, acceptedAt: null }]];
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(false);
     if (!r.ok) {
@@ -236,7 +237,7 @@ describe('acceptDeliverable — the second fact', () => {
     // The half that would silently regress: if the CAS still demanded a `storage_key`, a report
     // written in the canvas editor could never be accepted, and the refusal would say there is
     // nothing attached — while the document sits right there on the row.
-    db.state.results = [[{
+    db.state.results = [[], [{
       id: DELIVERABLE, title: 'Q1 technical report', acceptedAt: '2026-03-02',
       filename: null, storageKey: null, documentId: '77777777-7777-4777-8777-777777777777',
     }]];
@@ -246,7 +247,7 @@ describe('acceptDeliverable — the second fact', () => {
   });
 
   it('refuses a double-accept', async () => {
-    db.state.results = [[], [{ storageKey: 'k', documentId: null, acceptedAt: '2026-03-01T00:00:00.000Z' }]];
+    db.state.results = [[], [], [{ storageKey: 'k', documentId: null, acceptedAt: '2026-03-01T00:00:00.000Z' }]];
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('ALREADY_ACCEPTED');
@@ -256,10 +257,14 @@ describe('acceptDeliverable — the second fact', () => {
     // A read-then-write leaves a window in which two accepts both see `accepted_at IS NULL`. The
     // single UPDATE with both conditions in its predicate has no such window; the follow-up read
     // exists only to say WHICH refusal it was.
-    db.state.results = [[{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
+    db.state.results = [[], [{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
     const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(r.ok).toBe(true);
-    const cas = db.state.queries[0];
+    // Selected by WHAT IT IS, not by position — the second time this exact mistake has been made
+    // in this file. `queries[0]` was the CAS until mig 223 put the review gate's read in front of
+    // it, and a positional assertion silently repoints at whatever moved into the slot.
+    const cas = db.state.queries.find((q) => /UPDATE project_deliverables/i.test(q)) ?? '';
+    expect(cas, 'the compare-and-swap ran').not.toBe('');
     // The evidence arm is an OR of the two attachments — an AND here would make an authored
     // document unacceptable, and a missing arm would let an empty deliverable close a milestone.
     expect(cas).toMatch(/d\.storage_key IS NOT NULL OR d\.document_id IS NOT NULL/i);
@@ -267,14 +272,44 @@ describe('acceptDeliverable — the second fact', () => {
   });
 
   it('never touches the file', async () => {
-    db.state.results = [[{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
+    db.state.results = [[], [{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
     await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(writes()).not.toMatch(/storage_key =/i);
     expect(writes()).not.toMatch(/uploaded_at =/i);
   });
 
+  /**
+   * ── THE REVIEW GATE (mig 223) ──────────────────────────────────────────────────────────────
+   * Acceptance now asks whether a review is standing in the way, BEFORE the compare-and-swap, so
+   * the refusal can name the review instead of coming back as a generic conflict. What this case
+   * guards is that it asks at all: an acceptance path that skipped the read would let a rejected
+   * deliverable through, and every other assertion in this file would still pass.
+   */
+  it('CONSULTS the review gate before accepting, and refuses while one is open', async () => {
+    db.state.results = [[{ status: 'pending', reason: null }]];
+    const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.status).toBe(409);
+      expect(r.code).toBe('REVIEW_PENDING');
+    }
+    expect(db.state.queries.some((q) => /FROM project_reviews/i.test(q)),
+      'the gate was actually read').toBe(true);
+    expect(writes(), 'and nothing was written').toBe('');
+  });
+
+  it('repeats the rejection REASON, so nobody has to go and look for it', async () => {
+    db.state.results = [[{ status: 'rejected', reason: 'Section 3 cites the wrong CLIN.' }]];
+    const r = await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('REVIEW_REJECTED');
+      expect(r.error).toMatch(/wrong CLIN/);
+    }
+  });
+
   it('scopes the update through the milestone to THIS project', async () => {
-    db.state.results = [[{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
+    db.state.results = [[], [{ id: DELIVERABLE, title: 'Q1 report', acceptedAt: '2026-03-02', filename: 'r.pdf' }]];
     await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(all()).toMatch(/m\.project_id = \?/);
     expect(all()).toMatch(/d\.tenant_id = \?/);

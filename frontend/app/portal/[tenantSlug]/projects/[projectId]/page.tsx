@@ -11,7 +11,9 @@ import { listMilestones, listDeliverables } from '@/lib/projects/milestones';
 import { listMilestoneTasks } from '@/lib/projects/milestone-tasks';
 import { listTaskAttachments } from '@/lib/projects/task-attachments';
 import { listProjectComments } from '@/lib/projects/comments';
+import { listProjectReviews } from '@/lib/projects/reviews';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
+import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -85,7 +87,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -97,6 +99,7 @@ export default async function ProjectPage({
     // One read for the whole conversation, bucketed below. A request per anchor would turn one
     // page into thirty.
     listProjectComments(tenantId, projectId),
+    listProjectReviews(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -137,6 +140,19 @@ export default async function ProjectPage({
     commentsByAnchor.set(k, list);
   }
   const threadFor = (t: string, id: string | null) => commentsByAnchor.get(threadKey(t, id)) ?? [];
+
+  // Reviews are passed WHOLE to each panel, which picks its own: the component already applies the
+  // "only the latest counts" rule that the server's acceptance gate applies, and duplicating that
+  // selection here would be two places deciding what a standing objection is.
+  const panelReviews: PanelReview[] = reviews.map((r) => ({
+    id: r.id, entityType: r.entityType, entityId: r.entityId, requestedBy: r.requestedBy,
+    reviewerUserId: r.reviewerUserId, reviewerRole: r.reviewerRole,
+    reviewerEmail: r.reviewerEmail ?? null, note: r.note,
+    dueOn: isoDate(r.dueOn), status: r.status, reason: r.reason,
+    decidedAt: r.decidedAt ? String(r.decidedAt) : null,
+    createdAt: r.createdAt ? String(r.createdAt) : null,
+  }));
+  const memberOptions = assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }));
 
   const filesByTask = new Map<string, { id: string; filename: string }[]>();
   for (const f of taskFiles) {
@@ -384,6 +400,18 @@ export default async function ProjectPage({
                               argument should live — not in an email nobody else on the project
                               can read. */}
                           <li className="ml-4 list-none">
+                            {/* The review sits with the deliverable it gates, above the
+                                conversation: a standing rejection is the thing somebody has to act
+                                on, and burying it under a comment thread would make it optional. */}
+                            <ReviewPanel
+                              entityType="deliverable"
+                              entityId={d.id}
+                              label={d.title}
+                              reviews={panelReviews}
+                              members={memberOptions}
+                              basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                              canDecide={canAccept}
+                            />
                             <CommentThread
                               entityType="deliverable"
                               entityId={d.id}
