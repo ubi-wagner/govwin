@@ -745,6 +745,104 @@ async function main() {
   for (const id of [sameDayId].filter(Boolean)) {
     await api(asEmployee, 'patch', P + `/tasks/${id}`, { status: 'done' });
   }
+  // ══ 7g · THE CONVERSATION — comments, mentions, and where they land ═══════════════════════
+  //
+  // Until mig 222 a project carried exactly one human decision: a tenant_admin accepting a
+  // deliverable. There was nowhere to ask a question and nowhere to answer one. Every check here
+  // is about a way this feature fails QUIETLY — a comment that saved and reached nobody.
+  phase('7g · the conversation: comments, mentions, and where they land');
+
+  // The EMPLOYEE asks the admin something, by name.
+  const asked = await api(asEmployee, 'post', P + '/comments', {
+    body: `The rig slipped a week — @${ACTOR} can we move the demo, or do we compress test?`,
+  });
+  A(asked.status === 201, 'anyone on the project can say something', `${asked.status} ${asked.text.slice(0, 80)}`);
+  const askedId = ((asked.json.data as Json)?.comment as Json)?.id as string | undefined;
+  const mentionedBack = ((asked.json.data as Json)?.notified ?? []) as string[];
+  A(mentionedBack.includes(ACTOR.toLowerCase()),
+    'and the person they named is told they were named', mentionedBack.join(', ') || 'nobody');
+
+  // ── THE MENTION LANDS IN THE SAME QUEUE AS EVERYTHING ELSE ────────────────────────────────
+  const mentionTodo = await sql<{ id: string; title: string; dueAt: string | null; assigneeUserId: string | null }[]>`
+    SELECT id, title, due_at AS "dueAt", assignee_user_id AS "assigneeUserId"
+      FROM tasks
+     WHERE task_type = 'project_comment' AND entity_id = ${askedId ?? null}::uuid`;
+  A(mentionTodo.length === 1, 'a mention raises a real platform ToDo — not a second inbox',
+    `${mentionTodo.length} ToDo(s)`);
+  A(mentionTodo[0]?.dueAt === null,
+    'with NO due date — a mention is a request to look, not a deadline');
+
+  const mentionMail = await sql<{ template: string }[]>`
+    SELECT payload->>'template' AS template FROM system_events
+     WHERE namespace = 'system' AND type = 'notification.requested'
+       AND payload->>'commentId' = ${askedId ?? null}
+     ORDER BY created_at DESC LIMIT 1`;
+  A(mentionMail[0]?.template === 'project_comment_mention',
+    'and asks for email through the one seam, with a renderer that exists',
+    mentionMail[0]?.template ?? 'none');
+
+  // ── SOMEBODY NOT ON THE PROJECT IS REPORTED BACK, NOT NOTIFIED ────────────────────────────
+  // The silent failure this feature otherwise has: the author types a name, sees the comment
+  // appear, and believes they were heard.
+  const offRoster = await api(req, 'post', P + '/comments', {
+    body: 'asking @nobody@elsewhere.test to weigh in',
+  });
+  const unmatched = ((offRoster.json.data as Json)?.unmatched ?? []) as string[];
+  A(offRoster.status === 201 && unmatched.includes('nobody@elsewhere.test'),
+    'a name nobody here answers to is REPORTED, not silently dropped', unmatched.join(', ') || 'none');
+  const offRosterId = ((offRoster.json.data as Json)?.comment as Json)?.id as string | undefined;
+  const [{ strangerTodos }] = await sql<{ strangerTodos: number }[]>`
+    SELECT count(*)::int AS "strangerTodos" FROM tasks
+     WHERE task_type = 'project_comment' AND entity_id = ${offRosterId ?? null}::uuid`;
+  A(strangerTodos === 0, 'and nobody outside the project is summoned to a page they cannot open');
+
+  // ── THE ANCHOR IS CHECKED, BECAUSE NO FK CAN ──────────────────────────────────────────────
+  // entity_id points at four tables, so it has no foreign key. This lookup is the only thing
+  // between a comment and another customer's contract.
+  const wrongAnchor = await api(req, 'post', P + '/comments', {
+    entityType: 'milestone', entityId: '11111111-1111-4111-8111-111111111111', body: 'x',
+  });
+  A(wrongAnchor.status === 400
+    && /does not belong to this project/.test(String((wrongAnchor.json as Json).error ?? '')),
+    "a comment cannot be anchored to another project's milestone", `${wrongAnchor.status}`);
+
+  // ── ANCHORED WHERE THE ARGUMENT ACTUALLY HAPPENS ──────────────────────────────────────────
+  const onMilestone = await api(req, 'post', P + '/comments', {
+    entityType: 'milestone', entityId: workPhase,
+    body: 'Compressing test is fine if the rig is ready by Friday.',
+  });
+  A(onMilestone.status === 201, 'a comment can hang off the milestone it is about', `${onMilestone.status}`);
+
+  // ── THREADS ARE ONE LEVEL ─────────────────────────────────────────────────────────────────
+  const reply = await api(req, 'post', P + '/comments', { parentId: askedId, body: 'Move the demo.' });
+  A(reply.status === 201, 'and somebody can answer', `${reply.status}`);
+  const replyId = ((reply.json.data as Json)?.comment as Json)?.id as string | undefined;
+
+  const nested = await api(asEmployee, 'post', P + '/comments', { parentId: replyId, body: 'Understood.' });
+  const nestedParent = ((nested.json.data as Json)?.comment as Json)?.parentId as string | undefined;
+  A(nested.status === 201 && nestedParent === askedId,
+    'a reply to a reply attaches to the ROOT — never refused mid-conversation, never a fourth indent',
+    `parent=${String(nestedParent).slice(0, 8)} root=${String(askedId).slice(0, 8)}`);
+
+  // ── EDITING IS THE AUTHOR, AND ONLY THE AUTHOR ────────────────────────────────────────────
+  const notYours = await api(req, 'patch', P + `/comments/${askedId}`, { body: 'rewriting what they said' });
+  A(notYours.status === 403, "one person cannot rewrite another's words", `${notYours.status}`);
+
+  // ── RESOLVING CLOSES THE QUEUE BEHIND IT ──────────────────────────────────────────────────
+  const resolved = await api(asEmployee, 'patch', P + `/comments/${askedId}`, { action: 'resolve' });
+  A(resolved.status === 200, 'anyone on the project can close a thread', `${resolved.status}`);
+  const [{ stillMentioned }] = await sql<{ stillMentioned: number }[]>`
+    SELECT count(*)::int AS "stillMentioned" FROM tasks
+     WHERE task_type = 'project_comment' AND entity_id = ${askedId ?? null}::uuid AND status = 'open'`;
+  A(stillMentioned === 0,
+    "and a finished conversation leaves nothing in anybody's queue", `${stillMentioned} still open`);
+
+  const [resolvedRow] = await sql<{ resolvedBy: string | null; resolvedAt: string | null }[]>`
+    SELECT resolved_by AS "resolvedBy", resolved_at AS "resolvedAt"
+      FROM project_comments WHERE id = ${askedId ?? null}::uuid`;
+  A(Boolean(resolvedRow?.resolvedBy && resolvedRow?.resolvedAt),
+    'recorded as WHO and WHEN — six months later, "true" answers nothing');
+
   await empCtx7f.close();
 
   // ── AND STANDING WORK GATES CLOSE-OUT, NOT A MILESTONE ────────────────────────────────────

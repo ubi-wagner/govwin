@@ -638,6 +638,25 @@ TEMPLATES.update({
         to this work. Ticking a task off, or closing the milestone, stops the reminder.</p>
         {_button('Open your projects', p.get('workspaceUrl', '/portal'))}
     '''),
+    # ── The mention (H1) ────────────────────────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS `lib/projects/comments.ts`, which names it. B141 twice over:
+    # a template referenced by a code path and defined nowhere emits `notification.failed` instead
+    # of sending, and nothing downstream notices.
+    #
+    # One mail per mentioned person. Unlike the nudge this is NOT grouped and NOT repeated: a
+    # mention happens once, somebody chose to say it to you, and a digest would strip exactly the
+    # thing that makes it worth reading.
+    'project_comment_mention': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">You were mentioned</h2>
+        <p>Somebody mentioned you in a comment
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ' on a project'}.</p>
+        <div style="background:#f8fafc;border-left:3px solid {BRAND_NAVY};border-radius:4px;padding:16px;margin:16px 0;">
+            <p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">{_e(str(p.get('excerpt') or ''))}</p>
+        </div>
+        <p style="font-size:13px;color:#64748b;">It is in your to-do queue as well. Replying in the
+        workspace, or resolving the thread, clears it.</p>
+        {_button('Open the conversation', p.get('workspaceUrl', '/portal'))}
+    '''),
     'project_setup_ready': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Congratulations &mdash; you won</h2>
         <p><strong>{_e(str(p.get('title') or 'Your proposal'))}</strong> has been recorded as awarded,

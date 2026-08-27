@@ -29,7 +29,7 @@
  */
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
-import { createTask, completeTask } from '@/lib/tasks/tasks';
+import { createTask } from '@/lib/tasks/tasks';
 import type { Role } from '@/lib/rbac';
 import type { ProjectActor } from './access';
 import { isoDate } from './dates';
@@ -120,6 +120,50 @@ export async function raiseTaskTodo(
 }
 
 /**
+ * Retire the projected ToDo(s) behind a project thing that is finished.
+ *
+ * ── WHY THIS DOES NOT GO THROUGH `completeTask` ──────────────────────────────────────────────
+ * `completeTask` asks "may this person complete this task", and answers no unless the actor IS the
+ * assignee or outranks an assignee ROLE. That is exactly right for a person ticking work off, and
+ * exactly wrong here, because this is not a person completing somebody's work — it is the thing
+ * the ToDo pointed at ceasing to exist. A milestone closing, a project closing out, a comment
+ * thread being resolved: in each case the request has been answered, and whose queue it sat in is
+ * beside the point.
+ *
+ * Left on `completeTask`, the sweeps FAILED SILENTLY and left stale rows: a ToDo named to a person
+ * by id has no `assignee_role`, so a tenant_admin closing a milestone is neither the user-assignee
+ * nor a role-assignee and gets a 403 that `closeTodosUnder` discards as best-effort. It had not
+ * bitten yet only because the normal path closes each ToDo as the assignee ticks their own row —
+ * it would have surfaced the first time work was reassigned and then swept up by a manager.
+ *
+ * ── AND WHY IT IS SAFE ───────────────────────────────────────────────────────────────────────
+ * Narrow on every axis a mistake could widen: this tenant only, the two `task_type`s this module
+ * projects, open rows only, and always by an entity id the caller resolved from a row it had
+ * already scoped. It can reach nothing it did not create. `completed_by` records the person whose
+ * action retired it, so the audit trail still names somebody.
+ */
+async function retireProjectedTodos(
+  actor: ProjectActor,
+  ids: string[],
+  why: Record<string, unknown>,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await sql<{ id: string }[]>`
+    UPDATE tasks
+       SET status = 'completed',
+           result = ${sql.json(why as Parameters<typeof sql.json>[0])},
+           completed_by = ${actor.userId}::uuid,
+           completed_at = now(),
+           updated_at = now()
+     WHERE id = ANY(${ids}::uuid[])
+       AND tenant_id = ${actor.tenantId}::uuid
+       AND task_type IN ('project_task', 'project_comment')
+       AND status IN ('open', 'in_progress')
+    RETURNING id`;
+  return rows.length;
+}
+
+/**
  * Close the ToDo(s) standing against one checklist row.
  *
  * Plural because a task can be reassigned — the old holder's ToDo and the new one's both point at
@@ -135,14 +179,27 @@ export async function closeTaskTodos(
       SELECT id FROM tasks
        WHERE entity_type = 'project_milestone_task' AND entity_id = ${taskId}::uuid
          AND tenant_id = ${actor.tenantId}::uuid AND status = 'open'`;
-    let closed = 0;
-    for (const t of open) {
-      const r = await completeTask({ taskId: t.id, actor: asTaskActor(actor), result: why });
-      if (r.ok) closed += 1;
-    }
-    return closed;
+    return await retireProjectedTodos(actor, open.map((t) => t.id), why);
   } catch (err) {
     console.error('[projects/todos] closeTaskTodos failed:', err);
+    return 0;
+  }
+}
+
+/** Retire the mention ToDo(s) on one comment — the thread is answered. */
+export async function closeCommentTodos(
+  actor: ProjectActor,
+  commentId: string,
+  why: Record<string, unknown> = {},
+): Promise<number> {
+  try {
+    const open = await sql<{ id: string }[]>`
+      SELECT id FROM tasks
+       WHERE entity_type = 'project_comment' AND entity_id = ${commentId}::uuid
+         AND tenant_id = ${actor.tenantId}::uuid AND status = 'open'`;
+    return await retireProjectedTodos(actor, open.map((t) => t.id), why);
+  } catch (err) {
+    console.error('[projects/todos] closeCommentTodos failed:', err);
     return 0;
   }
 }
@@ -155,8 +212,8 @@ export async function closeTaskTodos(
  * failure, and a person's queue holding work on a finished phase is the kind of thing that quietly
  * erodes trust in the queue itself.
  *
- * `completeTask` is used rather than `closeTasksForEntity`, which requires `rfp_admin`: this runs as
- * the tenant's own admin, and a tenant act should not need platform authority.
+ * It retires the rows directly rather than going through `completeTask` — see
+ * `retireProjectedTodos` above for why, and for the silent failure that made it necessary.
  */
 export async function closeTodosUnder(
   actor: ProjectActor,
@@ -177,12 +234,7 @@ export async function closeTodosUnder(
            WHERE t.entity_type = 'project_milestone_task' AND t.status = 'open'
              AND t.tenant_id = ${actor.tenantId}::uuid
              AND p.project_id = ${scope.projectId ?? null}::uuid`;
-    let closed = 0;
-    for (const t of rows) {
-      const r = await completeTask({ taskId: t.id, actor: asTaskActor(actor), result: why });
-      if (r.ok) closed += 1;
-    }
-    return closed;
+    return await retireProjectedTodos(actor, rows.map((t) => t.id), why);
   } catch (err) {
     console.error('[projects/todos] closeTodosUnder failed:', err);
     return 0;

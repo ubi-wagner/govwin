@@ -1651,3 +1651,120 @@ the full lifecycle drive green at **126 checks**, footprint removed. `schema-che
 nothing on a DDL-only migration and says so rather than claiming a pass.
 
 ---
+
+## H1 — The conversation a project did not have
+
+Before this, a project carried exactly **one** human decision: a tenant_admin accepting a
+deliverable. There was nowhere to ask a question, nowhere to answer one, and nowhere to record why
+a date moved. Everything the product knew about a project was a fact; nothing was a discussion —
+which is why this came before more automation. Mail nobody can reply to is not a feature.
+
+Migration **222**: `project_comments`.
+
+### The anchor is polymorphic, and nothing in the database can check it
+
+`entity_type` + `entity_id`, the shape the platform `tasks` table already uses, over four kinds of
+row — `project` (a NULL `entity_id`) · `milestone` · `task` · `deliverable`. The pair is bound by a
+CHECK in both directions, the same idiom as mig 221's `scope`.
+
+There is **no FK on `entity_id`** — it cannot have one, pointing at four tables. That is the cost of
+the polymorphic anchor, and it is paid in the domain layer, which validates the target belongs to
+*this* project before writing. That lookup is the only thing standing between a comment and another
+customer's contract, so it is asserted directly in both the unit tests and the drive.
+
+`proposal_comments` was not widened: it has no `tenant_id` (it scopes through `proposal_id`), no
+threading, and `resolved` is a bare boolean. Six months later "was this ever answered, and by whom"
+is the question, and `true` cannot answer it — so resolution here is `resolved_at` + `resolved_by`,
+bound by a CHECK, the same shape as deliverable acceptance.
+
+### The mention is the point
+
+A comment nobody is told about is a diary. `@` + an email, and the rules are where the subtlety is:
+
+- **Token-boundary anchored.** An address in prose — *"write to dana@acme.test"* — is **not** a
+  mention. Without that rule, every address anyone pasted would summon its owner.
+- **Resolved against the project ROSTER, never the tenant directory.** Notifying somebody about a
+  project they will be refused is worse than not notifying them — the same rule that makes
+  `NOT_ON_PROJECT` a refusal on task assignment.
+- **An unmatched token stays plain text and the comment still saves**, but the API returns
+  `notified` and `unmatched` and the UI shows both. This is the failure this feature otherwise has:
+  the author types a name, sees the comment appear, believes they were heard, and the reply never
+  comes.
+- **The author is dropped.** Writing `@me` to make a note must not raise a ToDo telling you what
+  you already know.
+
+A mention raises a real platform ToDo (`/todos`, the bell, the Command Center — not a second inbox,
+per G1) and one email through the single seam, with `project_comment_mention` shipped in the *same
+change* as the code that names it. The ToDo carries **no due date and no nudge schedule**: a mention
+is a request to look, not a deadline, and chasing somebody about a comment on a cadence is how a
+queue gets muted.
+
+### One level of threading
+
+A reply to a reply attaches to the same **root**, normalised rather than refused — "you may not
+reply to that" is a strange thing to say mid-conversation, and nobody has ever wanted the fourth
+indent.
+
+### A latent bug in G1, found by building on it
+
+Resolving a thread must close the mention ToDos behind it. Routing that through `completeTask`
+**silently failed**: it asks "may this person complete this task" and answers no unless the actor
+*is* the assignee or outranks an assignee **role**. A mention is addressed to somebody else by
+definition, so the ToDo stayed open forever.
+
+The same defect sat in **G1's own sweeps**. `closeTodosUnder` — called when a milestone is met or a
+project closes out — runs as the tenant_admin, and a ToDo named to a person by id has no
+`assignee_role`, so the admin is neither the user-assignee nor a role-assignee and gets a 403 that
+best-effort code discards. It had not bitten yet only because the normal path closes each ToDo as
+the assignee ticks their own row; it would have surfaced the first time work was reassigned and then
+swept up by a manager.
+
+`retireProjectedTodos` replaces it. The distinction it encodes: **this is not a person completing
+somebody's work, it is the thing the ToDo pointed at ceasing to exist.** Narrow on every axis — this
+tenant, the two `task_type`s this module projects, open rows only, always by an id the caller
+resolved from a row it had already scoped — and `completed_by` still names whoever's action retired
+it.
+
+### Proven
+
+Nine schema invariants against real Postgres in a rolled-back transaction, including that deleting a
+root takes its replies and that a `resolved_by` with no `resolved_at` is refused. Then 34 unit
+assertions across two files, then as the actors:
+
+```
+✓ anyone on the project can say something — 201
+✓ and the person they named is told they were named — kate.ulepic@foundation3dp.com
+✓ a mention raises a real platform ToDo — not a second inbox — 1 ToDo(s)
+✓ with NO due date — a mention is a request to look, not a deadline
+✓ and asks for email through the one seam, with a renderer that exists — project_comment_mention
+✓ a name nobody here answers to is REPORTED, not silently dropped — nobody@elsewhere.test
+✓ and nobody outside the project is summoned to a page they cannot open
+✓ a comment cannot be anchored to another project's milestone — 400
+✓ a reply to a reply attaches to the ROOT — never a fourth indent
+✓ one person cannot rewrite another's words — 403
+✓ anyone on the project can close a thread — 200
+✓ and a finished conversation leaves nothing in anybody's queue — 0 still open
+✓ recorded as WHO and WHEN — six months later, "true" answers nothing
+```
+
+**Red-first, five defects injected and caught**: dropping the token boundary (two cases fail),
+not excluding the author, stripping the anchor's project/tenant scoping, skipping the ToDo sweep,
+and resolving mentions against the whole tenant.
+
+**One red-first attempt that silently did nothing** — the injected patch searched for a trailing
+`;` the source does not have, so `.replace()` matched zero times and the suite passed, which read as
+"the check cannot fail". Re-run with an `assert` on the match count, it failed correctly. A defect
+injection without an assertion is not a red-first; it is a green run with extra steps.
+
+### Found, not fixed here
+
+The notification feed (`app/api/portal/[tenantSlug]/notifications/route.ts`) filters
+`namespace IN ('proposal', 'capture', 'library', 'system')` — **`project` is not in the list**, on
+either the tenant-wide or the partner-scoped query, so all 16 live project event types are invisible
+in the bell. Recorded on H3, which is where it belongs; H1 does not depend on it, because a mention
+reaches people through the ToDo and the email regardless.
+
+`tsc` 0 · vitest 219 files / **2,204** · surfaces 82/82 · api-contract clean · write-contract clean ·
+the full lifecycle drive green, footprint removed.
+
+---

@@ -261,6 +261,23 @@ untracked — with the ToDo projection following (old holder's ToDo closed, new 
 reset). Creating stays tenant_admin. `project_task_attachments` carries references that **never touch
 status**, the same separation that keeps uploading a deliverable from accepting it.
 
+**The CONVERSATION (mig 222)** — `project_comments`, threaded one level, anchored polymorphically
+(`entity_type`+`entity_id`, the `tasks` idiom) to the project · a milestone · a task · a deliverable.
+Before it, a project carried exactly ONE human decision (a tenant_admin accepting a deliverable):
+everything else was a fact with no discussion attached, which is why this came before more automation.
+`entity_id` has **no FK** — it points at four tables — so the domain layer's scoped lookup is the only
+thing between a comment and another customer's contract. Resolution is `resolved_at`+`resolved_by`, not
+a bare boolean: six months on, "who answered this" is the question. **A mention is `@`+email, anchored
+to a token boundary** (an address in prose is NOT a mention) and **resolved against the project ROSTER,
+never the tenant directory** — notifying someone about a project they'd be refused is worse than not
+notifying them. An unmatched token stays plain text and the API returns `notified`/`unmatched` so the UI
+can say who was reached; the silent version lets an author believe they were heard. It raises a real
+platform ToDo (no due date, no nudges — a mention is a request to look) plus one email through the one
+seam. **`retireProjectedTodos` (`lib/projects/todos.ts`) closes projected ToDos directly, NOT via
+`completeTask`** — that asks "may this person complete this task" and refuses a non-assignee, so the
+sweeps failed silently; a milestone closing is the thing the ToDo pointed at ceasing to exist, not a
+person finishing someone else's work.
+
 **The project portal reuses the build portal's infrastructure rather than growing a parallel one.**
 *ToDos / email / nudges:* assigned checklist work is **PROJECTED** onto the platform `tasks` spine
 (`lib/projects/todos.ts`) — the same queue `/todos`, the bell, the Command Center and the shared

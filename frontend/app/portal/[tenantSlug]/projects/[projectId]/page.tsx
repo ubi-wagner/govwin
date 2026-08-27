@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
@@ -9,6 +10,8 @@ import { listClins } from '@/lib/projects/clins';
 import { listMilestones, listDeliverables } from '@/lib/projects/milestones';
 import { listMilestoneTasks } from '@/lib/projects/milestone-tasks';
 import { listTaskAttachments } from '@/lib/projects/task-attachments';
+import { listProjectComments } from '@/lib/projects/comments';
+import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -82,7 +85,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -91,6 +94,9 @@ export default async function ProjectPage({
     // Every reference on the project in one read. Per-task fetches would turn a twenty-task
     // milestone into twenty round trips on a page that already renders them all.
     listTaskAttachments(tenantId, projectId),
+    // One read for the whole conversation, bucketed below. A request per anchor would turn one
+    // page into thirty.
+    listProjectComments(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -112,6 +118,26 @@ export default async function ProjectPage({
   // A `scope: 'project'` task belongs to NO milestone (mig 221), so it is separated out rather than
   // bucketed under a stand-in key. Filing standing work under a phase it does not belong to would
   // make it gate that phase on screen while gating nothing in the database.
+  // Comments keyed by "<entityType>:<entityId>", so one map serves all four anchors and a thread
+  // cannot be rendered under the wrong kind of row just because two ids collided.
+  const threadKey = (t: string, id: string | null) => `${t}:${id ?? ''}`;
+  const commentsByAnchor = new Map<string, ThreadComment[]>();
+  for (const c of comments) {
+    const k = threadKey(c.entityType, c.entityId);
+    const list = commentsByAnchor.get(k) ?? [];
+    list.push({
+      id: c.id, entityType: c.entityType, entityId: c.entityId, parentId: c.parentId,
+      body: c.body, authorUserId: c.authorUserId,
+      authorEmail: c.authorEmail ?? null, authorName: c.authorName ?? null,
+      mentions: c.mentions ?? [],
+      resolvedAt: c.resolvedAt ? String(c.resolvedAt) : null,
+      editedAt: c.editedAt ? String(c.editedAt) : null,
+      createdAt: c.createdAt ? String(c.createdAt) : null,
+    });
+    commentsByAnchor.set(k, list);
+  }
+  const threadFor = (t: string, id: string | null) => commentsByAnchor.get(threadKey(t, id)) ?? [];
+
   const filesByTask = new Map<string, { id: string; filename: string }[]>();
   for (const f of taskFiles) {
     const list = filesByTask.get(f.taskId) ?? [];
@@ -328,22 +354,45 @@ export default async function ProjectPage({
                     canManage={canAccept}
                     milestoneMet={m.status === 'met'}
                   />
+                  <CommentThread
+                    entityType="milestone"
+                    entityId={m.id}
+                    label={m.title}
+                    comments={threadFor('milestone', m.id)}
+                    basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                  />
                   {items.length > 0 && (
                     <ul className="mt-3 space-y-2 text-sm">
                       {items.map((d) => (
-                        <DeliverableRow
-                          key={d.id}
-                          deliverable={{
-                            id: d.id, title: d.title, filename: d.filename,
-                            storageKey: d.storageKey,
-                            acceptedAt: d.acceptedAt ? String(d.acceptedAt) : null,
-                            documentId: d.documentId ?? null,
-                            documentTitle: d.documentTitle ?? null,
-                          }}
-                          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
-                          canAccept={canAccept}
-                          tenantSlug={tenantSlug}
-                        />
+                        // `DeliverableRow` IS the <li>, so the thread cannot be its sibling inside
+                        // a <ul> — a fragment keyed on the deliverable keeps both under one child
+                        // without putting a <div> where the HTML says a list item belongs.
+                        <Fragment key={d.id}>
+                          <DeliverableRow
+                            deliverable={{
+                              id: d.id, title: d.title, filename: d.filename,
+                              storageKey: d.storageKey,
+                              acceptedAt: d.acceptedAt ? String(d.acceptedAt) : null,
+                              documentId: d.documentId ?? null,
+                              documentTitle: d.documentTitle ?? null,
+                            }}
+                            basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                            canAccept={canAccept}
+                            tenantSlug={tenantSlug}
+                          />
+                          {/* A deliverable is where acceptance is argued about, so it is where the
+                              argument should live — not in an email nobody else on the project
+                              can read. */}
+                          <li className="ml-4 list-none">
+                            <CommentThread
+                              entityType="deliverable"
+                              entityId={d.id}
+                              label={d.title}
+                              comments={threadFor('deliverable', d.id)}
+                              basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                            />
+                          </li>
+                        </Fragment>
                       ))}
                     </ul>
                   )}
@@ -380,6 +429,29 @@ export default async function ProjectPage({
           </div>
         </section>
       )}
+
+      {/* ── THE PROJECT-LEVEL CONVERSATION ───────────────────────────────────────────────────
+          Everything that is about the contract rather than about one phase of it. It is a
+          section rather than a footer because a project with an unanswered question on it is
+          not in the same state as one without, and that should be visible without scrolling
+          to the bottom. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Discussion
+        </h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs text-gray-500">
+            About the project as a whole. Type <code>@</code> and someone&rsquo;s email to notify
+            them &mdash; they have to be on this project to be reachable.
+          </p>
+          <CommentThread
+            entityType="project"
+            entityId={null}
+            comments={threadFor('project', null)}
+            basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          />
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
