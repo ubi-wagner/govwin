@@ -1514,3 +1514,140 @@ ruler on 18 stored volumes: 0 under-counts · spine audit 0 dead triggers · the
 green, footprint removed.
 
 ---
+
+## P4 — Task spine v2: the plan's rules move into the database
+
+Six pieces, specified across three turns with the product owner. Migration **221**.
+
+### The table keeps its name
+
+`project_milestone_tasks` now holds rows belonging to no milestone. Renaming it would touch ~14
+modules, the ToDo projection, both completion gates and three harnesses, for zero behavioural gain —
+so what a rename would have bought, a reader not being misled, is bought instead by `scope` and by
+`COMMENT ON TABLE`, which lands in `docs/SCHEMA_MAP.md` because that file is generated from the live
+database. A comment where the reader already is beats a rename they have to notice.
+
+`scope` is redundant with `milestone_id IS NULL` and that is *why* the paired CHECK exists —
+redundancy without a guard is drift waiting to happen. It is `scope` and not `task_type` because the
+platform `tasks` table already has a `task_type` with a different vocabulary, and project tasks are
+projected onto that table: two same-named columns with different vocabularies, one feeding the other,
+is a trap laid for whoever debugs the projection next.
+
+### Two gates that were already right
+
+Making `milestone_id` nullable came out correct on both completion gates for free, because they had
+been scoped differently all along:
+
+| gate | scope | result for standing work |
+|---|---|---|
+| `markMilestoneMet` | `milestone_id = ?` | never blocks a phase ✓ |
+| `closeProject` | `project_id = ?` | **does** block close-out ✓ |
+
+Both halves are now asserted in the drive rather than claimed in prose.
+
+### The date rule, and the one date it does not touch
+
+A milestone-scoped task's `due_date` must not fall after its milestone's **`forecast_date`** — the
+current plan, not the frozen `baseline_date` and not the past `met_at`. `<=`, not `<`: finishing on
+the date you were given is the normal case.
+
+Enforced by a **trigger**, for the same reason the baseline freeze is: two paths write these dates —
+editing the task, and rescheduling the milestone underneath it — and an invariant each path has to
+remember is an invariant enforced nowhere. Pulling a milestone in **refuses and names the stranded
+tasks** rather than dragging their dates along; silently moving a date somebody committed to is how a
+plan stops being believed.
+
+**And the estimate is deliberately exempt.** `estimated_completion` is the assignee's own forecast and
+is free to run past the milestone. Refusing it would only teach people to enter the date that is
+accepted rather than the one they believe, and the gap between the two — the early warning the column
+exists for — would disappear.
+
+### Dependencies are between milestones and nowhere else
+
+One predecessor per milestone. No task-level graph, no critical path: task-level dependency graphs are
+the feature that turns a plan into something nobody maintains. Same-project and acyclic are both
+trigger-enforced (`23002`, `23003`).
+
+What it buys is a **precise cascade**. `rescheduleMilestone` moved everything with a higher
+`sort_index`; now, once anyone declares a dependency, it moves declared successors — two phases running
+in *parallel* no longer both slip because one did. With no dependency declared anywhere it falls back to
+serial order, so an untouched project behaves exactly as before.
+
+### Open editing, audited
+
+The per-task `PATCH` was **status-only**, so this is new surface rather than a permission loosening.
+Anyone on the project may reassign, move a date or edit the note; creating a task stays `tenant_admin`
+because that is adding scope. Every change emits `project:task.reassigned` / `task.rescheduled` with
+who, from what, to what — open means visible, not untracked.
+
+The projection follows: a reassignment closes the previous holder's ToDo and raises the new owner's
+(`closeTaskTodos` was already plural for exactly this), and a moved date resets `nudges_sent` so the
+shared sweeper re-fires against the new due. A status change and an edit cannot ride the same request —
+a note save must never be able to reopen finished work.
+
+### A reference is not evidence of completion
+
+`project_task_attachments` (RLS-forced) lets a task carry files. Nothing in it touches task `status` —
+the same separation that keeps uploading a deliverable from accepting it. A file appearing is not work
+finishing, and a checklist that could close itself the moment somebody shared context would make "done"
+stop meaning anyone decided it was done.
+
+### Proven
+
+Every schema invariant was exercised against real Postgres before a line of TypeScript depended on it —
+ten cases in a rolled-back transaction, including the **two that must not refuse**:
+
+```
+PASS 1  scope/milestone pairing refused        PASS 5b same-day task accepted
+PASS 2  self-dependency refused                PASS 5c estimate past the milestone accepted
+PASS 3  cross-project dependency refused       PASS 6  pull-in refused, naming the task
+PASS 4  cycle refused                          PASS 6b pushing the milestone out accepted
+PASS 5  task due after milestone refused       PASS 7  project-scope task, any date, accepted
+```
+
+Then as the actors, through the real routes — drive phase 7f, 18 checks, and the close-out gate:
+
+```
+✓ a task with NO milestone is accepted — standing project work — 201
+✓ and the database derived its scope rather than taking our word for it — scope=project milestone=null
+✓ a task due AFTER its milestone is refused — by the trigger, on the real write path — 409
+✓ but the SAME day is fine — finishing on the date is the normal case — 201
+✓ the ASSIGNEE may say they expect to be late — the estimate is deliberately unconstrained — 200
+✓ pulling the phase in is REFUSED and the tasks are named — 409 TASKS_WOULD_STRAND
+✓ one milestone can be declared to follow another · a loop is refused · so is self-reference
+✓ an EMPLOYEE can hand a task back to the team, and pick it back up — 200 / 200
+✓ but not to somebody who is not on the project — 409 NOT_ON_PROJECT
+✓ and BOTH handovers are on the record — 2 event(s), tenant_user → 07023cd4…
+✓ a reference file attaches — and did NOT move the status — done → done
+✓ standing work blocks CLOSE-OUT, having blocked no milestone — and the refusal names it
+```
+
+### Five defects caught, four of them mine
+
+**The Proxy trap, twice in one file.** A hoisted `` sql`id, project_id, …` `` column list, and
+`nudges_sent = ${moved ? 0 : sql`nudges_sent`}` — both written *within minutes of quoting the rule that
+forbids them*. A nested tagged template in a value position is a Promise, not a fragment. Then a third
+variant: a SQL comment written inside the template literal is still JavaScript, so its backticks and
+`${` were parsed by the compiler.
+
+**A `Date` is not its ISO string.** `before.dueDate` arrives as a JavaScript Date and the caller sends
+`'2026-06-30'`; comparing them directly is *always* "different", so every save would have reset the
+nudge watermark and re-raised a ToDo — a nudge storm produced by pressing save twice. Guarded by a test
+that fails on exactly that.
+
+**The self-dependency CHECK is unreachable**, found by exercising it: a `BEFORE` trigger runs ahead of
+CHECK evaluation, so the cycle walk catches a self-reference first and reports it as a loop of length
+one. Kept as a backstop, and the comment now says so instead of claiming the CHECK is what refuses it.
+
+**Three harness lies, caught before they became findings.** An assertion demanding a `task.reassigned`
+event after handing a task back to the person who already held it — asking the product to record
+something that correctly did not happen. A page-counter check comparing a *project-wide* count against a
+*per-milestone* string, which had only ever agreed because every task happened to sit under one
+milestone. And `afterAttach.status !== 'done'`, which tested the drive's own ordering rather than
+whether attaching a file moved anything — rewritten to compare before and after.
+
+`tsc` 0 · vitest 217 files / **2,170** · surfaces 82/82 · api-contract clean · write-contract clean ·
+the full lifecycle drive green at **126 checks**, footprint removed. `schema-check` reports it verified
+nothing on a DDL-only migration and says so rather than claiming a pass.
+
+---

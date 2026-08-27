@@ -57,7 +57,9 @@ const NUDGE_DAYS = [7, 2, 0];
 export async function raiseTaskTodo(
   actor: ProjectActor,
   task: {
-    id: string; projectId: string; milestoneId: string; title: string;
+    id: string; projectId: string;
+    /** NULL for a `scope: 'project'` task — standing work with no phase (mig 221). */
+    milestoneId: string | null; title: string;
     assigneeUserId: string | null; assigneeRole: string | null; dueDate: string | null;
   },
   projectName: string,

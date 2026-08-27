@@ -10,6 +10,9 @@
  *                         customer's signature) — separate messages, separate next actions.
  *             reschedule  move the end date; by default everything later moves with it, which is
  *                         what makes the plan serial rather than a list of loose dates.
+ *             depends_on  say which milestone this one follows. Milestone-to-milestone only —
+ *                         there is no task-level dependency graph (mig 221). Same-project and
+ *                         acyclic are enforced in the database, not here.
  *             resequence  fill in the serial starts (previous end + 1 day) without touching a
  *                         start someone pinned.
  */
@@ -17,7 +20,7 @@ import { NextResponse } from 'next/server';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createMilestone, listMilestones, listDeliverables, markMilestoneMet } from '@/lib/projects/milestones';
-import { listMilestoneTasks, rescheduleMilestone, resequence } from '@/lib/projects/milestone-tasks';
+import { listMilestoneTasks, rescheduleMilestone, resequence, setMilestoneDependency } from '@/lib/projects/milestone-tasks';
 
 export async function GET(_request: Request, ctx: { params: Promise<{ tenantSlug: string; projectId: string }> }) {
   try {
@@ -68,6 +71,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
         milestoneId?: string; action?: string;
         note?: string | null; metrics?: Record<string, unknown> | null;
         forecastDate?: string; cascade?: boolean;
+        dependsOnId?: string | null;
       };
       try { body = await request.json(); }
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
@@ -80,9 +84,23 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (!body?.milestoneId) {
         return NextResponse.json(
-          { error: "Provide milestoneId and one of action:'met' | 'reschedule' | 'resequence'", code: 'VALIDATION_ERROR' },
+          { error: "Provide milestoneId and one of action:'met' | 'reschedule' | 'depends_on' | 'resequence'", code: 'VALIDATION_ERROR' },
           { status: 400 },
         );
+      }
+
+      if (body.action === 'depends_on') {
+        // `null` clears the dependency — a meaning, not a missing field, so it is read with `in`
+        // rather than truthiness.
+        if (!('dependsOnId' in body)) {
+          return NextResponse.json(
+            { error: 'dependsOnId is required (null to clear it)', code: 'VALIDATION_ERROR' },
+            { status: 400 },
+          );
+        }
+        const dep = await setMilestoneDependency(gate.actor, projectId, body.milestoneId, body.dependsOnId ?? null);
+        if (!dep.ok) return NextResponse.json({ error: dep.error, code: dep.code }, { status: dep.status });
+        return NextResponse.json({ data: dep.data });
       }
 
       if (body.action === 'reschedule') {
@@ -96,7 +114,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (body.action !== 'met') {
         return NextResponse.json(
-          { error: "action must be 'met', 'reschedule' or 'resequence'", code: 'VALIDATION_ERROR' },
+          { error: "action must be 'met', 'reschedule', 'depends_on' or 'resequence'", code: 'VALIDATION_ERROR' },
           { status: 400 },
         );
       }

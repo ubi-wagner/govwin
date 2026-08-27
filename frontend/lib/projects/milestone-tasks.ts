@@ -43,18 +43,58 @@ import type { Fail, Ok } from './project';
 export interface MilestoneTask {
   id: string;
   projectId: string;
-  milestoneId: string;
+  /** NULL for a `scope: 'project'` task. Read `scope`, not this — see migration 221. */
+  milestoneId: string | null;
+  /** 'milestone' gates its milestone and obeys the date rule; 'project' is standing work. */
+  scope: 'milestone' | 'project';
   title: string;
   detail: string | null;
   assigneeUserId: string | null;
   assigneeRole: string | null;
   assigneeEmail?: string | null;
   dueDate: string | null;
+  /** The ASSIGNEE's own forecast — deliberately unconstrained by the milestone date. */
+  estimatedCompletion: string | null;
   status: 'open' | 'done' | 'blocked';
   blockedReason: string | null;
   completedAt: string | null;
   completedBy: string | null;
   sortIndex: number;
+}
+
+// The RETURNING column list is repeated in each statement below rather than hoisted into a shared
+// fragment. `lib/db.ts`'s `sql` is a Proxy that routes only the tagged-template CALL, so a hoisted
+// ``sql`id, project_id, …` `` is a PROMISE, not a fragment — the third Proxy trap, and it would
+// interpolate as a serialisation error rather than as column names.
+
+/**
+ * Turn migration 221's SQLSTATEs into the product's own refusals.
+ *
+ * The trigger raises the truth; a constraint name is not a sentence a person can act on. Each of
+ * these has a different next action, so each gets its own code — the same reason
+ * `TASKS_OUTSTANDING` and `DELIVERABLES_OUTSTANDING` are separate messages rather than one
+ * "not ready".
+ */
+function fromTrigger(err: unknown): Fail | null {
+  const code = (err as { code?: string })?.code;
+  const message = String((err as { message?: string })?.message ?? '');
+  switch (code) {
+    case '23002':
+      return { ok: false, status: 400, code: 'CROSS_PROJECT_DEPENDENCY',
+        error: 'A milestone can only depend on another in the same project.' };
+    case '23003':
+      return { ok: false, status: 409, code: 'DEPENDENCY_LOOP',
+        error: 'That dependency would make a loop — this milestone already comes before that one.' };
+    case '23004':
+      return { ok: false, status: 409, code: 'DUE_AFTER_MILESTONE',
+        error: `${message.replace(/^[^:]*:\s*/, '')}. Move the milestone first, or bring the task in.` };
+    case '23005':
+      return { ok: false, status: 409, code: 'TASKS_WOULD_STRAND',
+        error: `${message.replace(/^[^:]*:\s*/, '')}. Move them first — pulling a milestone in does not `
+          + 'move dates people committed to.' };
+    default:
+      return null;
+  }
 }
 
 /** A date the database will accept, or null. Rejects rather than coercing — a silently dropped due
@@ -85,13 +125,14 @@ export function shiftDate(value: unknown, days: number): string | null {
 export async function listMilestoneTasks(tenantId: string, projectId: string): Promise<MilestoneTask[]> {
   try {
     return await sql<MilestoneTask[]>`
-      SELECT t.id, t.project_id, t.milestone_id, t.title, t.detail,
+      SELECT t.id, t.project_id, t.milestone_id, t.scope, t.title, t.detail,
              t.assignee_user_id, t.assignee_role, u.email AS assignee_email,
-             t.due_date, t.status, t.blocked_reason, t.completed_at, t.completed_by, t.sort_index
+             t.due_date, t.estimated_completion, t.status, t.blocked_reason,
+             t.completed_at, t.completed_by, t.sort_index
         FROM project_milestone_tasks t
         LEFT JOIN users u ON u.id = t.assignee_user_id
        WHERE t.project_id = ${projectId}::uuid AND t.tenant_id = ${tenantId}::uuid
-       ORDER BY t.sort_index, t.created_at`;
+       ORDER BY t.scope DESC, t.sort_index, t.created_at`;
   } catch (err) {
     console.error('[projects/milestone-tasks] listMilestoneTasks failed:', err);
     return [];
@@ -109,9 +150,10 @@ export async function createMilestoneTask(
   actor: ProjectActor,
   projectId: string,
   input: {
-    milestoneId: string; title: string; detail?: string | null;
+    /** Omit (or null) for standing project work — see `scope` and migration 221. */
+    milestoneId?: string | null; title: string; detail?: string | null;
     assigneeUserId?: string | null; assigneeRole?: string | null;
-    dueDate?: string | null; sortIndex?: number;
+    dueDate?: string | null; estimatedCompletion?: string | null; sortIndex?: number;
   },
 ): Promise<Ok<MilestoneTask> | Fail> {
   if (!canAssign(actor.role)) {
@@ -126,19 +168,30 @@ export async function createMilestoneTask(
   }
   const due = asDate(input.dueDate);
   if (!due.ok) return { ok: false, status: 400, error: 'dueDate must be YYYY-MM-DD', code: 'VALIDATION_ERROR' };
+  const est = asDate(input.estimatedCompletion);
+  if (!est.ok) {
+    return { ok: false, status: 400, error: 'estimatedCompletion must be YYYY-MM-DD', code: 'VALIDATION_ERROR' };
+  }
   if (input.assigneeRole && !['tenant_admin', 'tenant_user'].includes(input.assigneeRole)) {
     return { ok: false, status: 400, error: 'assigneeRole must be tenant_admin or tenant_user', code: 'VALIDATION_ERROR' };
   }
+  // The scope is DERIVED from whether a milestone was named, never taken from the caller. Two
+  // inputs that must agree is two inputs that will disagree, and mig 221's paired CHECK would then
+  // answer with a constraint name instead of a sentence.
+  const milestoneId = input.milestoneId ?? null;
+  const scope: 'milestone' | 'project' = milestoneId ? 'milestone' : 'project';
 
   try {
     // FK-before-write, scoped to THIS project. A milestone id from another project satisfies the
     // FK perfectly and would hang one contract's task off another's phase.
-    const [ms] = await sql<{ id: string }[]>`
-      SELECT id FROM project_milestones
-       WHERE id = ${input.milestoneId}::uuid AND project_id = ${projectId}::uuid
-         AND tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
-    if (!ms) {
-      return { ok: false, status: 400, error: 'That milestone does not belong to this project', code: 'VALIDATION_ERROR' };
+    if (milestoneId) {
+      const [ms] = await sql<{ id: string }[]>`
+        SELECT id FROM project_milestones
+         WHERE id = ${milestoneId}::uuid AND project_id = ${projectId}::uuid
+           AND tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
+      if (!ms) {
+        return { ok: false, status: 400, error: 'That milestone does not belong to this project', code: 'VALIDATION_ERROR' };
+      }
     }
     // Same check for the assignee: a user id from another tenant satisfies the FK to `users`.
     if (input.assigneeUserId) {
@@ -170,20 +223,21 @@ export async function createMilestoneTask(
 
     const [row] = await sql<MilestoneTask[]>`
       INSERT INTO project_milestone_tasks
-        (tenant_id, project_id, milestone_id, title, detail, assignee_user_id, assignee_role,
-         due_date, sort_index, created_by)
+        (tenant_id, project_id, milestone_id, scope, title, detail, assignee_user_id, assignee_role,
+         due_date, estimated_completion, sort_index, created_by)
       VALUES
-        (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.milestoneId}::uuid, ${title},
+        (${actor.tenantId}::uuid, ${projectId}::uuid, ${milestoneId}, ${scope}, ${title},
          ${input.detail ?? null}, ${input.assigneeUserId ?? null}, ${input.assigneeRole ?? null},
-         ${due.value}, ${input.sortIndex ?? 0}, ${actor.userId}::uuid)
-      RETURNING id, project_id, milestone_id, title, detail, assignee_user_id, assignee_role,
-                due_date, status, blocked_reason, completed_at, completed_by, sort_index`;
+         ${due.value}, ${est.value}, ${input.sortIndex ?? 0}, ${actor.userId}::uuid)
+      RETURNING id, project_id, milestone_id, scope, title, detail, assignee_user_id, assignee_role,
+                due_date, estimated_completion, status, blocked_reason, completed_at, completed_by,
+                sort_index`;
     if (!row) return { ok: false, status: 500, error: 'Failed to add the task', code: 'DB_ERROR' };
 
     await auditLog({
       tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_created',
       entityType: 'project_milestone_task', entityId: row.id,
-      metadata: { projectId, milestoneId: input.milestoneId, title },
+      metadata: { projectId, milestoneId, scope, title },
     });
 
     // Project the assignment onto the platform ToDo spine — the queue, the bell, the Command
@@ -192,15 +246,208 @@ export async function createMilestoneTask(
     const [proj] = await sql<{ name: string }[]>`
       SELECT name FROM projects WHERE id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
     await raiseTaskTodo(actor, {
-      id: row.id, projectId, milestoneId: input.milestoneId, title,
+      id: row.id, projectId, milestoneId, title,
       assigneeUserId: input.assigneeUserId ?? null, assigneeRole: input.assigneeRole ?? null,
       dueDate: due.value,
     }, proj?.name ?? 'a project');
 
     return { ok: true, data: row };
   } catch (err) {
+    // Migration 221's date rule reaches us here: the trigger is what enforces it, on BOTH write
+    // paths, so this is where a task due after its milestone becomes a sentence.
+    const refusal = fromTrigger(err);
+    if (refusal) return refusal;
     console.error('[projects/milestone-tasks] createMilestoneTask failed:', err);
     return { ok: false, status: 500, error: 'Failed to add the task', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Edit a task in flight: who owns it, when it is due, what they now expect, and the note.
+ *
+ * ── OPEN TO ANY MEMBER ON THE PROJECT ────────────────────────────────────────────────────────
+ * Day-to-day rearranging is the work, not a management act. Creating a task stays `tenant_admin`
+ * because that is adding scope; handing one to whoever is free, or moving it a week, is the team
+ * doing its job. A plan only a manager can rearrange is a plan that goes stale between meetings.
+ *
+ * Every change emits an event carrying who moved what, from what, to what — so "open to anyone"
+ * means visible, not untracked. That is the same trade the section-editing spine makes.
+ *
+ * ── THE TWO DATES ARE NOT THE SAME KIND OF THING ─────────────────────────────────────────────
+ * `dueDate` is the commitment and mig 221's trigger holds it inside the milestone.
+ * `estimatedCompletion` is the assignee's own forecast, and it is deliberately free to run past —
+ * that gap is the early warning, and a system that refused it would only teach people to enter the
+ * date it accepts.
+ */
+export async function updateTask(
+  actor: ProjectActor,
+  projectId: string,
+  taskId: string,
+  patch: {
+    assigneeUserId?: string | null;
+    assigneeRole?: string | null;
+    dueDate?: string | null;
+    estimatedCompletion?: string | null;
+    detail?: string | null;
+  },
+): Promise<Ok<MilestoneTask> | Fail> {
+  if (!(await canAccessProject(actor, projectId))) {
+    return { ok: false, status: 404, error: 'Task not found', code: 'NOT_FOUND' };
+  }
+
+  const touchesAssignee = 'assigneeUserId' in patch || 'assigneeRole' in patch;
+  const due = asDate(patch.dueDate);
+  if (!due.ok) {
+    return { ok: false, status: 400, error: 'dueDate must be YYYY-MM-DD', code: 'VALIDATION_ERROR' };
+  }
+  const est = asDate(patch.estimatedCompletion);
+  if (!est.ok) {
+    return { ok: false, status: 400, error: 'estimatedCompletion must be YYYY-MM-DD', code: 'VALIDATION_ERROR' };
+  }
+  // Validated unconditionally, APPLIED conditionally. `asDate(undefined)` is a legal null, so a
+  // patch that never mentions a date passes this and then falls through to the `in` checks below —
+  // which are what distinguish "clear it" (an explicit null) from "leave it" (absent).
+  if (patch.assigneeRole && !['tenant_admin', 'tenant_user'].includes(patch.assigneeRole)) {
+    return { ok: false, status: 400, error: 'assigneeRole must be tenant_admin or tenant_user', code: 'VALIDATION_ERROR' };
+  }
+
+  try {
+    const [before] = await sql<(MilestoneTask & { nudgesSent: number })[]>`
+      SELECT id, project_id, milestone_id, scope, title, detail, assignee_user_id, assignee_role,
+             due_date, estimated_completion, status, blocked_reason, completed_at, completed_by,
+             sort_index, nudges_sent
+        FROM project_milestone_tasks
+       WHERE id = ${taskId}::uuid AND project_id = ${projectId}::uuid
+         AND tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
+    if (!before) return { ok: false, status: 404, error: 'Task not found', code: 'NOT_FOUND' };
+
+    // The same boundary `createMilestoneTask` enforces, for the same reason: work handed to somebody
+    // who cannot open the project is a silent dead end, and granting project access as a side effect
+    // of a reassignment form would make the boundary mean nothing.
+    if (patch.assigneeUserId) {
+      const [onProject] = await sql<{ userId: string }[]>`
+        SELECT a.user_id FROM project_assignments a
+          JOIN user_memberships m ON m.user_id = a.user_id AND m.tenant_id = ${actor.tenantId}::uuid
+         WHERE a.project_id = ${projectId}::uuid AND a.tenant_id = ${actor.tenantId}::uuid
+           AND a.user_id = ${patch.assigneeUserId}::uuid AND m.status = 'active' LIMIT 1`;
+      if (!onProject) {
+        return {
+          ok: false, status: 409, code: 'NOT_ON_PROJECT',
+          error: 'That person is not on this project, so they would never see the task. '
+            + 'Add them to the project first.',
+        };
+      }
+    }
+
+    // COALESCE on a per-field flag rather than on the value: `null` is a MEANING here (unassign,
+    // clear the date), so a plain COALESCE would make "clear it" indistinguishable from "leave it".
+    const nextAssigneeUser = touchesAssignee ? (patch.assigneeUserId ?? null) : before.assigneeUserId;
+    // A person and a role are alternatives, not a pair — naming a person clears the role bucket, the
+    // same rule `raiseTaskTodo` already applies when it decides where the ToDo lands.
+    const nextAssigneeRole = touchesAssignee
+      ? (patch.assigneeUserId ? null : (patch.assigneeRole ?? null))
+      : before.assigneeRole;
+    const nextDue = 'dueDate' in patch ? due.value : before.dueDate;
+    const nextEst = 'estimatedCompletion' in patch ? est.value : before.estimatedCompletion;
+    const nextDetail = 'detail' in patch ? (patch.detail?.trim() || null) : before.detail;
+    // `isoDate` on both sides: a `date` column arrives as a JavaScript Date, and comparing a Date
+    // to the ISO string the caller sent is always "different" — which would reset the nudge
+    // watermark and re-raise a ToDo on every save that touched nothing.
+    const dateMoved = isoDate(nextDue) !== isoDate(before.dueDate);
+    // The date moved, so the nudge history is about a deadline that no longer exists. Resetting the
+    // watermark is what makes the sweeper re-fire against the NEW due — exactly what
+    // `editPortalWorkflow` does when it re-projects a guardrail plan onto live task rows.
+    //
+    // A plain JS value, carried from the row read above. Writing this as a conditional SQL fragment
+    // in the value position is the third Proxy trap: a nested tagged template there is a Promise,
+    // not a fragment, and postgres.js throws serialising it. (Broken here once, within minutes of
+    // quoting the rule two functions up.)
+    const nextNudges = dateMoved ? 0 : (before.nudgesSent ?? 0);
+
+    const [row] = await sql<MilestoneTask[]>`
+      UPDATE project_milestone_tasks
+         SET assignee_user_id     = ${nextAssigneeUser},
+             assignee_role        = ${nextAssigneeRole},
+             due_date             = ${nextDue}::date,
+             estimated_completion = ${nextEst}::date,
+             detail               = ${nextDetail},
+             -- nudges_sent: a PLAIN VALUE computed above, see the note on nextNudges.
+             nudges_sent          = ${nextNudges},
+             updated_at           = now()
+       WHERE id = ${taskId}::uuid AND tenant_id = ${actor.tenantId}::uuid
+      RETURNING id, project_id, milestone_id, scope, title, detail, assignee_user_id, assignee_role,
+                due_date, estimated_completion, status, blocked_reason, completed_at, completed_by,
+                sort_index`;
+    if (!row) return { ok: false, status: 404, error: 'Task not found', code: 'NOT_FOUND' };
+
+    const reassigned = touchesAssignee
+      && (before.assigneeUserId !== row.assigneeUserId || before.assigneeRole !== row.assigneeRole);
+    // Same `isoDate` normalisation as above — `before.dueDate` and `row.dueDate` are both Dates,
+    // but comparing Date objects by `!==` is always true, so this would fire on every save.
+    const rescheduled = isoDate(before.dueDate) !== isoDate(row.dueDate);
+
+    if (reassigned) {
+      await emitEventSingle({
+        namespace: 'project',
+        type: 'task.reassigned',
+        actor: userActor(actor.userId),
+        tenantId: actor.tenantId,
+        payload: {
+          projectId, milestoneId: row.milestoneId, taskId, title: row.title,
+          from: before.assigneeUserId ?? before.assigneeRole,
+          to: row.assigneeUserId ?? row.assigneeRole,
+        },
+      });
+      await auditLog({
+        tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_reassigned',
+        entityType: 'project_milestone_task', entityId: taskId,
+        metadata: { projectId, from: before.assigneeUserId ?? before.assigneeRole, to: row.assigneeUserId ?? row.assigneeRole },
+      });
+    }
+    if (rescheduled) {
+      await emitEventSingle({
+        namespace: 'project',
+        type: 'task.rescheduled',
+        actor: userActor(actor.userId),
+        tenantId: actor.tenantId,
+        payload: {
+          projectId, milestoneId: row.milestoneId, taskId, title: row.title,
+          from: isoDate(before.dueDate), to: isoDate(row.dueDate),
+        },
+      });
+      await auditLog({
+        tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_rescheduled',
+        entityType: 'project_milestone_task', entityId: taskId,
+        metadata: { projectId, from: isoDate(before.dueDate), to: isoDate(row.dueDate) },
+      });
+    }
+
+    // ── THE PROJECTION FOLLOWS THE CHECKLIST ────────────────────────────────────────────────
+    // Reassigning closes the previous holder's ToDo and raises one for the new owner. Leaving the
+    // old one open would keep finished-for-them work in someone's queue, which is precisely how a
+    // queue stops being believed. `closeTaskTodos` is plural because BOTH can point at this row.
+    // Rescheduling alone also re-raises: the ToDo carries `due_at`, and a stale one would nudge
+    // against a date nobody holds any more.
+    if (reassigned || rescheduled) {
+      await closeTaskTodos(actor, taskId, {
+        via: reassigned ? 'reassigned' : 'rescheduled',
+        by: actor.userId,
+      });
+      const [proj] = await sql<{ name: string }[]>`
+        SELECT name FROM projects WHERE id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
+      await raiseTaskTodo(actor, {
+        id: row.id, projectId, milestoneId: row.milestoneId, title: row.title,
+        assigneeUserId: row.assigneeUserId, assigneeRole: row.assigneeRole,
+        dueDate: isoDate(row.dueDate),
+      }, proj?.name ?? 'a project');
+    }
+
+    return { ok: true, data: row };
+  } catch (err) {
+    const refusal = fromTrigger(err);
+    if (refusal) return refusal;
+    console.error('[projects/milestone-tasks] updateTask failed:', err);
+    return { ok: false, status: 500, error: 'Failed to update the task', code: 'DB_ERROR' };
   }
 }
 
@@ -254,8 +501,9 @@ export async function setTaskStatus(
              updated_at     = now()
        WHERE id = ${taskId}::uuid AND project_id = ${projectId}::uuid
          AND tenant_id = ${actor.tenantId}::uuid AND status <> ${next}
-      RETURNING id, project_id, milestone_id, title, detail, assignee_user_id, assignee_role,
-                due_date, status, blocked_reason, completed_at, completed_by, sort_index`;
+      RETURNING id, project_id, milestone_id, scope, title, detail, assignee_user_id, assignee_role,
+                due_date, estimated_completion, status, blocked_reason, completed_at, completed_by,
+                sort_index`;
     if (!row) {
       const [exists] = await sql<{ status: string }[]>`
         SELECT status FROM project_milestone_tasks
@@ -296,6 +544,91 @@ export interface MilestoneChainRow {
   baselineDate: string | null;
   status: string;
   sortIndex: number;
+  dependsOnId?: string | null;
+}
+
+/**
+ * Set (or clear) which milestone this one follows.
+ *
+ * Dependencies are between MILESTONES and nowhere else — see migration 221. The same-project and
+ * acyclic rules live in the database, so this maps their SQLSTATEs to sentences rather than
+ * re-implementing them: an invariant checked in two places is an invariant that disagrees with
+ * itself the first time one copy is edited.
+ */
+export async function setMilestoneDependency(
+  actor: ProjectActor,
+  projectId: string,
+  milestoneId: string,
+  dependsOnId: string | null,
+): Promise<Ok<{ milestoneId: string; dependsOnId: string | null }> | Fail> {
+  if (!canAssign(actor.role)) {
+    return { ok: false, status: 403, error: 'Only a tenant admin can change the plan', code: 'FORBIDDEN' };
+  }
+  if (!(await canAccessProject(actor, projectId))) {
+    return { ok: false, status: 404, error: 'Milestone not found', code: 'NOT_FOUND' };
+  }
+  try {
+    const [row] = await sql<{ id: string; dependsOnId: string | null; title: string }[]>`
+      UPDATE project_milestones SET depends_on_id = ${dependsOnId}, updated_at = now()
+       WHERE id = ${milestoneId}::uuid AND project_id = ${projectId}::uuid
+         AND tenant_id = ${actor.tenantId}::uuid
+      RETURNING id, depends_on_id, title`;
+    if (!row) return { ok: false, status: 404, error: 'Milestone not found', code: 'NOT_FOUND' };
+
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'milestone.dependency_set',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, milestoneId, dependsOnId: row.dependsOnId, title: row.title },
+    });
+    await auditLog({
+      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_dependency_set',
+      entityType: 'project_milestone', entityId: milestoneId,
+      metadata: { projectId, dependsOnId: row.dependsOnId },
+    });
+    return { ok: true, data: { milestoneId, dependsOnId: row.dependsOnId } };
+  } catch (err) {
+    const refusal = fromTrigger(err);
+    if (refusal) return refusal;
+    console.error('[projects/milestone-tasks] setMilestoneDependency failed:', err);
+    return { ok: false, status: 500, error: 'Failed to set the dependency', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Which milestones actually follow this one, transitively.
+ *
+ * With no dependency declared anywhere, this returns nothing and the caller falls back to
+ * "everything with a higher sort_index" — the pre-221 behaviour, which is right for a plain serial
+ * plan. Once someone declares a dependency, the cascade becomes precise: two phases running in
+ * PARALLEL should not both move because one of them slipped, and before 221 they both did.
+ *
+ * The walk is bounded by the row count as well as by the graph. The database refuses to store a
+ * cycle, but a harness or a restore could still present one, and a scheduler that hangs is worse
+ * than a scheduler that stops.
+ */
+function successorsOf(all: MilestoneChainRow[], rootId: string): Set<string> {
+  const byParent = new Map<string, string[]>();
+  for (const m of all) {
+    if (!m.dependsOnId) continue;
+    const kids = byParent.get(m.dependsOnId) ?? [];
+    kids.push(m.id);
+    byParent.set(m.dependsOnId, kids);
+  }
+  const out = new Set<string>();
+  const queue = [rootId];
+  let hops = 0;
+  while (queue.length && hops < all.length + 1) {
+    const next = queue.shift()!;
+    for (const kid of byParent.get(next) ?? []) {
+      if (out.has(kid)) continue;
+      out.add(kid);
+      queue.push(kid);
+    }
+    hops += 1;
+  }
+  return out;
 }
 
 /**
@@ -405,14 +738,24 @@ export async function rescheduleMilestone(
     let moved = 1;
 
     if (opts.cascade !== false && deltaDays !== 0) {
-      // Later milestones only, and only ones still PENDING: a met milestone happened on a real
-      // date and shifting it would rewrite history to keep a chart tidy.
-      const later = await sql<MilestoneChainRow[]>`
-        SELECT id, title, starts_on, forecast_date, baseline_date, status, sort_index
+      // Only PENDING milestones move: a met milestone happened on a real date and shifting it would
+      // rewrite history to keep a chart tidy.
+      const chain = await sql<MilestoneChainRow[]>`
+        SELECT id, title, starts_on, forecast_date, baseline_date, status, sort_index, depends_on_id
           FROM project_milestones
          WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
-           AND status = 'pending' AND sort_index > ${target.sortIndex}
          ORDER BY sort_index`;
+
+      // ── DECLARED SUCCESSORS, OR THE SERIAL FALLBACK ────────────────────────────────────────
+      // If anyone on this project has declared a dependency, the cascade follows the graph: two
+      // phases running in PARALLEL should not both move because one slipped. With no dependency
+      // declared, "everything later" is exactly right for a plain serial plan, and is what this
+      // did before mig 221 — so an untouched project behaves identically.
+      const declared = chain.some((m) => m.dependsOnId);
+      const successors = declared ? successorsOf(chain, milestoneId) : null;
+      const later = chain.filter((m) => m.status === 'pending' && (
+        successors ? successors.has(m.id) : m.sortIndex > target.sortIndex
+      ));
       for (const m of later) {
         const nextStart = shiftDate(m.startsOn, deltaDays);
         const nextEnd = shiftDate(m.forecastDate, deltaDays);
@@ -444,6 +787,11 @@ export async function rescheduleMilestone(
     });
     return { ok: true, data: { moved, deltaDays } };
   } catch (err) {
+    // Pulling a milestone IN can strand tasks committed to later dates. Mig 221's guard refuses and
+    // names them; this turns that into the product's own 409 rather than dragging the dates along,
+    // because silently moving a date somebody committed to is how a plan stops being believed.
+    const refusal = fromTrigger(err);
+    if (refusal) return refusal;
     console.error('[projects/milestone-tasks] rescheduleMilestone failed:', err);
     return { ok: false, status: 500, error: 'Failed to reschedule', code: 'DB_ERROR' };
   }

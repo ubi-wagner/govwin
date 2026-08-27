@@ -8,6 +8,7 @@ import { getProject, listSourceDocuments, readiness } from '@/lib/projects/proje
 import { listClins } from '@/lib/projects/clins';
 import { listMilestones, listDeliverables } from '@/lib/projects/milestones';
 import { listMilestoneTasks } from '@/lib/projects/milestone-tasks';
+import { listTaskAttachments } from '@/lib/projects/task-attachments';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -81,12 +82,15 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
     listDeliverables(tenantId, projectId),
     listMilestoneTasks(tenantId, projectId),
+    // Every reference on the project in one read. Per-task fetches would turn a twenty-task
+    // milestone into twenty round trips on a page that already renders them all.
+    listTaskAttachments(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -104,8 +108,31 @@ export default async function ProjectPage({
 
   // Tasks by milestone — the checklist half of the construct. A milestone is a dated segment of
   // work; without its list, the page shows only the date.
+  //
+  // A `scope: 'project'` task belongs to NO milestone (mig 221), so it is separated out rather than
+  // bucketed under a stand-in key. Filing standing work under a phase it does not belong to would
+  // make it gate that phase on screen while gating nothing in the database.
+  const filesByTask = new Map<string, { id: string; filename: string }[]>();
+  for (const f of taskFiles) {
+    const list = filesByTask.get(f.taskId) ?? [];
+    list.push({ id: f.id, filename: f.filename });
+    filesByTask.set(f.taskId, list);
+  }
+  // ONE mapper for both lists. Two copies of this shape is how the standing list quietly stops
+  // showing a field the milestone list gained.
+  const asChecklistTask = (t: (typeof tasks)[number]) => ({
+    id: t.id, title: t.title, detail: t.detail,
+    assigneeUserId: t.assigneeUserId ?? null,
+    assigneeEmail: t.assigneeEmail ?? null, assigneeRole: t.assigneeRole,
+    dueDate: isoDate(t.dueDate), estimatedCompletion: isoDate(t.estimatedCompletion),
+    status: t.status, blockedReason: t.blockedReason,
+    attachments: filesByTask.get(t.id) ?? [],
+  });
+
   const tasksByMilestone = new Map<string, typeof tasks>();
+  const projectTasks: typeof tasks = [];
   for (const t of tasks) {
+    if (!t.milestoneId) { projectTasks.push(t); continue; }
     const list = tasksByMilestone.get(t.milestoneId) ?? [];
     list.push(t);
     tasksByMilestone.set(t.milestoneId, list);
@@ -295,12 +322,8 @@ export default async function ProjectPage({
 
                   <MilestoneChecklist
                     milestoneId={m.id}
-                    tasks={(tasksByMilestone.get(m.id) ?? []).map((t) => ({
-                      id: t.id, title: t.title, detail: t.detail,
-                      assigneeEmail: t.assigneeEmail ?? null, assigneeRole: t.assigneeRole,
-                      dueDate: isoDate(t.dueDate), status: t.status,
-                      blockedReason: t.blockedReason,
-                    }))}
+                    tasks={(tasksByMilestone.get(m.id) ?? []).map(asChecklistTask)}
+                    members={assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }))}
                     basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
                     canManage={canAccept}
                     milestoneMet={m.status === 'met'}
@@ -330,6 +353,33 @@ export default async function ProjectPage({
           </div>
         )}
       </section>
+
+      {/* ── STANDING WORK ────────────────────────────────────────────────────────────────────
+          Tasks that belong to no phase (mig 221). Rendered as its own list rather than folded
+          into a milestone, because that is what it is: it gates CLOSE-OUT, not any one phase,
+          and showing it under a milestone would imply a gate the database does not enforce.
+          The section is shown whenever there is standing work OR someone can add some — an
+          empty list with no way to add is a section that only ever says "nothing here". */}
+      {(projectTasks.length > 0 || canAccept) && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Standing work
+          </h2>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">
+              Not tied to a phase. It does not gate a milestone — it gates close-out.
+            </p>
+            <MilestoneChecklist
+              milestoneId={null}
+              tasks={projectTasks.map(asChecklistTask)}
+              members={assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }))}
+              basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+              canManage={canAccept}
+              milestoneMet={false}
+            />
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">

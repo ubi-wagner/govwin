@@ -336,6 +336,7 @@ async function main() {
   const ms3 = await api(req, 'post', P + '/milestones', { title: 'Final report', clinId, forecastDate: iso(180), sortIndex: 3 });
   A(ms2.status === 201 && ms3.status === 201, 'two more phases', `${ms2.status}/${ms3.status}`);
   const ms2id = ((ms2.json.data as Json)?.milestone as Json)?.id as string | undefined;
+  const ms3id = ((ms3.json.data as Json)?.milestone as Json)?.id as string | undefined;
 
   const seq = await api(req, 'patch', P + '/milestones', { action: 'resequence' });
   A(seq.status === 200, 'the plan is sequenced', `${seq.status}`);
@@ -585,6 +586,178 @@ async function main() {
     'the metrics round-trip as an OBJECT — jsonb, not a string that char-iterates',
     JSON.stringify(rec?.metrics));
 
+  // ══ 7f · TASK SPINE V2 — the rules mig 221 moved into the database ═════════════════════════
+  //
+  // Every refusal below is raised by a TRIGGER, not by our code, so this is the only place they can
+  // be proven: a unit test against a mock shows what we would refuse, not what Postgres does. And
+  // each one is driven through the real route as the real actor.
+  phase('7f · the plan\'s own rules: scope, dates, dependencies, references');
+
+  // Its OWN employee session. The one further down is opened inside a later block and closed
+  // there; borrowing it across the boundary is how a drive starts depending on its own ordering.
+  const empCtx7f = await browser.newContext();
+  const empPage7f = await empCtx7f.newPage();
+  let asEmployee = req;
+  if (assignee?.email) {
+    try { await login(empPage7f, String(assignee.email), TENANT_PW); asEmployee = empCtx7f.request; }
+    catch (e) { no('the employee could not sign in for 7f', String((e as Error).message).slice(0, 60)); }
+  }
+
+  /** A date N days from an ISO date — the drive's `iso()` counts from today, not from a date. */
+  const shift = (from: string, days: number) =>
+    new Date(Date.parse(`${from}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+  // ── STANDING WORK: a task that belongs to no phase ────────────────────────────────────────
+  const standing = await api(req, 'post', P + '/tasks', {
+    title: 'Keep the risk register current', dueDate: iso(200),
+    assigneeUserId: assignee?.id ?? null,
+  });
+  A(standing.status === 201, 'a task with NO milestone is accepted — standing project work',
+    `${standing.status} ${standing.text.slice(0, 80)}`);
+  const standingId = ((standing.json.data as Json)?.task as Json)?.id as string | undefined;
+  const [standingRow] = await sql<{ scope: string; milestoneId: string | null }[]>`
+    SELECT scope, milestone_id AS "milestoneId" FROM project_milestone_tasks
+     WHERE id = ${standingId ?? null}::uuid`;
+  A(standingRow?.scope === 'project' && standingRow?.milestoneId === null,
+    'and the database derived its scope rather than taking our word for it',
+    `scope=${standingRow?.scope} milestone=${standingRow?.milestoneId}`);
+
+  // ── THE DATE RULE ─────────────────────────────────────────────────────────────────────────
+  const [phaseEnd] = await sql<{ forecast: string | null; title: string }[]>`
+    SELECT to_char(forecast_date, 'YYYY-MM-DD') AS forecast, title
+      FROM project_milestones WHERE id = ${workPhase ?? null}::uuid`;
+  const past = shift(phaseEnd?.forecast ?? iso(120), 30);
+  const tooLate = await api(req, 'post', P + '/tasks', {
+    milestoneId: workPhase, title: 'work that finishes after its own phase', dueDate: past,
+  });
+  A(tooLate.status === 409 && String((tooLate.json as Json).code) === 'DUE_AFTER_MILESTONE',
+    'a task due AFTER its milestone is refused — by the trigger, on the real write path',
+    `${tooLate.status} ${String((tooLate.json as Json).code)}`);
+
+  const sameDay = await api(req, 'post', P + '/tasks', {
+    milestoneId: workPhase, title: 'finishes the day it is due', dueDate: phaseEnd?.forecast ?? iso(120),
+  });
+  A(sameDay.status === 201, 'but the SAME day is fine — finishing on the date is the normal case',
+    `${sameDay.status}`);
+  const sameDayId = ((sameDay.json.data as Json)?.task as Json)?.id as string | undefined;
+
+  // ── THE ESTIMATE IS NOT THE COMMITMENT ────────────────────────────────────────────────────
+  // The whole reason the column exists. If a forecast past the milestone were refused, people would
+  // enter the date that is accepted instead of the one they believe.
+  const slipping = await api(asEmployee, 'patch', P + `/tasks/${sameDayId}`, {
+    estimatedCompletion: past,
+  });
+  A(slipping.status === 200,
+    'the ASSIGNEE may say they expect to be late — the estimate is deliberately unconstrained',
+    `${slipping.status} ${slipping.text.slice(0, 80)}`);
+
+  // ── PULLING A MILESTONE IN REFUSES RATHER THAN DRAGGING DATES ─────────────────────────────
+  const pullIn = await api(req, 'patch', P + '/milestones', {
+    action: 'reschedule', milestoneId: workPhase, forecastDate: shift(phaseEnd?.forecast ?? iso(120), -60),
+  });
+  A(pullIn.status === 409 && String((pullIn.json as Json).code) === 'TASKS_WOULD_STRAND',
+    'pulling the phase in is REFUSED and the tasks are named — it does not move a committed date',
+    `${pullIn.status} ${String((pullIn.json as Json).code)}`);
+  A(/finishes the day it is due|Rig build/.test(String((pullIn.json as Json).error ?? '')),
+    'and the refusal says WHICH tasks, so there is something to go and do');
+
+  // ── DEPENDENCIES ARE BETWEEN MILESTONES, SAME PROJECT, ACYCLIC ────────────────────────────
+  const dep = await api(req, 'patch', P + '/milestones', {
+    action: 'depends_on', milestoneId: ms3id, dependsOnId: workPhase,
+  });
+  A(dep.status === 200, 'one milestone can be declared to follow another', `${dep.status}`);
+
+  const loop = await api(req, 'patch', P + '/milestones', {
+    action: 'depends_on', milestoneId: workPhase, dependsOnId: ms3id,
+  });
+  A(loop.status === 409 && String((loop.json as Json).code) === 'DEPENDENCY_LOOP',
+    'and a loop is refused — by the trigger, so no consumer can walk it forever',
+    `${loop.status} ${String((loop.json as Json).code)}`);
+
+  const self = await api(req, 'patch', P + '/milestones', {
+    action: 'depends_on', milestoneId: workPhase, dependsOnId: workPhase,
+  });
+  A(self.status === 409, 'a milestone cannot depend on itself', `${self.status}`);
+
+  // ── OPEN EDIT, AUDITED ────────────────────────────────────────────────────────────────────
+  // An EMPLOYEE reassigns and reschedules. This is new surface: before mig 221 the per-task PATCH
+  // took a status and nothing else, so there was no way to hand work over at all.
+  // PERSON → ROLE BUCKET → PERSON. Two real transitions, because this drive has exactly one
+  // assignable member and handing a task back to whoever already holds it is not a handover —
+  // it changes nothing, emits nothing, and an assertion expecting an event would be asking the
+  // product for a record of something that correctly did not happen. (It was written that way
+  // first, and the two failing lines were the harness, not the route.)
+  const toBucket = await api(asEmployee, 'patch', P + `/tasks/${taskIds[0]}`, {
+    assigneeUserId: null, assigneeRole: 'tenant_user', detail: 'putting it back in the pool',
+  });
+  A(toBucket.status === 200, 'an EMPLOYEE can hand a task back to the team',
+    `${toBucket.status} ${toBucket.text.slice(0, 80)}`);
+
+  const reassign = await api(asEmployee, 'patch', P + `/tasks/${taskIds[0]}`, {
+    assigneeUserId: assignee?.id ?? null, detail: 'picked up after the rig slipped',
+  });
+  A(reassign.status === 200, 'and pick it back up — the plan is rearranged by the people working it',
+    `${reassign.status} ${reassign.text.slice(0, 80)}`);
+
+  const stranger = await api(req, 'patch', P + `/tasks/${taskIds[0]}`, {
+    assigneeUserId: '11111111-1111-4111-8111-111111111111',
+  });
+  A(stranger.status === 409 && String((stranger.json as Json).code) === 'NOT_ON_PROJECT',
+    'but not to somebody who is not on the project — access is not a side effect of a task form',
+    `${stranger.status} ${String((stranger.json as Json).code)}`);
+
+  const audited = await sql<{ type: string; payload: Json }[]>`
+    SELECT type, payload FROM system_events
+     WHERE namespace = 'project' AND type = 'task.reassigned'
+       AND payload->>'taskId' = ${taskIds[0] ?? null}
+     ORDER BY created_at ASC`;
+  A(audited.length === 2,
+    'and BOTH handovers are on the record — open editing means audited, not untracked',
+    `${audited.length} event(s)`);
+  A(audited[0]?.payload?.to === 'tenant_user' && audited[1]?.payload?.to === (assignee?.id ?? null),
+    'each says who it went to, in order',
+    `${String(audited[0]?.payload?.to ?? '—')} → ${String(audited[1]?.payload?.to ?? '—')}`);
+
+  // A status change and an edit in one body is refused: a note save must never be able to reopen
+  // finished work.
+  const mixed = await api(req, 'patch', P + `/tasks/${taskIds[0]}`, { status: 'done', detail: 'and a note' });
+  A(mixed.status === 400, 'a status change and an edit cannot ride the same request', `${mixed.status}`);
+
+  // ── A REFERENCE IS NOT EVIDENCE OF COMPLETION ─────────────────────────────────────────────
+  // BEFORE and AFTER, not a literal. Asserting `!== 'done'` tested the drive's ordering rather
+  // than the product: whether the task happened to be open at this point says nothing about
+  // whether attaching a file moved it.
+  const [beforeAttach] = await sql<{ status: string }[]>`
+    SELECT status FROM project_milestone_tasks WHERE id = ${taskIds[0] ?? null}::uuid`;
+  const ref = await req.fetch(`${BASE}/api/portal/${TENANT}/projects/${created.projectId}/tasks/${taskIds[0]}/attachments`, {
+    method: 'POST',
+    multipart: { file: { name: 'rig-drawing.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 rig') } },
+  });
+  A(ref.status() === 201, 'a reference file can be attached to a task', `${ref.status()}`);
+  const [afterAttach] = await sql<{ status: string }[]>`
+    SELECT status FROM project_milestone_tasks WHERE id = ${taskIds[0] ?? null}::uuid`;
+  A(afterAttach?.status === beforeAttach?.status,
+    'and attaching it did NOT move the status — a file appearing is not work finishing',
+    `${beforeAttach?.status} → ${afterAttach?.status}`);
+
+  // Clear the way for 7b: the two extra tasks added here would otherwise block the phase, which is
+  // correct behaviour and exactly what would make the next assertion fail for the wrong reason.
+  for (const id of [sameDayId].filter(Boolean)) {
+    await api(asEmployee, 'patch', P + `/tasks/${id}`, { status: 'done' });
+  }
+  await empCtx7f.close();
+
+  // ── AND STANDING WORK GATES CLOSE-OUT, NOT A MILESTONE ────────────────────────────────────
+  // The design claim, checked rather than asserted in prose: `markMilestoneMet` is scoped by
+  // milestone_id, so standing work never blocks a phase; `closeProject` is scoped by project_id,
+  // so it does block the contract finishing. Left OPEN deliberately until phase 10 proves the
+  // refusal — clearing it here would remove the only evidence the gate exists.
+  const [standingScope] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM project_milestone_tasks
+     WHERE milestone_id = ${workPhase ?? null}::uuid AND scope = 'project'`;
+  A(standingScope.n === 0, 'standing work is not filed under a phase — it gates close-out, not a milestone',
+    `${standingScope.n} standing task(s) under the work phase`);
+
   // ══ 7e · CANVAS DELIVERABLES — a report, a deck, a workbook, a PDF ══════════════════════════
   //
   // The build portal's authoring stack, applied to a contract deliverable: the same presets, the
@@ -670,12 +843,16 @@ async function main() {
   await uiPage.waitForTimeout(1200);
   const body = (await uiPage.locator('body').innerText()).replace(/\s+/g, ' ');
 
+  // Counted PER MILESTONE, matching what the page renders. The page draws one "N of M done" per
+  // milestone (and one for standing work), so a project-wide count is not the page's own predicate
+  // — it only agreed while every task happened to sit under one milestone, and mig 221's standing
+  // list broke that coincidence. Copy the predicate from the source.
   const [counts] = await sql<{ ms: number; done: number; tasks: number }[]>`
     SELECT (SELECT count(*)::int FROM project_milestones WHERE project_id = ${created.projectId}::uuid) AS ms,
            (SELECT count(*)::int FROM project_milestone_tasks
-             WHERE project_id = ${created.projectId}::uuid AND status = 'done') AS done,
+             WHERE milestone_id = ${workPhase ?? null}::uuid AND status = 'done') AS done,
            (SELECT count(*)::int FROM project_milestone_tasks
-             WHERE project_id = ${created.projectId}::uuid) AS tasks`;
+             WHERE milestone_id = ${workPhase ?? null}::uuid) AS tasks`;
   A(body.includes(`${counts.done} of ${counts.tasks} done`),
     'the checklist counter on the page equals the rows',
     `page expects "${counts.done} of ${counts.tasks} done"`);
@@ -689,8 +866,14 @@ async function main() {
   // the same thing.
   const viaApi = await api(req, 'get', P + '/milestones');
   const apiTasks = ((viaApi.json.data as Json)?.tasks ?? []) as Json[];
-  A(apiTasks.length === counts.tasks, 'the API returns the same task count the page rendered',
-    `api=${apiTasks.length} db=${counts.tasks}`);
+  // PROJECT-WIDE, which is what this route returns — distinct from `counts.tasks`, which is the
+  // per-milestone number the page prints. One variable was serving both, and only agreed while
+  // every task sat under a single milestone.
+  const [{ allTasks }] = await sql<{ allTasks: number }[]>`
+    SELECT count(*)::int AS "allTasks" FROM project_milestone_tasks
+     WHERE project_id = ${created.projectId}::uuid`;
+  A(apiTasks.length === allTasks, 'the API returns every task on the project',
+    `api=${apiTasks.length} db=${allTasks}`);
   await uiPage.close();
 
   // ══ 8 · HITL — closing the gate the automation opened ══════════════════════════════════════
@@ -767,6 +950,17 @@ async function main() {
     'and it BLOCKS close-out — the milestone gate ran before it existed',
     `${blockedByLate.status} ${String((blockedByLate.json as Json).code)}`);
   if (lateId) await api(req, 'patch', P + `/tasks/${lateId}`, { status: 'done' });
+
+  // ── STANDING WORK GATES CLOSE-OUT ─────────────────────────────────────────────────────────
+  // The other half of the mig 221 scoping claim. The project-scope task raised in 7f never blocked
+  // a milestone — every phase closed with it open — and it blocks the CONTRACT finishing. That is
+  // the whole reason standing work is its own scope rather than a task filed under a phase.
+  const blockedByStanding = await api(req, 'patch', P, { action: 'close' });
+  A(blockedByStanding.status === 409
+    && /Keep the risk register current/.test(String((blockedByStanding.json as Json).error ?? '')),
+    'standing work blocks CLOSE-OUT, having blocked no milestone — and the refusal names it',
+    `${blockedByStanding.status} ${String((blockedByStanding.json as Json).code)}`);
+  if (standingId) await api(req, 'patch', P + `/tasks/${standingId}`, { status: 'done' });
 
   const closeout = { invoicesPaid: 4, finalCost: 512000, propertyReturned: true };
   const shut = await api(req, 'patch', P, {

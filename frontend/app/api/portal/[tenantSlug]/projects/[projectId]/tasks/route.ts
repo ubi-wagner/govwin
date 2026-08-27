@@ -3,7 +3,12 @@
  *
  *   GET   — every task on the project, milestone order. Also served inline by the milestones GET;
  *           this exists so a client can refresh the checklist without re-fetching the whole plan.
- *   POST  — add a task to a milestone. tenant_admin+ — assigning work is a management act.
+ *   POST  — add a task. tenant_admin+ — assigning work is a management act.
+ *
+ * `milestoneId` is OPTIONAL (mig 221). Omit it for standing project work: the scope is DERIVED from
+ * whether one was named, never sent separately, because two inputs that must agree eventually will
+ * not. Editing an existing task — owner, dates, note — is open to anyone on the project and lives
+ * at `…/tasks/[taskId]`.
  *
  * Ticking one off lives at `…/tasks/[taskId]` and is open to any assigned member, because doing the
  * work is not a management act and a checklist only one person may touch is not a checklist.
@@ -33,24 +38,23 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
     const { tenantSlug, projectId } = await ctx.params;
     return await withProject(tenantSlug, async (gate) => {
       let body: {
-        milestoneId?: string; title?: string; detail?: string | null;
+        milestoneId?: string | null; title?: string; detail?: string | null;
         assigneeUserId?: string | null; assigneeRole?: string | null;
-        dueDate?: string | null; sortIndex?: number;
+        dueDate?: string | null; estimatedCompletion?: string | null; sortIndex?: number;
       };
       try { body = await request.json(); }
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
-      if (!body?.milestoneId) {
-        return NextResponse.json({ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
-      }
-
       const result = await createMilestoneTask(gate.actor, projectId, {
-        milestoneId: body.milestoneId,
+        // No `milestoneId` means standing project work — not a missing field. The domain layer
+        // derives `scope` from it.
+        milestoneId: body.milestoneId ?? null,
         title: body.title ?? '',
         detail: body.detail ?? null,
         assigneeUserId: body.assigneeUserId ?? null,
         assigneeRole: body.assigneeRole ?? null,
         dueDate: body.dueDate ?? null,
+        estimatedCompletion: body.estimatedCompletion ?? null,
         sortIndex: body.sortIndex,
       });
       if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });

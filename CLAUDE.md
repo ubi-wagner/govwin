@@ -241,6 +241,26 @@ the project** — a checklist only a manager may tick is a status report. `_run_
 plus one grouped `project_nudge` mail, hard-bounded by per-row `nudges_sent` + `last_nudged_at`;
 blocked tasks are not nudged. Proven by `scripts/drive-milestone-construct.mts`.
 
+**The task spine (mig 221)** keeps the table name `project_milestone_tasks` while holding rows that
+belong to no milestone: `scope` ∈ (`milestone`,`project`) with a paired CHECK — redundant with
+`milestone_id IS NULL`, which is *why* the guard exists — plus `COMMENT ON TABLE`, since SCHEMA_MAP.md
+is generated from the live DB. It is `scope`, not `task_type`: the platform `tasks` table already has
+that name with a different vocabulary and project tasks are PROJECTED onto it. Both gates were already
+right — `markMilestoneMet` is milestone-scoped so standing work never blocks a phase; `closeProject` is
+project-scoped so it **does** block close-out. **Dependencies are milestone-to-milestone only** (one
+predecessor; same-project `23002` + acyclic `23003` by trigger) — no task-level graph, no critical path
+— and they make the reschedule cascade *precise* (declared successors, not everything later), falling
+back to serial order when none is declared. A milestone-scoped task's `due_date` must not fall after its
+milestone's **forecast** date (`23004`, `<=` so same-day is legal), and **pulling a milestone in refuses
+and NAMES the stranded tasks** (`23005`) rather than dragging committed dates. All by TRIGGER, because
+two paths write those dates. **`estimated_completion` is deliberately exempt** — the assignee's own
+forecast may run past the milestone, and the due↔estimate gap is the early warning; refusing it would
+only teach people to enter the date that is accepted. Editing a task (owner · dates · note) is open to
+**anyone on the project** and emits `task.reassigned`/`task.rescheduled` — open means visible, not
+untracked — with the ToDo projection following (old holder's ToDo closed, new one raised, `nudges_sent`
+reset). Creating stays tenant_admin. `project_task_attachments` carries references that **never touch
+status**, the same separation that keeps uploading a deliverable from accepting it.
+
 **The project portal reuses the build portal's infrastructure rather than growing a parallel one.**
 *ToDos / email / nudges:* assigned checklist work is **PROJECTED** onto the platform `tasks` spine
 (`lib/projects/todos.ts`) — the same queue `/todos`, the bell, the Command Center and the shared
