@@ -21,6 +21,7 @@ import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { daysBetween } from './dates';
+import { closeTodosUnder } from './todos';
 import type { Fail, Ok } from './project';
 
 export interface Milestone {
@@ -253,6 +254,11 @@ export async function markMilestoneMet(
     // late", silently and forever. Same defect as the D8 page bug, in the sibling the D8 fix did
     // not touch.
     const variance = daysBetween(row.baselineDate, row.metAt);
+
+    // Sweep up any ToDo still standing under this phase. The gate above means there should be
+    // none — but a task can be REASSIGNED, and a queue holding work on a finished phase is exactly
+    // how people stop trusting the queue.
+    await closeTodosUnder(actor, { milestoneId }, { via: 'milestone met' });
 
     await emitEventSingle({
       namespace: 'project',

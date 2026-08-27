@@ -21,6 +21,7 @@
 import { sql, auditLog } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
+import { closeTodosUnder } from './todos';
 import type { Fail, Ok } from './project';
 
 export interface CloseoutResult {
@@ -118,6 +119,9 @@ export async function closeProject(
     const [{ n: milestones }] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM project_milestones
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
+
+    // Nothing project-related should be left in anyone's queue once the contract is finished.
+    await closeTodosUnder(actor, { projectId }, { via: 'project closed out' });
 
     await emitEventSingle({
       namespace: 'project',

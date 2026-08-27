@@ -37,6 +37,7 @@ import { sql, auditLog } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { isoDate } from './dates';
+import { raiseTaskTodo, closeTaskTodos } from './todos';
 import type { Fail, Ok } from './project';
 
 export interface MilestoneTask {
@@ -184,6 +185,18 @@ export async function createMilestoneTask(
       entityType: 'project_milestone_task', entityId: row.id,
       metadata: { projectId, milestoneId: input.milestoneId, title },
     });
+
+    // Project the assignment onto the platform ToDo spine — the queue, the bell, the Command
+    // Center and the shared nudge sweep — so a person meets project work where they meet
+    // everything else. Best-effort by construction: the checklist row is already saved and correct.
+    const [proj] = await sql<{ name: string }[]>`
+      SELECT name FROM projects WHERE id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
+    await raiseTaskTodo(actor, {
+      id: row.id, projectId, milestoneId: input.milestoneId, title,
+      assigneeUserId: input.assigneeUserId ?? null, assigneeRole: input.assigneeRole ?? null,
+      dueDate: due.value,
+    }, proj?.name ?? 'a project');
+
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/milestone-tasks] createMilestoneTask failed:', err);
@@ -262,6 +275,12 @@ export async function setTaskStatus(
       tenantId: actor.tenantId, userId: actor.userId, action: `project.task_${next}`,
       entityType: 'project_milestone_task', entityId: taskId, metadata: { projectId, title: row.title },
     });
+
+    // The checklist is the source of truth and the ToDo follows it. Ticking the work off clears it
+    // from the person's queue; blocking does NOT — a blocked task is still theirs, and hiding it
+    // would make "blocked" a way to make work disappear.
+    if (next === 'done') await closeTaskTodos(actor, taskId, { via: 'project checklist' });
+
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/milestone-tasks] setTaskStatus failed:', err);

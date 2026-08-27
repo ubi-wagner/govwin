@@ -469,6 +469,56 @@ async function main() {
   A(taskIds.length === 2, 'the milestone gets a checklist, assigned to someone who is ON the project',
     `${taskIds.length} task(s)`);
 
+  // ══ 7d · the ToDo SPINE — project work reaches a person where they already look ═════════════
+  //
+  // The parity test. A project task is not a second inbox: it is projected onto the platform ToDo,
+  // so it lands in /todos, the bell and the Command Center, and the SAME nudge sweeper that chases
+  // everything else picks it up.
+  phase('7d · ToDos, email and nudges — the same infrastructure as a build');
+
+  const todos = await sql<{ id: string; title: string; assigneeUserId: string | null; nudge: unknown; status: string; dueAt: string | null }[]>`
+    SELECT t.id, t.title, t.assignee_user_id AS "assigneeUserId", t.nudge_schedule AS nudge,
+           t.status, t.due_at AS "dueAt"
+      FROM tasks t
+     WHERE t.task_type = 'project_task'
+       AND t.entity_id = ANY(${taskIds}::uuid[])`;
+  A(todos.length === taskIds.length,
+    'every assigned checklist row raised a real platform ToDo',
+    `${todos.length} of ${taskIds.length}`);
+  A(todos.every((t) => t.assigneeUserId === assignee?.id),
+    'addressed to the person the work was given to, not to a role bucket');
+  A(todos.every((t) => Array.isArray(t.nudge) && (t.nudge as unknown[]).length > 0),
+    'each carries a nudge schedule, so the shared sweeper will chase it',
+    JSON.stringify(todos[0]?.nudge));
+  A(todos.every((t) => Boolean(t.dueAt)), 'and a due date the sweeper can measure against');
+
+  // It is in the ASSIGNEE's queue, read through the route they would read it through.
+  if (assignee?.email) {
+    const qCtx = await browser.newContext();
+    const qPage = await qCtx.newPage();
+    try {
+      await login(qPage, String(assignee.email), TENANT_PW);
+      const queue = await api(qCtx.request, 'get', `/api/portal/${TENANT}/tasks`);
+      const mine = JSON.stringify(queue.json);
+      A(queue.status === 200, 'the assignee can read their own queue', `${queue.status}`);
+      A(todos.some((t) => mine.includes(t.id)),
+        'and the project work is IN it — the same list as every other kind of task');
+    } catch (e) {
+      no('could not read the assignee queue', String((e as Error).message).slice(0, 60));
+    }
+    await qCtx.close();
+  }
+
+  // The mail goes through the ONE seam: a notification request the CRM renders, not a direct send.
+  const [mail] = await sql<{ template: string }[]>`
+    SELECT payload->>'template' AS template FROM system_events
+     WHERE namespace = 'system' AND type = 'notification.requested'
+       AND payload->>'template' = 'project_task_assigned'
+       AND payload->>'projectId' = ${created.projectId}
+     ORDER BY created_at DESC LIMIT 1`;
+  A(Boolean(mail), 'assignment asks for email through the notification seam, not a direct send',
+    mail?.template ?? 'none');
+
   const tooEarly = await api(req, 'patch', P + '/milestones', { action: 'met', milestoneId: workPhase });
   A(tooEarly.status === 409 && String((tooEarly.json as Json).code) === 'TASKS_OUTSTANDING',
     'the phase will not close while its checklist is open',
@@ -500,6 +550,12 @@ async function main() {
   } else {
     no('no member to assign work to — the employee half of the checklist is UNMEASURED');
   }
+
+  // ── and ticking it off CLEARS it: the checklist is the source of truth, the ToDo follows ──
+  const [{ stillOpen }] = await sql<{ stillOpen: number }[]>`
+    SELECT count(*)::int AS "stillOpen" FROM tasks
+     WHERE task_type = 'project_task' AND entity_id = ANY(${taskIds}::uuid[]) AND status = 'open'`;
+  A(stillOpen === 0, 'ticking the work off cleared it from the queue', `${stillOpen} still open`);
 
   const metrics = { attendees: 11, actionItems: 6, sowRevisions: 1 };
   const closed = await api(req, 'patch', P + '/milestones', {

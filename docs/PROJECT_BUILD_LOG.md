@@ -1284,3 +1284,69 @@ pre-existing 6 · the drive **green, all twelve phases**.
 
 ---
 
+## G1 · ToDos, email and nudges — the build portal's infrastructure, not a second one
+
+**Operator's ask:** *"Make sure ToDos and email and task nudges are built into the project management
+portal. Treat it like a proposal build portal when it comes to infrastructure, automation, audit
+ability, collaboration."*
+
+### A projection, not a second queue
+
+`project_milestone_tasks` is the project's own checklist — ordered under a milestone, gating its
+completion, carrying the domain rules. The platform `tasks` table is a different thing: it is where a
+PERSON looks — `/todos`, the notification bell, the Command Center, and the nudge sweep that already
+chases everything else in the product.
+
+Giving projects their own queue and their own nudge path would hand a customer two inboxes and us two
+things to keep in step. So assigned project work is **projected** onto a real ToDo, exactly as
+`editPortalWorkflow` re-projects a proposal's guardrail plan onto live `tasks` rows.
+
+```
+project_milestone_tasks   the domain object — the source of truth
+        ↓ projection (lib/projects/todos.ts)
+tasks                     how it reaches a human: queue · bell · Command Center · nudge sweeper
+```
+
+**The checklist is the source of truth and the ToDo follows it.** Ticking the work off closes the
+ToDo; meeting the milestone and closing the project sweep up whatever is left. Nothing in the
+projection ever writes back into the checklist — a mirror that can move the thing it mirrors is a
+second writer, and the two disagree the first time one of them fails.
+
+### One reminder, not two
+
+The project sweep nudges by date; an assigned task now also has a ToDo the platform sweeper nudges.
+Two reminders for one task teaches people to filter both, so `_run_project_nudges` now skips tasks
+that have an assignee — the ToDo carries those — and keeps only **unassigned** work, which has no
+queue to sit in and where the date is all there is.
+
+### Email through the one seam
+
+Assignment emits `system:notification.requested` with `project_task_assigned` rather than sending
+directly, so delivery, suppression and the ledger stay the CRM's single implementation. The renderer
+shipped **in the same change as the code that names it** — a template referenced by code and defined
+nowhere emits `notification.failed` instead of sending, which this repo has done twice (B141).
+
+Two mails, two jobs: `project_task_assigned` is per-person and per-item ("this is yours");
+`project_nudge` is the grouped one that chases what is already known.
+
+### Proven, as the actors
+
+```
+✓ every assigned checklist row raised a real platform ToDo — 2 of 2
+✓ addressed to the person the work was given to, not to a role bucket
+✓ each carries a nudge schedule, so the shared sweeper will chase it — [7,2]
+✓ the assignee can read their own queue — 200
+✓ and the project work is IN it — the same list as every other kind of task
+✓ assignment asks for email through the notification seam — project_task_assigned
+✓ ticking the work off cleared it from the queue — 0 still open
+```
+
+**One harness defect, caught before it became a finding:** the queue check originally ran AFTER the
+employee had ticked the work off, so it read an empty open queue and reported a failure that was
+entirely the ordering. Split: raised-and-queued before the tick, cleared after.
+
+`tsc` 0 · vitest 216 files / **2,145** · pipeline scheduler/event tests 85 · spine audit: 0 templates
+with no renderer · the full lifecycle drive green.
+
+---
+

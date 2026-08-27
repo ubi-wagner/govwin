@@ -488,6 +488,12 @@ async def _run_project_nudges(conn: asyncpg.Connection) -> None:
               FROM project_milestone_tasks t
               JOIN projects p ON p.id = t.project_id
              WHERE t.status = 'open'
+               -- ASSIGNED work is nudged by the PLATFORM ToDo it was projected onto
+               -- (`lib/projects/todos.ts` → `tasks.nudge_schedule`), the same sweeper that chases
+               -- every other kind of work in the product. Nudging it here as well would send two
+               -- reminders for one task, which teaches people to filter both. What is left here is
+               -- work nobody has taken: it has no queue to sit in, so the date is all there is.
+               AND t.assignee_user_id IS NULL AND t.assignee_role IS NULL
                AND t.due_date IS NOT NULL
                AND t.due_date <= CURRENT_DATE + $1::int
                AND t.nudges_sent < $2::int

@@ -595,6 +595,24 @@ TEMPLATES.update({
     # `system:notification.failed` instead of sending mail. That has happened twice (the 052
     # regression, then eight more found by audit join 7), which is why the template is written in
     # the same change as the workflow that names it.
+    # ── Project work assigned to a person (G1) ──────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS `lib/projects/todos.ts`, which names it. A template referenced
+    # by code and defined nowhere emits `notification.failed` instead of sending — B141, twice.
+    #
+    # One task, one mail, because this one IS per-person and per-item: "you have been given this".
+    # The GROUPED mail is `project_nudge`, which chases what is already known.
+    'project_task_assigned': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">A task is yours</h2>
+        <p><strong>{_e(str(p.get('title') or 'A project task'))}</strong>
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''}.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {'Due <strong>' + _e(str(p.get('dueOn'))) + '</strong>.' if p.get('dueOn')
+             else 'No due date set.'}
+            It is in your to-do queue, and the project workspace is where you tick it off.</p>
+        </div>
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
     # ── The project nudge (M2) ──────────────────────────────────────────────────────────────
     # WRITTEN IN THE SAME CHANGE AS THE SWEEP THAT NAMES IT. B141: eight NOTIFY steps named a
     # template that existed nowhere, so the mail emitted `notification.failed` instead of sending —
