@@ -1422,3 +1422,95 @@ four, and a patch written against four matched nothing.
 renderer.
 
 ---
+
+## G3 — The ruler on a deliverable, and the blank page it found
+
+*"Measurements are easier with our ruler and grid system as well."*
+
+### The G2 proof was not a proof
+
+G2 asserted that the export route answered **200** and that the first bytes were `%PDF` or the `PK`
+zip header. Both were true. Both stay true for a document with nothing in it — and that is exactly
+what was being exported.
+
+`starterFromPreset` builds a **blank** canvas. That is correct for the caller it was written for:
+the "New document" chooser, where a person clicked *blank letter* and means it. It is wrong for a
+deliverable, where the entry point is a **Draft…** button on a named contractual obligation with a
+due date on a named project. The authored report came out as an empty page, and an **865-byte PDF**
+passed every check.
+
+The tell had been in the database the whole time — `tenant_documents.node_count = 0` — and nothing
+looked, because the assertions that existed were about the **route** rather than the **artifact**.
+
+### What goes on the page, and what must not
+
+Only facts read off a row: the title, then one line — project · milestone · *Required by* date.
+
+Scaffolding plausible headings (Introduction, Approach, Results) would make the starter look more
+finished, and would put structure into a contract deliverable that nobody asked the product for.
+That is the ingest spine's rule applied one floor up: *a value the product did not read from the
+source must never look like one it did*. The nodes are stamped `source: 'template'`, not `ai_draft`,
+so a reader opening the history is told the product read them off a row.
+
+Rendered by LibreOffice, the delivered page reads:
+
+```
+Monthly technical report — March
+E2E award probe · Prototype demonstration · Required by 2026-12-15
+```
+
+### The instrument: an engine that did not write it
+
+`scripts/probe-deliverable-artifacts.mts` exports every authored deliverable through the shipped
+exporters, converts the Office files to PDF with **LibreOffice**, and reads the text layer back with
+**pdf.js**. Nothing in that chain is ours except the bytes under test — which is the point of B121's
+rule: *an artifact is not verified until an engine that did not write it has opened it*.
+
+It refuses to report a verdict it cannot earn, twice over:
+
+- **self-test** — it measures a deliberately blank canvas first and requires the detector to see it
+  as blank. A text layer that comes back empty because the reader silently failed looks exactly like
+  a blank page, and would make every green below unearned.
+- **control** — it converts a plain `.txt` before concluding anything about ours. A container with
+  `libreoffice-core` and no filters fails on everything, and without the control that reads as *our
+  .pptx is unopenable* — a claim this repo has actually made and had to retract.
+
+```
+self-test: a blank canvas reads as blank — the detector can fail
+control:   LibreOffice converted a plain .txt — the engine works
+
+✓ .pdf  — the rendered page names the deliverable — 1 page · 109 chars of text
+✓ .docx — the rendered page names the deliverable — 1 page · 109 chars of text
+✓ .pptx — the rendered page names the deliverable — 1 page · 109 chars of text
+✓ .xlsx — the rendered page names the deliverable — 1 page · 117 chars of text
+✓ the ruler does not UNDER-count what came out — estimate 1 · printed 1  (×3)
+11/11
+```
+
+### Three harness defects, caught before they became findings
+
+**The test agreed with the bug, twice.** "Names the deliverable" first read the whole INSERT
+parameter list — which carries the `title` **column**, present on a blank document — so it passed on
+the unfixed code. Narrowed to the canvas value, it still passed: `starterFromPreset` writes the
+title into `metadata.title` of even an empty canvas. Only `canvas.nodes` is printed, so only
+`canvas.nodes` answers *does the page say it*. Red-first was run after each narrowing, and only the
+third version failed on the unfixed code.
+
+**The drive accused the product of the thing the harness got wrong.** Phase 7e read `docRow.nodeCount`
+off a bare `postgres()` client, which has no `toCamel` — so it was `undefined`, `undefined > 0` is
+false, and the drive reported `the draft is not a blank page — 0 node(s)` against a document the
+database held two nodes for. The file's own header warns about this exact class. `node_count AS
+"nodeCount"`.
+
+**The drive left documents behind.** `project_deliverables.document_id` is `ON DELETE SET NULL` by
+design, so deleting the project does *not* take the authored document with it — and a drive that
+made one and walked away left a tenant holding documents for a project that no longer exists. Now in
+the footprint. `KEEP=1` exists so the probe can open the artifacts while the deliverable that owns
+them still exists; cleaning up first and then reporting "no authored deliverable" would be the probe
+measuring the drive's tidying rather than the product.
+
+`tsc` 0 · vitest 216 files / **2,151** · surfaces 82/82 · api-contract clean · write-contract clean ·
+ruler on 18 stored volumes: 0 under-counts · spine audit 0 dead triggers · the full lifecycle drive
+green, footprint removed.
+
+---

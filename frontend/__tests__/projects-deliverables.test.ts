@@ -17,13 +17,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { db } = vi.hoisted(() => {
-  const state = { queries: [] as string[], results: [] as unknown[][] };
+  const state = { queries: [] as string[], results: [] as unknown[][], values: [] as unknown[][] };
   const tagged = (strings: TemplateStringsArray, ...values: unknown[]) => {
     state.queries.push(strings.raw.join(' ? ').replace(/\s+/g, ' ').trim());
-    void values;
+    // The VALUES too, not only the SQL text. Most assertions in this file are about predicates, but
+    // what a starter canvas CONTAINS is a value — and a check that can only see the query string
+    // reads an INSERT of an empty document as identical to an INSERT of a real one.
+    state.values.push(values);
     return Promise.resolve(state.results.shift() ?? []);
   };
-  return { db: { sqlMock: Object.assign(tagged, { state }), state } };
+  // `sql.json` is a passthrough here: the production call exists to stop postgres.js stringifying a
+  // jsonb value into a string that char-iterates on read, which is a driver concern, not a logic one.
+  return { db: { sqlMock: Object.assign(tagged, { state, json: (v: unknown) => v }), state } };
 });
 
 vi.mock('@/lib/db', () => ({ sql: db.sqlMock, auditLog: vi.fn(async () => {}) }));
@@ -37,7 +42,7 @@ vi.mock('@/lib/projects/access', async (importOriginal) => ({
   canAccessProject: vi.fn(async () => true),
 }));
 
-import { markMilestoneMet, uploadDeliverable, acceptDeliverable } from '@/lib/projects/milestones';
+import { markMilestoneMet, uploadDeliverable, acceptDeliverable, authorDeliverable } from '@/lib/projects/milestones';
 import { emitEventSingle } from '@/lib/events';
 
 const ADMIN = { userId: 'u1', role: 'tenant_admin', tenantId: 't1' };
@@ -48,6 +53,7 @@ const MILESTONE = '55555555-5555-4555-8555-555555555555';
 
 beforeEach(() => {
   db.state.queries.length = 0;
+  db.state.values.length = 0;
   db.state.results = [];
   vi.mocked(emitEventSingle).mockClear();
 });
@@ -272,5 +278,91 @@ describe('acceptDeliverable — the second fact', () => {
     await acceptDeliverable(ADMIN, PROJECT, DELIVERABLE);
     expect(all()).toMatch(/m\.project_id = \?/);
     expect(all()).toMatch(/d\.tenant_id = \?/);
+  });
+});
+
+/**
+ * ── AUTHORING: A BLANK PAGE IS NOT A DRAFT ───────────────────────────────────────────────────
+ *
+ * This shipped, and every check passed it. `starterFromPreset` builds an EMPTY canvas — correct for
+ * the "New document" chooser, where someone clicked "blank letter" and means it — so the authored
+ * deliverable exported as a blank page. The drive asserted HTTP 200 and the file's magic number,
+ * and an empty PDF is still 200 and still starts `%PDF`: an 865-byte nothing passed as evidence.
+ *
+ * The tell was in the database the whole time — `tenant_documents.node_count = 0` — which no
+ * assertion looked at, because the ones that existed were about the ROUTE rather than the artifact.
+ *
+ * What goes on the page is bounded on the other side too: only facts read from a row. Scaffolding
+ * plausible section headings would make the starter look more finished while putting structure into
+ * a contract deliverable that nobody asked for — the same rule the ingest spine runs on.
+ */
+describe('authorDeliverable — the starter carries what the system knows', () => {
+  const FACTS = {
+    id: DELIVERABLE, title: 'Monthly technical report', documentId: null,
+    requiredBy: new Date('2026-06-30T00:00:00.000Z'), milestone: 'Execution', project: 'USAF SBIR Phase II',
+  };
+  /**
+   * The CANVAS value handed to the INSERT — not the whole parameter list.
+   *
+   * The distinction is load-bearing and was got wrong first: stringifying every value also picks up
+   * the `title` COLUMN, which carries the deliverable's name whether or not a single node exists.
+   * Asserting against that made "names the deliverable" pass on a blank document — an instrument
+   * agreeing with the defect it was written to catch. Selected by SHAPE (the value with a `nodes`
+   * array), so it cannot silently repoint if the column order changes.
+   */
+  const insertedCanvas = () => {
+    const i = db.state.queries.findIndex((q) => /INSERT INTO tenant_documents/i.test(q));
+    expect(i, 'the document was inserted at all').toBeGreaterThan(-1);
+    const canvas = db.state.values[i].find(
+      (v): v is { nodes: unknown[] } => Boolean(v) && Array.isArray((v as { nodes?: unknown }).nodes),
+    );
+    expect(canvas, 'a canvas value reached the INSERT').toBeTruthy();
+    // The NODES, not the whole canvas. `starterFromPreset` writes the title into `metadata.title`
+    // of even an empty document, so a check against the canvas as a whole finds the deliverable's
+    // name on a blank page and passes — the same way the title column did, one layer in. Only
+    // nodes are printed, so only nodes answer "does the page say it".
+    return JSON.stringify((canvas as { nodes: unknown[] }).nodes);
+  };
+
+  it('is not a blank page', async () => {
+    db.state.results = [[FACTS]];
+    const r = await authorDeliverable(ADMIN, PROJECT, DELIVERABLE, { preset: 'letter' });
+    expect(r.ok).toBe(true);
+    expect(JSON.parse(insertedCanvas()).length).toBeGreaterThan(0);
+  });
+
+  it('names the deliverable it satisfies', async () => {
+    db.state.results = [[FACTS]];
+    await authorDeliverable(ADMIN, PROJECT, DELIVERABLE, { preset: 'letter' });
+    expect(insertedCanvas()).toContain('Monthly technical report');
+  });
+
+  it('carries the project, the phase and the due date — read from the row', async () => {
+    db.state.results = [[FACTS]];
+    await authorDeliverable(ADMIN, PROJECT, DELIVERABLE, { preset: 'letter' });
+    const canvas = insertedCanvas();
+    expect(canvas).toContain('USAF SBIR Phase II');
+    expect(canvas).toContain('Execution');
+    // A `date` column arrives as a JavaScript Date. `String(d).slice(0,10)` is "Tue Jun 30" — the
+    // #2 crash class in this repo, and a fixture of ISO strings would pass against the broken code,
+    // so the fixture above is a real Date.
+    expect(canvas).toContain('Required by 2026-06-30');
+  });
+
+  it('invents nothing — no scaffolded section headings', async () => {
+    db.state.results = [[FACTS]];
+    await authorDeliverable(ADMIN, PROJECT, DELIVERABLE, { preset: 'letter' });
+    const canvas = insertedCanvas();
+    for (const invented of ['Introduction', 'Background', 'Approach', 'Conclusion']) {
+      expect(canvas, `"${invented}" was never read from a row`).not.toContain(invented);
+    }
+  });
+
+  it('still refuses a second draft', async () => {
+    db.state.results = [[{ ...FACTS, documentId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' }]];
+    const r = await authorDeliverable(ADMIN, PROJECT, DELIVERABLE, { preset: 'deck' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('ALREADY_AUTHORED');
+    expect(writes(), 'a refusal writes nothing').toBe('');
   });
 });

@@ -255,7 +255,15 @@ workbook or PDF is authored in the **same editor**, measured by the **same compl
 rendered by the **same** docx·pptx·xlsx·pdf exporters as a proposal volume — `ON DELETE SET NULL`,
 because losing the draft must not delete the obligation. Attaching widened to *file **or** document*
 (`NOTHING_ATTACHED`, an `OR` in the accept CAS); **acceptance did not** — `accepted_at` is still the
-separate tenant_admin act.
+separate tenant_admin act. The authored starter carries **only facts read off a row** (title ·
+project · milestone · *Required by* date, stamped `source:'template'`) — scaffolding plausible
+headings would put structure into a contract deliverable nobody asked for. It shipped BLANK first:
+`starterFromPreset` builds an empty canvas (right for the "New document" chooser), and a 200 plus a
+`%PDF` magic number passed an 865-byte nothing. `scripts/probe-deliverable-artifacts.mts` is the
+check that can see it — LibreOffice opens what our exporters wrote, pdf.js reads the text layer back
+(B121: **an artifact is not verified until an engine that did not write it has opened it**), and it
+refuses a verdict it cannot earn: a blank-canvas **self-test** must read as blank, and a plain `.txt`
+**control** must convert, or it exits 2.
 
 **EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
 `services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same

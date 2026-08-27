@@ -16,12 +16,13 @@
  */
 import { randomUUID } from 'crypto';
 import { starterFromPreset, isBlankPreset, countNodes } from '@/lib/documents/starter';
+import { createNode, type CanvasNode } from '@/lib/types/canvas-document';
 import { sql, auditLog } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
-import { daysBetween } from './dates';
+import { daysBetween, isoDate } from './dates';
 import { closeTodosUnder } from './todos';
 import type { Fail, Ok } from './project';
 
@@ -510,6 +511,51 @@ export async function acceptDeliverable(
  * deliberate act by a tenant_admin, because a deck someone wrote is not a deliverable the customer
  * has signed for.
  */
+/** What the system already knows about a deliverable, and can therefore put on the page. */
+interface DeliverableFacts {
+  id: string;
+  title: string;
+  documentId: string | null;
+  requiredBy: string | Date | null;
+  milestone: string;
+  project: string;
+}
+
+/**
+ * The opening nodes of an authored deliverable.
+ *
+ * ── ONLY FACTS THE SYSTEM HOLDS ──────────────────────────────────────────────────────────────
+ * A title, and one line of context: the project, the phase, and the date it is due. Nothing else.
+ * It is tempting to scaffold plausible section headings — Introduction, Approach, Results — and it
+ * would make the starter look more finished, but the product would then be putting structure into
+ * a contract deliverable that nobody asked it for. That is the same rule the ingest spine runs on:
+ * *a value the product did not read from the source must never look like one it did*
+ * (docs/INGEST_PROVENANCE.md). Every string below is read from a row.
+ *
+ * The provenance is `template`, the same source `starterFromTemplate` stamps on a scaffolded
+ * heading — not `ai_draft`. A reader opening the node's history should be told the product read
+ * these off a row, rather than left to wonder whether a model wrote them.
+ */
+function seedNodes(actorId: string, title: string, facts: DeliverableFacts): CanvasNode[] {
+  const due = isoDate(facts.requiredBy);
+  const context = [
+    facts.project,
+    facts.milestone,
+    due ? `Required by ${due}` : null,
+  ].filter(Boolean).join(' · ');
+
+  return [
+    createNode({
+      type: 'heading', content: { level: 1, text: title },
+      source: 'template', actorId, actorName: 'Project',
+    }),
+    createNode({
+      type: 'text_block', content: { text: context },
+      source: 'template', actorId, actorName: 'Project',
+    }),
+  ];
+}
+
 export async function authorDeliverable(
   actor: ProjectActor,
   projectId: string,
@@ -528,9 +574,12 @@ export async function authorDeliverable(
   }
 
   try {
-    const [existing] = await sql<{ id: string; title: string; documentId: string | null }[]>`
-      SELECT d.id, d.title, d.document_id FROM project_deliverables d
+    const [existing] = await sql<DeliverableFacts[]>`
+      SELECT d.id, d.title, d.document_id, d.required_by,
+             m.title AS milestone, p.name AS project
+        FROM project_deliverables d
         JOIN project_milestones m ON m.id = d.milestone_id
+        JOIN projects p ON p.id = m.project_id
        WHERE d.id = ${deliverableId}::uuid AND m.project_id = ${projectId}::uuid
          AND d.tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
     if (!existing) return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
@@ -551,6 +600,12 @@ export async function authorDeliverable(
       actorId: actor.userId,
       title: (input.title ?? '').trim() || existing.title,
     });
+    // `starterFromPreset` builds a BLANK canvas — right for the "New document" chooser, where a
+    // person clicked "blank letter" and means it. It is wrong HERE, and it shipped: the authored
+    // report exported as an empty page, which a magic-number check on the bytes cannot see (an
+    // 865-byte `%PDF` passed). A deliverable is not a blank page — it is a named obligation on a
+    // named project with a date, and the system already holds all three.
+    starter.canvas.nodes = seedNodes(actor.userId, starter.title, existing);
 
     await sql`
       INSERT INTO tenant_documents

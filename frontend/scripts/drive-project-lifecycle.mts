@@ -103,7 +103,19 @@ async function api(req: APIRequestContext, method: 'get' | 'post' | 'patch', pat
   return { status: r.status(), json, text };
 }
 
-const created: { proposalId?: string; projectId?: string; contractId?: string } = {};
+const created: { proposalId?: string; projectId?: string; contractId?: string; documentIds: string[] } = {
+  documentIds: [],
+};
+
+/**
+ * `KEEP=1` leaves the run's rows in place.
+ *
+ * Not a convenience: `probe-deliverable-artifacts.mts` opens the AUTHORED deliverable documents with
+ * LibreOffice, and it can only do that while the deliverable that owns them still exists. Cleaning
+ * up first and then reporting "no authored deliverable" would be the probe measuring the drive's
+ * tidying rather than the product.
+ */
+const KEEP = process.env.KEEP === '1';
 
 /** The arc's own artifact, if it ran. `null` means "synthesise one and say so". */
 async function fromArc(): Promise<{ proposalId: string; tenantSlug: string; actor: string } | null> {
@@ -596,6 +608,7 @@ async function main() {
   A(drafted.status === 201, 'a report is drafted in-product', `${drafted.status}`);
   const docId = ((drafted.json.data as Json)?.document as Json)?.documentId as string | undefined;
   A(Boolean(docId), 'and it is a real tenant_documents row the canvas editor opens');
+  if (docId) created.documentIds.push(docId);
 
   const twiceDrafted = await api(req, 'patch', P + `/deliverables/${authoredId}`, { action: 'author', preset: 'deck' });
   A(twiceDrafted.status === 409 && String((twiceDrafted.json as Json).code) === 'ALREADY_AUTHORED',
@@ -603,9 +616,27 @@ async function main() {
     `${twiceDrafted.status}`);
 
   // The EXPORT — the same route the build portal uses, in every format it offers.
-  const [docRow] = await sql<{ canvas: unknown }[]>`
-    SELECT canvas FROM tenant_documents WHERE id = ${docId ?? null}::uuid`;
+  // `node_count AS "nodeCount"` — a bare postgres() client has no `toCamel`, so `r.nodeCount` off a
+  // snake_case select is `undefined`, and `undefined > 0` is false. This assertion reported "0
+  // node(s)" against a document that had two, which is the harness accusing the product.
+  const [docRow] = await sql<{ canvas: unknown; nodeCount: number }[]>`
+    SELECT canvas, node_count AS "nodeCount" FROM tenant_documents WHERE id = ${docId ?? null}::uuid`;
   A(Boolean(docRow), 'the canvas is stored');
+
+  // ── THE DOCUMENT IS NOT BLANK ──────────────────────────────────────────────────────────────
+  // This assertion exists because its absence hid a real defect: `starterFromPreset` builds an
+  // EMPTY canvas (right for the "New document" chooser), so the authored deliverable exported as a
+  // blank page — and the magic-number check below passed it, because an empty PDF still starts
+  // `%PDF`. What a deliverable knows about itself is the least it can carry.
+  const seeded = ((docRow?.canvas as Json)?.nodes ?? []) as Array<Json>;
+  const seededText = seeded.map((n) => JSON.stringify((n as Json)?.content ?? {})).join(' ');
+  A(docRow?.nodeCount > 0, 'the draft is not a blank page', `${docRow?.nodeCount ?? 0} node(s)`);
+  A(seededText.includes('Monthly technical report'),
+    'it carries its own identity — the deliverable it satisfies');
+  // The date is the one THIS drive passed on the POST above, not a date the assertion re-derives:
+  // copy the predicate from the source. `Required by` is the seed's own wording.
+  A(seededText.includes(`Required by ${iso(110)}`),
+    'and the date it is due, read from the row rather than invented', iso(110));
   // A byte COUNT is not evidence a file is that format — an error page is bytes too. Check the
   // magic number: `%PDF` for pdf, `PK` (a zip) for the three OOXML formats.
   const MAGIC: Record<string, string> = { pdf: '%PDF', docx: 'PK', pptx: 'PK', xlsx: 'PK' };
@@ -794,7 +825,21 @@ async function main() {
 
 async function cleanup() {
   const footprint: string[] = [];
+  if (KEEP) {
+    console.log('\n  KEEP=1 — rows LEFT IN PLACE for probe-deliverable-artifacts.mts. Re-run without');
+    console.log('  KEEP, or delete the project by hand, before treating this box as clean.');
+    await sql.end();
+    return;
+  }
   try {
+    // The authored deliverable documents. `project_deliverables.document_id` is ON DELETE SET NULL
+    // by design — losing the draft must not delete the obligation — so deleting the project does
+    // NOT take these with it, and a drive that made them and walked away leaves a tenant holding
+    // documents for a project that no longer exists.
+    if (created.documentIds.length) {
+      await sql`DELETE FROM tenant_documents WHERE id = ANY(${created.documentIds}::uuid[])`;
+      footprint.push(`${created.documentIds.length} authored document(s)`);
+    }
     if (created.projectId) {
       await sql`DELETE FROM projects WHERE id = ${created.projectId}::uuid`;
       footprint.push('1 project + cascade');
