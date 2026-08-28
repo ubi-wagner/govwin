@@ -121,7 +121,7 @@ export function RiskRegister({
               </span>
             )}
             {r.reviewOn && (
-              <span className="text-[11px] text-gray-500">review {String(r.reviewOn).slice(0, 10)}</span>
+              <span className="text-[11px] text-gray-500">review {r.reviewOn.slice(0, 10)}</span>
             )}
           </div>
           {r.mitigation && <p className="text-xs text-gray-600">Mitigation: {r.mitigation}</p>}

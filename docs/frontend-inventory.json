@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 178,
-   "lines": 45142
+   "lines": 45161
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 326,
-   "lines": 67462
+   "files": 327,
+   "lines": 67638
   },
   {
    "kind": "middleware",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 232,
-   "lines": 32596
+   "files": 233,
+   "lines": 32695
   }
  ],
  "records": [
@@ -478,6 +478,78 @@
     "sqlMock\n      .mockResolvedValueOnce(platformRow())\n      .mockResolvedValueOnce(tenantRow()).mockRejectedValueOnce",
     "recordAgentSpend",
     "expect(cost).toBeCloseTo"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/ai-endpoint-single-source.test.ts",
+   "kind": "test",
+   "lines": 93,
+   "bytes": 4540,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "readdirSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "@/lib/ai/endpoint",
+     "names": [
+      "anthropicKey",
+      "anthropicMessagesUrl"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "path.resolve",
+    "readdirSync",
+    "e.startsWith",
+    "path.join",
+    "statSync(p).isDirectory",
+    "statSync",
+    "walk",
+    "/\\.tsx?$/.test",
+    "out.push",
+    "path.relative",
+    "describe",
+    "it",
+    "sourceFiles().filter",
+    "sourceFiles",
+    "readFileSync",
+    "text.replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace",
+    "text.replace",
+    "HOST.test",
+    "expect(offenders).toEqual",
+    "expect",
+    "expect(anthropicMessagesUrl()).toBe",
+    "anthropicMessagesUrl",
+    "expect(anthropicKey()).toBeNull",
+    "anthropicKey",
+    "expect(anthropicKey()).toBe"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -8704,8 +8776,8 @@
   {
    "file": "__tests__/projects-baseline.test.ts",
    "kind": "test",
-   "lines": 241,
-   "bytes": 11149,
+   "lines": 247,
+   "bytes": 11673,
    "client": false,
    "exports": [],
    "imports": [
@@ -72312,7 +72384,7 @@
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
    "kind": "page",
    "lines": 742,
-   "bytes": 37691,
+   "bytes": 37371,
    "client": false,
    "exports": [
     {
@@ -84351,8 +84423,8 @@
   {
    "file": "components/projects/cdrl-register.tsx",
    "kind": "component",
-   "lines": 321,
-   "bytes": 14640,
+   "lines": 324,
+   "bytes": 14866,
    "client": true,
    "exports": [
     {
@@ -84392,8 +84464,7 @@
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
-    "String(v).slice",
-    "String",
+    "v.slice",
     "useRouter",
     "useState",
     "setBusy",
@@ -84591,7 +84662,7 @@
    "file": "components/projects/evidence-panel.tsx",
    "kind": "component",
    "lines": 215,
-   "bytes": 8660,
+   "bytes": 8644,
    "client": true,
    "exports": [
     {
@@ -84648,9 +84719,8 @@
     "setFile",
     "router.refresh",
     "mine.map",
-    "String(e.occurredOn).slice",
-    "String",
-    "String(mine[0].occurredOn).slice",
+    "e.occurredOn.slice",
+    "mine[0].occurredOn.slice",
     "setKind",
     "KINDS.map",
     "submit"
@@ -84759,8 +84829,8 @@
   {
    "file": "components/projects/invoice-ledger.tsx",
    "kind": "component",
-   "lines": 405,
-   "bytes": 18232,
+   "lines": 409,
+   "bytes": 18597,
    "client": true,
    "exports": [
     {
@@ -84816,8 +84886,7 @@
    "calls": [
     "Number(n).toLocaleString",
     "Number",
-    "String(inv.submittedOn).slice",
-    "String",
+    "inv.submittedOn.slice",
     "/^\\d{4}-\\d{2}-\\d{2}$/.test",
     "Date.parse",
     "now.toISOString().slice",
@@ -84854,7 +84923,8 @@
     "ageOf",
     "inv.lines!.map",
     "reason.trim",
-    "act"
+    "act",
+    "String"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -84865,7 +84935,7 @@
    "file": "components/projects/meeting-log.tsx",
    "kind": "component",
    "lines": 283,
-   "bytes": 12328,
+   "bytes": 12320,
    "client": true,
    "exports": [
     {
@@ -84932,8 +85002,7 @@
     "setItems",
     "cur.map",
     "meetings.map",
-    "String(m.heldOn).slice",
-    "String",
+    "m.heldOn.slice",
     "m.attendees.join",
     "items.map",
     "setItem",
@@ -84952,8 +85021,8 @@
   {
    "file": "components/projects/milestone-checklist.tsx",
    "kind": "component",
-   "lines": 380,
-   "bytes": 17200,
+   "lines": 387,
+   "bytes": 17788,
    "client": true,
    "exports": [
     {
@@ -84994,9 +85063,8 @@
    "sqlTags": [],
    "calls": [
     "Date.parse",
-    "String(due).slice",
-    "String",
-    "String(est).slice",
+    "due.slice",
+    "est.slice",
     "Number.isFinite",
     "Math.round",
     "useRouter",
@@ -85019,12 +85087,13 @@
     "tasks.filter",
     "tasks.map",
     "setStatus",
-    "String(t.dueDate).slice",
+    "t.dueDate.slice",
     "slipDays",
-    "String(t.estimatedCompletion).slice",
+    "(t.estimatedCompletion ?? '').slice",
     "(t.attachments ?? []).map",
     "edit",
     "members.map",
+    "t.estimatedCompletion.slice",
     "attach",
     "addTask"
    ],
@@ -85036,8 +85105,8 @@
   {
    "file": "components/projects/modification-log.tsx",
    "kind": "component",
-   "lines": 394,
-   "bytes": 15815,
+   "lines": 399,
+   "bytes": 16219,
    "client": true,
    "exports": [
     {
@@ -85081,8 +85150,7 @@
     "Number.isFinite",
     "n.toLocaleString",
     "/^\\d{4}-\\d{2}-\\d{2}/.test",
-    "String",
-    "String(v).slice",
+    "v.slice",
     "useRouter",
     "useState",
     "setBusy",
@@ -85103,8 +85171,9 @@
     "setExecuting",
     "setExecutedOn",
     "modifications.filter",
+    "String",
     "show",
-    "String(m.executedOn ?? '').slice",
+    "(m.executedOn ?? '').slice",
     "m.changes!.map",
     "changeRow",
     "execute",
@@ -85400,7 +85469,7 @@
    "file": "components/projects/risk-register.tsx",
    "kind": "component",
    "lines": 259,
-   "bytes": 10875,
+   "bytes": 10867,
    "client": true,
    "exports": [
     {
@@ -85456,8 +85525,7 @@
     "setAsIssue",
     "risks.filter",
     "band",
-    "String(r.reviewOn).slice",
-    "String",
+    "r.reviewOn.slice",
     "window.prompt('Closing note — what changed?').trim",
     "window.prompt",
     "open.map",
@@ -94473,6 +94541,46 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/ai/endpoint.ts",
+   "kind": "lib",
+   "lines": 62,
+   "bytes": 2871,
+   "client": false,
+   "exports": [
+    {
+     "name": "anthropicBaseUrl",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "anthropicMessagesUrl",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "anthropicKey",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "anthropicHeaders",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "(process.env.ANTHROPIC_BASE_URL || DEFAULT_BASE).replace",
+    "anthropicBaseUrl"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/amendments.ts",
    "kind": "lib",
    "lines": 238,
@@ -99462,8 +99570,8 @@
   {
    "file": "lib/events.ts",
    "kind": "lib",
-   "lines": 344,
-   "bytes": 12341,
+   "lines": 406,
+   "bytes": 15075,
    "client": false,
    "exports": [
     {
@@ -99534,6 +99642,11 @@
      "async": true
     },
     {
+     "name": "emitEventSingleStrict",
+     "form": "function",
+     "async": true
+    },
+    {
      "name": "withEventBracket",
      "form": "function",
      "async": true
@@ -99559,7 +99672,7 @@
      ]
     }
    ],
-   "tryCount": 4,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
@@ -99576,6 +99689,10 @@
     {
      "tag": "sql",
      "line": 249
+    },
+    {
+     "tag": "sql",
+     "line": 307
     }
    ],
    "calls": [
@@ -102395,8 +102512,8 @@
   {
    "file": "lib/ingest/parse-solicitation.ts",
    "kind": "lib",
-   "lines": 274,
-   "bytes": 14476,
+   "lines": 277,
+   "bytes": 14648,
    "client": false,
    "exports": [
     {
@@ -102415,6 +102532,13 @@
      "names": [
       "extractByPattern",
       "hasUsableSourceText"
+     ]
+    },
+    {
+     "spec": "@/lib/ai/endpoint",
+     "names": [
+      "anthropicHeaders",
+      "anthropicMessagesUrl"
      ]
     },
     {
@@ -102456,8 +102580,9 @@
     "buildVolumes",
     "text.trim",
     "patternOnly",
-    "(process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace",
     "fetch",
+    "anthropicMessagesUrl",
+    "anthropicHeaders",
     "JSON.stringify",
     "buildPrompt",
     "res.json",
@@ -106446,8 +106571,8 @@
   {
    "file": "lib/process/launch-template.ts",
    "kind": "lib",
-   "lines": 186,
-   "bytes": 7803,
+   "lines": 190,
+   "bytes": 8162,
    "client": false,
    "exports": [
     {
@@ -106476,32 +106601,34 @@
      "names": [
       "Role"
      ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingleStrict"
+     ]
     }
    ],
    "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 59
+     "line": 60
     },
     {
      "tag": "sql",
-     "line": 123
+     "line": 124
     },
     {
      "tag": "sql",
-     "line": 125
-    },
-    {
-     "tag": "sql",
-     "line": 169
+     "line": 126
     }
    ],
    "calls": [
     "console.error",
     "UUID_RE.test",
     "tpl.triggerKey.split",
-    "sql.json"
+    "emitEventSingleStrict"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -106702,8 +106829,8 @@
   {
    "file": "lib/projects/baseline.ts",
    "kind": "lib",
-   "lines": 340,
-   "bytes": 16279,
+   "lines": 346,
+   "bytes": 16872,
    "client": false,
    "exports": [
     {
@@ -106796,15 +106923,15 @@
     },
     {
      "tag": "sql",
-     "line": 205
+     "line": 211
     },
     {
      "tag": "sql",
-     "line": 228
+     "line": 234
     },
     {
      "tag": "sql",
-     "line": 315
+     "line": 321
     }
    ],
    "calls": [
@@ -106816,7 +106943,7 @@
     "withEventBracket",
     "userActor",
     "withTenant",
-    "String",
+    "proj.baselinedAt.toISOString",
     "auditLog",
     "console.error",
     "(input.reason ?? '').trim",
@@ -106835,8 +106962,8 @@
   {
    "file": "lib/projects/cdrl.ts",
    "kind": "lib",
-   "lines": 386,
-   "bytes": 17273,
+   "lines": 403,
+   "bytes": 18835,
    "client": false,
    "exports": [
     {
@@ -106931,23 +107058,23 @@
     },
     {
      "tag": "sql",
-     "line": 113
+     "line": 121
     },
     {
      "tag": "sql",
-     "line": 222
+     "line": 239
     },
     {
      "tag": "sql",
-     "line": 231
+     "line": 248
     },
     {
      "tag": "sql",
-     "line": 304
+     "line": 321
     },
     {
      "tag": "sql",
-     "line": 334
+     "line": 351
     }
    ],
    "calls": [
@@ -107856,8 +107983,8 @@
   {
    "file": "lib/projects/invoices.ts",
    "kind": "lib",
-   "lines": 662,
-   "bytes": 29823,
+   "lines": 672,
+   "bytes": 30683,
    "client": false,
    "exports": [
     {
@@ -107984,47 +108111,47 @@
     },
     {
      "tag": "sql",
-     "line": 108
+     "line": 118
     },
     {
      "tag": "sql",
-     "line": 148
+     "line": 158
     },
     {
      "tag": "sql",
-     "line": 205
+     "line": 215
     },
     {
      "tag": "sql",
-     "line": 289
+     "line": 299
     },
     {
      "tag": "sql",
-     "line": 295
+     "line": 305
     },
     {
      "tag": "sql",
-     "line": 415
+     "line": 425
     },
     {
      "tag": "sql",
-     "line": 427
+     "line": 437
     },
     {
      "tag": "sql",
-     "line": 464
+     "line": 474
     },
     {
      "tag": "sql",
-     "line": 517
+     "line": 527
     },
     {
      "tag": "sql",
-     "line": 533
+     "line": 543
     },
     {
      "tag": "sql",
-     "line": 542
+     "line": 552
     }
    ],
    "calls": [
@@ -108800,8 +108927,8 @@
   {
    "file": "lib/projects/modifications.ts",
    "kind": "lib",
-   "lines": 637,
-   "bytes": 29693,
+   "lines": 646,
+   "bytes": 30480,
    "client": false,
    "exports": [
     {
@@ -108921,35 +109048,35 @@
     },
     {
      "tag": "sql",
-     "line": 109
+     "line": 118
     },
     {
      "tag": "sql",
-     "line": 211
+     "line": 220
     },
     {
      "tag": "sql",
-     "line": 368
+     "line": 377
     },
     {
      "tag": "sql",
-     "line": 390
+     "line": 399
     },
     {
      "tag": "sql",
-     "line": 398
+     "line": 407
     },
     {
      "tag": "sql",
-     "line": 533
+     "line": 542
     },
     {
      "tag": "sql",
-     "line": 609
+     "line": 618
     },
     {
      "tag": "sql",
-     "line": 621
+     "line": 630
     }
    ],
    "calls": [
@@ -121209,8 +121336,8 @@
   {
    "file": "lib/tools/source-scout.ts",
    "kind": "lib",
-   "lines": 553,
-   "bytes": 16816,
+   "lines": 556,
+   "bytes": 17330,
    "client": false,
    "exports": [
     {
@@ -121262,33 +121389,41 @@
      "names": [
       "defineTool"
      ]
+    },
+    {
+     "spec": "@/lib/ai/endpoint",
+     "names": [
+      "anthropicHeaders",
+      "anthropicKey",
+      "anthropicMessagesUrl"
+     ]
     }
    ],
    "tryCount": 9,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 260
+     "line": 263
     },
     {
      "tag": "sql",
-     "line": 290
+     "line": 293
     },
     {
      "tag": "sql",
-     "line": 367
+     "line": 370
     },
     {
      "tag": "sql",
-     "line": 387
+     "line": 390
     },
     {
      "tag": "sql",
-     "line": 431
+     "line": 434
     },
     {
      "tag": "sql",
-     "line": 464
+     "line": 467
     }
    ],
    "calls": [
@@ -121310,8 +121445,11 @@
     "html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '').replace",
     "html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '').replace",
     "html.replace",
+    "anthropicKey",
     "previousText.slice",
     "currentText.slice",
+    "anthropicMessagesUrl",
+    "anthropicHeaders",
     "JSON.stringify",
     "res.text().catch",
     "errText.slice",

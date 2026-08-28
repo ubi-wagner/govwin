@@ -60,9 +60,7 @@
     "lib/tools/volume-delete.ts",
     "lib/tools/volume-update-required-item.ts"
    ],
-   "bespoke": [
-    "lib/process/launch-template.ts"
-   ],
+   "bespoke": [],
    "candidates": 39
   },
   "documents:canvas": {
@@ -241,11 +239,10 @@
    "adopted": [
     "app/api/admin/rfp-curation/[solId]/shred-audit/route.ts",
     "lib/ingest/assessment.ts",
-    "lib/ingest/ingest-topic-files.ts"
-   ],
-   "bespoke": [
+    "lib/ingest/ingest-topic-files.ts",
     "lib/ingest/parse-solicitation.ts"
    ],
+   "bespoke": [],
    "candidates": 7
   },
   "templating:events": {
@@ -632,16 +629,8 @@
     "lib/projects/status-report.ts",
     "lib/projects/todos.ts"
    ],
-   "bespoke": [
-    "components/projects/cdrl-register.tsx",
-    "components/projects/evidence-panel.tsx",
-    "components/projects/invoice-ledger.tsx",
-    "components/projects/meeting-log.tsx",
-    "components/projects/milestone-checklist.tsx",
-    "components/projects/modification-log.tsx",
-    "components/projects/risk-register.tsx"
-   ],
-   "candidates": 19
+   "bespoke": [],
+   "candidates": 15
   },
   "projects:toast": {
    "adopted": [
@@ -798,60 +787,5 @@
    "candidates": 1
   }
  },
- "findings": [
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/cdrl-register.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/evidence-panel.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/invoice-ledger.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/meeting-log.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/milestone-checklist.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/modification-log.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "projects",
-   "seam": "dates",
-   "file": "components/projects/risk-register.tsx",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "rfp-ingest",
-   "seam": "agents",
-   "file": "lib/ingest/parse-solicitation.ts",
-   "kind": "BESPOKE"
-  },
-  {
-   "pipeline": "automation",
-   "seam": "events",
-   "file": "lib/process/launch-template.ts",
-   "kind": "BESPOKE"
-  }
- ]
+ "findings": []
 }

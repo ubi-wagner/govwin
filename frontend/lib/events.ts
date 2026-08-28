@@ -283,6 +283,68 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
 }
 
 /**
+ * The same emit, for a caller whose operation IS the event.
+ *
+ * ── WHY THIS EXISTS RATHER THAN A SECOND INSERT ──────────────────────────────────────────────
+ * `emitEventSingle` swallows its own failure by design: an event is usually instrumentation, and
+ * losing a record must not fail the work it describes. But `launchTemplate` is the inverse — the
+ * event IS the launch, the pipeline picks it up as the trigger, and a swallowed insert would
+ * report a workflow started that never will. It also needs the row id back, which the
+ * fire-and-forget signature cannot give.
+ *
+ * So it had its own `INSERT INTO system_events`, with a comment explaining the throw. The comment
+ * was right about the throw and silent about the rest: the copy also skipped
+ * `evaluateAutomationRules`, so an event that launched a workflow was **invisible to the
+ * tenant automation-rule layer** while the identical event from any other source was not. That is
+ * the cost of a second writer — it diverges in the part nobody was thinking about, not the part
+ * the comment justifies.
+ *
+ * Two behaviours, one implementation. `throwOnFailure` and the returned id are the only
+ * differences, and they are the only ones there have ever been meant to be.
+ */
+export async function emitEventSingleStrict(params: EmitSingleParams): Promise<string> {
+  warnUnknownNamespace(params.namespace, params.type);
+  const [row] = await sql<{ id: string }[]>`
+    INSERT INTO system_events (
+      namespace, type, phase, actor_type, actor_id, actor_email,
+      tenant_id, payload
+    ) VALUES (
+      ${params.namespace},
+      ${params.type},
+      'single',
+      ${params.actor.type},
+      ${params.actor.id},
+      ${params.actor.email ?? null},
+      ${params.tenantId ?? null},
+      ${jsonParam(params.payload ?? {})}
+    )
+    RETURNING id
+  `;
+  if (!row?.id) throw new Error('system_events insert returned no id');
+
+  // Best-effort, and separately caught: the automation-rule layer reacting badly must not undo a
+  // launch that has already been recorded. The row is the commitment; the rules are downstream.
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const { evaluateAutomationRules } = await import('@/lib/automation/triggers');
+      await evaluateAutomationRules({
+        eventId: row.id,
+        namespace: params.namespace,
+        type: params.type,
+        tenantId: params.tenantId ?? null,
+        payload: (params.payload ?? {}) as Record<string, unknown>,
+      });
+    } catch (err) {
+      log.error(
+        { err: serializeError(err), namespace: params.namespace, type: params.type },
+        'emitEventSingleStrict: automation rules failed after the event was written',
+      );
+    }
+  }
+  return row.id;
+}
+
+/**
  * Bracket an operation so the `end` cannot be lost, whatever happens inside.
  *
  * THE PROBLEM THIS EXISTS FOR. `emitEventStart` returns an id the `end` needs, so the natural way

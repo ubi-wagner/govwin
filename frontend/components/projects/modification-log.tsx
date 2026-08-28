@@ -74,10 +74,12 @@ function show(field: string | null, v: string | null): string {
     const n = Number(v);
     return Number.isFinite(n) ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : v;
   }
-  // A `date` column can arrive as a full timestamp; trim it to the day rather than showing a
-  // person a time nobody entered. Never slice a Date's STRING form — these are text off the change
-  // row, which is why a plain prefix test is safe here and is not elsewhere.
-  return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? String(v).slice(0, 10) : String(v);
+  // `old_value`/`new_value` are TEXT columns holding whatever the amended field held, so a date
+  // arrives here as a string already — and `v` is typed `string | null` and narrowed above.
+  // No `String()`: the wrapper accepts a `Date` silently, which is how three sibling panels on
+  // this page rendered "Fri Aug 28", no year. Trim a full timestamp to the day rather than
+  // showing a person a time nobody entered.
+  return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : v;
 }
 
 export function ModificationLog({
@@ -202,7 +204,7 @@ export function ModificationLog({
             </span>
           ) : (
             <span className="text-[11px] text-gray-500">
-              executed {String(m.executedOn ?? '').slice(0, 10)}
+              executed {(m.executedOn ?? '').slice(0, 10)}
             </span>
           )}
         </div>

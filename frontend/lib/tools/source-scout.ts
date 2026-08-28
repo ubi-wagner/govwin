@@ -21,6 +21,7 @@ import { emitEventSingle } from '@/lib/events';
 import { NotFoundError } from '@/lib/errors';
 import { ToolExternalError } from './errors';
 import { defineTool } from './base';
+import { anthropicHeaders, anthropicKey, anthropicMessagesUrl } from '@/lib/ai/endpoint';
 
 // ─── Schema ──────────────────────────────────────────────────────────
 
@@ -126,7 +127,9 @@ async function analyzeRegionWithClaude(
   model: string;
   tokensUsed: number;
 } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // Through the shared seam, so `sk-noop` reads as "no key" here exactly as it does at the five
+  // other model call sites — rather than being sent to the API to earn a 401.
+  const apiKey = anthropicKey();
   if (!apiKey) {
     return null;
   }
@@ -174,13 +177,13 @@ Severity guide:
 Only include extracted_opportunities if you identify specific, actionable opportunities.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // NOT a hard-coded host. This was the ONE model call site in the frontend that ignored
+    // `ANTHROPIC_BASE_URL`, which is the variable `EMULATE=1` sets to point every AI flow at the
+    // committed :8787 harness. The scout therefore reached past the emulator to the real API with
+    // a placeholder key and failed, alone, while every other AI-gated flow ran end to end.
+    const res = await fetch(anthropicMessagesUrl(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: anthropicHeaders(apiKey),
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,

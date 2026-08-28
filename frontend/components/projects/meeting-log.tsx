@@ -126,7 +126,7 @@ export function MeetingLog({
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-gray-900">{m.title}</span>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
-                    {m.heldOn && <span>{String(m.heldOn).slice(0, 10)}</span>}
+                    {m.heldOn && <span>{m.heldOn.slice(0, 10)}</span>}
                     {m.attendees.length > 0 && (
                       <span title={m.attendees.join(', ')} className="max-w-[13rem] truncate sm:max-w-none">
                         {m.attendees.join(', ')}

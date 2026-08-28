@@ -56,7 +56,10 @@ const DISTRIBUTION_MEANING: Record<string, string> = {
   F: 'As directed by the controlling DoD office',
 };
 
-const day = (v: string | null) => (v ? String(v).slice(0, 10) : '—');
+// No `String(v)`: the parameter is already `string | null`, and wrapping it would accept a
+// `Date` silently — which is exactly how this panel rendered "Fri Aug 28", no year. Slicing
+// the typed value makes the compiler the guard.
+const day = (v: string | null) => (v ? v.slice(0, 10) : '—');
 
 export function CdrlRegister({
   items, clins, basePath, canManage,

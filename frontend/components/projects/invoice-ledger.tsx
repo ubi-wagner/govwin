@@ -83,7 +83,9 @@ const STATUS_CLASS: Record<string, string> = {
 /** Days since submission, or null. Takes `now` so it is never read during render. */
 function ageOf(inv: LedgerInvoice, now: Date | null): number | null {
   if (inv.status !== 'submitted' || !inv.submittedOn || !now) return null;
-  const from = String(inv.submittedOn).slice(0, 10);
+  // Typed `string | null` and already narrowed above, so no `String()` — the wrapper is what
+  // let a `Date` through, and the guard below then silently returned null for every invoice.
+  const from = inv.submittedOn.slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return null;
   const ms = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`);
   return Number.isFinite(ms) ? Math.floor(ms / 86_400_000) : null;

@@ -107,7 +107,7 @@ export function EvidencePanel({
                 </span>
               )}
               {e.occurredOn && (
-                <span className="text-gray-500">on {String(e.occurredOn).slice(0, 10)}</span>
+                <span className="text-gray-500">on {e.occurredOn.slice(0, 10)}</span>
               )}
               <span title={e.filename} className="max-w-[11rem] truncate text-gray-400 sm:max-w-none">
                 📎 {e.filename}
@@ -124,7 +124,7 @@ export function EvidencePanel({
           accepted by <span className="font-medium text-gray-700">{acceptedByEmail}</span>
           {mine.length > 0
             ? <> · evidence: {KIND_LABEL[mine[0].kind] ?? mine[0].kind}
-              {mine[0].occurredOn ? `, ${String(mine[0].occurredOn).slice(0, 10)}` : ''}</>
+              {mine[0].occurredOn ? `, ${mine[0].occurredOn.slice(0, 10)}` : ''}</>
             : <> · <span className="text-amber-800">no customer evidence on file</span></>}
         </p>
       )}

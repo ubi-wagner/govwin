@@ -43,8 +43,11 @@ export interface ChecklistMember { id: string; email: string }
  */
 function slipDays(due: string | null, est: string | null): number {
   if (!due || !est) return 0;
-  const a = Date.parse(`${String(due).slice(0, 10)}T00:00:00Z`);
-  const b = Date.parse(`${String(est).slice(0, 10)}T00:00:00Z`);
+  // No `String()`: both are `string | null` and narrowed by the caller. The wrapper accepts a
+  // `Date`, whose string form parses to NaN — and NaN survives every comparison to pick a
+  // branch, which is how a variance rendered as a cheerful "NaN days early".
+  const a = Date.parse(`${due.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${est.slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
   return Math.round((b - a) / 86_400_000);
 }
@@ -198,7 +201,7 @@ export function MilestoneChecklist({
                   fragment competing with the title for the same line. */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {t.dueDate && (
-                  <span className="text-xs text-gray-500">due {String(t.dueDate).slice(0, 10)}</span>
+                  <span className="text-xs text-gray-500">due {t.dueDate.slice(0, 10)}</span>
                 )}
                 {(t.assigneeEmail || t.assigneeRole) && (
                   // `max-w` + `truncate`: a work address is longer than a phone is wide, and left
@@ -214,8 +217,12 @@ export function MilestoneChecklist({
                 {/* The assignee's own forecast, shown only when it DISAGREES with the promise.
                     Agreement is the normal case and needs no ink; the gap is the whole signal. */}
                 {slipDays(t.dueDate, t.estimatedCompletion) > 0 && t.status !== 'done' && (
+                  // `?? ''` rather than `String(...)`: `slipDays` already returns 0 when the
+                  // estimate is null, so this branch cannot render without one — but the compiler
+                  // cannot see that through a helper, and the honest way to say so is a narrowing
+                  // the type system accepts, not a cast that would also accept a Date.
                   <span
-                    title={`Assignee expects ${String(t.estimatedCompletion).slice(0, 10)}`}
+                    title={`Assignee expects ${(t.estimatedCompletion ?? '').slice(0, 10)}`}
                     className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-600/30"
                   >
                     expects {slipDays(t.dueDate, t.estimatedCompletion)}d late
@@ -283,9 +290,9 @@ export function MilestoneChecklist({
                     Due
                     <input
                       type="date"
-                      defaultValue={t.dueDate ? String(t.dueDate).slice(0, 10) : ''}
+                      defaultValue={t.dueDate ? t.dueDate.slice(0, 10) : ''}
                       aria-label={`Due date of ${t.title}`}
-                      onBlur={(e) => { if (e.target.value !== (t.dueDate ? String(t.dueDate).slice(0, 10) : '')) void edit(t.id, { dueDate: e.target.value || null }); }}
+                      onBlur={(e) => { if (e.target.value !== (t.dueDate ? t.dueDate.slice(0, 10) : '')) void edit(t.id, { dueDate: e.target.value || null }); }}
                       disabled={busy !== null}
                       className="mt-0.5 block w-full rounded border border-gray-300 px-1.5 py-1 text-xs sm:w-auto"
                     />
@@ -294,9 +301,9 @@ export function MilestoneChecklist({
                     Expect
                     <input
                       type="date"
-                      defaultValue={t.estimatedCompletion ? String(t.estimatedCompletion).slice(0, 10) : ''}
+                      defaultValue={t.estimatedCompletion ? t.estimatedCompletion.slice(0, 10) : ''}
                       aria-label={`Expected completion of ${t.title}`}
-                      onBlur={(e) => { if (e.target.value !== (t.estimatedCompletion ? String(t.estimatedCompletion).slice(0, 10) : '')) void edit(t.id, { estimatedCompletion: e.target.value || null }); }}
+                      onBlur={(e) => { if (e.target.value !== (t.estimatedCompletion ? t.estimatedCompletion.slice(0, 10) : '')) void edit(t.id, { estimatedCompletion: e.target.value || null }); }}
                       disabled={busy !== null}
                       className="mt-0.5 block w-full rounded border border-gray-300 px-1.5 py-1 text-xs sm:w-auto"
                     />

@@ -17,17 +17,17 @@
 | app-boundary | 5 | 132 |
 | app-component | 26 | 8,926 |
 | auth | 2 | 241 |
-| component | 178 | 45,142 |
+| component | 178 | 45,161 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 326 | 67,462 |
+| lib | 327 | 67,638 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
 | page | 118 | 18,460 |
 | script | 188 | 27,366 |
 | server-action | 1 | 45 |
-| test | 232 | 32,596 |
-| **total** | **1451** | **254,026** |
+| test | 233 | 32,695 |
+| **total** | **1453** | **254,320** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -659,7 +659,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 326 files
+## 6. Library modules — 327 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -669,6 +669,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/agent-client.ts | server | requestAgentTask, getAgentTaskResult | 2 | vitest |
 | lib/agent-output.ts | server | digStepText | — | **none** |
 | lib/ai/agent-guard.ts | server | RATE_LIMIT_PER_HOUR, DEFAULT_MONTHLY_BUDGET_USD, PER_CALL_CEILING_USD, MODEL_PRICING, computeCostUsd, AiRateLimitError +3 | 6 | vitest |
+| lib/ai/endpoint.ts | server | anthropicBaseUrl, anthropicMessagesUrl, anthropicKey, anthropicHeaders | — | vitest |
 | lib/amendments.ts | server | logAmendment, confirmAmendment, replayConfirmedAmendments, dismissAmendment, acknowledgeAmendmentFlag | 6 | **none** |
 | lib/analytics-admin.ts | server | getSiteAnalytics, getPageViewCounts, pageKeyToPath, getRecentSessions | 5 | **none** |
 | lib/api-helpers.ts | server | ok, err, withHandler | — | **none** |
@@ -723,7 +724,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/errors.ts | server | AppError, UnauthenticatedError, ForbiddenError, NotFoundError, ConflictError, ClaimConflictError +7 | — | vitest |
 | lib/event-labels.ts | server | describeEvent, eventHref, isNotifyWorthyPhase | — | vitest |
 | lib/event-namespaces.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES | — | vitest |
-| lib/events.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES, EventNamespace, userActor, systemActor, pipelineActor +5 | 4 | vitest |
+| lib/events.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES, EventNamespace, userActor, systemActor, pipelineActor +6 | 5 | vitest |
 | lib/export/artifact-export.ts | server | EXPORT_FORMATS, CONTENT_TYPE, resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, assembleFittedArtifactCanvas | — | vitest |
 | lib/export/canvas-html.ts | server | renderChartSvg, renderShapeSvg, canvasBaseCss, renderCanvasBodyHtml, renderCanvasToHtml, renderCanvasPreviewHtml | — | vitest |
 | lib/export/chromium.ts | server | resolveChromiumExecutable | — | **none** |
@@ -812,7 +813,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/portal-workflow.ts | server | GATE_CLOSERS, projectTodoTiming, resolveTodoAssignee, rebaselineConfig, canEditWorkflow, getGuardrailLimits +10 | 10 | vitest |
 | lib/process/force-advance.ts | server | forceAdvanceProcess | 4 | vitest |
 | lib/process/health.ts | server | HEARTBEAT_STALE_MS, classifyProcessHealth, healthSortWeight, filterAndSortProcesses | — | vitest |
-| lib/process/launch-template.ts | server | launchTemplate | 4 | vitest |
+| lib/process/launch-template.ts | server | launchTemplate | 3 | vitest |
 | lib/process/project-collaboration.ts | server | launchProjectCollaboration | — | vitest |
 | lib/projects/access.ts | server | projectScope, canAccessProject, listProjectsForActor, listAssignees, canAssign, assignMember +1 | 10 | vitest |
 | lib/projects/baseline.ts | server | setBaseline, rebaseline, milestoneVariance, noteSlip | 4 | vitest |
@@ -1022,7 +1023,7 @@ statement is per-layer, not one number.
 | pages | 118 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 155 | verify-api-contract | see that lens's own accounting |
 | API routes (write verbs) | 221 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 326 | vitest 187 · sweep-mold-quality 39 | 100 |
+| lib modules | 327 | vitest 188 · sweep-mold-quality 39 | 100 |
 | components | 204 | only transitively, via a page that renders them | not measured |
 
 **The write verbs are the real gap.** 221 routes expose a POST/PATCH/PUT/DELETE and no lens
@@ -1034,7 +1035,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 ### lib modules no harness loads
 
 - `lib/proposal/volume-finish.ts` — 616 lines
-- `lib/tools/source-scout.ts` — 553 lines
+- `lib/tools/source-scout.ts` — 556 lines
 - `lib/import/pdf-reader.ts` — 523 lines
 - `lib/content-admin.ts` — 515 lines
 - `lib/email-templates.ts` — 385 lines
