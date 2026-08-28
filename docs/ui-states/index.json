@@ -1,6 +1,6 @@
 {
  "base": "http://localhost:3000",
- "routesDriven": 126,
+ "routesDriven": 128,
  "shots": [
   {
    "lane": "anon",
@@ -27,7 +27,7 @@
    "file": "tenant__portal-tenantSlug-activity__003-panel-Proposal.jpg",
    "trigger": "Proposal",
    "kind": "panel",
-   "chars": "20390→12299"
+   "chars": "16921→18764"
   },
   {
    "lane": "tenant",
@@ -36,7 +36,7 @@
    "file": "tenant__portal-tenantSlug-activity__004-panel-Library.jpg",
    "trigger": "Library",
    "kind": "panel",
-   "chars": "12299→20028"
+   "chars": "18764→20321"
   },
   {
    "lane": "tenant",
@@ -45,7 +45,7 @@
    "file": "tenant__portal-tenantSlug-activity__005-panel-Capture.jpg",
    "trigger": "Capture",
    "kind": "panel",
-   "chars": "20028→17395"
+   "chars": "20321→20320"
   },
   {
    "lane": "tenant",
@@ -54,7 +54,7 @@
    "file": "tenant__portal-tenantSlug-activity__006-panel-Tool.jpg",
    "trigger": "Tool",
    "kind": "panel",
-   "chars": "17395→4194"
+   "chars": "20320→11387"
   },
   {
    "lane": "tenant",
@@ -63,7 +63,7 @@
    "file": "tenant__portal-tenantSlug-activity__007-panel-Identity.jpg",
    "trigger": "Identity",
    "kind": "panel",
-   "chars": "4194→669"
+   "chars": "11387→669"
   },
   {
    "lane": "tenant",
@@ -81,7 +81,7 @@
    "file": "tenant__portal-tenantSlug-activity__009-panel-System.jpg",
    "trigger": "System",
    "kind": "panel",
-   "chars": "203→7330"
+   "chars": "203→19453"
   },
   {
    "lane": "tenant",
@@ -90,7 +90,7 @@
    "file": "tenant__portal-tenantSlug-activity__010-panel-1h.jpg",
    "trigger": "1h",
    "kind": "panel",
-   "chars": "7330→541"
+   "chars": "19453→1200"
   },
   {
    "lane": "tenant",
@@ -99,7 +99,7 @@
    "file": "tenant__portal-tenantSlug-agents__011-panel-7d.jpg",
    "trigger": "7d",
    "kind": "panel",
-   "chars": "1611→1610"
+   "chars": "1927→1926"
   },
   {
    "lane": "tenant",
@@ -120,258 +120,204 @@
   },
   {
    "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "label": "panel-All",
-   "file": "tenant__portal-tenantSlug-atoms__014-panel-All.jpg",
-   "trigger": "All",
-   "kind": "panel",
-   "chars": "4825→5924"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "label": "panel-Foundations",
-   "file": "tenant__portal-tenantSlug-atoms__015-panel-Foundations.jpg",
-   "trigger": "Foundations",
-   "kind": "panel",
-   "chars": "5924→4825"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "label": "panel-Atoms",
-   "file": "tenant__portal-tenantSlug-atoms__016-panel-Atoms.jpg",
-   "trigger": "Atoms",
-   "kind": "panel",
-   "chars": "4825→5924"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "label": "panel-Review",
-   "file": "tenant__portal-tenantSlug-atoms__017-panel-Review.jpg",
-   "trigger": "Review",
-   "kind": "panel",
-   "chars": "6157→2308"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "label": "panel-Upload package",
-   "file": "tenant__portal-tenantSlug-atoms__018-panel-Upload-package.jpg",
-   "trigger": "Upload package",
-   "kind": "panel",
-   "chars": "2308→2818"
-  },
-  {
-   "lane": "tenant",
    "route": "/portal/[tenantSlug]/buckets",
    "label": "panel-Rank →",
-   "file": "tenant__portal-tenantSlug-buckets__019-panel-Rank.jpg",
+   "file": "tenant__portal-tenantSlug-buckets__014-panel-Rank.jpg",
    "trigger": "Rank →",
    "kind": "panel",
-   "chars": "438→1501"
+   "chars": "289→1290"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/buckets",
    "label": "panel-✎",
-   "file": "tenant__portal-tenantSlug-buckets__020-panel.jpg",
+   "file": "tenant__portal-tenantSlug-buckets__015-panel.jpg",
    "trigger": "✎",
    "kind": "panel",
-   "chars": "1501→1505"
+   "chars": "1290→1294"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/buckets",
    "label": "panel-✕",
-   "file": "tenant__portal-tenantSlug-buckets__021-panel.jpg",
+   "file": "tenant__portal-tenantSlug-buckets__016-panel.jpg",
    "trigger": "✕",
    "kind": "panel",
-   "chars": "1505→390"
+   "chars": "1294→246"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/buckets",
    "label": "panel-Rank →",
-   "file": "tenant__portal-tenantSlug-buckets__022-panel-Rank.jpg",
+   "file": "tenant__portal-tenantSlug-buckets__017-panel-Rank.jpg",
    "trigger": "Rank →",
    "kind": "panel",
-   "chars": "390→1340"
+   "chars": "246→1248"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/buckets",
    "label": "panel-✕",
-   "file": "tenant__portal-tenantSlug-buckets__023-panel.jpg",
+   "file": "tenant__portal-tenantSlug-buckets__018-panel.jpg",
    "trigger": "✕",
    "kind": "panel",
-   "chars": "1340→338"
+   "chars": "1248→491"
   },
   {
    "lane": "tenant",
-   "route": "/portal/[tenantSlug]/buckets",
-   "label": "panel-Rank →",
-   "file": "tenant__portal-tenantSlug-buckets__024-panel-Rank.jpg",
-   "trigger": "Rank →",
+   "route": "/portal/[tenantSlug]/cards",
+   "label": "panel-Unpin",
+   "file": "tenant__portal-tenantSlug-cards__019-panel-Unpin.jpg",
+   "trigger": "Unpin",
    "kind": "panel",
-   "chars": "338→1281"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/buckets",
-   "label": "panel-✕",
-   "file": "tenant__portal-tenantSlug-buckets__025-panel.jpg",
-   "trigger": "✕",
-   "kind": "panel",
-   "chars": "1281→293"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/buckets",
-   "label": "panel-Rank →",
-   "file": "tenant__portal-tenantSlug-buckets__026-panel-Rank.jpg",
-   "trigger": "Rank →",
-   "kind": "panel",
-   "chars": "293→1239"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant__portal-tenantSlug-cards__027-panel-Pin-to-pursue.jpg",
+   "file": "tenant__portal-tenantSlug-cards__020-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1946→1939"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant__portal-tenantSlug-cards__028-panel-Not-interested.jpg",
+   "file": "tenant__portal-tenantSlug-cards__021-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1939→1946"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant__portal-tenantSlug-cards__029-panel-Pin-to-pursue.jpg",
+   "file": "tenant__portal-tenantSlug-cards__022-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1946→1939"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant__portal-tenantSlug-cards__030-panel-Not-interested.jpg",
+   "file": "tenant__portal-tenantSlug-cards__023-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1939→1946"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant__portal-tenantSlug-cards__031-panel-Pin-to-pursue.jpg",
+   "file": "tenant__portal-tenantSlug-cards__024-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1946→1939"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant__portal-tenantSlug-cards__032-panel-Not-interested.jpg",
+   "file": "tenant__portal-tenantSlug-cards__025-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1939→1946"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant__portal-tenantSlug-cards__033-panel-Pin-to-pursue.jpg",
+   "file": "tenant__portal-tenantSlug-cards__026-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1946→1939"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/command",
-   "label": "panel-To-dos4",
-   "file": "tenant__portal-tenantSlug-command__034-panel-To-dos4.jpg",
-   "trigger": "To-dos4",
+   "label": "panel-To-dos87",
+   "file": "tenant__portal-tenantSlug-command__027-panel-To-dos87.jpg",
+   "trigger": "To-dos87",
    "kind": "panel",
-   "chars": "2133→1104"
+   "chars": "1689→18000"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/command",
-   "label": "panel-Workflows2",
-   "file": "tenant__portal-tenantSlug-command__035-panel-Workflows2.jpg",
-   "trigger": "Workflows2",
+   "label": "panel-Workflows",
+   "file": "tenant__portal-tenantSlug-command__028-panel-Workflows.jpg",
+   "trigger": "Workflows",
    "kind": "panel",
-   "chars": "1104→2858"
+   "chars": "18000→3782"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/command",
+   "label": "panel-Projects1",
+   "file": "tenant__portal-tenantSlug-command__029-panel-Projects1.jpg",
+   "trigger": "Projects1",
+   "kind": "panel",
+   "chars": "3782→269"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/command",
    "label": "panel-Activity",
-   "file": "tenant__portal-tenantSlug-command__036-panel-Activity.jpg",
+   "file": "tenant__portal-tenantSlug-command__030-panel-Activity.jpg",
    "trigger": "Activity",
    "kind": "panel",
-   "chars": "2858→1240"
+   "chars": "269→1194"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "open-4✓To-dos",
-   "file": "tenant__portal-tenantSlug-dashboard__037-open-4-To-dos.jpg",
-   "trigger": "4✓To-dos",
+   "label": "open-87✓To-dos",
+   "file": "tenant__portal-tenantSlug-dashboard__031-open-87-To-dos.jpg",
+   "trigger": "87✓To-dos",
    "kind": "open"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "open-23⬆Library",
-   "file": "tenant__portal-tenantSlug-dashboard__038-open-23-Library.jpg",
-   "trigger": "23⬆Library",
+   "label": "open-99+⬆Library",
+   "file": "tenant__portal-tenantSlug-dashboard__032-open-99-Library.jpg",
+   "trigger": "99+⬆Library",
    "kind": "open"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "open-9◎Opportunities",
-   "file": "tenant__portal-tenantSlug-dashboard__039-open-9-Opportunities.jpg",
-   "trigger": "9◎Opportunities",
+   "label": "open-10◎Opportunities",
+   "file": "tenant__portal-tenantSlug-dashboard__033-open-10-Opportunities.jpg",
+   "trigger": "10◎Opportunities",
    "kind": "open"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "filled-9◎Opportunities",
-   "file": "tenant__portal-tenantSlug-dashboard__040-filled-9-Opportunities.jpg",
-   "trigger": "9◎Opportunities",
+   "label": "filled-10◎Opportunities",
+   "file": "tenant__portal-tenantSlug-dashboard__034-filled-10-Opportunities.jpg",
+   "trigger": "10◎Opportunities",
    "kind": "filled",
    "fields": 3
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "open-2▦Buckets",
-   "file": "tenant__portal-tenantSlug-dashboard__041-open-2-Buckets.jpg",
-   "trigger": "2▦Buckets",
+   "label": "open-▦Buckets",
+   "file": "tenant__portal-tenantSlug-dashboard__035-open-Buckets.jpg",
+   "trigger": "▦Buckets",
    "kind": "open"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "filled-2▦Buckets",
-   "file": "tenant__portal-tenantSlug-dashboard__042-filled-2-Buckets.jpg",
-   "trigger": "2▦Buckets",
+   "label": "filled-▦Buckets",
+   "file": "tenant__portal-tenantSlug-dashboard__036-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
    "kind": "filled",
    "fields": 6
   },
@@ -379,24 +325,105 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "open-↻Activity",
-   "file": "tenant__portal-tenantSlug-dashboard__043-open-Activity.jpg",
+   "file": "tenant__portal-tenantSlug-dashboard__037-open-Activity.jpg",
    "trigger": "↻Activity",
    "kind": "open"
   },
   {
    "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "label": "panel-Grid",
+   "file": "tenant__portal-tenantSlug-documents-documentId__038-panel-Grid.jpg",
+   "trigger": "Grid",
+   "kind": "panel",
+   "chars": "2261→2367"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "label": "panel-+ From Library",
+   "file": "tenant__portal-tenantSlug-documents-documentId__039-panel-From-Library.jpg",
+   "trigger": "+ From Library",
+   "kind": "panel",
+   "chars": "2367→5731"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "label": "panel-Hide panel",
+   "file": "tenant__portal-tenantSlug-documents-documentId__040-panel-Hide-panel.jpg",
+   "trigger": "Hide panel",
+   "kind": "panel",
+   "chars": "5731→5420"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "label": "panel-HHeading",
+   "file": "tenant__portal-tenantSlug-documents-documentId__041-panel-HHeading.jpg",
+   "trigger": "HHeading",
+   "kind": "panel",
+   "chars": "5420→5442"
+  },
+  {
+   "lane": "tenant",
    "route": "/portal/[tenantSlug]/documents/new",
    "label": "panel-▦Slide deck16:9 slides — pitch, briefing, ca",
-   "file": "tenant__portal-tenantSlug-documents-new__044-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg",
+   "file": "tenant__portal-tenantSlug-documents-new__042-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg",
    "trigger": "▦Slide deck16:9 slides — pitch, briefing, ca",
    "kind": "panel",
    "chars": "713→1149"
   },
   {
    "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "label": "panel-Grid",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationI__043-panel-Grid.jpg",
+   "trigger": "Grid",
+   "kind": "panel",
+   "chars": "1045→1144"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "label": "panel-+ From Library",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationI__044-panel-From-Library.jpg",
+   "trigger": "+ From Library",
+   "kind": "panel",
+   "chars": "1144→4179"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "label": "panel-Hide panel",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationI__045-panel-Hide-panel.jpg",
+   "trigger": "Hide panel",
+   "kind": "panel",
+   "chars": "4179→3863"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "label": "panel-HHeading",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationI__046-panel-HHeading.jpg",
+   "trigger": "HHeading",
+   "kind": "panel",
+   "chars": "3863→3885"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "label": "panel-⊞Table",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationI__047-panel-Table.jpg",
+   "trigger": "⊞Table",
+   "kind": "panel",
+   "chars": "3930→3983"
+  },
+  {
+   "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-1Subscribenone",
-   "file": "tenant__portal-tenantSlug-manage__045-open-1Subscribenone.jpg",
+   "file": "tenant__portal-tenantSlug-manage__048-open-1Subscribenone.jpg",
    "trigger": "1Subscribenone",
    "kind": "open"
   },
@@ -404,7 +431,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-1Subscribenone",
-   "file": "tenant__portal-tenantSlug-manage__046-filled-1Subscribenone.jpg",
+   "file": "tenant__portal-tenantSlug-manage__049-filled-1Subscribenone.jpg",
    "trigger": "1Subscribenone",
    "kind": "filled",
    "fields": 1
@@ -412,25 +439,8 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
-   "label": "open-2Spotlight2 buckets · 9 OPPs",
-   "file": "tenant__portal-tenantSlug-manage__047-open-2Spotlight2-buckets-9-OPPs.jpg",
-   "trigger": "2Spotlight2 buckets · 9 OPPs",
-   "kind": "open"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/manage",
-   "label": "filled-2Spotlight2 buckets · 9 OPPs",
-   "file": "tenant__portal-tenantSlug-manage__048-filled-2Spotlight2-buckets-9-OPPs.jpg",
-   "trigger": "2Spotlight2 buckets · 9 OPPs",
-   "kind": "filled",
-   "fields": 6
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/manage",
    "label": "open-3Buy4 portals",
-   "file": "tenant__portal-tenantSlug-manage__049-open-3Buy4-portals.jpg",
+   "file": "tenant__portal-tenantSlug-manage__050-open-3Buy4-portals.jpg",
    "trigger": "3Buy4 portals",
    "kind": "open"
   },
@@ -438,7 +448,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-⚙Account",
-   "file": "tenant__portal-tenantSlug-manage__050-open-Account.jpg",
+   "file": "tenant__portal-tenantSlug-manage__051-open-Account.jpg",
    "trigger": "⚙Account",
    "kind": "open"
   },
@@ -446,7 +456,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-⚙Account",
-   "file": "tenant__portal-tenantSlug-manage__051-filled-Account.jpg",
+   "file": "tenant__portal-tenantSlug-manage__052-filled-Account.jpg",
    "trigger": "⚙Account",
    "kind": "filled",
    "fields": 1
@@ -454,17 +464,17 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
-   "label": "open-2▦Buckets",
-   "file": "tenant__portal-tenantSlug-manage__052-open-2-Buckets.jpg",
-   "trigger": "2▦Buckets",
+   "label": "open-▦Buckets",
+   "file": "tenant__portal-tenantSlug-manage__053-open-Buckets.jpg",
+   "trigger": "▦Buckets",
    "kind": "open"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
-   "label": "filled-2▦Buckets",
-   "file": "tenant__portal-tenantSlug-manage__053-filled-2-Buckets.jpg",
-   "trigger": "2▦Buckets",
+   "label": "filled-▦Buckets",
+   "file": "tenant__portal-tenantSlug-manage__054-filled-Buckets.jpg",
+   "trigger": "▦Buckets",
    "kind": "filled",
    "fields": 6
   },
@@ -472,7 +482,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-4👥Users",
-   "file": "tenant__portal-tenantSlug-manage__054-open-4-Users.jpg",
+   "file": "tenant__portal-tenantSlug-manage__055-open-4-Users.jpg",
    "trigger": "4👥Users",
    "kind": "open"
   },
@@ -480,7 +490,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-4👥Users",
-   "file": "tenant__portal-tenantSlug-manage__055-filled-4-Users.jpg",
+   "file": "tenant__portal-tenantSlug-manage__056-filled-4-Users.jpg",
    "trigger": "4👥Users",
    "kind": "filled",
    "fields": 6
@@ -489,7 +499,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-4🏗Portals",
-   "file": "tenant__portal-tenantSlug-manage__056-open-4-Portals.jpg",
+   "file": "tenant__portal-tenantSlug-manage__057-open-4-Portals.jpg",
    "trigger": "4🏗Portals",
    "kind": "open"
   },
@@ -497,7 +507,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-⚡Automation",
-   "file": "tenant__portal-tenantSlug-manage__057-open-Automation.jpg",
+   "file": "tenant__portal-tenantSlug-manage__058-open-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "open"
   },
@@ -505,7 +515,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "validation-⚡Automation",
-   "file": "tenant__portal-tenantSlug-manage__058-validation-Automation.jpg",
+   "file": "tenant__portal-tenantSlug-manage__059-validation-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "validation"
   },
@@ -513,7 +523,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-⚡Automation",
-   "file": "tenant__portal-tenantSlug-manage__059-filled-Automation.jpg",
+   "file": "tenant__portal-tenantSlug-manage__060-filled-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "filled",
    "fields": 6
@@ -522,7 +532,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-🤖AI usage",
-   "file": "tenant__portal-tenantSlug-manage__060-open-AI-usage.jpg",
+   "file": "tenant__portal-tenantSlug-manage__061-open-AI-usage.jpg",
    "trigger": "🤖AI usage",
    "kind": "open"
   },
@@ -530,46 +540,37 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/portals/[portalId]",
    "label": "panel-×",
-   "file": "tenant__portal-tenantSlug-portals-portalId__061-panel.jpg",
+   "file": "tenant__portal-tenantSlug-portals-portalId__062-panel.jpg",
    "trigger": "×",
    "kind": "panel",
-   "chars": "1583→1441"
+   "chars": "1586→1444"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/portals/[portalId]",
    "label": "panel-+ add to-do",
-   "file": "tenant__portal-tenantSlug-portals-portalId__062-panel-add-to-do.jpg",
+   "file": "tenant__portal-tenantSlug-portals-portalId__063-panel-add-to-do.jpg",
    "trigger": "+ add to-do",
    "kind": "panel",
-   "chars": "1441→1583"
+   "chars": "1444→1586"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/portals/[portalId]",
    "label": "panel-×",
-   "file": "tenant__portal-tenantSlug-portals-portalId__063-panel.jpg",
+   "file": "tenant__portal-tenantSlug-portals-portalId__064-panel.jpg",
    "trigger": "×",
    "kind": "panel",
-   "chars": "1583→1441"
+   "chars": "1586→1444"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/portals/[portalId]",
    "label": "panel-+ add to-do",
-   "file": "tenant__portal-tenantSlug-portals-portalId__064-panel-add-to-do.jpg",
+   "file": "tenant__portal-tenantSlug-portals-portalId__065-panel-add-to-do.jpg",
    "trigger": "+ add to-do",
    "kind": "panel",
-   "chars": "1441→1583"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/portals",
-   "label": "panel-Advance stage",
-   "file": "tenant__portal-tenantSlug-portals__065-panel-Advance-stage.jpg",
-   "trigger": "Advance stage",
-   "kind": "panel",
-   "chars": "782→783"
+   "chars": "1444→1586"
   },
   {
    "lane": "tenant",
@@ -578,34 +579,34 @@
    "file": "tenant__portal-tenantSlug-portals__066-panel-Advance-stage.jpg",
    "trigger": "Advance stage",
    "kind": "panel",
-   "chars": "783→784"
+   "chars": "786→739"
   },
   {
    "lane": "tenant",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "confirm-Move to next gate",
-   "file": "tenant__portal-tenantSlug-processes__067-confirm-Move-to-next-gate.jpg",
-   "trigger": "Move to next gate",
-   "kind": "confirm",
-   "message": "Override the \"Review Gate\" gate and move this process to its next step?"
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant__portal-tenantSlug-processes__068-panel-Steps.jpg",
-   "trigger": "Steps",
+   "route": "/portal/[tenantSlug]/portals",
+   "label": "panel-Advance stage",
+   "file": "tenant__portal-tenantSlug-portals__067-panel-Advance-stage.jpg",
+   "trigger": "Advance stage",
    "kind": "panel",
-   "chars": "2866→3005"
+   "chars": "739→692"
   },
   {
    "lane": "tenant",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "confirm-Move to next gate",
-   "file": "tenant__portal-tenantSlug-processes__069-confirm-Move-to-next-gate.jpg",
-   "trigger": "Move to next gate",
-   "kind": "confirm",
-   "message": "Override the \"Review Gate\" gate and move this process to its next step?"
+   "route": "/portal/[tenantSlug]/portals",
+   "label": "panel-Advance stage",
+   "file": "tenant__portal-tenantSlug-portals__068-panel-Advance-stage.jpg",
+   "trigger": "Advance stage",
+   "kind": "panel",
+   "chars": "692→645"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/portals",
+   "label": "panel-Advance stage",
+   "file": "tenant__portal-tenantSlug-portals__069-panel-Advance-stage.jpg",
+   "trigger": "Advance stage",
+   "kind": "panel",
+   "chars": "645→598"
   },
   {
    "lane": "tenant",
@@ -614,7 +615,7 @@
    "file": "tenant__portal-tenantSlug-processes__070-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "3005→3144"
+   "chars": "3782→3926"
   },
   {
    "lane": "tenant",
@@ -623,7 +624,7 @@
    "file": "tenant__portal-tenantSlug-processes__071-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "3144→3288"
+   "chars": "3926→4070"
   },
   {
    "lane": "tenant",
@@ -632,7 +633,7 @@
    "file": "tenant__portal-tenantSlug-processes__072-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "3288→3432"
+   "chars": "4070→4398"
   },
   {
    "lane": "tenant",
@@ -641,7 +642,7 @@
    "file": "tenant__portal-tenantSlug-processes__073-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "3432→3576"
+   "chars": "4398→4726"
   },
   {
    "lane": "tenant",
@@ -650,13 +651,58 @@
    "file": "tenant__portal-tenantSlug-processes__074-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "3576→3720"
+   "chars": "4726→5054"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant__portal-tenantSlug-processes__075-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "5054→5382"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant__portal-tenantSlug-processes__076-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "5382→5710"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant__portal-tenantSlug-processes__077-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "5710→6038"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant__portal-tenantSlug-processes__078-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "6038→6366"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant__portal-tenantSlug-processes__079-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "6366→6694"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/profile",
    "label": "panel-Edit",
-   "file": "tenant__portal-tenantSlug-profile__075-panel-Edit.jpg",
+   "file": "tenant__portal-tenantSlug-profile__080-panel-Edit.jpg",
    "trigger": "Edit",
    "kind": "panel",
    "chars": "600→541"
@@ -664,33 +710,35 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/projects/[projectId]",
-   "label": "toast-Accept",
-   "file": "tenant__portal-tenantSlug-projects-projectId__076-toast-Accept.jpg",
-   "trigger": "Accept",
-   "kind": "toast"
+   "label": "confirm-×",
+   "file": "tenant__portal-tenantSlug-projects-projectId__081-confirm.jpg",
+   "trigger": "×",
+   "kind": "confirm",
+   "message": "Take Conor Atkins off this project? They will lose access to it."
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/projects/[projectId]",
-   "label": "toast-Upload file",
-   "file": "tenant__portal-tenantSlug-projects-projectId__077-toast-Upload-file.jpg",
-   "trigger": "Upload file",
-   "kind": "toast"
+   "label": "confirm-×",
+   "file": "tenant__portal-tenantSlug-projects-projectId__082-confirm.jpg",
+   "trigger": "×",
+   "kind": "confirm",
+   "message": "Take Kate Ulepic off this project? They will lose access to it."
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]",
    "label": "panel-Assign a task",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId__078-panel-Assign-a-task.jpg",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId__083-panel-Assign-a-task.jpg",
    "trigger": "Assign a task",
    "kind": "panel",
-   "chars": "33690→33965"
+   "chars": "33799→34074"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "label": "panel-✓Comp 1/1",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__079-panel-Comp-1-1.jpg",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__084-panel-Comp-1-1.jpg",
    "trigger": "✓Comp 1/1",
    "kind": "panel",
    "chars": "2062→2158"
@@ -699,7 +747,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "label": "panel-Atoms",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__080-panel-Atoms.jpg",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__085-panel-Atoms.jpg",
    "trigger": "Atoms",
    "kind": "panel",
    "chars": "2158→2062"
@@ -708,7 +756,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "label": "panel-Grid",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__081-panel-Grid.jpg",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__086-panel-Grid.jpg",
    "trigger": "Grid",
    "kind": "panel",
    "chars": "2062→2161"
@@ -717,7 +765,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "label": "panel-Hide panel",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__082-panel-Hide-panel.jpg",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-__087-panel-Hide-panel.jpg",
    "trigger": "Hide panel",
    "kind": "panel",
    "chars": "2161→1804"
@@ -726,7 +774,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/team",
    "label": "confirm-Deactivate",
-   "file": "tenant__portal-tenantSlug-team__083-confirm-Deactivate.jpg",
+   "file": "tenant__portal-tenantSlug-team__088-confirm-Deactivate.jpg",
    "trigger": "Deactivate",
    "kind": "confirm",
    "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
@@ -735,7 +783,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/team",
    "label": "confirm-Deactivate",
-   "file": "tenant__portal-tenantSlug-team__084-confirm-Deactivate.jpg",
+   "file": "tenant__portal-tenantSlug-team__089-confirm-Deactivate.jpg",
    "trigger": "Deactivate",
    "kind": "confirm",
    "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
@@ -744,25 +792,16 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/team",
    "label": "confirm-Deactivate",
-   "file": "tenant__portal-tenantSlug-team__085-confirm-Deactivate.jpg",
+   "file": "tenant__portal-tenantSlug-team__090-confirm-Deactivate.jpg",
    "trigger": "Deactivate",
    "kind": "confirm",
    "message": "Deactivate this member? Their access is revoked immediately; their history is kept and you can reactivate them anytime."
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/templates",
-   "label": "panel-Refreshed ✕",
-   "file": "tenant__portal-tenantSlug-templates__086-panel-Refreshed.jpg",
-   "trigger": "Refreshed ✕",
-   "kind": "panel",
-   "chars": "2806→2794"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/templates",
    "label": "toast-Use this template",
-   "file": "tenant__portal-tenantSlug-templates__087-toast-Use-this-template.jpg",
+   "file": "tenant__portal-tenantSlug-templates__091-toast-Use-this-template.jpg",
    "trigger": "Use this template",
    "kind": "toast"
   },
@@ -770,52 +809,97 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-＋ New to-do / broadcast",
-   "file": "tenant__portal-tenantSlug-todos__088-panel-New-to-do-broadcast.jpg",
+   "file": "tenant__portal-tenantSlug-todos__092-panel-New-to-do-broadcast.jpg",
    "trigger": "＋ New to-do / broadcast",
    "kind": "panel",
-   "chars": "988→1248"
+   "chars": "17873→18133"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-Dismiss",
-   "file": "tenant__portal-tenantSlug-todos__089-panel-Dismiss.jpg",
+   "file": "tenant__portal-tenantSlug-todos__093-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "1248→1090"
+   "chars": "18133→18004"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-Dismiss",
-   "file": "tenant__portal-tenantSlug-todos__090-panel-Dismiss.jpg",
+   "file": "tenant__portal-tenantSlug-todos__094-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "1090→932"
+   "chars": "18004→17875"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-Dismiss",
-   "file": "tenant__portal-tenantSlug-todos__091-panel-Dismiss.jpg",
+   "file": "tenant__portal-tenantSlug-todos__095-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "932→614"
+   "chars": "17875→17746"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-Dismiss",
-   "file": "tenant__portal-tenantSlug-todos__092-panel-Dismiss.jpg",
+   "file": "tenant__portal-tenantSlug-todos__096-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "614→335"
+   "chars": "17746→17617"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "label": "panel-Dismiss",
+   "file": "tenant__portal-tenantSlug-todos__097-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "17617→17488"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "label": "panel-Dismiss",
+   "file": "tenant__portal-tenantSlug-todos__098-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "17488→17359"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "label": "panel-Dismiss",
+   "file": "tenant__portal-tenantSlug-todos__099-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "17359→17230"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "label": "panel-Dismiss",
+   "file": "tenant__portal-tenantSlug-todos__100-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "17230→17101"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "label": "panel-Dismiss",
+   "file": "tenant__portal-tenantSlug-todos__101-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "17101→16972"
   },
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/vaults",
    "label": "open-＋ New nook",
-   "file": "tenant__portal-tenantSlug-vaults__093-open-New-nook.jpg",
+   "file": "tenant__portal-tenantSlug-vaults__102-open-New-nook.jpg",
    "trigger": "＋ New nook",
    "kind": "open"
   },
@@ -823,7 +907,7 @@
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/vaults",
    "label": "filled-＋ New nook",
-   "file": "tenant__portal-tenantSlug-vaults__094-filled-New-nook.jpg",
+   "file": "tenant__portal-tenantSlug-vaults__103-filled-New-nook.jpg",
    "trigger": "＋ New nook",
    "kind": "filled",
    "fields": 2
@@ -832,70 +916,79 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-Proposal",
-   "file": "tenant2__portal-tenantSlug-activity__095-panel-Proposal.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__104-panel-Proposal.jpg",
    "trigger": "Proposal",
    "kind": "panel",
-   "chars": "6532→203"
+   "chars": "15282→1220"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-Library",
-   "file": "tenant2__portal-tenantSlug-activity__096-panel-Library.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__105-panel-Library.jpg",
    "trigger": "Library",
    "kind": "panel",
-   "chars": "203→3817"
+   "chars": "1220→4117"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-Capture",
-   "file": "tenant2__portal-tenantSlug-activity__097-panel-Capture.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__106-panel-Capture.jpg",
    "trigger": "Capture",
    "kind": "panel",
-   "chars": "3817→1467"
+   "chars": "4117→3979"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-Tool",
-   "file": "tenant2__portal-tenantSlug-activity__098-panel-Tool.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__107-panel-Tool.jpg",
    "trigger": "Tool",
    "kind": "panel",
-   "chars": "1467→203"
+   "chars": "3979→4866"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/activity",
+   "label": "panel-Identity",
+   "file": "tenant2__portal-tenantSlug-activity__108-panel-Identity.jpg",
+   "trigger": "Identity",
+   "kind": "panel",
+   "chars": "4866→203"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-System",
-   "file": "tenant2__portal-tenantSlug-activity__099-panel-System.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__109-panel-System.jpg",
    "trigger": "System",
    "kind": "panel",
-   "chars": "203→1572"
+   "chars": "203→3546"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/activity",
    "label": "panel-1h",
-   "file": "tenant2__portal-tenantSlug-activity__100-panel-1h.jpg",
+   "file": "tenant2__portal-tenantSlug-activity__110-panel-1h.jpg",
    "trigger": "1h",
    "kind": "panel",
-   "chars": "1572→203"
+   "chars": "3546→443"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/agents",
    "label": "panel-7d",
-   "file": "tenant2__portal-tenantSlug-agents__101-panel-7d.jpg",
+   "file": "tenant2__portal-tenantSlug-agents__111-panel-7d.jpg",
    "trigger": "7d",
    "kind": "panel",
-   "chars": "171→170"
+   "chars": "1701→1700"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/atoms",
    "label": "open-＋ Create canvas",
-   "file": "tenant2__portal-tenantSlug-atoms__102-open-Create-canvas.jpg",
+   "file": "tenant2__portal-tenantSlug-atoms__112-open-Create-canvas.jpg",
    "trigger": "＋ Create canvas",
    "kind": "open"
   },
@@ -903,7 +996,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/atoms",
    "label": "filled-＋ Create canvas",
-   "file": "tenant2__portal-tenantSlug-atoms__103-filled-Create-canvas.jpg",
+   "file": "tenant2__portal-tenantSlug-atoms__113-filled-Create-canvas.jpg",
    "trigger": "＋ Create canvas",
    "kind": "filled",
    "fields": 3
@@ -912,124 +1005,124 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/atoms",
    "label": "panel-Atoms",
-   "file": "tenant2__portal-tenantSlug-atoms__104-panel-Atoms.jpg",
+   "file": "tenant2__portal-tenantSlug-atoms__114-panel-Atoms.jpg",
    "trigger": "Atoms",
    "kind": "panel",
-   "chars": "51315→53725"
+   "chars": "51425→53802"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/cards",
+   "label": "panel-Unpin",
+   "file": "tenant2__portal-tenantSlug-cards__115-panel-Unpin.jpg",
+   "trigger": "Unpin",
+   "kind": "panel",
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant2__portal-tenantSlug-cards__105-panel-Pin-to-pursue.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__116-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1314→1307"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant2__portal-tenantSlug-cards__106-panel-Not-interested.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__117-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1307→1314"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant2__portal-tenantSlug-cards__107-panel-Pin-to-pursue.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__118-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1314→1307"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant2__portal-tenantSlug-cards__108-panel-Not-interested.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__119-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1307→1314"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant2__portal-tenantSlug-cards__109-panel-Pin-to-pursue.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__120-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1314→1307"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Not interested",
-   "file": "tenant2__portal-tenantSlug-cards__110-panel-Not-interested.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__121-panel-Not-interested.jpg",
    "trigger": "Not interested",
    "kind": "panel",
-   "chars": "1307→1314"
+   "chars": "1484→1491"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/cards",
    "label": "panel-Pin to pursue",
-   "file": "tenant2__portal-tenantSlug-cards__111-panel-Pin-to-pursue.jpg",
+   "file": "tenant2__portal-tenantSlug-cards__122-panel-Pin-to-pursue.jpg",
    "trigger": "Pin to pursue",
    "kind": "panel",
-   "chars": "1314→1307"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/cards",
-   "label": "panel-Not interested",
-   "file": "tenant2__portal-tenantSlug-cards__112-panel-Not-interested.jpg",
-   "trigger": "Not interested",
-   "kind": "panel",
-   "chars": "1307→1314"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/cards",
-   "label": "panel-Pin to pursue",
-   "file": "tenant2__portal-tenantSlug-cards__113-panel-Pin-to-pursue.jpg",
-   "trigger": "Pin to pursue",
-   "kind": "panel",
-   "chars": "1314→1307"
+   "chars": "1491→1484"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/command",
    "label": "panel-To-dos",
-   "file": "tenant2__portal-tenantSlug-command__114-panel-To-dos.jpg",
+   "file": "tenant2__portal-tenantSlug-command__123-panel-To-dos.jpg",
    "trigger": "To-dos",
    "kind": "panel",
-   "chars": "1445→187"
+   "chars": "1631→196"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/command",
    "label": "panel-Workflows",
-   "file": "tenant2__portal-tenantSlug-command__115-panel-Workflows.jpg",
+   "file": "tenant2__portal-tenantSlug-command__124-panel-Workflows.jpg",
    "trigger": "Workflows",
    "kind": "panel",
-   "chars": "187→626"
+   "chars": "196→1340"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/command",
+   "label": "panel-Projects",
+   "file": "tenant2__portal-tenantSlug-command__125-panel-Projects.jpg",
+   "trigger": "Projects",
+   "kind": "panel",
+   "chars": "1340→180"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/command",
    "label": "panel-Activity",
-   "file": "tenant2__portal-tenantSlug-command__116-panel-Activity.jpg",
+   "file": "tenant2__portal-tenantSlug-command__126-panel-Activity.jpg",
    "trigger": "Activity",
    "kind": "panel",
-   "chars": "626→1211"
+   "chars": "180→1254"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "open-✓To-dos",
-   "file": "tenant2__portal-tenantSlug-dashboard__117-open-To-dos.jpg",
+   "file": "tenant2__portal-tenantSlug-dashboard__127-open-To-dos.jpg",
    "trigger": "✓To-dos",
    "kind": "open"
   },
@@ -1037,24 +1130,24 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "open-99+⬆Library",
-   "file": "tenant2__portal-tenantSlug-dashboard__118-open-99-Library.jpg",
+   "file": "tenant2__portal-tenantSlug-dashboard__128-open-99-Library.jpg",
    "trigger": "99+⬆Library",
    "kind": "open"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "open-9◎Opportunities",
-   "file": "tenant2__portal-tenantSlug-dashboard__119-open-9-Opportunities.jpg",
-   "trigger": "9◎Opportunities",
+   "label": "open-10◎Opportunities",
+   "file": "tenant2__portal-tenantSlug-dashboard__129-open-10-Opportunities.jpg",
+   "trigger": "10◎Opportunities",
    "kind": "open"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
-   "label": "filled-9◎Opportunities",
-   "file": "tenant2__portal-tenantSlug-dashboard__120-filled-9-Opportunities.jpg",
-   "trigger": "9◎Opportunities",
+   "label": "filled-10◎Opportunities",
+   "file": "tenant2__portal-tenantSlug-dashboard__130-filled-10-Opportunities.jpg",
+   "trigger": "10◎Opportunities",
    "kind": "filled",
    "fields": 3
   },
@@ -1062,7 +1155,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "open-▦Buckets",
-   "file": "tenant2__portal-tenantSlug-dashboard__121-open-Buckets.jpg",
+   "file": "tenant2__portal-tenantSlug-dashboard__131-open-Buckets.jpg",
    "trigger": "▦Buckets",
    "kind": "open"
   },
@@ -1070,7 +1163,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "filled-▦Buckets",
-   "file": "tenant2__portal-tenantSlug-dashboard__122-filled-Buckets.jpg",
+   "file": "tenant2__portal-tenantSlug-dashboard__132-filled-Buckets.jpg",
    "trigger": "▦Buckets",
    "kind": "filled",
    "fields": 6
@@ -1079,7 +1172,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/dashboard",
    "label": "open-↻Activity",
-   "file": "tenant2__portal-tenantSlug-dashboard__123-open-Activity.jpg",
+   "file": "tenant2__portal-tenantSlug-dashboard__133-open-Activity.jpg",
    "trigger": "↻Activity",
    "kind": "open"
   },
@@ -1087,7 +1180,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/documents/new",
    "label": "panel-▦Slide deck16:9 slides — pitch, briefing, ca",
-   "file": "tenant2__portal-tenantSlug-documents-new__124-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg",
+   "file": "tenant2__portal-tenantSlug-documents-new__134-panel-Slide-deck16-9-slides-pitch-briefing-ca.jpg",
    "trigger": "▦Slide deck16:9 slides — pitch, briefing, ca",
    "kind": "panel",
    "chars": "713→1149"
@@ -1096,7 +1189,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "label": "panel-Grid",
-   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__125-panel-Grid.jpg",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__135-panel-Grid.jpg",
    "trigger": "Grid",
    "kind": "panel",
    "chars": "858→957"
@@ -1105,7 +1198,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "label": "panel-+ From Library",
-   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__126-panel-From-Library.jpg",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__136-panel-From-Library.jpg",
    "trigger": "+ From Library",
    "kind": "panel",
    "chars": "957→6717"
@@ -1114,7 +1207,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "label": "panel-Hide panel",
-   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__127-panel-Hide-panel.jpg",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__137-panel-Hide-panel.jpg",
    "trigger": "Hide panel",
    "kind": "panel",
    "chars": "6717→6407"
@@ -1123,7 +1216,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "label": "panel-HHeading",
-   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__128-panel-HHeading.jpg",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__138-panel-HHeading.jpg",
    "trigger": "HHeading",
    "kind": "panel",
    "chars": "6407→6368"
@@ -1132,7 +1225,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "label": "panel-⊞Table",
-   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__129-panel-Table.jpg",
+   "file": "tenant2__portal-tenantSlug-library-foundation-foundationI__139-panel-Table.jpg",
    "trigger": "⊞Table",
    "kind": "panel",
    "chars": "6414→6467"
@@ -1141,7 +1234,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-1Subscribenone",
-   "file": "tenant2__portal-tenantSlug-manage__130-open-1Subscribenone.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__140-open-1Subscribenone.jpg",
    "trigger": "1Subscribenone",
    "kind": "open"
   },
@@ -1149,7 +1242,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-1Subscribenone",
-   "file": "tenant2__portal-tenantSlug-manage__131-filled-1Subscribenone.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__141-filled-1Subscribenone.jpg",
    "trigger": "1Subscribenone",
    "kind": "filled",
    "fields": 1
@@ -1157,25 +1250,8 @@
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
-   "label": "open-2Spotlight0 buckets · 9 OPPs",
-   "file": "tenant2__portal-tenantSlug-manage__132-open-2Spotlight0-buckets-9-OPPs.jpg",
-   "trigger": "2Spotlight0 buckets · 9 OPPs",
-   "kind": "open"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/manage",
-   "label": "filled-2Spotlight0 buckets · 9 OPPs",
-   "file": "tenant2__portal-tenantSlug-manage__133-filled-2Spotlight0-buckets-9-OPPs.jpg",
-   "trigger": "2Spotlight0 buckets · 9 OPPs",
-   "kind": "filled",
-   "fields": 6
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/manage",
    "label": "open-3Buy0 portals",
-   "file": "tenant2__portal-tenantSlug-manage__134-open-3Buy0-portals.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__142-open-3Buy0-portals.jpg",
    "trigger": "3Buy0 portals",
    "kind": "open"
   },
@@ -1183,7 +1259,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-⚙Account",
-   "file": "tenant2__portal-tenantSlug-manage__135-open-Account.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__143-open-Account.jpg",
    "trigger": "⚙Account",
    "kind": "open"
   },
@@ -1191,7 +1267,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-⚙Account",
-   "file": "tenant2__portal-tenantSlug-manage__136-filled-Account.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__144-filled-Account.jpg",
    "trigger": "⚙Account",
    "kind": "filled",
    "fields": 1
@@ -1200,7 +1276,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-▦Buckets",
-   "file": "tenant2__portal-tenantSlug-manage__137-open-Buckets.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__145-open-Buckets.jpg",
    "trigger": "▦Buckets",
    "kind": "open"
   },
@@ -1208,7 +1284,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-▦Buckets",
-   "file": "tenant2__portal-tenantSlug-manage__138-filled-Buckets.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__146-filled-Buckets.jpg",
    "trigger": "▦Buckets",
    "kind": "filled",
    "fields": 6
@@ -1217,7 +1293,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-1👥Users",
-   "file": "tenant2__portal-tenantSlug-manage__139-open-1-Users.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__147-open-1-Users.jpg",
    "trigger": "1👥Users",
    "kind": "open"
   },
@@ -1225,7 +1301,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-1👥Users",
-   "file": "tenant2__portal-tenantSlug-manage__140-filled-1-Users.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__148-filled-1-Users.jpg",
    "trigger": "1👥Users",
    "kind": "filled",
    "fields": 3
@@ -1234,7 +1310,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-🏗Portals",
-   "file": "tenant2__portal-tenantSlug-manage__141-open-Portals.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__149-open-Portals.jpg",
    "trigger": "🏗Portals",
    "kind": "open"
   },
@@ -1242,7 +1318,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-⚡Automation",
-   "file": "tenant2__portal-tenantSlug-manage__142-open-Automation.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__150-open-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "open"
   },
@@ -1250,7 +1326,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "validation-⚡Automation",
-   "file": "tenant2__portal-tenantSlug-manage__143-validation-Automation.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__151-validation-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "validation"
   },
@@ -1258,7 +1334,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "filled-⚡Automation",
-   "file": "tenant2__portal-tenantSlug-manage__144-filled-Automation.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__152-filled-Automation.jpg",
    "trigger": "⚡Automation",
    "kind": "filled",
    "fields": 6
@@ -1267,81 +1343,9 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
    "label": "open-🤖AI usage",
-   "file": "tenant2__portal-tenantSlug-manage__145-open-AI-usage.jpg",
+   "file": "tenant2__portal-tenantSlug-manage__153-open-AI-usage.jpg",
    "trigger": "🤖AI usage",
    "kind": "open"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__146-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "642→786"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__147-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "786→930"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__148-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "930→1074"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__149-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "1074→1218"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__150-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "1218→1362"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__151-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "1362→1506"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__152-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "1506→1650"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/processes",
-   "label": "panel-Steps",
-   "file": "tenant2__portal-tenantSlug-processes__153-panel-Steps.jpg",
-   "trigger": "Steps",
-   "kind": "panel",
-   "chars": "1650→1794"
   },
   {
    "lane": "tenant2",
@@ -1350,7 +1354,7 @@
    "file": "tenant2__portal-tenantSlug-processes__154-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "1794→1938"
+   "chars": "1347→1491"
   },
   {
    "lane": "tenant2",
@@ -1359,13 +1363,85 @@
    "file": "tenant2__portal-tenantSlug-processes__155-panel-Steps.jpg",
    "trigger": "Steps",
    "kind": "panel",
-   "chars": "1938→2082"
+   "chars": "1491→1635"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__156-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "1635→1779"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__157-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "1779→1923"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__158-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "1923→2067"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__159-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "2067→2211"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__160-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "2211→2355"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__161-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "2355→2499"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__162-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "2499→2643"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/processes",
+   "label": "panel-Steps",
+   "file": "tenant2__portal-tenantSlug-processes__163-panel-Steps.jpg",
+   "trigger": "Steps",
+   "kind": "panel",
+   "chars": "2643→2787"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/profile",
    "label": "panel-Edit",
-   "file": "tenant2__portal-tenantSlug-profile__156-panel-Edit.jpg",
+   "file": "tenant2__portal-tenantSlug-profile__164-panel-Edit.jpg",
    "trigger": "Edit",
    "kind": "panel",
    "chars": "1255→534"
@@ -1374,110 +1450,88 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]",
    "label": "panel-Assign a task",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId__157-panel-Assign-a-task.jpg",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId__165-panel-Assign-a-task.jpg",
    "trigger": "Assign a task",
    "kind": "panel",
-   "chars": "2013→2288"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
-   "label": "panel-Run all 3 automatically",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId__158-panel-Run-all-3-automatically.jpg",
-   "trigger": "Run all 3 automatically",
-   "kind": "panel",
-   "chars": "2309→2405"
+   "chars": "2122→2397"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]",
    "label": "panel-Advance to Final →",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId__159-panel-Advance-to-Final.jpg",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId__166-panel-Advance-to-Final.jpg",
    "trigger": "Advance to Final →",
    "kind": "panel",
-   "chars": "2405→3035"
+   "chars": "2418→2976"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]",
    "label": "panel-All Sections",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId__160-panel-All-Sections.jpg",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId__167-panel-All-Sections.jpg",
    "trigger": "All Sections",
    "kind": "panel",
-   "chars": "3035→2642"
+   "chars": "2976→2581"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]",
    "label": "panel-My Sections",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId__161-panel-My-Sections.jpg",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId__168-panel-My-Sections.jpg",
    "trigger": "My Sections",
    "kind": "panel",
-   "chars": "2642→1965"
+   "chars": "2581→1903"
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
+   "label": "panel-Timeline",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId__169-panel-Timeline.jpg",
+   "trigger": "Timeline",
+   "kind": "panel",
+   "chars": "1903→2478"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "label": "toast-Check compliance",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__162-toast-Check-compliance.jpg",
-   "trigger": "Check compliance",
-   "kind": "toast"
+   "label": "panel-✓Comp 1/1",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__170-panel-Comp-1-1.jpg",
+   "trigger": "✓Comp 1/1",
+   "kind": "panel",
+   "chars": "913→1011"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "label": "toast-Research this section",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__163-toast-Research-this-section.jpg",
-   "trigger": "Research this section",
-   "kind": "toast"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "label": "toast-✗Comp 0/1",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__164-toast-Comp-0-1.jpg",
-   "trigger": "✗Comp 0/1",
-   "kind": "toast"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "label": "toast-✓ Accept & Lock",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__165-toast-Accept-Lock.jpg",
-   "trigger": "✓ Accept & Lock",
-   "kind": "toast"
-  },
-  {
-   "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "label": "toast-⊟ Panel",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__166-toast-Panel.jpg",
-   "trigger": "⊟ Panel",
-   "kind": "toast"
+   "label": "panel-Atoms",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__171-panel-Atoms.jpg",
+   "trigger": "Atoms",
+   "kind": "panel",
+   "chars": "1011→913"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "label": "panel-Grid",
-   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__167-panel-Grid.jpg",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__172-panel-Grid.jpg",
    "trigger": "Grid",
    "kind": "panel",
-   "chars": "1107→721"
+   "chars": "913→1012"
   },
   {
    "lane": "tenant2",
-   "route": "/portal/[tenantSlug]/templates",
-   "label": "panel-Refreshed ✕",
-   "file": "tenant2__portal-tenantSlug-templates__168-panel-Refreshed.jpg",
-   "trigger": "Refreshed ✕",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "label": "panel-Hide panel",
+   "file": "tenant2__portal-tenantSlug-proposals-proposalId-sections-__173-panel-Hide-panel.jpg",
+   "trigger": "Hide panel",
    "kind": "panel",
-   "chars": "2806→2794"
+   "chars": "1012→721"
   },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/templates",
    "label": "toast-Use this template",
-   "file": "tenant2__portal-tenantSlug-templates__169-toast-Use-this-template.jpg",
+   "file": "tenant2__portal-tenantSlug-templates__174-toast-Use-this-template.jpg",
    "trigger": "Use this template",
    "kind": "toast"
   },
@@ -1485,7 +1539,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/todos",
    "label": "panel-＋ New to-do / broadcast",
-   "file": "tenant2__portal-tenantSlug-todos__170-panel-New-to-do-broadcast.jpg",
+   "file": "tenant2__portal-tenantSlug-todos__175-panel-New-to-do-broadcast.jpg",
    "trigger": "＋ New to-do / broadcast",
    "kind": "panel",
    "chars": "75→335"
@@ -1494,7 +1548,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/vaults/[vaultId]",
    "label": "panel-＋ Add artifact",
-   "file": "tenant2__portal-tenantSlug-vaults-vaultId__171-panel-Add-artifact.jpg",
+   "file": "tenant2__portal-tenantSlug-vaults-vaultId__176-panel-Add-artifact.jpg",
    "trigger": "＋ Add artifact",
    "kind": "panel",
    "chars": "335→546"
@@ -1503,7 +1557,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/vaults",
    "label": "open-＋ New nook",
-   "file": "tenant2__portal-tenantSlug-vaults__172-open-New-nook.jpg",
+   "file": "tenant2__portal-tenantSlug-vaults__177-open-New-nook.jpg",
    "trigger": "＋ New nook",
    "kind": "open"
   },
@@ -1511,7 +1565,7 @@
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/vaults",
    "label": "filled-＋ New nook",
-   "file": "tenant2__portal-tenantSlug-vaults__173-filled-New-nook.jpg",
+   "file": "tenant2__portal-tenantSlug-vaults__178-filled-New-nook.jpg",
    "trigger": "＋ New nook",
    "kind": "filled",
    "fields": 2
@@ -1519,74 +1573,29 @@
   {
    "lane": "admin",
    "route": "/admin/command",
-   "label": "panel-Admin18",
-   "file": "admin__admin-command__174-panel-Admin18.jpg",
-   "trigger": "Admin18",
+   "label": "panel-Admin28",
+   "file": "admin__admin-command__179-panel-Admin28.jpg",
+   "trigger": "Admin28",
    "kind": "panel",
-   "chars": "810→3994"
+   "chars": "765→5173"
   },
   {
    "lane": "admin",
    "route": "/admin/command",
-   "label": "panel-Tenant4",
-   "file": "admin__admin-command__175-panel-Tenant4.jpg",
-   "trigger": "Tenant4",
+   "label": "panel-Tenant99+",
+   "file": "admin__admin-command__180-panel-Tenant99.jpg",
+   "trigger": "Tenant99+",
    "kind": "panel",
-   "chars": "3994→724"
+   "chars": "5173→8386"
   },
   {
    "lane": "admin",
    "route": "/admin/command",
-   "label": "panel-System",
-   "file": "admin__admin-command__176-panel-System.jpg",
-   "trigger": "System",
+   "label": "panel-System1",
+   "file": "admin__admin-command__181-panel-System1.jpg",
+   "trigger": "System1",
    "kind": "panel",
-   "chars": "724→378"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/dashboard",
-   "label": "panel-Dismiss",
-   "file": "admin__admin-dashboard__177-panel-Dismiss.jpg",
-   "trigger": "Dismiss",
-   "kind": "panel",
-   "chars": "4766→4453"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/dashboard",
-   "label": "panel-Dismiss",
-   "file": "admin__admin-dashboard__178-panel-Dismiss.jpg",
-   "trigger": "Dismiss",
-   "kind": "panel",
-   "chars": "4453→4125"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/dashboard",
-   "label": "panel-Dismiss",
-   "file": "admin__admin-dashboard__179-panel-Dismiss.jpg",
-   "trigger": "Dismiss",
-   "kind": "panel",
-   "chars": "4125→3824"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/dashboard",
-   "label": "panel-Dismiss",
-   "file": "admin__admin-dashboard__180-panel-Dismiss.jpg",
-   "trigger": "Dismiss",
-   "kind": "panel",
-   "chars": "3824→3519"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/dashboard",
-   "label": "panel-Dismiss",
-   "file": "admin__admin-dashboard__181-panel-Dismiss.jpg",
-   "trigger": "Dismiss",
-   "kind": "panel",
-   "chars": "3519→3225"
+   "chars": "8386→351"
   },
   {
    "lane": "admin",
@@ -1595,7 +1604,7 @@
    "file": "admin__admin-dashboard__182-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "3225→2904"
+   "chars": "5891→5586"
   },
   {
    "lane": "admin",
@@ -1604,7 +1613,7 @@
    "file": "admin__admin-dashboard__183-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "2904→2708"
+   "chars": "5586→5292"
   },
   {
    "lane": "admin",
@@ -1613,31 +1622,76 @@
    "file": "admin__admin-dashboard__184-panel-Dismiss.jpg",
    "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "2708→2512"
+   "chars": "5292→4971"
   },
   {
    "lane": "admin",
    "route": "/admin/dashboard",
-   "label": "panel-Acknowledge",
-   "file": "admin__admin-dashboard__185-panel-Acknowledge.jpg",
-   "trigger": "Acknowledge",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__185-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "2512→2369"
+   "chars": "4971→4775"
   },
   {
    "lane": "admin",
    "route": "/admin/dashboard",
-   "label": "panel-Acknowledge",
-   "file": "admin__admin-dashboard__186-panel-Acknowledge.jpg",
-   "trigger": "Acknowledge",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__186-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
    "kind": "panel",
-   "chars": "2369→2227"
+   "chars": "4775→4579"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__187-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "4579→4383"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__188-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "4383→4187"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__189-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "4187→3991"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__190-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "3991→3795"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/dashboard",
+   "label": "panel-Dismiss",
+   "file": "admin__admin-dashboard__191-panel-Dismiss.jpg",
+   "trigger": "Dismiss",
+   "kind": "panel",
+   "chars": "3795→3599"
   },
   {
    "lane": "admin",
    "route": "/admin/documents",
    "label": "open-New Document",
-   "file": "admin__admin-documents__187-open-New-Document.jpg",
+   "file": "admin__admin-documents__192-open-New-Document.jpg",
    "trigger": "New Document",
    "kind": "open"
   },
@@ -1645,7 +1699,7 @@
    "lane": "admin",
    "route": "/admin/documents",
    "label": "validation-New Document",
-   "file": "admin__admin-documents__188-validation-New-Document.jpg",
+   "file": "admin__admin-documents__193-validation-New-Document.jpg",
    "trigger": "New Document",
    "kind": "validation"
   },
@@ -1653,7 +1707,7 @@
    "lane": "admin",
    "route": "/admin/documents",
    "label": "filled-New Document",
-   "file": "admin__admin-documents__189-filled-New-Document.jpg",
+   "file": "admin__admin-documents__194-filled-New-Document.jpg",
    "trigger": "New Document",
    "kind": "filled",
    "fields": 7
@@ -1662,76 +1716,84 @@
    "lane": "admin",
    "route": "/admin/events",
    "label": "panel-1h",
-   "file": "admin__admin-events__190-panel-1h.jpg",
+   "file": "admin__admin-events__195-panel-1h.jpg",
    "trigger": "1h",
    "kind": "panel",
-   "chars": "75738→66653"
+   "chars": "76320→76316"
   },
   {
    "lane": "admin",
    "route": "/admin/events",
    "label": "panel-6h",
-   "file": "admin__admin-events__191-panel-6h.jpg",
+   "file": "admin__admin-events__196-panel-6h.jpg",
    "trigger": "6h",
    "kind": "panel",
-   "chars": "66653→75737"
+   "chars": "76316→76318"
   },
   {
    "lane": "admin",
    "route": "/admin/events",
    "label": "panel-24h",
-   "file": "admin__admin-events__192-panel-24h.jpg",
+   "file": "admin__admin-events__197-panel-24h.jpg",
    "trigger": "24h",
    "kind": "panel",
-   "chars": "75737→75738"
+   "chars": "76318→76320"
   },
   {
    "lane": "admin",
    "route": "/admin/events",
    "label": "panel-7d",
-   "file": "admin__admin-events__193-panel-7d.jpg",
+   "file": "admin__admin-events__198-panel-7d.jpg",
    "trigger": "7d",
    "kind": "panel",
-   "chars": "75738→75741"
+   "chars": "76320→76321"
   },
   {
    "lane": "admin",
    "route": "/admin/events",
    "label": "panel-30d",
-   "file": "admin__admin-events__194-panel-30d.jpg",
+   "file": "admin__admin-events__199-panel-30d.jpg",
    "trigger": "30d",
    "kind": "panel",
-   "chars": "75741→75741"
+   "chars": "76321→76321"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__195-toast-Watch.jpg",
-   "trigger": "Watch",
-   "kind": "toast"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__196-toast-Watch.jpg",
-   "trigger": "Watch",
-   "kind": "toast"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__197-toast-Watch.jpg",
-   "trigger": "Watch",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__200-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
    "kind": "toast"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
    "label": "toast-🔔 Watching",
-   "file": "admin__admin-opportunities__198-toast-Watching.jpg",
+   "file": "admin__admin-opportunities__201-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__202-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__203-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
+   "kind": "toast"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/opportunities",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__204-toast-Watching.jpg",
    "trigger": "🔔 Watching",
    "kind": "toast"
   },
@@ -1739,95 +1801,41 @@
    "lane": "admin",
    "route": "/admin/opportunities",
    "label": "toast-Watch",
-   "file": "admin__admin-opportunities__199-toast-Watch.jpg",
+   "file": "admin__admin-opportunities__205-toast-Watch.jpg",
    "trigger": "Watch",
    "kind": "toast"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__200-toast-Watch.jpg",
-   "trigger": "Watch",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__206-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
    "kind": "toast"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__201-toast-Watch.jpg",
-   "trigger": "Watch",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__207-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
    "kind": "toast"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__202-toast-Watch.jpg",
-   "trigger": "Watch",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__208-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
    "kind": "toast"
   },
   {
    "lane": "admin",
    "route": "/admin/opportunities",
-   "label": "toast-Watch",
-   "file": "admin__admin-opportunities__203-toast-Watch.jpg",
-   "trigger": "Watch",
+   "label": "toast-🔔 Watching",
+   "file": "admin__admin-opportunities__209-toast-Watching.jpg",
+   "trigger": "🔔 Watching",
    "kind": "toast"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__204-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "1575→1759"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__205-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "1759→1926"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__206-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "1926→2105"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__207-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "2105→2284"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__208-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "2367→2544"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/pipeline",
-   "label": "panel-metadata + result",
-   "file": "admin__admin-pipeline__209-panel-metadata-result.jpg",
-   "trigger": "metadata + result",
-   "kind": "panel",
-   "chars": "2544→2728"
   },
   {
    "lane": "admin",
@@ -1836,94 +1844,220 @@
    "file": "admin__admin-pipeline__210-panel-metadata-result.jpg",
    "trigger": "metadata + result",
    "kind": "panel",
-   "chars": "2728→2895"
+   "chars": "1940→2119"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__211-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "2119→2303"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__212-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "2386→2553"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__213-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "2553→2737"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__214-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "2737→2905"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__215-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "2988→3172"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__216-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "3172→3339"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/pipeline",
+   "label": "panel-metadata + result",
+   "file": "admin__admin-pipeline__217-panel-metadata-result.jpg",
+   "trigger": "metadata + result",
+   "kind": "panel",
+   "chars": "3339→3518"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__211-panel-details.jpg",
+   "file": "admin__admin-process__218-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "3438→3781"
+   "chars": "3535→3894"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__212-panel-details.jpg",
+   "file": "admin__admin-process__219-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "3781→3939"
+   "chars": "3894→4055"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__213-panel-details.jpg",
+   "file": "admin__admin-process__220-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "3939→4287"
+   "chars": "4055→4415"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__214-panel-details.jpg",
+   "file": "admin__admin-process__221-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "4450→4797"
+   "chars": "4577→4937"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__215-panel-details.jpg",
+   "file": "admin__admin-process__222-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "4958→5305"
+   "chars": "5099→5459"
   },
   {
    "lane": "admin",
    "route": "/admin/process",
    "label": "panel-details",
-   "file": "admin__admin-process__216-panel-details.jpg",
+   "file": "admin__admin-process__223-panel-details.jpg",
    "trigger": "details",
    "kind": "panel",
-   "chars": "5467→5810"
-  },
-  {
-   "lane": "admin",
-   "route": "/admin/processes",
-   "label": "panel-Awaiting 1",
-   "file": "admin__admin-processes__217-panel-Awaiting-1.jpg",
-   "trigger": "Awaiting 1",
-   "kind": "panel",
-   "chars": "502→515"
+   "chars": "5621→5980"
   },
   {
    "lane": "admin",
    "route": "/admin/processes",
    "label": "confirm-Advance",
-   "file": "admin__admin-processes__218-confirm-Advance.jpg",
+   "file": "admin__admin-processes__224-confirm-Advance.jpg",
    "trigger": "Advance",
    "kind": "confirm",
    "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
   },
   {
    "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__225-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Collaborate\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__226-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__227-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__228-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__229-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Collaborate\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__230-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Collaborate\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__231-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Schedule Login Reminder\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/processes",
+   "label": "confirm-Advance",
+   "file": "admin__admin-processes__232-confirm-Advance.jpg",
+   "trigger": "Advance",
+   "kind": "confirm",
+   "message": "Advance the \"Collaborate\" gate to the next step?"
+  },
+  {
+   "lane": "admin",
    "route": "/admin/rfp-curation/[solId]",
    "label": "panel-← Back to Triage Queue",
-   "file": "admin__admin-rfp-curation-solId__219-panel-Back-to-Triage-Queue.jpg",
+   "file": "admin__admin-rfp-curation-solId__233-panel-Back-to-Triage-Queue.jpg",
    "trigger": "← Back to Triage Queue",
    "kind": "panel",
-   "chars": "2975→4313"
+   "chars": "2975→6629"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
    "label": "panel-Edit Topic",
-   "file": "admin__admin-rfp-curation-solId-topic-topicId__220-panel-Edit-Topic.jpg",
+   "file": "admin__admin-rfp-curation-solId-topic-topicId__234-panel-Edit-Topic.jpg",
    "trigger": "Edit Topic",
    "kind": "panel",
    "chars": "554→415"
@@ -1932,105 +2066,115 @@
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__221-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__235-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "4319→4177"
+   "chars": "6635→6493"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__222-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__236-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "4177→4035"
+   "chars": "6493→6351"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__223-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__237-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "4035→3893"
+   "chars": "6351→6209"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__224-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__238-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "3893→3751"
+   "chars": "6209→6067"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__225-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__239-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "3751→3609"
+   "chars": "6067→5925"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__226-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__240-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "3609→3467"
+   "chars": "5925→5783"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__227-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__241-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "3467→3325"
+   "chars": "5783→5641"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "label": "panel-Acknowledge",
-   "file": "admin__admin-rfp-curation__228-panel-Acknowledge.jpg",
+   "file": "admin__admin-rfp-curation__242-panel-Acknowledge.jpg",
    "trigger": "Acknowledge",
    "kind": "panel",
-   "chars": "3325→3222"
+   "chars": "5641→5499"
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
-   "label": "toast-Claim",
-   "file": "admin__admin-rfp-curation__229-toast-Claim.jpg",
-   "trigger": "Claim",
-   "kind": "toast"
+   "label": "panel-Acknowledge",
+   "file": "admin__admin-rfp-curation__243-panel-Acknowledge.jpg",
+   "trigger": "Acknowledge",
+   "kind": "panel",
+   "chars": "5499→5356"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "label": "panel-Acknowledge",
+   "file": "admin__admin-rfp-curation__244-panel-Acknowledge.jpg",
+   "trigger": "Acknowledge",
+   "kind": "panel",
+   "chars": "5356→5214"
   },
   {
    "lane": "admin",
    "route": "/admin/site/[pageKey]",
    "label": "panel-Show version history",
-   "file": "admin__admin-site-pageKey__230-panel-Show-version-history.jpg",
+   "file": "admin__admin-site-pageKey__245-panel-Show-version-history.jpg",
    "trigger": "Show version history",
    "kind": "panel",
-   "chars": "5381→5833"
+   "chars": "6002→6524"
   },
   {
    "lane": "admin",
    "route": "/admin/site/[pageKey]",
    "label": "panel-+ Add block",
-   "file": "admin__admin-site-pageKey__231-panel-Add-block.jpg",
+   "file": "admin__admin-site-pageKey__246-panel-Add-block.jpg",
    "trigger": "+ Add block",
    "kind": "panel",
-   "chars": "5833→6454"
+   "chars": "6524→7145"
   },
   {
    "lane": "admin",
    "route": "/admin/site/[pageKey]",
    "label": "open-Preview",
-   "file": "admin__admin-site-pageKey__232-open-Preview.jpg",
+   "file": "admin__admin-site-pageKey__247-open-Preview.jpg",
    "trigger": "Preview",
    "kind": "open"
   },
@@ -2038,7 +2182,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "panel-Hide details",
-   "file": "admin__admin-site-docs-type-slug__233-panel-Hide-details.jpg",
+   "file": "admin__admin-site-docs-type-slug__248-panel-Hide-details.jpg",
    "trigger": "Hide details",
    "kind": "panel",
    "chars": "1098→862"
@@ -2047,7 +2191,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "toast-Save draft",
-   "file": "admin__admin-site-docs-type-slug__234-toast-Save-draft.jpg",
+   "file": "admin__admin-site-docs-type-slug__249-toast-Save-draft.jpg",
    "trigger": "Save draft",
    "kind": "toast"
   },
@@ -2055,7 +2199,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "toast-Atoms",
-   "file": "admin__admin-site-docs-type-slug__235-toast-Atoms.jpg",
+   "file": "admin__admin-site-docs-type-slug__250-toast-Atoms.jpg",
    "trigger": "Atoms",
    "kind": "toast"
   },
@@ -2063,7 +2207,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "toast-Groups",
-   "file": "admin__admin-site-docs-type-slug__236-toast-Groups.jpg",
+   "file": "admin__admin-site-docs-type-slug__251-toast-Groups.jpg",
    "trigger": "Groups",
    "kind": "toast"
   },
@@ -2071,7 +2215,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "toast-Provenance",
-   "file": "admin__admin-site-docs-type-slug__237-toast-Provenance.jpg",
+   "file": "admin__admin-site-docs-type-slug__252-toast-Provenance.jpg",
    "trigger": "Provenance",
    "kind": "toast"
   },
@@ -2079,7 +2223,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "toast-Grid",
-   "file": "admin__admin-site-docs-type-slug__238-toast-Grid.jpg",
+   "file": "admin__admin-site-docs-type-slug__253-toast-Grid.jpg",
    "trigger": "Grid",
    "kind": "toast"
   },
@@ -2087,7 +2231,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "panel-Hide panel",
-   "file": "admin__admin-site-docs-type-slug__239-panel-Hide-panel.jpg",
+   "file": "admin__admin-site-docs-type-slug__254-panel-Hide-panel.jpg",
    "trigger": "Hide panel",
    "kind": "panel",
    "chars": "1017→859"
@@ -2096,7 +2240,7 @@
    "lane": "admin",
    "route": "/admin/site/docs/[type]/[slug]",
    "label": "panel-HHeading",
-   "file": "admin__admin-site-docs-type-slug__240-panel-HHeading.jpg",
+   "file": "admin__admin-site-docs-type-slug__255-panel-HHeading.jpg",
    "trigger": "HHeading",
    "kind": "panel",
    "chars": "859→890"
@@ -2105,7 +2249,7 @@
    "lane": "admin",
    "route": "/admin/sources/[profileId]",
    "label": "panel-Edit",
-   "file": "admin__admin-sources-profileId__241-panel-Edit.jpg",
+   "file": "admin__admin-sources-profileId__256-panel-Edit.jpg",
    "trigger": "Edit",
    "kind": "panel",
    "chars": "1105→936"
@@ -2114,7 +2258,7 @@
    "lane": "admin",
    "route": "/admin/sources/[profileId]",
    "label": "panel-Edit",
-   "file": "admin__admin-sources-profileId__242-panel-Edit.jpg",
+   "file": "admin__admin-sources-profileId__257-panel-Edit.jpg",
    "trigger": "Edit",
    "kind": "panel",
    "chars": "936→715"
@@ -2123,70 +2267,70 @@
    "lane": "admin",
    "route": "/admin/sources",
    "label": "panel-▶Admin Notes",
-   "file": "admin__admin-sources__243-panel-Admin-Notes.jpg",
+   "file": "admin__admin-sources__258-panel-Admin-Notes.jpg",
    "trigger": "▶Admin Notes",
    "kind": "panel",
-   "chars": "1874→2035"
+   "chars": "1875→2036"
   },
   {
    "lane": "admin",
    "route": "/admin/sources",
    "label": "panel-▶Visit Instructions",
-   "file": "admin__admin-sources__244-panel-Visit-Instructions.jpg",
+   "file": "admin__admin-sources__259-panel-Visit-Instructions.jpg",
    "trigger": "▶Visit Instructions",
    "kind": "panel",
-   "chars": "2035→2232"
+   "chars": "2036→2233"
   },
   {
    "lane": "admin",
    "route": "/admin/sources",
    "label": "panel-▶Admin Notes",
-   "file": "admin__admin-sources__245-panel-Admin-Notes.jpg",
+   "file": "admin__admin-sources__260-panel-Admin-Notes.jpg",
    "trigger": "▶Admin Notes",
    "kind": "panel",
-   "chars": "2281→2457"
+   "chars": "2282→2458"
   },
   {
    "lane": "admin",
    "route": "/admin/sources",
    "label": "panel-▶Visit Instructions",
-   "file": "admin__admin-sources__246-panel-Visit-Instructions.jpg",
+   "file": "admin__admin-sources__261-panel-Visit-Instructions.jpg",
    "trigger": "▶Visit Instructions",
    "kind": "panel",
-   "chars": "2457→2685"
+   "chars": "2458→2686"
   },
   {
    "lane": "admin",
    "route": "/admin/storage",
    "label": "panel-Customer Storage(read-only)",
-   "file": "admin__admin-storage__247-panel-Customer-Storage-read-only.jpg",
+   "file": "admin__admin-storage__262-panel-Customer-Storage-read-only.jpg",
    "trigger": "Customer Storage(read-only)",
    "kind": "panel",
-   "chars": "415→293"
+   "chars": "415→308"
   },
   {
    "lane": "admin",
    "route": "/admin/storage",
    "label": "panel-Reference Library",
-   "file": "admin__admin-storage__248-panel-Reference-Library.jpg",
+   "file": "admin__admin-storage__263-panel-Reference-Library.jpg",
    "trigger": "Reference Library",
    "kind": "panel",
-   "chars": "293→383"
+   "chars": "308→383"
   },
   {
    "lane": "admin",
    "route": "/admin/system-state",
    "label": "panel-View all",
-   "file": "admin__admin-system-state__249-panel-View-all.jpg",
+   "file": "admin__admin-system-state__264-panel-View-all.jpg",
    "trigger": "View all",
    "kind": "panel",
-   "chars": "1364→534"
+   "chars": "1722→4385"
   },
   {
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__250-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__265-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4071→4124"
@@ -2195,7 +2339,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__251-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__266-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4124→4127"
@@ -2204,7 +2348,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__252-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__267-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4127→4117"
@@ -2213,7 +2357,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__253-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__268-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4117→4128"
@@ -2222,7 +2366,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__254-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__269-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4128→4125"
@@ -2231,7 +2375,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__255-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__270-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4125→4130"
@@ -2240,7 +2384,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__256-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__271-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4130→4131"
@@ -2249,7 +2393,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__257-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__272-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4131→4140"
@@ -2258,7 +2402,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__258-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__273-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4140→4134"
@@ -2267,7 +2411,7 @@
    "lane": "admin",
    "route": "/admin/template-stable",
    "label": "panel-Push new version",
-   "file": "admin__admin-template-stable__259-panel-Push-new-version.jpg",
+   "file": "admin__admin-template-stable__274-panel-Push-new-version.jpg",
    "trigger": "Push new version",
    "kind": "panel",
    "chars": "4134→4135"
@@ -2276,7 +2420,7 @@
    "lane": "admin",
    "route": "/admin/templates/[templateId]/edit",
    "label": "panel-Grid",
-   "file": "admin__admin-templates-templateId-edit__260-panel-Grid.jpg",
+   "file": "admin__admin-templates-templateId-edit__275-panel-Grid.jpg",
    "trigger": "Grid",
    "kind": "panel",
    "chars": "1175→1274"
@@ -2285,7 +2429,7 @@
    "lane": "admin",
    "route": "/admin/templates/[templateId]/edit",
    "label": "panel-Hide panel",
-   "file": "admin__admin-templates-templateId-edit__261-panel-Hide-panel.jpg",
+   "file": "admin__admin-templates-templateId-edit__276-panel-Hide-panel.jpg",
    "trigger": "Hide panel",
    "kind": "panel",
    "chars": "1274→1142"
@@ -2294,7 +2438,7 @@
    "lane": "admin",
    "route": "/admin/templates",
    "label": "panel-+ New Template",
-   "file": "admin__admin-templates__262-panel-New-Template.jpg",
+   "file": "admin__admin-templates__277-panel-New-Template.jpg",
    "trigger": "+ New Template",
    "kind": "panel",
    "chars": "2150→2337"
@@ -2303,7 +2447,7 @@
    "lane": "admin",
    "route": "/admin/templates",
    "label": "open-Preview",
-   "file": "admin__admin-templates__263-open-Preview.jpg",
+   "file": "admin__admin-templates__278-open-Preview.jpg",
    "trigger": "Preview",
    "kind": "open"
   },
@@ -2311,7 +2455,7 @@
    "lane": "admin",
    "route": "/admin/templates",
    "label": "open-Preview",
-   "file": "admin__admin-templates__264-open-Preview.jpg",
+   "file": "admin__admin-templates__279-open-Preview.jpg",
    "trigger": "Preview",
    "kind": "open"
   },
@@ -2319,7 +2463,7 @@
    "lane": "admin",
    "route": "/admin/templates",
    "label": "open-Preview",
-   "file": "admin__admin-templates__265-open-Preview.jpg",
+   "file": "admin__admin-templates__280-open-Preview.jpg",
    "trigger": "Preview",
    "kind": "open"
   },
@@ -2327,7 +2471,7 @@
    "lane": "admin",
    "route": "/admin/tenants",
    "label": "open-+ New partner org",
-   "file": "admin__admin-tenants__266-open-New-partner-org.jpg",
+   "file": "admin__admin-tenants__281-open-New-partner-org.jpg",
    "trigger": "+ New partner org",
    "kind": "open"
   },
@@ -2335,7 +2479,7 @@
    "lane": "admin",
    "route": "/admin/tenants",
    "label": "filled-+ New partner org",
-   "file": "admin__admin-tenants__267-filled-New-partner-org.jpg",
+   "file": "admin__admin-tenants__282-filled-New-partner-org.jpg",
    "trigger": "+ New partner org",
    "kind": "filled",
    "fields": 5
@@ -2344,7 +2488,7 @@
    "lane": "admin",
    "route": "/admin/tenants",
    "label": "open-+ New Company",
-   "file": "admin__admin-tenants__268-open-New-Company.jpg",
+   "file": "admin__admin-tenants__283-open-New-Company.jpg",
    "trigger": "+ New Company",
    "kind": "open"
   },
@@ -2352,7 +2496,7 @@
    "lane": "admin",
    "route": "/admin/tenants",
    "label": "validation-+ New Company",
-   "file": "admin__admin-tenants__269-validation-New-Company.jpg",
+   "file": "admin__admin-tenants__284-validation-New-Company.jpg",
    "trigger": "+ New Company",
    "kind": "validation"
   },
@@ -2360,7 +2504,7 @@
    "lane": "admin",
    "route": "/admin/tenants",
    "label": "filled-+ New Company",
-   "file": "admin__admin-tenants__270-filled-New-Company.jpg",
+   "file": "admin__admin-tenants__285-filled-New-Company.jpg",
    "trigger": "+ New Company",
    "kind": "filled",
    "fields": 5
@@ -2369,22 +2513,34 @@
    "lane": "admin",
    "route": "/admin/workflows",
    "label": "panel-Workflow Map34 workflows · discovery + build",
-   "file": "admin__admin-workflows__271-panel-Workflow-Map34-workflows-discovery-build.jpg",
+   "file": "admin__admin-workflows__286-panel-Workflow-Map34-workflows-discovery-build.jpg",
    "trigger": "Workflow Map34 workflows · discovery + build",
    "kind": "panel",
-   "chars": "3729→11714"
+   "chars": "16944→24988"
   },
   {
    "lane": "partner",
    "route": "/partner",
    "label": "panel-+ Add a company",
-   "file": "partner__partner__272-panel-Add-a-company.jpg",
+   "file": "partner__partner__287-panel-Add-a-company.jpg",
    "trigger": "+ Add a company",
    "kind": "panel",
-   "chars": "1135→1271"
+   "chars": "1747→1883"
   }
  ],
  "findings": [
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/new",
+   "what": "drive error: page.goto: net::ERR_ABORTED at http://localhost:3000/portal/foundation/documents/new",
+   "harness": true
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "what": "drive error: page.goto: net::ERR_ABORTED at http://localhost:3000/portal/foundation/manage",
+   "harness": true
+  },
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/manage",
@@ -2399,32 +2555,23 @@
   }
  ],
  "drift": [
-  "agent_task_log: 26 → 67",
-  "agent_task_queue: 1 → 22",
-  "agent_task_results: 1 → 22",
-  "atom_embeddings: 303 → 304",
-  "atom_tags: 5794 → 5797",
-  "automation_log: 2 → 12",
-  "canvas_versions: 6 → 7",
-  "command_seen_state: 6 → 12",
-  "content_pages: 69 → 71",
-  "document_cocoons: 5 → 6",
-  "episodic_memories: 25 → 66",
-  "library_atoms: 863 → 864",
-  "page_views: 285 → 306",
-  "pipeline_jobs: 8 → 10",
-  "process_instance_transitions: 561 → 599",
-  "process_instances: 179 → 189",
-  "proposal_activity_log: 21 → 23",
+  "agent_task_log: 256 → 272",
+  "agent_task_queue: 24 → 40",
+  "agent_task_results: 24 → 40",
+  "automation_log: 20 → 28",
+  "content_pages: 76 → 78",
+  "episodic_memories: 442 → 458",
+  "page_views: 302 → 323",
+  "pipeline_jobs: 15 → 17",
+  "process_instance_transitions: 2548 → 2588",
+  "process_instances: 756 → 758",
   "source_visits: 1 → 3",
-  "system_events: 4264 → 4730",
-  "tasks: 27 → 37",
+  "system_events: 20183 → 20506",
+  "tasks: 723 → 731",
   "template_bridge: 43 → 53",
-  "tenant_automation_policies: 0 → 2",
-  "tenant_bucket_scores: 45 → 18",
-  "tenant_documents: 1 → 5",
-  "tool_invocation_metrics: 28 → 30",
-  "triage_actions: 2 → 3",
-  "visitor_sessions: 38 → 42"
+  "tenant_bucket_scores: 20 → 0",
+  "tenant_documents: 32 → 36",
+  "tool_invocation_metrics: 62 → 63",
+  "visitor_sessions: 48 → 52"
  ]
 }
