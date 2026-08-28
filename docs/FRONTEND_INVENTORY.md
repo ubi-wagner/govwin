@@ -24,10 +24,10 @@
 | middleware | 1 | 325 |
 | other | 4 | 157 |
 | page | 118 | 18,460 |
-| script | 188 | 27,267 |
+| script | 188 | 27,366 |
 | server-action | 1 | 45 |
 | test | 232 | 32,596 |
-| **total** | **1451** | **253,927** |
+| **total** | **1451** | **254,026** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -328,38 +328,38 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/portal/[tenantSlug]/processes/[instanceId]` | GET | app/api/portal/[tenantSlug]/processes/[instanceId]/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 2×sql | 1 |
 | `/api/portal/[tenantSlug]/processes/[instanceId]/advance` | POST | app/api/portal/[tenantSlug]/processes/[instanceId]/advance/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | — | 2 |
 | `/api/portal/[tenantSlug]/profile` | GET PATCH | app/api/portal/[tenantSlug]/profile/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, enterTenant, getTenantBySlug | 4×sql | 7 |
-| `/api/portal/[tenantSlug]/projects` | GET POST | app/api/portal/[tenantSlug]/projects/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/assess-health` | POST | app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts | partner_user | — | — | — | 1 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/assignees` | DELETE GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts | partner_user | — | — | — | 4 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/baseline` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts | partner_user | — | — | — | 4 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/cdrl` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts | partner_user | — | — | — | 5 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/clins` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/comments` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]` | PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts | partner_user | — | — | — | 4 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/documents` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/gate-closer` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/invoices` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts | partner_user | — | — | — | 5 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/meetings` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/milestones` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts | partner_user | — | — | — | 5 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/modifications` | DELETE GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts | partner_user | — | — | — | 6 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/notifications` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/reviews` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/risks` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/rollup` | GET | app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts | partner_user | — | — | — | 1 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/tasks` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts | partner_user | — | — | — | 3 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts | partner_user | — | — | — | 2 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments` | DELETE GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts | partner_user | — | — | — | 4 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/time` | DELETE GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts | partner_user | — | — | — | 6 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/traceability` | GET | app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts | partner_user | — | — | — | 1 |
-| `/api/portal/[tenantSlug]/projects/[projectId]/wbs` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts | partner_user | — | — | — | 3 |
+| `/api/portal/[tenantSlug]/projects` | GET POST | app/api/portal/[tenantSlug]/projects/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/assess-health` | POST | app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts | partner_user | — | withProject, withProject | — | 1 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/assignees` | DELETE GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts | partner_user | — | withProject, withProject | — | 4 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/baseline` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts | partner_user | — | withProject, withProject | — | 4 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/cdrl` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts | partner_user | — | withProject, withProject | — | 5 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/clins` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/comments` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]` | PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts | partner_user | — | withProject, withProject | — | 4 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/documents` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/gate-closer` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/invoices` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts | partner_user | — | withProject, withProject | — | 5 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/meetings` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/milestones` | GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts | partner_user | — | withProject, withProject | — | 5 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/modifications` | DELETE GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts | partner_user | — | withProject, withProject | — | 6 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/notifications` | GET PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/reviews` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/risks` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/rollup` | GET | app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts | partner_user | — | withProject, withProject | — | 1 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/tasks` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts | partner_user | — | withProject, withProject | — | 3 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]` | PATCH | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts | partner_user | — | withProject, withProject | — | 2 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments` | DELETE GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts | partner_user | — | withProject, withProject | — | 4 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/time` | DELETE GET PATCH POST | app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts | partner_user | — | withProject, withProject | — | 6 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/traceability` | GET | app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts | partner_user | — | withProject, withProject | — | 1 |
+| `/api/portal/[tenantSlug]/projects/[projectId]/wbs` | GET POST | app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts | partner_user | — | withProject, withProject | — | 3 |
 | `/api/portal/[tenantSlug]/proposals` | GET | app/api/portal/[tenantSlug]/proposals/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, withTenant, getTenantBySlug | — | 2 |
 | `/api/portal/[tenantSlug]/proposals/[proposalId]` | GET | app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts | partner_user | auth, verifyTenantAccess | verifyTenantAccess, resolveUserAccess, enterTenant, getTenantBySlug | 4×sql | 5 |
 | `/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions` | POST | app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts | partner_user | auth | verifyProposalAccess, enterTenant, getTenantBySlug | 4×sql | 8 |
@@ -1140,43 +1140,6 @@ Each row is something the parser noticed. **None is a verdict.** CLAUDE.md is ex
 new harness's first output describes the harness; verify every row against the source before
 acting on it. Legitimate exceptions exist in every category (a public marketing page has no
 gate by design; an admin cross-tenant console reads `sqlBypass` on purpose).
-
-### `portal-route-no-tenant-AUTHORISATION` — 32
-
-| file | where | note |
-|---|---|---|
-| app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/assess-health | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/assignees | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/baseline | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/cdrl | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/clins | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/comments | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/deliverables | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/documents | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/draft-narrative | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/gate-closer | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/invoices | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/meetings | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/milestones | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/modifications | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/notifications | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/reviews | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/risks | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/rollup | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId] | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/tasks | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/time | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/traceability | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts | /api/portal/[tenantSlug]/projects/[projectId]/wbs | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
-| app/api/portal/[tenantSlug]/projects/route.ts | /api/portal/[tenantSlug]/projects | resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership |
 
 ### `api-no-gate-at-either-layer` — 8
 

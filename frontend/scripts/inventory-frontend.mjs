@@ -304,8 +304,16 @@ const AUTH_CALLS = ['auth', 'requireAdmin', 'requireRole', 'requireUser', 'getSe
  * returning tenant-specific data." Scoping alone is not enough either — RLS refuses foreign ROWS,
  * but a 200 with an empty list where a 403 belongs is still the wrong answer.
  */
-const TENANT_AUTHORISE = ['verifyTenantAccess', 'verifyProposalAccess', 'resolveVaultAccess', 'resolveUserAccess', 'verifyPortalAccess', 'requireTenantMember'];
-const TENANT_SCOPE = ['withTenant', 'enterTenant', 'runInTenant'];
+// `withProject` is BOTH — it authorises (`verifyTenantAccess`, then refuses a role with no project
+// reach at all) and scopes (`runInTenant`), which is the whole reason it exists as one wrapper. It
+// was missing from this list, and the cost was 32 of the 40 signals this instrument emits: every
+// project route read as "resolves but calls no authorisation helper" while each one authorises
+// correctly. A signal that is 80% false is a signal a reader learns to skip, which is worse than
+// not emitting it — the same lesson as the namespace-concatenation bug that opens `provedEvent`.
+// Adding a name here is only ever right when the helper genuinely makes the authority claim; the
+// self-test below pins one project route so a future rename cannot quietly re-open the gap.
+const TENANT_AUTHORISE = ['verifyTenantAccess', 'verifyProposalAccess', 'resolveVaultAccess', 'resolveUserAccess', 'verifyPortalAccess', 'requireTenantMember', 'withProject'];
+const TENANT_SCOPE = ['withTenant', 'enterTenant', 'runInTenant', 'withProject'];
 const TENANT_RESOLVE = ['getTenantBySlug'];
 const TENANT_CALLS = [...TENANT_AUTHORISE, ...TENANT_SCOPE, ...TENANT_RESOLVE];
 
@@ -387,6 +395,12 @@ const SELF_TEST = [
     file: 'app/api/admin/system/route.ts',
     expect: (r) => gateOf(r).includes('withHandler'),
     why: '`export const GET = withHandler({requireAuth:true})` counts as a gate',
+  },
+  {
+    file: 'app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts',
+    expect: (r) => tenantAuthOf(r).includes('withProject') && tenantScopeOf(r).includes('withProject'),
+    why: 'one wrapper that BOTH authorises and scopes — it was in neither list, and 32 correctly '
+      + 'gated project routes read as ungated because of it',
   },
   {
     file: 'app/portal/[tenantSlug]/pipeline/page.tsx',

@@ -60,7 +60,7 @@
   {
    "kind": "script",
    "files": 188,
-   "lines": 27267
+   "lines": 27366
   },
   {
    "kind": "server-action",
@@ -128204,8 +128204,8 @@
   {
    "file": "scripts/drive-project-lifecycle.mts",
    "kind": "script",
-   "lines": 2350,
-   "bytes": 141997,
+   "lines": 2449,
+   "bytes": 147630,
    "client": false,
    "exports": [],
    "imports": [
@@ -128231,19 +128231,11 @@
      ]
     }
    ],
-   "tryCount": 9,
+   "tryCount": 10,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 132
-    },
-    {
-     "tag": "sql",
-     "line": 144
-    },
-    {
-     "tag": "sql",
-     "line": 153
+     "line": 158
     },
     {
      "tag": "sql",
@@ -128251,31 +128243,23 @@
     },
     {
      "tag": "sql",
-     "line": 182
+     "line": 179
     },
     {
      "tag": "sql",
-     "line": 185
+     "line": 196
     },
     {
      "tag": "sql",
-     "line": 188
+     "line": 208
     },
     {
      "tag": "sql",
-     "line": 189
+     "line": 211
     },
     {
      "tag": "sql",
-     "line": 191
-    },
-    {
-     "tag": "sql",
-     "line": 192
-    },
-    {
-     "tag": "sql",
-     "line": 199
+     "line": 214
     },
     {
      "tag": "sql",
@@ -128283,59 +128267,71 @@
     },
     {
      "tag": "sql",
-     "line": 220
+     "line": 217
     },
     {
      "tag": "sql",
-     "line": 229
+     "line": 218
     },
     {
      "tag": "sql",
-     "line": 238
+     "line": 225
     },
     {
      "tag": "sql",
-     "line": 249
+     "line": 241
     },
     {
      "tag": "sql",
-     "line": 278
+     "line": 246
     },
     {
      "tag": "sql",
-     "line": 284
+     "line": 255
     },
     {
      "tag": "sql",
-     "line": 299
+     "line": 264
     },
     {
      "tag": "sql",
-     "line": 366
+     "line": 275
     },
     {
      "tag": "sql",
-     "line": 402
+     "line": 304
     },
     {
      "tag": "sql",
-     "line": 446
+     "line": 310
     },
     {
      "tag": "sql",
-     "line": 468
+     "line": 325
     },
     {
      "tag": "sql",
-     "line": 473
+     "line": 392
     },
     {
      "tag": "sql",
-     "line": 478
+     "line": 428
     },
     {
      "tag": "sql",
-     "line": 509
+     "line": 476
+    },
+    {
+     "tag": "sql",
+     "line": 482
+    },
+    {
+     "tag": "sql",
+     "line": 527
+    },
+    {
+     "tag": "sql",
+     "line": 549
     },
     {
      "tag": "sql",
@@ -128343,91 +128339,83 @@
     },
     {
      "tag": "sql",
-     "line": 588
+     "line": 559
     },
     {
      "tag": "sql",
-     "line": 630
+     "line": 590
     },
     {
      "tag": "sql",
-     "line": 643
+     "line": 635
     },
     {
      "tag": "sql",
-     "line": 682
+     "line": 669
     },
     {
      "tag": "sql",
-     "line": 690
+     "line": 711
     },
     {
      "tag": "sql",
-     "line": 773
+     "line": 724
     },
     {
      "tag": "sql",
-     "line": 794
+     "line": 763
     },
     {
      "tag": "sql",
-     "line": 801
+     "line": 771
     },
     {
      "tag": "sql",
-     "line": 830
+     "line": 854
     },
     {
      "tag": "sql",
-     "line": 839
+     "line": 875
     },
     {
      "tag": "sql",
-     "line": 858
+     "line": 882
     },
     {
      "tag": "sql",
-     "line": 898
+     "line": 911
     },
     {
      "tag": "sql",
-     "line": 904
+     "line": 920
     },
     {
      "tag": "sql",
-     "line": 915
+     "line": 939
     },
     {
      "tag": "sql",
-     "line": 955
+     "line": 979
     },
     {
      "tag": "sql",
-     "line": 1028
+     "line": 985
     },
     {
      "tag": "sql",
-     "line": 1055
+     "line": 996
     },
     {
      "tag": "sql",
-     "line": 1108
+     "line": 1036
     },
     {
      "tag": "sql",
-     "line": 1119
+     "line": 1109
     },
     {
      "tag": "sql",
-     "line": 1147
-    },
-    {
-     "tag": "sql",
-     "line": 1154
-    },
-    {
-     "tag": "sql",
-     "line": 1173
+     "line": 1136
     },
     {
      "tag": "sql",
@@ -128435,111 +128423,127 @@
     },
     {
      "tag": "sql",
-     "line": 1210
+     "line": 1204
     },
     {
      "tag": "sql",
-     "line": 1217
+     "line": 1232
     },
     {
      "tag": "sql",
-     "line": 1231
+     "line": 1239
     },
     {
      "tag": "sql",
-     "line": 1240
+     "line": 1258
     },
     {
      "tag": "sql",
-     "line": 1246
+     "line": 1274
     },
     {
      "tag": "sql",
-     "line": 1348
+     "line": 1295
     },
     {
      "tag": "sql",
-     "line": 1360
+     "line": 1302
     },
     {
      "tag": "sql",
-     "line": 1369
+     "line": 1316
     },
     {
      "tag": "sql",
-     "line": 1393
+     "line": 1325
     },
     {
      "tag": "sql",
-     "line": 1443
+     "line": 1331
     },
     {
      "tag": "sql",
-     "line": 1458
+     "line": 1433
     },
     {
      "tag": "sql",
-     "line": 1502
+     "line": 1445
     },
     {
      "tag": "sql",
-     "line": 1522
+     "line": 1454
     },
     {
      "tag": "sql",
-     "line": 1525
+     "line": 1478
     },
     {
      "tag": "sql",
-     "line": 1538
+     "line": 1528
     },
     {
      "tag": "sql",
-     "line": 1553
+     "line": 1543
     },
     {
      "tag": "sql",
-     "line": 1566
+     "line": 1587
     },
     {
      "tag": "sql",
-     "line": 1576
+     "line": 1607
     },
     {
      "tag": "sql",
-     "line": 1582
+     "line": 1610
     },
     {
      "tag": "sql",
-     "line": 1625
+     "line": 1623
     },
     {
      "tag": "sql",
-     "line": 1636
+     "line": 1638
     },
     {
      "tag": "sql",
-     "line": 1649
+     "line": 1651
     },
     {
      "tag": "sql",
-     "line": 1680
+     "line": 1661
     },
     {
      "tag": "sql",
-     "line": 1744
+     "line": 1667
     },
     {
      "tag": "sql",
-     "line": 1766
+     "line": 1710
     },
     {
      "tag": "sql",
-     "line": 1799
+     "line": 1721
     },
     {
      "tag": "sql",
-     "line": 1815
+     "line": 1734
+    },
+    {
+     "tag": "sql",
+     "line": 1765
+    },
+    {
+     "tag": "sql",
+     "line": 1829
+    },
+    {
+     "tag": "sql",
+     "line": 1851
+    },
+    {
+     "tag": "sql",
+     "line": 1884
     },
     {
      "tag": "sql",
@@ -128547,111 +128551,119 @@
     },
     {
      "tag": "sql",
-     "line": 1908
+     "line": 1985
     },
     {
      "tag": "sql",
-     "line": 1912
+     "line": 1993
     },
     {
      "tag": "sql",
-     "line": 1940
+     "line": 1997
     },
     {
      "tag": "sql",
-     "line": 1954
+     "line": 2025
     },
     {
      "tag": "sql",
-     "line": 1967
+     "line": 2039
     },
     {
      "tag": "sql",
-     "line": 1979
+     "line": 2052
     },
     {
      "tag": "sql",
-     "line": 2010
+     "line": 2064
     },
     {
      "tag": "sql",
-     "line": 2019
+     "line": 2095
     },
     {
      "tag": "sql",
-     "line": 2096
+     "line": 2104
     },
     {
      "tag": "sql",
-     "line": 2118
+     "line": 2181
     },
     {
      "tag": "sql",
-     "line": 2131
+     "line": 2203
     },
     {
      "tag": "sql",
-     "line": 2140
+     "line": 2216
     },
     {
      "tag": "sql",
-     "line": 2143
+     "line": 2225
     },
     {
      "tag": "sql",
-     "line": 2146
+     "line": 2228
     },
     {
      "tag": "sql",
-     "line": 2148
+     "line": 2231
     },
     {
      "tag": "sql",
-     "line": 2179
+     "line": 2233
     },
     {
      "tag": "sql",
-     "line": 2184
+     "line": 2264
     },
     {
      "tag": "sql",
-     "line": 2229
+     "line": 2269
     },
     {
      "tag": "sql",
-     "line": 2241
+     "line": 2314
     },
     {
      "tag": "sql",
-     "line": 2256
+     "line": 2326
     },
     {
      "tag": "sql",
-     "line": 2290
+     "line": 2341
     },
     {
      "tag": "sql",
-     "line": 2294
+     "line": 2375
     },
     {
      "tag": "sql",
-     "line": 2298
+     "line": 2379
     },
     {
      "tag": "sql",
-     "line": 2304
+     "line": 2383
     },
     {
      "tag": "sql",
-     "line": 2307
+     "line": 2389
     },
     {
      "tag": "sql",
-     "line": 2311
+     "line": 2392
     },
     {
      "tag": "sql",
-     "line": 2320
+     "line": 2396
+    },
+    {
+     "tag": "sql",
+     "line": 2405
+    },
+    {
+     "tag": "sql",
+     "line": 2419
     }
    ],
    "calls": [
@@ -128718,7 +128730,15 @@
     "endAfter.get",
     "endBefore.get",
     "Array.isArray",
-    "members.find",
+    "ACTOR.slice(ACTOR.indexOf('@')).toLowerCase",
+    "ACTOR.slice",
+    "ACTOR.indexOf",
+    "list.find",
+    "String(m.email ?? '').toLowerCase",
+    "ACTOR.toLowerCase",
+    "String(m.email ?? '').toLowerCase().endsWith",
+    "String(m.role ?? '').startsWith",
+    "colleague",
     "onProject.some",
     "/\\b(NaN|Invalid Date|[A-Z][a-z]{2} [A-Z][a-z]{2} \\d)/.test",
     "String(again.json.error ?? '').slice",
@@ -128750,7 +128770,6 @@
     "[sameDayId].filter",
     "asked.text.slice",
     "mentionedBack.includes",
-    "ACTOR.toLowerCase",
     "mentionedBack.join",
     "unmatched.includes",
     "unmatched.join",
@@ -128881,7 +128900,7 @@
    ],
    "jsx": [],
    "snakeRowTypes": [],
-   "ownClientSql": 105,
+   "ownClientSql": 108,
    "jsonResponses": []
   },
   {
@@ -140798,198 +140817,6 @@
    "file": "app/api/invite/route.ts",
    "route": "/api/invite",
    "note": "no in-file gate AND no middleware PATH_MIN_ROLE prefix — verify (a deliberately public route is legitimate)"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assess-health",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/baseline",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/cdrl",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/clins",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/documents",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/gate-closer",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/invoices",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/modifications",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/notifications",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/rollup",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/time",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/traceability",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects/[projectId]/wbs",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
-  },
-  {
-   "sig": "portal-route-no-tenant-AUTHORISATION",
-   "file": "app/api/portal/[tenantSlug]/projects/route.ts",
-   "route": "/api/portal/[tenantSlug]/projects",
-   "note": "resolves/scopes (nothing) but calls no authorisation helper — middleware gates ROLE, never membership"
   },
   {
    "sig": "api-no-gate-at-either-layer",
