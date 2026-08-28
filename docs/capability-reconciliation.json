@@ -780,7 +780,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 236
+   "rows": 237
   },
   {
    "name": "deploy_baseline",
@@ -824,7 +824,7 @@
    "archetype": "compliance_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "content_curator",
@@ -908,7 +908,7 @@
    "archetype": "opportunity_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "opportunity_scout",
@@ -986,7 +986,7 @@
    "archetype": "scoring_strategist",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "section_drafter",
@@ -1185,7 +1185,6 @@
   "atom.archived",
   "atom.curated",
   "atom.restored",
-  "automation_preferences.updated",
   "contract.started",
   "document.created",
   "document.exported",
@@ -1195,13 +1194,8 @@
   "portal.stage_advanced",
   "preview.generated",
   "project.collaboration_requested",
-  "proposal.research_requested",
   "purchase.completed",
-  "review_phase.completed",
-  "review_phase.requested",
   "task.assigned",
-  "team_member.role_changed",
-  "template.acknowledged",
   "template.applied",
   "tenant.cards_backfilled"
  ]

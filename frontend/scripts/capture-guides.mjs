@@ -74,10 +74,17 @@ async function ids() {
   // Content length matters too: the selection toolbar reads a live text selection back to the
   // model, and an empty node has nothing to select.
   const [sect] = rich ? await sql`
-    SELECT id FROM proposal_sections WHERE proposal_id = ${rich.id}
+    SELECT id, (locked_at IS NULL) AS editable FROM proposal_sections WHERE proposal_id = ${rich.id}
     ORDER BY COALESCE(is_locked, false) ASC, length(COALESCE(content, '')) DESC,
              sort_index ASC NULLS LAST, section_number ASC
     LIMIT 1` : [];
+  // AND WHETHER THE ONE WE GOT IS ACTUALLY EDITABLE. The ORDER BY above PREFERS an unlocked
+  // section; it cannot conjure one. When every section the actor can reach is locked — which is
+  // the state of this fixture, where all 68 Foundation sections are locked and the only three
+  // unlocked ones belong to another tenant — the toolbox simply is not in the DOM, and each
+  // toolbar capture below spent 30 seconds in `scrollIntoViewIfNeeded` before failing with a
+  // Playwright timeout. Five opaque timeouts read like a broken editor. They are not: they are
+  // one fixture fact, and the script already has an honest way to say it.
   // A "topic" is an `opportunities` row hanging off the solicitation — there is no
   // `solicitation_topics` table, and assuming one is how a capture script ends up shooting a 404.
   // This mirrors the predicate the topic PAGE itself runs, so a row found here is a row it renders.
@@ -105,7 +112,8 @@ async function ids() {
   const [adminDoc] = await sql`
     SELECT id FROM tenant_documents ORDER BY node_count DESC NULLS LAST, created_at DESC LIMIT 1`;
   return {
-    proposalId: rich?.id, sectionId: sect?.id, solId: sol?.id, topicId: topic?.id,
+    proposalId: rich?.id, sectionId: sect?.id, sectionEditable: Boolean(sect?.editable),
+    solId: sol?.id, topicId: topic?.id,
     portalId: portal?.id, portalSlug: portal?.slug, tenantId: tenant?.id,
     templateId: tpl?.id, adminDocId: adminDoc?.id,
     ...(await canvasDocIds(tenant?.id)),
@@ -478,6 +486,16 @@ try {
         };
         const reopen = async (pg) => { await pg.goto(BASE + SEC, { waitUntil: 'domcontentloaded' }); await settle(pg, 1400); };
 
+        // The toolbox only renders on an EDITABLE section. Reported, not attempted — a screenshot
+        // of the read-only surface captioned as the editing one is the failure this guard exists
+        // to avoid, and a timeout is not a finding about the product.
+        if (!ID.sectionEditable) {
+          for (const n of ['14-canvas-insert', '15-canvas-format', '16-canvas-ai',
+                           '18-canvas-floorplan', '19-canvas-library']) {
+            notAddressable(n, 'every section this actor can reach is LOCKED, so the editing toolbox '
+              + 'is not rendered — unlock one on the fixture tenant to illustrate these five');
+          }
+        } else {
         await act(p, OUT, { name: '14-canvas-insert', run: card('Insert'), prove: 'text=Paragraph' });
         await act(p, OUT, {
           name: '15-canvas-format',
@@ -493,9 +511,15 @@ try {
           prove: 'text=/Style|Text|Emphasis/',
         });
         await act(p, OUT, { name: '16-canvas-ai', run: card('AI Assist'), prove: 'text=/Custom instruction|Revis/i' });
-        await act(p, OUT, { name: '17-canvas-compliance', run: card('Compliance & Status'), prove: 'text=Document Status' });
         await act(p, OUT, { name: '18-canvas-floorplan', run: card('Floorplan'), prove: 'text=/Margin|Header|Page/i' });
         await act(p, OUT, { name: '19-canvas-library', run: card('Insert from Library'), prove: 'text=Insert from Library' });
+        }
+        // OUTSIDE the guard on purpose: this one captured cleanly on a locked section in the run
+        // that found the other five. "Compliance & Status" is a READING surface — it reports what
+        // the section is, which is exactly the thing a locked section still has. Putting it inside
+        // would have suppressed a figure that works, which is the mirror error of illustrating one
+        // that does not.
+        await act(p, OUT, { name: '17-canvas-compliance', run: card('Compliance & Status'), prove: 'text=Document Status' });
         await act(p, OUT, {
           name: '20-canvas-overlays',
           // The SAME chip bar as the fluid view — one OverlayLayer over all four surfaces — which
