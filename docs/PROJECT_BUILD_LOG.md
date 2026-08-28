@@ -2111,3 +2111,83 @@ dispute, which is the only moment it matters.
 820 · lifecycle drive green.
 
 ---
+
+## P2 — The register, and the question a review actually asks
+
+Migration **225**: `project_risks`.
+
+### One table, because the transition is the point
+
+A risk is something that might happen; an issue is a risk that did. Two tables would make that
+transition a **copy** between them — and a copied row cannot answer the question every program
+review asks: *when did we know, and what did we rate it?*
+
+So `kind` moves risk → issue **in place** and `became_issue_at` records when. One row, one history,
+and the score it carried at the time survives. The drive checks the row count afterwards for exactly
+this reason: **ONE row, moved — not a risk row plus an issue row.**
+
+An issue **keeps its probability**. It reads oddly — the thing happened, so probability is moot —
+but *"we had this at 20 out of 25 and it landed"* is the register's whole claim to having been
+useful, and blanking the field on transition destroys it.
+
+`kind` and `status` are separate axes, so a closed risk and a closed issue stay distinguishable: one
+was mitigated before it happened, the other was survived.
+
+### The score is GENERATED
+
+`probability × impact`, computed by the database. A number the UI calculated goes stale the day the
+formula changes, and nothing afterwards says which rows are which. The UI shows it live while you
+pick the ratings, and it cannot drift, because the server never accepts one.
+
+### A mitigation is a real task
+
+*"Order the long-lead parts now"* is work with an owner and a date — which is exactly what
+`project_milestone_tasks` is. A private checklist on the register would give a customer **two places
+their work lives**, the same argument that made project ToDos a projection rather than a queue, and
+canvas deliverables one column rather than a second editor.
+
+So `mitigate` creates a project-scope task, and it inherits everything that spine already has: a
+ToDo, an email, nudges, reassignment, attachments. The drive proves the consequence rather than
+asserting the intent — the mitigation **blocked close-out** until it was ticked off, like any other
+standing work.
+
+### Who
+
+Raising and rescoring are open to **anyone on the project**: the person who sees a risk first is
+rarely the manager, and a register only a manager may write lags reality by a week. Closing is
+`tenant_admin` — deciding a risk is behind us is a management call.
+
+### Proven
+
+Eight schema invariants against real Postgres, 16 unit assertions, and as the actors:
+
+```
+✓ a risk is raised — 201
+✓ and the database computed its score — never a number the UI sent — 20
+✓ a rating outside 1-5 is refused, not clamped — 400
+✓ its mitigation becomes a real project task — 201
+✓ which means it inherits the ToDo, the email and the nudges — not a second checklist — 1 ToDo(s)
+✓ an employee can say it happened — they usually see it first — 200
+✓ the SAME row became an issue, and recorded when
+✓ and it KEPT the score it was rated at — "we had this at 20 and it landed" — score=20
+✓ a second click cannot re-stamp the day we learned — 409
+✓ ONE row, moved — not a risk row plus an issue row — 1
+✓ the mitigation is worked and ticked off, like any other task
+```
+
+### Two harness defects, and one duplication caught in my own work
+
+Two assertions matched the `RETURNING` clause and reported defects that were not there:
+`INSERT … RETURNING …, score, …` contains the word "score" without writing it. Narrowed to the half
+of the statement before `RETURNING`, which is what "does it write this" actually means.
+
+And by 7k I had written **three inline copies** of *open a browser context, log in as the employee,
+do one thing, close it*. That is precisely the duplication this drive is used to find in the
+product. Folded into one `asEmployee_` helper that returns `null` when there is nobody to be — and
+the **caller** decides whether that is a skip or a finding, because a helper that silently
+substituted the admin would report the manager's half twice.
+
+`tsc` 0 · vitest 222 files / **2,293** · surfaces 82/82 · write-contract clean · mobile probe clean ·
+lifecycle drive green.
+
+---

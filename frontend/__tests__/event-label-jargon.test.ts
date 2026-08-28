@@ -75,6 +75,13 @@ const CUSTOMER_VISIBLE: Array<[string, string]> = [
   ['project', 'review.withdrawn'],
   ['project', 'nudge_sweep.completed'],
   ['project', 'acceptance_evidence.filed'],
+  ['project', 'risk.raised'],
+  ['project', 'issue.raised'],
+  ['project', 'risk.became_issue'],
+  ['project', 'risk.rescored'],
+  ['project', 'risk.closed'],
+  ['project', 'issue.closed'],
+  ['project', 'risk.mitigation_planned'],
 ];
 
 describe('events a customer sees carry a written label', () => {

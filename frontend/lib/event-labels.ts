@@ -309,6 +309,33 @@ export function describeEvent(ev: EventLike): string {
       case 'review.withdrawn':
         return 'Review request withdrawn';
 
+      // ── The register (mig 225) ────────────────────────────────────────────────────────────
+      case 'risk.raised':
+        return `Risk raised: ${str(payload.title) ?? 'a risk'}`
+          + `${typeof payload.score === 'number' ? ` — scored ${payload.score}/25` : ''}`;
+      case 'issue.raised':
+        return `Issue logged: ${str(payload.title) ?? 'an issue'}`;
+      case 'risk.became_issue':
+        // The transition a program review asks about, and the score it was rated at — which is the
+        // register's whole claim to having been useful.
+        return `A risk HAPPENED: ${str(payload.title) ?? 'a risk'}`
+          + `${typeof payload.score === 'number' ? ` — we had it at ${payload.score}/25` : ''}`;
+      case 'risk.rescored': {
+        const from = typeof payload.from === 'number' ? payload.from : null;
+        const to = typeof payload.to === 'number' ? payload.to : null;
+        const dir = from !== null && to !== null ? (to > from ? 'up' : 'down') : '';
+        return `Risk rescored ${dir}: ${str(payload.title) ?? 'a risk'}`
+          + `${from !== null && to !== null ? ` — ${from} → ${to}` : ''}`;
+      }
+      case 'risk.closed':
+        return `Risk closed: ${str(payload.title) ?? 'a risk'}`
+          + `${str(payload.note) ? ` · ${str(payload.note)}` : ''}`;
+      case 'issue.closed':
+        return `Issue resolved: ${str(payload.title) ?? 'an issue'}`
+          + `${str(payload.note) ? ` · ${str(payload.note)}` : ''}`;
+      case 'risk.mitigation_planned':
+        return `Mitigation planned: ${str(payload.title) ?? 'a mitigation'}`;
+
       // ── The customer's act, filed by us (mig 224) ─────────────────────────────────────────
       case 'acceptance_evidence.filed': {
         // "reports" is doing the work. This row must never read as the customer's own act — the

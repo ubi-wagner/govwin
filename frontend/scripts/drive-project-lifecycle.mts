@@ -32,7 +32,7 @@
  *
  * Exit 0 the whole chain holds · 1 a link is broken · 2 it could not run.
  */
-import { chromium, type Page, type APIRequestContext } from 'playwright';
+import { chromium, type Page, type APIRequestContext, type BrowserContext } from 'playwright';
 import postgres from 'postgres';
 import { readFileSync } from 'node:fs';
 
@@ -1002,6 +1002,95 @@ async function main() {
   // The employee session opened in 7f has now served 7f, 7g and 7h; this is the last use of it.
   await empCtx7f.close();
 
+  /**
+   * Do ONE thing as the assigned employee, in a session of its own.
+   *
+   * The context 7f opened is closed at the end of 7h, and reaching for a closed one is how a drive
+   * starts depending on its own ordering (learned the hard way in 7h). Three inline copies of
+   * "open, log in, act, close" had accumulated before this existed — which is exactly the
+   * duplication this drive is used to find in the product.
+   *
+   * Returns null when there is nobody to be, and the CALLER decides whether that is a skip or a
+   * finding — a helper that silently substituted the admin would report the manager's half twice.
+   */
+  async function asEmployee_<T>(fn: (ctx: BrowserContext) => Promise<T>): Promise<T | null> {
+    if (!assignee?.email) return null;
+    const ctx = await browser.newContext();
+    const pg = await ctx.newPage();
+    try {
+      await login(pg, String(assignee.email), TENANT_PW);
+      return await fn(ctx);
+    } catch (e) {
+      no('an employee action could not run', String((e as Error).message).slice(0, 60));
+      return null;
+    } finally {
+      await ctx.close();
+    }
+  }
+
+  // ══ 7k · THE REGISTER — a risk, and the day it stopped being one ═══════════════════════════
+  //
+  // The question a program review asks is not "what are the risks" but "when did we know, and what
+  // did we rate it?" Two tables would make the transition a copy, and a copied row answers neither.
+  phase('7k · risks and issues: one row, moved, keeping its history');
+
+  const raised = await api(req, 'post', P + '/risks', {
+    title: 'Rig vendor lead time slips past the demo',
+    probability: 4, impact: 5, ownerUserId: assignee?.id ?? null,
+    mitigation: 'Order the long-lead parts now', reviewOn: iso(14),
+  });
+  A(raised.status === 201, 'a risk is raised', `${raised.status} ${raised.text.slice(0, 70)}`);
+  const riskId = ((raised.json.data as Json)?.risk as Json)?.id as string | undefined;
+
+  const [scored] = await sql<{ score: number; probability: number }[]>`
+    SELECT score, probability FROM project_risks WHERE id = ${riskId ?? null}::uuid`;
+  A(scored?.score === 20,
+    'and the database computed its score — never a number the UI sent', `${scored?.score}`);
+
+  const badRating = await api(req, 'post', P + '/risks', { title: 'x', probability: 9, impact: 3 });
+  A(badRating.status === 400, 'a rating outside 1-5 is refused, not clamped', `${badRating.status}`);
+
+  // ── THE MITIGATION IS A REAL TASK, ON THE SPINE THAT ALREADY EXISTS ───────────────────────
+  const mitig = await api(req, 'patch', P + `/risks/${riskId}`, {
+    action: 'mitigate', assigneeUserId: assignee?.id ?? null, dueDate: iso(10),
+  });
+  A(mitig.status === 201, 'its mitigation becomes a real project task', `${mitig.status}`);
+  const mitigTaskId = ((mitig.json.data as Json)?.taskId) as string | undefined;
+  const [{ mitigTodos }] = await sql<{ mitigTodos: number }[]>`
+    SELECT count(*)::int AS "mitigTodos" FROM tasks
+     WHERE task_type = 'project_task' AND entity_id = ${mitigTaskId ?? null}::uuid`;
+  A(mitigTodos === 1,
+    'which means it inherits the ToDo, the email and the nudges — not a second checklist',
+    `${mitigTodos} ToDo(s)`);
+
+  // ── AND THEN IT HAPPENS ───────────────────────────────────────────────────────────────────
+  const happened = await asEmployee_((ctx) =>
+    api(ctx.request, 'patch', P + `/risks/${riskId}`, { action: 'raise_issue' }));
+  A(happened?.status === 200, 'an employee can say it happened — they usually see it first',
+    `${happened?.status ?? 'no employee to be'}`);
+
+  const [afterIssue] = await sql<{ kind: string; probability: number; score: number; becameIssueAt: string | null }[]>`
+    SELECT kind, probability, score, became_issue_at AS "becameIssueAt"
+      FROM project_risks WHERE id = ${riskId ?? null}::uuid`;
+  A(afterIssue?.kind === 'issue' && Boolean(afterIssue?.becameIssueAt),
+    'the SAME row became an issue, and recorded when', `${afterIssue?.kind}`);
+  A(afterIssue?.score === 20 && afterIssue?.probability === 4,
+    'and it KEPT the score it was rated at — "we had this at 20 and it landed"',
+    `score=${afterIssue?.score}`);
+
+  const twiceIssue = await api(req, 'patch', P + `/risks/${riskId}`, { action: 'raise_issue' });
+  A(twiceIssue.status === 409, 'a second click cannot re-stamp the day we learned', `${twiceIssue.status}`);
+
+  const [{ riskRows }] = await sql<{ riskRows: number }[]>`
+    SELECT count(*)::int AS "riskRows" FROM project_risks
+     WHERE project_id = ${created.projectId ?? null}::uuid`;
+  A(riskRows === 1, 'ONE row, moved — not a risk row plus an issue row', `${riskRows}`);
+
+  const closedRisk = await api(req, 'patch', P + `/risks/${riskId}`, {
+    action: 'close', note: 'Parts arrived; demo held on the original date.',
+  });
+  A(closedRisk.status === 200, 'a tenant_admin closes it', `${closedRisk.status}`);
+
   // ══ 7j · THE CUSTOMER'S ACT, FILED BY US ═══════════════════════════════════════════════════
   //
   // This replaces a COR read-only portal, which would have reopened the boundary
@@ -1039,30 +1128,21 @@ async function main() {
 
   // Its own short-lived session: the one 7f opened was closed at the end of 7h, and reaching for
   // a closed context is how a drive starts depending on its own ordering (learned in 7h).
-  if (assignee?.email) {
-    const evCtx = await browser.newContext();
-    const evPage = await evCtx.newPage();
-    try {
-      await login(evPage, String(assignee.email), TENANT_PW);
-      const denied = await evCtx.request.fetch(
-        `${BASE}/api/portal/${TENANT}/projects/${created.projectId}/deliverables/${authoredId}/evidence`,
-        {
-          method: 'POST',
-          multipart: {
-            file: { name: 'not-mine.eml', mimeType: 'message/rfc822', buffer: Buffer.from('x') },
-            kind: 'cor_email',
-          },
-        },
-      );
-      A(denied.status() === 403,
-        'and an employee cannot file it — a claim about somebody outside the company is narrower '
-        + 'than an upload', `${denied.status()}`);
-    } catch (e) {
-      no('the employee could not be tested against the evidence gate', String((e as Error).message).slice(0, 60));
-    }
-    await evCtx.close();
-  } else {
-    no('no employee to test the evidence gate with — the refusal is UNMEASURED');
+  const denied = await asEmployee_((ctx) => ctx.request.fetch(
+    `${BASE}/api/portal/${TENANT}/projects/${created.projectId}/deliverables/${authoredId}/evidence`,
+    {
+      method: 'POST',
+      multipart: {
+        file: { name: 'not-mine.eml', mimeType: 'message/rfc822', buffer: Buffer.from('x') },
+        kind: 'cor_email',
+      },
+    },
+  ));
+  if (denied === null) no('no employee to test the evidence gate with — the refusal is UNMEASURED');
+  else {
+    A(denied.status() === 403,
+      'and an employee cannot file it — a claim about somebody outside the company is narrower '
+      + 'than an upload', `${denied.status()}`);
   }
 
   // ══ 7i · THE INBOX — project work reaches the surfaces a person already reads ══════════════
@@ -1226,6 +1306,16 @@ async function main() {
   // The other half of the mig 221 scoping claim. The project-scope task raised in 7f never blocked
   // a milestone — every phase closed with it open — and it blocks the CONTRACT finishing. That is
   // the whole reason standing work is its own scope rather than a task filed under a phase.
+  // A mitigation is standing work like any other, so it gates close-out like any other — which is
+  // the whole reason it was made a real task instead of a field on the risk. Ticked here, by the
+  // person it was given to.
+  if (mitigTaskId) {
+    const done = await asEmployee_((ctx) =>
+      api(ctx.request, 'patch', P + `/tasks/${mitigTaskId}`, { status: 'done' }));
+    A(done?.status === 200, 'the mitigation is worked and ticked off, like any other task',
+      `${done?.status ?? 'no employee to be'}`);
+  }
+
   const blockedByStanding = await api(req, 'patch', P, { action: 'close' });
   A(blockedByStanding.status === 409
     && /Keep the risk register current/.test(String((blockedByStanding.json as Json).error ?? '')),

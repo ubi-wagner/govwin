@@ -13,9 +13,11 @@ import { listTaskAttachments } from '@/lib/projects/task-attachments';
 import { listProjectComments } from '@/lib/projects/comments';
 import { listProjectReviews } from '@/lib/projects/reviews';
 import { listAcceptanceEvidence } from '@/lib/projects/evidence';
+import { listProjectRisks } from '@/lib/projects/risks';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
 import { EvidencePanel, type PanelEvidence } from '@/components/projects/evidence-panel';
+import { RiskRegister, type RegisterRisk } from '@/components/projects/risk-register';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -89,7 +91,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -103,6 +105,7 @@ export default async function ProjectPage({
     listProjectComments(tenantId, projectId),
     listProjectReviews(tenantId, projectId),
     listAcceptanceEvidence(tenantId, projectId),
+    listProjectRisks(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -478,6 +481,27 @@ export default async function ProjectPage({
           </div>
         </section>
       )}
+
+      {/* ── THE REGISTER ─────────────────────────────────────────────────────────────────────
+          Above the discussion, because a high-scoring open risk is the thing a person opening
+          this page most needs to see, and below the plan, because it is about the plan. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Risks and issues
+        </h2>
+        <RiskRegister
+          risks={risks.map((r): RegisterRisk => ({
+            id: r.id, title: r.title, detail: r.detail, kind: r.kind, status: r.status,
+            probability: r.probability, impact: r.impact, score: r.score,
+            ownerEmail: r.ownerEmail ?? null, mitigation: r.mitigation,
+            contingency: r.contingency, reviewOn: isoDate(r.reviewOn),
+            closedNote: r.closedNote,
+          }))}
+          members={memberOptions}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canClose={canAccept}
+        />
+      </section>
 
       {/* ── THE PROJECT-LEVEL CONVERSATION ───────────────────────────────────────────────────
           Everything that is about the contract rather than about one phase of it. It is a
