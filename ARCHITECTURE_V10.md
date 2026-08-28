@@ -579,9 +579,18 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 217)
+## 7. New / Changed Schema (migrations 093 → 236)
 
-Highest migration: **217** (215 email ledger · 216 delivery spine · 217 the `project` namespace — see §7.x; 214 closed a committed demo credential; 185–213 per docs/; 179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **236**. Since 217 the post-award half was built out: **218** the milestone
+construct (dated segment · checklist · completion record) · **219** close-out · **220** the
+deliverable's authored CanvasDocument · **221** the task spine (`scope`, milestone-to-milestone
+dependencies, the four date triggers) · **222** threaded comments + roster-resolved mentions ·
+**223** the review gate (approving is not accepting) · **228** collapsed `project_wbs_nodes` into
+`project_milestones` · **229** the cost baseline 228 silently dropped · **230** contract
+modifications (the only write path to a CLIN) · **231** invoicing · **232** the CDRL register and
+its third state, *submitted* · **233/234** the CLIN child-cascade correction, where 233 asserted
+ordering as fact and measuring proved it wrong · **235** the per-project notification policy ·
+**236** the AI-manager gate closer. Earlier: (215 email ledger · 216 delivery spine · 217 the `project` namespace — see §7.x; 214 closed a committed demo credential; 185–213 per docs/; 179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
@@ -805,6 +814,28 @@ The **ingest → curate → release → fan-out (per topic) → pin → provisio
 spine is end-to-end wired and driven-green; the customer surface is converged on the canonical cards;
 the library is unified on atoms with enforced visibility; the compliance matrix and rankings are real;
 and the workflow engine runs live keyed to the opportunity spine.
+
+---
+
+### 10.x The instrument set, as it stands
+
+Nine instruments now measure this system, and three of them were added because the existing ones
+were structurally incapable of seeing a class of defect:
+
+| Instrument | The question no other one asks |
+|---|---|
+| `verify-surfaces` · `verify-api-contract` · `verify-db-crud` · `verify-ui-vs-db` · `verify-write-contract` | the five lenses — render, envelope, write-lands, number-matches, refuse-cleanly |
+| `reconcile-capability` | is there a DOOR? a feature nothing calls and no page covers |
+| `audit-automation-spine` | does the trigger→start→end chain close, across two runtimes |
+| `audit-pipeline-coherence` | do ten pipelines do one job ONE way, or ten ways |
+| `audit-row-type-truth` | does the `sql<T>` row type tell the truth about what postgres.js returns |
+| `probe-interaction-mobile` | can you REACH everything at 390px — which is not "does the page scroll" |
+| `audit-env-inventory` | can an operator know to set every variable the services read |
+
+The five lenses can all be green while ten pipelines each solve the same problem differently, while
+a row type quietly hands a `Date` to a field declared `string`, while a page's primary action sits
+clipped off the viewport, and while a production variable appears in no deploy document. Each of the
+bottom four exists because that happened.
 
 ---
 
