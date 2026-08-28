@@ -521,6 +521,39 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the titles (B135), and a customer's audit trail reading "Shadow descended" (B136). Canonical:
   **docs/CAPABILITY_RECONCILIATION.md**, which also records the fifteen ways the join was wrong —
   most importantly that **a source-literal scan against a dynamically-fetched list cannot pass**.
+- **No lens compares one pipeline to ANOTHER.** Each measures a surface against its own
+  expectation, so ten pipelines can each be green while solving the same problem ten ways.
+  `frontend/scripts/audit-pipeline-coherence.mjs` asks the join question — per shared seam (events ·
+  email · ToDos · canvas · the compliance floor · tenant authority · audit · agents · dates ·
+  toast), which files do the seam's **job**, and which of those **reach the shared implementation**.
+  A pipeline that never needed a seam prints `—`, never `0`: "did not need it" and "reimplemented
+  it" are opposite findings. Canonical: **docs/PIPELINE_COHERENCE_REVIEW.md**. Its companion
+  `audit-row-type-truth.mjs` closes the half of the `sql<T>` trap nothing guarded — the inventory
+  catches a snake_case NAME, and this catches a wrong TYPE by asking the live DB what each column
+  is. A wrong name is `undefined`, which throws; **a wrong type is a value of the wrong shape that
+  RENDERS** — it put `Fri Aug 28`, no year, on the project workspace and blanked an invoice-ageing
+  column. 817 typed sites · 248 lying row types · ranked by whether the value is then read as a
+  string, because a `Date` that only reaches `NextResponse.json` serialises to ISO and harms
+  nobody.
+- **Three instruments were wrong the same way in one sitting: a text search for a bug pattern finds
+  the CHANGELOG of that bug.** This repo documents each defect at its own site, so scanning for
+  `String(d).slice(0,10)` finds the comment explaining why the line below does *not* do that —
+  which means an instrument that reads prose as code reports the most defects exactly where the
+  most care was taken. Strip comments before asking what a file **does**; read the full text to ask
+  what it is **about**. And a SQL `--` comment inside a template literal is invisible to a JS
+  comment stripper, so never quote a bug pattern there either.
+- **A scanner that silently drops what it cannot parse reports a clean run** — worse than not
+  scanning. `audit-automation-spine.mjs`'s new JOIN 7b matched `[a-z0-9_]+` for a template name, so
+  the red test's `project_review_decidedX` failed to match at all and the site VANISHED from the
+  count while the audit printed "0 with NO renderer". Take any string, and report what cannot be
+  resolved as UNCHECKED. (JOIN 7b exists because JOIN 7 walked only the Python step registry, while
+  the frontend now names email templates too in `system:notification.requested` payloads — B141's
+  gap, in a place the audit built to prevent B141 did not look.)
+- **In a coherence audit the FALSE NEGATIVE is the dangerous direction.** Three "this pipeline does
+  not use the seam" cells were predicates matching import SPELLING (`./todos` vs
+  `@/lib/projects/todos`) or knowing only one of two legitimate mail paths. A false positive gets
+  contradicted by the code; a false negative invents work and nothing argues back. Match on
+  RESOLVED modules, and pin each corrected class in the self-test.
 - **Run all five on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
   where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
   survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.
