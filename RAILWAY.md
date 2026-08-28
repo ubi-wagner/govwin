@@ -264,17 +264,52 @@ Redeploy the frontend service (Settings → Deploy → Redeploy).
 ## Ongoing Deployments
 
 ```bash
-# Every push to main deploys both services automatically
 git add .
 git commit -m "feat: add tenant management page"
-git push origin main
-# Railway detects changes, rebuilds affected Dockerfiles, redeploys
+git push origin main          # → CI gate → Railway rebuild → migrations → deploy-verify
 ```
 
-Railway only rebuilds a service if files in its build context changed:
-- Changes in `frontend/` → rebuilds frontend only
-- Changes in `pipeline/` → rebuilds pipeline only
-- Changes in `db/` → no automatic rebuild (run migrations manually)
+**Merge to main is the whole deploy.** Nobody edits a service or the database by hand.
+
+### The gate before the deploy — `.github/workflows/ci.yml`
+
+Six jobs: `frontend` (`npm ci` → `type-check` → `lint` → `test` → `build`), `pipeline`, `crm`,
+`migrate-crm`, `migrate-main`. `npm test` runs vitest with `__tests__/integration/**` excluded —
+those need a live database and belong to the drives, not to CI.
+
+### Migrations run INSIDE the deployment, and both services fail closed
+
+This is the part that changed, and the old text here said the opposite.
+
+| Service | What runs before the process starts | On failure |
+|---|---|---|
+| frontend | `entrypoint.sh` → `db/migrations/migrate.mjs`, under `set -e`, as `DATABASE_URL_OWNER` | boot aborts — the app role cannot create a table referencing `tenants`, so it would crash-loop on "permission denied" anyway |
+| rfp-crm | Dockerfile `CMD` → `services/cms/db/run.sh` | exits 1 — *"refusing to boot on an unmigrated schema"* |
+
+So a change under `db/` **is** applied automatically, by the deploy that carries it.
+
+> ⚠️ **Do not run migrations by hand during a deploy.** This section used to say "run migrations
+> manually", which is now both unnecessary and unsafe: two runners against one database is exactly
+> the race the in-deployment path exists to avoid.
+
+`.github/workflows/migrate.yml` is the **break-glass** path — `workflow_dispatch` only, for ad-hoc
+or recovery runs. It cannot reach a database with no public endpoint, and the CRM database is
+internal by design, so its CRM jobs will fail to connect; the right answer to that failure is to run
+the migration from inside the deployment, not to open the database.
+
+### The gate after the deploy — `.github/workflows/deploy-verify.yml`
+
+Does not deploy. Asks whether everything is aligned:
+
+1. **drift-audit** — `migrate.mjs --check` against the prod main DB, read-only. Fails if an applied
+   migration's file has changed since it was applied. That silent edited-after-apply drift is what
+   left `idx_process_instances_dedup` missing in production (mig 154).
+2. **health-parity** — polls each service's health endpoint and asserts they report the **same build
+   SHA** (`RAILWAY_GIT_COMMIT_SHA`, surfaced as `.version`). Frontend and CMS are required; pipeline
+   joins when `PROD_PIPELINE_URL` is set, since it is a worker and may not expose one.
+
+Railway only rebuilds a service whose build context changed: `frontend/` → frontend, `pipeline/` →
+pipeline, `services/cms/` → rfp-crm.
 
 ---
 
