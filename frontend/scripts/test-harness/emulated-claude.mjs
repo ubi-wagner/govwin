@@ -992,6 +992,58 @@ const RESPONDERS = [
   // "ValueError: Claude returned unparseable JSON" (7 failed instances), and no structured-output AI
   // flow could be driven end to end in the sandbox at all. The emulator is documented as mirroring
   // the prod wiring exactly; here it did the opposite.
+  /**
+   * finder.scout_source — the HITL source scout's change analysis.
+   *
+   * ── WHY THIS ONE HAD TO BE ADDED, AND WHAT IT REVEALED ─────────────────────────────────────
+   * `lib/tools/source-scout.ts` was the one model call site in the frontend that hard-coded
+   * `api.anthropic.com`, so it never reached this emulator at all: the request went out, failed,
+   * and the scout's `analysis?.changed ?? hashChanged` fell back to the HASH — which is `true`.
+   * The uncovered-triggers drive passed on that fallback for as long as the bug existed. It was
+   * green because the AI call was BROKEN.
+   *
+   * The moment the call site was fixed, the request landed here, fell through to `json-schema`,
+   * and came back without a `changed` field — so `parsed.changed ?? false` made every real diff
+   * "not meaningful" and the drive failed. The failure was the fix working.
+   *
+   * So the responder has to answer this prompt's own contract. It reads the two content blocks
+   * and decides from the TEXT rather than returning a constant: a run where nothing changed must
+   * still be able to report `changed: false`, or the drive would be asserting the emulator's
+   * optimism instead of the scout's behaviour.
+   */
+  {
+    name: 'source_scout',
+    match: (req) => /analyzing a government opportunity website for changes/i.test(reqText(req)),
+    respond: (req) => {
+      const all = reqText(req);
+      const prev = between(all, 'previous_content').replace(/\s+/g, ' ').trim();
+      const cur = between(all, 'current_content').replace(/\s+/g, ' ').trim();
+      const changed = cur.length > 0 && cur !== prev;
+
+      // What is in the new text that was not in the old — the same question a person would ask,
+      // and enough to make the summary specific rather than a fixed sentence.
+      const before = new Set(prev.toLowerCase().split(/\W+/).filter(Boolean));
+      const added = [...new Set(cur.toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !before.has(w)))];
+      const looksLikeOpportunity = /solicitation|topic|baa|sbir|sttr|proposal|deadline|due/i.test(cur)
+        && !/solicitation|topic|baa|sbir|sttr|proposal|deadline|due/i.test(prev);
+
+      return textMsg(req.model, JSON.stringify({
+        changed,
+        summary: changed
+          ? `The monitored region changed. New terms in the current content: ${added.slice(0, 8).join(', ') || 'formatting only'}.`
+          : 'No changes detected',
+        severity: !changed ? 'info' : looksLikeOpportunity ? 'high' : 'medium',
+        extracted_opportunities: looksLikeOpportunity ? [{
+          title: 'Emulated opportunity detected in the changed region',
+          agency: 'Sandbox harness',
+          deadline: null,
+          url: null,
+          description: 'Extracted by the emulated model so the scout-intake candidate queue can be '
+            + 'driven end to end. Not a real opportunity.',
+        }] : [],
+      }));
+    },
+  },
   {
     name: 'json-schema',
     match: (req) => wantsJson(req),
