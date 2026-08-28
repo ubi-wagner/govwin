@@ -196,6 +196,15 @@ export function describeEvent(ev: EventLike): string {
         return `Modification ${str(payload.modNumber) ?? ''} drafted`
           + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
       }
+      case 'milestone.auto_closed':
+        return `Milestone closed by the AI manager: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.auto_close_declined': {
+        // The DECLINE is the more interesting row. A sweep that only logged its successes would
+        // make "nothing happened" and "a phase was held back" look identical in the feed.
+        const why = Array.isArray(payload.objections) ? payload.objections : [];
+        return `AI manager held back ${str(payload.title) ?? 'a milestone'}`
+          + `${why.length ? ` — ${String(why[0])}` : ''}`;
+      }
       case 'status_narrative.requested':
         // The check is the point, and the feed says so — otherwise "narrative drafted" reads as
         // "the report now contains generated numbers", which is the one thing it does not.

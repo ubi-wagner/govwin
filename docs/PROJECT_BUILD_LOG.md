@@ -2992,3 +2992,67 @@ fixture.
 
 `tsc` 0 · vitest 230 files / 2,448 · **8 live assertions green** · surfaces 82/82 · api-contract 133
 graded · write-contract 254/254 · 0 broken links in the whole chain.
+
+## A4 · The AI-manager gate closer — migration 236
+
+The proposal side locked this rule and it carries over unchanged
+(docs/TENANT_WORKFLOW_SETUP_DESIGN.md §8.1, owner-confirmed):
+
+> *"Gate closer is per-stage: HUMAN (HITL) or AI-MANAGER … Advancement is always gated on real
+> completion … never on a clock alone."*
+
+A milestone declares who closes it. The choice changes **who presses the button — never what the
+button is allowed to do.**
+
+### The asymmetry, and why it is structural rather than careful
+
+`attemptAutoClose` does not close a milestone. It calls `markMilestoneMet`, which is the only thing
+that ever has, and which already refuses on `TASKS_OUTSTANDING` and `DELIVERABLES_OUTSTANDING`.
+
+> **A human can close a milestone the agent would not. The agent can never close one a human could
+> not.**
+
+That holds because there is ONE writer, not because the code is careful. A second path — *"the agent
+knows it is fine, skip the check"* — would invert it in one line, so the test asserts its absence on
+the **source**: an added `UPDATE project_milestones SET status` fails, and a well-shaped outcome
+object could not have caught it. Confirmed red.
+
+When the deterministic gate refuses, the agent reports **markMilestoneMet's own sentence verbatim** —
+the person sees exactly what they would have seen clicking the button themselves.
+
+### What the agent actually contributes: a reason to STOP
+
+Not permission — the deterministic gates already grant that. Its judgement can only **block** a
+close, never enable one, and that is worth saying plainly because the intuitive design is the
+opposite ("the AI decides it's done"). Here the rows decide it is done and the AI may object:
+
+- an **open risk or issue scored ≥ 15** against this phase;
+- a deliverable **accepted internally but never sent** — which `markMilestoneMet` does not check,
+  because acceptance is its gate, so every box is ticked and the customer has nothing.
+
+A decline **emits an event**. A sweep that logged only its successes would make "nothing to do" and
+"a phase was held back" identical in the feed, and the route reports `declined` alongside `closed`
+for the same reason.
+
+**Opt-in, per milestone.** `gate_closer` defaults to `'human'`, including on every row written
+before this existed — a capability that switched itself on for old rows would decide something on
+the customer's behalf that they were never asked about. And the completion record stamps
+`closedBy: 'ai_manager'`, because an audit cannot otherwise tell a click from a sweep.
+
+### Driven both ways, live
+
+```
+✓ and REFUSES the milestone a person could not close either — 1 task(s) … are not done: Unfinished work…
+✓ with markMilestoneMet's own sentence, not a paraphrase
+✓ and the sweep REPORTS what it declined — silence would look like "nothing to do" — 1 declined
+✓ the row did not move — pending
+✓ once the work is genuinely done, the AI manager closes it
+✓ the completion record says WHO closed it — {"closedBy":"ai_manager"}
+✓ and a human-gated milestone is never even considered — 2 human-gated pending, 0 swept
+```
+
+### Verification
+
+`tsc` 0 · vitest 231 files / **2,462** (14 new) · migration 236 applied · **12 live assertions
+green** · isolation 20 tables · surfaces 82/82 · write-contract **255/255** · 0 broken links in the
+whole chain.

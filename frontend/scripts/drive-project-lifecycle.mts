@@ -1261,6 +1261,72 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7v · THE AI-MANAGER GATE CLOSER — a strict subset of what a person may do ═════════════
+  //
+  // A4. The claim is an ASYMMETRY: a human can close a milestone the agent would not; the agent can
+  // never close one a human could not. Both halves are driven here, against the live product.
+  phase('7v · the gate closer: it can only ever do LESS than a person');
+
+  // A fresh milestone with an OPEN task — a person could not close this, so neither may the agent.
+  const gated = await api(req, 'post', P + '/milestones', {
+    title: 'AI-gated phase', clinId, forecastDate: iso(140), sortIndex: 91,
+  });
+  A(gated.status === 201, 'a milestone is created for the closer to try', `${gated.status}`);
+  const gatedId = ((gated.json.data as Json)?.milestone as Json)?.id as string | undefined;
+
+  const assign = await api(req, 'patch', P + '/gate-closer', {
+    action: 'set', milestoneId: gatedId, gateCloser: 'ai_manager',
+  });
+  A(assign.status === 200, 'and assigned to the AI manager', `${assign.status}`);
+
+  const blocker = await api(req, 'post', P + '/tasks', {
+    milestoneId: gatedId, title: 'Unfinished work on the AI-gated phase', assigneeUserId: assignee?.id,
+  });
+  A(blocker.status === 201, 'with one task still open', `${blocker.status}`);
+  const blockerId = ((blocker.json.data as Json)?.task as Json)?.id as string | undefined;
+
+  const sweep1 = await api(req, 'patch', P + '/gate-closer', { action: 'sweep' });
+  A(sweep1.status === 200, 'the sweep runs', `${sweep1.status}`);
+  const out1 = ((sweep1.json.data as Json)?.outcomes as Json[]) ?? [];
+  const mine1 = out1.find((o) => o.milestoneId === gatedId);
+  A(mine1?.closed === false,
+    'and REFUSES the milestone a person could not close either', String(mine1?.reason ?? '').slice(0, 70));
+  A(/not done/i.test(String(mine1?.reason ?? '')),
+    'with markMilestoneMet’s own sentence, not a paraphrase', String(mine1?.reason ?? '').slice(0, 60));
+  A(((sweep1.json.data as Json)?.declined as number) >= 1,
+    'and the sweep REPORTS what it declined — silence would look like "nothing to do"',
+    `${(sweep1.json.data as Json)?.declined} declined`);
+
+  const [stillPending] = await sql<{ status: string }[]>`
+    SELECT status FROM project_milestones WHERE id = ${gatedId ?? null}::uuid`;
+  A(stillPending?.status === 'pending', 'the row did not move', String(stillPending?.status));
+
+  // Now finish the work — and it closes, through the same function a person's click reaches.
+  if (blockerId) await api(req, 'patch', P + `/tasks/${blockerId}`, { status: 'done' });
+  const sweep2 = await api(req, 'patch', P + '/gate-closer', { action: 'sweep' });
+  const out2 = ((sweep2.json.data as Json)?.outcomes as Json[]) ?? [];
+  const mine2 = out2.find((o) => o.milestoneId === gatedId);
+  A(mine2?.closed === true,
+    'once the work is genuinely done, the AI manager closes it', String(mine2?.reason ?? '').slice(0, 70));
+
+  const [closedRow] = await sql<{ status: string; note: string | null; metrics: unknown }[]>`
+    SELECT status, completion_note AS note, completion_metrics AS metrics
+      FROM project_milestones WHERE id = ${gatedId ?? null}::uuid`;
+  A(closedRow?.status === 'met', 'and the row says met', String(closedRow?.status));
+  A(JSON.stringify(closedRow?.metrics ?? {}).includes('ai_manager'),
+    'the completion record says WHO closed it — an audit cannot tell a click from a sweep otherwise',
+    JSON.stringify(closedRow?.metrics ?? {}));
+
+  // A milestone left to a PERSON is never touched by the sweep.
+  const [humanGated] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid AND gate_closer = 'human' AND status = 'pending'`;
+  const sweep3 = await api(req, 'patch', P + '/gate-closer', { action: 'sweep' });
+  const out3 = ((sweep3.json.data as Json)?.outcomes as Json[]) ?? [];
+  A(out3.length === 0,
+    'and a human-gated milestone is never even considered — opt-in means opt-in',
+    `${humanGated?.n} human-gated pending, ${out3.length} swept`);
+
   // ══ 7u · TRACEABILITY — every line item, and what satisfies it ════════════════════════════
   //
   // A3, built as a DETERMINISTIC join rather than an agent: every question it answers is a foreign
