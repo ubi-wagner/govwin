@@ -1163,6 +1163,104 @@ async function main() {
     await asEmployee_((ctx) => api(ctx.request, 'patch', P + `/tasks/${id}`, { status: 'done' }));
   }
 
+  // ══ 7m · CONTRACT MODIFICATIONS — the only write path to a CLIN ════════════════════════════
+  //
+  // The whole point is that drafting does NOT move the contract and executing does, once, citing a
+  // signed document. Every assertion below is about a number a customer is billed against, so each
+  // reads the CLIN back from the database rather than trusting the route's own answer.
+  phase('7m · modifications: drafting is not executing');
+
+  const clinBefore = await sql<{ fundedAmount: string | null; popEnd: string | null }[]>`
+    SELECT funded_amount AS "fundedAmount", pop_end::text AS "popEnd"
+      FROM project_clins WHERE id = ${clinId ?? null}::uuid`;
+  A(clinBefore[0]?.fundedAmount != null, 'the CLIN has a funded amount to move', `${clinBefore[0]?.fundedAmount}`);
+
+  const modDraft = await api(req, 'post', P + '/modifications', {
+    modNumber: 'P00001', title: 'Incremental funding and option period',
+    kind: 'funding', sourceDocId: srcDoc?.id,
+    changes: [
+      { action: 'amend', clinId, field: 'funded_amount', newValue: 900000 },
+      { action: 'amend', clinId, field: 'pop_end', newValue: iso(420) },
+    ],
+  });
+  A(modDraft.status === 201, 'a modification is drafted', `${modDraft.status}`);
+  const modId = ((modDraft.json.data as Json)?.modification as Json)?.id as string | undefined;
+
+  const midDraft = await sql<{ fundedAmount: string | null }[]>`
+    SELECT funded_amount AS "fundedAmount" FROM project_clins WHERE id = ${clinId ?? null}::uuid`;
+  A(String(midDraft[0]?.fundedAmount) === String(clinBefore[0]?.fundedAmount),
+    'and the CLIN has NOT moved — drafting is not executing',
+    `${clinBefore[0]?.fundedAmount} → ${midDraft[0]?.fundedAmount}`);
+
+  // A CLIN from nowhere is refused before anything is written. No FK stops it: a CLIN id from
+  // another contract is a real row, and RLS cannot see the difference when both belong to one tenant.
+  const foreignClin = await api(req, 'post', P + '/modifications', {
+    modNumber: 'P00009', title: 'should not exist', kind: 'funding',
+    changes: [{ action: 'amend', clinId: created.projectId, field: 'funded_amount', newValue: 1 }],
+  });
+  A(foreignClin.status === 400, 'a CLIN that is not on this project is refused', `${foreignClin.status}`);
+
+  const executed = await api(req, 'patch', P + '/modifications', {
+    action: 'execute', modificationId: modId, executedOn: iso(-1),
+  });
+  A(executed.status === 200, 'the modification executes', `${executed.status}`);
+  A(((executed.json.data as Json)?.applied as number) === 2,
+    'and applied both changes', `applied=${(executed.json.data as Json)?.applied}`);
+
+  const clinAfter = await sql<{ fundedAmount: string | null; popEnd: string | null }[]>`
+    SELECT funded_amount AS "fundedAmount", pop_end::text AS "popEnd"
+      FROM project_clins WHERE id = ${clinId ?? null}::uuid`;
+  A(Number(clinAfter[0]?.fundedAmount) === 900000, 'the CLIN moved', `${clinAfter[0]?.fundedAmount}`);
+  A(clinAfter[0]?.popEnd === iso(420), 'and so did the period of performance', `${clinAfter[0]?.popEnd}`);
+
+  // The OLD value recorded is the one that was standing at execution — the audit trail's whole job.
+  const [amend] = await sql<{ oldValue: string | null; appliedAt: string | null }[]>`
+    SELECT old_value AS "oldValue", applied_at AS "appliedAt"
+      FROM project_modification_changes
+     WHERE modification_id = ${modId ?? null}::uuid AND field = 'funded_amount'`;
+  A(Number(amend?.oldValue) === Number(clinBefore[0]?.fundedAmount),
+    'the change row records the value that was actually standing, not one carried from the draft',
+    `old=${amend?.oldValue} was=${clinBefore[0]?.fundedAmount}`);
+  A(Boolean(amend?.appliedAt), 'and is stamped as applied');
+
+  // ── PROVENANCE SUPERSEDES ────────────────────────────────────────────────────────────────
+  // The subtle one. `recordProvenance` normally refuses an upsert whose method does not OUTRANK
+  // the existing — so `verified` (this mod) over `verified` (the original contract) is refused by
+  // a guard that compares method and not recency. The money would move and the badge would still
+  // cite the award page saying the old number.
+  const [modProv] = await sql<{ sourceDocId: string; excerpt: string | null }[]>`
+    SELECT source_doc_id AS "sourceDocId", excerpt FROM project_provenance
+     WHERE target_table = 'project_clins' AND target_id = ${clinId ?? null}::uuid
+       AND field = 'funded_amount'`;
+  A(modProv?.excerpt?.includes('P00001') === true,
+    'the citation now points at the MODIFICATION, not the original award page',
+    String(modProv?.excerpt ?? 'none').slice(0, 60));
+
+  // ── AND IT DOES NOT REBASELINE ───────────────────────────────────────────────────────────
+  const frozenStill = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid AND baseline_date IS NOT NULL`;
+  A(frozenStill[0]?.n === froze.dates,
+    'the frozen baseline is untouched — a mod is not a rebaseline',
+    `${froze.dates} → ${frozenStill[0]?.n}`);
+  const [rebaseTodo] = await sql<{ id: string; title: string }[]>`
+    SELECT id, title FROM tasks
+     WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'project_modification'
+       AND entity_id = ${modId ?? null}::uuid`;
+  A(Boolean(rebaseTodo) && /Rebaseline/i.test(rebaseTodo?.title ?? ''),
+    'it RAISED A TODO asking a person to rebaseline instead',
+    rebaseTodo?.title ?? 'no ToDo');
+
+  const modTwice = await api(req, 'patch', P + '/modifications', {
+    action: 'execute', modificationId: modId, executedOn: iso(-1),
+  });
+  A(modTwice.status === 409, 'executing twice is refused', `${modTwice.status} ${String((modTwice.json as Json).code)}`);
+
+  const history = await api(req, 'get', P + '/modifications');
+  const mods = ((history.json.data as Json)?.modifications as unknown[]) ?? [];
+  A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
+    'and the history reads it back with its changes', `${mods.length} mod(s)`);
+
   // ══ 7k · THE REGISTER — a risk, and the day it stopped being one ═══════════════════════════
   //
   // The question a program review asks is not "what are the risks" but "when did we know, and what

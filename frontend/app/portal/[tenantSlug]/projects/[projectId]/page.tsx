@@ -14,12 +14,14 @@ import { listProjectComments } from '@/lib/projects/comments';
 import { listProjectReviews } from '@/lib/projects/reviews';
 import { listAcceptanceEvidence } from '@/lib/projects/evidence';
 import { listProjectRisks } from '@/lib/projects/risks';
+import { listModifications } from '@/lib/projects/modifications';
 import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
 import { EvidencePanel, type PanelEvidence } from '@/components/projects/evidence-panel';
 import { RiskRegister, type RegisterRisk } from '@/components/projects/risk-register';
 import { MeetingLog, type LogMeeting } from '@/components/projects/meeting-log';
+import { ModificationLog, type LoggedModification } from '@/components/projects/modification-log';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -93,7 +95,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -109,6 +111,7 @@ export default async function ProjectPage({
     listAcceptanceEvidence(tenantId, projectId),
     listProjectRisks(tenantId, projectId),
     listProjectMeetings(tenantId, projectId),
+    listModifications(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -484,6 +487,23 @@ export default async function ProjectPage({
           </div>
         </section>
       )}
+
+      {/* ── THE AMENDMENT HISTORY ────────────────────────────────────────────────────────────
+          Directly under the CLIN table, because it is the only thing that moves it. A person
+          reading a funded amount and wondering why it is not the number in the award needs the
+          answer on the same screen, not on a tab. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Contract modifications
+        </h2>
+        <ModificationLog
+          modifications={modifications as unknown as LoggedModification[]}
+          clins={clins.map((c) => ({ id: c.id, clinNumber: c.clinNumber, title: c.title }))}
+          documents={docs.map((d) => ({ id: d.id, filename: d.filename ?? d.kind }))}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canAmend={canAccept}
+        />
+      </section>
 
       {/* ── THE REGISTER ─────────────────────────────────────────────────────────────────────
           Above the discussion, because a high-scoring open risk is the thing a person opening

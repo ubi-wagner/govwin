@@ -191,6 +191,25 @@ export function describeEvent(ev: EventLike): string {
         return `CLIN ${str(payload.clinNumber) ?? ''} added${str(payload.title) ? ` — ${str(payload.title)}` : ''}`.trim();
       case 'baseline.set':
         return phase === 'start' ? 'Freezing the contract baseline' : 'Contract baseline set';
+      case 'modification.drafted': {
+        const n = typeof payload.changes === 'number' ? payload.changes : null;
+        return `Modification ${str(payload.modNumber) ?? ''} drafted`
+          + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
+      }
+      case 'modification.executed': {
+        // What it MOVED, not that it happened. "Modification executed" six months later is a row
+        // nobody can act on; the money and the dates are why anyone opens the feed.
+        const applied = typeof payload.applied === 'number' ? payload.applied : 0;
+        const added = typeof payload.clinsCreated === 'number' ? payload.clinsCreated : 0;
+        const what = [
+          applied - added > 0 ? `${applied - added} CLIN field${applied - added === 1 ? '' : 's'}` : null,
+          added > 0 ? `${added} new CLIN${added === 1 ? '' : 's'}` : null,
+        ].filter(Boolean).join(' and ');
+        const pop = payload.movedPeriodOfPerformance === true
+          ? ' · period of performance moved — rebaseline requested' : '';
+        return `Modification ${str(payload.modNumber) ?? ''} executed`
+          + `${what ? ` — ${what}` : ''}${pop}`;
+      }
       case 'project.rebaselined':
         return phase === 'start' ? 'Rebaselining the project plan' : 'Project plan rebaselined';
       case 'milestone.due':

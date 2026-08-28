@@ -2453,3 +2453,87 @@ wildcard, and a name that is not actually drifting is reported rather than silen
 new cost-immutability refusal) · rollup drive 15/15 against hand-computed numbers · **lifecycle
 drive green end to end** · surfaces 82/82 · api-contract 127 graded, 0 violations · write-contract
 244/244 · ui-vs-db green · mobile probe green at 390 and 820 · `next build` clean.
+
+## P5 · Contract modifications — migration 230
+
+**A CLIN had no update path, and that was not an omission.** `lib/projects/clins.ts` shipped with
+`createClin` and no `updateClin`. Every CLIN field carries a citation on the ingest-provenance trust
+order, and a plain UPDATE would move the value while leaving the badge reading "Read from source",
+pointing at a contract page that no longer says that.
+
+A contract does not change because somebody edited a field. It changes because **a modification was
+signed**. So that is the write path: a mod carries its own number, its own signed date and its own
+document, and executing it is what moves the CLIN.
+
+```
+project_modifications            P00001 · kind · draft|executed · executed_on · signed document
+  └── project_modification_changes
+        'amend'     clin_id + field + old_value → new_value
+        'add_clin'  an option exercise; payload carries the row, clin_id set at execution
+```
+
+There is deliberately no `remove_clin`. A contract does not delete a line item, it **deobligates**
+one — an `amend` setting `funded_amount` to 0 — and deleting the row would take the milestones,
+deliverables and delivery history that reference it along with it.
+
+**Draft is not executed** — the eighth time this capability draws that line (upload is not
+acceptance; logging is not approving; a comment is not a review). A draft that moved the money would
+put unsigned numbers into the roll-up.
+
+**And an executed mod is immutable**, by trigger. Same rule as the baseline, for the same reason: it
+records what was agreed on a date. A mistake is corrected by **issuing another mod**, which is also
+how it works on paper.
+
+### The decision the module is built around: executing does NOT rebaseline
+
+A mod that extends the period of performance is exactly the moment somebody wants the schedule
+baseline moved, and this refuses to do it silently. `baseline_date` and `baseline_cost` are the
+ORIGINAL promise; `rebaseline` already exists, already demands a reason, and already moves the
+current plan without touching what was frozen.
+
+So executing **raises a ToDo** asking a person to rebaseline — onto the same `tasks` spine, the same
+queue, the same nudges. Two writers on the plan's dates is how a schedule stops being explainable,
+and an automatic rebaseline would be the second. The ToDo is skipped entirely on a project with no
+baseline yet: the question has no meaning before there is a promise to be out of step with, and a
+ToDo nobody can action is how a queue becomes noise.
+
+### The bug it found in the provenance helper
+
+`recordProvenance` upserts **only when the new method outranks the existing one** — the trust order
+doing its job at the write. So `verified` (this mod's signed document) replacing `verified` (the
+original award) is *refused*: `array_position(new) < array_position(old)` is false when they are
+equal.
+
+The funded amount would have moved to $900,000 and the badge would still have read "Read from
+source", citing the award page that says $750,000. That is precisely the failure the provenance
+model exists to prevent, arriving through the provenance model itself.
+
+The trust order compares **method, not recency**, and it cannot tell "a weaker source is clobbering
+a stronger one" (refuse) from "a later document of equal authority replaced the earlier one"
+(allow). `recordProvenance` now takes `supersedes: true` for the second case — and nothing else: the
+"a citing method needs something to cite" refusal, which is the one that actually protects the badge,
+still applies. Confirmed red: without the flag the assertion fails on the same build.
+
+### And the isolation lens had been measuring seven tables out of seventeen
+
+`verify-project-isolation.mjs` hard-coded migration 216's seven table names. Ten project tables have
+been added since — tasks, attachments, comments, reviews, evidence, risks, meetings, time entries and
+both modification tables — and **none of them had a structural isolation check**, because the lens
+only ever asked about names somebody had remembered to type. Every one carries tenant data.
+
+It now enumerates from the database (`relname LIKE 'project%'`), keeping the hand-list only as an
+existence FLOOR — enumeration cannot tell you a table is *missing*, since one never created is
+simply not in the enumeration. It accepts either policy shape: one `FOR ALL` (mig 216) or four
+per-command (mig 184, which every table since has used); anything else is a partial set, which is
+the state that leaks. Proven by dropping one `UPDATE` policy on `project_modifications` — a table
+the old lens never looked at — and watching it fail: *"3 policies — expected 1 or 4, not a partial
+set"*.
+
+### Verification
+
+`tsc` 0 · vitest 225 files / **2,356** (24 new) · migration 230 applied · **15 modification
+assertions green in the live lifecycle drive** — drafting leaves the CLIN untouched, executing moves
+it, the recorded `old_value` is the one that was standing at execution, the citation follows the mod,
+the frozen baseline does not move and a rebaseline ToDo is raised instead, and a second execution is
+refused 409 · isolation lens 17 tables (was 7) · surfaces 82/82 · api-contract clean ·
+write-contract **247/247** · mobile green at 390 and 820 · `next build` clean.

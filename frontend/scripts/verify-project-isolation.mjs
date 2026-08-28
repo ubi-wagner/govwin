@@ -37,10 +37,16 @@ if (!APP || !OWNER) {
 const app = postgres(APP, { max: 1, onnotice: () => {} });
 const owner = postgres(OWNER, { max: 1, onnotice: () => {} });
 
-// `project_wbs_nodes` is NOT in this list because it no longer exists: migration 228 collapsed it
-// into `project_milestones` (the milestone IS the WBS element) and 229 dropped it. A name left here
-// would fail step 1 as "migration 216 has not been applied", which is the opposite of true.
-const TABLES = [
+/**
+ * The FLOOR: migration 216's spine must exist. A hand-list is right for existence — enumerating
+ * from the database cannot tell you a table is MISSING, because a table that was never created
+ * simply is not in the enumeration.
+ *
+ * `project_wbs_nodes` is deliberately absent: migration 228 collapsed it into `project_milestones`
+ * (the milestone IS the WBS element) and 229 dropped it. A name left here would fail as "migration
+ * 216 has not been applied", which is the opposite of true.
+ */
+const REQUIRED = [
   'projects',
   'project_source_documents',
   'project_clins',
@@ -49,6 +55,26 @@ const TABLES = [
   'project_provenance',
   'project_assignments',
 ];
+
+/**
+ * …and the COVERAGE is enumerated from the database, not typed here.
+ *
+ * This list was the seven above for eleven migrations, while ten more project tables were added —
+ * tasks, attachments, comments, reviews, evidence, risks, meetings, time entries, and both
+ * modification tables. Every one carries tenant data and NONE of them had a structural isolation
+ * check, because the lens only ever asked about the names somebody had remembered to type.
+ *
+ * A surface a lens has no expectation for is UNCOVERED, not passing. Enumerating means the next
+ * project table is covered the moment it exists, whether or not anybody thinks to come back here.
+ */
+async function projectTables(owner) {
+  const rows = await owner`
+    SELECT c.relname AS name
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'project%'
+     ORDER BY c.relname`;
+  return rows.map((r) => r.name);
+}
 
 let bad = 0;
 const ok = (m) => console.log(`  ok    ${m}`);
@@ -80,6 +106,12 @@ async function main() {
   // This assertion needs no fixture data, which is exactly when a missing policy is easiest to
   // introduce and hardest to see (mig 212's whole class was invisible for months).
   let missing = 0;
+  const TABLES = await projectTables(owner);
+  for (const t of REQUIRED) {
+    if (!TABLES.includes(t)) { no(`${t} does not exist — migration 216 has not been applied here`); missing++; }
+  }
+  if (missing) { await finish(); return; }
+
   for (const t of TABLES) {
     const [row] = await owner`
       SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced,
@@ -97,15 +129,20 @@ async function main() {
                  AND col.column_name = 'tenant_id' AND col.is_nullable = 'NO') AS "tenantCol"
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'public' AND c.relname = ${t}`;
-    if (!row) { no(`${t} does not exist — migration 216 has not been applied here`); missing++; continue; }
+    if (!row) { no(`${t} vanished between the enumeration and the read`); missing++; continue; }
     if (!row.rls || !row.forced) no(`${t}: rls ${row.rls ? 'on' : 'OFF'}, force ${row.forced ? 'on' : 'OFF'}`);
-    else if (row.policies !== 1) no(`${t}: ${row.policies} policies, expected exactly 1 (tenant_isolation)`);
+    // ONE `tenant_isolation` FOR ALL (mig 216's shape) or FOUR per-command policies (mig 184's,
+    // which every project table since has used). Both are correct; anything else is somebody
+    // halfway through writing a policy set, which is the state that leaks.
+    else if (row.policies !== 1 && row.policies !== 4) {
+      no(`${t}: ${row.policies} policies — expected 1 (FOR ALL) or 4 (per-command), not a partial set`);
+    }
     // Tenancy by COLUMN, not by FK lineage. A tenant_id-shaped audit cannot see a lineage-shaped
     // table, which is how seven proposal-spine tables leaked unnoticed until mig 212.
     else if (row.tenantCol !== 1) no(`${t}: no NOT NULL tenant_id column — tenancy by lineage is invisible to every audit here`);
   }
   if (missing) { await finish(); return; }
-  if (bad === 0) ok(`all ${TABLES.length} tables: force-RLS, one tenant_isolation policy, NOT NULL tenant_id`);
+  if (bad === 0) ok(`all ${TABLES.length} project tables (enumerated, not listed): force-RLS, a complete policy set, NOT NULL tenant_id`);
 
   // ── 2 · the reserved-word regression ────────────────────────────────────────────────────────
   //

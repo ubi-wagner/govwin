@@ -65,9 +65,29 @@ export interface ProvenanceRecord {
  * existing one**, so a later `default` cannot quietly overwrite a human's `hitl` entry. That is the
  * whole trust order doing its job at the write rather than at the read; a read-time comparison
  * would leave two rows to disagree about.
+ *
+ * ── `supersedes` — WHEN THE OLD CITATION IS NO LONGER TRUE ────────────────────────────────────
+ * The trust order compares METHOD, not RECENCY, and it cannot tell the difference between "a
+ * weaker source is trying to clobber a stronger one" (which it must refuse) and "a later document
+ * of equal authority replaced the earlier one" (which it must allow).
+ *
+ * That second case is a **contract modification**. P00001 moves a CLIN's funded amount and cites
+ * the signed mod — `verified` replacing `verified`, which `array_position(new) < array_position(old)`
+ * refuses. The value would move and the badge would still read "Read from source", pointing at the
+ * original contract page that says the old number. That is exactly the failure this module exists
+ * to prevent, arriving through the module itself.
+ *
+ * So `supersedes: true` drops the trust-order guard — and nothing else. It is not a force flag: the
+ * "a citing method needs something to cite" refusal above still applies, which is the one that
+ * actually protects the badge. Pass it only where a NEW document genuinely replaced the old one as
+ * the thing that is true about this field.
  */
 export async function recordProvenance(
-  params: ProvenanceRecord & { tenantId: string; projectId: string; userId?: string | null },
+  params: ProvenanceRecord & {
+    tenantId: string; projectId: string; userId?: string | null;
+    /** A later document of equal authority replaced the earlier one — see above. */
+    supersedes?: boolean;
+  },
 ): Promise<boolean> {
   if (!(TRUST_ORDER as readonly string[]).includes(params.method)) {
     console.error(`[projects/provenance] unknown method '${params.method}'`);
@@ -100,7 +120,8 @@ export async function recordProvenance(
             char_offset   = EXCLUDED.char_offset,
             created_by    = EXCLUDED.created_by,
             created_at    = now()
-        WHERE array_position(
+        WHERE ${params.supersedes === true}::boolean
+              OR array_position(
                 ARRAY['hitl','verified','override','pattern_match','ai','default'],
                 EXCLUDED.method)
               < array_position(
