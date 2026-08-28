@@ -14,6 +14,13 @@
  *      live database. That is the "resolve, don't pin" pattern already applied; the literal is a
  *      documented last resort, not a live dependency.
  *   3. A LITERAL IN A COMMENT IS PROSE.
+ *   4. AN ID THAT IS *SUPPOSED* TO RESOLVE TO NOTHING IS THE FIXTURE, NOT ROT. A drive proving a
+ *      refusal — "assigning to somebody not on the project is refused", "a comment anchored at a
+ *      milestone from another contract is refused" — needs an id that exists nowhere. Absent from
+ *      the database is the CORRECT and required state for it, and flagging it asks somebody to
+ *      "resolve or build" a row whose absence is the whole assertion. Marked by NAME, using the
+ *      same signal as correction 1 — a comment cannot carry it, because comments are stripped
+ *      before the scan.
  *
  * So this reports three numbers, narrowest first, and the narrowest is the one to worry about.
  */
@@ -46,7 +53,19 @@ const guarded = (line) => /process\.env\.[A-Z_]+\s*(\?\?|\|\|)/.test(line);
  * are declarations of intent to create.
  */
 const CREATES = /\b(TEMP|PROBE|SCENARIO|FIXTURE|THROWAWAY|NEW)_/;
-const creating = (line) => CREATES.test(line) || /@scenario\.test|zz\./.test(line);
+/**
+ * …and the mirror of it: a constant whose name DECLARES that the row must not exist. A drive
+ * proving a refusal needs an id that resolves to nothing, and "absent" is its required state.
+ *
+ * Deliberately a narrow, explicit vocabulary rather than a general opt-out: somebody has to name
+ * the constant this way, which is an act, and it reads at every use site — `assigneeUserId: NOBODY`
+ * says what it is doing where it is doing it.
+ */
+// No trailing \b: `_` is a word character, so `\bNOBODY\b` does NOT match `NOBODY_EMAIL` — the
+// first version of this correction silently did nothing, which is the failure mode a correction to
+// an over-counting audit must not have. `CREATES` above is prefix-shaped for the same reason.
+const ABSENT = /\b(ABSENT|NOBODY|STRANGER|NOT_ON|NONEXISTENT|ELSEWHERE)/;
+const creating = (line) => CREATES.test(line) || ABSENT.test(line) || /@scenario\.test|zz\./.test(line);
 
 const scan = (file) => {
   const src = strip(readFileSync(`scripts/${file}`, 'utf8'));

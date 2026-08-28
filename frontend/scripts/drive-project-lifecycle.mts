@@ -103,6 +103,32 @@ async function api(req: APIRequestContext, method: 'get' | 'post' | 'patch', pat
   return { status: r.status(), json, text };
 }
 
+/**
+ * A uuid that resolves to NOTHING, and must keep doing so.
+ *
+ * Three assertions below prove a refusal — a person who is not on the project, a milestone from
+ * another contract — and each needs an id that exists nowhere. Absent from the database is its
+ * required state, not rot.
+ *
+ * Named this way on purpose: `audit-pinned-fixtures.mjs` reads the NAME to tell a dead id somebody
+ * depends on from one they are proving is refused, and it strips comments before it scans, so a
+ * marker comment would vanish. It also reads correctly at the call site — `assigneeUserId: NOBODY`
+ * says what it is doing where it is doing it.
+ */
+const NOBODY = '11111111-1111-4111-8111-111111111111';
+
+/**
+ * An address that belongs to nobody, and must keep belonging to nobody.
+ *
+ * The mention assertion needs a token that resolves to no member: an unmatched mention has to be
+ * REPORTED BACK, or the author types a name, sees the comment appear, and believes they were heard.
+ *
+ * Not exempted by the audit's `example.com` rule and it should not be — `.test` addresses ARE real
+ * rows in this database (the trigger probes), so blanket-exempting the TLD would hide genuine rot.
+ * Named instead, like NOBODY above.
+ */
+const NOBODY_EMAIL = 'nobody@elsewhere.test';
+
 const created: { proposalId?: string; projectId?: string; contractId?: string; documentIds: string[] } = {
   documentIds: [],
 };
@@ -414,9 +440,34 @@ async function main() {
   // envelope's inner shape.
   const roster = await api(req, 'get', `/api/portal/${TENANT}/team`);
   const members = (Array.isArray(roster.json.data) ? roster.json.data : []) as Json[];
-  const assignee = members.find((m) => String(m.role) === 'tenant_user' && m.id !== undefined) ?? members[0];
-  A(roster.status === 200 && Boolean(assignee), 'the roster route offers someone to staff with',
-    `${roster.status} · ${members.length} member(s)`);
+
+  // ── SELECT FOR WHAT THE ASSERTION NEEDS, NOT FOR WHAT IS NEAREST ─────────────────────────
+  //
+  // The next assertion is "assigning to somebody NOT on the project is refused", so the only thing
+  // that makes it meaningful is a person who is not already on it. The acting user always is —
+  // `createProject` assigns its creator — so picking them makes the refusal structurally unable to
+  // fire, and it answers 201.
+  //
+  // The first version was `find(m.role === 'tenant_user') ?? members[0]`, which is wrong twice.
+  // `/team` returns the MEMBERSHIP role and filters `source IN ('home','manual')`, so the match was
+  // against the wrong field over a smaller set than the tenant's directory; and the `?? members[0]`
+  // fallback then silently degraded to the actor herself. Standalone there happened to be a
+  // matching member and it passed; in the full suite the roster came back as two, and 28 assertions
+  // failed downstream from this one line (B146/B147, the same class again).
+  const assignee = members.find(
+    (m) => m.id !== undefined && String(m.email ?? '').toLowerCase() !== ACTOR.toLowerCase(),
+  );
+  A(roster.status === 200, 'the roster route answers', `${roster.status}`);
+  if (!assignee) {
+    // CANT-RUN, said out loud. Degrading to the actor would make every assertion below measure
+    // nothing while reporting green — uncovered is not passing.
+    console.error(`  CANT-RUN — the roster holds ${members.length} member(s) and none of them is `
+      + `somebody other than ${ACTOR}. The staffing and assignment assertions below need a second `
+      + 'person at this tenant; seed one rather than letting them measure the actor.');
+    process.exit(2);
+  }
+  A(true, 'the roster offers somebody OTHER than the actor to staff with',
+    `${members.length} member(s) · picked ${String(assignee.email ?? assignee.id)}`);
 
   // Handing work to someone who is NOT on the project is refused — they would never see it.
   const premature = await api(req, 'post', P + '/tasks', {
@@ -764,7 +815,7 @@ async function main() {
     `${reassign.status} ${reassign.text.slice(0, 80)}`);
 
   const stranger = await api(req, 'patch', P + `/tasks/${taskIds[0]}`, {
-    assigneeUserId: '11111111-1111-4111-8111-111111111111',
+    assigneeUserId: NOBODY,
   });
   A(stranger.status === 409 && String((stranger.json as Json).code) === 'NOT_ON_PROJECT',
     'but not to somebody who is not on the project — access is not a side effect of a task form',
@@ -849,10 +900,10 @@ async function main() {
   // The silent failure this feature otherwise has: the author types a name, sees the comment
   // appear, and believes they were heard.
   const offRoster = await api(req, 'post', P + '/comments', {
-    body: 'asking @nobody@elsewhere.test to weigh in',
+    body: `asking @${NOBODY_EMAIL} to weigh in`,
   });
   const unmatched = ((offRoster.json.data as Json)?.unmatched ?? []) as string[];
-  A(offRoster.status === 201 && unmatched.includes('nobody@elsewhere.test'),
+  A(offRoster.status === 201 && unmatched.includes(NOBODY_EMAIL),
     'a name nobody here answers to is REPORTED, not silently dropped', unmatched.join(', ') || 'none');
   const offRosterId = ((offRoster.json.data as Json)?.comment as Json)?.id as string | undefined;
   const [{ strangerTodos }] = await sql<{ strangerTodos: number }[]>`
@@ -864,7 +915,7 @@ async function main() {
   // entity_id points at four tables, so it has no foreign key. This lookup is the only thing
   // between a comment and another customer's contract.
   const wrongAnchor = await api(req, 'post', P + '/comments', {
-    entityType: 'milestone', entityId: '11111111-1111-4111-8111-111111111111', body: 'x',
+    entityType: 'milestone', entityId: NOBODY, body: 'x',
   });
   A(wrongAnchor.status === 400
     && /does not belong to this project/.test(String((wrongAnchor.json as Json).error ?? '')),
@@ -1134,7 +1185,7 @@ async function main() {
     items: [
       { title: 'Send the revised SOW to the CO', assigneeUserId: assignee?.id ?? null, dueDate: iso(7) },
       { title: 'Re-run the thermal margin case', assigneeUserId: assignee?.id ?? null },
-      { title: 'Give this one to somebody who is not here', assigneeUserId: '11111111-1111-4111-8111-111111111111' },
+      { title: 'Give this one to somebody who is not here', assigneeUserId: NOBODY },
     ],
   });
   A(actions.status === 201, 'the agreed items are raised in ONE call', `${actions.status}`);
