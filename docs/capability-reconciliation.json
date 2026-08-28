@@ -818,13 +818,13 @@
    "archetype": "color_team_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "compliance_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "content_curator",
@@ -866,7 +866,7 @@
    "archetype": "ingest_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "librarian",
@@ -896,19 +896,19 @@
    "archetype": "matrix_stager",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "onboarding_agent",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "opportunity_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "opportunity_scout",
@@ -986,19 +986,19 @@
    "archetype": "scoring_strategist",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "section_drafter",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "skeleton_architect",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "social_scheduler",
@@ -1132,7 +1132,7 @@
    "template": "on_rfp_uploaded",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_social_schedule_requested",
@@ -1144,7 +1144,7 @@
    "template": "on_solicitation_pushed",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_solicitation_review_requested",
@@ -1181,17 +1181,28 @@
   "amendment.acknowledged",
   "amendment.flagged",
   "artifact.exported",
+  "artifact.locked",
   "atom.archived",
   "atom.curated",
   "atom.restored",
+  "automation_preferences.updated",
   "contract.started",
   "document.created",
   "document.exported",
   "document.updated",
+  "draft.completed",
   "outcome.attributed",
   "portal.stage_advanced",
+  "preview.generated",
   "project.collaboration_requested",
+  "proposal.research_requested",
+  "purchase.completed",
+  "review_phase.completed",
+  "review_phase.requested",
   "task.assigned",
-  "template.applied"
+  "team_member.role_changed",
+  "template.acknowledged",
+  "template.applied",
+  "tenant.cards_backfilled"
  ]
 }

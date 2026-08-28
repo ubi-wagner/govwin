@@ -26,7 +26,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1977 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 2484 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +58,10 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **219** — mig 219 project close-out; mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **236** — migs 228–236 the post-award build-out: 229 the milestone cost
+baseline after 228 collapsed `project_wbs_nodes` into `project_milestones`, 230 contract
+modifications, 231 invoicing, 232 the CDRL register, 233/234 the CLIN child-cascade correction,
+235 the per-project notification policy, 236 the AI-manager gate closer; mig 219 project close-out; mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
 proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
@@ -123,7 +126,7 @@ A build can also be **RFP-Admin-approved as a free (comped) portal** — that re
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, **36 archetypes, all auto-registered — dormant ≠ dead**)
+The pipeline agent workforce (`AgentFabric`, **38 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY` — in the sandbox the committed emulator stands in for Claude:
@@ -315,6 +318,34 @@ tenant_admin (a gate anyone can open is not a gate); WITHDRAWING is whoever aske
 per entity by partial unique index. `blockingReview` returns a BLOCKER on a database error — a gate
 that cannot read its own state must never fail open.
 
+**THE CONTRACT ITSELF — modifications, invoicing, CDRLs (migs 228–236).** Mig 228 collapsed
+`project_wbs_nodes` into `project_milestones` (one dated segment, not two parallel trees) and mig
+229 caught what that silently dropped: the cost BASELINE. The grid had been aliasing `planned_cost`
+as "Baseline cost", so cost variance would have read zero forever — a number that is confidently
+wrong, which is the failure mode this capability is built against. `setBaseline` now freezes both,
+by the same trigger. **A CLIN is written ONE way** (mig 230): a `project_modifications` row with its
+changes, `draft`→`executed`, frozen by trigger once executed — because a contract value that can be
+edited in place is a contract nobody can reconstruct. Invoicing (mig 231) bounds a claim by the
+CLIN's funded ceiling and settles against `amount_paid`; `numeric` columns are declared `string` and
+converted through `money()`, which is the mirror of the date trap and got right what the dates got
+wrong. The CDRL register (mig 232) adds the THIRD state — **submitted is not accepted, and accepted
+is not submitted**: a deliverable accepted internally but never sent to the customer is exactly what
+the AI-manager gate closer (mig 236) refuses to close a phase over. Mig 233 asserted cascade
+ordering as fact and was WRONG; mig 234 settled both child FKs on CASCADE after measuring. Mig 235
+puts the notification policy on the project, on the open `tenant_automation_policies` scope.
+
+**Two more archetypes (38 total): `project_manager` and `status_narrator`.** Both advisory, both
+tenant-bound. The gate closer's safety argument is structural rather than careful — it calls
+`markMilestoneMet`, the only thing that has ever closed a milestone, so **the agent's reach is a
+strict subset of a person's**: it can close only what a tenant_admin could have closed at that
+moment, and it additionally requires its own preconditions. What the agent contributes is not
+permission but A REASON TO STOP. EAC/ETC is arithmetic, not an agent (`lib/projects/forecast.ts`) —
+computed once per measure and reported side by side, never blended, and `null` rather than a number
+when a measure has no denominator. `status_narrator` writes prose, and the route CHECKS every figure
+in it against what the system computed before offering it: a prompt asking a model not to invent
+figures is also in place and is deliberately the weaker of the two, because an instruction is not an
+invariant.
+
 **EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
 `services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
 `email_suppressions` (mig 215; docs/EMAIL_INTERFACE_DESIGN.md, as-built docs/EMAIL_BUILD_LOG.md). Never
@@ -382,7 +413,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Portal routes MUST verify tenant access — never query by ID alone
 - **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
-  the 271 scripts and whether it still drives identifiers that exist. 37 classify as branch suite, 4 the
+  the 302 scripts and whether it still drives identifiers that exist. 40 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
   `run-branch-drives.sh` registers **39 drives**, because two of them are filed elsewhere (RULER,
   and the deck probe under DOCUMENTED); both
@@ -395,7 +426,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1977 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (2484 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and
@@ -429,9 +460,31 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   outright: the page body never scrolls sideways. ⚠️ It is **not read-only** — it prints its
   mutation footprint, and the honest way to run it is `pg_dump` before, restore after. Sheets group
   by KIND, not route: twenty validation messages side by side is what makes the odd one visible.
+- **"The page does not scroll sideways" and "you can reach everything" are DIFFERENT claims, and
+  only the second one matters.** `probe-interaction-mobile.mts` measures every element against the
+  390px viewport with the overlays OPEN, and additionally sweeps width over every addressable page
+  route. It exists because a clipped overflow keeps the body-scroll invariant answering "no"
+  **precisely because the content is unreachable** — so every check the tree had was structurally
+  incapable of seeing it. It found the `+ New Document` button, the primary action of the documents
+  page, cut off at the viewport edge and untappable; and `/admin/opportunities` laying out 1058px of
+  table row into 390px with 63% of every row unreachable, because eight admin tables shared one
+  `border … rounded-lg overflow-hidden` wrapper whose clip was for the rounded corners. Overflowing
+  routes 11 → 4, all four admin-only. It shares `scripts/lib/mobile-measure.mts` with
+  `probe-project-mobile.mts` — two probes with two definitions of overflow produce two numbers
+  nobody can reconcile. **It refuses a verdict when the app is serving no CSS**: a stale
+  `next-server` with a mismatched BUILD_ID once made it report 75 phantom findings across the whole
+  tree, because an unstyled page always overflows.
+- **The deployment docs are hand-maintained, which is the same shape of problem SCHEMA_MAP is
+  generated to avoid.** `frontend/scripts/audit-env-inventory.mjs` sweeps every `process.env` /
+  `os.environ` read across the three services and reconciles it against `docs/SECRETS_INVENTORY.md`,
+  `docs/RAILWAY_ENV_VARS.md` and `RAILWAY.md`, both directions. A missing row is a variable nobody
+  sets in Railway, a capability that silently does nothing in production, and a debugging session
+  that starts from a document asserting the variable does not exist. **Run it after adding any env
+  read.** Platform-injected and harness-only names are EXEMPT with a stated reason each — an
+  unexplained exclusion is how a real variable leaves an operator's checklist.
 - **The UI has its own two documents, and a route sweep is not a UI sweep.** `docs/UI_CATALOG.md`
-  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 116 routes, 184 components,
-  **1,479 event handlers**, 328 fetch sites — with the render graph both ways so an orphan is
+  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 118 routes, 200 components,
+  **1,604 event handlers** (1,363 bound to a DOM element, 241 passed as a prop), 352 fetch sites — with the render graph both ways so an orphan is
   visible. `docs/UI_ATLAS.md` (`capture-ui-atlas.mjs` + `build-ui-contact-sheets.mjs`) PHOTOGRAPHS
   every route as the actor who owns it: 150 shots, 6 lanes, 13 contact sheets, each caption carrying
   the live DOM's button/link/input counts. **Look at the sheets.** A page can answer 200, return a
