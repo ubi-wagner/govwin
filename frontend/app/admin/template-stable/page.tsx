@@ -156,7 +156,7 @@ export default function AdminTemplateStablePage() {
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${badge.cls}`}>{badge.label}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-800 truncate">{m.title}</span>
+                        <span className="text-sm font-medium text-gray-800 truncate" title={m.title}>{m.title}</span>
                         {m.agency && <span className="text-[11px] text-gray-400">{m.agency}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-400 font-mono">

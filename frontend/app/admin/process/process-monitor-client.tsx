@@ -233,7 +233,7 @@ export function ProcessMonitorClient({
             {activeProcesses.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white p-4"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-blue-200 bg-white p-4"
               >
                 {/* Pulsing blue dot */}
                 <span className="relative flex h-3 w-3 flex-shrink-0">
@@ -247,14 +247,17 @@ export function ProcessMonitorClient({
                 </span>
 
                 {/* Description */}
-                <span className="text-sm font-medium text-gray-900">
+                <span className="min-w-0 flex-1 break-words text-sm font-medium text-gray-900">
                   {describeEvent(p.namespace, p.type)}
                 </span>
 
-                {/* Actor */}
-                <span className="flex items-center text-xs text-gray-500 ml-auto flex-shrink-0">
+                {/* Actor — the SECOND row with this shape in this file. Fixing only the one the
+                    probe named would have left the identical defect two hundred lines up, which is
+                    how a fix becomes a whack-a-mole instead of a change. */}
+                <span className="flex min-w-0 items-center text-xs text-gray-500 sm:ml-auto"
+                      title={actorLabel(p.actorType, p.actorEmail)}>
                   <ActorIndicator actorType={p.actorType} />
-                  {actorLabel(p.actorType, p.actorEmail)}
+                  <span className="truncate">{actorLabel(p.actorType, p.actorEmail)}</span>
                 </span>
 
                 {/* Elapsed time */}
@@ -281,7 +284,11 @@ export function ProcessMonitorClient({
               const isExpanded = expandedIds.has(c.id);
               return (
                 <div key={c.id} className="p-4">
-                  <div className="flex items-center gap-3">
+                  {/* WRAPS, and the description may shrink. Six items — badge, description,
+                      actor, duration, time, expand — of which five were `flex-shrink-0`, so the
+                      row was 557px wide at a 390px viewport and MAIN clips: the timestamp and the
+                      expand control were simply gone on a phone. */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     {/* Status indicator */}
                     {hasError ? (
                       <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-red-100 text-red-600 text-xs font-bold">
@@ -299,14 +306,19 @@ export function ProcessMonitorClient({
                     </span>
 
                     {/* Description */}
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="min-w-0 flex-1 break-words text-sm font-medium text-gray-900">
                       {describeEvent(c.namespace, c.type)}
                     </span>
 
                     {/* Actor */}
-                    <span className="flex items-center text-xs text-gray-500 ml-auto flex-shrink-0">
+                    {/* The actor label is an EMAIL — arbitrary length, and `flex-shrink-0` on it
+                        meant the row grew to fit rather than the label shrinking. `min-w-0` +
+                        `truncate` with the full value in `title`: recoverable, which is the
+                        difference between a deliberate truncation and text that is simply gone. */}
+                    <span className="flex min-w-0 items-center text-xs text-gray-500 sm:ml-auto"
+                          title={actorLabel(c.actorType, c.actorEmail)}>
                       <ActorIndicator actorType={c.actorType} />
-                      {actorLabel(c.actorType, c.actorEmail)}
+                      <span className="truncate">{actorLabel(c.actorType, c.actorEmail)}</span>
                     </span>
 
                     {/* Duration */}
@@ -376,14 +388,19 @@ export function ProcessMonitorClient({
                     key={err.id}
                     className="rounded-lg border border-red-200 bg-red-50 p-4"
                   >
-                    <div className="flex items-center gap-3 mb-2">
+                    {/* THIRD row of this shape in this file. The first two were named by the
+                        probe; this one was found by grepping for the class rather than waiting to
+                        be told, which is the difference between fixing a defect and fixing a
+                        report. */}
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500" />
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getNamespaceBadge(err.namespace)}`}>
                         {err.namespace}.{err.type}
                       </span>
-                      <span className="flex items-center text-xs text-gray-500">
+                      <span className="flex min-w-0 items-center text-xs text-gray-500"
+                            title={actorLabel(err.actorType, err.actorEmail)}>
                         <ActorIndicator actorType={err.actorType} />
-                        {actorLabel(err.actorType, err.actorEmail)}
+                        <span className="truncate">{actorLabel(err.actorType, err.actorEmail)}</span>
                       </span>
                       {err.tenantId && (
                         <span className="text-xs text-gray-400 font-mono">

@@ -1289,7 +1289,7 @@ export function CurationWorkspace({
                               {t.topicNumber}
                             </span>
                           )}
-                          <span className="font-medium text-sm text-gray-800 truncate">
+                          <span className="font-medium text-sm text-gray-800 truncate" title={t.title}>
                             {t.title}
                           </span>
                         </div>
@@ -2533,7 +2533,7 @@ function VolumesPanel({
                     <span className="font-mono text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
                       Vol {vol.volumeNumber}
                     </span>
-                    <span className="font-medium text-sm text-gray-800 truncate">
+                    <span className="font-medium text-sm text-gray-800 truncate" title={vol.volumeName}>
                       {vol.volumeName}
                     </span>
                     <span className="text-xs text-gray-500">

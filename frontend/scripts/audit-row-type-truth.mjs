@@ -353,4 +353,13 @@ if (unchecked.length) {
   for (const u of unchecked.slice(0, 25)) console.log(`  ${u.file}:${u.line} — ${u.why}`);
   if (unchecked.length > 25) console.log(`  … and ${unchecked.length - 25} more`);
 }
-process.exit(findings.length ? 1 : 0);
+// ── WHAT FAILS A RUN, AND WHY IT IS NOT "ANY FINDING" ────────────────────────────────────────
+// 240 declarations contradict the runtime and NONE of them is currently read as a string, which
+// means none of them renders wrong. Exiting 1 on the total would put a permanently-red entry in
+// the branch suite over a condition nobody can see — and this repo has already written down what
+// happens next: "a check that fails 121 times on its first run gets turned off".
+//
+// So the gate is the consequence, which this tool already ranks: a wrong type that is READ AS A
+// STRING renders `Fri Aug 28` where a date belongs. The rest are reported every run, in full,
+// because they are real and worth fixing — but they are a backlog, not a break.
+process.exit(harmful.length ? 1 : 0);

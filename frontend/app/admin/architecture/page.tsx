@@ -19,7 +19,11 @@ export default async function ArchitecturePage() {
   if (role !== 'master_admin' && role !== 'rfp_admin') redirect('/admin');
 
   return (
-    <div className="-m-8 flex h-[calc(100vh-3.5rem)] flex-col bg-white">
+    // `-m-4 sm:-m-8`: the negative margin exists to cancel the admin shell's padding and go
+    // edge-to-edge, but that padding is `p-4` below `sm` and `p-8` above it. A flat `-m-8`
+    // therefore overshot by 2rem on a phone — the container ended at 406px in a 390px viewport,
+    // and MAIN clips, so the overhang was unreachable rather than scrollable.
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col bg-white sm:-m-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">System Architecture</h1>

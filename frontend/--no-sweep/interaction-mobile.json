@@ -103,7 +103,7 @@
    "probed": true,
    "opened": 0,
    "overflow": 0,
-   "clipped": 5,
+   "clipped": 0,
    "smallTargets": 45
   },
   {
@@ -113,7 +113,7 @@
    "probed": true,
    "opened": 0,
    "overflow": 0,
-   "clipped": 8,
+   "clipped": 1,
    "smallTargets": 1907
   },
   {
@@ -123,7 +123,7 @@
    "probed": true,
    "opened": 0,
    "overflow": 0,
-   "clipped": 8,
+   "clipped": 1,
    "smallTargets": 1907
   },
   {
@@ -134,7 +134,7 @@
    "opened": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 143
+   "smallTargets": 145
   },
   {
    "lane": "tenant",
@@ -153,7 +153,7 @@
    "probed": true,
    "opened": 2,
    "overflow": 0,
-   "clipped": 2,
+   "clipped": 0,
    "smallTargets": 54
   },
   {
@@ -173,7 +173,7 @@
    "probed": true,
    "opened": 2,
    "overflow": 0,
-   "clipped": 2,
+   "clipped": 0,
    "smallTargets": 67
   },
   {

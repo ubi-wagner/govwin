@@ -161,7 +161,7 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
           {buckets.map((b) => (
             <div key={b.id} className="border border-gray-200 rounded-lg p-3 bg-white">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-gray-800 truncate">{b.name}</span>
+                <span className="text-sm font-medium text-gray-800 truncate" title={b.name}>{b.name}</span>
                 <span className="flex items-center gap-2 flex-shrink-0">
                   <button disabled={busy} onClick={() => rank(b.id)} className="text-xs font-medium text-blue-600 hover:underline">Rank →</button>
                   {canEdit && (

@@ -321,6 +321,25 @@ DRIVES=(
   # stored-artifact ruler had never measured a deck out of the database. Carries a deliberate
   # over-stuffed deck so the overflow check has a case that fails when the product is wrong.
   "deck-ruler|scripts/verify-deck-ruler-live.mts"
+
+  # ── THE STATIC AUDITS ───────────────────────────────────────────────────────────────────────
+  #
+  # Not drives — they open no browser and mutate nothing — but registered here for the reason this
+  # file exists at all, stated in its own header: an instrument run by hand is one that quietly
+  # stops being run. All four were written in a single session and none of them was wired in, which
+  # would have made them exactly the "documented but never executed" scripts the inventory keeps
+  # counting. They are cheap (seconds, no browser) and each answers a question no drive above does.
+  #
+  # `audit-env-inventory` also needs no database, so it is the one check here that still means
+  # something on a box with nothing running.
+  "coherence|scripts/audit-pipeline-coherence.mjs"
+  "row-types|scripts/audit-row-type-truth.mjs"
+  "env-inventory|scripts/audit-env-inventory.mjs"
+
+  # The phone probe belongs with the drives rather than the audits: it opens a browser, signs in as
+  # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
+  # which is the failure that once made it report 75 phantom findings across the whole tree.
+  "mobile-interaction|scripts/probe-interaction-mobile.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0

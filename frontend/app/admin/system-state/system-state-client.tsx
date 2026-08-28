@@ -637,7 +637,10 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
       </div>
 
       {/* Bar chart */}
-      <div className="flex items-end gap-1" style={{ height: 160 }}>
+      {/* Scrolls rather than overflowing: twenty-four hourly bars plus their gaps are wider than
+          a phone, and the page's MAIN is `overflow-x-clip`, so the most recent hours — the ones an
+          operator actually wants — were the ones cut off. */}
+      <div className="flex items-end gap-1 overflow-x-auto" style={{ height: 160 }}>
         {hours.map((hour) => {
           const nsMap = hourMap.get(hour)!;
           let total = 0;

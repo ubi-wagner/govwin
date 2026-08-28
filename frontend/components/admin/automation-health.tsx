@@ -84,7 +84,14 @@ export function AutomationHealth({ logStatus, openTodos, instances, agent, firin
             {firings.map((f) => (
               <div key={f.id} className="flex items-center justify-between gap-3 py-1.5 text-sm">
                 <div className="min-w-0 flex items-baseline gap-2">
-                  <span className="text-gray-800 shrink-0">{f.ruleName ?? f.actionType}</span>
+                  {/* Not `shrink-0`. A rule name is arbitrary-length user text, and pinning it
+                      inside a `min-w-0` row means the row grows instead — 403px at a 390px
+                      viewport. `truncate` with a `title` keeps the full value reachable, which is
+                      the rule the phone probe applies: a deliberate truncation with a way to
+                      recover the text is not a defect; clipped text with no way back is. */}
+                  <span className="truncate text-gray-800" title={f.ruleName ?? f.actionType}>
+                    {f.ruleName ?? f.actionType}
+                  </span>
                   {f.detail && <span className="text-[11px] text-gray-400 truncate">{f.detail}</span>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
