@@ -233,7 +233,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -340,6 +340,20 @@ DRIVES=(
   # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
   # which is the failure that once made it report 75 phantom findings across the whole tree.
   "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
+  # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
+  # kill switch stops everything, the hourly rate limit refuses and allows, and the framework
+  # ceiling beats a tenant's own inflated figure. Every case asserts the ALLOW as well as the
+  # REFUSE, because a guard that refuses everything passes a refusal-only test. It snapshots every
+  # value it touches FIRST and restores in a `finally`, and asserts the restore — written that way
+  # after an earlier hand-run left a tenant on a $9999 budget and a $0.39 ceiling.
+  "spend-guardrails|../pipeline/tests/verify_spend_guardrails.py"
+  # WHAT A FULL BUILD COSTS, and whether the caps see it. Clones a real proposal's structure into a
+  # throwaway with authorable sections — because every proposal on this box is `approved`, so a
+  # full-draft fired at any of them drafts NOTHING and reports the review cohort's cost under the
+  # heading "full build". It refuses a verdict (exit 2) if the run drafts zero sections, prints its
+  # mutation footprint, and re-counts the tables afterwards. Needs the emulator on :8787.
+  "full-build-cost|scripts/estimate-full-build-cost.mjs"
 )
 
 pass=0; fail=0; missing=0; cantrun=0
@@ -403,6 +417,14 @@ for entry in "${DRIVES[@]}"; do
   if [[ " $SCENARIO_DRIVES " == *" $label "* ]]; then drive_db="$DATABASE_URL_OWNER"; fi
   if [[ "$script" == *.mts ]]; then
     DATABASE_URL="$drive_db" timeout 900 node --import tsx "$script" $drive_args > "$log" 2>&1
+  elif [[ "$script" == *.py ]]; then
+    # The pipeline's own guards live in Python and were therefore run by hand — the exact failure
+    # mode this file's header names. `python3` directly, never the `pytest` on PATH: that is a uv
+    # tool that cannot see asyncpg and collapses into 66 collection errors that read as a broken
+    # suite (CLAUDE.md, the pipeline-test note). The DRIVES entry carries the `../` itself so the
+    # existence check above sees the same path this line runs.
+    DATABASE_URL="$drive_db" PYTHONPATH="$(pwd)/../pipeline/src" \
+      timeout 900 python3 "$script" $drive_args > "$log" 2>&1
   else
     DATABASE_URL="$drive_db" timeout 900 node "$script" $drive_args > "$log" 2>&1
   fi

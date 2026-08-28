@@ -1080,7 +1080,23 @@ const server = http.createServer((httpReq, res) => {
     catch { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'bad json' } })); return; }
     const responder = RESPONDERS.find((r) => r.match(req)) || RESPONDERS[RESPONDERS.length - 1];
     const out = responder.respond(req);
-    log({ t: nowIso(), responder: responder.name, model: req.model, tools: toolNames(req), toolChoice: req.tool_choice ?? null, system: systemText(req).slice(0, 240), lastUser: lastUserText(req).slice(0, 240), out });
+    // `system` / `lastUser` are TRUNCATED for readability; `chars` is not. The usage block this
+    // server returns is a CONSTANT (64/96 input) — it cannot be, because a fabricated response has
+    // no real prompt behind it — so a cost figure read off `agent_task_log` after an emulated run
+    // measures the CALL COUNT, never the spend. `chars` is the one honest input a cost estimate can
+    // be built from: the real bytes the product assembled and sent. Recorded whole, per part, so
+    // scripts/estimate-live-cost.mjs can price a run at real per-model rates.
+    const sysChars = systemText(req).length;
+    const toolSchemaChars = JSON.stringify(req.tools || []).length;
+    const msgChars = JSON.stringify(req.messages || []).length;
+    log({
+      t: nowIso(), responder: responder.name, model: req.model, tools: toolNames(req),
+      toolChoice: req.tool_choice ?? null,
+      system: systemText(req).slice(0, 240), lastUser: lastUserText(req).slice(0, 240),
+      chars: { system: sysChars, toolSchemas: toolSchemaChars, messages: msgChars, total: sysChars + toolSchemaChars + msgChars },
+      outChars: JSON.stringify(out.content || []).length,
+      out,
+    });
     res.writeHead(200, { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' });
     res.end(JSON.stringify(out));
   });
