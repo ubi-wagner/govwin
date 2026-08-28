@@ -3095,7 +3095,7 @@
     "links": 31,
     "inputs": 2,
     "forms": 1,
-    "text": 2270,
+    "text": 2281,
     "h1": "There's non-dilutive money for your R&D. You probably qualify."
    },
    "declared": {
@@ -3122,7 +3122,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
@@ -3149,7 +3149,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
@@ -3172,11 +3172,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 189,
+    "buttons": 183,
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 21789,
+    "text": 17428,
     "h1": "Foundation"
    },
    "declared": {
@@ -3203,7 +3203,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 2047,
+    "text": 2147,
     "h1": "Foundation"
    },
    "declared": {
@@ -3226,11 +3226,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 21,
-    "inputs": 27,
+    "buttons": 1623,
+    "links": 81,
+    "inputs": 204,
     "forms": 0,
-    "text": 5064,
+    "text": 46173,
     "h1": "Foundation"
    },
    "declared": {
@@ -3257,7 +3257,7 @@
     "links": 21,
     "inputs": 12,
     "forms": 0,
-    "text": 3787,
+    "text": 5621,
     "h1": "Foundation"
    },
    "declared": {
@@ -3284,7 +3284,7 @@
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 1237,
+    "text": 1238,
     "h1": "Foundation"
    },
    "declared": {
@@ -3311,7 +3311,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 670,
+    "text": 671,
     "h1": "Foundation"
    },
    "declared": {
@@ -3334,11 +3334,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 20,
+    "links": 29,
     "inputs": 3,
     "forms": 0,
-    "text": 2937,
+    "text": 3199,
     "h1": "Foundation"
    },
    "declared": {
@@ -3361,11 +3361,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 22,
-    "links": 31,
+    "buttons": 25,
+    "links": 32,
     "inputs": 3,
     "forms": 0,
-    "text": 3134,
+    "text": 3406,
     "h1": "Foundation"
    },
    "declared": {
@@ -3392,7 +3392,7 @@
     "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 536,
+    "text": 537,
     "h1": "Foundation"
    },
    "declared": {
@@ -3416,10 +3416,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 22,
+    "links": 34,
     "inputs": 0,
     "forms": 0,
-    "text": 470,
+    "text": 1487,
     "h1": "Foundation"
    },
    "declared": {
@@ -3446,13 +3446,40 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 6,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "url": "/portal/foundation/documents/9d047cbb-4ea9-4a61-9709-c39e51d28f1d",
+   "file": "tenant__portal-tenantSlug-documents-documentId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/documents/9d047cbb-4ea9-4a61-9709-c39e51d28f1d",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 60,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 2501,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
     "forms": 0,
     "handlers": 0
    },
@@ -3473,7 +3500,7 @@
     "links": 23,
     "inputs": 2,
     "forms": 0,
-    "text": 946,
+    "text": 947,
     "h1": "Foundation"
    },
    "declared": {
@@ -3497,16 +3524,43 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 186,
+    "links": 205,
     "inputs": 0,
     "forms": 0,
-    "text": 14526,
+    "text": 15804,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 12,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "url": "/portal/foundation/library/foundation/e31166fe-d62a-44ad-9ff4-2cf480f765dd",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/library/foundation/e31166fe-d62a-44ad-9ff4-2cf480f765dd",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 58,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1279,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
     "forms": 0,
     "handlers": 0
    },
@@ -3523,11 +3577,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 21,
-    "inputs": 27,
+    "buttons": 1623,
+    "links": 81,
+    "inputs": 204,
     "forms": 0,
-    "text": 5064,
+    "text": 46173,
     "h1": "Foundation"
    },
    "declared": {
@@ -3550,11 +3604,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 21,
-    "inputs": 27,
+    "buttons": 1623,
+    "links": 81,
+    "inputs": 204,
     "forms": 0,
-    "text": 5064,
+    "text": 46173,
     "h1": "Foundation"
    },
    "declared": {
@@ -3577,11 +3631,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 21,
-    "inputs": 27,
+    "buttons": 1623,
+    "links": 81,
+    "inputs": 204,
     "forms": 0,
-    "text": 5064,
+    "text": 46173,
     "h1": "Foundation"
    },
    "declared": {
@@ -3608,7 +3662,7 @@
     "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 752,
+    "text": 755,
     "h1": "Foundation"
    },
    "declared": {
@@ -3635,7 +3689,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
@@ -3658,11 +3712,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 20,
+    "links": 29,
     "inputs": 3,
     "forms": 0,
-    "text": 2937,
+    "text": 3199,
     "h1": "Foundation"
    },
    "declared": {
@@ -3689,7 +3743,7 @@
     "links": 22,
     "inputs": 35,
     "forms": 0,
-    "text": 1818,
+    "text": 1819,
     "h1": "Foundation"
    },
    "declared": {
@@ -3716,7 +3770,7 @@
     "links": 37,
     "inputs": 0,
     "forms": 0,
-    "text": 1020,
+    "text": 1021,
     "h1": "Foundation"
    },
    "declared": {
@@ -3739,11 +3793,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 95,
+    "buttons": 106,
     "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 3788,
+    "text": 4045,
     "h1": "Foundation"
    },
    "declared": {
@@ -3770,7 +3824,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 832,
+    "text": 833,
     "h1": "Foundation"
    },
    "declared": {
@@ -3786,18 +3840,18 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/projects/[projectId]",
-   "url": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "url": "/portal/foundation/projects/a2780650-071d-4446-acb4-c4dcec363808",
    "file": "tenant__portal-tenantSlug-projects-projectId.png",
    "status": 200,
-   "finalUrl": "/portal/foundation/projects/e9c0a1ea-26c4-484c-8895-ffa6be944722",
+   "finalUrl": "/portal/foundation/projects/a2780650-071d-4446-acb4-c4dcec363808",
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 22,
-    "inputs": 4,
+    "buttons": 48,
+    "links": 25,
+    "inputs": 5,
     "forms": 0,
-    "text": 2097,
+    "text": 6841,
     "h1": "Foundation"
    },
    "declared": {
@@ -3821,10 +3875,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 22,
+    "links": 24,
     "inputs": 0,
     "forms": 0,
-    "text": 411,
+    "text": 513,
     "h1": "Foundation"
    },
    "declared": {
@@ -3851,7 +3905,7 @@
     "links": 21,
     "inputs": 7,
     "forms": 1,
-    "text": 34028,
+    "text": 34029,
     "h1": "Foundation"
    },
    "declared": {
@@ -3878,7 +3932,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 2293,
+    "text": 2294,
     "h1": "Foundation"
    },
    "declared": {
@@ -3901,11 +3955,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 3,
+    "buttons": 4,
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 1080,
+    "text": 1111,
     "h1": "Foundation"
    },
    "declared": {
@@ -3921,18 +3975,18 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
-   "url": "/portal/foundation/spotlights/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "url": "/portal/foundation/spotlights/e0721470-88cd-478a-9ffb-c19dafcbd30d",
    "file": "tenant__portal-tenantSlug-spotlights-spotlightId.png",
    "status": 200,
    "finalUrl": "/portal/foundation/cards",
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 20,
+    "links": 29,
     "inputs": 3,
     "forms": 0,
-    "text": 2937,
+    "text": 3199,
     "h1": "Foundation"
    },
    "declared": {
@@ -3955,11 +4009,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 20,
+    "links": 29,
     "inputs": 3,
     "forms": 0,
-    "text": 2937,
+    "text": 3199,
     "h1": "Foundation"
    },
    "declared": {
@@ -3986,7 +4040,7 @@
     "links": 21,
     "inputs": 6,
     "forms": 1,
-    "text": 1193,
+    "text": 1194,
     "h1": "Foundation"
    },
    "declared": {
@@ -4013,7 +4067,7 @@
     "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 3067,
+    "text": 3068,
     "h1": "Foundation"
    },
    "declared": {
@@ -4036,11 +4090,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 24,
-    "links": 31,
+    "buttons": 170,
+    "links": 91,
     "inputs": 0,
     "forms": 0,
-    "text": 2034,
+    "text": 19567,
     "h1": "Foundation"
    },
    "declared": {
@@ -4067,7 +4121,7 @@
     "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 629,
+    "text": 630,
     "h1": "Foundation"
    },
    "declared": {
@@ -4094,7 +4148,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
@@ -4121,7 +4175,7 @@
     "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 927,
+    "text": 931,
     "h1": "Foundation"
    },
    "declared": {
@@ -4136,12 +4190,6 @@
   }
  ],
  "unbound": {
-  "/portal/[tenantSlug]/documents/[documentId]": [
-   "tenant: no [documentId]"
-  ],
-  "/portal/[tenantSlug]/library/foundation/[foundationId]": [
-   "tenant: no [foundationId]"
-  ],
   "/portal/[tenantSlug]/vaults/[vaultId]": [
    "tenant: no [vaultId]"
   ]
@@ -4153,6 +4201,6 @@
  "laneRun": {
   "lane": "tenant",
   "considered": 43,
-  "reached": 40
+  "reached": 42
  }
 }
