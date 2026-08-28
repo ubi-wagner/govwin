@@ -3124,3 +3124,53 @@ by category:
 
 Three of five are agents, and each earns it by doing something SQL cannot. The other two would have
 been a model guessing at arithmetic in a document a customer reads.
+
+## Surfacing A1–A5 — the gap that "fully tested" was hiding
+
+Asked whether the work was fully done, the honest answer was **no**, and the reason is the one
+`docs/CAPABILITY_RECONCILIATION.md` exists to name:
+
+> *The lenses cannot see what was never surfaced. None can find a feature with no way in, because no
+> page renders it, no route is called, and nobody writes a test for something unreachable.*
+
+A1–A5 had routes, domain logic, unit tests and **live drive coverage** — and no UI. Every drive
+passed because it calls the routes directly. Five capabilities were complete and unreachable.
+
+### The lens refused a verdict, then was generous
+
+`reconcile-capability.mjs` first exited as a **HARNESS DEFECT**: 19 routes added this session were
+absent from `docs/frontend-inventory.json`, which is where it gets its route list, and *"every
+verdict below would be silent about them — which reads exactly like a pass."* The manifest was stale
+because I never regenerated it. That guard did its job.
+
+Regenerated, it then classed all four new routes as reachable — `draft-narrative` and `traceability`
+as covered by the project page, `assess-health` and `gate-closer` as second doors because they share
+`withProject()`. Both are heuristics, and a direct grep said **0 UI callers**. CLAUDE.md records that
+this join has been wrong fifteen ways; the grep was the truthful signal, and taking the lens's word
+over it would have been exactly the mistake the doc warns about.
+
+### What was built
+
+| | where it sits | why there |
+|---|---|---|
+| `ForecastPanel` (A5) | under the three measures | an EAC is only as meaningful as the percent-complete beneath it |
+| `TraceabilityMap` (A3) | beside the data requirements | both answer an auditor's question from opposite ends |
+| `GateCloserControl` (A4) | with the reminders | a settings question; a selector on every milestone row would make the plan a form |
+| `ProjectAssistant` (A1+A2) | at the foot | it reads and reports, so it is not part of the plan |
+
+Two things the panels have to *say*, not merely do. The gate-closer control states that the AI
+manager **runs the same checks your click does and can only hold a phase back** — a person reading
+"AI manager" beside a milestone will otherwise assume it decides the phase is finished, which is
+wrong in the dangerous direction. And the assistant states *advisory* on the buttons rather than in a
+tooltip discovered afterwards.
+
+`readDraftedNarrative` was extracted so the page and the route share **one** implementation. Two
+copies would eventually disagree about which figures are permitted, and the disagreement would
+surface as a draft the page offered and the route refused.
+
+### Verification
+
+`tsc` 0 · vitest 232 files / **2,481** · **surfaces 82/82 clean** — the workspace renders with four
+new panels and no client throw · **mobile green at 390 and 820** with every panel open, nothing past
+the viewport, nothing clipped unrecoverably · reconciliation: **6 unsurfaced, all pre-existing, none
+from this work** · api-contract 133 · ui-vs-db green · lifecycle drive green end to end.

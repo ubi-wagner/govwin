@@ -19,6 +19,9 @@ import { listInvoices, clinBilling, billableHours } from '@/lib/projects/invoice
 import { listCdrlItems } from '@/lib/projects/cdrl';
 import { resolveProjectNotify, PROJECT_TRIGGERS } from '@/lib/projects/notify-policy';
 import { TRIGGER_CATALOG } from '@/lib/automation/catalog';
+import { forecast, forecastNote } from '@/lib/projects/forecast';
+import { traceability } from '@/lib/projects/traceability';
+import { readDraftedNarrative } from '@/lib/projects/narrative-read';
 import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
@@ -29,6 +32,10 @@ import { ModificationLog, type LoggedModification } from '@/components/projects/
 import { InvoiceLedger, type LedgerInvoice, type LedgerClin, type LedgerUnbilled } from '@/components/projects/invoice-ledger';
 import { CdrlRegister, type RegisterCdrl } from '@/components/projects/cdrl-register';
 import { NotificationPolicy, type PolicyTrigger } from '@/components/projects/notification-policy';
+import { ForecastPanel, type PanelForecast } from '@/components/projects/forecast-panel';
+import { TraceabilityMap, type MapClin, type MapGap } from '@/components/projects/traceability-map';
+import { ProjectAssistant, type AssistantNarrative } from '@/components/projects/project-assistant';
+import { GateCloserControl, type GateMilestone } from '@/components/projects/gate-closer-control';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -102,7 +109,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, cdrlItems, notifyPolicy, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, cdrlItems, notifyPolicy, trace, draftedNarrative, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -134,6 +141,8 @@ export default async function ProjectPage({
         deliveryStatus: meta?.deliveryStatus ?? 'preview', ...resolved,
       };
     })),
+    traceability(tenantId, projectId),
+    readDraftedNarrative(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -186,6 +195,19 @@ export default async function ProjectPage({
     decidedAt: r.decidedAt ? String(r.decidedAt) : null,
     createdAt: r.createdAt ? String(r.createdAt) : null,
   }));
+  // ── A5: the forecast, from the measures just loaded ────────────────────────────────────────
+  // Computed HERE from `measures`, not fetched separately: a forecast served from its own call can
+  // be read beside a stale roll-up and disagree with it.
+  const fc = forecast({
+    actualCost: Number(measures.project.actualCost ?? 0),
+    plannedCost: measures.project.plannedCost === null ? null : Number(measures.project.plannedCost),
+    baselineCost: measures.project.baselineCost === null ? null : Number(measures.project.baselineCost),
+    costPct: measures.project.costPct,
+    schedulePct: measures.project.schedulePct,
+    deliverablesPct: measures.project.deliverablesPct,
+  });
+  const projectForecast = { ...fc, note: forecastNote(fc) } as unknown as PanelForecast;
+
   const memberOptions = assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }));
 
   const panelEvidence: PanelEvidence[] = evidence.map((e) => ({
@@ -527,6 +549,30 @@ export default async function ProjectPage({
         />
       </section>
 
+      {/* ── WHERE IT LANDS (A5) ──────────────────────────────────────────────────────────────
+          Directly under the three measures it extrapolates from, because an EAC is only as
+          meaningful as the percent-complete underneath it. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Forecast
+        </h2>
+        <ForecastPanel forecast={projectForecast} />
+      </section>
+
+      {/* ── TRACEABILITY (A3) ────────────────────────────────────────────────────────────────
+          Beside the data requirements, because both answer the same auditor's question from
+          different ends: what does the contract require, and what satisfies it. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Contract coverage
+        </h2>
+        <TraceabilityMap
+          clins={trace.clins as unknown as MapClin[]}
+          unassignedMilestones={trace.unassignedMilestones}
+          gaps={trace.gaps as unknown as MapGap[]}
+        />
+      </section>
+
       {/* ── THE DATA REQUIREMENTS ────────────────────────────────────────────────────────────
           Between the contract (CLINs, modifications) and the money (billing), because that is
           where it sits in fact: a CDRL is a contractual obligation, and on many contracts
@@ -598,6 +644,34 @@ export default async function ProjectPage({
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           tenantSlug={tenantSlug}
           canRaise={canAccept}
+        />
+      </section>
+
+      {/* ── WHO CLOSES A PHASE (A4) ──────────────────────────────────────────────────────────
+          With the reminders, not with the milestones: both are settings about how the project is
+          RUN, and putting a closer selector on every milestone row would make the plan a form. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Phase gates
+        </h2>
+        <GateCloserControl
+          milestones={milestones as unknown as GateMilestone[]}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canEdit={canAccept}
+        />
+      </section>
+
+      {/* ── THE AI MANAGER (A1 + A2) ─────────────────────────────────────────────────────────
+          Both actions read and report. The panel says so on the buttons rather than in a tooltip
+          discovered afterwards. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Assistance
+        </h2>
+        <ProjectAssistant
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canRequest={canAccept}
+          narrative={draftedNarrative as unknown as AssistantNarrative}
         />
       </section>
 

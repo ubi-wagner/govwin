@@ -279,6 +279,17 @@
    "nearMiss": false
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/assess-health",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
    "methods": [
@@ -305,8 +316,33 @@
    "nearMiss": true
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/cdrl",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/clins",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts",
    "methods": [
     "GET",
     "POST"
@@ -341,11 +377,109 @@
    "nearMiss": true
   },
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/gate-closer",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts",
+   "methods": [
+    "PATCH"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/invoices",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts",
+   "methods": [
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
    "methods": [
     "GET",
     "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/modifications",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts",
+   "methods": [
+    "DELETE",
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/notifications",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts",
+   "methods": [
+    "GET",
+    "PATCH"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts",
+   "methods": [
+    "GET",
     "POST"
    ],
    "reason": null,
@@ -370,6 +504,31 @@
    "methods": [
     "GET",
     "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/time",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts",
+   "methods": [
+    "DELETE",
+    "GET",
+    "PATCH",
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+   "secondDoor": "/api/portal/[tenantSlug]/projects/[projectId] (both call withProject())",
+   "nearMiss": true
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/traceability",
+   "file": "app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts",
+   "methods": [
+    "GET"
    ],
    "reason": null,
    "duplicatedBy": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
@@ -574,8 +733,32 @@
  ],
  "tailCalled": [
   {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]",
+   "tail": "/comments/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence",
+   "tail": "/deliverables/:p/evidence"
+  },
+  {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
    "tail": "/deliverables/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]",
+   "tail": "/meetings/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]",
+   "tail": "/reviews/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]",
+   "tail": "/risks/:p"
+  },
+  {
+   "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments",
+   "tail": "/tasks/:p/attachments"
   },
   {
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
@@ -597,7 +780,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 220
+   "rows": 236
   },
   {
    "name": "deploy_baseline",
@@ -764,6 +947,12 @@
    "everRan": true
   },
   {
+   "archetype": "project_manager",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
    "archetype": "proposal_architect",
    "inWorkflow": true,
    "namedInUi": true,
@@ -813,6 +1002,12 @@
   },
   {
    "archetype": "social_scheduler",
+   "inWorkflow": true,
+   "namedInUi": true,
+   "everRan": true
+  },
+  {
+   "archetype": "status_narrator",
    "inWorkflow": true,
    "namedInUi": true,
    "everRan": true
@@ -898,6 +1093,12 @@
    "everRan": false
   },
   {
+   "template": "on_project_health_requested",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
    "template": "on_proposal_advanced",
    "namedInUi": true,
    "viaEnumerator": true,
@@ -959,6 +1160,12 @@
   },
   {
    "template": "on_source_change_detected",
+   "namedInUi": true,
+   "viaEnumerator": true,
+   "everRan": true
+  },
+  {
+   "template": "on_status_narrative_requested",
    "namedInUi": true,
    "viaEnumerator": true,
    "everRan": true

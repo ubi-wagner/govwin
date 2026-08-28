@@ -52,6 +52,9 @@ export interface Milestone {
   /** Whatever this milestone actually measured — units, tests, hours. Open jsonb because the shape
    *  varies per contract, and a column per metric would be a schema change per customer. */
   completionMetrics: Record<string, unknown> | null;
+  /** Who closes this phase (mig 236): a person, or the AI manager. It changes who presses the
+   *  button, never what the button may do — see `lib/projects/gate-closer.ts`. */
+  gateCloser: string;
   sortIndex: number;
 }
 
@@ -90,7 +93,7 @@ export async function listMilestones(tenantId: string, projectId: string): Promi
     return await sql<Milestone[]>`
       SELECT id, project_id, clin_id, code, planned_cost, actual_cost, title, starts_on, baseline_date,
              forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
-             sort_index
+             gate_closer, sort_index
         FROM project_milestones
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
        ORDER BY sort_index, forecast_date NULLS LAST`;
