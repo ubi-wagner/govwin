@@ -1,13 +1,13 @@
 {
  "totals": {
   "routes": 118,
-  "components": 187,
-  "handlers": 1494,
-  "binding": 1253,
-  "fetches": 336,
+  "components": 200,
+  "handlers": 1604,
+  "binding": 1363,
+  "fetches": 352,
   "forms": 24,
-  "inputs": 463,
-  "buttons": 697,
+  "inputs": 518,
+  "buttons": 752,
   "orphans": 1
  },
  "records": [
@@ -1366,7 +1366,7 @@
   },
   {
    "file": "app/admin/dashboard/page.tsx",
-   "lines": 269,
+   "lines": 272,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1899,7 +1899,7 @@
   },
   {
    "file": "app/admin/opportunities/page.tsx",
-   "lines": 154,
+   "lines": 160,
    "client": false,
    "kind": "page",
    "exports": [
@@ -2008,7 +2008,7 @@
   },
   {
    "file": "app/admin/process/process-monitor-client.tsx",
-   "lines": 467,
+   "lines": 468,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -2065,7 +2065,7 @@
   },
   {
    "file": "app/admin/processes/admin-processes-client.tsx",
-   "lines": 212,
+   "lines": 213,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -2097,7 +2097,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 193
+     "line": 194
     }
    ],
    "fetches": [
@@ -2153,7 +2153,7 @@
   },
   {
    "file": "app/admin/proposals/page.tsx",
-   "lines": 120,
+   "lines": 121,
    "client": false,
    "kind": "page",
    "exports": [
@@ -3188,7 +3188,7 @@
   },
   {
    "file": "app/admin/system/page.tsx",
-   "lines": 207,
+   "lines": 211,
    "client": false,
    "kind": "page",
    "exports": [
@@ -3247,7 +3247,7 @@
   },
   {
    "file": "app/admin/system-state/system-state-client.tsx",
-   "lines": 1279,
+   "lines": 1282,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -3283,49 +3283,49 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1058
+     "line": 1061
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1109
+     "line": 1112
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1127
+     "line": 1130
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1154
+     "line": 1157
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1169
+     "line": 1172
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1197
+     "line": 1200
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1238
+     "line": 1241
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1244
+     "line": 1247
     }
    ],
    "fetches": [],
@@ -3547,7 +3547,7 @@
   },
   {
    "file": "app/admin/tenants/[tenantId]/page.tsx",
-   "lines": 372,
+   "lines": 373,
    "client": false,
    "kind": "page",
    "exports": [
@@ -4631,7 +4631,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
-   "lines": 528,
+   "lines": 537,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -4689,7 +4689,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 434
+     "line": 443
     }
    ],
    "fetches": [],
@@ -4924,7 +4924,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/command/page.tsx",
-   "lines": 270,
+   "lines": 396,
    "client": false,
    "kind": "page",
    "exports": [
@@ -4937,6 +4937,7 @@
     "OpportunitiesBody",
     "TodosPanel",
     "ProcessesClient",
+    "ProjectsBody",
     "ActivityBody",
     "CommandTabs"
    ],
@@ -4945,7 +4946,7 @@
    "forms": 0,
    "inputs": 0,
    "buttons": 0,
-   "links": 2,
+   "links": 3,
    "localImports": [
     "@/components/command/command-tabs",
     "@/components/tasks/todos-panel",
@@ -5105,7 +5106,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/documents/page.tsx",
-   "lines": 573,
+   "lines": 579,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5818,7 +5819,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
-   "lines": 361,
+   "lines": 742,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5830,7 +5831,21 @@
     "Measure",
     "ProjectRoster",
     "MilestoneChecklist",
-    "DeliverableRow"
+    "CommentThread",
+    "Fragment",
+    "DeliverableRow",
+    "ReviewPanel",
+    "EvidencePanel",
+    "ModificationLog",
+    "ForecastPanel",
+    "TraceabilityMap",
+    "CdrlRegister",
+    "InvoiceLedger",
+    "RiskRegister",
+    "MeetingLog",
+    "GateCloserControl",
+    "ProjectAssistant",
+    "NotificationPolicy"
    ],
    "handlers": [],
    "fetches": [],
@@ -5839,6 +5854,19 @@
    "buttons": 0,
    "links": 1,
    "localImports": [
+    "@/components/projects/comment-thread",
+    "@/components/projects/review-panel",
+    "@/components/projects/evidence-panel",
+    "@/components/projects/risk-register",
+    "@/components/projects/meeting-log",
+    "@/components/projects/modification-log",
+    "@/components/projects/invoice-ledger",
+    "@/components/projects/cdrl-register",
+    "@/components/projects/notification-policy",
+    "@/components/projects/forecast-panel",
+    "@/components/projects/traceability-map",
+    "@/components/projects/project-assistant",
+    "@/components/projects/gate-closer-control",
     "@/components/projects/deliverable-row",
     "@/components/projects/milestone-checklist",
     "@/components/projects/project-roster"
@@ -5853,7 +5881,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/projects/page.tsx",
-   "lines": 116,
+   "lines": 126,
    "client": false,
    "kind": "page",
    "exports": [
@@ -6512,7 +6540,7 @@
   },
   {
    "file": "components/admin/admin-file-manager.tsx",
-   "lines": 777,
+   "lines": 779,
    "client": true,
    "kind": "component",
    "exports": [
@@ -6524,211 +6552,211 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 355
+     "line": 357
     },
     {
      "on": "onDragOver",
      "element": "div",
      "binds": true,
-     "line": 372
+     "line": 374
     },
     {
      "on": "onDragLeave",
      "element": "div",
      "binds": true,
-     "line": 373
+     "line": 375
     },
     {
      "on": "onDrop",
      "element": "div",
      "binds": true,
-     "line": 374
+     "line": 376
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 386
+     "line": 388
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 398
+     "line": 400
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 418
+     "line": 420
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 433
+     "line": 435
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 442
+     "line": 444
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 450
+     "line": 452
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 465
+     "line": 467
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 466
+     "line": 468
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 479
+     "line": 481
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 487
+     "line": 489
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 504
+     "line": 506
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 518
+     "line": 520
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 526
+     "line": 528
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 549
+     "line": 551
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 572
+     "line": 574
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 605
+     "line": 607
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 623
+     "line": 625
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 624
+     "line": 626
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 634
+     "line": 636
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 635
+     "line": 637
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 640
+     "line": 642
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 657
+     "line": 659
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 664
+     "line": 666
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 682
+     "line": 684
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 700
+     "line": 702
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 701
+     "line": 703
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 711
+     "line": 713
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 712
+     "line": 714
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 732
+     "line": 734
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 741
+     "line": 743
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 748
+     "line": 750
     }
    ],
    "fetches": [
@@ -10685,8 +10713,7 @@
    "links": 0,
    "localImports": [],
    "renderedBy": [
-    "components/canvas/canvas-renderer.tsx",
-    "components/canvas/canvas-sidebar.tsx"
+    "components/canvas/canvas-renderer.tsx"
    ],
    "reachableFrom": [
     "/admin/templates",
@@ -17712,8 +17739,211 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/projects/cdrl-register.tsx",
+   "lines": 324,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "CdrlRegister"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 140
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 153
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 159
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 165
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 171
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 176
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 181
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 186
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 199
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 210
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 281
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 283
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 287
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 291
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 301
+    }
+   ],
+   "fetches": [
+    {
+     "method": "GET",
+     "url": "`${basePath}/cdrl`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 10,
+   "buttons": 5,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 15,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/comment-thread.tsx",
+   "lines": 231,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "CommentThread"
+   ],
+   "renders": [
+    "TimeAgo"
+   ],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 134
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 142
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 156
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 187
+    },
+    {
+     "on": "onChange",
+     "element": "textarea",
+     "binds": true,
+     "line": 194
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 207
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/comments`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/comments/${id}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 5,
+   "links": 0,
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+    "components/canvas/canvas-sidebar.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/admin/documents/[documentId]",
+    "/admin/site/docs/[type]/[slug]",
+    "/admin/templates/[templateId]/edit",
+    "/portal/[tenantSlug]/documents/[documentId]",
+    "/portal/[tenantSlug]/library/foundation/[foundationId]",
+    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]"
+   ],
+   "bindingHandlers": 6,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/projects/deliverable-row.tsx",
-   "lines": 202,
+   "lines": 214,
    "client": true,
    "kind": "component",
    "exports": [
@@ -17725,25 +17955,25 @@
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 159
+     "line": 167
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 166
+     "line": 174
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 179
+     "line": 191
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 192
+     "line": 204
     }
    ],
    "fetches": [
@@ -17775,26 +18005,20 @@
    "passedHandlers": 0
   },
   {
-   "file": "components/projects/milestone-checklist.tsx",
-   "lines": 193,
+   "file": "components/projects/evidence-panel.tsx",
+   "lines": 215,
    "client": true,
    "kind": "component",
    "exports": [
-    "MilestoneChecklist"
+    "EvidencePanel"
    ],
    "renders": [],
    "handlers": [
     {
-     "on": "onClick",
-     "element": "button",
+     "on": "onChange",
+     "element": "select",
      "binds": true,
-     "line": 113
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 136
+     "line": 140
     },
     {
      "on": "onChange",
@@ -17806,28 +18030,457 @@
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 159
+     "line": 161
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 172
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 180
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 166
+     "line": 188
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 173
+     "line": 193
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 182
+     "line": 205
     }
    ],
    "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/deliverables/${deliverableId}/evidence`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 5,
+   "buttons": 3,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 8,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/forecast-panel.tsx",
+   "lines": 112,
+   "client": false,
+   "kind": "component",
+   "exports": [
+    "ForecastPanel"
+   ],
+   "renders": [],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/gate-closer-control.tsx",
+   "lines": 138,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "GateCloserControl"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 76
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 101
+    }
+   ],
+   "fetches": [
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/gate-closer`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 1,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/invoice-ledger.tsx",
+   "lines": 409,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "InvoiceLedger"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 175
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 239
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 245
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 252
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 258
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 268
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 327
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 335
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 343
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 351
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 356
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 366
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 379
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 392
+    }
+   ],
+   "fetches": [
+    {
+     "method": "GET",
+     "url": "`${basePath}/invoices`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 7,
+   "buttons": 7,
+   "links": 0,
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 14,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/meeting-log.tsx",
+   "lines": 283,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "MeetingLog"
+   ],
+   "renders": [
+    "Link"
+   ],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 162
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 177
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 184
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 194
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 203
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 211
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 216
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 231
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 242
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 251
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 262
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 267
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 276
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/meetings`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/meetings/${meetingId}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 6,
+   "buttons": 7,
+   "links": 1,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 13,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/milestone-checklist.tsx",
+   "lines": 387,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "MilestoneChecklist"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 193
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 252
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 260
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 281
+    },
+    {
+     "on": "onBlur",
+     "element": "input",
+     "binds": true,
+     "line": 295
+    },
+    {
+     "on": "onBlur",
+     "element": "input",
+     "binds": true,
+     "line": 306
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 316
+    },
+    {
+     "on": "onBlur",
+     "element": "textarea",
+     "binds": true,
+     "line": 327
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 345
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 353
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 360
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 367
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 376
+    }
+   ],
+   "fetches": [
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/tasks/${taskId}`"
+    },
+    {
+     "method": "POST",
+     "url": "`${basePath}/tasks/${taskId}/attachments`"
+    },
     {
      "method": "PATCH",
      "url": "`${basePath}/tasks/${task.id}`"
@@ -17835,6 +18488,194 @@
     {
      "method": "POST",
      "url": "`${basePath}/tasks`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 7,
+   "buttons": 6,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 13,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/modification-log.tsx",
+   "lines": 399,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "ModificationLog"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 232
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 239
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 246
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 257
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 270
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 298
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 311
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 317
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 323
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 335
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 347
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 355
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 362
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 374
+    }
+   ],
+   "fetches": [
+    {
+     "method": "GET",
+     "url": "path"
+    }
+   ],
+   "forms": 0,
+   "inputs": 8,
+   "buttons": 6,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 14,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/notification-policy.tsx",
+   "lines": 196,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "NotificationPolicy"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 115
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 123
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 132
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 140
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 157
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 169
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 180
+    }
+   ],
+   "fetches": [
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/notifications`"
     }
    ],
    "forms": 0,
@@ -17852,8 +18693,51 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/projects/project-assistant.tsx",
+   "lines": 121,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "ProjectAssistant"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 75
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 83
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/${path}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 2,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/projects/project-roster.tsx",
-   "lines": 119,
+   "lines": 122,
    "client": true,
    "kind": "component",
    "exports": [
@@ -17865,19 +18749,19 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 82
+     "line": 85
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 97
+     "line": 100
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 109
+     "line": 112
     }
    ],
    "fetches": [
@@ -17902,6 +18786,239 @@
     "/portal/[tenantSlug]/projects/[projectId]"
    ],
    "bindingHandlers": 3,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/review-panel.tsx",
+   "lines": 272,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "ReviewPanel"
+   ],
+   "renders": [
+    "TimeAgo"
+   ],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "textarea",
+     "binds": true,
+     "line": 151
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 161
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 168
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 180
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 188
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 196
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 214
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 227
+    },
+    {
+     "on": "onChange",
+     "element": "textarea",
+     "binds": true,
+     "line": 235
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 245
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 252
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 262
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "`${basePath}/reviews`"
+    },
+    {
+     "method": "PATCH",
+     "url": "`${basePath}/reviews/${id}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 4,
+   "buttons": 8,
+   "links": 0,
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 12,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/risk-register.tsx",
+   "lines": 259,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "RiskRegister"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 136
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 146
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 179
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 189
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 200
+    },
+    {
+     "on": "onChange",
+     "element": "select",
+     "binds": true,
+     "line": 211
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 228
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 234
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 241
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 246
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 252
+    }
+   ],
+   "fetches": [
+    {
+     "method": "GET",
+     "url": "path"
+    }
+   ],
+   "forms": 0,
+   "inputs": 6,
+   "buttons": 5,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 11,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/projects/traceability-map.tsx",
+   "lines": 111,
+   "client": false,
+   "kind": "component",
+   "exports": [
+    "TraceabilityMap"
+   ],
+   "renders": [],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/projects/[projectId]"
+   ],
+   "bindingHandlers": 0,
    "passedHandlers": 0
   },
   {
@@ -20835,6 +21952,8 @@
     "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
     "components/admin/recent-sessions.tsx",
     "components/portal/proposal-timeline.tsx",
+    "components/projects/comment-thread.tsx",
+    "components/projects/review-panel.tsx",
     "components/scout/candidate-queue.tsx"
    ],
    "reachableFrom": [
@@ -20845,6 +21964,13 @@
     "/portal/[tenantSlug]/activity",
     "/admin/analytics",
     "/portal/[tenantSlug]/proposals/[proposalId]",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/admin/documents/[documentId]",
+    "/admin/site/docs/[type]/[slug]",
+    "/admin/templates/[templateId]/edit",
+    "/portal/[tenantSlug]/documents/[documentId]",
+    "/portal/[tenantSlug]/library/foundation/[foundationId]",
+    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
     "/admin/scouts"
    ],
    "bindingHandlers": 0,

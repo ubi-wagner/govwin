@@ -119,7 +119,12 @@ async function bindings() {
   const [tcard] = await sql`
     SELECT tc.id FROM tenant_template_cards tc JOIN tenants t ON t.id = tc.tenant_id
     WHERE t.slug = 'foundation' LIMIT 1`.catch(() => [undefined]);
-  const [task] = await sql`SELECT id FROM tasks LIMIT 1`;
+  // Scoped, for the same reason as `process_instances` below. `tasks` holds BOTH tenant rows and
+  // PLATFORM rows (`tenant_id IS NULL`), so an unscoped LIMIT 1 hands the tenant lane an id it is
+  // correctly refused — a 404 that grades as a finding and means the opposite.
+  const [task] = await sql`
+    SELECT tk.id FROM tasks tk JOIN tenants t ON t.id = tk.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY tk.created_at DESC LIMIT 1`;
   // Scoped to `foundation`, like every other tenant-lane binding. It was `LIMIT 1` over the whole
   // table, which picked an `rfp-pipeline` instance — so the tenant lane graded a 404 that was
   // CORRECT ISOLATION and told us nothing about whether the route can see its own data.
@@ -129,7 +134,15 @@ async function bindings() {
   const [sol] = await sql`SELECT id FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`;
   const [opp] = await sql`SELECT id FROM opportunities LIMIT 1`;
   const [tenant] = await sql`SELECT id FROM tenants WHERE slug = 'foundation'`;
-  const [portal] = await sql`SELECT id FROM proposal_portals ORDER BY created_at DESC LIMIT 1`;
+  // Scoped. This binding was the SIBLING of the `process_instances` one above, carrying the same
+  // defect the comment there describes — and it survived that fix. It picked a `lighthouse`
+  // portal, called it as `foundation`, and reported the product's CORRECT cross-tenant refusal as
+  // "a route that cannot find its own tenant's data". Foundation owns four portals; the lens
+  // simply never asked for one. Third occurrence of this class in this repo (B146/B147): a
+  // resolver must select for what its CONSUMER needs, not for what is merely nearest.
+  const [portal] = await sql`
+    SELECT pp.id FROM proposal_portals pp JOIN tenants t ON t.id = pp.tenant_id
+    WHERE t.slug = 'foundation' ORDER BY pp.created_at DESC LIMIT 1`;
   const [tmpl] = await sql`SELECT id FROM document_templates LIMIT 1`.catch(() => [undefined]);
   const [src] = await sql`SELECT id FROM source_profiles LIMIT 1`.catch(() => [undefined]);
   const [usr] = await sql`

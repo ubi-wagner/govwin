@@ -15,7 +15,7 @@
   {
    "kind": "app-component",
    "files": 26,
-   "lines": 8926
+   "lines": 8940
   },
   {
    "kind": "auth",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 178,
-   "lines": 45161
+   "lines": 45163
   },
   {
    "kind": "e2e",
@@ -55,12 +55,12 @@
   {
    "kind": "page",
    "files": 118,
-   "lines": 18460
+   "lines": 18491
   },
   {
    "kind": "script",
-   "files": 188,
-   "lines": 27366
+   "files": 190,
+   "lines": 27797
   },
   {
    "kind": "server-action",
@@ -20377,8 +20377,8 @@
   {
    "file": "app/admin/dashboard/page.tsx",
    "kind": "page",
-   "lines": 269,
-   "bytes": 11094,
+   "lines": 272,
+   "bytes": 11355,
    "client": false,
    "exports": [
     {
@@ -21198,8 +21198,8 @@
   {
    "file": "app/admin/opportunities/page.tsx",
    "kind": "page",
-   "lines": 154,
-   "bytes": 6969,
+   "lines": 160,
+   "bytes": 7533,
    "client": false,
    "exports": [
     {
@@ -21493,8 +21493,8 @@
   {
    "file": "app/admin/process/process-monitor-client.tsx",
    "kind": "app-component",
-   "lines": 467,
-   "bytes": 18560,
+   "lines": 468,
+   "bytes": 18663,
    "client": true,
    "exports": [
     {
@@ -21585,8 +21585,8 @@
   {
    "file": "app/admin/processes/admin-processes-client.tsx",
    "kind": "app-component",
-   "lines": 212,
-   "bytes": 9075,
+   "lines": 213,
+   "bytes": 9168,
    "client": true,
    "exports": [
     {
@@ -21752,8 +21752,8 @@
   {
    "file": "app/admin/proposals/page.tsx",
    "kind": "page",
-   "lines": 120,
-   "bytes": 4432,
+   "lines": 121,
+   "bytes": 4525,
    "client": false,
    "exports": [
     {
@@ -23654,8 +23654,8 @@
   {
    "file": "app/admin/system/page.tsx",
    "kind": "page",
-   "lines": 207,
-   "bytes": 8004,
+   "lines": 211,
+   "bytes": 8250,
    "client": false,
    "exports": [
     {
@@ -23954,8 +23954,8 @@
   {
    "file": "app/admin/system-state/system-state-client.tsx",
    "kind": "app-component",
-   "lines": 1279,
-   "bytes": 50369,
+   "lines": 1282,
+   "bytes": 50685,
    "client": true,
    "exports": [
     {
@@ -24375,8 +24375,8 @@
   {
    "file": "app/admin/tenants/[tenantId]/page.tsx",
    "kind": "page",
-   "lines": 372,
-   "bytes": 14552,
+   "lines": 373,
+   "bytes": 14657,
    "client": false,
    "exports": [
     {
@@ -69572,8 +69572,8 @@
   {
    "file": "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
    "kind": "app-component",
-   "lines": 528,
-   "bytes": 19566,
+   "lines": 537,
+   "bytes": 20479,
    "client": true,
    "exports": [
     {
@@ -70988,8 +70988,8 @@
   {
    "file": "app/portal/[tenantSlug]/documents/page.tsx",
    "kind": "page",
-   "lines": 573,
-   "bytes": 25098,
+   "lines": 579,
+   "bytes": 25694,
    "client": false,
    "exports": [
     {
@@ -72827,8 +72827,8 @@
   {
    "file": "app/portal/[tenantSlug]/projects/page.tsx",
    "kind": "page",
-   "lines": 116,
-   "bytes": 5059,
+   "lines": 126,
+   "bytes": 5971,
    "client": false,
    "exports": [
     {
@@ -74600,8 +74600,8 @@
   {
    "file": "components/admin/admin-file-manager.tsx",
    "kind": "component",
-   "lines": 777,
-   "bytes": 30864,
+   "lines": 779,
+   "bytes": 31112,
    "client": true,
    "exports": [
     {
@@ -133535,6 +133535,97 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/lib/mobile-measure.mts",
+   "kind": "script",
+   "lines": 149,
+   "bytes": 7338,
+   "client": false,
+   "exports": [
+    {
+     "name": "Overflow",
+     "form": "type"
+    },
+    {
+     "name": "SmallTarget",
+     "form": "type"
+    },
+    {
+     "name": "Clipped",
+     "form": "type"
+    },
+    {
+     "name": "overflowing",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "smallTargets",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "clipped",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "openEverything",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "Page"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "page.evaluate",
+    "Array.from",
+    "document.querySelectorAll",
+    "el.getBoundingClientRect",
+    "getComputedStyle",
+    "out.push",
+    "el.tagName.toLowerCase",
+    "String((el as HTMLElement).className ?? '').slice",
+    "String",
+    "Math.round",
+    "(el.textContent ?? '').trim().slice",
+    "(el.textContent ?? '').trim",
+    "out.slice",
+    "((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').trim().slice",
+    "((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').trim",
+    "el.getAttribute",
+    "(e.innerText ?? '').trim",
+    "[e, e.parentElement].some",
+    "n.title.includes",
+    "text.replace(/…$/, '').trim().slice",
+    "text.replace(/…$/, '').trim",
+    "text.replace",
+    "(n.getAttribute('aria-label') ?? '').includes",
+    "n.getAttribute",
+    "text.slice",
+    "String(e.className).slice",
+    "loc.click",
+    "page.locator('button[aria-expanded=\"false\"]').all",
+    "page.locator",
+    "click",
+    "page.getByRole('button', { name, exact: false }).all",
+    "page.getByRole",
+    "page.locator('details:not([open]) > summary').all",
+    "page.waitForTimeout"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/lib/scenario.mts",
    "kind": "script",
    "lines": 527,
@@ -135628,6 +135719,145 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/probe-interaction-mobile.mts",
+   "kind": "script",
+   "lines": 369,
+   "bytes": 19083,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page",
+      "Browser"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "mkdirSync",
+      "writeFileSync",
+      "readFileSync"
+     ]
+    },
+    {
+     "spec": "./lib/mobile-measure.mts",
+     "names": [
+      "overflowing",
+      "smallTargets",
+      "clipped",
+      "openEverything"
+     ]
+    }
+   ],
+   "tryCount": 8,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 109
+    },
+    {
+     "tag": "sql",
+     "line": 112
+    }
+   ],
+   "calls": [
+    "console.log",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "postgres",
+    "sql.end",
+    "page.evaluate",
+    "Array.from",
+    "document.querySelectorAll",
+    "getComputedStyle",
+    "body.fontFamily.slice",
+    "browser.newContext",
+    "ctx.newPage",
+    "login",
+    "page.setViewportSize",
+    "resp.status",
+    "summary.push",
+    "openEverything",
+    "overflowing",
+    "smallTargets",
+    "clipped",
+    "A",
+    "over.map((o) => `<${o.tag} class=\"${o.cls}\"> ends ${o.right}`).join(' · ').slice",
+    "over.map((o) => `<${o.tag} class=\"${o.cls}\"> ends ${o.right}`).join",
+    "over.map",
+    "cut.map((c) => `\"${c.text}\"`).join(' · ').slice",
+    "cut.map((c) => `\"${c.text}\"`).join",
+    "cut.map",
+    "small.slice(0, 4).map((s) => `${s.tag}\"${s.label}\" ${s.w}×${s.h}`).join",
+    "small.slice(0, 4).map",
+    "small.slice",
+    "route.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice",
+    "route.replace(/[^a-zA-Z0-9]+/g, '-').replace",
+    "route.replace",
+    "page.screenshot",
+    "shots.push",
+    "(e as Error).message.slice",
+    "ctx.close",
+    "JSON.parse",
+    "readFileSync",
+    "inv.records\n      .filter((r) => r.kind === 'page' && r.route)\n      .map((r) => r.route as string)\n      .filter((r) => /^\\/(admin|portal)/.test(r))\n      // `[tenantSlug]` is BOUND, not dropped. The first version filtered out every route\n      // containing a bracket — and since EVERY portal route is `/portal/[tenantSlug]/…`, that\n      // silently excluded the entire tenant half while the header printed \"38 addressable page\n      // routes\" and the run reported findings only in admin. A scanner that discards what it\n      // cannot address and says nothing is the defect this whole sweep exists to catch.\n      .map((r) => r.replace('[tenantSlug]', 'foundation')).filter",
+    "inv.records\n      .filter((r) => r.kind === 'page' && r.route)\n      .map((r) => r.route as string)\n      .filter((r) => /^\\/(admin|portal)/.test(r)).map",
+    "inv.records\n      .filter((r) => r.kind === 'page' && r.route)\n      .map((r) => r.route as string).filter",
+    "inv.records\n      .filter((r) => r.kind === 'page' && r.route).map",
+    "inv.records.filter",
+    "/^\\/(admin|portal)/.test",
+    "r.replace",
+    "r.includes",
+    "unaddressable.push",
+    "routes.filter",
+    "r.startsWith",
+    "unaddressable.slice(0, 6).join",
+    "unaddressable.slice",
+    "over.map((o) => `<${o.tag} class=\"${String(o.cls).slice(0, 44)}\"> ends ${o.right}`).slice(0, 2).join",
+    "over.map((o) => `<${o.tag} class=\"${String(o.cls).slice(0, 44)}\"> ends ${o.right}`).slice",
+    "String(o.cls).slice",
+    "String",
+    "mkdirSync",
+    "bindRoutes",
+    "chromium.launch",
+    "pre.newContext",
+    "stylesheetsLoaded",
+    "console.error",
+    "process.exit",
+    "pre.close",
+    "lane.routes.flatMap",
+    "probeRoute",
+    "process.argv.includes",
+    "sweepWidths",
+    "browser.close",
+    "writeFileSync",
+    "JSON.stringify",
+    "summary.filter",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 2,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/probe-measure-grid.mts",
    "kind": "script",
    "lines": 58,
@@ -135923,8 +136153,8 @@
   {
    "file": "scripts/probe-project-mobile.mts",
    "kind": "script",
-   "lines": 218,
-   "bytes": 10993,
+   "lines": 131,
+   "bytes": 6896,
    "client": false,
    "exports": [],
    "imports": [
@@ -135947,46 +136177,26 @@
       "mkdirSync",
       "writeFileSync"
      ]
+    },
+    {
+     "spec": "./lib/mobile-measure.mts",
+     "names": [
+      "overflowing",
+      "smallTargets",
+      "clipped",
+      "openEverything"
+     ]
     }
    ],
    "tryCount": 1,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 152
+     "line": 70
     }
    ],
    "calls": [
     "console.log",
-    "page.evaluate",
-    "Array.from",
-    "document.querySelectorAll",
-    "el.getBoundingClientRect",
-    "getComputedStyle",
-    "out.push",
-    "el.tagName.toLowerCase",
-    "String((el as HTMLElement).className ?? '').slice",
-    "String",
-    "Math.round",
-    "(el.textContent ?? '').trim().slice",
-    "(el.textContent ?? '').trim",
-    "out.filter((o, i) => !out.some((p, j) => j !== i && p.right >= o.right && o.tag !== 'body'\n      && false)).slice",
-    "out.filter",
-    "out.some",
-    "((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').trim().slice",
-    "((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').trim",
-    "el.getAttribute",
-    "(e.innerText ?? '').trim",
-    "[e, e.parentElement].some",
-    "n.title.includes",
-    "text.replace(/…$/, '').trim().slice",
-    "text.replace(/…$/, '').trim",
-    "text.replace",
-    "(n.getAttribute('aria-label') ?? '').includes",
-    "n.getAttribute",
-    "text.slice",
-    "String(e.className).slice",
-    "out.slice",
     "page.goto",
     "page.waitForSelector",
     "page.fill",
@@ -136006,14 +136216,9 @@
     "ctx.newPage",
     "login",
     "page.setViewportSize",
-    "page.locator('button[aria-expanded=\"false\"]').all",
-    "page.locator",
-    "b.click({ timeout: 2000 }).catch",
-    "b.click",
-    "page.getByRole('button', { name: 'Edit' }).all",
-    "page.getByRole",
-    "overflowing",
+    "openEverything",
     "A",
+    "overflowing",
     "over.map((o) => `<${o.tag} class=\"${o.cls}\"> ends ${o.right}`).join(' · ').slice",
     "over.map((o) => `<${o.tag} class=\"${o.cls}\"> ends ${o.right}`).join",
     "over.map",

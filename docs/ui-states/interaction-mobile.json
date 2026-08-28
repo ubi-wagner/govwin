@@ -237,9 +237,9 @@
    "overflow": 8,
    "worst": {
     "tag": "span",
-    "cls": "flex items-center text-xs text-gray-500 ml-auto flex-shrink-0",
-    "right": 485,
-    "text": "kate.ulepic@foundation3dp.com"
+    "cls": "text-xs font-mono text-gray-600 flex-shrink-0 min-w-[60px] text-right",
+    "right": 396,
+    "text": "8ms"
    }
   },
   {

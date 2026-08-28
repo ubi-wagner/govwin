@@ -109,6 +109,27 @@ enrichment) · `SOFFICE_PATH` / `SOFFICE_TIMEOUT` (LibreOffice doc conversion) �
 `RAILWAY_*` (auto-injected) · `AGENT_DATABASE_URL` (the NOBYPASSRLS `rfp_agent` agent role — for the
 post-launch RLS cutover).
 
+**Storage driver** — `STORAGE_DRIVER=local` swaps the S3/R2 client for a filesystem one (sandbox
+and CI; production leaves it unset and uses R2). `LOCAL_STORAGE_DIR` is where that driver writes,
+default `/tmp/govwin-storage` in both the frontend and the pipeline. `AWS_REGION` is accepted as a
+fallback for `AWS_DEFAULT_REGION` — the code reads `AWS_DEFAULT_REGION || AWS_REGION || 'auto'`,
+the same both-names tolerance already applied to the bucket.
+
+**Two more capability gates**, alongside `ATOM_OCR` / `ATOM_VISION` above —
+`VISUAL_REVIEW=off` disables the Claude visual page review (otherwise on whenever a real
+`ANTHROPIC_API_KEY` is present; `sk-noop` counts as absent) · `REGION_PROPOSER=demo` turns on the
+demo region proposer for atom boxing (anything else, including unset, leaves it off).
+
+**One tuning knob** — `PARTNER_NAME_MATCH_THRESHOLD` is the pg_trgm similarity floor for matching a
+partner-managed company by name, default `0.45`; a value outside `(0, 1]` falls back to the default
+rather than being trusted.
+
+> These seven rows were added after `frontend/scripts/audit-env-inventory.mjs` found them read by
+> the services and named in no deployment document. **Run that audit after adding any
+> `process.env` / `os.environ` read** — a variable an operator cannot know to set is a capability
+> that silently does nothing in production, and the document asserting it does not exist is where
+> the debugging starts.
+
 ## F. Descoped — do NOT need for launch
 
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_SPOTLIGHT_PRICE_ID`,

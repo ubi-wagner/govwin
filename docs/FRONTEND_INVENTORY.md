@@ -15,19 +15,19 @@
 |---|---:|---:|
 | api-route | 283 | 42,849 |
 | app-boundary | 5 | 132 |
-| app-component | 26 | 8,926 |
+| app-component | 26 | 8,940 |
 | auth | 2 | 241 |
-| component | 178 | 45,161 |
+| component | 178 | 45,163 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
 | lib | 327 | 67,638 |
 | middleware | 1 | 325 |
 | other | 4 | 157 |
-| page | 118 | 18,460 |
-| script | 188 | 27,366 |
+| page | 118 | 18,491 |
+| script | 190 | 27,797 |
 | server-action | 1 | 45 |
 | test | 233 | 32,695 |
-| **total** | **1453** | **254,320** |
+| **total** | **1455** | **254,798** |
 
 ## 2. Pages — every addressable customer/admin surface
 

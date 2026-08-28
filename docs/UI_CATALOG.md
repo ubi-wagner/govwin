@@ -10,12 +10,12 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 | | count |
 |---|---:|
 | addressable routes | 118 |
-| components | 187 |
-| event handlers (total) | 1494 |
-| …of which BIND behaviour (on a DOM element) | 1253 |
+| components | 200 |
+| event handlers (total) | 1604 |
+| …of which BIND behaviour (on a DOM element) | 1363 |
 | …of which PASS a prop to a child component | 241 |
-| `fetch` call sites | 336 |
-| `<form>` · `<input>` · `<button>` | 24 · 463 · 697 |
+| `fetch` call sites | 352 |
+| `<form>` · `<input>` · `<button>` | 24 · 518 · 752 |
 | components NO route can reach (orphans) | **1** |
 
 ## 1. Routes — the addressable surface
@@ -103,7 +103,7 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/billing` | app/portal/[tenantSlug]/billing/page.tsx | server | 0 | 0 | 0/0/0 | BillingPanel |
 | `/portal/[tenantSlug]/buckets` | app/portal/[tenantSlug]/buckets/page.tsx | server | 0 | 0 | 0/0/0 | SpotlightBuckets |
 | `/portal/[tenantSlug]/cards` | app/portal/[tenantSlug]/cards/page.tsx | server | 0 | 0 | 0/0/0 | PipelineCards |
-| `/portal/[tenantSlug]/command` | app/portal/[tenantSlug]/command/page.tsx | server | 0 | 0 | 0/0/0 | Link, PipelineCards, OpportunitiesBody, TodosPanel, ProcessesClient, ActivityBody +1 |
+| `/portal/[tenantSlug]/command` | app/portal/[tenantSlug]/command/page.tsx | server | 0 | 0 | 0/0/0 | Link, PipelineCards, OpportunitiesBody, TodosPanel, ProcessesClient, ProjectsBody +2 |
 | `/portal/[tenantSlug]/contracts` | app/portal/[tenantSlug]/contracts/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/contracts/[contractId]` | app/portal/[tenantSlug]/contracts/[contractId]/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/dashboard` | app/portal/[tenantSlug]/dashboard/page.tsx | server | 0 | 0 | 0/0/0 | Cockpit |
@@ -121,7 +121,7 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/processes` | app/portal/[tenantSlug]/processes/page.tsx | server | 0 | 0 | 0/0/0 | ProcessesClient |
 | `/portal/[tenantSlug]/profile` | app/portal/[tenantSlug]/profile/page.tsx | server | 0 | 0 | 0/0/0 | ProfileEditor |
 | `/portal/[tenantSlug]/projects` | app/portal/[tenantSlug]/projects/page.tsx | server | 0 | 0 | 0/0/0 | Link |
-| `/portal/[tenantSlug]/projects/[projectId]` | app/portal/[tenantSlug]/projects/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure, ProjectRoster, MilestoneChecklist, DeliverableRow |
+| `/portal/[tenantSlug]/projects/[projectId]` | app/portal/[tenantSlug]/projects/[projectId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, Measure, ProjectRoster, MilestoneChecklist, CommentThread, Fragment +13 |
 | `/portal/[tenantSlug]/proposals` | app/portal/[tenantSlug]/proposals/page.tsx | server | 0 | 0 | 0/0/0 | Link, ArchivedProposals |
 | `/portal/[tenantSlug]/proposals/[proposalId]` | app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx | server | 0 | 0 | 0/0/0 | OpportunityCard, AssignTaskForm, AmendmentBanner, ArchivePortalButton, ProposalStudio, StrategyPanel +1 |
 | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx | server | 0 | 0 | 0/0/0 | SectionAssignBar, SectionAssistBar, CanvasEditorPage |
@@ -305,9 +305,22 @@ tree carries far more, listed per component in §2.
 | components/portal/vaults/nook-detail.tsx | client | 10/0 | 6 | /portal/[tenantSlug]/vaults/[vaultId], /vaults/[vaultId] |
 | components/portal/vaults/nooks-index.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/vaults |
 | components/portal/volume-layout-gauge.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
+| components/projects/cdrl-register.tsx | client | 15/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/comment-thread.tsx | client | 6/0 | 2 | /portal/[tenantSlug]/projects/[projectId], /admin/documents/[documentId], /admin/site/docs/[type]/[slug] +4 |
 | components/projects/deliverable-row.tsx | client | 4/0 | 3 | /portal/[tenantSlug]/projects/[projectId] |
-| components/projects/milestone-checklist.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/evidence-panel.tsx | client | 8/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/forecast-panel.tsx | server | 0/0 | 0 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/gate-closer-control.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/invoice-ledger.tsx | client | 14/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/meeting-log.tsx | client | 13/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/milestone-checklist.tsx | client | 13/0 | 4 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/modification-log.tsx | client | 14/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/notification-policy.tsx | client | 7/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/project-assistant.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
 | components/projects/project-roster.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/review-panel.tsx | client | 12/0 | 2 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/risk-register.tsx | client | 11/0 | 1 | /portal/[tenantSlug]/projects/[projectId] |
+| components/projects/traceability-map.tsx | server | 0/0 | 0 | /portal/[tenantSlug]/projects/[projectId] |
 | components/proposal/section-assign-bar.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
 | components/proposal/section-assist-bar.tsx | client | 3/0 | 5 | /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
 | components/rfp-curation/amendments-panel.tsx | client | 14/0 | 4 | /admin/rfp-curation/[solId] |
@@ -334,14 +347,14 @@ tree carries far more, listed per component in §2.
 | components/ui/modal.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/portals, /portal/[tenantSlug]/manage |
 | components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +80 |
 | components/ui/tabs.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId], /admin/command, /portal/[tenantSlug]/command |
-| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +5 |
+| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +12 |
 
 ## 3. Handler census — what kind of interaction, and how much of it
 
 | handler | count | distinct files |
 |---|---:|---:|
-| `onClick` | 714 | 152 |
-| `onChange` | 453 | 104 |
+| `onClick` | 769 | 163 |
+| `onChange` | 505 | 114 |
 | `onClose` | 39 | 11 |
 | `onKeyDown` | 24 | 16 |
 | `onSubmit` | 21 | 18 |
@@ -351,6 +364,7 @@ tree carries far more, listed per component in §2.
 | `onUpdate` | 10 | 1 |
 | `onToggle` | 9 | 5 |
 | `onComplete` | 9 | 3 |
+| `onBlur` | 8 | 3 |
 | `onMouseDown` | 8 | 5 |
 | `onSave` | 7 | 6 |
 | `onMouseEnter` | 7 | 3 |
@@ -358,7 +372,6 @@ tree carries far more, listed per component in §2.
 | `onSelectNode` | 6 | 5 |
 | `onUpdateNode` | 6 | 5 |
 | `onSelect` | 6 | 4 |
-| `onBlur` | 5 | 2 |
 | `onDragStart` | 5 | 1 |
 | `onDragEnd` | 5 | 1 |
 | `onExport` | 4 | 3 |
@@ -487,6 +500,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/proposals/:p/advance` | 2 |
 | `GET base` | 2 |
 | `POST base` | 2 |
+| `GET path` | 2 |
 | `GET /api/admin/rfp-document/:p/signed-url` | 2 |
 | `POST /api/admin/rfp-curation/:p/ingest-assist` | 2 |
 | `POST '/api/admin/upload-topic-files'` | 2 |
@@ -685,12 +699,25 @@ tree carries far more, listed per component in §2.
 | `GET /api/portal/:p/vaults` | 1 |
 | `POST /api/portal/:p/vaults` | 1 |
 | `GET /api/portal/:p/proposals/:p/artifacts/:p/layout` | 1 |
+| `GET :p/cdrl` | 1 |
+| `POST :p/comments` | 1 |
+| `PATCH :p/comments/:p` | 1 |
 | `POST :p/deliverables/:p` | 1 |
 | `PATCH :p/deliverables/:p` | 1 |
+| `POST :p/deliverables/:p/evidence` | 1 |
+| `PATCH :p/gate-closer` | 1 |
+| `GET :p/invoices` | 1 |
+| `POST :p/meetings` | 1 |
+| `PATCH :p/meetings/:p` | 1 |
 | `PATCH :p/tasks/:p` | 1 |
+| `POST :p/tasks/:p/attachments` | 1 |
 | `POST :p/tasks` | 1 |
+| `PATCH :p/notifications` | 1 |
+| `POST :p/:p` | 1 |
 | `POST :p/assignees` | 1 |
 | `DELETE :p/assignees?userId=:p` | 1 |
+| `POST :p/reviews` | 1 |
+| `PATCH :p/reviews/:p` | 1 |
 | `PATCH /api/portal/:p/proposals/:p/sections/:p/assign` | 1 |
 | `POST /api/admin/rfp-curation/:p/amendments/:p` | 1 |
 | `GET /api/admin/rfp-curation/:p/annotations` | 1 |
