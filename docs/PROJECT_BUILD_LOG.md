@@ -1975,3 +1975,78 @@ clean · write-contract clean · spine audit 0 dead triggers · lifecycle drive 
 clean at 390 and 820 with every panel open.
 
 ---
+
+## H3 — The inbox: post-award work reaches the surfaces people already read
+
+### 29 event types were reaching nobody
+
+The notification feed selected `namespace IN ('proposal', 'capture', 'library', 'system')`. **The
+`project` namespace was not in the list**, on either arm of the query — so every event migs 216–223
+emit landed in `system_events` and was never selected. The bell was not filtering them out; it was
+never asking for them.
+
+### And nine of them had no sentence
+
+Reconciling the DISTINCT types the database has actually emitted against the labels in
+`lib/event-labels.ts` — the same join that found B136's *"Shadow descended"* — turned up nine with
+no case: everything P4, H1 and H2 added. They would have reached a customer's feed through the
+humaniser as "Comment posted" and "Review rejected": not wrong so much as **nobody's sentence**, and
+in the rejection's case dropping the one thing a reader needs.
+
+The labels now carry what makes each row worth reading:
+
+| event | what the row says |
+|---|---|
+| `review.rejected` | **the reason**, in the row — not behind a click |
+| `task.reassigned` | **who** it went to |
+| `comment.posted` | the excerpt, and how many people were mentioned |
+| `milestone.dependency_set` | whether it was set or cleared |
+
+Two labels — `project.reopened` and `comment.edited` — happened to read *exactly* like the humanised
+fallback, so nothing could tell a written label from a missing one. Rather than weaken the test,
+both were given the fact a reader of that row actually wants: *"Closed-out project reopened"* and
+*"Comment edited by its author"*.
+
+`event-label-jargon.test.ts` now carries all 29 project types, built the same way — joined from what
+the database emitted, not from what the code declares.
+
+### The partner arm's exclusion is now deliberate
+
+A `partner_user` is refused the project capability outright, so they must not see post-award
+activity. They already didn't — but only because the partner query requires
+`payload->>'proposalId'`, and project payloads carry `projectId`. **That is an accident of payload
+shape**, and the first project event to carry a proposal id would have quietly undone it. The
+namespace list is where the decision belongs, and the omission is now commented as load-bearing.
+
+### "For you" learns what a project is
+
+A proposal event is yours when it touches a section assigned to you. A project event is yours when
+it happens on a project **you are on** — the roster is the access mechanism there, so it is the right
+routing key — or when a comment **mentions you outright**, which is stronger than either.
+
+### The Command Center lane
+
+Scoped by `listProjectsForActor`, the same function the workspace uses: a lane built on a second
+query would be a second opinion about who can see what.
+
+The badge counts **what needs a person** — overdue milestones plus reviews awaiting a decision — not
+how many projects exist. A lane that reads "3" because you are on three healthy projects is a lane
+that is always non-zero and therefore never informative. A project with nothing outstanding says so,
+quietly, rather than being hidden.
+
+`'projects'` had to be added to `KNOWN_TABS`, or marking the lane seen is refused and the "new since
+you looked" dot never clears — a lane that always shouts is a lane people stop looking at.
+
+### Proven
+
+```
+✓ project events reach the notification bell at all — 36 of 100 row(s)
+✓ and every one of them is a written sentence, not a de-punctuated type — all labelled
+✓ and work on a project I am ON is flagged for me — the roster is the routing key — 10 flagged
+✓ the Command Center carries a Projects lane — 200
+```
+
+`tsc` 0 · vitest **2,260** · harness syntax 269/269 · surfaces 82/82 · api-contract clean ·
+lifecycle drive green.
+
+---

@@ -9,6 +9,7 @@ import { getCommandSeen, isNew } from '@/lib/command/seen';
 import { CommandTabs, type CommandTabInput } from '@/components/command/command-tabs';
 import { TodosPanel } from '@/components/tasks/todos-panel';
 import PipelineCards from '@/components/portal/pipeline-cards';
+import { listProjectsForActor } from '@/lib/projects/access';
 import { ProcessesClient, type ProcessRow } from '../processes/processes-client';
 
 /**
@@ -79,6 +80,65 @@ interface ActivityItem { id: string; label: string; at: string }
 
 // Activity lane — a compact recent-events feed (admin-only). The full filterable firehose lives at
 // /activity; this is the glanceable "what happened lately" for the console.
+/**
+ * The Projects lane.
+ *
+ * One row per active project, and each says the ONE thing that would make somebody open it. A list
+ * of names with no state is a list somebody has to click through to learn anything, which is the
+ * opposite of what a command centre is for — so a project with nothing outstanding says so, in
+ * quiet type, rather than being hidden.
+ */
+function ProjectsBody({
+  rows, basePath,
+}: {
+  rows: Array<{ id: string; name: string; overdue: number; reviews: number; unaccepted: number }>;
+  basePath: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
+        No active projects. A won proposal raises a to-do to open one.
+      </p>
+    );
+  }
+  return (
+    <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white text-sm">
+      {rows.map((r) => {
+        const flags = [
+          r.overdue > 0 ? `${r.overdue} overdue` : null,
+          r.reviews > 0 ? `${r.reviews} awaiting review` : null,
+          r.unaccepted > 0 ? `${r.unaccepted} unaccepted` : null,
+        ].filter(Boolean) as string[];
+        return (
+          // Stacked below `sm`, one line above it — the same shape as every other row on the
+          // project surfaces, so the lane does not become the one place that behaves differently
+          // on a phone.
+          <li key={r.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+            <Link href={`${basePath}/projects/${r.id}`} className="min-w-0 truncate font-medium text-blue-700 hover:underline">
+              {r.name}
+            </Link>
+            <span className="flex flex-wrap gap-1.5">
+              {flags.length === 0
+                ? <span className="text-xs text-gray-400">nothing outstanding</span>
+                : flags.map((f) => (
+                  <span
+                    key={f}
+                    className={`rounded px-1.5 py-0.5 text-[11px] ring-1 ring-inset ${
+                      /overdue/.test(f)
+                        ? 'bg-red-50 text-red-800 ring-red-600/30'
+                        : 'bg-amber-50 text-amber-900 ring-amber-600/30'}`}
+                  >
+                    {f}
+                  </span>
+                ))}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function ActivityBody({ items, basePath }: { items: ActivityItem[]; basePath: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -196,6 +256,63 @@ export default async function TenantCommandCenterPage({
 
   const oppsCount = pinnedCards + activeProposalCount;
 
+  // ── Projects: the post-award half of a customer's life (migs 216-223) ──
+  //
+  // Scoped by `listProjectsForActor`, which is the same function the workspace uses — the roster
+  // IS the access mechanism for an employee, so a lane built on a second query would be a second
+  // opinion about who can see what. Each row carries the ONE thing that would make somebody open
+  // it: what is overdue, what is waiting on a decision, what is unaccepted.
+  type ProjectLaneRow = {
+    id: string; name: string; status: string;
+    overdue: number; reviews: number; unaccepted: number; updatedAt: string | null;
+  };
+  let projectRows: ProjectLaneRow[] = [];
+  try {
+    const mine = await listProjectsForActor({ userId: sessionUser.id!, role, tenantId });
+    const active = mine.filter((p) => p.status !== 'closed');
+    if (active.length) {
+      const ids = active.map((p) => p.id);
+      const [late, pendingReviews, unaccepted, touched] = await Promise.all([
+        sql<{ projectId: string; n: number }[]>`
+          SELECT project_id, count(*)::int AS n FROM project_milestones
+           WHERE project_id = ANY(${ids}::uuid[]) AND tenant_id = ${tenantId}::uuid
+             AND status = 'pending' AND forecast_date < CURRENT_DATE
+           GROUP BY project_id`,
+        sql<{ projectId: string; n: number }[]>`
+          SELECT project_id, count(*)::int AS n FROM project_reviews
+           WHERE project_id = ANY(${ids}::uuid[]) AND tenant_id = ${tenantId}::uuid
+             AND status = 'pending'
+           GROUP BY project_id`,
+        sql<{ projectId: string; n: number }[]>`
+          SELECT m.project_id, count(*)::int AS n FROM project_deliverables d
+            JOIN project_milestones m ON m.id = d.milestone_id
+           WHERE m.project_id = ANY(${ids}::uuid[]) AND d.tenant_id = ${tenantId}::uuid
+             AND d.accepted_at IS NULL
+           GROUP BY m.project_id`,
+        sql<{ id: string; updatedAt: string }[]>`
+          SELECT id, updated_at FROM projects
+           WHERE id = ANY(${ids}::uuid[]) AND tenant_id = ${tenantId}::uuid`,
+      ]);
+      const by = (rows: { projectId: string; n: number }[]) =>
+        new Map(rows.map((r) => [r.projectId, r.n]));
+      const lateBy = by(late); const revBy = by(pendingReviews); const unBy = by(unaccepted);
+      const touchedBy = new Map(touched.map((r) => [r.id, r.updatedAt]));
+      projectRows = active.map((p) => ({
+        id: p.id, name: p.name, status: p.status,
+        overdue: lateBy.get(p.id) ?? 0,
+        reviews: revBy.get(p.id) ?? 0,
+        unaccepted: unBy.get(p.id) ?? 0,
+        updatedAt: touchedBy.get(p.id) ?? null,
+      }));
+    }
+  } catch (e) {
+    console.error('[portal/command] project lane failed:', e);
+  }
+  // The BADGE counts what needs a person, not how many projects exist. A lane that reads "3"
+  // because you are on three healthy projects is a lane that is always non-zero and therefore
+  // never informative.
+  const projectsCount = projectRows.reduce((n, r) => n + r.overdue + r.reviews, 0);
+
   // ── "New since you last looked" (mig 179): the newest item per lane (from what we already fetched)
   //    vs the per-tab watermark. First visit (no watermark) → no dots. Best-effort. ──
   const scope = `tenant:${tenantId}`;
@@ -209,6 +326,9 @@ export default async function TenantCommandCenterPage({
     todos: isNew(seen, 'todos', newestTodo),
     workflows: isNew(seen, 'workflows', (processRows ?? [])[0]?.updatedAt ?? null),
     activity: isNew(seen, 'activity', recentEvents[0]?.createdAt ?? null),
+    projects: isNew(seen, 'projects', projectRows.reduce<string | null>(
+      (m, r) => (r.updatedAt && (!m || new Date(r.updatedAt) > new Date(m)) ? r.updatedAt : m), null,
+    )),
   };
 
   const tabs: CommandTabInput[] = [
@@ -245,13 +365,19 @@ export default async function TenantCommandCenterPage({
       ),
     },
     {
+      key: 'projects', title: 'Projects', tone: projectsCount > 0 ? 'action' : 'default',
+      count: projectsCount, hasNew: hasNew.projects,
+      actions: [{ label: '📁 All projects', href: `${basePath}/projects` }],
+      body: <ProjectsBody rows={projectRows} basePath={basePath} />,
+    },
+    {
       key: 'activity', title: 'Activity', tone: 'default', count: 0, hasNew: hasNew.activity,
       actions: [],
       body: <ActivityBody items={activity} basePath={basePath} />,
     },
   ];
 
-  const actionable = oppsCount + todosCount;
+  const actionable = oppsCount + todosCount + projectsCount;
 
   return (
     <div className="max-w-3xl mx-auto">

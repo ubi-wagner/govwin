@@ -228,7 +228,8 @@ export function describeEvent(ev: EventLike): string {
           + `${note ? ` · ${note}` : ''}`;
       }
       case 'project.reopened':
-        return `Project reopened${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
+        // "Closed-out" is the fact that matters: this project was finished, and is not any more.
+        return `Closed-out project reopened${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
       case 'task.completed':
         return `Task done: ${str(payload.title) ?? 'a task'}`;
       case 'task.blocked':
@@ -250,6 +251,71 @@ export function describeEvent(ev: EventLike): string {
           + `${str(payload.preset) ? ` (${str(payload.preset)})` : ''}`;
       case 'deliverable.accepted':
         return `Deliverable accepted: ${str(payload.title) ?? 'a deliverable'}`;
+
+      // ── The plan (mig 221) ────────────────────────────────────────────────────────────────
+      case 'task.reassigned': {
+        // WHO it moved to is the whole reason this event exists — "a task was reassigned" is a
+        // sentence that makes a reader open the project to learn anything.
+        const what = str(payload.title) ?? 'a task';
+        const to = str(payload.to);
+        return `Task handed over: ${what}${to ? ` — now ${to}` : ''}`;
+      }
+      case 'task.rescheduled': {
+        const what = str(payload.title) ?? 'a task';
+        const from = str(payload.from);
+        const to = str(payload.to);
+        return `Task moved: ${what}${from && to ? ` — ${from} → ${to}` : to ? ` — now due ${to}` : ''}`;
+      }
+      case 'task.reference_attached':
+        return `Reference attached to ${str(payload.title) ?? 'a task'}`
+          + `${str(payload.filename) ? ` — ${str(payload.filename)}` : ''}`;
+      case 'task.reference_removed':
+        return `Reference removed from ${str(payload.title) ?? 'a task'}`;
+      case 'milestone.dependency_set':
+        return str(payload.dependsOnId)
+          ? `Milestone now follows another: ${str(payload.title) ?? 'a milestone'}`
+          : `Milestone dependency cleared: ${str(payload.title) ?? 'a milestone'}`;
+
+      // ── The conversation (mig 222) ────────────────────────────────────────────────────────
+      case 'comment.posted': {
+        // The EXCERPT, not just the fact. A feed row saying "a comment was posted" is a row
+        // whose only function is to make somebody click.
+        const on = str(payload.entityType);
+        const where = !on || on === 'project' ? '' : ` on a ${on}`;
+        const said = str(payload.excerpt);
+        const n = typeof payload.mentioned === 'number' ? payload.mentioned : 0;
+        const who = n > 0 ? ` · ${n} person${n === 1 ? '' : 's'} mentioned` : '';
+        return `Comment${where}${said ? `: ${said}` : ''}${who}`;
+      }
+      case 'comment.resolved':
+        return 'Comment thread resolved';
+      case 'comment.reopened':
+        return 'Comment thread reopened';
+      case 'comment.edited':
+        // "by its author" is the rule, not decoration — nobody else can, and a reader seeing an
+        // edited comment should know it was not rewritten by somebody else.
+        return 'Comment edited by its author';
+
+      // ── The review gate (mig 223) ─────────────────────────────────────────────────────────
+      case 'review.requested':
+        return `Review requested on a ${str(payload.entityType) ?? 'deliverable'}`
+          + `${str(payload.dueOn) ? ` — wanted by ${str(payload.dueOn)}` : ''}`;
+      case 'review.approved':
+        return `Review approved — the ${str(payload.entityType) ?? 'deliverable'} can be accepted`;
+      case 'review.rejected':
+        // The REASON. A rejection whose reason is not in the feed sends the reader hunting for
+        // the one thing that tells them what to change.
+        return `Review REJECTED: ${str(payload.reason) ?? 'no reason recorded'}`;
+      case 'review.withdrawn':
+        return 'Review request withdrawn';
+
+      // ── The daily sweep ───────────────────────────────────────────────────────────────────
+      case 'nudge_sweep.completed': {
+        const n = typeof payload.notified === 'number' ? payload.notified
+          : typeof payload.items === 'number' ? payload.items : null;
+        return `Project reminders sent${n !== null ? ` — ${n} item${n === 1 ? '' : 's'}` : ''}`;
+      }
+
       default:
         break;
     }

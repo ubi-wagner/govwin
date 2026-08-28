@@ -1002,6 +1002,42 @@ async function main() {
   // The employee session opened in 7f has now served 7f, 7g and 7h; this is the last use of it.
   await empCtx7f.close();
 
+  // ══ 7i · THE INBOX — project work reaches the surfaces a person already reads ══════════════
+  //
+  // Until now the bell selected `namespace IN ('proposal','capture','library','system')`, so every
+  // project event this drive has emitted reached NOBODY. Two checks, because "the feed returns
+  // rows" and "the rows say something a person understands" are different claims.
+  phase('7i · the bell and the Command Center carry post-award work');
+
+  const bell = await api(req, 'get', `/api/portal/${TENANT}/notifications?limit=100`);
+  const feed = ((bell.json.data as Json)?.notifications ?? []) as Json[];
+  const projectRows = feed.filter((n) => n.namespace === 'project');
+  A(bell.status === 200 && projectRows.length > 0,
+    'project events reach the notification bell at all',
+    `${projectRows.length} of ${feed.length} row(s)`);
+
+  // A label that fell through the humanizer reads like a de-punctuated identifier. The feed is
+  // populated either way, which is why this is asserted rather than eyeballed (B136).
+  const unlabelled = projectRows.filter((n) => {
+    const t = String(n.type ?? '');
+    const fallback = t.replace(/[._]/g, ' ').trim();
+    const cap = fallback.charAt(0).toUpperCase() + fallback.slice(1);
+    return String(n.title ?? '') === cap;
+  });
+  A(unlabelled.length === 0,
+    'and every one of them is a written sentence, not a de-punctuated type',
+    unlabelled.map((n) => String(n.type)).join(', ') || 'all labelled');
+
+  const forMe = projectRows.filter((n) => n.is_for_you === true);
+  A(forMe.length > 0,
+    'and work on a project I am ON is flagged for me — the roster is the routing key',
+    `${forMe.length} flagged`);
+
+  const cc = await req.fetch(`${BASE}/portal/${TENANT}/command`);
+  const ccBody = await cc.text();
+  A(cc.status() === 200 && /Projects/.test(ccBody),
+    'the Command Center carries a Projects lane', `${cc.status()}`);
+
   // ══ 7c · DB → UI → DB: the page states what the tables hold ════════════════════════════════
   //
   // The whole point of "full DB to UI and back again". Everything above wrote through the API; this
