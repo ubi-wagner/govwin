@@ -67,6 +67,10 @@ export interface Deliverable {
   uploadedAt: string | null;
   acceptedAt: string | null;
   acceptedBy: string | null;
+  /** The email of the person IN THIS PRODUCT who accepted it — never the customer. The workspace
+   *  renders "accepted by <this> · evidence: …", and merging the two would be exactly the claim
+   *  mig 224 exists to prevent. */
+  acceptedByEmail?: string | null;
   sortIndex: number;
 }
 
@@ -97,10 +101,11 @@ export async function listDeliverables(tenantId: string, projectId: string): Pro
       SELECT d.id, d.milestone_id, d.title, d.required_by, d.storage_key, d.filename,
              d.content_type, d.byte_size, d.uploaded_by, d.uploaded_at,
              d.accepted_at, d.accepted_by, d.sort_index,
-             d.document_id, td.title AS document_title
+             d.document_id, td.title AS document_title, au.email AS accepted_by_email
         FROM project_deliverables d
         JOIN project_milestones m ON m.id = d.milestone_id
         LEFT JOIN tenant_documents td ON td.id = d.document_id
+        LEFT JOIN users au ON au.id = d.accepted_by
        WHERE m.project_id = ${projectId}::uuid AND d.tenant_id = ${tenantId}::uuid
        ORDER BY d.sort_index, d.title`;
   } catch (err) {

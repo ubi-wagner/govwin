@@ -12,8 +12,10 @@ import { listMilestoneTasks } from '@/lib/projects/milestone-tasks';
 import { listTaskAttachments } from '@/lib/projects/task-attachments';
 import { listProjectComments } from '@/lib/projects/comments';
 import { listProjectReviews } from '@/lib/projects/reviews';
+import { listAcceptanceEvidence } from '@/lib/projects/evidence';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
+import { EvidencePanel, type PanelEvidence } from '@/components/projects/evidence-panel';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -87,7 +89,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -100,6 +102,7 @@ export default async function ProjectPage({
     // page into thirty.
     listProjectComments(tenantId, projectId),
     listProjectReviews(tenantId, projectId),
+    listAcceptanceEvidence(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -153,6 +156,13 @@ export default async function ProjectPage({
     createdAt: r.createdAt ? String(r.createdAt) : null,
   }));
   const memberOptions = assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }));
+
+  const panelEvidence: PanelEvidence[] = evidence.map((e) => ({
+    id: e.id, deliverableId: e.deliverableId, kind: e.kind,
+    customerName: e.customerName, customerRole: e.customerRole,
+    occurredOn: isoDate(e.occurredOn), filename: e.filename, note: e.note,
+    uploadedByEmail: e.uploadedByEmail ?? null,
+  }));
 
   const filesByTask = new Map<string, { id: string; filename: string }[]>();
   for (const f of taskFiles) {
@@ -411,6 +421,17 @@ export default async function ProjectPage({
                               members={memberOptions}
                               basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
                               canDecide={canAccept}
+                            />
+                            {/* The customer's act, filed by us — and rendered as exactly that.
+                                `acceptedByEmail` is the person in THIS product; the evidence names
+                                who they say signed. Two facts, side by side, never merged. */}
+                            <EvidencePanel
+                              deliverableId={d.id}
+                              label={d.title}
+                              evidence={panelEvidence}
+                              basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+                              canFile={canAccept}
+                              acceptedByEmail={d.acceptedAt ? (d.acceptedByEmail ?? null) : null}
                             />
                             <CommentThread
                               entityType="deliverable"

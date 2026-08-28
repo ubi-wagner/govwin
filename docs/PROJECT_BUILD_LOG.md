@@ -2050,3 +2050,64 @@ you looked" dot never clears — a lane that always shouts is a lane people stop
 lifecycle drive green.
 
 ---
+
+## P9 — The customer's act, filed by us
+
+Migration **224**: `project_acceptance_evidence`.
+
+### What it replaces, and why that is the better trade
+
+The plan originally had a read-only login for the customer's contracting officer. That reopens a
+boundary this product closed on purpose — `partner_user` is refused the project capability outright,
+which is what removes cross-tenant from it entirely — and it would mean an external session, a new
+audience for every project surface, and a scoping question on each one.
+
+Filing the evidence costs none of that. **The customer's act reaches the system as a file the
+tenant_admin already has**, and the boundary stays where it is.
+
+### Evidencing is not accepting — the fourth time this line is drawn
+
+Uploading is not accepting. Authoring is not accepting. Approving is not accepting. And evidence of
+the customer's act is not the customer's act. **Four ways to attach a fact, one deliberate act by a
+person who is allowed to make it.** Nothing in this module writes `accepted_at`.
+
+### And a claim about somebody is not their act
+
+This is the ingest-provenance rule applied to acceptance: *a value the product did not read from the
+source must never look like one it did.*
+
+An admin types a contracting officer's name into a form. The product has never met that person,
+verified nothing, and holds no record of them — so `customer_name` is stored as free text with **no
+attempt to resolve it to a user**, because inventing a user row for a COR would manufacture an
+identity nothing checked. The event keeps `filedBy` (a user id) and `customerName` (a string
+somebody typed) as **separate fields**, and the workspace renders:
+
+> accepted by **dana@acme.test** · evidence: Email from the COR/CO, 2026-04-02
+
+never *"accepted by the government"*. A deliverable accepted with nothing on file says so, in amber:
+**no customer evidence on file**.
+
+Filing is `tenant_admin`+ — anyone on the project may upload a working file, but asserting that
+somebody outside the company signed for it is a narrower thing.
+
+### Proven
+
+Nine unit assertions and, as the actors:
+
+```
+✓ a tenant_admin can file the customer's acceptance evidence — 201
+✓ and the row keeps the reported name and the filing admin APART — two different facts
+  — reports "J. Rivera" · filed by a real user
+✓ the evidence is on file
+✓ and an employee cannot file it — 403
+```
+
+Red-first, two defects injected: filing that *also* accepts, and the reported name merged into a
+single `acceptedBy`. Each fails exactly the case written for it — and neither would have errored in
+production. They would have produced a clean, confident, wrong sentence, read six months later in a
+dispute, which is the only moment it matters.
+
+`tsc` 0 · vitest **2,271** · surfaces 82/82 · write-contract clean · mobile probe clean at 390 and
+820 · lifecycle drive green.
+
+---

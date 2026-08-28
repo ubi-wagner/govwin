@@ -309,6 +309,17 @@ export function describeEvent(ev: EventLike): string {
       case 'review.withdrawn':
         return 'Review request withdrawn';
 
+      // ── The customer's act, filed by us (mig 224) ─────────────────────────────────────────
+      case 'acceptance_evidence.filed': {
+        // "reports" is doing the work. This row must never read as the customer's own act — the
+        // product has not met that person and verified nothing.
+        const who = str(payload.customerName);
+        const kind = str(payload.kind) ?? 'evidence';
+        const on = str(payload.occurredOn);
+        return `Customer acceptance evidence filed (${kind})`
+          + `${who ? ` — reports ${who}` : ''}${on ? `, ${on}` : ''}`;
+      }
+
       // ── The daily sweep ───────────────────────────────────────────────────────────────────
       case 'nudge_sweep.completed': {
         const n = typeof payload.notified === 'number' ? payload.notified

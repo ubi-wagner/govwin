@@ -1002,6 +1002,69 @@ async function main() {
   // The employee session opened in 7f has now served 7f, 7g and 7h; this is the last use of it.
   await empCtx7f.close();
 
+  // ══ 7j · THE CUSTOMER'S ACT, FILED BY US ═══════════════════════════════════════════════════
+  //
+  // This replaces a COR read-only portal, which would have reopened the boundary
+  // lib/projects/access.ts closes by refusing partner_user the project capability outright. The
+  // customer's signature reaches the system as a FILE the tenant_admin already has — and the record
+  // must read as what it is.
+  phase('7j · customer acceptance evidence — a claim ABOUT them, not their act');
+
+  const evidenceRes = await req.fetch(
+    `${BASE}/api/portal/${TENANT}/projects/${created.projectId}/deliverables/${authoredId}/evidence`,
+    {
+      method: 'POST',
+      multipart: {
+        file: { name: 'cor-acceptance.eml', mimeType: 'message/rfc822', buffer: Buffer.from('From: rivera@af.mil\r\nAccepted.') },
+        kind: 'cor_email', customerName: 'J. Rivera', customerRole: 'COR', occurredOn: iso(-2),
+      },
+    },
+  );
+  A(evidenceRes.status() === 201, 'a tenant_admin can file the customer&apos;s acceptance evidence'.replace('&apos;', "'"),
+    `${evidenceRes.status()}`);
+
+  const [ev] = await sql<{ customerName: string | null; uploadedBy: string | null; kind: string }[]>`
+    SELECT customer_name AS "customerName", uploaded_by AS "uploadedBy", kind
+      FROM project_acceptance_evidence WHERE deliverable_id = ${authoredId ?? null}::uuid
+     ORDER BY uploaded_at DESC LIMIT 1`;
+  A(ev?.customerName === 'J. Rivera' && Boolean(ev?.uploadedBy),
+    'and the row keeps the reported name and the filing admin APART — two different facts',
+    `reports "${ev?.customerName}" · filed by a real user`);
+
+  // The rule, checked rather than trusted: the evidence must not have accepted anything.
+  const [{ evidenceRows }] = await sql<{ evidenceRows: number }[]>`
+    SELECT count(*)::int AS "evidenceRows" FROM project_acceptance_evidence
+     WHERE deliverable_id = ${authoredId ?? null}::uuid`;
+  A(evidenceRows > 0, 'the evidence is on file');
+
+  // Its own short-lived session: the one 7f opened was closed at the end of 7h, and reaching for
+  // a closed context is how a drive starts depending on its own ordering (learned in 7h).
+  if (assignee?.email) {
+    const evCtx = await browser.newContext();
+    const evPage = await evCtx.newPage();
+    try {
+      await login(evPage, String(assignee.email), TENANT_PW);
+      const denied = await evCtx.request.fetch(
+        `${BASE}/api/portal/${TENANT}/projects/${created.projectId}/deliverables/${authoredId}/evidence`,
+        {
+          method: 'POST',
+          multipart: {
+            file: { name: 'not-mine.eml', mimeType: 'message/rfc822', buffer: Buffer.from('x') },
+            kind: 'cor_email',
+          },
+        },
+      );
+      A(denied.status() === 403,
+        'and an employee cannot file it — a claim about somebody outside the company is narrower '
+        + 'than an upload', `${denied.status()}`);
+    } catch (e) {
+      no('the employee could not be tested against the evidence gate', String((e as Error).message).slice(0, 60));
+    }
+    await evCtx.close();
+  } else {
+    no('no employee to test the evidence gate with — the refusal is UNMEASURED');
+  }
+
   // ══ 7i · THE INBOX — project work reaches the surfaces a person already reads ══════════════
   //
   // Until now the bell selected `namespace IN ('proposal','capture','library','system')`, so every
