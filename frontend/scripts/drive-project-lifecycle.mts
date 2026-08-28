@@ -1261,6 +1261,67 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7q · THE STATUS REPORT — a document whose numbers are read, not typed ═════════════════
+  //
+  // Not a new kind of thing: a fifth PRESET on the same deliverable, producing the same
+  // `tenant_documents` row on the same rules. The assertions are about what it SAYS — the three
+  // measures stay three, and nothing in it was invented.
+  phase('7q · the status report: prefilled from the rollup');
+
+  const srDel = await api(req, 'post', P + '/deliverables', {
+    milestoneId, title: 'Monthly status report — June', requiredBy: iso(75),
+  });
+  A(srDel.status === 201, 'a deliverable exists to author the report against', `${srDel.status}`);
+  const srId = ((srDel.json.data as Json)?.deliverable as Json)?.id as string | undefined;
+
+  const authored = await api(req, 'patch', P + `/deliverables/${srId}`, {
+    action: 'author', preset: 'status_report',
+  });
+  A(authored.status === 200 || authored.status === 201, 'it authors as a status report', `${authored.status}`);
+  // Same shape as the letter draft above: `data.document.documentId`. Read the route, do not
+  // assume the envelope's inner shape.
+  const srDocId = ((authored.json.data as Json)?.document as Json)?.documentId as string | undefined;
+  A(Boolean(srDocId), 'and it is a real tenant_documents row');
+
+  const [srDoc] = await sql<{ nodeCount: number; canvas: unknown }[]>`
+    SELECT node_count AS "nodeCount", canvas FROM tenant_documents
+     WHERE id = ${srDocId ?? null}::uuid`;
+  A((srDoc?.nodeCount ?? 0) > 5,
+    'the document is NOT a blank page — the G3 failure, which a magic-number check cannot see',
+    `${srDoc?.nodeCount} node(s)`);
+
+  // Read the words back out of the stored canvas: what a person will actually see.
+  const srText = JSON.stringify(srDoc?.canvas ?? {});
+  A(/Cost/.test(srText) && /Schedule/.test(srText) && /Deliverables/.test(srText),
+    'and it carries all THREE measures, side by side');
+  A(!/44\.4|percent complete|overall progress/i.test(srText),
+    'with no blended figure — the number that looks most like an answer and is worth least');
+  A(/snapshot and do not update/.test(srText),
+    'it says the figures are a snapshot, so a June report keeps saying June');
+
+  // A real artifact. An unexported report is a claim about a document nobody has opened.
+  // The export route is a POST carrying the canvas — the same one the build portal uses.
+  const srPdf = await req.fetch(`${BASE}/api/portal/${TENANT}/documents/${srDocId}/export`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    data: { document: srDoc?.canvas, format: 'pdf' },
+  });
+  A(srPdf.status() === 200, 'the report exports as a PDF', `${srPdf.status()}`);
+  const srBytes = await srPdf.body();
+  // BYTES AND CONTENT, not just a magic number. G3 shipped a blank authored deliverable that
+  // passed a `%PDF` check at 865 bytes — the length is the half that would have caught it.
+  A(srBytes.length > 2000 && srBytes.subarray(0, 4).toString() === '%PDF',
+    'and it is a real PDF with content in it, not an 865-byte nothing',
+    `${srBytes.length} bytes`);
+
+  // And it is an ORDINARY deliverable in every other respect — accepted through the same gate,
+  // with no special path. Its `document_id` is what satisfies the attachment requirement, which is
+  // the widening mig 220 made (`NOTHING_ATTACHED` accepts a file OR a document).
+  const srAccept = await api(req, 'patch', P + `/deliverables/${srId}`, { action: 'accept' });
+  A(srAccept.status === 200,
+    'and it accepts through the ordinary gate — a generated document is still a deliverable',
+    `${srAccept.status} ${String((srAccept.json as Json).code ?? '')}`);
+
   // ══ 7p · THE CDRL REGISTER — the obligation, and the third state ══════════════════════════
   //
   // A CDRL is a standing requirement; its submission history IS its deliverables. The assertion

@@ -24,6 +24,8 @@ import { customerProjectPath } from '@/lib/storage/paths';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { daysBetween, isoDate } from './dates';
 import { closeTodosUnder } from './todos';
+import { buildStatusReport } from './status-report';
+import { statusReportInput } from './status-report-data';
 import { blockingReview } from './reviews';
 import type { Fail, Ok } from './project';
 
@@ -598,10 +600,16 @@ export async function authorDeliverable(
     return { ok: false, status: 404, error: 'Deliverable not found', code: 'NOT_FOUND' };
   }
   const preset = (input.preset ?? 'letter').trim();
-  if (!isBlankPreset(preset)) {
+  // `status_report` is a fifth preset and NOT a fifth kind of document: it produces the same
+  // `tenant_documents` row on the same letter rules, measured by the same compliance floor and
+  // rendered by the same exporters. Only the starter's CONTENT differs — every figure in it is
+  // read off a row, which is what makes prefilling it legitimate where a blank deliverable's
+  // scaffolded headings would not be (G3).
+  const isStatusReport = preset === 'status_report';
+  if (!isStatusReport && !isBlankPreset(preset)) {
     return {
       ok: false, status: 400, code: 'VALIDATION_ERROR',
-      error: "preset must be one of: flier, letter, deck, sheet",
+      error: "preset must be one of: flier, letter, deck, sheet, status_report",
     };
   }
 
@@ -627,7 +635,7 @@ export async function authorDeliverable(
     // The id is generated first so the canvas can key its own `document_id` to the row, exactly as
     // the standalone documents route does.
     const documentId = randomUUID();
-    const starter = starterFromPreset(preset, {
+    const starter = starterFromPreset(isStatusReport ? 'letter' : preset, {
       documentId,
       actorId: actor.userId,
       title: (input.title ?? '').trim() || existing.title,
@@ -637,7 +645,22 @@ export async function authorDeliverable(
     // report exported as an empty page, which a magic-number check on the bytes cannot see (an
     // 865-byte `%PDF` passed). A deliverable is not a blank page — it is a named obligation on a
     // named project with a date, and the system already holds all three.
-    starter.canvas.nodes = seedNodes(actor.userId, starter.title, existing);
+    if (isStatusReport) {
+      // The one document whose entire content IS rows. `asAt` is passed in rather than read inside
+      // the builder: a builder that reads the clock cannot be tested, and the figures are a
+      // SNAPSHOT — this document does not re-compute when it is reopened, which is exactly right
+      // for a report that was submitted in June.
+      const data = await statusReportInput(actor.tenantId, projectId, {
+        title: starter.title,
+        projectName: existing.project,
+        periodStart: null,
+        periodEnd: isoDate(existing.requiredBy),
+        asAt: new Date().toISOString().slice(0, 10),
+      });
+      starter.canvas.nodes = buildStatusReport(data, actor.userId);
+    } else {
+      starter.canvas.nodes = seedNodes(actor.userId, starter.title, existing);
+    }
 
     await sql`
       INSERT INTO tenant_documents

@@ -178,6 +178,10 @@ export function DeliverableRow({
             <option value="letter">Report</option>
             <option value="deck">Slide deck</option>
             <option value="sheet">Workbook</option>
+            {/* The one prefilled starter. Every figure in it is read off a row — the rollup, the
+                variance, the register, the billing position — which is why it may be prefilled
+                where a blank deliverable's scaffolded headings may not (G3). */}
+            <option value="status_report">Status report (from the rollup)</option>
             <option value="flier">One-pager</option>
           </select>
         )}

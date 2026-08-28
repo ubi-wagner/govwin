@@ -2661,3 +2661,74 @@ an accepted one can, lateness is real (`daysLate=5`), sending twice is refused, 
 refused **by the database itself** (23001) · **0 broken links in the whole chain** · isolation lens
 **20 tables** (it picked the new one up with no edit) · surfaces 82/82 · api-contract 130 graded ·
 write-contract **251/251** · ui-vs-db green · mobile green at 390 and 820 · `next build` clean.
+
+## P1 · The status report — a document whose numbers are read, not typed
+
+**It is not a new kind of thing.** "Monthly Status Report" is already modelled: a CDRL with a
+frequency (P8), producing one deliverable per period under its own milestone. So this is a fifth
+**preset** on `authorDeliverable` — not a reports table, not a reports page. Everything downstream is
+unchanged: the same editor, the same compliance floor, the same docx·pptx·xlsx·pdf exporters, the
+same internal acceptance gate, the same "sent to the customer" state, the same CDRL register
+counting it. Only the starter's content differs.
+
+### Why prefilling is legitimate here, when G3 said it was not
+
+G3's rule stands — a starter carries **only facts read off a row**, because scaffolding plausible
+headings puts structure nobody asked for into a contract deliverable. A status report does not
+violate it: it is the one document whose entire content IS rows. Every figure comes from `rollup()`,
+`milestoneVariance()`, the risk register and `clinBilling()`. Nothing is invented and nothing is left
+as a prompt for somebody to fill in.
+
+The builder is **pure** and the data-gathering is a separate module, so every rule about what the
+report *says* is testable without a database — which is how a document's rules end up tested at all.
+
+Three rules it holds, each with a failure mode that looks fine:
+
+- **The three measures stay three.** 60% cost, 40% schedule and 33.3% deliverables average to 44.4 —
+  the number that looks most like an answer and is worth the least. The test asserts that figure
+  never appears.
+- **A measure with no denominator says "not measured"**, never `0%`, *and says why* ("no planned cost
+  recorded", "no milestone carries both dates"). A report is exactly where a confident zero gets
+  believed.
+- **A null variance is "no baseline"**, which is a different statement from "on baseline". Rendering
+  it as on-time claims a promise was kept that was never made.
+
+It also says **"figures as at <date>; they are a snapshot and do not update"** — because the document
+is written once and then edited by a person, and a report submitted in June has to keep saying what
+it said in June.
+
+### Two defects the probes found
+
+**The report was headed with the wrong name.** `authorDeliverable` titles the document after the
+deliverable ("Monthly status report — June") while the builder wrote an H1 from the project name. A
+document titled one thing and headed another cannot be matched to the obligation it satisfies.
+Nothing in the unit tests could see it; `probe-deliverable-artifacts` did, by rendering the `.pptx`
+through LibreOffice and looking for the deliverable's name in the text layer — the `.pdf` and `.docx`
+passed because they carry a document title the `.pptx` does not. **B121's rule earning itself again:
+an artifact is not verified until an engine that did not write it has opened it.** Now 22/22.
+
+**A project with an executed modification could not be deleted** — migration 230 gave
+`project_modification_changes.clin_id` an `ON DELETE SET NULL` beside a CHECK requiring an `amend`
+row to carry one. Those cannot both hold. It surfaced only while clearing scratch fixtures, because
+the product archives rather than deletes; that makes it the kind of defect that waits.
+
+Migration **233** changed it to RESTRICT, matching `project_invoice_lines`, and **asserted in its own
+header that RESTRICT would not block a project delete because the cascade removes modification rows
+first.** That was a guess, and measuring it proved it false — Postgres reaches `project_clins` first.
+Which also means `project_invoice_lines.clin_id` had carried the same latent defect since migration
+231, unnoticed only because the modification constraint failed first and masked it.
+
+Migration **234** settles both on CASCADE, and the reasoning is the point: what protects the history
+is not a foreign-key action but the fact that **nothing deletes a CLIN** — `clins.ts` has no delete,
+because a line item is deobligated to zero by a modification, never removed. The modification header
+survives regardless. *A claim about how the database behaves has to be measured; 233 stated its
+cascade ordering as a fact in a sentence, and the sentence was false.*
+
+### Verification
+
+`tsc` 0 · vitest 228 files / **2,418** (18 new) · migrations 233–234 applied · **10 status-report
+assertions green in the live lifecycle drive** — 15 nodes not a blank page, all three measures
+present, no blended figure, the snapshot line, a 35 KB PDF, and acceptance through the ordinary gate
+· **0 broken links in the whole chain** · `probe-deliverable-artifacts` **22/22** (LibreOffice +
+pdf.js) · isolation 20 tables · surfaces 82/82 · api-contract 130 · write-contract 251/251 · mobile
+green at 390 and 820 · `next build` clean.
