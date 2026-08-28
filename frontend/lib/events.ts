@@ -20,7 +20,7 @@
  * logic that it's instrumenting.
  */
 
-import { sql } from './db';
+import { sql, sqlBypass } from './db';
 import { createLogger } from './logger';
 
 const log = createLogger('events');
@@ -279,6 +279,91 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
       { err: serializeError(err), namespace: params.namespace, type: params.type },
       'emitEventSingle failed',
     );
+  }
+}
+
+/**
+ * Close the brackets a crashed process left open.
+ *
+ * ── THE GAP THIS FILLS, AND WHY THE CODE AUDIT COULD NOT SEE IT ──────────────────────────────
+ * `withEventBracket` guarantees an `end` on every code path — that is the whole reason it exists
+ * (B139, 31 handlers that returned from a `catch` without one). What it cannot guarantee is an end
+ * when the PROCESS DIES: a SIGKILL mid-request, an OOM, a container reclaimed under it. The start
+ * row is already committed; nothing is left running to write the end.
+ *
+ * `audit-automation-spine` reports 0 open brackets and is correct — it reads the SOURCE. The
+ * database disagreed: 1,384 starts, 1,377 ends, seven `proposal:proposal.created` starts with no
+ * end, timestamped to the minutes a server was killed mid-request. Both statements are true, and
+ * the gap between them is exactly this function.
+ *
+ * ── WHY THAT MATTERS FOR MORE THAN TIDINESS ──────────────────────────────────────────────────
+ * The workflow engine's `EventTrigger` is built on the guarantee that a failed operation still
+ * emits a terminal `end` carrying `error` — it inspects that field to avoid spawning instances off
+ * failures. A start with no end gives the engine no terminal event at all, so anything waiting on
+ * that operation waits forever with no signal that it never will arrive. An abandoned bracket is
+ * indistinguishable, to every reader, from an operation still in flight.
+ *
+ * ── THE SHAPE OF THE ANSWER ──────────────────────────────────────────────────────────────────
+ * ABANDONED is not a synonym for FAILED and is not recorded as one. The operation may well have
+ * succeeded and died before saying so — writing `error: {code:'FAILED'}` would assert something
+ * nobody knows. The end carries `ABANDONED`, names the age, and says plainly that the outcome is
+ * unknown, which is the only honest terminal state for an operation nobody watched finish.
+ *
+ * `olderThanMinutes` must exceed the longest legitimate operation, or this closes brackets that
+ * are still running. 60 is the default because the workflow engine's own instance deadline is one
+ * hour; anything the app does inside a single request is orders of magnitude shorter.
+ */
+export async function closeAbandonedBrackets(
+  { olderThanMinutes = 60, limit = 500 }: { olderThanMinutes?: number; limit?: number } = {},
+): Promise<{ scanned: number; closed: number; types: Record<string, number> }> {
+  const types: Record<string, number> = {};
+  let closed = 0;
+  try {
+    // sqlBypass: this is a PLATFORM sweep across every tenant's rows, and the app role is
+    // tenant-scoped. Reading one tenant's abandoned brackets would silently leave the rest open.
+    const orphans = await sqlBypass<{
+      id: string; namespace: string; type: string; actorType: ActorType;
+      actorId: string; actorEmail: string | null; tenantId: string | null; createdAt: Date;
+    }[]>`
+      SELECT s.id, s.namespace, s.type, s.actor_type, s.actor_id, s.actor_email,
+             s.tenant_id, s.created_at
+        FROM system_events s
+       WHERE s.phase = 'start'
+         AND s.created_at < now() - (${olderThanMinutes} * interval '1 minute')
+         AND NOT EXISTS (
+           SELECT 1 FROM system_events e
+            WHERE e.phase = 'end' AND e.parent_event_id = s.id)
+       ORDER BY s.created_at
+       LIMIT ${limit}`;
+
+    for (const o of orphans) {
+      const ageMin = Math.round((Date.now() - o.createdAt.getTime()) / 60000);
+      await sqlBypass`
+        INSERT INTO system_events (
+          namespace, type, phase, actor_type, actor_id, actor_email, tenant_id,
+          parent_event_id, payload, error, duration_ms
+        ) VALUES (
+          ${o.namespace}, ${o.type}, 'end', ${o.actorType}, ${o.actorId}, ${o.actorEmail},
+          ${o.tenantId}, ${o.id}::uuid,
+          ${jsonParam({ abandoned: true, ageMinutes: ageMin, sweptAt: new Date().toISOString() })},
+          ${jsonParam({
+            code: 'ABANDONED',
+            message: `No end was recorded within ${olderThanMinutes} minutes. The process that `
+              + 'opened this bracket did not survive to close it; the operation\'s outcome is '
+              + 'UNKNOWN — it may have succeeded.',
+          })},
+          ${ageMin * 60_000}
+        )`;
+      types[`${o.namespace}:${o.type}`] = (types[`${o.namespace}:${o.type}`] ?? 0) + 1;
+      closed += 1;
+    }
+    if (closed > 0) {
+      log.warn({ closed, types, olderThanMinutes }, 'closed abandoned event brackets');
+    }
+    return { scanned: orphans.length, closed, types };
+  } catch (err) {
+    log.error({ err: serializeError(err) }, 'closeAbandonedBrackets failed');
+    return { scanned: 0, closed, types };
   }
 }
 
