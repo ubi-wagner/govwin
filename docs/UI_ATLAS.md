@@ -20,7 +20,7 @@
 >   && node scripts/write-ui-docs.mjs
 > ```
 
-**153 screenshots · 115 of 118 routes reached · 0 broken.** Every route is driven as the actor who owns it, at 1440×900, full page. The caption on each contact sheet carries what a picture cannot: HTTP status, rendered text length, and the button/link/input/form counts **counted in the live DOM** — so a page that looks full but built nothing is visible as such.
+**155 screenshots · 115 of 118 routes reached · 0 broken.** Every route is driven as the actor who owns it, at 1440×900, full page. The caption on each contact sheet carries what a picture cannot: HTTP status, rendered text length, and the button/link/input/form counts **counted in the live DOM** — so a page that looks full but built nothing is visible as such.
 
 ⚠️ Lane(s) **tenant** were refreshed on their own; every other lane's shots are carried forward from the last full run.
 
@@ -30,9 +30,6 @@
 |---|---|---:|
 | `sheet-anon-1.png` | anon | 16 |
 | `sheet-anon-2.png` | anon | 10 |
-| `sheet-tenant-1.png` | tenant | 16 |
-| `sheet-tenant-2.png` | tenant | 16 |
-| `sheet-tenant-3.png` | tenant | 8 |
 | `sheet-tenant2-1.png` | tenant2 | 16 |
 | `sheet-tenant2-2.png` | tenant2 | 16 |
 | `sheet-tenant2-3.png` | tenant2 | 8 |
@@ -41,6 +38,9 @@
 | `sheet-admin-3.png` | admin | 13 |
 | `sheet-partner-1.png` | partner | 1 |
 | `sheet-collab-1.png` | collab | 1 |
+| `sheet-tenant-1.png` | tenant | 16 |
+| `sheet-tenant-2.png` | tenant | 16 |
+| `sheet-tenant-3.png` | tenant | 10 |
 
 ## Lanes
 
@@ -51,7 +51,7 @@
 | admin | master_admin | 45 |
 | partner | partner_admin @ entrepreneurs-center | 1 |
 | collab | partner_user (collaborator) | 1 |
-| tenant | tenant_admin @ foundation | 40 |
+| tenant | tenant_admin @ foundation | 42 |
 
 ## Every route, as photographed
 
@@ -171,49 +171,49 @@
 | partner | `/partner` | 200 | 1517 | 1/12/0/0 | `partner__partner.png` |
 | collab | `/vaults` | 200 | 352 | 1/1/0/0 | `collab__vaults.png` |
 | tenant | `/change-password` | 200 | 124 | 1/0/3/1 | `tenant__change-password.png` |
-| tenant | `/federal-rd-101` | 200 | 2270 | 3/31/2/1 | `tenant__federal-rd-101.png` |
-| tenant | `/dashboard` → `/portal/foundation/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__dashboard.png` |
-| tenant | `/go` → `/portal/foundation/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__go.png` |
-| tenant | `/portal/[tenantSlug]/activity` | 200 | 21789 | 189/22/1/0 | `tenant__portal-tenantSlug-activity.png` |
-| tenant | `/portal/[tenantSlug]/agents` | 200 | 2047 | 6/21/0/0 | `tenant__portal-tenantSlug-agents.png` |
-| tenant | `/portal/[tenantSlug]/atoms` | 200 | 5064 | 170/21/27/0 | `tenant__portal-tenantSlug-atoms.png` |
-| tenant | `/portal/[tenantSlug]/automation` | 200 | 3787 | 21/21/12/0 | `tenant__portal-tenantSlug-automation.png` |
-| tenant | `/portal/[tenantSlug]/billing` | 200 | 1237 | 5/21/1/0 | `tenant__portal-tenantSlug-billing.png` |
-| tenant | `/portal/[tenantSlug]/buckets` | 200 | 670 | 19/21/6/0 | `tenant__portal-tenantSlug-buckets.png` |
-| tenant | `/portal/[tenantSlug]/cards` | 200 | 2937 | 18/28/3/0 | `tenant__portal-tenantSlug-cards.png` |
-| tenant | `/portal/[tenantSlug]/command` | 200 | 3134 | 22/31/3/0 | `tenant__portal-tenantSlug-command.png` |
-| tenant | `/portal/[tenantSlug]/contracts/[contractId]` | 200 | 536 | 3/23/0/0 | `tenant__portal-tenantSlug-contracts-contractId.png` |
-| tenant | `/portal/[tenantSlug]/contracts` | 200 | 470 | 3/22/0/0 | `tenant__portal-tenantSlug-contracts.png` |
-| tenant | `/portal/[tenantSlug]/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__portal-tenantSlug-dashboard.png` |
-| tenant | `/portal/[tenantSlug]/documents/new` | 200 | 946 | 7/23/2/0 | `tenant__portal-tenantSlug-documents-new.png` |
-| tenant | `/portal/[tenantSlug]/documents` | 200 | 14526 | 3/186/0/0 | `tenant__portal-tenantSlug-documents.png` |
-| tenant | `/portal/[tenantSlug]/library` → `/portal/foundation/atoms` | 200 | 5064 | 170/21/27/0 | `tenant__portal-tenantSlug-library.png` |
-| tenant | `/portal/[tenantSlug]/library/review` → `/portal/foundation/atoms` | 200 | 5064 | 170/21/27/0 | `tenant__portal-tenantSlug-library-review.png` |
-| tenant | `/portal/[tenantSlug]/library/upload` → `/portal/foundation/atoms` | 200 | 5064 | 170/21/27/0 | `tenant__portal-tenantSlug-library-upload.png` |
-| tenant | `/portal/[tenantSlug]/manage` | 200 | 752 | 16/23/0/0 | `tenant__portal-tenantSlug-manage.png` |
-| tenant | `/portal/[tenantSlug]` → `/portal/foundation/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__portal-tenantSlug.png` |
-| tenant | `/portal/[tenantSlug]/pipeline` → `/portal/foundation/cards` | 200 | 2937 | 18/28/3/0 | `tenant__portal-tenantSlug-pipeline.png` |
-| tenant | `/portal/[tenantSlug]/portals/[portalId]` | 200 | 1818 | 24/22/35/0 | `tenant__portal-tenantSlug-portals-portalId.png` |
-| tenant | `/portal/[tenantSlug]/portals` | 200 | 1020 | 11/37/0/0 | `tenant__portal-tenantSlug-portals.png` |
-| tenant | `/portal/[tenantSlug]/processes` | 200 | 3788 | 95/21/1/0 | `tenant__portal-tenantSlug-processes.png` |
-| tenant | `/portal/[tenantSlug]/profile` | 200 | 832 | 4/21/0/0 | `tenant__portal-tenantSlug-profile.png` |
-| tenant | `/portal/[tenantSlug]/projects/[projectId]` | 200 | 2097 | 18/22/4/0 | `tenant__portal-tenantSlug-projects-projectId.png` |
-| tenant | `/portal/[tenantSlug]/projects` | 200 | 411 | 3/22/0/0 | `tenant__portal-tenantSlug-projects.png` |
-| tenant | `/portal/[tenantSlug]/proposals/[proposalId]` | 200 | 34028 | 63/21/7/1 | `tenant__portal-tenantSlug-proposals-proposalId.png` |
-| tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | 200 | 2293 | 20/22/1/0 | `tenant__portal-tenantSlug-proposals-proposalId-sections-sectionId.png` |
-| tenant | `/portal/[tenantSlug]/proposals` | 200 | 1080 | 3/25/0/0 | `tenant__portal-tenantSlug-proposals.png` |
-| tenant | `/portal/[tenantSlug]/spotlights/[spotlightId]` → `/portal/foundation/cards` | 200 | 2937 | 18/28/3/0 | `tenant__portal-tenantSlug-spotlights-spotlightId.png` |
-| tenant | `/portal/[tenantSlug]/spotlights` → `/portal/foundation/cards` | 200 | 2937 | 18/28/3/0 | `tenant__portal-tenantSlug-spotlights.png` |
-| tenant | `/portal/[tenantSlug]/team` | 200 | 1193 | 14/21/6/1 | `tenant__portal-tenantSlug-team.png` |
-| tenant | `/portal/[tenantSlug]/templates` | 200 | 3067 | 85/22/1/0 | `tenant__portal-tenantSlug-templates.png` |
-| tenant | `/portal/[tenantSlug]/todos` | 200 | 2034 | 24/31/0/0 | `tenant__portal-tenantSlug-todos.png` |
-| tenant | `/portal/[tenantSlug]/vaults` | 200 | 629 | 4/21/0/0 | `tenant__portal-tenantSlug-vaults.png` |
-| tenant | `/portal` → `/portal/foundation/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__portal.png` |
-| tenant | `/select-company` → `/portal/foundation/dashboard` | 200 | 927 | 8/25/0/0 | `tenant__select-company.png` |
+| tenant | `/federal-rd-101` | 200 | 2281 | 3/31/2/1 | `tenant__federal-rd-101.png` |
+| tenant | `/dashboard` → `/portal/foundation/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__dashboard.png` |
+| tenant | `/go` → `/portal/foundation/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__go.png` |
+| tenant | `/portal/[tenantSlug]/activity` | 200 | 17428 | 183/22/1/0 | `tenant__portal-tenantSlug-activity.png` |
+| tenant | `/portal/[tenantSlug]/agents` | 200 | 2147 | 6/21/0/0 | `tenant__portal-tenantSlug-agents.png` |
+| tenant | `/portal/[tenantSlug]/atoms` | 200 | 46173 | 1623/81/204/0 | `tenant__portal-tenantSlug-atoms.png` |
+| tenant | `/portal/[tenantSlug]/automation` | 200 | 5621 | 21/21/12/0 | `tenant__portal-tenantSlug-automation.png` |
+| tenant | `/portal/[tenantSlug]/billing` | 200 | 1238 | 5/21/1/0 | `tenant__portal-tenantSlug-billing.png` |
+| tenant | `/portal/[tenantSlug]/buckets` | 200 | 671 | 19/21/6/0 | `tenant__portal-tenantSlug-buckets.png` |
+| tenant | `/portal/[tenantSlug]/cards` | 200 | 3199 | 20/29/3/0 | `tenant__portal-tenantSlug-cards.png` |
+| tenant | `/portal/[tenantSlug]/command` | 200 | 3406 | 25/32/3/0 | `tenant__portal-tenantSlug-command.png` |
+| tenant | `/portal/[tenantSlug]/contracts/[contractId]` | 200 | 537 | 3/23/0/0 | `tenant__portal-tenantSlug-contracts-contractId.png` |
+| tenant | `/portal/[tenantSlug]/contracts` | 200 | 1487 | 3/34/0/0 | `tenant__portal-tenantSlug-contracts.png` |
+| tenant | `/portal/[tenantSlug]/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__portal-tenantSlug-dashboard.png` |
+| tenant | `/portal/[tenantSlug]/documents/[documentId]` | 200 | 2501 | 60/22/2/0 | `tenant__portal-tenantSlug-documents-documentId.png` |
+| tenant | `/portal/[tenantSlug]/documents/new` | 200 | 947 | 7/23/2/0 | `tenant__portal-tenantSlug-documents-new.png` |
+| tenant | `/portal/[tenantSlug]/documents` | 200 | 15804 | 3/205/0/0 | `tenant__portal-tenantSlug-documents.png` |
+| tenant | `/portal/[tenantSlug]/library/foundation/[foundationId]` | 200 | 1279 | 58/22/2/0 | `tenant__portal-tenantSlug-library-foundation-foundationId.png` |
+| tenant | `/portal/[tenantSlug]/library` → `/portal/foundation/atoms` | 200 | 46173 | 1623/81/204/0 | `tenant__portal-tenantSlug-library.png` |
+| tenant | `/portal/[tenantSlug]/library/review` → `/portal/foundation/atoms` | 200 | 46173 | 1623/81/204/0 | `tenant__portal-tenantSlug-library-review.png` |
+| tenant | `/portal/[tenantSlug]/library/upload` → `/portal/foundation/atoms` | 200 | 46173 | 1623/81/204/0 | `tenant__portal-tenantSlug-library-upload.png` |
+| tenant | `/portal/[tenantSlug]/manage` | 200 | 755 | 16/23/0/0 | `tenant__portal-tenantSlug-manage.png` |
+| tenant | `/portal/[tenantSlug]` → `/portal/foundation/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__portal-tenantSlug.png` |
+| tenant | `/portal/[tenantSlug]/pipeline` → `/portal/foundation/cards` | 200 | 3199 | 20/29/3/0 | `tenant__portal-tenantSlug-pipeline.png` |
+| tenant | `/portal/[tenantSlug]/portals/[portalId]` | 200 | 1819 | 24/22/35/0 | `tenant__portal-tenantSlug-portals-portalId.png` |
+| tenant | `/portal/[tenantSlug]/portals` | 200 | 1021 | 11/37/0/0 | `tenant__portal-tenantSlug-portals.png` |
+| tenant | `/portal/[tenantSlug]/processes` | 200 | 4045 | 106/21/1/0 | `tenant__portal-tenantSlug-processes.png` |
+| tenant | `/portal/[tenantSlug]/profile` | 200 | 833 | 4/21/0/0 | `tenant__portal-tenantSlug-profile.png` |
+| tenant | `/portal/[tenantSlug]/projects/[projectId]` | 200 | 6841 | 48/25/5/0 | `tenant__portal-tenantSlug-projects-projectId.png` |
+| tenant | `/portal/[tenantSlug]/projects` | 200 | 513 | 3/24/0/0 | `tenant__portal-tenantSlug-projects.png` |
+| tenant | `/portal/[tenantSlug]/proposals/[proposalId]` | 200 | 34029 | 63/21/7/1 | `tenant__portal-tenantSlug-proposals-proposalId.png` |
+| tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | 200 | 2294 | 20/22/1/0 | `tenant__portal-tenantSlug-proposals-proposalId-sections-sectionId.png` |
+| tenant | `/portal/[tenantSlug]/proposals` | 200 | 1111 | 4/25/0/0 | `tenant__portal-tenantSlug-proposals.png` |
+| tenant | `/portal/[tenantSlug]/spotlights/[spotlightId]` → `/portal/foundation/cards` | 200 | 3199 | 20/29/3/0 | `tenant__portal-tenantSlug-spotlights-spotlightId.png` |
+| tenant | `/portal/[tenantSlug]/spotlights` → `/portal/foundation/cards` | 200 | 3199 | 20/29/3/0 | `tenant__portal-tenantSlug-spotlights.png` |
+| tenant | `/portal/[tenantSlug]/team` | 200 | 1194 | 14/21/6/1 | `tenant__portal-tenantSlug-team.png` |
+| tenant | `/portal/[tenantSlug]/templates` | 200 | 3068 | 85/22/1/0 | `tenant__portal-tenantSlug-templates.png` |
+| tenant | `/portal/[tenantSlug]/todos` | 200 | 19567 | 170/91/0/0 | `tenant__portal-tenantSlug-todos.png` |
+| tenant | `/portal/[tenantSlug]/vaults` | 200 | 630 | 4/21/0/0 | `tenant__portal-tenantSlug-vaults.png` |
+| tenant | `/portal` → `/portal/foundation/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__portal.png` |
+| tenant | `/select-company` → `/portal/foundation/dashboard` | 200 | 931 | 8/25/0/0 | `tenant__select-company.png` |
 
 ## Routes no lane could address
 
-- `/portal/[tenantSlug]/documents/[documentId]` — tenant: no [documentId]
-- `/portal/[tenantSlug]/library/foundation/[foundationId]` — tenant: no [foundationId]
 - `/portal/[tenantSlug]/vaults/[vaultId]` — tenant: no [vaultId]
 

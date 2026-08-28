@@ -77,7 +77,7 @@ One of the four lenses. Run after a UI change or a deploy.
 
 | script | rot | touched |
 |---|---|---|
-| `verify-api-contract.mjs` | — | 2026-08-27 |
+| `verify-api-contract.mjs` | — | 2026-08-28 |
 | `verify-db-crud.mjs` | — | 2026-08-24 |
 | `verify-surfaces.mjs` | — | 2026-08-27 |
 | `verify-ui-vs-db.mjs` | — | 2026-08-28 |
@@ -105,7 +105,7 @@ Canvas measurement + calibration. Anything touching layout or export runs these.
 | `verify-ruler-on-proposals.mts` | — | 2026-08-23 |
 | `verify-ruler-on-stored-artifacts.mts` | — | 2026-08-23 |
 
-## LIBRARY — 6
+## LIBRARY — 7
 
 Imported by other scripts; never run directly.
 
@@ -116,6 +116,7 @@ Imported by other scripts; never run directly.
 | `lib/drive-actor.mjs` | — | 2026-08-23 |
 | `lib/error-surface.mjs` | — | 2026-08-25 |
 | `lib/harness-residue.mts` | — | 2026-08-24 |
+| `lib/mobile-measure.mts` | — | 2026-08-28 |
 | `lib/scenario.mts` | — | 2026-08-24 |
 
 ## CALLED-BY-ANOTHER — 24
@@ -157,13 +158,14 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 91
+## DOCUMENTED — 93
 
 No code references it, but a document tells someone to run it.
 
 | script | rot | touched |
 |---|---|---|
 | `audit-automation-spine.mjs` | — | 2026-08-28 |
+| `audit-env-inventory.mjs` | — | 2026-08-28 |
 | `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
 | `audit-row-type-truth.mjs` | — | 2026-08-28 |
 | `backfill-buckets.mts` | — | 2026-08-15 |
@@ -216,8 +218,9 @@ No code references it, but a document tells someone to run it.
 | `probe-bucket-rerank.mjs` | — | 2026-08-20 |
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
 | `probe-deliverable-artifacts.mts` | 1 | 2026-08-27 |
+| `probe-interaction-mobile.mts` | — | 2026-08-28 |
 | `probe-pattern-extract.mts` | — | 2026-08-22 |
-| `probe-project-mobile.mts` | — | 2026-08-27 |
+| `probe-project-mobile.mts` | — | 2026-08-28 |
 | `probe-style-matrix.mts` | — | 2026-08-24 |
 | `prove-pdf-export.mts` | — | 2026-08-15 |
 | `reconcile-capability.mjs` | — | 2026-08-26 |
@@ -434,10 +437,10 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
-| LIBRARY | 6 |
+| LIBRARY | 7 |
 | CALLED-BY-ANOTHER | 24 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 91 |
+| DOCUMENTED | 93 |
 | UNREFERENCED | 86 |
 | CANNOT-RUN | 41 |
-| **total** | **302** |
+| **total** | **305** |

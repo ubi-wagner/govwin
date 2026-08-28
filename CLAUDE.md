@@ -58,7 +58,8 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **236** — migs 228–236 the post-award build-out: 229 the milestone cost
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **237** — mig 237 the freeze trigger that returned NEW on a DELETE and so
+cancelled it silently, leaving children without parents through a CASCADE; migs 228–236 the post-award build-out: 229 the milestone cost
 baseline after 228 collapsed `project_wbs_nodes` into `project_milestones`, 230 contract
 modifications, 231 invoicing, 232 the CDRL register, 233/234 the CLIN child-cascade correction,
 235 the per-project notification policy, 236 the AI-manager gate closer; mig 219 project close-out; mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
