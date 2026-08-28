@@ -196,6 +196,12 @@ export function describeEvent(ev: EventLike): string {
         return `Modification ${str(payload.modNumber) ?? ''} drafted`
           + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
       }
+      case 'status_narrative.requested':
+        // The check is the point, and the feed says so — otherwise "narrative drafted" reads as
+        // "the report now contains generated numbers", which is the one thing it does not.
+        return phase === 'start'
+          ? 'Drafting the status-report narrative — every figure is checked against the rows'
+          : 'Status-report narrative drafted, pending review';
       case 'health.assessment_requested':
         // ADVISORY, said in the feed itself. A reader scanning the activity log must not think a
         // date moved because an assessment ran.

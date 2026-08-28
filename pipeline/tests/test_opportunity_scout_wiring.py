@@ -27,7 +27,7 @@ def test_registered_and_action_mapped():
     assert "opportunity_scout" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.opportunity.scout") == "opportunity_scout"
     # roster unchanged — this wakes an existing archetype, it does not add one
-    assert len(_ARCHETYPE_CLASSES) == 37   # +project_manager (A1)
+    assert len(_ARCHETYPE_CLASSES) == 38   # +project_manager (A1)
 
 
 # ── Trigger handling ─────────────────────────────────────────────────────────

@@ -81,6 +81,7 @@ EXPECTED_ARCHETYPES = {
     # no firing hook wired): the draft PLANNER + requirement-coverage / redaction / market gates.
     "project_manager",
     "proposal_manager",
+    "status_narrator",
     "traceability_auditor",
     "redaction_guard",
     "market_analyst",

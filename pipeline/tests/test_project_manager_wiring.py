@@ -39,8 +39,8 @@ def test_registered_and_action_mapped():
     fabric = AgentFabric()
     assert "project_manager" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.project.assess_health") == "project_manager"
-    # the 37th (was 36 after rfp_ingest_manager)
-    assert len(_ARCHETYPE_CLASSES) == 37
+    # project_manager was the 37th; status_narrator (A2) then made it 38
+    assert len(_ARCHETYPE_CLASSES) == 38
 
 
 def test_step_only_never_event_dispatched():

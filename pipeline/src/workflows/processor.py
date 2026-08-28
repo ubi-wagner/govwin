@@ -312,6 +312,9 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     # Post-award (A1). STEP-ONLY like its pre-award sibling: `handles_event` is False, so the
     # only way it fires is this declarative action — never the archetype-fallback dispatch.
     "tool.project.assess_health": "project_manager",
+    # A2. Writes the report's PROSE only; a deterministic fidelity check
+    # (lib/projects/narrative-fidelity.ts) rejects any figure the system did not compute.
+    "tool.project.draft_status_narrative": "status_narrator",
     "tool.proposal.plan_draft": "proposal_manager",
     "tool.proposal.audit_traceability": "traceability_auditor",
     "tool.proposal.scan_redaction": "redaction_guard",

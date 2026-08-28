@@ -2873,3 +2873,65 @@ and I skipped it twice.
 templates · **7 live assertions green with the worker running against the emulator**, the agent
 firing 6 times and the plan provably unchanged · write-contract **253/253** · 0 broken links in the
 whole chain.
+
+## A2 · `status_narrator` — the paragraph a report cannot compute, and the gate on it
+
+P1's status report is correct **by construction**: every figure read off a row, built by a pure
+function with no way to state something the database did not say. That property is why the document
+can be handed to a customer.
+
+What it cannot produce is the paragraph a project manager would otherwise type — *what happened, what
+is in the way, what happens next*. Reading a blocked task's reason beside a slipping forecast beside
+an open risk and saying "these are one problem" is not arithmetic, and it is the tedious half of
+writing a monthly report.
+
+### The guarantee is not the prompt
+
+One sentence can undo a correct-by-construction document. **"We are approximately 65% through the
+period"** reads perfectly, sits beside a table saying 40%, and nothing in the document disagrees —
+the reader believes whichever they saw first.
+
+So the tables stay deterministic, the agent writes prose, and
+`lib/projects/narrative-fidelity.ts` **rejects any figure the system did not compute**, naming it. A
+prompt asking the model not to invent numbers is also in place and is the weaker of the two on
+purpose: an instruction is not an invariant.
+
+The check is calibrated to be *usable*, because a guard that cries wolf gets switched off:
+
+- small integers (≤ 12) pass — "two of three phases" is ordinary English;
+- a **year** passes — a date is not a claim about the project;
+- `$750,000` matches the computed `750000` — separators and currency symbols are not differences;
+- a computed `33.3` may be written `33` — dropping precision the system had is fine;
+- `33.34` is **rejected** — adding precision it did not have is not;
+- **`$750K` is rejected**, and that is deliberate: it is almost certainly 750,000, and a check that
+  approves numbers by inference will eventually approve a wrong one.
+
+The rejection names the token **as the person wrote it** (`512,000`, not `512000`), so they can find
+it in their own text.
+
+### Two defects, and the second is the interesting one
+
+**The route read the wrong table.** It looked for the agent's output in `system_events`
+`agent.invoked` — which is a *telemetry* record (rounds, cost, guardrail verdict, token counts) and
+carries neither the output nor a `projectId`. It answered `none` forever. The output lands in the
+workflow's `process_instances.step_results`.
+
+**And the drive agreed with it.** The first assertion accepted all four honest states — `ready`,
+`rejected`, `none`, `empty` — on the reasoning that each says something true. Each does; accepting
+them all here meant a broken read looked exactly like a pass. It now demands `ready` or `rejected`:
+the agent ran, so a draft must have *arrived and been judged*. (`rejected` stays acceptable because
+it is not a failure of the feature — it **is** the feature.)
+
+The wait was wrong in the same way: it polled `agent.invoked` for the archetype in a ten-minute
+window, which a **previous run satisfies instantly**, so the read fired before this run's instance
+existed. A global-window check standing in for a per-entity one — the same mistake as the assertion
+it fed. It now waits for *this project's* instance to stage its step result.
+
+### Verification
+
+`tsc` 0 · vitest 230 files / **2,448** (16 new in `projects-narrative-fidelity.test.ts`) ·
+**pytest 1,354 passed / 9 skipped** (13 new in `test_status_narrator_wiring.py`) · spine audit: 122
+step actions resolve, 0 missing templates · **9 live assertions green with the worker running** —
+`status_narrator` fired and emitted, the draft read back `ready`, and the gate **provably rejected**
+a fabricated `87.5` and `$9,412,000` against the project's real figures · surfaces 82/82 ·
+api-contract 132 · write-contract **254/254** · 0 broken links in the whole chain.

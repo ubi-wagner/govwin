@@ -1261,6 +1261,90 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7t · THE NARRATIVE DRAFTER — and the gate that makes it safe ══════════════════════════
+  //
+  // A2. The report's TABLES are correct by construction. This drafts the prose around them, and the
+  // assertion that matters is not "an agent wrote something" — it is that a figure the system never
+  // computed CANNOT reach the document.
+  phase('7t · the status narrative: prose, and a gate on every number');
+
+  const askedNarr = await api(req, 'post', P + '/draft-narrative', {});
+  A(askedNarr.status === 202, 'a drafted narrative can be requested', `${askedNarr.status}`);
+  A(/checked against what the system computed/i.test(String((askedNarr.json.data as Json)?.note ?? '')),
+    'and the promise made to the person is the CHECK, not the prose');
+
+  for (let i = 0; i < 30; i++) {
+    const [done] = await sql<{ id: string }[]>`
+      SELECT id FROM system_events
+       WHERE namespace = 'project' AND type = 'status_narrative.requested' AND phase = 'end'
+         AND payload->>'projectId' = ${created.projectId ?? null}`;
+    if (done) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  // WAIT FOR *THIS PROJECT'S* INSTANCE, not for any recent agent.invoked.
+  //
+  // The first version polled `agent.invoked` for the archetype inside a ten-minute window — which a
+  // PREVIOUS run satisfies instantly, so the wait returned immediately and the read below ran
+  // before this run's instance existed. A global-window check standing in for a per-entity one is
+  // the same mistake as the assertion it then fed.
+  let narrInstance: { steps: string | null } | undefined;
+  for (let i = 0; i < 40 && !narrInstance?.steps; i++) {
+    [narrInstance] = await sql<{ steps: string | null }[]>`
+      SELECT step_results::text AS steps FROM process_instances
+       WHERE workflow_name = 'OnStatusNarrativeRequested'
+         AND payload->>'projectId' = ${created.projectId ?? null}
+       ORDER BY created_at DESC LIMIT 1`;
+    if (!narrInstance?.steps || narrInstance.steps === '{}') {
+      narrInstance = undefined;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  A(Boolean(narrInstance), 'the workflow ran for THIS project and staged its step result');
+  A(String(narrInstance?.steps ?? '').includes('emit_narrative'),
+    'status_narrator fired — the 38th archetype, live, and it emitted');
+
+  const readBack = await api(req, 'get', P + '/draft-narrative');
+  A(readBack.status === 200, 'the draft reads back', `${readBack.status}`);
+  const narrStatus = String((readBack.json.data as Json)?.status ?? '');
+  // 'ready' or 'rejected' — the agent RAN, so a draft must have arrived and been judged. The first
+  // version of this accepted 'none' and 'empty' too, on the reasoning that all four states are
+  // legitimate; they are, but accepting them here let a real defect through as a pass. The route
+  // was reading `agent.invoked`, which is a TELEMETRY record carrying neither the output nor a
+  // projectId, so it answered 'none' forever and the assertion agreed with it.
+  //
+  // 'rejected' stays acceptable because it is not a failure of the feature — it IS the feature.
+  A(['ready', 'rejected'].includes(narrStatus),
+    'a draft ARRIVED and was judged — not "none", which is what a broken read looks like',
+    narrStatus);
+  if (narrStatus === 'ready') {
+    A(typeof (readBack.json.data as Json)?.figuresChecked === 'number',
+      'a READY draft reports how many figures it verified — a clean over zero is not a pass',
+      `${(readBack.json.data as Json)?.figuresChecked}`);
+  }
+  if (narrStatus === 'rejected') {
+    A(Array.isArray((readBack.json.data as Json)?.invented),
+      'a REJECTED draft NAMES the invented figure — a person who got nothing deserves to know why',
+      JSON.stringify((readBack.json.data as Json)?.invented));
+  }
+
+  // ── THE GATE ITSELF, DRIVEN AGAINST A KNOWN LIE ──────────────────────────────────────────
+  // The live agent may or may not invent a figure on any given run, so the assertion above cannot
+  // prove the gate WORKS — only that it ran. This proves it: the same check, over prose that
+  // definitely contains a fabricated number, against the same project's real figures.
+  {
+    const { checkNarrativeFidelity, allowedFigures } = await import('../lib/projects/narrative-fidelity.ts');
+    const real = await sql<{ planned: string | null }[]>`
+      SELECT SUM(planned_cost)::text AS planned FROM project_milestones
+       WHERE project_id = ${created.projectId}::uuid`;
+    const allowed = allowedFigures(real);
+    const lie = checkNarrativeFidelity('The programme is 87.5% complete and $9,412,000 has been spent.', allowed);
+    A(lie.ok === false && lie.invented.includes('87.5'),
+      'the gate REJECTS a fabricated figure — proven, not assumed',
+      JSON.stringify(lie.invented));
+    const honest = checkNarrativeFidelity('Two phases closed and nothing is blocked.', allowed);
+    A(honest.ok === true, 'and passes prose that states nothing it should not');
+  }
+
   // ══ 7s · THE POST-AWARD MANAGER — advisory, and provably so ═══════════════════════════════
   //
   // A1. The assertions are in two halves and the second is the important one: that the agent RAN,
