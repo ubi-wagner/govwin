@@ -143,7 +143,11 @@ const openBrackets = [];
 
 for (const file of tsFiles) {
   const src = fs.readFileSync(file, 'utf8');
-  if (!src.includes('emitEvent')) continue;
+  // `withEventBracket` does NOT contain the substring "emitEvent", so this cheap pre-filter — an
+  // optimisation, not a rule — silently skipped every file that adopted the safe wrapper. The
+  // parse below was correct all along; it was simply never reached. A filter that decides what to
+  // look at is part of the instrument, and this one made two live workflows invisible.
+  if (!/emitEvent|withEventBracket/.test(src)) continue;
   const rel = path.relative(REPO, file);
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
 
@@ -190,7 +194,20 @@ for (const file of tsFiles) {
       if (nss && types) {
         for (const n1 of nss) for (const t1 of types) {
           if (fn === 'emitEventSingle') addEmit(n1, t1, 'single', rel);
+          // `emitEventSingleStrict` is the same INSERT with a throw and a returned id — the
+          // launch-template path. Its rows are indistinguishable from `emitEventSingle`'s in
+          // `system_events`, so a scan that knew only one of the two would call a live single
+          // event unemittable.
+          if (fn === 'emitEventSingleStrict') addEmit(n1, t1, 'single', rel);
           if (fn === 'emitEventStart') { addEmit(n1, t1, 'start', rel); addEmit(n1, t1, 'end', rel); }
+          // `withEventBracket` IS a start and an end — that is the whole point of it (B139): it
+          // exists so the `end` cannot be lost on a throw. Reading only `emitEventStart` meant
+          // every handler that adopted the safe wrapper vanished from the emitter side, and two
+          // live agent workflows (OnProjectHealthRequested, OnStatusNarrativeRequested) were
+          // reported as triggers "nothing can emit" — while the audit's own DB cross-check said,
+          // in the same line, that the database HAS such a row. The tool was arguing with itself,
+          // and the honest annotation is what made the parser gap findable rather than believed.
+          if (fn === 'withEventBracket') { addEmit(n1, t1, 'start', rel); addEmit(n1, t1, 'end', rel); }
         }
       }
 
@@ -563,6 +580,11 @@ const T = [
   ['a known frontend emit is found', emitters.has(key('capture', 'application.accepted', 'single'))
     || emitters.has(key('capture', 'application.accepted', 'end'))],
   // emitEventStart implies an end of the same type — the pairing the end call site cannot name.
+  // The wrapper that exists so an `end` is never lost must itself register an `end`, or the audit
+  // punishes exactly the handlers that adopted it.
+  ['withEventBracket registers BOTH phases',
+    emitters.has(key('project', 'status_narrative.requested', 'start'))
+    && emitters.has(key('project', 'status_narrative.requested', 'end'))],
   ['emitEventStart registers BOTH phases', emitters.has(key('proposal', 'proposal.created', 'start'))
     && emitters.has(key('proposal', 'proposal.created', 'end'))],
   /**
