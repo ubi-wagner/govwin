@@ -42,6 +42,7 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | ✅ written |
 | [Admin observability — dashboard, ToDos & event stream](./admin-observability.md) | master_admin, rfp_admin | ✅ written |
 | [Projects — after you win](./projects.md) | tenant_admin, tenant_user | ✅ written |
+| [On a phone — web and mobile](./mobile.md) | all roles | ✅ written |
 
 Legend: ✅ written · 📝 in progress · 🔲 planned (todo below).
 
@@ -67,6 +68,19 @@ implies it exists).
 - [x] ✅ **Unified ToDo queue on the landing** — every ToDo is a step in a defined workflow (step trail); broadcast notes acknowledge-on-read → [getting-started](./getting-started.md#your-to-dos-are-steps-in-defined-workflows)
 - [x] ✅ **View / edit profile** (`/portal/[t]/profile`) — all customer roles
 - [ ] ⚠ **Self-serve signup / Stripe checkout** — *descoped; the comp code stands in* (do NOT document as available)
+
+### A1. Web and mobile
+
+Every guide in this set is illustrated at desktop width. This one says what changes when the screen
+is narrow — measured at 390 × 844, not assumed. → [mobile](./mobile.md)
+
+- [x] ✅ **Every core surface works on a phone** — 12 measured, **0 overflow the screen**
+- [x] ✅ **The sidebar becomes a ☰ drawer** below laptop width; the sign-in page has no nav at all
+- [x] ✅ **Customer-facing rows stack** into columns rather than being squeezed
+- [x] ✅ **Admin tables scroll inside their own frame** — the page itself never scrolls sideways
+- [x] ✅ **Truncated names keep their full text** and reveal it on long-press; truncation with nothing behind it is treated as a bug
+- [x] ✅ **A tablet in landscape is a small desktop** — sidebar back, no inner scrolling, editor side panel returns
+- [ ] ⚠ **Canvas authoring on a phone** — works, but a one-column screen for a two-column tool; *the toolbox at 390px was NOT measured* (every fixture section is locked, so it renders read-only at any width) — do not document it as verified
 
 ### A2. After the award (post-award Projects)
 

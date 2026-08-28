@@ -24,12 +24,15 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 40
+## SUITE — 44
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
+| `audit-env-inventory.mjs` | — | 2026-08-28 |
+| `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
+| `audit-row-type-truth.mjs` | — | 2026-08-28 |
 | `close-e2e-cms.mjs` | — | 2026-08-24 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-atomization.mts` | — | 2026-08-24 |
@@ -66,6 +69,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-uncovered-triggers.mts` | — | 2026-08-24 |
 | `drive-vault-isolation.mts` | — | 2026-08-24 |
 | `probe-deck-overlap.mts` | — | 2026-08-25 |
+| `probe-interaction-mobile.mts` | — | 2026-08-28 |
 | `probe-measure-grid.mts` | — | 2026-08-24 |
 | `probe-page-scale.mts` | — | 2026-08-26 |
 | `probe-structural-nodes.mts` | — | 2026-08-25 |
@@ -146,7 +150,7 @@ Invoked by another script rather than by a person.
 | `probe-node-vocabulary.mts` | — | 2026-08-23 | drive-canvas-authoring.mts |
 | `probe-temp-password.mjs` | — | 2026-08-20 | j1b-new-customer.mjs |
 | `rehydrate-sandbox.sh` | — | 2026-08-25 | health-manager.sh, sandbox-heartbeat.sh |
-| `run-branch-drives.sh` | — | 2026-08-27 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
+| `run-branch-drives.sh` | — | 2026-08-28 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
 | `seed-isolation-fixture.mts` | 1 | 2026-08-24 | drive-agent-flows.mjs |
 | `seed-project-scenario.mjs` | — | 2026-08-28 | verify-ui-vs-db.mjs |
 
@@ -158,19 +162,18 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 93
+## DOCUMENTED — 91
 
 No code references it, but a document tells someone to run it.
 
 | script | rot | touched |
 |---|---|---|
 | `audit-automation-spine.mjs` | — | 2026-08-28 |
-| `audit-env-inventory.mjs` | — | 2026-08-28 |
-| `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
-| `audit-row-type-truth.mjs` | — | 2026-08-28 |
 | `backfill-buckets.mts` | — | 2026-08-15 |
 | `bug-log-status.mjs` | — | 2026-08-24 |
-| `capture-guides.mjs` | — | 2026-08-23 |
+| `capture-guides.mjs` | — | 2026-08-28 |
+| `capture-mobile-guide.mts` | — | — |
+| `capture-projects-guide.mjs` | — | 2026-08-28 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
 | `capture-templates.mts` | — | 2026-08-24 |
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
@@ -218,7 +221,6 @@ No code references it, but a document tells someone to run it.
 | `probe-bucket-rerank.mjs` | — | 2026-08-20 |
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
 | `probe-deliverable-artifacts.mts` | 1 | 2026-08-27 |
-| `probe-interaction-mobile.mts` | — | 2026-08-28 |
 | `probe-pattern-extract.mts` | — | 2026-08-22 |
 | `probe-project-mobile.mts` | — | 2026-08-28 |
 | `probe-style-matrix.mts` | — | 2026-08-24 |
@@ -256,7 +258,7 @@ No code references it, but a document tells someone to run it.
 | `verify-studio-voice.mts` | — | 2026-08-23 |
 | `verify-surfaced-capability.mjs` | — | 2026-08-25 |
 | `verify-write-contract.mjs` | — | 2026-08-25 |
-| `write-ui-docs.mjs` | — | 2026-08-27 |
+| `write-ui-docs.mjs` | — | 2026-08-28 |
 
 ## UNREFERENCED — 86
 
@@ -433,14 +435,14 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 40 |
+| SUITE | 44 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
 | LIBRARY | 7 |
 | CALLED-BY-ANOTHER | 24 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 93 |
+| DOCUMENTED | 91 |
 | UNREFERENCED | 86 |
 | CANNOT-RUN | 41 |
-| **total** | **305** |
+| **total** | **307** |

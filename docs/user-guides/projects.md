@@ -221,3 +221,7 @@ being explicit about: **the rows decide it is done; the AI may object.**
 - [Proposal build — draft → lock → export](./proposal-build.md) — everything before the award
 - [Documents — create, template, export](./documents.md) — the editor a deliverable is authored in
 - [Getting started + portal tour](./getting-started.md) — the ToDo queue these tasks land in
+
+## Related
+
+- [On a phone — web and mobile](./mobile.md) — ticking tasks and checking progress from a phone

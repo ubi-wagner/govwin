@@ -226,3 +226,7 @@ promise customers the dormant archetypes yet.*
   dependency; when it's down, document/section PDF export returns a friendly *"PDF export is
   temporarily unavailable — use .docx"* (HTTP 503) instead of failing. **DOCX / PPTX / XLSX
   always work** — retry the PDF later.
+
+## Related
+
+- [On a phone — web and mobile](./mobile.md) — admin tables scroll inside themselves, not the page
