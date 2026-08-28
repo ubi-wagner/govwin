@@ -597,7 +597,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   framework ceiling · tenant budget · hourly rate · per-call) in BOTH directions — 11 passed — because
   *a guard that refuses everything passes a refusal-only test*. It snapshots every value FIRST and
   asserts the restore, written that way after a hand-run left a tenant on a $9999 budget and the
-  ceiling at $0.39. `frontend/scripts/estimate-full-build-cost.mjs` then asks what a build costs, and
+  ceiling at $0.39. `frontend/scripts/estimate-full-build-cost.mts` then asks what a build costs, and
   the answer needs care: **the emulator returns a CONSTANT usage block** (`input_tokens: 64`), so
   `agent_task_log.cost_usd` after an emulated run measures the CALL COUNT and the rate table, never
   spend. It reports two numbers and never blends them — LEDGER ($0.15/build) and LIVE-RATE

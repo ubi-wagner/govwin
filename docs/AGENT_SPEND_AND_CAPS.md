@@ -1,7 +1,7 @@
 # Agent spend and the caps that bound it
 
 **Measured 2026-08-28** on the sandbox, against the build that was serving.
-Instruments: `pipeline/tests/verify_spend_guardrails.py` · `frontend/scripts/estimate-full-build-cost.mjs`.
+Instruments: `pipeline/tests/verify_spend_guardrails.py` · `frontend/scripts/estimate-full-build-cost.mts`.
 Both are registered in `frontend/scripts/run-branch-drives.sh` (`spend-guardrails`, `full-build-cost`)
 — an instrument run by hand is one that quietly stops being run.
 

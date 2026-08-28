@@ -353,7 +353,7 @@ DRIVES=(
   # full-draft fired at any of them drafts NOTHING and reports the review cohort's cost under the
   # heading "full build". It refuses a verdict (exit 2) if the run drafts zero sections, prints its
   # mutation footprint, and re-counts the tables afterwards. Needs the emulator on :8787.
-  "full-build-cost|scripts/estimate-full-build-cost.mjs"
+  "full-build-cost|scripts/estimate-full-build-cost.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0

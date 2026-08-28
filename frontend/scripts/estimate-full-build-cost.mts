@@ -47,6 +47,12 @@ import { dirname, join } from 'node:path';
 // third spelling of the same question, and the credential drift that follows is documented four
 // times over in CLAUDE.md (B146/B147).
 import { CannotRun, resolveActor, loginOrDie, dieWell } from './lib/drive-actor.mjs';
+// The product's OWN prose counter and page ruler. `proposal_sections.content` holds the canvas
+// JSON, not prose — measuring its raw length asks how verbose our serialisation is, not how much
+// the model had to write, and overstates the output side by roughly the markup overhead.
+// `countDocCharacters` is the same count the agency character cap is enforced against, and
+// `paginate` is the same ruler the export gate uses. Copied predicates, not re-derived ones.
+import { countDocCharacters, estimatePageCount, docNodes } from '../lib/types/canvas-document';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EMU_LOG = join(HERE, 'test-harness', 'emulated-claude.log.jsonl');
@@ -121,21 +127,55 @@ async function main() {
     // and correctly reported "no drafted sections" for a proposal with 68,701 characters of prose.
     const sections = await sql`
       SELECT section_number, title, volume_name, volume_number, section_type, sort_index,
-             page_allocation, character_allocation, meta, length(coalesce(content, '')) AS content_len
+             page_allocation, character_allocation, meta, content
       FROM proposal_sections WHERE proposal_id = ${src.id} ORDER BY sort_index`;
     if (!sections.length) throw new CannotRun(`source proposal ${src.id} has no sections.`);
 
-    // The output assumption, sourced. These are the lengths of the sections AS THEY STAND on the
-    // source proposal — real drafted prose for this solicitation, not a guess about how long a
-    // section "should" be. A source whose sections are empty cannot fund the assumption, and the
-    // script says so instead of substituting a number.
-    const drafted = sections.filter((s) => s.contentLen > 0).map((s) => s.contentLen);
-    if (!drafted.length) {
-      throw new CannotRun(
-        `source proposal ${src.id} has no drafted sections, so there is nothing to base the OUTPUT ` +
-        `side of the estimate on. Point --source at a proposal that has been written.`);
+    // The output basis, MEASURED with the product's own instruments.
+    //
+    // `content` is the canvas JSON. Its raw length measures our serialisation, not the writing —
+    // 68,701 stored characters over a SEVEN-page volume, which is impossible as prose and is
+    // mostly markup. `countDocCharacters` is the prose count the agency character cap is enforced
+    // against, and `paginate` is the ruler the export gate uses; together they give both what the
+    // model had to write and how many pages that came to.
+    let proseChars = 0, pages = 0, withProse = 0;
+    // Page count is measured PER VOLUME, on the sections concatenated into one document — because
+    // a page limit is a property of a volume, and `estimatePageCount` on a single section floors
+    // at 1. Measuring section-by-section reported 18 pages for a volume set whose limit is 7:
+    // exactly one page per section, which is the floor talking, not the ruler. Two API notes that
+    // cost a run each: `paginate` returns a LayoutResult, so `.length` is `undefined` and
+    // `pages += undefined` is NaN that then propagates silently; and `docNodes` is what flattens
+    // either doc shape (flat `nodes`, or `sections`→`groups`→`nodes`) into the node list.
+    const byVolume = new Map<string, { canvas: unknown; nodes: unknown[] }>();
+    for (const s of sections) {
+      if (!s.content) continue;
+      let doc;
+      try { doc = typeof s.content === 'string' ? JSON.parse(s.content) : s.content; } catch { continue; }
+      if (!doc || typeof doc !== 'object') continue;
+      const n = countDocCharacters(doc);
+      if (n <= 0) continue;
+      proseChars += n; withProse++;
+      const key = s.volumeName ?? '(unnamed volume)';
+      if (!byVolume.has(key)) byVolume.set(key, { canvas: doc.canvas, nodes: [] });
+      byVolume.get(key)!.nodes.push(...docNodes(doc));
     }
-    const avgSectionChars = Math.round(drafted.reduce((a, b) => a + b, 0) / drafted.length);
+    for (const v of byVolume.values()) {
+      try { pages += estimatePageCount({ version: 2, canvas: v.canvas, nodes: v.nodes } as never); }
+      catch { /* a partial canvas is a known real shape, not a finding here */ }
+    }
+    if (!withProse) {
+      throw new CannotRun(
+        `source proposal ${src.id} has no section carrying prose, so there is nothing to base the ` +
+        `OUTPUT side of the estimate on. Point --source at a proposal that has been written.`);
+    }
+    const avgSectionChars = Math.round(proseChars / withProse);
+
+    // The agency's OWN page limit, which is what actually sizes a Phase I against a Phase II. A
+    // fixture is one drafting of one solicitation; the limit is the contract every drafting of it
+    // has to fit, so it is the honest basis for projecting to a differently-sized programme.
+    const [lim] = await sql`
+      SELECT page_limit_technical, character_limit_narrative, custom_variables
+      FROM solicitation_compliance WHERE solicitation_id = ${src.solicitationId}`.catch(() => [null]);
 
     // ── 2 · The actor ──────────────────────────────────────────────────────────────────────────
     const actor = await resolveActor(sql, { role: 'tenant_admin', tenantSlug: src.slug });
@@ -263,9 +303,10 @@ async function main() {
       console.log(`\nLIVE-RATE  ${band(inLo + outLo, inHi + outHi)}  per full build of ${sections.length} sections`);
       console.log(`         ├ input   ${band(inLo, inHi)}  ← MEASURED: ${realInputChars.toLocaleString()} real chars the`);
       console.log(`         │                       product assembled and sent across ${withChars.length} requests`);
-      console.log(`         └ output  ${band(outLo, outHi)}  ← ASSUMED: ${draftingCalls} drafting calls × ${avgSectionChars} chars`);
-      console.log(`                                 (the observed mean of ${drafted.length} drafted sections on the`);
-      console.log(`                                 source proposal) + ${advisoryCalls} advisory calls × ${ADVISORY_OUT_CHARS} chars`);
+      console.log(`         └ output  ${band(outLo, outHi)}  ← MEASURED SIZE, ASSUMED REUSE: ${draftingCalls} drafting`);
+      console.log(`                                 calls × ${avgSectionChars.toLocaleString()} prose chars (countDocCharacters over`);
+      console.log(`                                 ${withProse} written sections = ${proseChars.toLocaleString()} chars, ${pages} pages by the`);
+      console.log(`                                 export ruler) + ${advisoryCalls} advisory × ${ADVISORY_OUT_CHARS}`);
       console.log(`         Band spans ${CPT_HIGH} → ${CPT_LOW} chars/token. Blended rate: ` +
                   `$${blendedIn.toFixed(2)}/$${blendedOut.toFixed(2)} per M (${Math.round(sonnetShare * 100)}% Sonnet).`);
       if (unmeasured) console.log(`         ⚠ ${unmeasured} record(s) carried no \`chars\` field and are EXCLUDED, not zeroed.`);
@@ -289,6 +330,45 @@ async function main() {
       console.log(`                         mean call ${money(meanCall)} · bound ${money(boundCall)} ` +
                   `against the $0.50 PER_CALL_CEILING_USD`);
       console.log(`                         → ${boundCall > 0.5 ? '⚠ THE BOUND IS OVER THE CEILING' : `${(0.5 / boundCall).toFixed(1)}× headroom even at the bound`}.`);
+
+      // ── Projecting to the agency's page limit ────────────────────────────────────────────────
+      //
+      // This is what separates a Phase I from a Phase II. A fixture is ONE drafting of one
+      // solicitation and may sit well under (or over) what the agency allows; the page limit is
+      // the contract every drafting has to fit, so scaling the measured run by
+      // limit ÷ measured-pages is the only projection with a source on both sides.
+      //
+      // Input scales with it too, and that is not obvious: each drafting call assembles RFP
+      // context plus the section, so a longer volume means more sections, not merely longer ones.
+      // Scaling BOTH is the conservative reading; scaling output alone would understate a Phase II
+      // by most of its cost, since input is ~80% of the total here.
+      const pageLimit = lim?.pageLimitTechnical == null ? null : Number(lim.pageLimitTechnical);
+      console.log(`\nSIZE, AND THE AGENCY LIMIT`);
+      for (const [name, v] of byVolume) {
+        let p = 0;
+        try { p = estimatePageCount({ version: 2, canvas: v.canvas, nodes: v.nodes } as never); } catch { /* partial canvas */ }
+        console.log(`  ${String(p).padStart(3)} pp  ${name}`);
+      }
+      console.log(`  ${String(pages).padStart(3)} pp  TOTAL across ${byVolume.size} volume(s)`);
+      // NO AUTO-SCALING ACROSS MISMATCHED DENOMINATORS. `page_limit_technical` bounds ONE volume —
+      // the technical narrative — and `pages` here is every volume including cost workbooks and
+      // letters. Dividing one by the other produced a confident 0.39× that was comparing different
+      // things. Scale only when there is exactly one volume and the comparison is unambiguous;
+      // otherwise print both and let the reader do the mapping, which is the honest failure mode.
+      if (pageLimit == null) {
+        console.log(`  agency limit: this solicitation records no page_limit_technical.`);
+      } else if (byVolume.size === 1 && pages > 0) {
+        const factor = pageLimit / pages;
+        console.log(`  agency limit: ${pageLimit} pp for the technical volume — ` +
+                    (Math.abs(factor - 1) < 0.05
+                      ? `the draft is at it, so the figures above ARE the at-limit cost.`
+                      : `scaling by ${factor.toFixed(2)}× → ${band(liveLo * factor, liveHi * factor)} at the full limit.`));
+      } else {
+        console.log(`  agency limit: ${pageLimit} pp for the TECHNICAL volume only — not compared to the`);
+        console.log(`                ${pages}-page total above, which spans ${byVolume.size} volumes including forms`);
+        console.log(`                and letters. Two different denominators; scaling them would be a`);
+        console.log(`                confident wrong number.`);
+      }
     }
 
     // ── 7 · Where that lands against the caps ──────────────────────────────────────────────────
