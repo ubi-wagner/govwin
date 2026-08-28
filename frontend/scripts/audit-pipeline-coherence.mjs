@@ -116,7 +116,7 @@ const SEAMS = [
     owner: /^lib\/(events|event-namespaces)\.ts$/,
     // Writing to system_events is the job. Reaching lib/events is the seam.
     job: (r, src) => /system_events/.test(src) || /emitEvent|withEventBracket/.test(src),
-    uses: (r) => (r.calls ?? []).some((c) => /^(emitEventSingle|emitEventStart|emitEventEnd|withEventBracket|emitEvent)$/.test(c)),
+    uses: (r) => (r.calls ?? []).some((c) => /^(emitEventSingle|emitEventSingleStrict|emitEventStart|emitEventEnd|withEventBracket|emitEvent)$/.test(c)),
     bespoke: (r, src) => /INSERT\s+INTO\s+system_events/i.test(src),
   },
   {
@@ -124,8 +124,14 @@ const SEAMS = [
     owner: /^lib\/email\//,
     label: 'outbound mail → lib/email',
     job: (r, src) => /sendEmail|mailer|nodemailer|notification\.requested|sendMail/.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /^@\/lib\/email/.test(i.spec))
-      || (r.calls ?? []).some((c) => /^(sendEmail|queueEmail)$/.test(c)),
+    // Two legitimate paths, and both are the seam. A direct `lib/email` send renders in TS; an
+    // emitted `system:notification.requested` renders in the CRM — and BOTH write the same
+    // `email_send_ledger` and honour the same suppressions (docs/EMAIL_INTERFACE_DESIGN.md).
+    // Counting only the first reported the whole Projects capability as 0/3 while it was sending
+    // correctly through the path its own comments name.
+    uses: (r, src) => imports(r, /^lib\/email/)
+      || (r.calls ?? []).some((c) => /^(sendEmail|queueEmail)$/.test(c))
+      || /notification\.requested/.test(src ?? ''),
     bespoke: (r, src) => /nodemailer|createTransport|smtplib|postmarkapp\.com/.test(src),
   },
   {
@@ -133,8 +139,7 @@ const SEAMS = [
     owner: /^lib\/(tasks\/|automation\/(triggers|prestage-todos)\.ts|projects\/todos\.ts)/,
     label: 'human work → the tasks spine',
     job: (r, src) => /\btasks\b/.test(src) && /(INSERT|raiseTask|createTask|projectTodo)/.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /^@\/lib\/(tasks|automation\/(triggers|prestage-todos))/.test(i.spec)
-      || /^@\/lib\/projects\/todos$/.test(i.spec)),
+    uses: (r) => imports(r, /^lib\/(tasks\/|automation\/(triggers|prestage-todos)|projects\/todos)/),
     bespoke: (r, src) => /INSERT\s+INTO\s+tasks\b/i.test(src),
   },
   {
@@ -142,7 +147,7 @@ const SEAMS = [
     owner: /^lib\/(types\/canvas-document\.ts|canvas\/)/,
     label: 'authored content → CanvasDocument',
     job: (r, src) => /CanvasDocument|canvas_versions|\bcanvas\b/.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /canvas-document|@\/lib\/canvas/.test(i.spec)),
+    uses: (r) => imports(r, /canvas-document|^lib\/canvas\//),
     bespoke: () => false, // a second document model would be a design decision, not a grep
   },
   {
@@ -174,8 +179,8 @@ const SEAMS = [
     owner: /^lib\/(ai\/|agent-client\.ts|agent-output\.ts|tools\/)/,
     label: 'AI through the fabric, not a direct call',
     job: (r, src) => /anthropic|claude|agent_task_queue|AI_INVOKE|archetype/i.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /@\/lib\/(ai|agent-client|agent-output|tools)/.test(i.spec))
-      || (r.calls ?? []).some((c) => /^(emitEventSingle|withEventBracket)$/.test(c)),
+    uses: (r) => imports(r, /^lib\/(ai\/|agent-client|agent-output|tools\/)/)
+      || (r.calls ?? []).some((c) => /^(emitEventSingle|emitEventSingleStrict|withEventBracket)$/.test(c)),
     bespoke: (r, src) => /api\.anthropic\.com/.test(src),
   },
   {
@@ -183,8 +188,7 @@ const SEAMS = [
     owner: /^lib\/projects\/dates\.ts$/,
     label: 'date columns read as Date, not sliced',
     job: (r, src) => /toISOString\(\)\.slice|String\([a-zA-Z.]+\)\.slice|isoDate|daysBetween/.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /projects\/dates/.test(i.spec))
-      || (r.calls ?? []).some((c) => /^(isoDate|daysBetween)$/.test(c)),
+    uses: (r) => imports(r, /projects\/dates/) || (r.calls ?? []).some((c) => /^(isoDate|daysBetween)$/.test(c)),
     // THE bug class, three shipped occurrences: slicing the STRING form of a Date column.
     bespoke: (r, src) => /String\(\s*[a-zA-Z_$][\w.$]*\s*\)\s*\.slice\(\s*0\s*,\s*10\s*\)/.test(src),
   },
@@ -193,7 +197,7 @@ const SEAMS = [
     owner: /^lib\/toast\.tsx$/,
     label: 'user feedback → toast(), not alert()',
     job: (r, src) => r.client && /alert\(|toast\(/.test(src),
-    uses: (r) => (r.imports ?? []).some((i) => /@\/lib\/toast/.test(i.spec)),
+    uses: (r) => imports(r, /^lib\/toast/),
     bespoke: (r, src) => /(?<![.\w])alert\s*\(/.test(src),
   },
 ];
@@ -231,6 +235,30 @@ for (const r of records) {
   code.set(r.file, stripComments(text));
 }
 
+/**
+ * A file's imports as REPO-RELATIVE module paths.
+ *
+ * `uses` predicates used to match the import SPELLING, and the spelling varies: `lib/projects/
+ * milestones.ts` reaches the ToDo seam as `./todos`, not `@/lib/projects/todos`. Three separate
+ * "this pipeline does not use the seam" findings turned out to be that — the projects ToDo
+ * column read 3/9 while eight of the nine used it, and the ninth had no ToDos to raise.
+ *
+ * A predicate that answers a question about MODULES must be asked in modules. Relative specifiers
+ * are resolved against the importing file's directory; `@/` is the repo alias; a bare package name
+ * is left alone.
+ */
+function importedModules(rec) {
+  const dir = path.posix.dirname(rec.file);
+  return (rec.imports ?? []).map((i) => {
+    const spec = i.spec ?? '';
+    if (spec.startsWith('@/')) return spec.slice(2);
+    if (spec.startsWith('.')) return path.posix.normalize(path.posix.join(dir, spec));
+    return spec;
+  });
+}
+/** Does this record import a module matching `re`, however the import was spelled? */
+const imports = (rec, re) => importedModules(rec).some((m) => re.test(m));
+
 function pipelineOf(file) {
   for (const p of PIPELINES) if (p.match(file)) return p.key;
   return null;
@@ -256,7 +284,7 @@ for (const r of records) {
     if (!isJob) continue;
     const c = cell(pk, seam.key);
     c.candidates.push(r.file);
-    if (seam.uses(r)) c.adopted.push(r.file);
+    if (seam.uses(r, text)) c.adopted.push(r.file);
     let bad = false;
     try { bad = Boolean(seam.bespoke(r, code.get(r.file) ?? '')); } catch { bad = false; }
     if (bad) c.bespoke.push(r.file);
@@ -301,6 +329,19 @@ const SELF_TEST = [
     ok: () => ['lib/projects/cdrl.ts', 'lib/projects/invoices.ts', 'lib/projects/milestones.ts']
       .every((f) => /String\(d\)\.slice\(0,10\)|String\(row\.baselineDate\)/.test(src.get(f) ?? '')
         && !cell('projects', 'dates').bespoke.includes(f)),
+  },
+  {
+    // Each of these was a "this pipeline does not use the seam" finding that turned out to be the
+    // predicate. Pinned, because a false NEGATIVE is the dangerous direction here: it invents work
+    // and spends the reader's trust, and unlike a false positive nothing downstream contradicts it.
+    why: 'mail sent by emitting system:notification.requested counts as the email seam',
+    ok: () => cell('projects', 'email').adopted.includes('lib/projects/todos.ts'),
+  },
+  {
+    why: 'a RELATIVE import of the seam counts — `./todos` is the same module as `@/lib/projects/todos`',
+    ok: () => cell('projects', 'todos').adopted.includes('lib/projects/milestone-tasks.ts')
+      && importedModules({ file: 'lib/projects/milestone-tasks.ts', imports: [{ spec: './todos' }] })
+        .includes('lib/projects/todos'),
   },
   {
     why: 'stripping comments does not eat a URL — `https://x` survives intact',

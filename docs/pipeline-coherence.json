@@ -35,6 +35,7 @@
     "app/api/admin/workflows/[instanceId]/retry/route.ts",
     "lib/automation/prestage-todos.ts",
     "lib/process/force-advance.ts",
+    "lib/process/launch-template.ts",
     "lib/tasks/tasks.ts",
     "lib/tasks/update-task.ts",
     "lib/tools/compliance-add-variable.ts",
@@ -623,6 +624,7 @@
     "lib/projects/baseline.ts",
     "lib/projects/cdrl.ts",
     "lib/projects/invoices.ts",
+    "lib/projects/meetings.ts",
     "lib/projects/milestone-tasks.ts",
     "lib/projects/milestones.ts",
     "lib/projects/reviews.ts",
@@ -760,13 +762,19 @@
    "candidates": 2
   },
   "projects:email": {
-   "adopted": [],
+   "adopted": [
+    "lib/projects/comments.ts",
+    "lib/projects/reviews.ts",
+    "lib/projects/todos.ts"
+   ],
    "bespoke": [],
    "candidates": 3
   },
   "projects:todos": {
    "adopted": [
     "lib/projects/comments.ts",
+    "lib/projects/milestone-tasks.ts",
+    "lib/projects/milestones.ts",
     "lib/projects/modifications.ts",
     "lib/projects/reviews.ts"
    ],
