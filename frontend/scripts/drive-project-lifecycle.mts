@@ -1261,6 +1261,58 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7u · TRACEABILITY — every line item, and what satisfies it ════════════════════════════
+  //
+  // A3, built as a DETERMINISTIC join rather than an agent: every question it answers is a foreign
+  // key, and there is no judgement for a model to add. The assertions compare it against links this
+  // drive itself created, so a wrong map cannot pass by agreeing with itself.
+  phase('7u · traceability: the map matches the links this drive made');
+
+  const trace = await api(req, 'get', P + '/traceability');
+  A(trace.status === 200, 'the traceability map answers', `${trace.status}`);
+  const traceClins = ((trace.json.data as Json)?.clins as Json[]) ?? [];
+  const traceGaps = ((trace.json.data as Json)?.gaps as Json[]) ?? [];
+  A(traceClins.length >= 1, 'it reports the project’s CLINs', `${traceClins.length}`);
+
+  // Phase 4 put every milestone under `clinId`, so the map must find them there. Compared against
+  // the DATABASE rather than against the map's own arithmetic.
+  const [{ msUnderClin }] = await sql<{ msUnderClin: number }[]>`
+    SELECT count(*)::int AS "msUnderClin" FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid AND clin_id = ${clinId ?? null}::uuid`;
+  const mapped = ((traceClins[0]?.milestones as unknown[]) ?? []).length;
+  A(mapped === msUnderClin,
+    'and every milestone under that CLIN appears beneath it', `map=${mapped} db=${msUnderClin}`);
+
+  // The CDRL registered in 7p has instances (7p created two), so it must NOT be reported as a gap.
+  A(!traceGaps.some((g) => String(g.kind) === 'cdrl_without_instance'),
+    'a CDRL that HAS deliverables is not reported as a gap');
+
+  // And a gap NAMES its subject rather than counting. "3 gaps" sends somebody investigating; "CLIN
+  // 0002 has no deliverable" is a thing to do.
+  A(traceGaps.every((g) => typeof g.subject === 'string' && String(g.subject).length > 0),
+    'every gap names the row it is about', `${traceGaps.length} gap(s)`);
+
+  // A DELIBERATE gap, made and then measured: a milestone under no CLIN is work the contract does
+  // not account for, and the map has to say so.
+  const orphan = await api(req, 'post', P + '/milestones', {
+    title: 'Unbilled internal review', forecastDate: iso(90), sortIndex: 90,
+  });
+  A(orphan.status === 201, 'a milestone is added under NO CLIN', `${orphan.status}`);
+  const orphanId = ((orphan.json.data as Json)?.milestone as Json)?.id as string | undefined;
+  const trace2 = await api(req, 'get', P + '/traceability');
+  const gaps2 = ((trace2.json.data as Json)?.gaps as Json[]) ?? [];
+  A(gaps2.some((g) => String(g.kind) === 'milestone_without_clin'
+      && String(g.subject).includes('Unbilled internal review')),
+    'and the map names it as work no line item accounts for — a gap it did not have a moment ago',
+    `${gaps2.length} gap(s)`);
+  const unassigned = ((trace2.json.data as Json)?.unassignedMilestones as unknown[]) ?? [];
+  A(unassigned.length === 1, 'and lists it separately from the CLIN breakdown', `${unassigned.length}`);
+
+  // Tidy it away — an open milestone blocks close-out, correctly.
+  if (orphanId) {
+    await api(req, 'patch', P + '/milestones', { action: 'met', milestoneId: orphanId, note: 'Not billable.' });
+  }
+
   // ══ 7t · THE NARRATIVE DRAFTER — and the gate that makes it safe ══════════════════════════
   //
   // A2. The report's TABLES are correct by construction. This drafts the prose around them, and the

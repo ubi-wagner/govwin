@@ -2935,3 +2935,60 @@ step actions resolve, 0 missing templates · **9 live assertions green with the 
 `status_narrator` fired and emitted, the draft read back `ready`, and the gate **provably rejected**
 a fabricated `87.5` and `$9,412,000` against the project's real figures · surfaces 82/82 ·
 api-contract 132 · write-contract **254/254** · 0 broken links in the whole chain.
+
+## A3 · Contract traceability — and why it is NOT an agent
+
+The backlog filed this beside the agent work. It does not belong there, and the reasoning is the
+same one that justifies A1 read in reverse.
+
+`project_manager` exists because reading a blocked task's reason beside a slipping forecast and
+saying *"these are one problem"* is a judgement — something SQL cannot do and a person must be able
+to disagree with. **Traceability is the opposite.** Every question it answers is a foreign key: does
+this CLIN have a milestone under it, does this milestone produce anything, does this deliverable name
+a contractual item, does this CDRL have an instance. There is no judgement to make, and an agent
+asked to make one could get it wrong in a document a customer reads.
+
+So it is built as a deterministic join. **An agent here would add nothing and could subtract.**
+
+There *is* one advisory question in the neighbourhood — "this untagged deliverable probably satisfies
+CLIN 0002" — and that is a natural follow-on. It is deliberately not built yet, because a suggestion
+is only useful once something can say what is actually missing, and this is that.
+
+### What a program review actually asks
+
+Not "is the project healthy". It asks **show me every line item and what satisfies it** — so the map
+is organised by CLIN, and every gap **names its subject**. "CLIN 0002 has no deliverable" is a thing
+to do; "3 gaps" is a number somebody has to go and investigate.
+
+It also keeps the two CLIN links apart (mig 228): a deliverable's own `clin_id` says *this is the
+contractual item it satisfies*; its milestone's says *this is the line item the work sat under*.
+`direct` records which, because to an auditor those are not the same statement.
+
+**A gap is not a failure.** An early-stage project legitimately has CLINs with nothing under them
+yet. The map says what is unlinked; it does not say it is wrong. An amber banner over a project three
+weeks into a five-year contract is how a person learns to ignore the panel.
+
+And on error it returns an **empty** map, never a partial one — a traceability report missing half
+its rows shows gaps that are not there, and somebody would go and "fix" them.
+
+### Proven against links the drive itself made
+
+The assertions compare the map to the **database**, not to its own arithmetic, and the last two make
+a gap on purpose:
+
+```
+✓ and every milestone under that CLIN appears beneath it — map=4 db=4
+✓ a CDRL that HAS deliverables is not reported as a gap
+✓ every gap names the row it is about — 2 gap(s)
+✓ a milestone is added under NO CLIN — 201
+✓ and the map names it as work no line item accounts for — a gap it did not have a moment ago — 4 gap(s)
+✓ and lists it separately from the CLIN breakdown — 1
+```
+
+Creating the gap and watching it appear is the difference between testing the map and testing the
+fixture.
+
+### Verification
+
+`tsc` 0 · vitest 230 files / 2,448 · **8 live assertions green** · surfaces 82/82 · api-contract 133
+graded · write-contract 254/254 · 0 broken links in the whole chain.
