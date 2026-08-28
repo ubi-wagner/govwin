@@ -2261,3 +2261,84 @@ occurrence of that exact defect, and the first one that cost seconds instead of 
 clean · lifecycle drive green.
 
 ---
+
+## P6 — The cost measure gets a source, and the WBS starts driving
+
+Migration **227**. Two things that belong together.
+
+### Part 1 · The WBS is the spine; the CLIN is a tag on it
+
+Stated by the product owner: *"WBS is CLIN like and should drive everything. They can be associated
+with CLIN numbers as tags such that monthly reports are WBS milestones each month but all be a unit
+of CLIN 0002 deliverables."*
+
+The WBS side already worked — `project_wbs_nodes.clin_id` is inherited by children, and `rollup.ts`
+resolves the effective CLIN with a recursive CTE. **Milestones did not.** Measured on this box:
+
+```
+milestones with BOTH clin_id and wbs_node_id : 0
+milestones with clin_id ONLY                 : 3
+milestones with wbs_node_id                  : 0
+```
+
+Every milestone tagged a CLIN **directly** and hung off no WBS node at all. So the WBS drove nothing
+for them, and a milestone could name CLIN 0001 while sitting under a node tagged CLIN 0002 — two
+answers to "what does this CLIN cover", both plausible. Adding labour roll-up on top would have made
+them visibly disagree.
+
+The fix is not to delete the column: a detached milestone still needs a CLIN, and every existing row
+is one of those. It is to make the two **agree by construction** — a trigger walks to the nearest
+ancestor carrying a CLIN, exactly as the roll-up does, and forces the milestone's tag to match.
+Attach a milestone to the WBS and the CLIN follows; leave it detached and the direct tag stands.
+
+### Part 2 · The measure that reported against nothing
+
+`rollup.ts` computed cost from `project_wbs_nodes.actual_cost` — **a column nothing had ever
+written.** The honest `null` → "not measured" was hiding a missing *input*, which is the worse kind
+of empty because it reads as restraint.
+
+Time is logged against a **WBS node, required**. It is the level the plan is costed at and the level
+the CLIN roll-up already resolves, so twelve monthly-report nodes all reach CLIN 0002 without anybody
+re-tagging an entry. A task may be tagged too, but the node carries the money.
+
+Three rules, each protecting a number somebody gets billed for:
+
+- **The rate is copied in, not looked up.** Resolved later, history re-prices itself every time
+  somebody gets a raise, and last year's cost report stops matching last year's invoice.
+- **`actual_cost` is not overwritten.** It keeps its meaning — other direct costs, travel and
+  materials — and labour is summed beside it. Two writers on one number is how a total becomes
+  unexplainable. The roll-up reports **both halves**, because a number a reader cannot decompose is a
+  number they cannot check.
+- **Logging is not approving** — the fifth time this module draws that line. Anyone logs their own
+  hours; a tenant_admin approves; **only approved hours count**.
+
+### Proven against hand-computed numbers
+
+The roll-up is SQL, so it is proven by a live drive rather than a mock. Both new failure modes
+produce a *plausible* number rather than an error, so the fixture was chosen to make each visible —
+and red-first confirmed each one:
+
+| defect injected | what the drive reported |
+|---|---|
+| unapproved hours counted | labour **1500**, expected 500 · cost **150%**, expected 50% |
+| entries joined into the CTE rather than aggregated first | CLIN 0002 planned **1500.00**, expected 1000 |
+
+```
+ok  0002 labour cost — APPROVED hours only (400 + 100), not the 1000 nobody signed off = 500
+ok  0002 approved hours (4 + 2, not the unapproved 10) = 6
+ok  0002 cost% = (odc 0 + labour 500) / 1000 — a measure with a SOURCE at last = 50
+ok  0002 planned cost is 1000 — the labour join did not multiply the WBS rows
+ok  project cost% from ROWS (1300/3000), not the average of CLIN percentages (45%) = 43.3
+ok  project labour is the sum of APPROVED entries = 500
+ok  and other direct cost is reported SEPARATELY, so the total can be decomposed = 800
+```
+
+Six schema invariants held too — including a milestone's **wrong** CLIN tag being overridden by its
+WBS node's, and a detached milestone keeping its own.
+
+This unblocks **A5** (`cost_estimator` EAC/ETC), which had no input.
+
+`tsc` 0 · vitest 224 files / **2,329** · surfaces 82/82 · write-contract clean · rollup drive green ·
+lifecycle drive green.
+
+---

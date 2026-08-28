@@ -39,6 +39,13 @@ export interface Measures {
   // The raw counts, so a reader can see what each percentage was computed FROM. A percentage
   // whose denominator is invisible is a percentage nobody can check.
   plannedCost: string | null;
+  /** Other direct costs entered on the WBS node — travel, materials. */
+  otherDirectCost: string;
+  /** APPROVED labour, summed from project_time_entries (mig 227). */
+  labourCost: string;
+  labourHours: string;
+  /** `otherDirectCost + labourCost`. Both halves are reported beside it, because a number a
+   *  reader cannot decompose is a number they cannot check. */
   actualCost: string;
   deliverablesAccepted: number;
   deliverablesTotal: number;
@@ -87,6 +94,9 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
     const wbs = await sql<Array<{
       clinId: string | null;
       plannedCost: string | null;
+      otherDirectCost: string | null;
+      labourCost: string | null;
+      labourHours: string | null;
       actualCost: string | null;
       elapsedDays: string | null;
       totalDays: string | null;
@@ -105,10 +115,24 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
           FROM project_wbs_nodes c
           JOIN resolved r ON r.id = c.parent_id
          WHERE c.project_id = ${projectId}::uuid AND c.tenant_id = ${tenantId}::uuid
+      ),
+      -- APPROVED labour per node (mig 227). Only approved: hours are what a customer is billed
+      -- for, and "somebody typed it" is not the same claim as "a manager checked it". Aggregated
+      -- FIRST and joined once, because joining the entries into resolved would multiply every
+      -- node's planned_cost by its number of timesheet rows -- a total that still looks plausible.
+      labour AS (
+        SELECT wbs_node_id, SUM(cost) AS labour_cost, SUM(hours) AS labour_hours
+          FROM project_time_entries
+         WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
+           AND approved_at IS NOT NULL
+         GROUP BY wbs_node_id
       )
       SELECT effective_clin AS clin_id,
              SUM(planned_cost)                                   AS planned_cost,
-             SUM(actual_cost)                                    AS actual_cost,
+             SUM(actual_cost)                                    AS other_direct_cost,
+             COALESCE(SUM(l.labour_cost), 0)                     AS labour_cost,
+             COALESCE(SUM(l.labour_hours), 0)                    AS labour_hours,
+             SUM(actual_cost) + COALESCE(SUM(l.labour_cost), 0)  AS actual_cost,
              -- Elapsed, clamped into the node's own window: a task that has not started
              -- contributes 0, one that is past its end contributes its whole duration, and
              -- nothing contributes more than it is worth.
@@ -127,6 +151,7 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
                WHERE planned_start IS NOT NULL AND planned_end IS NOT NULL
              )::int                                              AS nodes_with_dates
         FROM resolved
+        LEFT JOIN labour l ON l.wbs_node_id = resolved.id
        GROUP BY effective_clin`;
 
     // ── Deliverables, per effective CLIN via the milestone ───────────────────────────────────
@@ -178,6 +203,9 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
         schedulePct: pct(elapsed, total),
         deliverablesPct: d ? pct(d.accepted, d.total) : null,
         plannedCost: w?.plannedCost ?? null,
+        otherDirectCost: w?.otherDirectCost ?? '0',
+        labourCost: w?.labourCost ?? '0',
+        labourHours: w?.labourHours ?? '0',
         actualCost: w?.actualCost ?? '0',
         deliverablesAccepted: d?.accepted ?? 0,
         deliverablesTotal: d?.total ?? 0,
@@ -220,6 +248,9 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
         schedulePct: pct(elapsedAll, totalAll),
         deliverablesPct: pct(acceptedAll, deliverablesAll),
         plannedCost: plannedAll ? String(plannedAll) : null,
+        otherDirectCost: String(sum((r) => Number(r.otherDirectCost ?? 0))),
+        labourCost: String(sum((r) => Number(r.labourCost ?? 0))),
+        labourHours: String(sum((r) => Number(r.labourHours ?? 0))),
         actualCost: String(actualAll),
         deliverablesAccepted: acceptedAll,
         deliverablesTotal: deliverablesAll,
@@ -236,7 +267,7 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
     return {
       project: {
         costPct: null, schedulePct: null, deliverablesPct: null,
-        plannedCost: null, actualCost: '0',
+        plannedCost: null, otherDirectCost: '0', labourCost: '0', labourHours: '0', actualCost: '0',
         deliverablesAccepted: 0, deliverablesTotal: 0, nodesWithDates: 0,
       },
       clins: [],

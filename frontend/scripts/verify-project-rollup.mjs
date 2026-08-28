@@ -100,6 +100,34 @@ async function main() {
     VALUES (${tenant.id}, ${projectId}, ${clinB.id}, '2.2', 'Build out', 500, 0,
             CURRENT_DATE + 1, CURRENT_DATE + 200, 4)`;
 
+  // ── LABOUR (mig 227) ──────────────────────────────────────────────────────────────────────
+  // `actual_cost` on a WBS node is OTHER DIRECT COST; labour is summed from APPROVED time entries
+  // and added beside it. Two failure modes to make visible, both of which produce a plausible
+  // number rather than an error:
+  //
+  //   · counting UNAPPROVED hours — a customer is billed for what a manager checked, not for what
+  //     somebody typed, and the total would silently run ahead of the invoice
+  //   · joining the entries into the WBS CTE instead of aggregating first — every node's
+  //     planned_cost gets multiplied by its number of timesheet rows
+  //
+  //   CLIN 0002 · 'Spike' node: approved 4h @ 100 = 400, PLUS approved 2h @ 50 = 100  ⇒ 500
+  //               and an UNAPPROVED 10h @ 100 = 1000 that must NOT count
+  //   ⇒ 0002 actual = odc 0 + labour 500 = 500, planned 1000 ⇒ cost 50.0%
+  //   If unapproved counted, actual would be 1500 and cost 150% — visibly wrong.
+  //   If the join multiplied, 0002 planned would read 3000 (three entries on one node).
+  const [spike] = await owner`
+    SELECT id FROM project_wbs_nodes WHERE project_id = ${projectId} AND code = '2.1' LIMIT 1`;
+  const [someone] = await owner`SELECT id FROM users ORDER BY created_at LIMIT 1`;
+  for (const [hours, rate, approved] of [[4, 100, true], [2, 50, true], [10, 100, false]]) {
+    await owner`
+      INSERT INTO project_time_entries
+        (tenant_id, project_id, wbs_node_id, user_id, worked_on, hours, hourly_rate,
+         approved_by, approved_at)
+      VALUES (${tenant.id}, ${projectId}, ${spike.id}, ${someone.id}, CURRENT_DATE,
+              ${hours}, ${rate},
+              ${approved ? someone.id : null}, ${approved ? new Date() : null})`;
+  }
+
   // Deliverables on CLIN 0001: THREE under one milestone, one accepted.
   // If the WBS and deliverables were joined in one statement, CLIN 0001's planned cost would be
   // multiplied by 3 → 6000, and cost% would read 13.3% instead of 40%.
@@ -148,15 +176,28 @@ async function main() {
   else {
     expect('0002 schedule% (duration-weighted 2/202, NOT the 50% an unweighted average gives)',
       b.schedulePct, 1);
-    expect('0002 cost% (nothing spent yet — a measured zero)', b.costPct, 0);
+    // ── The labour measure (mig 227) ────────────────────────────────────────────────────────
+    // Before it, `actual_cost` was a column nothing wrote and this read a permanent 0%.
+    expect('0002 labour cost — APPROVED hours only (400 + 100), not the 1000 nobody signed off',
+      Number(b.labourCost), 500);
+    expect('0002 approved hours (4 + 2, not the unapproved 10)', Number(b.labourHours), 6);
+    expect('0002 cost% = (odc 0 + labour 500) / 1000 — a measure with a SOURCE at last', b.costPct, 50);
+    if (b.plannedCost !== null && Number(b.plannedCost) !== 1000) {
+      no(`0002 planned cost is ${b.plannedCost}, expected 1000 — 3000 means the time entries were `
+        + 'joined into the WBS CTE instead of aggregated first');
+    } else ok('0002 planned cost is 1000 — the labour join did not multiply the WBS rows');
     expect('0002 deliverables% (none exist — NOT MEASURED, not zero)', b.deliverablesPct, null);
   }
 
   // The project total, computed from rows rather than by averaging the CLIN percentages.
-  //   planned 1000+1000+500+500 = 3000 · actual 800 ⇒ 26.7%
-  //   averaging the two CLIN cost percentages would give (40 + 0) / 2 = 20%
-  expect('project cost% from ROWS (800/3000), not the average of CLIN percentages (20%)',
-    r.project.costPct, 26.7);
+  //   planned 1000+1000+500+500 = 3000
+  //   actual = odc 800 + approved labour 500 = 1300 ⇒ 43.3%
+  //   averaging the two CLIN cost percentages would give (40 + 50) / 2 = 45%
+  expect('project cost% from ROWS (1300/3000), not the average of CLIN percentages (45%)',
+    r.project.costPct, 43.3);
+  expect('project labour is the sum of APPROVED entries', Number(r.project.labourCost), 500);
+  expect('and other direct cost is reported SEPARATELY, so the total can be decomposed',
+    Number(r.project.otherDirectCost), 800);
   expect('project deliverables% (1 of 3)', r.project.deliverablesPct, 33.3);
 
   // The contract that makes all of this readable.
