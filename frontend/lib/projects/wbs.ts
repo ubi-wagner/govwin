@@ -26,15 +26,32 @@ import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/type
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import type { Fail, Ok } from './project';
 
+/**
+ * ── THE WBS ELEMENT IS A MILESTONE (mig 228) ─────────────────────────────────────────────────
+ * `project_wbs_nodes` was a parallel hierarchy beside `project_milestones`, describing the same
+ * thing with its own dates, costs and CLIN. It is gone: a project is the portal, the WBS **is** the
+ * milestone list, and each milestone carries tasks and deliverables.
+ *
+ * This module survives because the WORKPLAN GRID does — a canvas table over the plan — and it now
+ * reads the one spine. `parent_id` is gone because milestones do not nest, and a caller that sends
+ * one is REFUSED rather than quietly ignored.
+ *
+ * ── AND THE BASELINE COLUMNS ARE READ, NOT SYNTHESISED (mig 229) ─────────────────────────────
+ * The first cut of this repointing aliased `baseline_date` into BOTH baseline-date columns and
+ * `planned_cost` into the baseline cost, because the milestone had no `baseline_cost` yet. The grid
+ * renders those columns greyed out and labelled "Baseline" — so that alias put the CURRENT plan
+ * behind a label promising the frozen one, and made cost variance compute as zero forever by
+ * subtracting a column from itself. Migration 229 gives the milestone a real frozen `baseline_cost`
+ * and the shape below reads it. A grid may show an empty baseline; it may not show a fake one.
+ */
 export interface WbsNode {
   id: string;
   projectId: string;
   clinId: string | null;
-  parentId: string | null;
-  code: string;
+  code: string | null;
   title: string;
-  baselineStart: string | null;
-  baselineEnd: string | null;
+  /** Frozen at baseline, refused thereafter by migration 216's trigger. */
+  baselineDate: string | null;
   baselineCost: string | null;
   plannedStart: string | null;
   plannedEnd: string | null;
@@ -46,12 +63,13 @@ export interface WbsNode {
 export async function listWbs(tenantId: string, projectId: string): Promise<WbsNode[]> {
   try {
     return await sql<WbsNode[]>`
-      SELECT id, project_id, clin_id, parent_id, code, title,
-             baseline_start, baseline_end, baseline_cost,
-             planned_start, planned_end, planned_cost, actual_cost, sort_index
-        FROM project_wbs_nodes
+      SELECT id, project_id, clin_id, code, title,
+             baseline_date, baseline_cost,
+             starts_on AS planned_start, forecast_date AS planned_end,
+             planned_cost, actual_cost, sort_index
+        FROM project_milestones
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
-       ORDER BY sort_index, code`;
+       ORDER BY sort_index, code NULLS LAST`;
   } catch (err) {
     console.error('[projects/wbs] listWbs failed:', err);
     return [];
@@ -113,38 +131,41 @@ export async function createWbsNode(
     // FK-BEFORE-WRITE, both of them scoped to this project. A parent or CLIN from a DIFFERENT
     // project would satisfy the FK — it is a real row — and quietly graft one contract's plan onto
     // another's. RLS would not catch it either, because both rows can belong to the same tenant.
-    for (const [label, id, table] of [
-      ['parentId', input.parentId, 'project_wbs_nodes'],
-      ['clinId', input.clinId, 'project_clins'],
-    ] as const) {
-      if (!id) continue;
-      const rows = table === 'project_wbs_nodes'
-        ? await sql<{ id: string }[]>`
-            SELECT id FROM project_wbs_nodes
-             WHERE id = ${id}::uuid AND project_id = ${projectId}::uuid LIMIT 1`
-        : await sql<{ id: string }[]>`
-            SELECT id FROM project_clins
-             WHERE id = ${id}::uuid AND project_id = ${projectId}::uuid LIMIT 1`;
+    if (input.parentId) {
+      // REFUSED, not ignored. Accepting an input and discarding it is how a caller comes to
+      // believe in a hierarchy that does not exist — and then writes twelve nodes under a parent
+      // nothing reads.
+      return {
+        ok: false, status: 400, code: 'VALIDATION_ERROR',
+        error: 'WBS elements do not nest — a milestone IS the element. Use sortIndex to order them.',
+      };
+    }
+    if (input.clinId) {
+      const rows = await sql<{ id: string }[]>`
+        SELECT id FROM project_clins
+         WHERE id = ${input.clinId}::uuid AND project_id = ${projectId}::uuid LIMIT 1`;
       if (rows.length === 0) {
-        return { ok: false, status: 400, error: `${label} does not belong to this project`, code: 'VALIDATION_ERROR' };
+        return { ok: false, status: 400, error: 'clinId does not belong to this project', code: 'VALIDATION_ERROR' };
       }
     }
 
+    // A WBS element IS a milestone (mig 228).
     const [row] = await sql<WbsNode[]>`
-      INSERT INTO project_wbs_nodes
-        (tenant_id, project_id, clin_id, parent_id, code, title,
-         planned_start, planned_end, planned_cost, sort_index)
+      INSERT INTO project_milestones
+        (tenant_id, project_id, clin_id, code, title, starts_on, forecast_date,
+         planned_cost, sort_index)
       VALUES
         (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.clinId ?? null},
-         ${input.parentId ?? null}, ${code}, ${title},
-         ${start.value}, ${end.value}, ${cost ?? null}, ${input.sortIndex ?? 0})
-      RETURNING id, project_id, clin_id, parent_id, code, title,
-                baseline_start, baseline_end, baseline_cost,
-                planned_start, planned_end, planned_cost, actual_cost, sort_index`;
+         ${code}, ${title}, ${start.value}::date, ${end.value}::date,
+         ${cost ?? null}, ${input.sortIndex ?? 0})
+      RETURNING id, project_id, clin_id, code, title,
+                baseline_date, baseline_cost,
+                starts_on AS planned_start, forecast_date AS planned_end,
+                planned_cost, actual_cost, sort_index`;
 
     await auditLog({
       tenantId: actor.tenantId, userId: actor.userId, action: 'project.wbs_node_created',
-      entityType: 'project_wbs_node', entityId: row.id, metadata: { projectId, code, title },
+      entityType: 'project_milestone', entityId: row.id, metadata: { projectId, code, title },
     });
     return { ok: true, data: row };
   } catch (err) {
@@ -166,13 +187,13 @@ export async function createWbsNode(
  * the save fails.
  */
 export const WORKPLAN_COLUMNS = [
-  'Code', 'Task', 'CLIN',
-  'Baseline start', 'Baseline end', 'Baseline cost',
+  'Code', 'Milestone', 'CLIN',
+  'Baseline date', 'Baseline cost',
   'Planned start', 'Planned end', 'Planned cost', 'Actual cost',
 ] as const;
 
 /** Columns the grid must not let a person type into. Index-aligned with WORKPLAN_COLUMNS. */
-export const WORKPLAN_READONLY_COLUMNS = [3, 4, 5];
+export const WORKPLAN_READONLY_COLUMNS = [3, 4];
 
 export function toWorkplanCanvas(
   nodes: WbsNode[],
@@ -188,11 +209,10 @@ export function toWorkplanCanvas(
     content: {
       headers: [...WORKPLAN_COLUMNS],
       rows: nodes.map((n) => [
-        n.code,
+        n.code ?? '',
         n.title,
         n.clinId ? (clinNumber.get(n.clinId) ?? '') : '',
-        n.baselineStart ?? '',
-        n.baselineEnd ?? '',
+        n.baselineDate ?? '',
         money(n.baselineCost),
         n.plannedStart ?? '',
         n.plannedEnd ?? '',

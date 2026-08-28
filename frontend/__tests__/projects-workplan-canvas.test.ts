@@ -23,9 +23,12 @@ import { toWorkplanCanvas, WORKPLAN_COLUMNS, WORKPLAN_READONLY_COLUMNS, type Wbs
 function node(i: number, over: Partial<WbsNode> = {}): WbsNode {
   return {
     id: `1111111${String(i).padStart(4, '0')}-1111-4111-8111-111111111111`,
-    projectId: 'p1', clinId: null, parentId: null,
+    projectId: 'p1', clinId: null,
     code: `1.${i}`, title: `Task ${i}`,
-    baselineStart: '2026-01-01', baselineEnd: '2026-03-31', baselineCost: '1000.00',
+    // Frozen and current DELIBERATELY DIFFER. A fixture where they match would pass just as
+    // happily against the shape this file used to test — one where the "Baseline" columns were
+    // aliases of the current plan — and that is the defect migration 229 went back for.
+    baselineDate: '2026-03-31', baselineCost: '1000.00',
     plannedStart: '2026-01-15', plannedEnd: '2026-04-15', plannedCost: '1250.00',
     actualCost: '400.00', sortIndex: i,
     ...over,
@@ -66,8 +69,29 @@ describe('toWorkplanCanvas', () => {
   it('shows the baseline BESIDE the current plan — variance is the number a PM reads', () => {
     const doc = toWorkplanCanvas([node(1)], [], 'P');
     const row = (doc.nodes?.[0] as unknown as { content: { rows: string[][] } }).content.rows[0];
-    expect(row[3]).toBe('2026-01-01');   // baseline start
-    expect(row[6]).toBe('2026-01-15');   // planned start — fourteen days later, and visible
+    expect(row[3]).toBe('2026-03-31');   // baseline date — what was promised
+    expect(row[6]).toBe('2026-04-15');   // planned end — fifteen days later, and visible
+  });
+
+  it('the baseline columns render the FROZEN values, never the current plan', () => {
+    // The regression this file exists to catch. When `project_milestones` had no `baseline_cost`,
+    // `listWbs` aliased `planned_cost` into the baseline column — so a greyed-out cell labelled
+    // "Baseline cost" showed the current plan, and cost variance was a column subtracted from
+    // itself: structurally zero, forever, and reading as a project perfectly on budget.
+    const doc = toWorkplanCanvas([node(1)], [], 'P');
+    const row = (doc.nodes?.[0] as unknown as { content: { rows: string[][] } }).content.rows[0];
+    expect(row[4], 'baseline cost').toBe('1000.00');
+    expect(row[7], 'planned cost').toBe('1250.00');
+    expect(row[4]).not.toBe(row[7]);
+  });
+
+  it('a milestone with no baseline renders EMPTY, not a stand-in', () => {
+    // Before baselining there is no promise. An empty cell says so; anything else invents one.
+    const doc = toWorkplanCanvas([node(1, { baselineDate: null, baselineCost: null })], [], 'P');
+    const row = (doc.nodes?.[0] as unknown as { content: { rows: string[][] } }).content.rows[0];
+    expect(row[3]).toBe('');
+    expect(row[4]).toBe('');
+    expect(row[7], 'and the current plan is still shown').toBe('1250.00');
   });
 
   it('marks the baseline columns read-only', () => {

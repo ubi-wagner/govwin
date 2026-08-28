@@ -2342,3 +2342,114 @@ This unblocks **A5** (`cost_estimator` EAC/ETC), which had no input.
 lifecycle drive green.
 
 ---
+
+## The WBS is the milestone list — migrations 228 · 229
+
+**The correction, from the product owner, hours after P6 shipped:**
+
+> *"CLIN 002 can have 12 milestones under the WBS. Milestones drive everything. That is what a WBS
+> is comprised of typically. 1 project is the portal. It has high level information like
+> participants and contact upload and summary and start and end dates. Then the WBS are the
+> milestones with tasks and deliverables. The deliverables on any milestone could be CLINs from the
+> contract."*
+
+`project_wbs_nodes` had been a SECOND hierarchy sitting beside `project_milestones` since migration
+216 — its own dates, its own costs, its own CLIN, describing the same thing. That is the shape this
+codebase has refused five times elsewhere (a second ToDo queue, a second nudge path, a second
+editor, a second checklist, a second comment table) and it was in the middle of the schema the whole
+time.
+
+It also produced two answers to one question. **P6 shipped a trigger to reconcile them** — forcing a
+milestone's CLIN to follow its WBS node's — which was the right fix for the wrong model. Migration
+228 drops that trigger four hours old. The model did not need reconciling; it needed one spine.
+
+```
+projects                     the portal: participants, contract documents, summary, dates
+  └── project_milestones               = THE WBS ELEMENT
+        · code, dates, owner, cost, completion record
+        · clin_id  — the GROUPING: CLIN 0002 has twelve monthly milestones
+        ├── project_milestone_tasks
+        └── project_deliverables
+              · clin_id — the CONTRACTUAL ITEM this deliverable satisfies
+```
+
+**Two CLIN links, and they are different claims.** A milestone's CLIN says *which line item this
+month's work is under*. A deliverable's CLIN says *this is the thing the contract asked for*. They
+usually agree, and a monthly milestone under CLIN 0001 that produces a CLIN 0002 artefact is
+counted where the contract counts it — which one column could not express.
+
+What went away: a recursive CTE in `rollup.ts` resolving an inherited CLIN up a parent chain, a
+second `UPDATE` in both `setBaseline` and `rebaseline`, `parent_id`, and P6's reconciliation
+trigger. Collapsing a parallel structure is supposed to feel like this.
+
+### The half that did NOT survive, and had to be gone back for
+
+Migration 228 was applied, the code was repointed, `tsc` was clean and the rollup drive was green
+on all fourteen assertions. **It had silently dropped the cost baseline.** The WBS node froze three
+columns under migration 216's immutability trigger — `baseline_start`, `baseline_end` and
+`baseline_cost`. The milestone froze one: `baseline_date`.
+
+So after 228 the schedule promise was still held and the cost promise was not — and
+`lib/projects/wbs.ts` renders a **read-only column labelled "Baseline cost"**. With nothing to read,
+the repointing had aliased `planned_cost` into it. A person would have read the current plan out of
+a greyed-out cell promising the frozen one, and cost variance would have computed as **zero
+forever**, cheerfully, because both sides of the subtraction were the same column — rendering as a
+project permanently on budget.
+
+Nothing caught it. Every unit test passed; the isolation lens asserted milestone `baseline_date`
+immutability and said nothing about cost; the lifecycle drive counted frozen rows without asking
+what was frozen in them. It was found by reading the migration back and asking what the old table
+held that the new one does not.
+
+Migration **229** adds `project_milestones.baseline_cost`, re-declares the trigger over both columns
+(the function is generic over `TG_ARGV`, so this is a redefinition and not a second rule), carries
+the old values across, and only then drops `project_wbs_nodes` — the one project table ever dropped.
+`setBaseline` freezes both promises in the one statement.
+
+**Red-first on the three new assertions**, each failing against the code as it stood:
+
+| assertion | on the unfixed code |
+|---|---|
+| `setBaseline` freezes BOTH promises | `expected 'UPDATE project_milestones SET baselin…' to match /baseline_cost\s*=\s*planned_cost/` |
+| the baseline columns render the FROZEN values | `baseline cost: expected '1250.00' to be '1000.00'` |
+| a milestone with no baseline renders EMPTY | `expected '1250.00' to be ''` |
+
+The grid's column contract shrank with the model: `Baseline start · Baseline end · Baseline cost`
+was three columns fed by two values, one of them repeated. It is now `Baseline date · Baseline cost`,
+read from the two columns that exist.
+
+### Two things the repointing turned up on its own
+
+**The seed had been unrunnable since P4.** `seed-project-scenario.mjs` writes a checklist task due
+`CURRENT_DATE - 12` under a milestone forecasting `CURRENT_DATE - 16`, which migration 221's
+`project_task_due_within_milestone` trigger refuses (23004). P4 added that trigger and nothing
+re-ran the seed, so it sat broken until this pass. Fixed in the fixture, not by loosening the rule:
+a blocked task is still due before the phase it belongs to.
+
+**A drive that asserted positions rather than properties.** The `/wbs` route now writes a milestone,
+so the plan gained a row and every `chain[1]` / `chain[2]` index shifted by one — the same trap as
+reading `queries[0]` in a mocked test. The serial-date checks now assert what the rule actually says
+— *each unpinned phase starts the day after the previous one ends, and a pinned start is respected*
+— by title, at whatever length the plan happens to be. It is a stronger assertion than the
+hard-coded offsets it replaces.
+
+Two smaller corrections fell out: `baseline.set` was carrying `wbsNodes` **and** `milestones` in its
+payload, both filled from the same array — two names for one number, which reads as corroboration
+and is not; and `verify-ui-vs-db` was joining the deliverables count through the old node table
+rather than copying the predicate from `rollup.ts` as its own header requires.
+
+### And the migration runner stopped crying wolf
+
+Applying 229 surfaced a standing `⚠️ DRIFT` on `221_project_task_spine.sql` — edited after it was
+applied. Every object it declares was verified present by hand (columns, all three triggers, the
+attachments table with its four policies, all seven CHECKs), so the drift was comment bytes. But a
+warning nobody can clear is a warning everybody learns to scroll past, and the next one will be
+real. `migrate.mjs` now takes `--accept-drift=<file>`: an explicit, named, logged restamp, never a
+wildcard, and a name that is not actually drifting is reported rather than silently doing nothing.
+
+### Verification
+
+`tsc` 0 · vitest 224 files / **2,332** · migration 229 applied · isolation lens 13/13 (including the
+new cost-immutability refusal) · rollup drive 15/15 against hand-computed numbers · **lifecycle
+drive green end to end** · surfaces 82/82 · api-contract 127 graded, 0 violations · write-contract
+244/244 · ui-vs-db green · mobile probe green at 390 and 820 · `next build` clean.

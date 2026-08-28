@@ -301,17 +301,40 @@ async function main() {
      WHERE target_table = 'project_clins' AND target_id = ${clinId ?? null}::uuid AND field = 'pop_end'`;
   A(prov?.method === 'verified', 'the citation was recorded as provenance, not dropped', prov ? `${prov.method} p.${prov.page}` : 'none');
 
-  const parent = await api(req, 'post', P + '/wbs', {
-    code: '1', title: 'Prototype development', clinId,
-    plannedStart: iso(-30), plannedEnd: iso(120), plannedCost: 500000,
+  // ── THE WBS ROUTE AND THE MILESTONE ROUTE WRITE THE SAME TABLE (migs 228-229) ───────────────
+  //
+  // A WBS element IS a milestone. The `/wbs` route is the GRID view of the plan and `/milestones`
+  // is the list view; both insert `project_milestones`, which is why this drive counts what the
+  // grid creates as part of the plan rather than as a separate structure. It used to create a
+  // parent and a child here and treat neither as a phase — so close-out was later blocked by a
+  // milestone the drive itself had made and never tracked.
+  const wbsRow = await api(req, 'post', P + '/wbs', {
+    code: '1.1', title: 'Sensor integration', clinId,
+    plannedStart: iso(-30), plannedEnd: iso(30), plannedCost: 250000,
+    // Explicit, so the chain below has ONE ordering. Two rows sharing sort_index 0 makes the
+    // sequence a function of insertion order, and an assertion about "the phase before" then
+    // depends on something nobody declared.
+    sortIndex: 1,
   });
-  A(parent.status === 201 || parent.status === 200, 'a WBS parent is added', `${parent.status}`);
-  const parentId = ((parent.json.data as Json)?.node as Json)?.id as string | undefined;
-  const child = await api(req, 'post', P + '/wbs', {
-    code: '1.1', title: 'Sensor integration', parentId,
-    plannedStart: iso(-30), plannedEnd: iso(60), plannedCost: 250000,
+  A(wbsRow.status === 201 || wbsRow.status === 200, 'a WBS element is added through the grid', `${wbsRow.status}`);
+  const wbsId = ((wbsRow.json.data as Json)?.node as Json)?.id as string | undefined;
+
+  // NESTING IS REFUSED, NOT IGNORED. Accepting a `parentId` and discarding it is how a caller comes
+  // to believe in a hierarchy that does not exist, and then writes twelve elements under a parent
+  // nothing reads. The message has to say what to do instead.
+  const nestedWbs = await api(req, 'post', P + '/wbs', {
+    code: '1.1.1', title: 'Sensor bracket', parentId: wbsId,
+    plannedStart: iso(-30), plannedEnd: iso(20), plannedCost: 50000,
   });
-  A(child.status === 201 || child.status === 200, 'a child WBS node inherits its CLIN through the parent', `${child.status}`);
+  A(nestedWbs.status === 400, 'WBS elements do not nest — a parentId is REFUSED', `${nestedWbs.status}`);
+  A(/do not nest|sortIndex/i.test(String(nestedWbs.json.error ?? '')),
+    'and the refusal says what to do instead', String(nestedWbs.json.error ?? '').slice(0, 70));
+
+  // The same row is visible through the grid, which is the point of one spine: two views, one plan.
+  const grid = await api(req, 'get', P + '/wbs');
+  const gridRows = ((grid.json.data as Json)?.nodes as unknown[]) ?? [];
+  A(gridRows.some((n) => (n as Json)?.id === wbsId),
+    'and the grid lists what the grid created', `${gridRows.length} row(s)`);
 
   const ms = await api(req, 'post', P + '/milestones', {
     title: 'Critical design review', clinId, forecastDate: iso(45),
@@ -344,20 +367,47 @@ async function main() {
     SELECT title, starts_on AS "startsOn", forecast_date AS "forecastDate"
       FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
   const d10 = (v: unknown) => (v ? new Date(v as string).toISOString().slice(0, 10) : null);
-  A(d10(chain[1]?.startsOn) === iso(46), 'phase 2 starts the day after phase 1 ends',
-    `${d10(chain[1]?.startsOn)} (phase 1 ends ${d10(chain[0]?.forecastDate)})`);
-  A(d10(chain[2]?.startsOn) === iso(121), 'phase 3 starts the day after phase 2 ends', `${d10(chain[2]?.startsOn)}`);
+  const plusDay = (s: string | null) =>
+    (s ? new Date(new Date(`${s}T00:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10) : null);
+
+  // ── ASSERT THE PROPERTY, NOT A POSITION ─────────────────────────────────────────────────────
+  //
+  // These used to be `chain[1]` and `chain[2]` against hard-coded offsets. Migrations 228-229 made
+  // the `/wbs` route write a milestone, so the plan gained a row and every positional index shifted
+  // by one — the same trap as reading `queries[0]` in a mocked test. What the rule actually says is
+  // "a start is filled from the previous end + 1 day, and a PINNED start is respected", so that is
+  // what gets asserted, by title, at whatever length the plan happens to be.
+  const PINNED = new Set(['Sensor integration']);   // the only one created with an explicit start
+  const breaks: string[] = [];
+  let serial = 0;
+  for (let i = 1; i < chain.length; i++) {
+    if (PINNED.has(chain[i].title)) continue;
+    const expected = plusDay(d10(chain[i - 1].forecastDate));
+    if (d10(chain[i].startsOn) === expected) serial++;
+    else breaks.push(`${chain[i].title}: ${d10(chain[i].startsOn)} ≠ ${expected}`);
+  }
+  A(breaks.length === 0 && serial >= 2,
+    'each unpinned phase starts the day after the one before it ends',
+    breaks.length ? breaks.join(' · ') : `${serial} of ${chain.length - 1} links, in a ${chain.length}-phase plan`);
+  const pinned = chain.find((c) => c.title === 'Sensor integration');
+  A(d10(pinned?.startsOn) === iso(-30),
+    'and a PINNED start is RESPECTED — resequencing fills gaps, it does not overwrite a decision',
+    `${d10(pinned?.startsOn)}`);
 
   // A slip moves what FOLLOWS. That is what makes the dates serial rather than a list.
-  const beforeSlip = chain.map((c) => d10(c.forecastDate));
+  const endBefore = new Map(chain.map((c) => [c.title, d10(c.forecastDate)]));
   const slip = await api(req, 'patch', P + '/milestones', { action: 'reschedule', milestoneId: ms2id, forecastDate: iso(134) });
   A(slip.status === 200 && ((slip.json.data as Json)?.deltaDays as number) === 14,
     'phase 2 slips 14 days', `${slip.status} delta=${(slip.json.data as Json)?.deltaDays}`);
-  const afterSlip = await sql<{ forecastDate: string | null; baselineDate: string | null }[]>`
-    SELECT forecast_date AS "forecastDate", baseline_date AS "baselineDate"
+  const afterSlip = await sql<{ title: string; forecastDate: string | null; baselineDate: string | null }[]>`
+    SELECT title, forecast_date AS "forecastDate", baseline_date AS "baselineDate"
       FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
-  A(d10(afterSlip[2]?.forecastDate) === iso(194), 'phase 3 slips with it', `${beforeSlip[2]} → ${d10(afterSlip[2]?.forecastDate)}`);
-  A(d10(afterSlip[0]?.forecastDate) === beforeSlip[0], 'the EARLIER phase does not move');
+  const endAfter = new Map(afterSlip.map((c) => [c.title, d10(c.forecastDate)]));
+  A(endAfter.get('Final report') === iso(194), 'the LATER phase slips with it',
+    `${endBefore.get('Final report')} → ${endAfter.get('Final report')}`);
+  A(endAfter.get('Critical design review') === endBefore.get('Critical design review'),
+    'and the EARLIER phase does not move',
+    `${endBefore.get('Critical design review')} → ${endAfter.get('Critical design review')}`);
 
   // ── STAFFING: assignment is the access mechanism, so it comes before the work ──────────────
   // `/team` returns the roster as a BARE ARRAY under `data` — read the route, do not assume the
@@ -390,10 +440,19 @@ async function main() {
   const base = await api(req, 'post', P + '/baseline', {});
   A(base.status === 200 || base.status === 201, 'the baseline is set', `${base.status}`);
 
-  const [{ frozen }] = await sql<{ frozen: number }[]>`
-    SELECT count(*)::int AS frozen FROM project_wbs_nodes
-     WHERE project_id = ${created.projectId}::uuid AND baseline_start IS NOT NULL`;
-  A(frozen === 2, 'every planned WBS node carries a frozen baseline', `${frozen}`);
+  // The milestone IS the WBS element (migs 228-229), so "the plan is frozen" is one count against
+  // one table. BOTH promises are asserted: `baseline_date` alone would have passed while migration
+  // 228 was silently carrying no cost baseline at all, which is exactly what 229 went back for.
+  const [froze] = await sql<{ dates: number; costs: number; planned: number }[]>`
+    SELECT count(*) FILTER (WHERE baseline_date IS NOT NULL)::int AS dates,
+           count(*) FILTER (WHERE baseline_cost IS NOT NULL)::int AS costs,
+           count(*) FILTER (WHERE planned_cost  IS NOT NULL)::int AS planned
+      FROM project_milestones
+     WHERE project_id = ${created.projectId}::uuid`;
+  A(froze.dates >= 2, 'every planned milestone carries a frozen baseline date', `${froze.dates}`);
+  A(froze.costs === froze.planned,
+    'and a frozen baseline COST wherever a cost was planned — cost variance has two sides',
+    `${froze.costs} frozen / ${froze.planned} planned`);
 
   const again = await api(req, 'post', P + '/baseline', {});
   A(again.status === 409, 'a SECOND baseline is refused', `${again.status} ${String(again.json.code ?? '')}`);
@@ -411,17 +470,20 @@ async function main() {
      WHERE namespace = 'project' AND type = 'baseline.set' AND phase = 'start'
        AND payload->>'projectId' = ${created.projectId}`;
   A(Boolean(start), 'project:baseline.set opened a bracket');
-  const [close] = await sql<{ wbs: string | null; ms: string | null }[]>`
-    SELECT payload->>'wbsNodes' AS wbs, payload->>'milestones' AS ms FROM system_events
+  const [close] = await sql<{ ms: string | null }[]>`
+    SELECT payload->>'milestones' AS ms FROM system_events
      WHERE namespace = 'project' AND type = 'baseline.set' AND phase = 'end'
        AND parent_event_id = ${start?.id ?? null}::uuid`;
   A(Boolean(close), 'and CLOSED it — a start with no end is B139, the class the spine audit exists for');
   const [{ msCount }] = await sql<{ msCount: number }[]>`
     SELECT count(*)::int AS "msCount" FROM project_milestones
      WHERE project_id = ${created.projectId}::uuid`;
-  A(close?.wbs === '2' && close?.ms === String(msCount),
+  // ONE count, because there is one spine. The payload used to carry `wbsNodes` beside
+  // `milestones`, both filled from the same array — two names for one number, which reads as
+  // corroboration and is not.
+  A(close?.ms === String(msCount),
     'the end event carries what was frozen, not an empty object',
-    close ? `wbsNodes=${close.wbs} milestones=${close.ms} (plan holds ${msCount})` : 'no end row');
+    close ? `milestones=${close.ms} (plan holds ${msCount})` : 'no end row');
 
   // ══ 6 · HITL — the work is delivered and ACCEPTED ══════════════════════════════════════════
   phase('6 · HITL: upload is not acceptance');

@@ -161,16 +161,18 @@ try {
     } else {
       const body = await text(p, `/portal/foundation/projects/${proj.id}`);
 
-      // rollup.ts:137-147, verbatim.
+      // rollup.ts's deliverables query, verbatim — COPIED from the source, not re-derived. It
+      // changed shape with migrations 228-229 (the deliverable now names its own CLIN, falling
+      // back to its milestone's) and a predicate I believed equivalent would have kept passing
+      // against the old join while the page computed something else.
       const delRows = await sql`
-        SELECT COALESCE(m.clin_id, n.clin_id) AS clin_id,
+        SELECT COALESCE(d.clin_id, m.clin_id) AS clin_id,
                COUNT(*) FILTER (WHERE d.accepted_at IS NOT NULL)::int AS accepted,
                COUNT(*)::int                                          AS total
           FROM project_deliverables d
           JOIN project_milestones m ON m.id = d.milestone_id
-          LEFT JOIN project_wbs_nodes n ON n.id = m.wbs_node_id
          WHERE m.project_id = ${proj.id}::uuid AND d.tenant_id = ${tid}::uuid
-         GROUP BY COALESCE(m.clin_id, n.clin_id)`;
+         GROUP BY COALESCE(d.clin_id, m.clin_id)`;
       const dbAccepted = delRows.reduce((a, r) => a + r.accepted, 0);
       const dbTotal = delRows.reduce((a, r) => a + r.total, 0);
 

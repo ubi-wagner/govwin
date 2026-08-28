@@ -645,7 +645,9 @@ Two capabilities landed after 184 and both add tables rather than change the exi
   makes a crash mid-send visible instead of invisible.
 - **mig 216 — Projects.** Eight tables: `projects`, `project_assignments`,
   `project_source_documents`, `project_clins`, `project_wbs_nodes`, `project_milestones`,
-  `project_deliverables`, `project_provenance`. Every one carries `tenant_id` **NOT NULL and directly**
+  `project_deliverables`, `project_provenance` — **seven now**: migs 228–229 collapsed
+  `project_wbs_nodes` into `project_milestones` (the milestone IS the WBS element) and dropped it,
+  the only project table ever dropped. Every one carries `tenant_id` **NOT NULL and directly**
   — never by lineage through a parent — with force-RLS and a `tenant_isolation` policy, because a policy
   that has to join to find its tenant is a policy that can be joined around. Baseline immutability is a
   **trigger** raising `23001`, not an app rule: an app-layer rule protects only the writers that exist

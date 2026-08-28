@@ -19,11 +19,21 @@
  * `null` says "not measured"; `0` says "measured, and it is zero". The UI has to render them
  * differently, which is the point.
  *
- * ── THE EFFECTIVE CLIN ───────────────────────────────────────────────────────────────────────
- * A WBS node carries `clin_id` OR inherits it from the nearest ancestor that does — a plan is
- * written as "CLIN 0001 → design → wireframes", and nobody re-tags every leaf. The recursive CTE
- * below resolves that once; aggregating on the raw column instead would silently drop every child
- * node from its CLIN's cost, and the total would still look plausible.
+ * ── THE MILESTONE IS THE WBS ELEMENT (mig 228) ───────────────────────────────────────────────
+ * There is no separate node tree, and so no recursive CTE resolving an inherited CLIN: a project is
+ * the portal, the WBS **is** the milestone list, and each milestone carries tasks and deliverables.
+ * The whole of that resolution logic went away, which is what collapsing a parallel structure is
+ * supposed to feel like.
+ *
+ * TWO CLIN LINKS, and they answer different questions:
+ *
+ *   `project_milestones.clin_id`    which line item this month's WORK is under — CLIN 0002 having
+ *                                   twelve monthly milestones is this column. Cost groups by it.
+ *   `project_deliverables.clin_id`  which contractual ITEM a deliverable satisfies. Deliverable
+ *                                   counts group by it.
+ *
+ * They usually agree and are still not the same claim: a milestone under CLIN 0001 can produce an
+ * artefact that satisfies CLIN 0002, and a single column could not say so.
  */
 import { sql } from '@/lib/db';
 
@@ -39,9 +49,16 @@ export interface Measures {
   // The raw counts, so a reader can see what each percentage was computed FROM. A percentage
   // whose denominator is invisible is a percentage nobody can check.
   plannedCost: string | null;
-  /** Other direct costs entered on the WBS node — travel, materials. */
+  /**
+   * What was promised at baseline — frozen, and refused thereafter by migration 216's trigger
+   * (the column arrived in mig 229). Reported BESIDE `plannedCost` rather than replacing it,
+   * because they answer different questions: burn is against the current plan, and whether the
+   * plan still matches the promise is the distance between these two. `null` before baselining.
+   */
+  baselineCost: string | null;
+  /** Other direct costs entered on the milestone — travel, materials. */
   otherDirectCost: string;
-  /** APPROVED labour, summed from project_time_entries (mig 227). */
+  /** APPROVED labour, summed from project_time_entries (migs 227–228). */
   labourCost: string;
   labourHours: string;
   /** `otherDirectCost + labourCost`. Both halves are reported beside it, because a number a
@@ -80,20 +97,21 @@ export function pct(numerator: number, denominator: number): number | null {
 }
 
 /**
- * The rollup. One query for the WBS (cost + schedule) and one for deliverables, because they hang
- * off different parents — deliverables belong to milestones, not to WBS nodes — and forcing them
- * into a single join produces a cartesian product that silently multiplies the cost totals.
+ * The rollup. One query for cost and schedule and one for deliverables — kept apart because a
+ * milestone has many of each, and joining both in one statement multiplies every milestone's
+ * `planned_cost` by its deliverable count while the total still looks plausible.
  */
 export async function rollup(tenantId: string, projectId: string): Promise<ProjectRollup> {
   try {
-    // ── WBS: cost and schedule, per effective CLIN ──────────────────────────────────────────
+    // ── Cost and schedule, per CLIN, from the MILESTONES ────────────────────────────────────
     //
-    // `effective_clin` walks up `parent_id` to the nearest ancestor carrying a CLIN. Schedule is
-    // weighted by DURATION: a two-day task at 100% and a two-hundred-day task at 0% is not 50%
-    // done, and an unweighted node-count average says it is.
+    // Flat: milestones do not nest, so there is nothing to resolve. Schedule is weighted by
+    // DURATION — a two-day milestone at 100% and a two-hundred-day one at 0% is not 50% done, and
+    // an unweighted count says it is.
     const wbs = await sql<Array<{
       clinId: string | null;
       plannedCost: string | null;
+      baselineCost: string | null;
       otherDirectCost: string | null;
       labourCost: string | null;
       labourHours: string | null;
@@ -102,74 +120,59 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
       totalDays: string | null;
       nodesWithDates: number;
     }>>`
-      WITH RECURSIVE resolved AS (
-        SELECT n.id, n.parent_id, n.clin_id, n.planned_cost, n.actual_cost,
-               n.planned_start, n.planned_end, n.clin_id AS effective_clin
-          FROM project_wbs_nodes n
-         WHERE n.project_id = ${projectId}::uuid AND n.tenant_id = ${tenantId}::uuid
-           AND n.parent_id IS NULL
-        UNION ALL
-        SELECT c.id, c.parent_id, c.clin_id, c.planned_cost, c.actual_cost,
-               c.planned_start, c.planned_end,
-               COALESCE(c.clin_id, r.effective_clin) AS effective_clin
-          FROM project_wbs_nodes c
-          JOIN resolved r ON r.id = c.parent_id
-         WHERE c.project_id = ${projectId}::uuid AND c.tenant_id = ${tenantId}::uuid
-      ),
-      -- APPROVED labour per node (mig 227). Only approved: hours are what a customer is billed
-      -- for, and "somebody typed it" is not the same claim as "a manager checked it". Aggregated
-      -- FIRST and joined once, because joining the entries into resolved would multiply every
-      -- node's planned_cost by its number of timesheet rows -- a total that still looks plausible.
-      labour AS (
-        SELECT wbs_node_id, SUM(cost) AS labour_cost, SUM(hours) AS labour_hours
+      WITH labour AS (
+        -- APPROVED labour per milestone (migs 227-228). Only approved: hours are what a customer
+        -- is billed for, and "somebody typed it" is not "a manager checked it". Aggregated FIRST
+        -- and joined once — joining the entries directly would multiply each milestone's
+        -- planned_cost by its number of timesheet rows, and the total would still look plausible.
+        SELECT milestone_id, SUM(cost) AS labour_cost, SUM(hours) AS labour_hours
           FROM project_time_entries
          WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
            AND approved_at IS NOT NULL
-         GROUP BY wbs_node_id
+         GROUP BY milestone_id
       )
-      SELECT effective_clin AS clin_id,
-             SUM(planned_cost)                                   AS planned_cost,
-             SUM(actual_cost)                                    AS other_direct_cost,
-             COALESCE(SUM(l.labour_cost), 0)                     AS labour_cost,
-             COALESCE(SUM(l.labour_hours), 0)                    AS labour_hours,
-             SUM(actual_cost) + COALESCE(SUM(l.labour_cost), 0)  AS actual_cost,
-             -- Elapsed, clamped into the node's own window: a task that has not started
-             -- contributes 0, one that is past its end contributes its whole duration, and
-             -- nothing contributes more than it is worth.
+      SELECT m.clin_id                                             AS clin_id,
+             SUM(m.planned_cost)                                   AS planned_cost,
+             SUM(m.baseline_cost)                                  AS baseline_cost,
+             SUM(m.actual_cost)                                    AS other_direct_cost,
+             COALESCE(SUM(l.labour_cost), 0)                       AS labour_cost,
+             COALESCE(SUM(l.labour_hours), 0)                      AS labour_hours,
+             SUM(m.actual_cost) + COALESCE(SUM(l.labour_cost), 0)  AS actual_cost,
+             -- Elapsed, clamped into each milestone's own window: one that has not started
+             -- contributes 0, one past its end contributes its whole duration, and nothing
+             -- contributes more than it is worth.
              SUM(
-               CASE WHEN planned_start IS NULL OR planned_end IS NULL THEN 0
+               CASE WHEN m.starts_on IS NULL OR m.forecast_date IS NULL THEN 0
                     ELSE GREATEST(0, LEAST(
-                      (planned_end - planned_start) + 1,
-                      (CURRENT_DATE - planned_start) + 1
+                      (m.forecast_date - m.starts_on) + 1,
+                      (CURRENT_DATE - m.starts_on) + 1
                     )) END
-             )::numeric                                          AS elapsed_days,
+             )::numeric                                            AS elapsed_days,
              SUM(
-               CASE WHEN planned_start IS NULL OR planned_end IS NULL THEN 0
-                    ELSE (planned_end - planned_start) + 1 END
-             )::numeric                                          AS total_days,
+               CASE WHEN m.starts_on IS NULL OR m.forecast_date IS NULL THEN 0
+                    ELSE (m.forecast_date - m.starts_on) + 1 END
+             )::numeric                                            AS total_days,
              COUNT(*) FILTER (
-               WHERE planned_start IS NOT NULL AND planned_end IS NOT NULL
-             )::int                                              AS nodes_with_dates
-        FROM resolved
-        LEFT JOIN labour l ON l.wbs_node_id = resolved.id
-       GROUP BY effective_clin`;
+               WHERE m.starts_on IS NOT NULL AND m.forecast_date IS NOT NULL
+             )::int                                                AS nodes_with_dates
+        FROM project_milestones m
+        LEFT JOIN labour l ON l.milestone_id = m.id
+       WHERE m.project_id = ${projectId}::uuid AND m.tenant_id = ${tenantId}::uuid
+       GROUP BY m.clin_id`;
 
-    // ── Deliverables, per effective CLIN via the milestone ───────────────────────────────────
-    //
-    // A milestone carries its own `clin_id`; when it does not, it inherits through its WBS node.
-    // Separate query, because a deliverable is not a WBS node — joining them in one statement
-    // multiplies every cost row by the number of deliverables under it.
     const deliverables = await sql<Array<{
       clinId: string | null; accepted: number; total: number;
     }>>`
-      SELECT COALESCE(m.clin_id, n.clin_id) AS clin_id,
+      -- By the DELIVERABLE's own CLIN, falling back to its milestone's. The deliverable names the
+      -- contractual item; the milestone names the line item its work sits under. A milestone under
+      -- CLIN 0001 producing a CLIN 0002 artefact is counted where the contract counts it.
+      SELECT COALESCE(d.clin_id, m.clin_id) AS clin_id,
              COUNT(*) FILTER (WHERE d.accepted_at IS NOT NULL)::int AS accepted,
              COUNT(*)::int                                          AS total
         FROM project_deliverables d
         JOIN project_milestones m ON m.id = d.milestone_id
-        LEFT JOIN project_wbs_nodes n ON n.id = m.wbs_node_id
        WHERE m.project_id = ${projectId}::uuid AND d.tenant_id = ${tenantId}::uuid
-       GROUP BY COALESCE(m.clin_id, n.clin_id)`;
+       GROUP BY COALESCE(d.clin_id, m.clin_id)`;
 
     const clinRows = await sql<Array<{
       id: string; clinNumber: string; title: string; fundedAmount: string | null;
@@ -203,6 +206,7 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
         schedulePct: pct(elapsed, total),
         deliverablesPct: d ? pct(d.accepted, d.total) : null,
         plannedCost: w?.plannedCost ?? null,
+        baselineCost: w?.baselineCost ?? null,
         otherDirectCost: w?.otherDirectCost ?? '0',
         labourCost: w?.labourCost ?? '0',
         labourHours: w?.labourHours ?? '0',
@@ -237,6 +241,10 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
     const sum = (f: (r: (typeof wbs)[number]) => number) => wbs.reduce((a, r) => a + f(r), 0);
     const plannedAll = sum((r) => Number(r.plannedCost ?? 0));
     const actualAll = sum((r) => Number(r.actualCost ?? 0));
+    // "No baseline" and "a baseline of zero" are different answers, and `baselineAll ? … : null`
+    // cannot tell them apart. Ask whether any row HAS one, rather than whether the total is truthy.
+    const baselineAll = sum((r) => Number(r.baselineCost ?? 0));
+    const anyBaseline = wbs.some((r) => r.baselineCost != null);
     const elapsedAll = sum((r) => Number(r.elapsedDays ?? 0));
     const totalAll = sum((r) => Number(r.totalDays ?? 0));
     const acceptedAll = deliverables.reduce((a, r) => a + r.accepted, 0);
@@ -248,6 +256,7 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
         schedulePct: pct(elapsedAll, totalAll),
         deliverablesPct: pct(acceptedAll, deliverablesAll),
         plannedCost: plannedAll ? String(plannedAll) : null,
+        baselineCost: anyBaseline ? String(baselineAll) : null,
         otherDirectCost: String(sum((r) => Number(r.otherDirectCost ?? 0))),
         labourCost: String(sum((r) => Number(r.labourCost ?? 0))),
         labourHours: String(sum((r) => Number(r.labourHours ?? 0))),
@@ -267,7 +276,8 @@ export async function rollup(tenantId: string, projectId: string): Promise<Proje
     return {
       project: {
         costPct: null, schedulePct: null, deliverablesPct: null,
-        plannedCost: null, otherDirectCost: '0', labourCost: '0', labourHours: '0', actualCost: '0',
+        plannedCost: null, baselineCost: null,
+        otherDirectCost: '0', labourCost: '0', labourHours: '0', actualCost: '0',
         deliverablesAccepted: 0, deliverablesTotal: 0, nodesWithDates: 0,
       },
       clins: [],

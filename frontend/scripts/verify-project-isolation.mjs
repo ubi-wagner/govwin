@@ -37,11 +37,13 @@ if (!APP || !OWNER) {
 const app = postgres(APP, { max: 1, onnotice: () => {} });
 const owner = postgres(OWNER, { max: 1, onnotice: () => {} });
 
+// `project_wbs_nodes` is NOT in this list because it no longer exists: migration 228 collapsed it
+// into `project_milestones` (the milestone IS the WBS element) and 229 dropped it. A name left here
+// would fail step 1 as "migration 216 has not been applied", which is the opposite of true.
 const TABLES = [
   'projects',
   'project_source_documents',
   'project_clins',
-  'project_wbs_nodes',
   'project_milestones',
   'project_deliverables',
   'project_provenance',
@@ -135,18 +137,17 @@ async function main() {
     INSERT INTO projects (tenant_id, name) VALUES (${B.id}, ${`probe-B-${stamp}`}) RETURNING id`;
   created.projects.push(pA.id, pB.id);
 
+  // ONE fixture row, because there is one spine: the milestone IS the WBS element (mig 228).
   await owner`
-    INSERT INTO project_wbs_nodes (tenant_id, project_id, code, title, planned_cost)
-    VALUES (${A.id}, ${pA.id}, '1.1', 'Probe task', 1000)`;
-  await owner`
-    INSERT INTO project_milestones (tenant_id, project_id, title) VALUES (${A.id}, ${pA.id}, 'Probe milestone')`;
+    INSERT INTO project_milestones (tenant_id, project_id, code, title, planned_cost)
+    VALUES (${A.id}, ${pA.id}, '1.1', 'Probe milestone', 1000)`;
 
   // ── 4 · behaviour, the part that cannot be faked ─────────────────────────────────────────────
   const seen = await app.begin(async (tx) => {
     await tx`SELECT set_config('app.tenant_id', ${B.id}, true)`;
     const [own] = await tx`SELECT count(*)::int AS n FROM projects WHERE id = ${pB.id}`;
     const [foreign] = await tx`SELECT count(*)::int AS n FROM projects WHERE id = ${pA.id}`;
-    const [foreignWbs] = await tx`SELECT count(*)::int AS n FROM project_wbs_nodes WHERE project_id = ${pA.id}`;
+    const [foreignWbs] = await tx`SELECT count(*)::int AS n FROM project_milestones WHERE project_id = ${pA.id}`;
     return { own: own.n, foreign: foreign.n, foreignWbs: foreignWbs.n };
   });
 
@@ -156,65 +157,73 @@ async function main() {
   else ok(`tenant '${B.slug}' sees its own project`);
   if (seen.foreign !== 0) no(`tenant '${B.slug}' can see '${A.slug}'s project`);
   else ok(`tenant '${B.slug}' sees 0 of '${A.slug}'s projects`);
-  if (seen.foreignWbs !== 0) no(`tenant '${B.slug}' can read ${seen.foreignWbs} of '${A.slug}'s WBS node(s)`);
-  else ok(`tenant '${B.slug}' sees 0 of '${A.slug}'s WBS nodes`);
+  if (seen.foreignWbs !== 0) no(`tenant '${B.slug}' can read ${seen.foreignWbs} of '${A.slug}'s milestone(s)`);
+  else ok(`tenant '${B.slug}' sees 0 of '${A.slug}'s milestones`);
 
   // A write into another tenant's project must be refused by WITH CHECK, not merely invisible.
   const writeCode = await refusedWith(() => app.begin(async (tx) => {
     await tx`SELECT set_config('app.tenant_id', ${B.id}, true)`;
-    await tx`INSERT INTO project_wbs_nodes (tenant_id, project_id, code, title)
+    await tx`INSERT INTO project_milestones (tenant_id, project_id, code, title)
              VALUES (${A.id}, ${pA.id}, '9.9', 'injected')`;
   }));
   if (writeCode !== '42501') {
     no(`a cross-tenant INSERT ${writeCode === null ? 'SUCCEEDED' : `raised ${writeCode}`} — expected 42501`);
-    if (writeCode === null) await owner`DELETE FROM project_wbs_nodes WHERE code = '9.9' AND project_id = ${pA.id}`;
+    if (writeCode === null) await owner`DELETE FROM project_milestones WHERE code = '9.9' AND project_id = ${pA.id}`;
   } else ok('a cross-tenant INSERT is refused (42501)');
 
   // ── 5 · the baseline refuses to move ────────────────────────────────────────────────────────
   //
-  // Three distinct facts, and only the third is the headline. Setting once must WORK, or the
+  // ONE table now (migs 228-229). It used to be two, and the WBS half carried the COST promise —
+  // so this section is also where a regression in the collapse would surface: if `baseline_cost`
+  // had not come across, the assertions below would be measuring a column that does not exist and
+  // the run would abort rather than quietly pass with the schedule half only.
+  //
+  // Four distinct facts, and only the third is the headline. Setting once must WORK, or the
   // trigger is a deny-all wearing an immutability badge; rewriting the same value must work, or an
   // idempotent whole-row UPDATE fails for touching a column it did not change.
-  const [node] = await owner`SELECT id FROM project_wbs_nodes WHERE project_id = ${pA.id} LIMIT 1`;
+  const [node] = await owner`SELECT id FROM project_milestones WHERE project_id = ${pA.id} LIMIT 1`;
 
   const setCode = await refusedWith(() => owner`
-    UPDATE project_wbs_nodes SET baseline_start = '2026-01-01', baseline_cost = 1000 WHERE id = ${node.id}`);
+    UPDATE project_milestones SET baseline_date = '2026-01-01', baseline_cost = 1000 WHERE id = ${node.id}`);
   if (setCode !== null) no(`setting a baseline for the first time was refused (${setCode}) — the trigger is a deny-all`);
   else ok('a baseline can be set once');
 
   const rewriteSameCode = await refusedWith(() => owner`
-    UPDATE project_wbs_nodes SET baseline_start = '2026-01-01', title = 'Probe task renamed' WHERE id = ${node.id}`);
+    UPDATE project_milestones SET baseline_date = '2026-01-01', title = 'Probe milestone renamed' WHERE id = ${node.id}`);
   if (rewriteSameCode !== null) no(`rewriting a baseline with the SAME value was refused (${rewriteSameCode}) — an idempotent row update would fail`);
   else ok('rewriting a baseline with the same value is allowed (idempotent updates still work)');
 
   const moveCode = await refusedWith(() => owner`
-    UPDATE project_wbs_nodes SET baseline_start = '2026-06-01' WHERE id = ${node.id}`);
+    UPDATE project_milestones SET baseline_date = '2026-06-01' WHERE id = ${node.id}`);
   if (moveCode !== '23001') {
     no(`MOVING a set baseline ${moveCode === null ? 'SUCCEEDED' : `raised ${moveCode}`} — expected 23001 `
       + '(restrict_violation). Variance only means something if you still hold what you promised.');
-  } else ok('moving a set baseline is refused (23001 restrict_violation)');
+  } else ok('moving a set baseline date is refused (23001 restrict_violation)');
+
+  // The COST promise, separately — it is the half that migration 228 dropped and 229 restored, and
+  // an assertion only on the date would have reported that loss as correct.
+  const costMoveCode = await refusedWith(() => owner`
+    UPDATE project_milestones SET baseline_cost = 2500 WHERE id = ${node.id}`);
+  if (costMoveCode !== '23001') {
+    no(`MOVING a set baseline_cost ${costMoveCode === null ? 'SUCCEEDED' : `raised ${costMoveCode}`} — expected 23001. `
+      + 'Cost variance measured against an editable column is zero forever.');
+  } else ok('moving a set baseline cost is refused (23001)');
 
   const clearCode = await refusedWith(() => owner`
-    UPDATE project_wbs_nodes SET baseline_cost = NULL WHERE id = ${node.id}`);
+    UPDATE project_milestones SET baseline_cost = NULL WHERE id = ${node.id}`);
   if (clearCode !== '23001') no(`CLEARING a set baseline ${clearCode === null ? 'SUCCEEDED' : `raised ${clearCode}`} — expected 23001`);
   else ok('clearing a set baseline is refused (23001)');
 
   // The current plan must stay freely editable — an immutability rule that froze the live plan
-  // would make the whole capability read-only and would pass every assertion above.
+  // would make the whole capability read-only and would pass every assertion above. `forecast_date`
+  // is in here deliberately: it is the current-plan twin of the frozen `baseline_date`, and if the
+  // trigger were declared one column too wide, variance would become unrecordable.
   const planCode = await refusedWith(() => owner`
-    UPDATE project_wbs_nodes SET planned_start = '2026-07-01', planned_cost = 2500, actual_cost = 400
+    UPDATE project_milestones
+       SET starts_on = '2026-07-01', forecast_date = '2026-08-15', planned_cost = 2500, actual_cost = 400
      WHERE id = ${node.id}`);
   if (planCode !== null) no(`editing the CURRENT plan was refused (${planCode}) — the trigger is too wide`);
-  else ok('the current plan stays freely editable');
-
-  // ── 6 · a milestone's baseline date, same rule, different table ──────────────────────────────
-  const [ms] = await owner`SELECT id FROM project_milestones WHERE project_id = ${pA.id} LIMIT 1`;
-  await owner`UPDATE project_milestones SET baseline_date = '2026-03-01', forecast_date = '2026-03-01' WHERE id = ${ms.id}`;
-  const msMove = await refusedWith(() => owner`UPDATE project_milestones SET baseline_date = '2026-04-01' WHERE id = ${ms.id}`);
-  const msForecast = await refusedWith(() => owner`UPDATE project_milestones SET forecast_date = '2026-04-15' WHERE id = ${ms.id}`);
-  if (msMove !== '23001') no(`a milestone baseline_date could be moved (${msMove ?? 'succeeded'})`);
-  else if (msForecast !== null) no(`a milestone forecast_date could NOT be moved (${msForecast}) — variance would be unrecordable`);
-  else ok('milestone: baseline_date frozen, forecast_date free — variance is recordable');
+  else ok('the current plan stays freely editable — variance is recordable');
 
   await finish();
 }

@@ -62,23 +62,25 @@ async function main() {
   // ── The fixture, chosen so each failure mode shows up as a DIFFERENT wrong number ──────────
   //
   // CLIN 0001 — a parent carrying the CLIN, and a CHILD that does not. If the CTE is wrong and the
-  // child is dropped, cost reads 25% instead of 40%: both plausible, only one right.
+  // one is dropped, cost reads 25% instead of 40%: both plausible, only one right.
   //
-  //   parent  planned 1000  actual  400
-  //   child   planned 1000  actual  400      (clin_id NULL — inherits)
+  //   '1'    planned 1000  actual 400
+  //   '1.1'  planned 1000  actual 400
   //   ⇒ planned 2000, actual 800  ⇒ cost 40.0%
-  const [parentA] = await owner`
-    INSERT INTO project_wbs_nodes
-      (tenant_id, project_id, clin_id, code, title, planned_cost, actual_cost,
-       planned_start, planned_end, sort_index)
-    VALUES (${tenant.id}, ${projectId}, ${clinA.id}, '1', 'Design', 1000, 400,
-            CURRENT_DATE - 9, CURRENT_DATE, 1)
-    RETURNING id`;
+  // TWO milestones on CLIN 0001 — mig 228 removed the node hierarchy, so what used to be a
+  // parent and an inheriting child is now two elements tagged with the same CLIN. That IS the
+  // product owner's model: "CLIN 0002 can have 12 milestones under the WBS".
   await owner`
-    INSERT INTO project_wbs_nodes
-      (tenant_id, project_id, clin_id, parent_id, code, title, planned_cost, actual_cost,
-       planned_start, planned_end, sort_index)
-    VALUES (${tenant.id}, ${projectId}, NULL, ${parentA.id}, '1.1', 'Wireframes', 1000, 400,
+    INSERT INTO project_milestones
+      (tenant_id, project_id, clin_id, code, title, planned_cost, actual_cost,
+       starts_on, forecast_date, sort_index)
+    VALUES (${tenant.id}, ${projectId}, ${clinA.id}, '1', 'Design', 1000, 400,
+            CURRENT_DATE - 9, CURRENT_DATE, 1)`;
+  await owner`
+    INSERT INTO project_milestones
+      (tenant_id, project_id, clin_id, code, title, planned_cost, actual_cost,
+       starts_on, forecast_date, sort_index)
+    VALUES (${tenant.id}, ${projectId}, ${clinA.id}, '1.1', 'Wireframes', 1000, 400,
             CURRENT_DATE - 9, CURRENT_DATE, 2)`;
 
   // CLIN 0002 — planned but not started, and a LONG task next to a SHORT one so an unweighted
@@ -88,15 +90,15 @@ async function main() {
   //   long  200 days, starts tomorrow      → 0 of 200
   //   unweighted average would be 50%; duration-weighted is 2/202 = 1.0%
   await owner`
-    INSERT INTO project_wbs_nodes
+    INSERT INTO project_milestones
       (tenant_id, project_id, clin_id, code, title, planned_cost, actual_cost,
-       planned_start, planned_end, sort_index)
+       starts_on, forecast_date, sort_index)
     VALUES (${tenant.id}, ${projectId}, ${clinB.id}, '2.1', 'Spike', 500, 0,
             CURRENT_DATE - 1, CURRENT_DATE, 3)`;
   await owner`
-    INSERT INTO project_wbs_nodes
+    INSERT INTO project_milestones
       (tenant_id, project_id, clin_id, code, title, planned_cost, actual_cost,
-       planned_start, planned_end, sort_index)
+       starts_on, forecast_date, sort_index)
     VALUES (${tenant.id}, ${projectId}, ${clinB.id}, '2.2', 'Build out', 500, 0,
             CURRENT_DATE + 1, CURRENT_DATE + 200, 4)`;
 
@@ -107,21 +109,21 @@ async function main() {
   //
   //   · counting UNAPPROVED hours — a customer is billed for what a manager checked, not for what
   //     somebody typed, and the total would silently run ahead of the invoice
-  //   · joining the entries into the WBS CTE instead of aggregating first — every node's
-  //     planned_cost gets multiplied by its number of timesheet rows
+  //   · joining the entries in instead of aggregating first — every milestone's planned_cost
+  //     gets multiplied by its number of timesheet rows
   //
-  //   CLIN 0002 · 'Spike' node: approved 4h @ 100 = 400, PLUS approved 2h @ 50 = 100  ⇒ 500
+  //   CLIN 0002 · 'Spike' milestone: approved 4h @ 100 = 400, PLUS approved 2h @ 50 = 100 ⇒ 500
   //               and an UNAPPROVED 10h @ 100 = 1000 that must NOT count
   //   ⇒ 0002 actual = odc 0 + labour 500 = 500, planned 1000 ⇒ cost 50.0%
   //   If unapproved counted, actual would be 1500 and cost 150% — visibly wrong.
-  //   If the join multiplied, 0002 planned would read 3000 (three entries on one node).
+  //   If the join multiplied, 0002 planned would read 3000 (three entries on one milestone).
   const [spike] = await owner`
-    SELECT id FROM project_wbs_nodes WHERE project_id = ${projectId} AND code = '2.1' LIMIT 1`;
+    SELECT id FROM project_milestones WHERE project_id = ${projectId} AND code = '2.1' LIMIT 1`;
   const [someone] = await owner`SELECT id FROM users ORDER BY created_at LIMIT 1`;
   for (const [hours, rate, approved] of [[4, 100, true], [2, 50, true], [10, 100, false]]) {
     await owner`
       INSERT INTO project_time_entries
-        (tenant_id, project_id, wbs_node_id, user_id, worked_on, hours, hourly_rate,
+        (tenant_id, project_id, milestone_id, user_id, worked_on, hours, hourly_rate,
          approved_by, approved_at)
       VALUES (${tenant.id}, ${projectId}, ${spike.id}, ${someone.id}, CURRENT_DATE,
               ${hours}, ${rate},
@@ -156,13 +158,13 @@ async function main() {
   const r = await rollup(tenant.id, projectId);
   const byClin = Object.fromEntries(r.clins.map((c) => [c.clinNumber, c]));
 
-  console.log(`  fixture: tenant '${tenant.slug}', 4 WBS nodes, 2 CLINs, 3 deliverables`);
+  console.log(`  fixture: tenant '${tenant.slug}', 4 milestones, 2 CLINs, 3 deliverables`);
 
   // CLIN 0001 — the effective-CLIN test.
   const a = byClin['0001'];
   if (!a) no('CLIN 0001 is missing from the rollup');
   else {
-    expect("0001 cost% (child inherits the CLIN: 800/2000)", a.costPct, 40);
+    expect("0001 cost% (two milestones on one CLIN: 800/2000)", a.costPct, 40);
     if (a.plannedCost !== null && Number(a.plannedCost) !== 2000) {
       no(`0001 planned cost is ${a.plannedCost}, expected 2000 — a value of 6000 means the `
         + 'deliverables join multiplied the WBS rows');
@@ -184,8 +186,8 @@ async function main() {
     expect('0002 cost% = (odc 0 + labour 500) / 1000 — a measure with a SOURCE at last', b.costPct, 50);
     if (b.plannedCost !== null && Number(b.plannedCost) !== 1000) {
       no(`0002 planned cost is ${b.plannedCost}, expected 1000 — 3000 means the time entries were `
-        + 'joined into the WBS CTE instead of aggregated first');
-    } else ok('0002 planned cost is 1000 — the labour join did not multiply the WBS rows');
+        + 'joined in instead of aggregated first');
+    } else ok('0002 planned cost is 1000 — the labour join did not multiply the milestone rows');
     expect('0002 deliverables% (none exist — NOT MEASURED, not zero)', b.deliverablesPct, null);
   }
 

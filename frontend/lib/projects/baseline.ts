@@ -27,7 +27,6 @@ import { readiness, type Fail, type Ok } from './project';
 export interface BaselineResult {
   projectId: string;
   baselinedAt: string;
-  wbsNodes: number;
   milestones: number;
 }
 
@@ -103,19 +102,19 @@ export async function setBaseline(
         const out = await withTenant(actor.tenantId, async (tx: any) => {
           // NULL → value on every row. The trigger permits exactly this transition; a second call
           // would be value → different and is refused above with a legible message.
-          const wbs = await tx`
-            UPDATE project_wbs_nodes
-               SET baseline_start = planned_start,
-                   baseline_end   = planned_end,
-                   baseline_cost  = planned_cost,
-                   updated_at     = now()
-             WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
-               AND baseline_start IS NULL AND baseline_end IS NULL AND baseline_cost IS NULL
-            RETURNING id`;
-
+          //
+          // ONE statement now: the milestone IS the WBS element (mig 228), so freezing the plan
+          // is freezing the milestones. It used to be two, against two tables that described the
+          // same thing — and a baseline written in two places is a baseline that can half-freeze.
+          //
+          // BOTH promises, in the one statement (mig 229). Freezing the date and leaving the cost
+          // is a half-baseline of a subtler kind: schedule variance would be measurable and cost
+          // variance would silently be zero, because `planned_cost` — which a rebaseline may move —
+          // would be standing on both sides of the subtraction.
           const ms = await tx`
             UPDATE project_milestones
                SET baseline_date = forecast_date,
+                   baseline_cost = planned_cost,
                    updated_at    = now()
              WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
                AND baseline_date IS NULL
@@ -133,17 +132,17 @@ export async function setBaseline(
           // producing a second, later timestamp over the same frozen plan.
           if (!proj) throw new Error('BASELINE_RACE');
 
-          return { wbsNodes: wbs.length, milestones: ms.length, baselinedAt: String(proj.baselinedAt) };
+          return { milestones: ms.length, baselinedAt: String(proj.baselinedAt) };
         });
 
         await auditLog({
           tenantId: actor.tenantId, userId: actor.userId, action: 'project.baseline_set',
           entityType: 'project', entityId: projectId,
-          metadata: { wbsNodes: out.wbsNodes, milestones: out.milestones },
+          metadata: { milestones: out.milestones },
         });
 
         return {
-          result: { wbsNodes: out.wbsNodes, milestones: out.milestones },
+          result: { milestones: out.milestones },
           value: { ok: true as const, data: { projectId, ...out } },
         };
       },
@@ -171,7 +170,6 @@ export interface RebaselineInput {
 export interface RebaselineResult {
   projectId: string;
   shiftedDays: number;
-  wbsNodes: number;
   milestones: number;
 }
 
@@ -228,7 +226,7 @@ export async function rebaseline(
         return { ok: false, status: 400, error: 'startOn must be YYYY-MM-DD', code: 'VALIDATION_ERROR' };
       }
       const [row] = await sql<{ earliest: string | null }[]>`
-        SELECT MIN(planned_start)::text AS earliest FROM project_wbs_nodes
+        SELECT MIN(starts_on)::text AS earliest FROM project_milestones
          WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid`;
       if (!row?.earliest) {
         return { ok: false, status: 409, error: 'No planned dates to shift', code: 'NOT_READY' };
@@ -266,27 +264,22 @@ export async function rebaseline(
         // `tx: any` is the house idiom (lib/intake.ts, lib/rls.ts, lib/ingest/materialize.ts) —
         // postgres.js's TransactionSql type is not callable as a tagged template under this config.
         const out = await withTenant(actor.tenantId, async (tx: any) => {
-          // ONLY the planned_* columns. The baseline_* columns are not in this statement at all —
-          // and if a future edit added them, the trigger would refuse the write rather than let it
-          // through quietly.
-          const wbs = await tx`
-            UPDATE project_wbs_nodes
-               SET planned_start = planned_start + ${shiftDays} * INTERVAL '1 day',
-                   planned_end   = planned_end   + ${shiftDays} * INTERVAL '1 day',
-                   updated_at    = now()
-             WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
-               AND (planned_start IS NOT NULL OR planned_end IS NOT NULL)
-            RETURNING id`;
-
+          // ONLY the current-plan columns. `baseline_date` and `baseline_cost` are not in this
+          // statement at all — and if a future edit added them, the trigger would refuse the write
+          // rather than let it through quietly.
+          // ONE statement, against the one spine (mig 228). Both ends of a milestone's window move
+          // together — shifting the end without the start silently compresses every phase, and the
+          // dates still look like dates.
           const ms = await tx`
             UPDATE project_milestones
-               SET forecast_date = forecast_date + ${shiftDays} * INTERVAL '1 day',
+               SET starts_on     = starts_on     + ${shiftDays} * INTERVAL '1 day',
+                   forecast_date = forecast_date + ${shiftDays} * INTERVAL '1 day',
                    updated_at    = now()
              WHERE project_id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
-               AND forecast_date IS NOT NULL AND status = 'pending'
+               AND (starts_on IS NOT NULL OR forecast_date IS NOT NULL) AND status = 'pending'
             RETURNING id`;
 
-          return { wbsNodes: wbs.length, milestones: ms.length };
+          return { milestones: ms.length };
         });
 
         await auditLog({

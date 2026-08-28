@@ -76,7 +76,9 @@ function queueProject(baselinedAt: string | null, docs: Array<{ kind: string }>)
   db.state.results = [
     [{ id: PROJECT, name: 'Ohio TVSF', baselinedAt }],   // the project row
     docs.map((d, i) => ({ id: `d${i}`, ...d })),          // listSourceDocuments (via readiness)
-    [{ id: 'w1' }],                                       // wbs UPDATE … RETURNING
+    // ONE write now, not two. The milestone IS the WBS element (mig 228), so freezing the plan is
+    // freezing the milestones — and a baseline written against two tables is one that can
+    // half-freeze.
     [{ id: 'm1' }],                                       // milestones UPDATE … RETURNING
     [{ baselinedAt: '2026-03-03T00:00:00.000Z' }],        // the project CAS
   ];
@@ -110,7 +112,7 @@ describe('setBaseline', () => {
       expect(r.code).toBe('ALREADY_BASELINED');
       expect(r.error, 'the message has to say what to do instead').toMatch(/rebaseline/i);
     }
-    expect(allQueries(), 'nothing may be written on a refusal').not.toMatch(/UPDATE project_wbs_nodes/i);
+    expect(allQueries(), 'nothing may be written on a refusal').not.toMatch(/UPDATE project_milestones/i);
   });
 
   it('REFUSES when an anchor document is missing, and names which one', async () => {
@@ -121,7 +123,7 @@ describe('setBaseline', () => {
       expect(r.code).toBe('NOT_READY');
       expect(r.error).toMatch(/as-submitted proposal/);
     }
-    expect(allQueries()).not.toMatch(/UPDATE project_wbs_nodes/i);
+    expect(allQueries()).not.toMatch(/UPDATE project_milestones/i);
   });
 
   it('only sets baseline columns that are still NULL', async () => {
@@ -129,8 +131,23 @@ describe('setBaseline', () => {
     // statement inside what the trigger allows rather than relying on the trigger to stop it.
     queueProject(null, bothDocs);
     await setBaseline(ADMIN, PROJECT);
-    expect(allQueries()).toMatch(/baseline_start IS NULL/i);
+    // One PREDICATE, guarding both frozen columns: `baseline_date IS NULL` is what makes the
+    // statement a NULL -> value transition on a row that has never been baselined.
     expect(allQueries()).toMatch(/baseline_date IS NULL/i);
+  });
+
+  it('freezes BOTH promises — the date and the cost', async () => {
+    // Migration 228 collapsed the WBS node into the milestone and, in doing so, dropped the only
+    // frozen COST in the schema: the node had `baseline_cost`, the milestone had only
+    // `baseline_date`. Every assertion in this file still passed. Schedule variance stayed
+    // measurable and cost variance became structurally zero — `planned_cost` standing on both
+    // sides of the subtraction — which renders as a project perfectly on budget. Migration 229
+    // put the column back; this is the assertion that would have caught its absence.
+    queueProject(null, bothDocs);
+    await setBaseline(ADMIN, PROJECT);
+    const froze = db.state.queries.find((q) => /UPDATE project_milestones/i.test(q)) ?? '';
+    expect(froze).toMatch(/baseline_date\s*=\s*forecast_date/i);
+    expect(froze).toMatch(/baseline_cost\s*=\s*planned_cost/i);
   });
 
   it('claims the project by compare-and-swap, so two requests cannot both win', async () => {
@@ -148,7 +165,7 @@ describe('setBaseline', () => {
 });
 
 describe('rebaseline', () => {
-  const baselined = () => { db.state.results = [[{ id: PROJECT, baselinedAt: '2026-03-03' }], [{ id: 'w1' }], [{ id: 'm1' }]]; };
+  const baselined = () => { db.state.results = [[{ id: PROJECT, baselinedAt: '2026-03-03' }], [{ id: 'm1' }]]; };
 
   it('shifts the CURRENT plan and does not name the baseline columns AT ALL', async () => {
     // The assertion this file exists for. A rebaseline that shifted the baseline too would return
@@ -159,7 +176,9 @@ describe('rebaseline', () => {
     expect(r.ok).toBe(true);
 
     const writes = db.state.queries.filter((q) => /^UPDATE/i.test(q)).join(' ');
-    expect(writes).toMatch(/planned_start = planned_start/i);
+    // BOTH ends of the window move. Shifting the end without the start silently compresses every
+    // phase, and the dates still look like dates.
+    expect(writes).toMatch(/starts_on = starts_on/i);
     expect(writes).toMatch(/forecast_date = forecast_date/i);
     expect(writes, 'the baseline is not part of this operation').not.toMatch(/baseline_start/i);
     expect(writes).not.toMatch(/baseline_end/i);

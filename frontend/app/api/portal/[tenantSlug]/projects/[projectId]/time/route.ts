@@ -2,16 +2,16 @@
  * Labour actuals.
  *
  *   GET    — every entry on the project, newest first.
- *   POST   — log hours against a WBS NODE (required) and optionally a task. Anyone on the project
+ *   POST   — log hours against a MILESTONE (required) and optionally a task. Anyone on the project
  *            logs their own; logging on somebody else's behalf is `tenant_admin`, because a
  *            timesheet anybody can write in another person's name is not a timesheet.
  *   PATCH  { action: 'approve', entryIds } — `tenant_admin`. Approving is what turns hours into
  *            cost, and only approved hours reach the roll-up.
  *   DELETE ?entryId= — your own, while it is unapproved. Approved hours are a billing record.
  *
- * The node is required because it is the level the plan is costed at and the level the CLIN
- * roll-up already resolves: twelve monthly-report nodes all roll up to CLIN 0002 without anybody
- * re-tagging each entry.
+ * The milestone is required because it IS the WBS element (mig 228) — the level the plan is costed
+ * at and the level the CLIN grouping lives at: twelve monthly milestones all roll up to CLIN 0002
+ * without anybody re-tagging an entry.
  */
 import { NextResponse } from 'next/server';
 import { withProject } from '@/lib/projects/gate';
@@ -45,7 +45,7 @@ export async function POST(request: Request, ctx: Ctx) {
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await logTime(gate.actor, projectId, {
-        wbsNodeId: body.wbsNodeId as string,
+        milestoneId: body.milestoneId as string,
         taskId: (body.taskId as string) ?? null,
         workedOn: body.workedOn as string,
         hours: body.hours as number,

@@ -2,18 +2,18 @@
  * Labour actuals — the source the cost measure never had.
  *
  * ── WHAT WAS WRONG ───────────────────────────────────────────────────────────────────────────
- * `lib/projects/rollup.ts` reports cost against `project_wbs_nodes.actual_cost`, a column **nothing
- * has ever written**. Its honest `null` → "not measured" was hiding a missing INPUT, not a missing
- * number — which is a worse kind of empty, because it reads as restraint.
+ * `lib/projects/rollup.ts` reported cost against a column **nothing had ever written**. Its honest
+ * `null` → "not measured" was hiding a missing INPUT, not a missing number — which is a worse kind
+ * of empty, because it reads as restraint.
  *
- * ── TIME GOES TO A WBS NODE ──────────────────────────────────────────────────────────────────
- * The node is required. It is the level the plan is costed at, and the level the CLIN roll-up
- * already resolves — a WBS node carries a CLIN or inherits one, so twelve monthly-report nodes all
- * roll up to CLIN 0002 without anybody re-tagging each entry. A task may be tagged as well, for
- * people who want to know which piece of work the hours went to, but the node carries the money.
+ * ── TIME GOES TO A MILESTONE ─────────────────────────────────────────────────────────────────
+ * The milestone IS the WBS element (mig 228) — the level the plan is costed at, and the level the
+ * CLIN grouping lives at, so twelve monthly milestones all roll up to CLIN 0002 without anybody
+ * re-tagging an entry. A task may be tagged as well, for people who want to know which piece of
+ * work the hours went to, but the milestone carries the money.
  *
- * Hours with no place in the work breakdown cannot roll up to a CLIN at all, and a cost measure
- * that silently dropped them would be worse than one reporting nothing.
+ * Hours with no place in the breakdown cannot roll up to a CLIN at all, and a cost measure that
+ * silently dropped them would be worse than one reporting nothing.
  *
  * ── THE RATE IS COPIED, NOT LOOKED UP ────────────────────────────────────────────────────────
  * `hourly_rate` is the rate AT THE TIME. Resolved later, history re-prices itself every time
@@ -33,9 +33,9 @@ import type { Fail, Ok } from './project';
 export interface TimeEntry {
   id: string;
   projectId: string;
-  wbsNodeId: string;
-  wbsCode?: string | null;
-  wbsTitle?: string | null;
+  milestoneId: string;
+  milestoneTitle?: string | null;
+  milestoneCode?: string | null;
   taskId: string | null;
   userId: string;
   userEmail?: string | null;
@@ -61,11 +61,11 @@ export async function listTimeEntries(
 ): Promise<TimeEntry[]> {
   try {
     return await sql<TimeEntry[]>`
-      SELECT e.id, e.project_id, e.wbs_node_id, n.code AS wbs_code, n.title AS wbs_title,
+      SELECT e.id, e.project_id, e.milestone_id, m.title AS milestone_title, m.code AS milestone_code,
              e.task_id, e.user_id, u.email AS user_email, e.worked_on, e.hours, e.hourly_rate,
              e.cost, e.note, e.approved_by, e.approved_at
         FROM project_time_entries e
-        JOIN project_wbs_nodes n ON n.id = e.wbs_node_id
+        JOIN project_milestones m ON m.id = e.milestone_id
         LEFT JOIN users u ON u.id = e.user_id
        WHERE e.project_id = ${projectId}::uuid AND e.tenant_id = ${tenantId}::uuid
        ORDER BY e.worked_on DESC, e.created_at DESC`;
@@ -79,7 +79,7 @@ export async function logTime(
   actor: ProjectActor,
   projectId: string,
   input: {
-    wbsNodeId?: string; taskId?: string | null; workedOn?: string;
+    milestoneId?: string; taskId?: string | null; workedOn?: string;
     hours?: number | string; hourlyRate?: number | string | null; note?: string | null;
     /** Logging on somebody else's behalf — `tenant_admin` only. */
     userId?: string | null;
@@ -88,10 +88,10 @@ export async function logTime(
   if (!(await canAccessProject(actor, projectId))) {
     return { ok: false, status: 404, error: 'Project not found', code: 'NOT_FOUND' };
   }
-  if (!input.wbsNodeId) {
+  if (!input.milestoneId) {
     return {
       ok: false, status: 400, code: 'VALIDATION_ERROR',
-      error: 'Say which WBS node the hours went to — hours with no place in the work breakdown '
+      error: 'Say which milestone the hours went to — hours with no place in the breakdown '
         + 'cannot roll up to a CLIN.',
     };
   }
@@ -119,14 +119,14 @@ export async function logTime(
   }
 
   try {
-    // FK-before-write, scoped to THIS project: a WBS node id from another contract satisfies the
+    // FK-before-write, scoped to THIS project: a milestone id from another contract satisfies the
     // FK and would bill one customer's hours to another's CLIN.
-    const [node] = await sql<{ id: string; code: string; title: string }[]>`
-      SELECT id, code, title FROM project_wbs_nodes
-       WHERE id = ${input.wbsNodeId}::uuid AND project_id = ${projectId}::uuid
+    const [node] = await sql<{ id: string; code: string | null; title: string }[]>`
+      SELECT id, code, title FROM project_milestones
+       WHERE id = ${input.milestoneId}::uuid AND project_id = ${projectId}::uuid
          AND tenant_id = ${actor.tenantId}::uuid LIMIT 1`;
     if (!node) {
-      return { ok: false, status: 400, error: 'That WBS node does not belong to this project', code: 'VALIDATION_ERROR' };
+      return { ok: false, status: 400, error: 'That milestone does not belong to this project', code: 'VALIDATION_ERROR' };
     }
     if (input.taskId) {
       const [task] = await sql<{ id: string }[]>`
@@ -140,12 +140,12 @@ export async function logTime(
 
     const [row] = await sql<TimeEntry[]>`
       INSERT INTO project_time_entries
-        (tenant_id, project_id, wbs_node_id, task_id, user_id, worked_on, hours, hourly_rate, note)
+        (tenant_id, project_id, milestone_id, task_id, user_id, worked_on, hours, hourly_rate, note)
       VALUES
-        (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.wbsNodeId}::uuid,
+        (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.milestoneId}::uuid,
          ${input.taskId ?? null}, ${userId}::uuid, ${workedOn}::date, ${hours},
          ${rate}, ${(input.note ?? '').trim() || null})
-      RETURNING id, project_id, wbs_node_id, task_id, user_id, worked_on, hours, hourly_rate,
+      RETURNING id, project_id, milestone_id, task_id, user_id, worked_on, hours, hourly_rate,
                 cost, note, approved_by, approved_at`;
     if (!row) return { ok: false, status: 500, error: 'Failed to log the time', code: 'DB_ERROR' };
 
@@ -155,11 +155,11 @@ export async function logTime(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: {
-        projectId, entryId: row.id, wbsNodeId: input.wbsNodeId, wbsCode: node.code,
+        projectId, entryId: row.id, milestoneId: input.milestoneId, milestone: node.title,
         hours, workedOn, onBehalfOf: userId !== actor.userId ? userId : undefined,
       },
     });
-    return { ok: true, data: { ...row, wbsCode: node.code, wbsTitle: node.title } };
+    return { ok: true, data: { ...row, milestoneCode: node.code, milestoneTitle: node.title } };
   } catch (err) {
     console.error('[projects/time] logTime failed:', err);
     return { ok: false, status: 500, error: 'Failed to log the time', code: 'DB_ERROR' };

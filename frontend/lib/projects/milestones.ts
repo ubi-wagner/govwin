@@ -31,7 +31,10 @@ export interface Milestone {
   id: string;
   projectId: string;
   clinId: string | null;
-  wbsNodeId: string | null;
+  /** The WBS code — "2.3". The milestone IS the WBS element (mig 228); there is no node tree. */
+  code: string | null;
+  plannedCost: string | null;
+  actualCost: string;
   title: string;
   /** The start of the segment. Serial by default (the previous milestone's end + 1 day) but
    *  pinnable — see `lib/projects/milestone-tasks.ts`. Planning, not a promise: it is NOT
@@ -83,7 +86,7 @@ function asDate(v: unknown): { ok: true; value: string | null } | { ok: false } 
 export async function listMilestones(tenantId: string, projectId: string): Promise<Milestone[]> {
   try {
     return await sql<Milestone[]>`
-      SELECT id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+      SELECT id, project_id, clin_id, code, planned_cost, actual_cost, title, starts_on, baseline_date,
              forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
              sort_index
         FROM project_milestones
@@ -117,7 +120,11 @@ export async function listDeliverables(tenantId: string, projectId: string): Pro
 export async function createMilestone(
   actor: ProjectActor,
   projectId: string,
-  input: { title: string; clinId?: string | null; wbsNodeId?: string | null; forecastDate?: string | null; sortIndex?: number },
+  input: {
+    title: string; clinId?: string | null; forecastDate?: string | null; sortIndex?: number;
+    /** The WBS code, e.g. "2.3". */
+    code?: string | null; plannedCost?: number | null;
+  },
 ): Promise<Ok<Milestone> | Fail> {
   if (!canAssign(actor.role)) {
     return { ok: false, status: 403, error: 'Only a tenant admin can add milestones', code: 'FORBIDDEN' };
@@ -136,27 +143,26 @@ export async function createMilestone(
   }
 
   try {
-    // FK-before-write, scoped to THIS project — a CLIN or WBS node from another project satisfies
-    // the FK and would silently attach one contract's milestone to another's line item.
-    for (const [label, id, table] of [
-      ['clinId', input.clinId, 'clins'], ['wbsNodeId', input.wbsNodeId, 'wbs'],
-    ] as const) {
-      if (!id) continue;
-      const rows = table === 'clins'
-        ? await sql<{ id: string }[]>`SELECT id FROM project_clins WHERE id = ${id}::uuid AND project_id = ${projectId}::uuid LIMIT 1`
-        : await sql<{ id: string }[]>`SELECT id FROM project_wbs_nodes WHERE id = ${id}::uuid AND project_id = ${projectId}::uuid LIMIT 1`;
+    // FK-before-write, scoped to THIS project — a CLIN from another project satisfies the FK and
+    // would silently attach one contract's milestone to another's line item. The loop that also
+    // checked a WBS node is gone with the node table (mig 228): the milestone IS the element.
+    if (input.clinId) {
+      const rows = await sql<{ id: string }[]>`
+        SELECT id FROM project_clins
+         WHERE id = ${input.clinId}::uuid AND project_id = ${projectId}::uuid LIMIT 1`;
       if (rows.length === 0) {
-        return { ok: false, status: 400, error: `${label} does not belong to this project`, code: 'VALIDATION_ERROR' };
+        return { ok: false, status: 400, error: 'clinId does not belong to this project', code: 'VALIDATION_ERROR' };
       }
     }
 
     const [row] = await sql<Milestone[]>`
       INSERT INTO project_milestones
-        (tenant_id, project_id, clin_id, wbs_node_id, title, forecast_date, sort_index)
+        (tenant_id, project_id, clin_id, code, planned_cost, title, forecast_date, sort_index)
       VALUES
         (${actor.tenantId}::uuid, ${projectId}::uuid, ${input.clinId ?? null},
-         ${input.wbsNodeId ?? null}, ${title}, ${forecast.value}, ${input.sortIndex ?? 0})
-      RETURNING id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+         ${(input.code ?? '').trim() || null}, ${input.plannedCost ?? null}, ${title},
+         ${forecast.value}, ${input.sortIndex ?? 0})
+      RETURNING id, project_id, clin_id, code, planned_cost, actual_cost, title, starts_on, baseline_date,
                 forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
                 sort_index`;
 
@@ -249,7 +255,7 @@ export async function markMilestoneMet(
                : sql.json(metrics as Record<string, never>)}
        WHERE id = ${milestoneId}::uuid AND project_id = ${projectId}::uuid
          AND tenant_id = ${actor.tenantId}::uuid AND status = 'pending'
-      RETURNING id, project_id, clin_id, wbs_node_id, title, starts_on, baseline_date,
+      RETURNING id, project_id, clin_id, code, planned_cost, actual_cost, title, starts_on, baseline_date,
                 forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
                 sort_index`;
     if (!row) {

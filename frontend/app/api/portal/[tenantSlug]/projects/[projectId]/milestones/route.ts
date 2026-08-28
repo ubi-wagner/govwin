@@ -48,7 +48,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
     const { tenantSlug, projectId } = await ctx.params;
     return await withProject(tenantSlug, async (gate) => {
 
-      let body: { title?: string; clinId?: string | null; wbsNodeId?: string | null; forecastDate?: string | null; sortIndex?: number };
+      let body: { title?: string; clinId?: string | null; code?: string | null; plannedCost?: number | null; forecastDate?: string | null; sortIndex?: number };
       try { body = await request.json(); }
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 

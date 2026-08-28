@@ -8,9 +8,11 @@
  * populated page can show.
  *
  * So this seeds one coherent scenario rather than scattered rows: a real award, both anchor
- * documents, two CLINs with mixed provenance, a WBS whose child inherits its CLIN, milestones with
- * genuine variance, and deliverables in all three states — nothing uploaded, uploaded but not
- * accepted, accepted.
+ * documents, two CLINs with mixed provenance, and a WBS — which IS the milestone list (migs
+ * 228-229): four milestones, three of them under one CLIN, so the grouping the product owner
+ * described ("CLIN 0002 can have 12 milestones under the WBS") is visible at a size that fits on
+ * a page. Genuine variance across them, and deliverables in all three states — nothing uploaded,
+ * uploaded but not accepted, accepted.
  *
  * ── THE MIXED PROVENANCE IS THE POINT ────────────────────────────────────────────────────────
  * One field is cited from the contract, one is a deferral (a citation with NO value — "set out in
@@ -105,51 +107,49 @@ async function main() {
     ON CONFLICT (target_table, target_id, field) DO NOTHING`;
   // …and CLIN 0002's funded_amount deliberately has NO provenance row, so it renders Unverified.
 
-  // A WBS whose CHILD inherits its CLIN — the case the rollup's recursive CTE exists for.
-  const [wbsParent] = await sql`
-    INSERT INTO project_wbs_nodes
-      (tenant_id, project_id, clin_id, code, title, baseline_start, baseline_end, baseline_cost,
-       planned_start, planned_end, planned_cost, actual_cost, sort_index)
-    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, '1', 'Prototype development',
-            CURRENT_DATE - 120, CURRENT_DATE + 60, 700000, CURRENT_DATE - 120, CURRENT_DATE + 74,
-            700000, 402500, 1)
-    RETURNING id`;
-  await sql`
-    INSERT INTO project_wbs_nodes
-      (tenant_id, project_id, clin_id, parent_id, code, title, baseline_start, baseline_end,
-       baseline_cost, planned_start, planned_end, planned_cost, actual_cost, sort_index)
-    VALUES
-      (${tenant.id}, ${project.id}, NULL, ${wbsParent.id}, '1.1', 'Sensor integration',
-       CURRENT_DATE - 120, CURRENT_DATE - 30, 250000, CURRENT_DATE - 120, CURRENT_DATE - 16,
-       250000, 262000, 2),
-      (${tenant.id}, ${project.id}, NULL, ${wbsParent.id}, '1.2', 'Autonomy stack',
-       CURRENT_DATE - 30, CURRENT_DATE + 60, 400000, CURRENT_DATE - 16, CURRENT_DATE + 74,
-       400000, 140500, 3)`;
-  await sql`
-    INSERT INTO project_wbs_nodes
-      (tenant_id, project_id, clin_id, code, title, planned_start, planned_end, planned_cost,
-       actual_cost, sort_index)
-    VALUES (${tenant.id}, ${project.id}, ${clin2.id}, '2', 'Flight test support',
-            CURRENT_DATE + 246, CURRENT_DATE + 425, 400000, 0, 4)`;
-
-  // Milestones with REAL variance — one met early, one running late, one still pending.
+  // ── THE WBS IS THE MILESTONE LIST (migs 228-229) ────────────────────────────────────────────
+  //
+  // There is no node tree beside this: a project is the portal, and the WBS elements are the
+  // milestones, each carrying a code, a dated window, a cost and its own tasks and deliverables.
+  //
+  // The seed's job here is to make the SHAPE visible in one screenshot: **three milestones under
+  // CLIN 0001 and one under CLIN 0002** — "CLIN 0002 can have twelve monthly milestones" is this
+  // relationship, at a size that fits on a page. Cost is per milestone and groups by `clin_id`, so
+  // CLIN 0001's planned cost is the sum of its three rows and nobody re-tags anything.
+  //
+  // REAL variance, too: one met early, one running late, one not started. A seed where forecast
+  // equals baseline everywhere makes a variance column that is structurally zero look correct.
   const [msKickoff] = await sql`
     INSERT INTO project_milestones
-      (tenant_id, project_id, clin_id, title, baseline_date, forecast_date, status, met_at, sort_index)
-    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, 'Kickoff and SOW agreed',
-            CURRENT_DATE - 113, CURRENT_DATE - 116, 'met', now() - interval '116 days', 1)
+      (tenant_id, project_id, clin_id, code, title, baseline_date, starts_on, forecast_date,
+       baseline_cost, planned_cost, actual_cost, status, met_at, sort_index)
+    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, '1.1', 'Kickoff and SOW agreed',
+            CURRENT_DATE - 113, CURRENT_DATE - 120, CURRENT_DATE - 116,
+            250000, 250000, 262000, 'met', now() - interval '116 days', 1)
     RETURNING id`;
   const [msCdr] = await sql`
     INSERT INTO project_milestones
-      (tenant_id, project_id, clin_id, title, baseline_date, forecast_date, status, sort_index)
-    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, 'Critical design review',
-            CURRENT_DATE - 30, CURRENT_DATE - 16, 'pending', 2)
+      (tenant_id, project_id, clin_id, code, title, baseline_date, starts_on, forecast_date,
+       baseline_cost, planned_cost, actual_cost, status, sort_index)
+    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, '1.2', 'Critical design review',
+            CURRENT_DATE - 30, CURRENT_DATE - 112, CURRENT_DATE - 16,
+            400000, 400000, 140500, 'pending', 2)
     RETURNING id`;
   await sql`
     INSERT INTO project_milestones
-      (tenant_id, project_id, clin_id, title, baseline_date, forecast_date, status, sort_index)
-    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, 'Prototype demonstration',
-            CURRENT_DATE + 60, CURRENT_DATE + 74, 'pending', 3)`;
+      (tenant_id, project_id, clin_id, code, title, baseline_date, starts_on, forecast_date,
+       baseline_cost, planned_cost, actual_cost, status, sort_index)
+    VALUES (${tenant.id}, ${project.id}, ${clin1.id}, '1.3', 'Prototype demonstration',
+            CURRENT_DATE + 60, CURRENT_DATE - 15, CURRENT_DATE + 74,
+            50000, 50000, 0, 'pending', 3)`;
+  // The second CLIN, so the rollup has two groups to keep apart and the project total is visibly
+  // computed from ROWS rather than from an average of the two percentages.
+  await sql`
+    INSERT INTO project_milestones
+      (tenant_id, project_id, clin_id, code, title, starts_on, forecast_date,
+       planned_cost, actual_cost, status, sort_index)
+    VALUES (${tenant.id}, ${project.id}, ${clin2.id}, '2.1', 'Flight test support',
+            CURRENT_DATE + 246, CURRENT_DATE + 425, 400000, 0, 'pending', 4)`;
 
   // Deliverables in ALL THREE states, so "uploaded" and "accepted" are visibly different things.
   await sql`
@@ -168,14 +168,10 @@ async function main() {
   // ── THE MILESTONE CONSTRUCT (mig 218) ───────────────────────────────────────────────────────
   // Serial starts, a checklist per milestone, and a completion record on the one that is met. This
   // is what makes the smallest useful case visible in a screenshot: a milestone with a task list is
-  // a dated ToDo list for the team, and the plan is that shape repeated in series.
-  await sql`
-    UPDATE project_milestones SET starts_on = CURRENT_DATE - 120 WHERE id = ${msKickoff.id}`;
-  await sql`
-    UPDATE project_milestones
-       SET starts_on = CURRENT_DATE - 112,
-           completion_note = NULL
-     WHERE id = ${msCdr.id}`;
+  // a dated ToDo list for the team, and the plan is that shape repeated in series. The starts are
+  // set in the INSERTs above, where the rest of each row's dates are — a second statement moving a
+  // date the first one already wrote is how a seed comes to disagree with itself.
+  //
   // The met milestone carries what it measured — the reason `completion_metrics` is an open jsonb.
   await sql`
     UPDATE project_milestones
@@ -190,7 +186,12 @@ async function main() {
     [msKickoff.id, 'Circulate draft SOW', -116, 'done'],
     [msCdr.id, 'Thermal margin analysis', -22, 'done'],
     [msCdr.id, 'CDR slide package', -18, 'open'],
-    [msCdr.id, 'Vendor lead times confirmed', -12, 'blocked'],
+    // -17, NOT -12. Migration 221's trigger refuses a task due AFTER its own milestone (23004),
+    // and the CDR phase forecasts at CURRENT_DATE-16 — so this fixture had been unrunnable since
+    // P4 shipped and nobody had re-run the seed to find out. A blocked task is still due before
+    // the phase it belongs to; being blocked is why it will not make the date, not permission to
+    // sit outside it.
+    [msCdr.id, 'Vendor lead times confirmed', -17, 'blocked'],
   ];
   for (const [i, [milestoneId, title, offset, status]] of CHECKLIST.entries()) {
     await sql`
@@ -219,8 +220,8 @@ async function main() {
   await sql`UPDATE projects SET baselined_at = now() - interval '110 days' WHERE id = ${project.id}`;
 
   console.log(`✓ seeded "${NAME}" for tenant '${tenant.slug}'`);
-  console.log('  2 CLINs (one with a deferral, one unverified) · 4 WBS nodes (one inheriting its CLIN)');
-  console.log('  3 milestones (met early · running late · pending) · 3 deliverables (accepted · uploaded · nothing)');
+  console.log('  2 CLINs (one with a deferral, one unverified) · 4 milestones = the WBS (3 under CLIN 0001, 1 under 0002)');
+  console.log('  variance: met early · running late · not started · 3 deliverables (accepted · uploaded · nothing)');
   console.log(`  /portal/${tenant.slug}/projects/${project.id}`);
   await sql.end();
 }

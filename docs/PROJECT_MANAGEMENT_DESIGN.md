@@ -12,6 +12,33 @@ RLS, the workflow engine, storage, canvas, email — and shares no schema with t
 
 ---
 
+> ## ⚠️ SUPERSEDED IN ONE PLACE: `project_wbs_nodes` NO LONGER EXISTS
+>
+> Migration **228** collapsed it into `project_milestones` and **229** dropped the table. The
+> product owner's correction, verbatim:
+>
+> > *"CLIN 002 can have 12 milestones under the WBS. Milestones drive everything. That is what a
+> > WBS is comprised of typically. 1 project is the portal. It has high level information like
+> > participants and contact upload and summary and start and end dates. Then the WBS are the
+> > milestones with tasks and deliverables. The deliverables on any milestone could be CLINs from
+> > the contract."*
+>
+> So **the milestone IS the WBS element**, and the shape below — a node tree beside a milestone
+> list, each with its own dates, costs and CLIN — was two structures describing one thing. It also
+> produced two answers to the same question, which migration 227 tried to reconcile with a trigger
+> before 228 removed the need for one.
+>
+> **Read as built:** `docs/PROJECT_BUILD_LOG.md`. Everything below stands except that wherever this
+> document says `project_wbs_nodes`, the table is `project_milestones`; there is no `parent_id`
+> (milestones do not nest — `sort_index` orders them); the frozen columns are `baseline_date` and
+> `baseline_cost`, and the current plan is `starts_on` / `forecast_date` / `planned_cost`.
+>
+> One thing did NOT survive the collapse and had to be restored: the node carried a frozen
+> `baseline_cost` and the milestone did not, so migration 229 added it. Without it, cost variance
+> subtracted `planned_cost` from itself and read as a project permanently on budget.
+
+---
+
 ## Why segregated rather than extended
 
 Three places the proposal spine's shapes would actively fight this, each verified in the code:

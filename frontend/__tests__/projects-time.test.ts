@@ -39,17 +39,17 @@ import { emitEventSingle } from '@/lib/events';
 const ADMIN = { userId: 'u-admin', role: 'tenant_admin', tenantId: 't1' };
 const EMPLOYEE = { userId: 'u-emp', role: 'tenant_user', tenantId: 't1' };
 const PROJECT = '22222222-2222-4222-8222-222222222222';
-const NODE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const MILESTONE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ENTRY = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
-const nodeRow = { id: NODE, code: '2.3', title: 'Monthly report — March' };
+const nodeRow = { id: MILESTONE, code: '2.3', title: 'Monthly report — March' };
 const entryRow = (o: Record<string, unknown> = {}) => ({
-  id: ENTRY, projectId: PROJECT, wbsNodeId: NODE, taskId: null, userId: 'u-emp',
+  id: ENTRY, projectId: PROJECT, milestoneId: MILESTONE, taskId: null, userId: 'u-emp',
   workedOn: '2026-05-04', hours: '7.50', hourlyRate: '142.00', cost: '1065.00',
   note: null, approvedBy: null, approvedAt: null, ...o,
 });
 
-const good = { wbsNodeId: NODE, workedOn: '2026-05-04', hours: 7.5, hourlyRate: 142 };
+const good = { milestoneId: MILESTONE, workedOn: '2026-05-04', hours: 7.5, hourlyRate: 142 };
 
 beforeEach(() => {
   db.state.queries.length = 0;
@@ -60,27 +60,27 @@ beforeEach(() => {
 
 // ── where the hours land ─────────────────────────────────────────────────────────────────────
 
-describe('hours go to a WBS node, and nowhere else', () => {
-  it('refuses an entry with no node, and says why', async () => {
-    // Hours with no place in the work breakdown cannot roll up to a CLIN, and a cost measure that
+describe('hours go to a MILESTONE, and nowhere else', () => {
+  it('refuses an entry with no milestone, and says why', async () => {
+    // Hours with no place in the breakdown cannot roll up to a CLIN, and a cost measure that
     // silently dropped them would be worse than one reporting nothing.
-    const r = await logTime(EMPLOYEE, PROJECT, { ...good, wbsNodeId: undefined });
+    const r = await logTime(EMPLOYEE, PROJECT, { ...good, milestoneId: undefined });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/cannot roll up to a CLIN/);
     expect(db.state.queries, 'refused before writing').toEqual([]);
   });
 
-  it('REFUSES a node from another project — no FK stops it billing another customer', async () => {
+  it('REFUSES a milestone from another project — no FK stops it billing another customer', async () => {
     db.state.results = [[]];
     const r = await logTime(EMPLOYEE, PROJECT, good);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/does not belong to this project/);
   });
 
-  it('scopes the node lookup by project AND tenant', async () => {
+  it('scopes the milestone lookup by project AND tenant', async () => {
     db.state.results = [[]];
     await logTime(EMPLOYEE, PROJECT, good);
-    const probe = db.state.queries.find((q) => /FROM project_wbs_nodes/i.test(q)) ?? '';
+    const probe = db.state.queries.find((q) => /FROM project_milestones/i.test(q)) ?? '';
     expect(probe).toMatch(/project_id = \?/);
     expect(probe).toMatch(/tenant_id = \?/);
   });
