@@ -415,7 +415,8 @@ export function ProcessMonitorClient({
             No tenant activity in the last 24 hours
           </div>
         ) : (
-          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          // `overflow-x-auto`: a clipped table has no scrollbar, so its right columns cannot be read.
+          <div className="rounded-lg border border-gray-200 bg-white overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>

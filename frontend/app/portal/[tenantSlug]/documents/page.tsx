@@ -243,14 +243,20 @@ export default async function DocumentsPage({ params }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      {/* WRAPS. A `justify-between` row with a title block and three actions is 460px wide, so at
+          390px the primary action — "+ New Document" — was cut off at the viewport edge and could
+          not be tapped at all. The responsive pass reported this page clean, because an ancestor
+          clips the overflow and the BODY never scrolls sideways: the invariant held while the
+          button was unreachable. Found by `probe-interaction-mobile.mts`, which measures elements
+          against the viewport rather than asking whether the page scrolls. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documents</h1>
           <p className="text-sm text-gray-500 mt-1">
             {totalCount} document{totalCount !== 1 ? 's' : ''} across your workspace
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href="/guides/creating-documents.html"
             target="_blank"

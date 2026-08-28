@@ -74,14 +74,24 @@ export default async function ProjectsPage({
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        // `overflow-x-auto`, NOT `overflow-hidden`. With four columns this table is 461px wide at a
+        // 390px viewport, and `overflow-hidden` on the card meant the last column was CLIPPED and
+        // unreachable — the body does not scroll, so nothing could bring it back. The responsive
+        // pass called this page clean for exactly that reason: it asks whether the PAGE scrolls
+        // sideways, and a clipped overflow keeps that answer no while the content is gone.
+        // `probe-interaction-mobile.mts` measures elements against the viewport instead.
+        //
+        // The date a project was opened is also the least load-bearing column, so it steps out
+        // below `sm` rather than being scrolled to. The scroller stays as the backstop: a fifth
+        // column added later degrades to "scroll for it", never to "you cannot see it".
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Project</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Baseline</th>
-                <th className="px-4 py-3 font-medium">Opened</th>
+                <th className="hidden px-4 py-3 font-medium sm:table-cell">Opened</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -101,7 +111,7 @@ export default async function ProjectsPage({
                       ? new Date(p.baselinedAt).toLocaleDateString()
                       : <span className="text-amber-700">not baselined</span>}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="hidden px-4 py-3 text-gray-500 sm:table-cell">
                     {new Date(p.createdAt).toLocaleDateString()}
                   </td>
                 </tr>

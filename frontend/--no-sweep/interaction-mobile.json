@@ -1,0 +1,210 @@
+{
+ "shots": [
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-cards__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/buckets",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-atoms__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/library",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-library__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/documents",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-documents__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/templates",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-templates__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals/c3db60b1-2f0e-4bc8-903c-1ec098906c58",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg"
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/a0198796-2dbd-48b6-a3f0-44056f0aa71b",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__tenant-portal-foundation-projects-a0198796-2dbd-48b6-__vp-phone-open.jpg"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/workflows",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__admin-admin-workflows__vp-phone-open.jpg"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/agents",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__admin-admin-agents__vp-phone-open.jpg"
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "viewport": "phone",
+   "width": 390,
+   "file": "probe__admin-admin-templates__vp-phone-open.jpg"
+  }
+ ],
+ "summary": [
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/cards",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 51
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/buckets",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 5,
+   "smallTargets": 45
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/atoms",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 8,
+   "smallTargets": 1907
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/library",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 8,
+   "smallTargets": 1907
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/documents",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 143
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/templates",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 107
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/proposals/c3db60b1-2f0e-4bc8-903c-1ec098906c58",
+   "status": 200,
+   "probed": true,
+   "opened": 2,
+   "overflow": 0,
+   "clipped": 2,
+   "smallTargets": 54
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/foundation/projects/a0198796-2dbd-48b6-a3f0-44056f0aa71b",
+   "status": 200,
+   "probed": true,
+   "opened": 16,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 89
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/rfp-curation",
+   "status": 200,
+   "probed": true,
+   "opened": 2,
+   "overflow": 0,
+   "clipped": 2,
+   "smallTargets": 67
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/workflows",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 328
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/agents",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 0,
+   "smallTargets": 51
+  },
+  {
+   "lane": "admin",
+   "route": "/admin/templates",
+   "status": 200,
+   "probed": true,
+   "opened": 0,
+   "overflow": 0,
+   "clipped": 8,
+   "smallTargets": 47
+  }
+ ]
+}

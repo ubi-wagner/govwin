@@ -346,8 +346,10 @@ export default function AdminFileManager() {
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Prefix tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
+      {/* Prefix tabs — SCROLLABLE. At 390px this row is 486px wide and the page's MAIN is
+          `overflow-x-clip`, so the last prefix tab could not be reached at all. Same fix, same
+          reason, as the system-state tab strip. */}
+      <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200">
         {TOP_LEVEL_PREFIXES.map((p) => (
           <button
             key={p.prefix}

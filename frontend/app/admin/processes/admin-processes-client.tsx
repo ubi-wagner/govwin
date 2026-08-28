@@ -156,7 +156,8 @@ export function AdminProcessesClient({
           No active processes match.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        // `overflow-x-auto`: the clipping wrapper made 706px of table unreachable at 390px.
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs uppercase text-gray-500">

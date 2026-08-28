@@ -63,7 +63,8 @@ export default async function AdminProposalsPage() {
       {proposals.length === 0 ? (
         <p className="text-sm text-gray-400 py-8">No proposals found.</p>
       ) : (
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
+        // `overflow-x-auto`: the clipping wrapper made 908px of table unreachable at 390px.
+        <div className="border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">

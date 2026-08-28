@@ -86,7 +86,13 @@ export default async function AdminOpportunityRollupPage() {
       {rows.length === 0 ? (
         <p className="text-sm text-gray-400 py-8">No opportunities are in any customer pipeline yet.</p>
       ) : (
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
+        // `overflow-x-auto`, not `overflow-hidden`. The clip was there for the rounded corners; its
+        // invisible cost was the right-hand columns. At 390px this table lays out 1058px of row
+        // into a 390px viewport, the body does not scroll, and the clipped 63% was simply
+        // unreachable. Every viewport check in this tree had asked whether the PAGE scrolls
+        // sideways — which stays "no" precisely BECAUSE the overflow is clipped, so a clipping
+        // wrapper is invisible to it. Found by scripts/probe-interaction-mobile.mts.
+        <div className="border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">

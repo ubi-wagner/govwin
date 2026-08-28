@@ -182,7 +182,10 @@ export default async function DashboardPage() {
           {recentEvents.length === 0 ? (
             <p className="text-sm text-gray-400 py-4">No events recorded</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            // `overflow-x-auto`: `overflow-hidden` here clipped the last columns at phone width
+            // with no way to scroll to them. Same wrapper idiom, same invisible cost, in seven
+            // other files — see docs/PIPELINE_COHERENCE_REVIEW.md.
+            <div className="border border-gray-200 rounded-lg overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">

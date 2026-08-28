@@ -538,7 +538,8 @@ function ErrorsTable({ errors }: { errors: ErrorEvent[] }) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    // `overflow-x-auto`: a clipped table has no scrollbar, so its right columns cannot be read.
+    <div className="border border-gray-200 rounded-lg overflow-x-auto bg-white">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
@@ -1050,8 +1051,10 @@ export function SystemStateClient({
       <HealthBar health={health} />
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-0 -mb-px">
+      {/* `overflow-x-auto`: at 390px the tab row is 506px wide and the page's MAIN is
+          `overflow-x-clip`, so the last tabs were unreachable rather than merely off-screen. */}
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex gap-0 -mb-px whitespace-nowrap">
           {TABS.map((tab) => (
             <button
               key={tab.key}

@@ -29,6 +29,10 @@
 import { chromium, type Page } from 'playwright';
 import postgres from 'postgres';
 import { mkdirSync, writeFileSync } from 'node:fs';
+// ONE definition of overflow / touch target / unrecoverable clipping, shared with
+// `probe-interaction-mobile.mts`. Two probes with two definitions produce two numbers nobody can
+// reconcile — the exact defect docs/PIPELINE_COHERENCE_REVIEW.md was written to find.
+import { overflowing, smallTargets, clipped, openEverything } from './lib/mobile-measure.mts';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -46,92 +50,6 @@ const A = (ok: boolean, label: string, extra = '') => {
   if (!ok) failed += 1;
   console.log(`  ${ok ? '✓' : '✗'} ${label}${extra ? ` — ${extra}` : ''}`);
 };
-
-/** Elements whose right edge passes the viewport. Inner auto-scrollers are legitimate. */
-async function overflowing(page: Page, vw: number) {
-  return page.evaluate((w) => {
-    const out: Array<{ tag: string; cls: string; right: number; text: string }> = [];
-    for (const el of Array.from(document.querySelectorAll('body *'))) {
-      const r = el.getBoundingClientRect();
-      if (r.right <= w + 1 || r.width < 24) continue;
-      // Walk up: if any ancestor scrolls horizontally on purpose, this is inside a scroller.
-      let node: Element | null = el;
-      let inScroller = false;
-      while (node && node !== document.body) {
-        const cs = getComputedStyle(node);
-        if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') { inScroller = true; break; }
-        node = node.parentElement;
-      }
-      if (inScroller) continue;
-      out.push({
-        tag: el.tagName.toLowerCase(),
-        cls: String((el as HTMLElement).className ?? '').slice(0, 70),
-        right: Math.round(r.right),
-        text: (el.textContent ?? '').trim().slice(0, 40),
-      });
-    }
-    // Only the outermost offender per subtree — a wide child reports its parent too, and twenty
-    // lines naming the same box is a report nobody reads.
-    return out.filter((o, i) => !out.some((p, j) => j !== i && p.right >= o.right && o.tag !== 'body'
-      && false)).slice(0, 8);
-  }, vw);
-}
-
-/** Controls smaller than the 44px touch target. Reported, never failed. */
-async function smallTargets(page: Page) {
-  return page.evaluate(() => {
-    const out: Array<{ tag: string; label: string; w: number; h: number }> = [];
-    for (const el of Array.from(document.querySelectorAll('button, a, input, select, textarea'))) {
-      const r = el.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) continue;      // hidden — not a target
-      if (r.height >= 44 && r.width >= 44) continue;
-      out.push({
-        tag: el.tagName.toLowerCase(),
-        label: ((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').trim().slice(0, 30),
-        w: Math.round(r.width), h: Math.round(r.height),
-      });
-    }
-    return out;
-  });
-}
-
-/**
- * Text clipped by its own box WITH NO WAY TO RECOVER IT.
- *
- * ── TRUNCATION IS NOT THE DEFECT; UNRECOVERABLE TRUNCATION IS ───────────────────────────────
- * A work email is longer than a phone is wide. Left whole it becomes the entire row and pushes
- * everything else onto its own line, so this codebase truncates identifiers deliberately and keeps
- * the full value in a `title`. Reporting that as a finding would be the instrument disagreeing
- * with a decision, and the only thing it would achieve is teaching whoever runs this to ignore the
- * line — the first version of this check did exactly that on five chips.
- *
- * So the question narrowed to the one that actually matters: is the clipped text reachable at all?
- * `title` (or `aria-label`) carrying it means yes. Nothing carrying it means a word is simply gone,
- * and the page photographs as tidy either way. That also makes the check STRONGER than the naive
- * version: a `truncate` added later without a title now fails, where before it was lost in noise.
- */
-async function clipped(page: Page) {
-  return page.evaluate(() => {
-    const out: Array<{ text: string; cls: string }> = [];
-    for (const el of Array.from(document.querySelectorAll('body *'))) {
-      const e = el as HTMLElement;
-      if (e.children.length > 0) continue;                 // leaf text nodes only
-      const cs = getComputedStyle(e);
-      if (cs.overflow === 'visible' && cs.textOverflow !== 'ellipsis') continue;
-      if (e.scrollWidth <= e.clientWidth + 2) continue;
-      const text = (e.innerText ?? '').trim();
-      if (!text) continue;
-      // Recoverable? The full value on the element or on the box that clips it.
-      const recoverable = [e, e.parentElement].some((n) =>
-        n instanceof HTMLElement
-        && ((n.title && n.title.includes(text.replace(/…$/, '').trim().slice(0, 12)))
-          || (n.getAttribute('aria-label') ?? '').includes(text.slice(0, 12))));
-      if (recoverable) continue;
-      out.push({ text: text.slice(0, 50), cls: String(e.className).slice(0, 50) });
-    }
-    return out.slice(0, 8);
-  });
-}
 
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
@@ -178,13 +96,8 @@ async function main() {
 
       // OPEN EVERYTHING. The collapsed page is what the responsive pass already covers; what has
       // never been seen at this width is a comment composer and an inline task edit row.
-      for (const b of await page.locator('button[aria-expanded="false"]').all()) {
-        await b.click({ timeout: 2000 }).catch(() => {});
-      }
-      for (const b of await page.getByRole('button', { name: 'Edit' }).all()) {
-        await b.click({ timeout: 2000 }).catch(() => {});
-      }
-      await page.waitForTimeout(600);
+      const opened = await openEverything(page);
+      A(opened > 0, 'the probe actually opened something', `${opened} control(s)`);
 
       const over = await overflowing(page, vp.w);
       A(over.length === 0, `nothing runs past the ${vp.w}px viewport with every panel open`,
