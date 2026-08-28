@@ -2732,3 +2732,63 @@ present, no blended figure, the snapshot line, a 35 KB PDF, and acceptance throu
 · **0 broken links in the whole chain** · `probe-deliverable-artifacts` **22/22** (LibreOffice +
 pdf.js) · isolation 20 tables · surfaces 82/82 · api-contract 130 · write-contract 251/251 · mobile
 green at 390 and 820 · `next build` clean.
+
+## H4 · The project's own reminder policy — migration 235
+
+**What was hard-coded.** `lib/projects/todos.ts` carried `const NUDGE_DAYS = [7, 2, 0]` and the
+Python sweep read only the platform framework. So a customer could tune every reminder the proposal
+side sends and **none** their project sends — the shape of a capability built *alongside* the policy
+model rather than into it.
+
+The model already had three levels and Projects used none of them:
+
+| | |
+|---|---|
+| platform | `automation_framework` — the operator's floor and caps |
+| tenant | `tenant_automation_policies` — the customer's default per trigger |
+| **per-entity** | the build side uses the portal's `guardrail_config`; the project side now uses `projects.notification_policy` |
+
+`scope` widened from `('discovery','build')` to include `'project'` — three phases of one customer's
+life (before they buy · before they submit · after they have won), and a trigger belongs to exactly
+one. Filing a milestone reminder under `build` would make it appear in the proposal editor's list,
+which is where a vocabulary starts lying.
+
+### Two rules that only show up later
+
+**Empty means INHERIT**, never "a copy taken at creation". The difference is invisible on day one
+and obvious months later, when the customer changes their default and half their projects ignore it.
+Clearing an override is therefore its own control — *"Use the organisation setting"* — because
+retyping the inherited numbers looks identical today and stops tracking tomorrow.
+
+**The narrower scope can only NARROW.** A project may switch a reminder off that the tenant left on;
+it may not switch one on that the tenant switched off. Otherwise a customer who turned something off
+centrally would find it still firing from forty projects, and would have to visit all forty to find
+out why. Confirmed red against the plausible simplification (`overrideEnabled ?? gate.enabled`).
+
+### The catalog's honesty guard did its job, and got stronger
+
+`automation-catalog.test.ts` exists because *"a control that silently does nothing is a broken
+promise"*: it refuses to let a trigger be marked `active` unless a real `resolveGatePolicy` consumer
+fires it. It **rejected both new project triggers** — correctly, until the consumer existed.
+
+But its detector was one string match, `triggerKey: '<key>'`, over every consumer concatenated. That
+is wrong in both directions: it would credit a file that merely *mentioned* the literal without
+resolving anything, and it refused a resolver that is **generic over its trigger** —
+`lib/projects/notify-policy.ts` passes `triggerKey: trigger`, a real consumer the grep could not
+see. It now requires, **per file**, both a `resolveGatePolicy(` call and the key. Stronger, not
+laxer: marking a genuinely unconsumed trigger active still fails it.
+
+The `channel` dial does not overpromise either. `'todo'` means the queue without the mail — the ToDo
+**row** is not optional, because the checklist projection finds and retires it when the task is
+ticked off, so suppressing it would leave a queue holding work nothing can clear. What a person is
+choosing is whether their inbox is involved, and the help text says exactly that.
+
+### Verification
+
+`tsc` 0 · vitest 230 files / **2,432** (14 new) · migration 235 applied · **11 reminder assertions
+green in the live lifecycle drive**, every one about what the product then *sent* rather than what it
+stored: unconfigured resolves to the platform default and says which level decided; an override
+saves; **work assigned afterwards carries the project's cadence and not the default**;
+`channel: 'todo'` raised the ToDo with **0 mail events**; clearing returns to inherit and the key is
+*gone* from the row · **0 broken links in the whole chain** · isolation 20 tables · surfaces 82/82 ·
+api-contract 131 · write-contract **252/252** · ui-vs-db green · mobile green · `next build` clean.

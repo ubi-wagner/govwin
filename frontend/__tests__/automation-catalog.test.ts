@@ -25,9 +25,23 @@ const CONSUMER_SRC = [
   'app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts',     // contract_kickoff (internal)
   'app/api/portal/[tenantSlug]/purchase/route.ts',                           // proposal_setup (internal)
   'app/api/stripe/webhook/route.ts',                                         // curation SLA (internal)
-].map((p) => readFileSync(join(FRONTEND, p), 'utf8')).join('\n');
+  'lib/projects/notify-policy.ts',                                           // project:task.assigned, project:milestone.due_soon
+].map((p) => ({ path: p, src: readFileSync(join(FRONTEND, p), 'utf8') }));
 
-const firesTrigger = (key: string) => CONSUMER_SRC.includes(`triggerKey: '${key}'`);
+/**
+ * A trigger is fired for real when some consumer file BOTH calls `resolveGatePolicy` AND names the
+ * key — the two halves of "this dial reaches the resolver".
+ *
+ * It used to be one string match, `triggerKey: '<key>'`, over every consumer concatenated. That is
+ * strictly weaker in one direction and strictly stronger in another: it would credit a file that
+ * merely mentioned the literal without resolving anything, and it REFUSED a resolver generic over
+ * its trigger — `lib/projects/notify-policy.ts` passes `triggerKey: trigger`, which is a real
+ * consumer the old grep could not see. Both halves, per file, is the property actually meant.
+ */
+const firesTrigger = (key: string) => CONSUMER_SRC.some(
+  (f) => f.src.includes('resolveGatePolicy(')
+      && (f.src.includes(`triggerKey: '${key}'`) || f.src.includes(`'${key}'`)),
+);
 
 describe('automation trigger catalog — the dial can never lie', () => {
   it('marks exactly the consumer-backed triggers as active (locks the current truth)', () => {
@@ -37,6 +51,8 @@ describe('automation trigger catalog — the dial can never lie', () => {
       'build:final_review',
       'build:proposal:proposal.advanced',
       'build:section_review',
+      'project:project:milestone.due_soon',
+      'project:project:task.assigned',
     ]);
   });
 

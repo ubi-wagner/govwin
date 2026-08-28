@@ -33,6 +33,7 @@ import { createTask } from '@/lib/tasks/tasks';
 import type { Role } from '@/lib/rbac';
 import type { ProjectActor } from './access';
 import { isoDate } from './dates';
+import { resolveProjectNotify } from './notify-policy';
 
 /** The platform actor shape `lib/tasks` wants, from the project actor we hold. */
 function asTaskActor(actor: ProjectActor, email: string | null = null) {
@@ -40,12 +41,19 @@ function asTaskActor(actor: ProjectActor, email: string | null = null) {
 }
 
 /**
- * Nudge cadence for project work: a week out, two days out, then on the day.
+ * The DEFAULT nudge cadence for project work: a week out, two days out, then on the day.
  *
  * Front-loaded on purpose. A reminder that arrives the morning something is due is not a reminder,
  * it is a report — the useful one is early enough to do something about.
+ *
+ * It is a default and no longer a constant: `resolveProjectNotify` merges the platform framework,
+ * the tenant's own policy and this project's override over it (mig 235). A customer could tune
+ * every reminder the proposal side sends and none of the ones their project sends, which is what a
+ * capability built ALONGSIDE the policy model rather than into it looks like.
+ *
+ * The value lives in `lib/projects/notify-policy.ts` now; this is left as documentation of what the
+ * unconfigured answer is.
  */
-const NUDGE_DAYS = [7, 2, 0];
 
 /**
  * Raise the ToDo for a newly assigned project task.
@@ -66,6 +74,12 @@ export async function raiseTaskTodo(
 ): Promise<string | null> {
   if (!task.assigneeUserId && !task.assigneeRole) return null;
   try {
+    // Platform → tenant → THIS project. A project may switch the reminder off entirely, and when it
+    // does there is no ToDo and no mail — the assignment still happened, and the checklist still
+    // shows it, because turning off a reminder is not turning off the work.
+    const policy = await resolveProjectNotify(actor.tenantId, task.projectId, 'project:task.assigned');
+    if (!policy.enabled) return null;
+
     const due = isoDate(task.dueDate);
     const res = await createTask({
       actor: asTaskActor(actor),
@@ -81,7 +95,7 @@ export async function raiseTaskTodo(
       entityType: 'project_milestone_task',
       entityId: task.id,
       dueAt: due ? `${due}T17:00:00Z` : null,
-      nudgeDays: NUDGE_DAYS,
+      nudgeDays: policy.nudgeDays,
       params: { projectId: task.projectId, milestoneId: task.milestoneId },
     });
     if (!res.ok) {
@@ -89,12 +103,20 @@ export async function raiseTaskTodo(
       return null;
     }
 
-    // ── THE EMAIL, THROUGH THE ONE SEAM ────────────────────────────────────────────────────
+    // ── THE EMAIL, THROUGH THE ONE SEAM, AND ONLY IF THE POLICY SAYS SO ────────────────────
     // Not a direct send: `system:notification.requested` is the path the digest and every other
     // grouped mail take, so delivery, suppression and the ledger are the CRM's single
     // implementation rather than a second one living here. The renderer ships in the same change
     // (services/cms/src/templates.py) — a template named by code and defined nowhere emits
     // `notification.failed` instead of sending, twice over in this repo's history.
+    //
+    // `channel: 'todo'` means the queue without the mail. The ToDo ROW is not optional here and the
+    // dial does not pretend otherwise: the checklist projection finds and retires that row when the
+    // task is ticked off (`retireProjectedTodos`), so suppressing it would leave the queue holding
+    // work nothing can ever clear. What a person is actually choosing is whether their inbox is
+    // involved, and the catalog's help text says exactly that.
+    if (policy.channel === 'todo') return res.data.taskId ?? null;
+
     await emitEventSingle({
       namespace: 'system',
       type: 'notification.requested',

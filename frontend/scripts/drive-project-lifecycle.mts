@@ -1261,6 +1261,77 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7r · THE REMINDER POLICY — and whether changing it changes anything ═══════════════════
+  //
+  // A settings page that stores a value nothing reads is the failure this whole layer is built to
+  // avoid ("a control that silently does nothing is a broken promise"). So every assertion here is
+  // about the ToDo that actually gets raised AFTERWARDS, not about the row that was written.
+  phase('7r · reminders: the dial moves the thing it points at');
+
+  const pol0 = await api(req, 'get', P + '/notifications');
+  const pols = ((pol0.json.data as Json)?.triggers as Json[]) ?? [];
+  A(pol0.status === 200 && pols.length >= 2, 'the project answers with its resolved policy',
+    `${pol0.status} · ${pols.length} trigger(s)`);
+  const assignPol = pols.find((t) => t.trigger === 'project:task.assigned');
+  A(JSON.stringify(assignPol?.nudgeDays) === '[7,2,0]',
+    'unconfigured, it is the platform default', JSON.stringify(assignPol?.nudgeDays));
+  A((assignPol?.source as Json)?.projectOverride === false,
+    'and it says so — which LEVEL decided is half the answer');
+  A(assignPol?.deliveryStatus === 'active',
+    'the dial declares itself as actually delivering', String(assignPol?.deliveryStatus));
+
+  // ── CHANGE IT, THEN ASSIGN WORK, THEN READ THE TODO ──────────────────────────────────────
+  const setPol = await api(req, 'patch', P + '/notifications', {
+    trigger: 'project:task.assigned', nudgeDays: [5, 1], channel: 'todo',
+  });
+  A(setPol.status === 200, 'a per-project override saves', `${setPol.status}`);
+  A(JSON.stringify((setPol.json.data as Json)?.nudgeDays) === '[5,1]',
+    'and resolves to the new cadence', JSON.stringify((setPol.json.data as Json)?.nudgeDays));
+
+  const policedTask = await api(req, 'post', P + '/tasks', {
+    milestoneId, title: 'Work assigned under the new cadence', assigneeUserId: assignee?.id,
+    dueDate: iso(20),
+  });
+  A(policedTask.status === 201, 'work is assigned after the change', `${policedTask.status}`);
+  const policedId = ((policedTask.json.data as Json)?.task as Json)?.id as string | undefined;
+
+  // `nudge_schedule`, and asserted as a PROPERTY rather than an exact array: `createTask` drops a
+  // 0-day beat (a reminder on the due date is handled by the overdue sweep, not the pre-nudge), so
+  // pinning [5,1] would be asserting my assumption about the platform's filtering rather than the
+  // thing under test. What matters is that it followed THIS PROJECT's cadence and not the default.
+  const [raisedTodo] = await sql<{ sched: number[] | null }[]>`
+    SELECT nudge_schedule AS sched FROM tasks
+     WHERE tenant_id = ${tenantId}::uuid AND entity_type = 'project_milestone_task'
+       AND entity_id = ${policedId ?? null}::uuid`;
+  const sched = raisedTodo?.sched ?? [];
+  A(sched.includes(5) && sched.includes(1) && !sched.includes(7) && !sched.includes(2),
+    'THE TODO CARRIES THE PROJECT CADENCE, not the default — the dial moved what it points at',
+    JSON.stringify(sched));
+
+  // `channel: 'todo'` means the queue WITHOUT the mail. The ToDo row is not optional — the
+  // checklist projection retires it — so what a person is choosing is whether their inbox is used.
+  const [mailed] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM system_events
+     WHERE namespace = 'system' AND type = 'notification.requested'
+       AND payload->>'taskId' = ${policedId ?? null}`;
+  A(mailed?.n === 0, 'and channel=todo raised the ToDo WITHOUT the email', `${mailed?.n} mail event(s)`);
+
+  // ── AND CLEARING IS NOT THE SAME AS RETYPING ─────────────────────────────────────────────
+  const cleared = await api(req, 'patch', P + '/notifications', {
+    trigger: 'project:task.assigned', nudgeDays: null, channel: null, enabled: null,
+  });
+  A(cleared.status === 200 && JSON.stringify((cleared.json.data as Json)?.nudgeDays) === '[7,2,0]',
+    'clearing returns to inherit, not to a copy of what was inherited',
+    JSON.stringify((cleared.json.data as Json)?.nudgeDays));
+  const [rowAfter] = await sql<{ pol: unknown }[]>`
+    SELECT notification_policy AS pol FROM projects WHERE id = ${created.projectId}::uuid`;
+  A(!JSON.stringify(rowAfter?.pol ?? {}).includes('task.assigned'),
+    'and the key is GONE from the row — inherit reads as absent',
+    JSON.stringify(rowAfter?.pol ?? {}).slice(0, 60));
+
+  // Tick it off so it does not block close-out — standing work is standing work.
+  if (policedId) await api(req, 'patch', P + `/tasks/${policedId}`, { status: 'done' });
+
   // ══ 7q · THE STATUS REPORT — a document whose numbers are read, not typed ═════════════════
   //
   // Not a new kind of thing: a fifth PRESET on the same deliverable, producing the same

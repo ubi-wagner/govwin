@@ -17,6 +17,8 @@ import { listProjectRisks } from '@/lib/projects/risks';
 import { listModifications } from '@/lib/projects/modifications';
 import { listInvoices, clinBilling, billableHours } from '@/lib/projects/invoices';
 import { listCdrlItems } from '@/lib/projects/cdrl';
+import { resolveProjectNotify, PROJECT_TRIGGERS } from '@/lib/projects/notify-policy';
+import { TRIGGER_CATALOG } from '@/lib/automation/catalog';
 import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
@@ -26,6 +28,7 @@ import { MeetingLog, type LogMeeting } from '@/components/projects/meeting-log';
 import { ModificationLog, type LoggedModification } from '@/components/projects/modification-log';
 import { InvoiceLedger, type LedgerInvoice, type LedgerClin, type LedgerUnbilled } from '@/components/projects/invoice-ledger';
 import { CdrlRegister, type RegisterCdrl } from '@/components/projects/cdrl-register';
+import { NotificationPolicy, type PolicyTrigger } from '@/components/projects/notification-policy';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -99,7 +102,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, cdrlItems, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, cdrlItems, notifyPolicy, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -120,6 +123,17 @@ export default async function ProjectPage({
     clinBilling(tenantId, projectId),
     billableHours(tenantId, projectId),
     listCdrlItems(tenantId, projectId),
+    // The third level of the automation policy, resolved for each project trigger. Reading it here
+    // rather than in the component keeps the page one round of queries, and keeps the resolver on
+    // the server where the tenant policy lives.
+    Promise.all(PROJECT_TRIGGERS.map(async (t) => {
+      const resolved = await resolveProjectNotify(tenantId, projectId, t);
+      const meta = TRIGGER_CATALOG.find((c) => c.scope === 'project' && c.triggerKey === t);
+      return {
+        trigger: t, label: meta?.label ?? t, help: meta?.help ?? '',
+        deliveryStatus: meta?.deliveryStatus ?? 'preview', ...resolved,
+      };
+    })),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -584,6 +598,20 @@ export default async function ProjectPage({
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           tenantSlug={tenantSlug}
           canRaise={canAccept}
+        />
+      </section>
+
+      {/* ── REMINDERS ────────────────────────────────────────────────────────────────────────
+          At the foot, because it is a SETTING and not work. A person comes here once, when the
+          default cadence is wrong for this contract. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Reminders
+        </h2>
+        <NotificationPolicy
+          triggers={notifyPolicy as unknown as PolicyTrigger[]}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canEdit={canAccept}
         />
       </section>
 
