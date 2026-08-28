@@ -1028,6 +1028,79 @@ async function main() {
     }
   }
 
+  // ══ 7l · WHAT WAS AGREED — a meeting, its notes, and the work that came out of it ══════════
+  //
+  // The failure this guards is the one that leaves two records disagreeing and both looking
+  // complete: notes claiming five agreements beside a plan holding two.
+  phase('7l · meetings: notes in the canvas, actions on the task spine');
+
+  const metRec = await asEmployee_((ctx) => api(ctx.request, 'post', P + '/meetings', {
+    title: 'CDR walkthrough with the COR',
+    heldOn: iso(-3),
+    attendees: ['Kate Ulepic', 'J. Rivera (COR)', 'Kate Ulepic'],
+  }));
+  A(metRec?.status === 201, 'an employee records the meeting — whoever took the notes',
+    `${metRec?.status ?? 'no employee to be'}`);
+  const meetingId = ((metRec?.json.data as Json)?.meeting as Json)?.id as string | undefined;
+
+  const [mtgRow] = await sql<{ attendees: string[]; documentId: string | null }[]>`
+    SELECT attendees, document_id AS "documentId" FROM project_meetings
+     WHERE id = ${meetingId ?? null}::uuid`;
+  A(mtgRow?.attendees?.length === 2,
+    'attendees are kept as names, de-duplicated, customer and all',
+    (mtgRow?.attendees ?? []).join(' · '));
+  A(Boolean(mtgRow?.documentId),
+    'and the notes are a real canvas document — the same editor and exporters as everything else');
+
+  // The minutes must open and export like any other artifact. A `notes text` column would have
+  // passed every other check here and failed this one.
+  const [mtgDoc] = await sql<{ canvas: unknown }[]>`
+    SELECT canvas FROM tenant_documents WHERE id = ${mtgRow?.documentId ?? null}::uuid`;
+  const mtgExport = await req.fetch(`${BASE}/api/portal/${TENANT}/documents/${mtgRow?.documentId}/export`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    data: { document: mtgDoc?.canvas, format: 'docx' },
+  });
+  const mtgBytes = await mtgExport.body();
+  A(mtgExport.status() === 200 && mtgBytes.subarray(0, 2).toString('latin1') === 'PK',
+    'minutes that cannot be exported are minutes nobody can send',
+    `${mtgExport.status()} · ${mtgBytes.length} bytes`);
+
+  // ── AND THE ACTIONS ARE ORDINARY TASKS ────────────────────────────────────────────────────
+  const actions = await api(req, 'patch', P + `/meetings/${meetingId}`, {
+    action: 'raise_actions',
+    items: [
+      { title: 'Send the revised SOW to the CO', assigneeUserId: assignee?.id ?? null, dueDate: iso(7) },
+      { title: 'Re-run the thermal margin case', assigneeUserId: assignee?.id ?? null },
+      { title: 'Give this one to somebody who is not here', assigneeUserId: '11111111-1111-4111-8111-111111111111' },
+    ],
+  });
+  A(actions.status === 201, 'the agreed items are raised in ONE call', `${actions.status}`);
+  const raisedIds = ((actions.json.data as Json)?.taskIds ?? []) as string[];
+  const refusedList = ((actions.json.data as Json)?.refused ?? []) as string[];
+  A(raisedIds.length === 2 && refusedList.length === 1,
+    'and one bad item does not lose the other two — the refusal comes back NAMED',
+    `${raisedIds.length} raised · ${refusedList.length} refused`);
+
+  const [{ actionTodos }] = await sql<{ actionTodos: number }[]>`
+    SELECT count(*)::int AS "actionTodos" FROM tasks
+     WHERE task_type = 'project_task' AND entity_id = ANY(${raisedIds}::uuid[])`;
+  A(actionTodos === raisedIds.length,
+    'each one is an ORDINARY task, so it lands in the same queue as everything else that person owes',
+    `${actionTodos} ToDo(s)`);
+
+  const [{ traced }] = await sql<{ traced: number }[]>`
+    SELECT count(*)::int AS "traced" FROM project_milestone_tasks
+     WHERE meeting_id = ${meetingId ?? null}::uuid`;
+  A(traced === raisedIds.length,
+    'and still knows which meeting it was agreed in — six weeks later, that is the question',
+    `${traced} traced`);
+
+  // Tick them, or they correctly block close-out further down — standing work is standing work.
+  for (const id of raisedIds) {
+    await asEmployee_((ctx) => api(ctx.request, 'patch', P + `/tasks/${id}`, { status: 'done' }));
+  }
+
   // ══ 7k · THE REGISTER — a risk, and the day it stopped being one ═══════════════════════════
   //
   // The question a program review asks is not "what are the risks" but "when did we know, and what

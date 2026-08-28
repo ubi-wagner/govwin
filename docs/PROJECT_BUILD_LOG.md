@@ -2191,3 +2191,73 @@ substituted the admin would report the manager's half twice.
 lifecycle drive green.
 
 ---
+
+## P3 — What was agreed, and whether it happened
+
+Migration **226**: `project_meetings`, plus one nullable back-pointer on the task table.
+
+### The notes are a canvas document
+
+Not a `notes text` column. The same `tenant_documents` row a deliverable uses, so minutes get the
+same editor, the same compliance floor and the same docx · pptx · xlsx · pdf exporters — **minutes
+that cannot be exported are minutes nobody can send**, and a text column would have passed every
+other check here and failed that one. The drive exports them and checks the `PK` header for exactly
+that reason.
+
+Seeded with facts read off the row — the title, the date, who was there — and **no agenda
+headings**. Scaffolding *Agenda / Discussion / Next steps* would put structure into a record of what
+was actually said, and the product does not know what was said.
+
+Attendees are **names, not user ids**: half the room usually works for the customer, and resolving
+would either lose them or manufacture an identity nothing verified. Same rule as
+`acceptance_evidence.customer_name`.
+
+### An action item is an ordinary task
+
+`project_milestone_tasks.meeting_id` is a nullable back-pointer, not a new kind of row. Work agreed
+in a meeting is work with an owner and a date — so it arrives with a ToDo, an email, nudges,
+reassignment and attachments, and lands in the same list as everything else that person owes.
+
+**A separate "action items" table would have been the fifth second-checklist this module has
+refused** — after the ToDo queue, the nudge path, the canvas editor and the risk register's
+mitigations.
+
+What the meeting adds over the document is provenance: six weeks later, *"who agreed to this?"* is
+settled by the notes it was decided in.
+
+### One call, and both halves of the answer
+
+That is how a meeting ends — somebody reads back five things. Raising them one at a time is five
+chances to be interrupted, leaving **notes claiming five agreements beside a plan holding two, both
+looking complete**. Nothing errors; the disagreement surfaces weeks later when the thing nobody was
+assigned does not happen.
+
+So the batch is one call, and it reports what it refused, by name. One bad item does not lose the
+others — but **nothing landing is a refusal, not a partial success**: an employee hitting the
+tenant_admin rule gets a 403, not a cheerful 201 with an empty list.
+
+### Proven
+
+14 unit assertions, two red-first defects (a silently dropped item; nothing landing reporting
+success), and as the actors:
+
+```
+✓ an employee records the meeting — whoever took the notes — 201
+✓ attendees are kept as names, de-duplicated, customer and all — Kate Ulepic · J. Rivera (COR)
+✓ and the notes are a real canvas document — the same editor and exporters as everything else
+✓ minutes that cannot be exported are minutes nobody can send — 200 · 8,831 bytes
+✓ the agreed items are raised in ONE call — 201
+✓ and one bad item does not lose the other two — the refusal comes back NAMED — 2 raised · 1 refused
+✓ each one is an ORDINARY task, so it lands in the same queue as everything else that person owes
+✓ and still knows which meeting it was agreed in — six weeks later, that is the question — 2 traced
+```
+
+### The harness check paid for itself
+
+`check-harness-syntax.mjs` (H2) caught a duplicate `const met` **before** the rebuild — the third
+occurrence of that exact defect, and the first one that cost seconds instead of ten minutes.
+
+`tsc` 0 · vitest 223 files / **2,309** · harness syntax 269/269 · surfaces 82/82 · mobile probe
+clean · lifecycle drive green.
+
+---

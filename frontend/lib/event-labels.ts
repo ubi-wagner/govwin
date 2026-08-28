@@ -309,6 +309,22 @@ export function describeEvent(ev: EventLike): string {
       case 'review.withdrawn':
         return 'Review request withdrawn';
 
+      // ── Meetings (mig 226) ────────────────────────────────────────────────────────────────
+      case 'meeting.recorded': {
+        const n = typeof payload.attendees === 'number' ? payload.attendees : 0;
+        return `Meeting recorded: ${str(payload.title) ?? 'a meeting'}`
+          + `${str(payload.heldOn) ? ` (${str(payload.heldOn)})` : ''}`
+          + `${n ? ` · ${n} attendee${n === 1 ? '' : 's'}` : ''}`;
+      }
+      case 'meeting.actions_raised': {
+        // Both halves. Saying "5 raised" when one was refused is how the notes and the plan start
+        // disagreeing about what was agreed.
+        const raised = typeof payload.raised === 'number' ? payload.raised : 0;
+        const refused = typeof payload.refused === 'number' ? payload.refused : 0;
+        return `${raised} action item${raised === 1 ? '' : 's'} raised from `
+          + `"${str(payload.title) ?? 'a meeting'}"${refused ? ` · ${refused} refused` : ''}`;
+      }
+
       // ── The register (mig 225) ────────────────────────────────────────────────────────────
       case 'risk.raised':
         return `Risk raised: ${str(payload.title) ?? 'a risk'}`

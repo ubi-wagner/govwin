@@ -14,10 +14,12 @@ import { listProjectComments } from '@/lib/projects/comments';
 import { listProjectReviews } from '@/lib/projects/reviews';
 import { listAcceptanceEvidence } from '@/lib/projects/evidence';
 import { listProjectRisks } from '@/lib/projects/risks';
+import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
 import { EvidencePanel, type PanelEvidence } from '@/components/projects/evidence-panel';
 import { RiskRegister, type RegisterRisk } from '@/components/projects/risk-register';
+import { MeetingLog, type LogMeeting } from '@/components/projects/meeting-log';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -91,7 +93,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -106,6 +108,7 @@ export default async function ProjectPage({
     listProjectReviews(tenantId, projectId),
     listAcceptanceEvidence(tenantId, projectId),
     listProjectRisks(tenantId, projectId),
+    listProjectMeetings(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -500,6 +503,26 @@ export default async function ProjectPage({
           members={memberOptions}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canClose={canAccept}
+        />
+      </section>
+
+      {/* ── WHAT WAS AGREED ──────────────────────────────────────────────────────────────────
+          Below the register, because a meeting is where most of what is on the register got
+          decided, and above the discussion, because the discussion is about all of it. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Meetings and action items
+        </h2>
+        <MeetingLog
+          meetings={meetings.map((m): LogMeeting => ({
+            id: m.id, title: m.title, heldOn: isoDate(m.heldOn),
+            attendees: m.attendees ?? [], documentId: m.documentId,
+            actionItems: m.actionItems ?? 0, actionItemsDone: m.actionItemsDone ?? 0,
+          }))}
+          members={memberOptions}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          tenantSlug={tenantSlug}
+          canRaise={canAccept}
         />
       </section>
 
