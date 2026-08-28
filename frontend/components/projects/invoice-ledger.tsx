@@ -27,8 +27,10 @@ import { useClientNow } from '@/components/ui/time-ago';
  */
 export interface LedgerLine {
   id: string;
-  clinNumber: string | null;
-  milestoneTitle: string | null;
+  /** Optional for the same reason as the modification log's: the lib declares it optional and
+   *  silencing that with a cast is what let a Date reach a field declared `string`. */
+  clinNumber?: string | null;
+  milestoneTitle?: string | null;
   description: string;
   source: string;
   amount: string;

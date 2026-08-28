@@ -96,8 +96,16 @@ const money = (v: unknown) => Number(v ?? 0);
 export async function listInvoices(tenantId: string, projectId: string): Promise<Invoice[]> {
   try {
     const invoices = await sql<Invoice[]>`
-      SELECT id, project_id, invoice_number, period_start, period_end, status,
-             submitted_on, paid_on, amount_paid, void_reason, document_id, notes, created_at
+      -- ::text on every date/timestamp column. The row type above declares them as string and
+      -- postgres.js hands back a JavaScript Date; the assertion compiles, so nothing catches
+      -- it, and the panel renders String(d).slice(0,10) = "Fri Aug 28" -- no year -- while an
+      -- ageing calculation guarded on a YYYY-MM-DD shape silently shows nothing at all.
+      -- Cast at the SOURCE, so the declared type is true for every caller and not just here.
+      -- (No backticks in this comment: it lives inside a JS template literal.)
+      SELECT id, project_id, invoice_number,
+             period_start::text AS period_start, period_end::text AS period_end, status,
+             submitted_on::text AS submitted_on, paid_on::text AS paid_on,
+             amount_paid, void_reason, document_id, notes, created_at::text AS created_at
         FROM project_invoices
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
        ORDER BY submitted_on DESC NULLS FIRST, created_at DESC`;

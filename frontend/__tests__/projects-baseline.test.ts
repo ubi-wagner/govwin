@@ -80,7 +80,13 @@ function queueProject(baselinedAt: string | null, docs: Array<{ kind: string }>)
     // freezing the milestones — and a baseline written against two tables is one that can
     // half-freeze.
     [{ id: 'm1' }],                                       // milestones UPDATE … RETURNING
-    [{ baselinedAt: '2026-03-03T00:00:00.000Z' }],        // the project CAS
+    // A REAL `Date`, because `baselined_at` is a timestamptz and postgres.js returns one. This
+    // fixture used to hold the ISO STRING, and that is precisely why it passed against
+    // `String(proj.baselinedAt)` — which on the real type produces
+    // "Tue Mar 03 2026 00:00:00 GMT+0000 (Coordinated Universal Time)" and shipped it as the
+    // API's `baselinedAt` while every other timestamp in the tree is ISO. A date fixture that is
+    // not a Date tests the wrong function (CLAUDE.md, the #2 crash class).
+    [{ baselinedAt: new Date('2026-03-03T00:00:00.000Z') }],  // the project CAS
   ];
 }
 

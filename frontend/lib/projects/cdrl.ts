@@ -99,9 +99,15 @@ function daysBetween(from: string | null, to: string | null): number | null {
 export async function listCdrlItems(tenantId: string, projectId: string): Promise<CdrlItem[]> {
   try {
     const items = await sql<CdrlItem[]>`
+      -- ::text on every date/timestamp column. The row type above declares them as string and
+      -- postgres.js hands back a JavaScript Date; the assertion compiles, so nothing catches
+      -- it, and the panel renders String(d).slice(0,10) = "Fri Aug 28" -- no year -- while an
+      -- ageing calculation guarded on a YYYY-MM-DD shape silently shows nothing at all.
+      -- Cast at the SOURCE, so the declared type is true for every caller and not just here.
+      -- (No backticks in this comment: it lives inside a JS template literal.)
       SELECT c.id, c.project_id, c.cdrl_number, c.title, c.did_number, c.subtitle,
              c.clin_id, k.clin_number, c.frequency, c.approval_code, c.distribution,
-             c.distribution_note, c.first_due, c.recurrence_days, c.notes
+             c.distribution_note, c.first_due::text AS first_due, c.recurrence_days, c.notes
         FROM project_cdrl_items c
         LEFT JOIN project_clins k ON k.id = c.clin_id
        WHERE c.project_id = ${projectId}::uuid AND c.tenant_id = ${tenantId}::uuid
@@ -111,8 +117,15 @@ export async function listCdrlItems(tenantId: string, projectId: string): Promis
     // THE SUBMISSION HISTORY IS THE DELIVERABLES. One read for all of them; a query per item would
     // be N+1 on a register that renders every item's history.
     const rows = await sql<Array<CdrlSubmission & { cdrlItemId: string }>>`
-      SELECT d.id AS deliverable_id, d.cdrl_item_id, d.title, d.required_by, d.submitted_at,
-             d.accepted_at, d.transmittal_ref, m.title AS milestone_title
+      -- ::text on every date/timestamp column. The row type above declares them as string and
+      -- postgres.js hands back a JavaScript Date; the assertion compiles, so nothing catches
+      -- it, and the panel renders String(d).slice(0,10) = "Fri Aug 28" -- no year -- while an
+      -- ageing calculation guarded on a YYYY-MM-DD shape silently shows nothing at all.
+      -- Cast at the SOURCE, so the declared type is true for every caller and not just here.
+      -- (No backticks in this comment: it lives inside a JS template literal.)
+      SELECT d.id AS deliverable_id, d.cdrl_item_id, d.title,
+             d.required_by::text AS required_by, d.submitted_at::text AS submitted_at,
+             d.accepted_at::text AS accepted_at, d.transmittal_ref, m.title AS milestone_title
         FROM project_deliverables d
         JOIN project_milestones m ON m.id = d.milestone_id
        WHERE d.cdrl_item_id = ANY(${items.map((i) => i.id)}::uuid[])

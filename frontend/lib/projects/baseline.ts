@@ -120,7 +120,7 @@ export async function setBaseline(
                AND baseline_date IS NULL
             RETURNING id`;
 
-          const [proj] = await tx`
+          const [proj] = await tx<{ baselinedAt: Date }[]>`
             UPDATE projects
                SET baselined_at = now(), status = 'active', updated_at = now()
              WHERE id = ${projectId}::uuid AND tenant_id = ${actor.tenantId}::uuid
@@ -132,7 +132,13 @@ export async function setBaseline(
           // producing a second, later timestamp over the same frozen plan.
           if (!proj) throw new Error('BASELINE_RACE');
 
-          return { milestones: ms.length, baselinedAt: String(proj.baselinedAt) };
+          // `.toISOString()`, NOT `String(…)`. `baselined_at` is a timestamptz, so postgres.js
+          // returns a `Date` — and `String(aDate)` is "Fri Aug 28 2026 08:27:38 GMT+0000 (…)",
+          // which is what this route handed back as `baselinedAt` while every other timestamp in
+          // the API is ISO. Left as a `Date` it would also have been right, because
+          // `NextResponse.json` serialises one to ISO; calling `String()` was the step that broke
+          // it. The row type now says `Date`, which is what the column actually gives.
+          return { milestones: ms.length, baselinedAt: proj.baselinedAt.toISOString() };
         });
 
         await auditLog({

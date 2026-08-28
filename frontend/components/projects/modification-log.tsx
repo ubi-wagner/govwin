@@ -28,7 +28,10 @@ export interface LoggedChange {
   id: string;
   action: 'amend' | 'add_clin';
   clinId: string | null;
-  clinNumber: string | null;
+  /** Optional because the lib's row type is: the LEFT JOIN can miss, and a change on a CLIN
+   *  that was later deleted has no number. Widened rather than cast away at the call site —
+   *  an `as unknown as` on the prop is how the date-type bug reached three of these panels. */
+  clinNumber?: string | null;
   field: string | null;
   oldValue: string | null;
   newValue: string | null;

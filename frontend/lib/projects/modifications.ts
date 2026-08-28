@@ -97,8 +97,15 @@ export async function listModifications(
 ): Promise<Modification[]> {
   try {
     const mods = await sql<Modification[]>`
+      -- ::text on every date/timestamp column. The row type above declares them as string and
+      -- postgres.js hands back a JavaScript Date; the assertion compiles, so nothing catches
+      -- it, and the panel renders String(d).slice(0,10) = "Fri Aug 28" -- no year -- while an
+      -- ageing calculation guarded on a YYYY-MM-DD shape silently shows nothing at all.
+      -- Cast at the SOURCE, so the declared type is true for every caller and not just here.
+      -- (No backticks in this comment: it lives inside a JS template literal.)
       SELECT id, project_id, mod_number, title, description, kind, status,
-             executed_on, executed_by, source_doc_id, created_by, created_at
+             executed_on::text AS executed_on, executed_by, source_doc_id, created_by,
+             created_at::text AS created_at
         FROM project_modifications
        WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
        ORDER BY executed_on DESC NULLS FIRST, created_at DESC`;

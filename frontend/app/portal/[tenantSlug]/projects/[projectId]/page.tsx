@@ -206,7 +206,7 @@ export default async function ProjectPage({
     schedulePct: measures.project.schedulePct,
     deliverablesPct: measures.project.deliverablesPct,
   });
-  const projectForecast = { ...fc, note: forecastNote(fc) } as unknown as PanelForecast;
+  const projectForecast = { ...fc, note: forecastNote(fc) };
 
   const memberOptions = assignees.map((a) => ({ id: a.userId, email: a.email ?? a.userId }));
 
@@ -541,7 +541,7 @@ export default async function ProjectPage({
           Contract modifications
         </h2>
         <ModificationLog
-          modifications={modifications as unknown as LoggedModification[]}
+          modifications={modifications}
           clins={clins.map((c) => ({ id: c.id, clinNumber: c.clinNumber, title: c.title }))}
           documents={docs.map((d) => ({ id: d.id, filename: d.filename ?? d.kind }))}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
@@ -567,9 +567,9 @@ export default async function ProjectPage({
           Contract coverage
         </h2>
         <TraceabilityMap
-          clins={trace.clins as unknown as MapClin[]}
+          clins={trace.clins}
           unassignedMilestones={trace.unassignedMilestones}
-          gaps={trace.gaps as unknown as MapGap[]}
+          gaps={trace.gaps}
         />
       </section>
 
@@ -582,7 +582,7 @@ export default async function ProjectPage({
           Data requirements
         </h2>
         <CdrlRegister
-          items={cdrlItems as unknown as RegisterCdrl[]}
+          items={cdrlItems}
           clins={clins.map((c) => ({ id: c.id, clinNumber: c.clinNumber }))}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canManage={canAccept}
@@ -598,9 +598,9 @@ export default async function ProjectPage({
           Billing and invoices
         </h2>
         <InvoiceLedger
-          invoices={invoices as unknown as LedgerInvoice[]}
-          billing={billing as unknown as LedgerClin[]}
-          unbilled={unbilled as unknown as LedgerUnbilled[]}
+          invoices={invoices}
+          billing={billing}
+          unbilled={unbilled}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canBill={canAccept}
         />
@@ -655,7 +655,7 @@ export default async function ProjectPage({
           Phase gates
         </h2>
         <GateCloserControl
-          milestones={milestones as unknown as GateMilestone[]}
+          milestones={milestones}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canEdit={canAccept}
         />
@@ -671,7 +671,7 @@ export default async function ProjectPage({
         <ProjectAssistant
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canRequest={canAccept}
-          narrative={draftedNarrative as unknown as AssistantNarrative}
+          narrative={draftedNarrative}
         />
       </section>
 
@@ -683,7 +683,7 @@ export default async function ProjectPage({
           Reminders
         </h2>
         <NotificationPolicy
-          triggers={notifyPolicy as unknown as PolicyTrigger[]}
+          triggers={notifyPolicy}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canEdit={canAccept}
         />
