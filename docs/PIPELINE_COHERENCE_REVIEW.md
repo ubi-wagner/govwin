@@ -241,6 +241,16 @@ in the self-test.
 
 ## Verification
 
-`tsc` 0 · `vitest` 2,484 · branch drive suite 41 drives · coherence findings 0 · row types read as a
-string 0 · frontend notification templates with no renderer 0 · responsive 102 shots with no
-sideways scroll.
+`tsc` 0 · `vitest` 2,484 · branch drives **41 passed · 0 failed · 0 could-not-run** (exit 0, checked
+rather than read off the summary line) · coherence findings 0 · row types read as a string 0 ·
+frontend notification templates with no renderer 0 · responsive 102 shots with no sideways scroll ·
+UI atlas tenant lane re-shot, 13 contact sheets.
+
+One drive had to be fixed to STAY passing, and the way it failed is the most useful thing here.
+`uncovered-triggers` went red the moment the hard-coded model host was corrected, because
+`source-scout` had never reached the emulator: its request went out, failed, and
+`analysis?.changed ?? hashChanged` fell back to the hash — which is `true`. The drive had been green
+on a broken AI call for as long as the bug existed. The emulator now answers that prompt's own
+contract, and can say **no**: identical content returns `changed:false`, a diff introducing
+solicitation language returns `changed:true, severity:"high"`. A responder that could only agree
+would make the drive assert the emulator's optimism instead of the scout's behaviour.
