@@ -15,6 +15,7 @@ import { listProjectReviews } from '@/lib/projects/reviews';
 import { listAcceptanceEvidence } from '@/lib/projects/evidence';
 import { listProjectRisks } from '@/lib/projects/risks';
 import { listModifications } from '@/lib/projects/modifications';
+import { listInvoices, clinBilling, billableHours } from '@/lib/projects/invoices';
 import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
@@ -22,6 +23,7 @@ import { EvidencePanel, type PanelEvidence } from '@/components/projects/evidenc
 import { RiskRegister, type RegisterRisk } from '@/components/projects/risk-register';
 import { MeetingLog, type LogMeeting } from '@/components/projects/meeting-log';
 import { ModificationLog, type LoggedModification } from '@/components/projects/modification-log';
+import { InvoiceLedger, type LedgerInvoice, type LedgerClin, type LedgerUnbilled } from '@/components/projects/invoice-ledger';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -95,7 +97,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -112,6 +114,9 @@ export default async function ProjectPage({
     listProjectRisks(tenantId, projectId),
     listProjectMeetings(tenantId, projectId),
     listModifications(tenantId, projectId),
+    listInvoices(tenantId, projectId),
+    clinBilling(tenantId, projectId),
+    billableHours(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -502,6 +507,23 @@ export default async function ProjectPage({
           documents={docs.map((d) => ({ id: d.id, filename: d.filename ?? d.kind }))}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canAmend={canAccept}
+        />
+      </section>
+
+      {/* ── BILLING ──────────────────────────────────────────────────────────────────────────
+          Directly under the modifications, because the ceiling it reports IS the CLIN's funded
+          amount and a signed mod is the only thing that moves it. Reading them apart is how
+          somebody comes to wonder why the remaining figure changed. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Billing and invoices
+        </h2>
+        <InvoiceLedger
+          invoices={invoices as unknown as LedgerInvoice[]}
+          billing={billing as unknown as LedgerClin[]}
+          unbilled={unbilled as unknown as LedgerUnbilled[]}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canBill={canAccept}
         />
       </section>
 

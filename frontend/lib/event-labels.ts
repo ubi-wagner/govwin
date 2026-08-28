@@ -196,6 +196,31 @@ export function describeEvent(ev: EventLike): string {
         return `Modification ${str(payload.modNumber) ?? ''} drafted`
           + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
       }
+      case 'invoice.drafted': {
+        const n = typeof payload.total === 'number' ? payload.total : null;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} drafted`
+          + `${n === null ? '' : ` — ${n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}, not yet claimed`}`;
+      }
+      case 'invoice.submitted': {
+        const n = typeof payload.total === 'number' ? payload.total : null;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} submitted`
+          + `${n === null ? '' : ` — ${n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`}`;
+      }
+      case 'invoice.paid': {
+        // PART-paid is the normal case, and "Invoice paid" over a 90% payment is the sentence that
+        // makes somebody stop chasing the withholding.
+        const got = typeof payload.amount === 'number' ? payload.amount : null;
+        const cash = got === null ? '' : ` — ${got.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} received`;
+        return payload.settled === true
+          ? `Invoice ${str(payload.invoiceNumber) ?? ''} settled${cash}`
+          : `Payment against invoice ${str(payload.invoiceNumber) ?? ''}${cash} · still outstanding`;
+      }
+      case 'invoice.voided': {
+        const freed = typeof payload.hoursReleased === 'number' ? payload.hoursReleased : 0;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} voided`
+          + `${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`
+          + `${freed > 0 ? ` · ${freed} time entr${freed === 1 ? 'y' : 'ies'} released to bill again` : ''}`;
+      }
       case 'modification.executed': {
         // What it MOVED, not that it happened. "Modification executed" six months later is a row
         // nobody can act on; the money and the dates are why anyone opens the feed.

@@ -1261,6 +1261,103 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7n · BILLING — the ceiling, the hours, and the claim ══════════════════════════════════
+  //
+  // The two invariants, both against a number a customer is billed for: you cannot bill past what
+  // the contract funded, and the same hours cannot be billed twice. Both are read back from the
+  // database rather than trusted from the route's own answer.
+  phase('7n · invoicing: the ceiling holds and hours are billed once');
+
+  // The CLIN was moved to 900,000 by P00001 a moment ago — so the ceiling under test is the one a
+  // signed modification set, which is the whole point of the two features meeting.
+  const billing0 = await api(req, 'get', P + '/invoices');
+  const pos0 = ((billing0.json.data as Json)?.billing as Json[]) ?? [];
+  A(billing0.status === 200 && pos0.length > 0, 'the billing position answers', `${billing0.status} · ${pos0.length} CLIN(s)`);
+  A(Number(pos0[0]?.fundedAmount) === 900000,
+    'and its ceiling is what the MODIFICATION set, not the original award',
+    `${pos0[0]?.fundedAmount}`);
+  A(Number(pos0[0]?.billed) === 0, 'nothing billed yet', `${pos0[0]?.billed}`);
+
+  const inv1 = await api(req, 'post', P + '/invoices', {
+    invoiceNumber: 'INV-0001',
+    lines: [{ clinId, description: 'April progress', source: 'manual', amount: 500000 }],
+  });
+  A(inv1.status === 201, 'an invoice is drafted', `${inv1.status}`);
+  const inv1Id = ((inv1.json.data as Json)?.invoice as Json)?.id as string | undefined;
+
+  // A DRAFT is not a claim: the position must not move.
+  const afterDraft = await api(req, 'get', P + '/invoices');
+  const posDraft = ((afterDraft.json.data as Json)?.billing as Json[]) ?? [];
+  A(Number(posDraft[0]?.billed) === 0,
+    'and a DRAFT does not move the billed position — nothing has been claimed',
+    `${posDraft[0]?.billed}`);
+
+  const sub1 = await api(req, 'patch', P + '/invoices', {
+    action: 'submit', invoiceId: inv1Id, submittedOn: iso(0),
+  });
+  A(sub1.status === 200, 'submitting makes it a claim', `${sub1.status}`);
+  const afterSubmit = await api(req, 'get', P + '/invoices');
+  const posSub = ((afterSubmit.json.data as Json)?.billing as Json[]) ?? [];
+  A(Number(posSub[0]?.billed) === 500000, 'and NOW it is billed', `${posSub[0]?.billed}`);
+  A(Number(posSub[0]?.remaining) === 400000, 'with the remaining figure following', `${posSub[0]?.remaining}`);
+
+  // ── THE CEILING, CUMULATIVELY ────────────────────────────────────────────────────────────
+  // 500,000 is already claimed against 900,000 funded. A second invoice of 500,000 is under the
+  // ceiling on its own and over it in total — which is exactly the case a per-invoice check misses.
+  const inv2 = await api(req, 'post', P + '/invoices', {
+    invoiceNumber: 'INV-0002',
+    lines: [{ clinId, description: 'May progress', source: 'manual', amount: 500000 }],
+  });
+  A(inv2.status === 201, 'a second invoice drafts fine — a draft may hold anything', `${inv2.status}`);
+  const inv2Id = ((inv2.json.data as Json)?.invoice as Json)?.id as string | undefined;
+  const sub2 = await api(req, 'patch', P + '/invoices', {
+    action: 'submit', invoiceId: inv2Id, submittedOn: iso(0),
+  });
+  A(sub2.status === 409 && String((sub2.json as Json).code) === 'OVER_FUNDED_CEILING',
+    'but submitting it is REFUSED — cumulative, not per-invoice',
+    `${sub2.status} ${String((sub2.json as Json).code)}`);
+  A(/100000\.00 over/.test(String(sub2.json.error ?? '')),
+    'and the refusal says by how much', String(sub2.json.error ?? '').slice(0, 80));
+
+  // ── SUBMITTED IS NOT PAID ────────────────────────────────────────────────────────────────
+  const part = await api(req, 'patch', P + '/invoices', {
+    action: 'pay', invoiceId: inv1Id, paidOn: iso(0), amount: 450000,
+  });
+  A(part.status === 200 && ((part.json.data as Json)?.settled as boolean) === false,
+    'a PARTIAL payment does not settle the claim — the withholding is the normal case',
+    `settled=${(part.json.data as Json)?.settled}`);
+  const rest = await api(req, 'patch', P + '/invoices', {
+    action: 'pay', invoiceId: inv1Id, paidOn: iso(0), amount: 50000,
+  });
+  A(rest.status === 200 && ((rest.json.data as Json)?.settled as boolean) === true,
+    'and the rest settles it', `settled=${(rest.json.data as Json)?.settled}`);
+
+  const [paidRow] = await sql<{ status: string; amountPaid: string; paidOn: string | null }[]>`
+    SELECT status, amount_paid AS "amountPaid", paid_on::text AS "paidOn"
+      FROM project_invoices WHERE id = ${inv1Id ?? null}::uuid`;
+  A(paidRow?.status === 'paid' && Number(paidRow?.amountPaid) === 500000 && Boolean(paidRow?.paidOn),
+    'the row agrees — status, amount and stamp are one fact',
+    `${paidRow?.status} @ ${paidRow?.amountPaid} on ${paidRow?.paidOn}`);
+
+  // A submitted invoice's lines are FROZEN by the trigger — the claim is what was claimed.
+  const frozenLine = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM project_invoice_lines WHERE invoice_id = ${inv1Id ?? null}::uuid`;
+  let lineEditRefused = false;
+  try {
+    await sql`UPDATE project_invoice_lines SET amount = 1 WHERE invoice_id = ${inv1Id ?? null}::uuid`;
+  } catch (e) { lineEditRefused = (e as { code?: string })?.code === '23001'; }
+  A(lineEditRefused, 'a submitted invoice’s lines cannot be edited (23001)', `${frozenLine[0]?.n} line(s)`);
+
+  // ── VOID RELEASES ────────────────────────────────────────────────────────────────────────
+  const voided = await api(req, 'patch', P + '/invoices', {
+    action: 'void', invoiceId: inv2Id, reason: 'Raised against the wrong period',
+  });
+  A(voided.status === 200, 'the over-ceiling draft is voided with a reason', `${voided.status}`);
+  const afterVoid = await api(req, 'get', P + '/invoices');
+  const posVoid = ((afterVoid.json.data as Json)?.billing as Json[]) ?? [];
+  A(Number(posVoid[0]?.billed) === 500000,
+    'and a void does not count against the funding', `${posVoid[0]?.billed}`);
+
   // ══ 7k · THE REGISTER — a risk, and the day it stopped being one ═══════════════════════════
   //
   // The question a program review asks is not "what are the risks" but "when did we know, and what

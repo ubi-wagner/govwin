@@ -2537,3 +2537,62 @@ it, the recorded `old_value` is the one that was standing at execution, the cita
 the frozen baseline does not move and a rebaseline ToDo is raised instead, and a second execution is
 refused 409 · isolation lens 17 tables (was 7) · surfaces 82/82 · api-contract clean ·
 write-contract **247/247** · mobile green at 390 and 820 · `next build` clean.
+
+## P7 · Invoicing — migration 231
+
+Where everything else in this capability becomes money. It is built on what is already here, and
+invents no second source for a number that already has one:
+
+| what | where it comes from |
+|---|---|
+| the CEILING | `project_clins.funded_amount` — which **P5** made movable only by a signed modification |
+| the LABOUR | approved `project_time_entries` — **P6**'s hours, and only the approved ones |
+| the WORK | an ACCEPTED deliverable under a milestone — what a payment milestone actually bills |
+
+That is the point of doing P5 and P6 first. "How much may we bill" has exactly one answer and one
+way to change it, and the drive asserts precisely that: **the ceiling under test is the $900,000
+modification P00001 set, not the $750,000 the award did.**
+
+### The two invariants
+
+**You cannot bill past the ceiling** — checked at SUBMIT (a draft may hold anything while it is
+assembled, exactly as a modification may), and checked **cumulatively**. Three invoices of $300,000
+against $750,000 funded are each comfortably under the limit and together are over it, and each one
+looks correct at the moment it is submitted. The refusal names the overage, because "over the
+funding" with no number sends somebody to a spreadsheet to work out what this code already knew.
+
+**The same hours cannot be billed twice** — `project_time_entries.invoice_line_id` is the link, so
+"unbilled" is a query rather than a convention. The claim is made in the PREDICATE
+(`approved_at IS NOT NULL AND invoice_line_id IS NULL`), so a concurrent invoice racing for the same
+entries loses by matching zero rows rather than both marking them. **Voiding releases them** — a
+void keeps its lines (they record what was claimed), so the release is explicit; without it a
+voided invoice would hold its hours hostage and the correcting invoice could never re-bill the work.
+
+**And submitted is not paid** — the ninth time this capability draws that line. Partial payment is
+the normal case, not an edge one: a government customer pays against a withholding, and an invoice
+that can only be all-or-nothing forces somebody to lie about which. `amount_paid` accumulates and
+`status` flips to `paid` only when the claim is settled to the cent.
+
+### One conflation caught while writing it
+
+`clinBilling` originally counted every non-void invoice as `billed`, which is right for the ceiling
+check and **wrong for reporting**: the position on the dashboard would have moved every time
+somebody opened a form and typed a number. They are two different questions. `clinBilling` now
+reports SUBMITTED and PAID only, and `submitInvoice` adds the draft's own lines to that figure
+itself. One function answering both would have to be wrong for one of them, and the wrong one is
+silent.
+
+`remaining` is `null` — rendering **"funding not set"** — when a CLIN carries no funded amount. Zero
+is a measurement; a missing ceiling is not one, and a reader cannot tell them apart once both render
+as a number.
+
+### Verification
+
+`tsc` 0 · vitest 226 files / **2,380** (24 new) · migration 231 applied · **17 billing assertions
+green in the live lifecycle drive** — the ceiling is the modification's, a draft does not move the
+billed position, submitting does, a second invoice under the limit is refused *cumulatively* with
+the overage named, a partial payment does not settle, the rest does, a submitted invoice's lines are
+frozen (23001), and a void does not count against the funding · isolation lens **19 tables** (it
+picked both new ones up with no edit — the enumeration doing its job) · surfaces 82/82 ·
+api-contract 129 graded · write-contract **249/249** · ui-vs-db green · mobile green at 390 and
+820 · `next build` clean.
