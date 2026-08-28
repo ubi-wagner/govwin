@@ -2596,3 +2596,68 @@ frozen (23001), and a void does not count against the funding · isolation lens 
 picked both new ones up with no edit — the enumeration doing its job) · surfaces 82/82 ·
 api-contract 129 graded · write-contract **249/249** · ui-vs-db green · mobile green at 390 and
 820 · `next build` clean.
+
+## P8 · The CDRL register — migration 232
+
+**A CDRL is an obligation; a deliverable is one instance of it.** "A002 — Monthly Status Report,
+DI-MGMT-81334D, monthly, Distribution Statement B" is written into the contract once; the twelve
+reports it produces are twelve deliverables under twelve monthly milestones — the same shape the
+product owner described for the WBS.
+
+So the submission history of a CDRL **is** its deliverables, in date order. There is no second
+deliverable table and no parallel submission-history table; building one would have been the fifth
+structure this module has refused. What comes *back* is already modelled too:
+`project_acceptance_evidence` (P9) records a DD-250 or a transmittal as a claim ABOUT the customer,
+uploaded by an admin, never the customer's own act.
+
+### The third state, which the deliverable genuinely lacked
+
+|  |  |
+|---|---|
+| ATTACHED | `uploaded_at` — a file or an authored document is on it |
+| ACCEPTED | `accepted_at` — a tenant_admin signed off internally |
+| **SENT** | `submitted_at` — **the customer has it** |
+
+For a CDRL the distinction is the whole point: the contract sets a date by which the item must be
+**delivered to the government**, and lateness is measured against the day it was sent, not the day
+somebody finished writing. Neither existing state carried that.
+
+Sending is gated on internal acceptance — in the database *and* in the domain layer, so the refusal
+is a sentence rather than a 500 carrying a SQLSTATE. Sending work nobody signed off is the failure
+the acceptance gate exists to prevent, arriving one step later. **Un-sending is refused outright**:
+a corrected version is a new submission, and the record of what the customer received has to survive.
+
+### The marking is not decoration
+
+Distribution Statement B–F restricts who may receive the document, and the marking is required to
+appear ON the artifact. It is carried on the CDRL so it can be stamped on a deliverable authored in
+this product's own canvas (mig 220) — the post-award analogue of the compliance floor.
+
+`distributionMarking()` returns **null** when the contract stated none, and the form's dropdown does
+not pre-select. Defaulting to "A" because it is the permissive letter would put a public-release
+marking on a document that may not be publicly releasable — a legally significant claim, invented by
+a UI convenience. Confirmed red: with the default in place, the test reads
+`expected 'DISTRIBUTION STATEMENT A: Approved fo…' to be null`.
+
+The register renders each letter **with its meaning**, because "B" alone tells a reader nothing and
+knowing who may receive the document is the entire purpose of the marking.
+
+### An assertion that was passing without being exercised
+
+The drive's gate check looked for an existing unaccepted deliverable and reported *"none found"* —
+by that point in the run every deliverable on the project has been accepted. That is **uncovered,
+not passing**, and it left the most important assertion in the phase inert. It now **builds** the
+case: create an unaccepted deliverable, prove the refusal, then accept it and prove the *same call*
+goes through — because without that second half the refusal would pass identically against a route
+that refused everything. Same shape as the isolation lens asserting a baseline can be set once
+before asserting it cannot be moved.
+
+### Verification
+
+`tsc` 0 · vitest 227 files / **2,400** (20 new) · migration 232 applied · **16 CDRL assertions green
+in the live lifecycle drive** — a recurring item with no first due date is refused by name, a
+duplicate number 409s, the register answers "0 of 1 sent", an unaccepted deliverable cannot be sent,
+an accepted one can, lateness is real (`daysLate=5`), sending twice is refused, and un-sending is
+refused **by the database itself** (23001) · **0 broken links in the whole chain** · isolation lens
+**20 tables** (it picked the new one up with no edit) · surfaces 82/82 · api-contract 130 graded ·
+write-contract **251/251** · ui-vs-db green · mobile green at 390 and 820 · `next build` clean.

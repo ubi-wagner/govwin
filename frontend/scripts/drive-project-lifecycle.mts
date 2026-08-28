@@ -1261,6 +1261,116 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7p · THE CDRL REGISTER — the obligation, and the third state ══════════════════════════
+  //
+  // A CDRL is a standing requirement; its submission history IS its deliverables. The assertion
+  // that matters is the GATE: uploading is not accepting, and accepting is not sending.
+  phase('7p · CDRL: registered, and delivered to the customer');
+
+  const badFreq = await api(req, 'post', P + '/cdrl', {
+    cdrlNumber: 'A999', title: 'Monthly status report', frequency: 'monthly',
+  });
+  A(badFreq.status === 400, 'a recurring item with no first due date is refused', `${badFreq.status}`);
+  A(/first due date/i.test(String(badFreq.json.error ?? '')),
+    'and the refusal names the field', String(badFreq.json.error ?? '').slice(0, 60));
+
+  const cdrl = await api(req, 'post', P + '/cdrl', {
+    cdrlNumber: 'A002', title: 'Monthly status report', didNumber: 'DI-MGMT-81334D',
+    clinId, frequency: 'monthly', approvalCode: 'A', distribution: 'B',
+    distributionNote: 'Critical technology; controlling office AFRL/RQ.', firstDue: iso(30),
+  });
+  A(cdrl.status === 201, 'a CDRL item is registered', `${cdrl.status}`);
+  const cdrlId = ((cdrl.json.data as Json)?.item as Json)?.id as string | undefined;
+
+  const dupe = await api(req, 'post', P + '/cdrl', { cdrlNumber: 'A002', title: 'again' });
+  A(dupe.status === 409, 'a duplicate CDRL number is refused', `${dupe.status}`);
+
+  // Tie THIS project's already-accepted deliverable to the requirement — one instance of it.
+  await sql`
+    UPDATE project_deliverables SET cdrl_item_id = ${cdrlId ?? null}::uuid
+     WHERE id = ${deliverableId ?? null}::uuid`;
+
+  const register = await api(req, 'get', P + '/cdrl');
+  const regItems = ((register.json.data as Json)?.items as Json[]) ?? [];
+  A(register.status === 200 && regItems.length === 1, 'the register reads back', `${regItems.length} item(s)`);
+  A((regItems[0]?.instances as number) === 1 && (regItems[0]?.sent as number) === 0,
+    'and the item shows 1 instance, 0 sent — the question a register exists to answer',
+    `${regItems[0]?.sent} of ${regItems[0]?.instances}`);
+
+  // ── THE GATE, ON A CASE THE DRIVE CREATES ────────────────────────────────────────────────
+  //
+  // The first version of this looked for an existing unaccepted deliverable and reported
+  // "none found" when it did not find one — by this point every deliverable on the project has
+  // been accepted. That is UNCOVERED, not passing, and it left the most important assertion in
+  // the phase unexercised. So the case is built rather than hoped for.
+  const gateDel = await api(req, 'post', P + '/deliverables', {
+    milestoneId, title: 'Monthly status report — May', requiredBy: iso(60),
+  });
+  A(gateDel.status === 201, 'a fresh, unaccepted deliverable exists to test the gate with', `${gateDel.status}`);
+  const gateId = ((gateDel.json.data as Json)?.deliverable as Json)?.id as string | undefined;
+  await sql`UPDATE project_deliverables SET cdrl_item_id = ${cdrlId ?? null}::uuid WHERE id = ${gateId ?? null}::uuid`;
+
+  const cdrlTooSoon = await api(req, 'patch', P + '/cdrl', {
+    action: 'submitted', deliverableId: gateId, submittedAt: iso(0),
+  });
+  A(cdrlTooSoon.status === 409 && String((cdrlTooSoon.json as Json).code) === 'NOT_ACCEPTED',
+    'an UNACCEPTED deliverable cannot be sent to the customer',
+    `${cdrlTooSoon.status} ${String((cdrlTooSoon.json as Json).code)}`);
+  A(/Uploading is not accepting/i.test(String(cdrlTooSoon.json.error ?? '')),
+    'and the refusal draws the line in words', String(cdrlTooSoon.json.error ?? '').slice(0, 60));
+
+  // AND IT IS A GATE, NOT A DENY-ALL. Accept it, and the same call now works — without this the
+  // assertion above would pass identically against a route that refused everything.
+  await req.fetch(`${BASE + P}/deliverables/${gateId}`, {
+    method: 'POST',
+    multipart: { file: { name: 'may-status.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 MAY') } },
+  });
+  await api(req, 'patch', P + `/deliverables/${gateId}`, { action: 'accept' });
+  const nowAllowed = await api(req, 'patch', P + '/cdrl', {
+    action: 'submitted', deliverableId: gateId, submittedAt: iso(0), transmittalRef: 'TR-2026-015',
+  });
+  A(nowAllowed.status === 200,
+    'and once accepted, the SAME call goes through — a gate, not a deny-all',
+    `${nowAllowed.status} ${String((nowAllowed.json as Json).code ?? '')}`);
+
+  // And the accepted one goes out, LATE, with the lateness measured against the day it was SENT.
+  const sent = await api(req, 'patch', P + '/cdrl', {
+    action: 'submitted', deliverableId, submittedAt: iso(50), transmittalRef: 'TR-2026-014',
+  });
+  A(sent.status === 200, 'an ACCEPTED deliverable is recorded as sent', `${sent.status}`);
+  A(typeof (sent.json.data as Json)?.daysLate === 'number',
+    'with a real lateness figure, not null', `daysLate=${(sent.json.data as Json)?.daysLate}`);
+
+  const [delRow] = await sql<{ submittedAt: string | null; transmittalRef: string | null }[]>`
+    SELECT submitted_at::text AS "submittedAt", transmittal_ref AS "transmittalRef"
+      FROM project_deliverables WHERE id = ${deliverableId ?? null}::uuid`;
+  A(Boolean(delRow?.submittedAt) && delRow?.transmittalRef === 'TR-2026-014',
+    'the row records both the date and how it went out',
+    `${delRow?.submittedAt} · ${delRow?.transmittalRef}`);
+
+  const twiceSent = await api(req, 'patch', P + '/cdrl', {
+    action: 'submitted', deliverableId, submittedAt: iso(51),
+  });
+  A(twiceSent.status === 409, 'sending the same thing twice is refused', `${twiceSent.status}`);
+
+  // UN-sending is refused by the database, not merely by the route — the record of what the
+  // customer received has to survive whichever writer arrives.
+  let unsendRefused = false;
+  try {
+    await sql`UPDATE project_deliverables SET submitted_at = NULL WHERE id = ${deliverableId ?? null}::uuid`;
+  } catch (e) { unsendRefused = (e as { code?: string })?.code === '23001'; }
+  A(unsendRefused, 'and un-sending is refused by the database itself (23001)');
+
+  const after = await api(req, 'get', P + '/cdrl');
+  const afterItems = ((after.json.data as Json)?.items as Json[]) ?? [];
+  // TWO instances now — the original and the one built for the gate test — and both have gone out.
+  // Asserted as sent===instances rather than a hard-coded count, so adding a case above does not
+  // silently turn this into a number nobody re-derived.
+  A((afterItems[0]?.sent as number) === (afterItems[0]?.instances as number)
+    && (afterItems[0]?.instances as number) === 2,
+    'the register now reads every instance as sent',
+    `${afterItems[0]?.sent} of ${afterItems[0]?.instances}`);
+
   // ══ 7n · BILLING — the ceiling, the hours, and the claim ══════════════════════════════════
   //
   // The two invariants, both against a number a customer is billed for: you cannot bill past what

@@ -196,6 +196,24 @@ export function describeEvent(ev: EventLike): string {
         return `Modification ${str(payload.modNumber) ?? ''} drafted`
           + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
       }
+      case 'cdrl.registered': {
+        const dist = str(payload.distribution);
+        return `CDRL ${str(payload.cdrlNumber) ?? ''} registered — ${str(payload.title) ?? 'a data item'}`
+          + `${str(payload.frequency) && payload.frequency !== 'one_time' ? `, ${String(payload.frequency).replace('_', ' ')}` : ''}`
+          + `${dist ? ` \u00b7 Distribution ${dist}` : ''}`;
+      }
+      case 'cdrl.submitted': {
+        // LATE or EARLY, said plainly. "CDRL submitted" is the row nobody can act on; whether it
+        // met the contract date is the only thing a program review asks.
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        const when = late === null || late === 0 ? ''
+          : late > 0 ? ` \u2014 ${late} day${late === 1 ? '' : 's'} late`
+          : ` \u2014 ${-late} day${late === -1 ? '' : 's'} early`;
+        const ref = str(payload.transmittalRef);
+        return `Delivered to the customer: ${str(payload.title) ?? 'a deliverable'}`
+          + `${str(payload.cdrlNumber) ? ` (CDRL ${str(payload.cdrlNumber)})` : ''}${when}`
+          + `${ref ? ` \u00b7 ${ref}` : ''}`;
+      }
       case 'invoice.drafted': {
         const n = typeof payload.total === 'number' ? payload.total : null;
         return `Invoice ${str(payload.invoiceNumber) ?? ''} drafted`

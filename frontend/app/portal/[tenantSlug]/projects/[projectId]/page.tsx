@@ -16,6 +16,7 @@ import { listAcceptanceEvidence } from '@/lib/projects/evidence';
 import { listProjectRisks } from '@/lib/projects/risks';
 import { listModifications } from '@/lib/projects/modifications';
 import { listInvoices, clinBilling, billableHours } from '@/lib/projects/invoices';
+import { listCdrlItems } from '@/lib/projects/cdrl';
 import { listProjectMeetings } from '@/lib/projects/meetings';
 import { CommentThread, type ThreadComment } from '@/components/projects/comment-thread';
 import { ReviewPanel, type PanelReview } from '@/components/projects/review-panel';
@@ -24,6 +25,7 @@ import { RiskRegister, type RegisterRisk } from '@/components/projects/risk-regi
 import { MeetingLog, type LogMeeting } from '@/components/projects/meeting-log';
 import { ModificationLog, type LoggedModification } from '@/components/projects/modification-log';
 import { InvoiceLedger, type LedgerInvoice, type LedgerClin, type LedgerUnbilled } from '@/components/projects/invoice-ledger';
+import { CdrlRegister, type RegisterCdrl } from '@/components/projects/cdrl-register';
 import { provenanceFor, badgeFor } from '@/lib/projects/provenance';
 import { rollup } from '@/lib/projects/rollup';
 import { isoDate, daysBetween, varianceLabel } from '@/lib/projects/dates';
@@ -97,7 +99,7 @@ export default async function ProjectPage({
   const project = await getProject(actor, projectId);
   if (!project) notFound();
 
-  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, candidates, ready, assignees, measures] = await Promise.all([
+  const [docs, clins, milestones, deliverables, tasks, taskFiles, comments, reviews, evidence, risks, meetings, modifications, invoices, billing, unbilled, cdrlItems, candidates, ready, assignees, measures] = await Promise.all([
     listSourceDocuments(tenantId, projectId),
     listClins(tenantId, projectId),
     listMilestones(tenantId, projectId),
@@ -117,6 +119,7 @@ export default async function ProjectPage({
     listInvoices(tenantId, projectId),
     clinBilling(tenantId, projectId),
     billableHours(tenantId, projectId),
+    listCdrlItems(tenantId, projectId),
     // Candidates for the roster picker. A person adds someone the UI OFFERS; the route
     // re-checks membership, so this list is convenience, not the boundary.
     sql<{ id: string; email: string; name: string | null }[]>`
@@ -507,6 +510,22 @@ export default async function ProjectPage({
           documents={docs.map((d) => ({ id: d.id, filename: d.filename ?? d.kind }))}
           basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
           canAmend={canAccept}
+        />
+      </section>
+
+      {/* ── THE DATA REQUIREMENTS ────────────────────────────────────────────────────────────
+          Between the contract (CLINs, modifications) and the money (billing), because that is
+          where it sits in fact: a CDRL is a contractual obligation, and on many contracts
+          delivering it is what makes an invoice payable. */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Data requirements
+        </h2>
+        <CdrlRegister
+          items={cdrlItems as unknown as RegisterCdrl[]}
+          clins={clins.map((c) => ({ id: c.id, clinNumber: c.clinNumber }))}
+          basePath={`/api/portal/${tenantSlug}/projects/${projectId}`}
+          canManage={canAccept}
         />
       </section>
 
