@@ -129,7 +129,7 @@ const NOBODY = '11111111-1111-4111-8111-111111111111';
  */
 const NOBODY_EMAIL = 'nobody@elsewhere.test';
 
-const created: { proposalId?: string; projectId?: string; contractId?: string; documentIds: string[] } = {
+const created: { proposalId?: string; projectId?: string; contractId?: string; seededUserId?: string; documentIds: string[] } = {
   documentIds: [],
 };
 
@@ -441,33 +441,63 @@ async function main() {
   const roster = await api(req, 'get', `/api/portal/${TENANT}/team`);
   const members = (Array.isArray(roster.json.data) ? roster.json.data : []) as Json[];
 
-  // ── SELECT FOR WHAT THE ASSERTION NEEDS, NOT FOR WHAT IS NEAREST ─────────────────────────
+  // ── SELECT FOR WHAT THE ASSERTIONS NEED, AND SEED IT IF THE TENANT HAS NOBODY ────────────
   //
-  // The next assertion is "assigning to somebody NOT on the project is refused", so the only thing
-  // that makes it meaningful is a person who is not already on it. The acting user always is —
-  // `createProject` assigns its creator — so picking them makes the refusal structurally unable to
-  // fire, and it answers 201.
+  // Everything below needs a COLLEAGUE: somebody who is (1) not the actor, (2) allowed to be given
+  // project work, and (3) whose session this drive can actually open. All three matter, and this
+  // line got each of them wrong in turn:
   //
-  // The first version was `find(m.role === 'tenant_user') ?? members[0]`, which is wrong twice.
-  // `/team` returns the MEMBERSHIP role and filters `source IN ('home','manual')`, so the match was
-  // against the wrong field over a smaller set than the tenant's directory; and the `?? members[0]`
-  // fallback then silently degraded to the actor herself. Standalone there happened to be a
-  // matching member and it passed; in the full suite the roster came back as two, and 28 assertions
-  // failed downstream from this one line (B146/B147, the same class again).
-  const assignee = members.find(
-    (m) => m.id !== undefined && String(m.email ?? '').toLowerCase() !== ACTOR.toLowerCase(),
+  //   · `find(m.role === 'tenant_user') ?? members[0]` — `/team` returns the MEMBERSHIP role over
+  //     `source IN ('home','manual')`, so the match was against the wrong field over a smaller set;
+  //     and the fallback degraded to the ACTOR, whom `createProject` always assigns. The refusal
+  //     "assigning to somebody not on the project" was then structurally unable to fire: 201, and
+  //     27 more failures behind it.
+  //   · excluding only the actor — in the suite this drive CONTINUES THE ARC, which lands at
+  //     `lighthouse`, whose only other member is a `partner_user`. That role is refused project
+  //     work by design, so staffing answered 403 and the employee login failed (they hold a
+  //     different credential). Selecting "not the actor" is still selecting for what is nearest.
+  //
+  // So: a member at the ACTOR'S OWN DOMAIN, excluding partner roles. And if the tenant has nobody —
+  // which is the normal case for an arc tenant — one is SEEDED, copying the actor's own password
+  // hash so no second credential exists to drift out of sync (B146/B147: one credential, one
+  // place). Seeding is declared setup, exactly like the award rollback in phase 1.
+  const actorDomain = ACTOR.slice(ACTOR.indexOf('@')).toLowerCase();
+  const colleague = (list: Json[]) => list.find(
+    (m) => m.id !== undefined
+      && String(m.email ?? '').toLowerCase() !== ACTOR.toLowerCase()
+      && String(m.email ?? '').toLowerCase().endsWith(actorDomain)
+      && !String(m.role ?? '').startsWith('partner'),
   );
+
   A(roster.status === 200, 'the roster route answers', `${roster.status}`);
+  let assignee = colleague(members);
   if (!assignee) {
-    // CANT-RUN, said out loud. Degrading to the actor would make every assertion below measure
-    // nothing while reporting green — uncovered is not passing.
-    console.error(`  CANT-RUN — the roster holds ${members.length} member(s) and none of them is `
-      + `somebody other than ${ACTOR}. The staffing and assignment assertions below need a second `
-      + 'person at this tenant; seed one rather than letting them measure the actor.');
+    const email = `colleague.${process.pid}${actorDomain}`;
+    const [seeded] = await sql<{ id: string; email: string }[]>`
+      INSERT INTO users (email, name, role, password_hash, is_active)
+      SELECT ${email}, 'Drive colleague', 'tenant_user', u.password_hash, true
+        FROM users u WHERE lower(u.email) = ${ACTOR.toLowerCase()}
+      RETURNING id, email`;
+    if (seeded) {
+      await sql`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status, source)
+        VALUES (${seeded.id}::uuid, ${tenantId}::uuid, 'tenant_user', 'active', 'home')
+        ON CONFLICT DO NOTHING`;
+      created.seededUserId = seeded.id;
+      assignee = { id: seeded.id, email: seeded.email, role: 'tenant_user' } as Json;
+      console.log(`  · SETUP: this tenant had no colleague to assign work to — seeded ${email}`);
+      console.log('    with the actor\'s own password hash, so the drive needs no second credential.');
+    }
+  }
+  if (!assignee) {
+    // Still nobody, and the seed failed. CANT-RUN out loud: degrading to the actor or to a partner
+    // would make fifteen assertions below measure nothing while reporting green.
+    console.error(`  CANT-RUN — no colleague at ${actorDomain} to assign work to, and one could not `
+      + 'be seeded. Every staffing and assignment assertion below would measure the actor.');
     process.exit(2);
   }
-  A(true, 'the roster offers somebody OTHER than the actor to staff with',
-    `${members.length} member(s) · picked ${String(assignee.email ?? assignee.id)}`);
+  A(true, 'there is a colleague to staff with — not the actor, and not a partner',
+    `${members.length} member(s) · ${String(assignee.email ?? assignee.id)}`);
 
   // Handing work to someone who is NOT on the project is refused — they would never see it.
   const premature = await api(req, 'post', P + '/tasks', {
@@ -1164,6 +1194,10 @@ async function main() {
     (mtgRow?.attendees ?? []).join(' · '));
   A(Boolean(mtgRow?.documentId),
     'and the notes are a real canvas document — the same editor and exporters as everything else');
+  // Tracked for teardown for the same reason the deliverable drafts are: the document belongs to
+  // the TENANT, not the project, so deleting the project leaves it behind. This one was invisible
+  // until the seeded-colleague delete hit its `created_by` FK and said so.
+  if (mtgRow?.documentId) created.documentIds.push(mtgRow.documentId);
 
   // The minutes must open and export like any other artifact. A `notes text` column would have
   // passed every other check here and failed this one.
@@ -2373,6 +2407,20 @@ async function cleanup() {
     }
   } catch (e) {
     console.error('  cleanup failed:', (e as Error)?.message ?? e);
+  }
+  // LAST, and in its own try: the colleague this run seeded because the tenant had nobody else to
+  // staff with. Its own try because a leftover reference elsewhere would throw on the FK, and a
+  // throw inside the block above would abandon everything after it — the project would survive a
+  // failure to delete one user row. Everything this drive attaches to the colleague either
+  // cascades with the project or cascades off `users` itself, so a failure here is a real finding
+  // and is printed rather than swallowed.
+  if (created.seededUserId) {
+    try {
+      await sql`DELETE FROM users WHERE id = ${created.seededUserId}::uuid`;
+      footprint.push('1 seeded colleague');
+    } catch (e) {
+      console.error(`  LEFT BEHIND: seeded colleague ${created.seededUserId} — ${(e as Error)?.message ?? e}`);
+    }
   }
   console.log(`\n  MUTATED, then removed: ${footprint.join(' · ') || 'nothing'}`);
   console.log('  (process_instances, tasks history and system_events from this run are LEFT — they are');
