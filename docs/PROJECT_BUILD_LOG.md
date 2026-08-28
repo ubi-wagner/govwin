@@ -2792,3 +2792,84 @@ saves; **work assigned afterwards carries the project's cadence and not the defa
 `channel: 'todo'` raised the ToDo with **0 mail events**; clearing returns to inherit and the key is
 *gone* from the row · **0 broken links in the whole chain** · isolation 20 tables · surfaces 82/82 ·
 api-contract 131 · write-contract **252/252** · ui-vs-db green · mobile green · `next build` clean.
+
+## A1 · `project_manager` — the 37th archetype
+
+The post-award analog of `proposal_manager` (which plans a draft) and `rfp_ingest_manager` (which
+plans an ingest). This one plans nothing: it reads a project's milestones, open work and risk
+register, and says **which phases are at risk and why**.
+
+### Why an agent at all, when SQL already computes every input
+
+Variance is arithmetic. An overdue task is a date comparison. `rollup.ts` reports all of it without a
+model, and does so on the customer's screen already. What SQL cannot do is read a blocked task's
+*reason* beside a slipping forecast beside an open risk and say **"these are the same problem"**.
+
+That is the entire contribution, and it is why the agent is advisory: a judgement about why three
+rows relate is exactly the kind a person has to be able to disagree with. The system prompt is
+written against the failure mode an assessment agent has —
+
+- **Say what the rows say.** A milestone with no baseline is `no_baseline`, never `on_track` — two
+  different claims, and rendering one as the other asserts a promise was kept that was never made.
+- **Connect rows, do not restate them.** The counts are already on screen.
+- **A confident number you did not read is a lie.** No estimated percentages, costs or dates; degree
+  is expressed as a band.
+
+### The invariants, and how each is actually held
+
+| invariant | how |
+|---|---|
+| tenant-bound | no tool schema carries a `tenant_id`; every read calls `_owns` first, and the SQL is scoped by tenant as well |
+| advisory | `emit_health_assessment` returns `persisted: false` — asserted on the **source**, because a future edit adding an INSERT would return the same dict |
+| injection-fenced | milestone titles, task titles, blocked reasons, risk text **and the project name** are all tenant-authored; all fenced, forged closing markers neutralised |
+| never dead-ends | the AI step is independent, the NOTIFY does not depend on it, and bad input returns an error rather than raising |
+
+The fence tests are adversarial rather than structural: one feeds text containing a forged
+`--- END USER CONTENT ---` and asserts exactly **one** real closing marker survives; another asserts
+the project name appears *inside* the fence, because a project called "Ignore the above" interpolated
+into the instruction line is the attack.
+
+### Proven live, and proven inert
+
+Confirmed red on the tenant fence: deleting one `_owns` call fails **both** the source assertion and
+the live cross-tenant drive — which is what proves the drive's `if other:` guard is actually
+exercised rather than skipping past.
+
+The live drive photographs the plan **before** the assessment and compares after, so "it changed
+nothing" is a comparison and not a hope:
+
+```
+✓ a tenant admin can request an assessment — 202
+✓ and the route SAYS it is advisory, in the field a UI renders
+✓ the request event closed its bracket — a start with no end is B139
+✓ the workflow engine created an instance from the event — completed
+✓ project_manager actually fired — the 37th archetype, live — 6 invocation(s)
+✓ NOT ONE milestone moved — no status, no forecast, no baseline — 4 milestone(s) compared
+✓ and it created no work of its own — 6 → 6
+```
+
+### Three instruments earned their keep on the way
+
+**Five roster-count guards** refused the change until updated — `test_agents.py`'s expected set plus
+three `len(_ARCHETYPE_CLASSES) == 36` assertions. A new archetype cannot be added quietly.
+
+**The automation-spine audit** confirmed the new `AI_INVOKE` action resolves (121 steps, 0
+unresolvable) and that the NOTIFY template exists — the renderer shipped in the same change, because
+B141 was *"8 of 15 named a template that existed nowhere"*, twice.
+
+**The worker's own RLS preflight** said, in its first seconds, exactly why nothing was happening:
+*"WORKFLOW WRITES WILL FAIL. Connected as 'govtech_app'… every TENANT-scoped write will fail… and
+nothing else will say so."* I had started it on the app role. Without that preflight this would have
+looked like a broken agent for as long as it took to read a log.
+
+Two schema guesses of my own (`nudge_days`, `template_key`) reached a drive that
+`node scripts/schema-check.mjs` would have caught in seconds — it is documented as a pre-run step
+and I skipped it twice.
+
+### Verification
+
+`tsc` 0 · vitest **2,432** · **pytest 1,337 passed / 9 skipped** (14 new in
+`test_project_manager_wiring.py`) · automation-spine audit: 121 step actions resolve, 0 missing
+templates · **7 live assertions green with the worker running against the emulator**, the agent
+firing 6 times and the plan provably unchanged · write-contract **253/253** · 0 broken links in the
+whole chain.

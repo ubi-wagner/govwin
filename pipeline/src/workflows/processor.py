@@ -309,6 +309,9 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     #   traceability_auditor — requirement→coverage map (unaddressed + orphan content)
     #   redaction_guard      — cross-boundary / OPSEC leak scan over assembled content
     #   market_analyst       — SOTA/market web context for commercialization + related-work
+    # Post-award (A1). STEP-ONLY like its pre-award sibling: `handles_event` is False, so the
+    # only way it fires is this declarative action — never the archetype-fallback dispatch.
+    "tool.project.assess_health": "project_manager",
     "tool.proposal.plan_draft": "proposal_manager",
     "tool.proposal.audit_traceability": "traceability_auditor",
     "tool.proposal.scan_redaction": "redaction_guard",

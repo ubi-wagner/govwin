@@ -27,6 +27,7 @@ from .packaging_specialist import PackagingSpecialistArchetype
 from .partner_coordinator import PartnerCoordinatorArchetype
 from .pp_matcher import PpMatcherArchetype
 from .proposal_architect import ProposalArchitectArchetype
+from .project_manager import ProjectManagerArchetype
 from .proposal_manager import ProposalManagerArchetype
 from .redaction_guard import RedactionGuardArchetype
 from .research_scout import ResearchScoutArchetype
@@ -66,6 +67,7 @@ __all__ = [
     "PartnerCoordinatorArchetype",
     "PpMatcherArchetype",
     "ProposalArchitectArchetype",
+    "ProjectManagerArchetype",
     "ProposalManagerArchetype",
     "RedactionGuardArchetype",
     "ResearchScoutArchetype",

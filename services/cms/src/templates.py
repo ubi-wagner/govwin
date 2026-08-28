@@ -613,6 +613,23 @@ TEMPLATES.update({
         </div>
         {_button('Open the project', p.get('workspaceUrl', '/portal'))}
     '''),
+    # ── The health assessment is ready (A1) ─────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS THE NOTIFY STEP THAT NAMES IT (B141, twice over).
+    #
+    # It carries the SHAPE of the finding and not the finding itself — how many phases are
+    # slipping, how many at risk — because the assessment is advisory and belongs on the screen
+    # where the rows behind it are, not paraphrased into an inbox where nobody can check it.
+    'project_health_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Your project assessment is ready</h2>
+        <p>The health assessment for
+        <strong>{_e(str(p.get('project') or 'your project'))}</strong> has finished.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {_e(str(p.get('headline'))) if p.get('headline')
+             else 'It is advisory: nothing has been changed on the project. Open it to read what it found, and decide what to do.'}</p>
+        </div>
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
     # ── The project nudge (M2) ──────────────────────────────────────────────────────────────
     # WRITTEN IN THE SAME CHANGE AS THE SWEEP THAT NAMES IT. B141: eight NOTIFY steps named a
     # template that existed nowhere, so the mail emitted `notification.failed` instead of sending —

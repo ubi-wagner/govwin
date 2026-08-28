@@ -1261,6 +1261,79 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7s · THE POST-AWARD MANAGER — advisory, and provably so ═══════════════════════════════
+  //
+  // A1. The assertions are in two halves and the second is the important one: that the agent RAN,
+  // and that having run, it changed NOTHING. An advisory agent that quietly writes is worse than
+  // no agent, because the workspace then disagrees with the person who thought they were deciding.
+  phase('7s · the project manager: it assesses, and it changes nothing');
+
+  // Photograph the plan BEFORE, so "changed nothing" is a comparison and not a hope.
+  const planBefore = await sql<{ id: string; status: string; forecast: string | null; baseline: string | null }[]>`
+    SELECT id, status, forecast_date::text AS forecast, baseline_date::text AS baseline
+      FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
+  const [{ tasksBefore }] = await sql<{ tasksBefore: number }[]>`
+    SELECT count(*)::int AS "tasksBefore" FROM project_milestone_tasks
+     WHERE project_id = ${created.projectId}::uuid`;
+
+  const askedHealth = await api(req, 'post', P + '/assess-health', {});
+  A(askedHealth.status === 202, 'a tenant admin can request an assessment', `${askedHealth.status}`);
+  A((askedHealth.json.data as Json)?.advisory === true,
+    'and the route SAYS it is advisory, in the field a UI renders',
+    String((askedHealth.json.data as Json)?.note ?? '').slice(0, 60));
+
+  // The engine owns the run. Wait for the bracket to close rather than for a fixed sleep.
+  let ranAt: string | null = null;
+  for (let i = 0; i < 30 && !ranAt; i++) {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM system_events
+       WHERE namespace = 'project' AND type = 'health.assessment_requested' AND phase = 'end'
+         AND payload->>'projectId' = ${created.projectId ?? null}`;
+    if (row) ranAt = row.id; else await new Promise((r) => setTimeout(r, 1000));
+  }
+  A(Boolean(ranAt), 'the request event closed its bracket — a start with no end is B139');
+
+  // The engine picked it up: a managed instance exists, correlated to THIS request's event.
+  // `workflow_name` + `trigger_event_id` — the predicate COPIED from phase 2 of this same drive,
+  // which already reads process_instances correctly. The first version of this invented
+  // `template_key` and `context->>'projectId'`, neither of which is a column: a predicate I
+  // believed equivalent, which is the rule this repo has written down twice.
+  let instance: { status: string } | undefined;
+  for (let i = 0; i < 30 && !instance; i++) {
+    [instance] = await sql<{ status: string }[]>`
+      SELECT status FROM process_instances
+       WHERE workflow_name = 'OnProjectHealthRequested' AND trigger_event_id = ${ranAt}::uuid
+       ORDER BY created_at DESC LIMIT 1`;
+    if (!instance) await new Promise((r) => setTimeout(r, 1000));
+  }
+  A(Boolean(instance), 'the workflow engine created an instance from the event',
+    instance?.status ?? 'none');
+
+  // THE AGENT FIRED. `agent.invoked` carrying the archetype is the verification signal the whole
+  // workforce uses (docs/AGENT_WORKFORCE.md §0).
+  let fired = 0;
+  for (let i = 0; i < 30 && fired === 0; i++) {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM system_events
+       WHERE type = 'agent.invoked' AND payload->>'archetype' = 'project_manager'
+         AND created_at > now() - interval '10 minutes'`;
+    fired = row?.n ?? 0;
+    if (fired === 0) await new Promise((r) => setTimeout(r, 1000));
+  }
+  A(fired > 0, 'project_manager actually fired — the 37th archetype, live', `${fired} invocation(s)`);
+
+  // ── AND IT CHANGED NOTHING ───────────────────────────────────────────────────────────────
+  const planAfter = await sql<{ id: string; status: string; forecast: string | null; baseline: string | null }[]>`
+    SELECT id, status, forecast_date::text AS forecast, baseline_date::text AS baseline
+      FROM project_milestones WHERE project_id = ${created.projectId}::uuid ORDER BY sort_index`;
+  A(JSON.stringify(planAfter) === JSON.stringify(planBefore),
+    'NOT ONE milestone moved — no status, no forecast, no baseline',
+    `${planBefore.length} milestone(s) compared`);
+  const [{ tasksAfter }] = await sql<{ tasksAfter: number }[]>`
+    SELECT count(*)::int AS "tasksAfter" FROM project_milestone_tasks
+     WHERE project_id = ${created.projectId}::uuid`;
+  A(tasksAfter === tasksBefore, 'and it created no work of its own', `${tasksBefore} → ${tasksAfter}`);
+
   // ══ 7r · THE REMINDER POLICY — and whether changing it changes anything ═══════════════════
   //
   // A settings page that stores a value nothing reads is the failure this whole layer is built to

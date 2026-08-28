@@ -196,6 +196,12 @@ export function describeEvent(ev: EventLike): string {
         return `Modification ${str(payload.modNumber) ?? ''} drafted`
           + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
       }
+      case 'health.assessment_requested':
+        // ADVISORY, said in the feed itself. A reader scanning the activity log must not think a
+        // date moved because an assessment ran.
+        return phase === 'start'
+          ? 'Assessing project health — advisory, nothing will be changed'
+          : 'Project health assessment requested';
       case 'cdrl.registered': {
         const dist = str(payload.distribution);
         return `CDRL ${str(payload.cdrlNumber) ?? ''} registered — ${str(payload.title) ?? 'a data item'}`
