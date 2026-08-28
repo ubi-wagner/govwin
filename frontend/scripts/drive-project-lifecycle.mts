@@ -1261,6 +1261,54 @@ async function main() {
   A(mods.length >= 1 && (mods[0] as Json)?.status === 'executed',
     'and the history reads it back with its changes', `${mods.length} mod(s)`);
 
+  // ══ 7w · EAC / ETC — three estimates, and the refusal to blend them ═══════════════════════
+  //
+  // A5, deterministic for A3's reason: EAC is spend over percent-complete, and a model producing it
+  // would produce a number nobody could check. The assertion that matters is that it is served
+  // WITH the roll-up it was computed from — a forecast on a separate call can be read beside a
+  // stale measure and disagree with it.
+  phase('7w · the forecast: computed from the measures, and never averaged');
+
+  const fc = await api(req, 'get', P + '/rollup');
+  A(fc.status === 200, 'the roll-up answers', `${fc.status}`);
+  const fcast = (fc.json.data as Json)?.forecast as Json | undefined;
+  A(Boolean(fcast), 'and carries the forecast in the SAME response as the measures it used');
+
+  const ests = (fcast?.estimates as Json[]) ?? [];
+  A(ests.length === 3 && ests.map((e) => String(e.basis)).join(',') === 'cost,schedule,deliverables',
+    'one estimate per basis — never one blended number',
+    ests.map((e) => String(e.basis)).join(','));
+
+  // Every estimate either has a number or says why not. A silent null is the failure mode.
+  A(ests.every((e) => (e.eac === null) === (e.unavailable !== null)),
+    'and every missing estimate SAYS why it is missing',
+    JSON.stringify(ests.map((e) => e.unavailable ?? 'ok')));
+
+  // No blended figure anywhere in the payload — the number that looks most like an answer.
+  const fcKeys = Object.keys(fcast ?? {});
+  A(!fcKeys.some((k) => ['eac', 'headline', 'blended', 'overall'].includes(k)),
+    'no headline EAC is exposed at the top level', fcKeys.join(','));
+
+  // Each estimate carries the percent-complete it divided by, so a reader can check it.
+  A(ests.every((e) => 'percentComplete' in e),
+    'and each carries the denominator it used — a figure nobody can check is not a figure');
+
+  // Cross-check ONE of them by hand against the measures in the same payload, rather than trusting
+  // the module to agree with itself.
+  const proj = (fc.json.data as Json)?.project as Json;
+  const costEst = ests.find((e) => String(e.basis) === 'cost');
+  if (proj?.costPct !== null && proj?.costPct !== undefined && Number(proj.costPct) > 0
+      && Number(proj.actualCost) > 0) {
+    const byHand = Math.round((Number(proj.actualCost) / (Number(proj.costPct) / 100)) * 100) / 100;
+    A(Number(costEst?.eac) === byHand,
+      'the cost EAC is what a person would compute by hand from the same two numbers',
+      `${costEst?.eac} vs ${byHand}`);
+  } else {
+    A(costEst?.eac === null,
+      'with no spend or no denominator, the cost EAC is null rather than a fabrication',
+      String(costEst?.unavailable ?? ''));
+  }
+
   // ══ 7v · THE AI-MANAGER GATE CLOSER — a strict subset of what a person may do ═════════════
   //
   // A4. The claim is an ASYMMETRY: a human can close a milestone the agent would not; the agent can

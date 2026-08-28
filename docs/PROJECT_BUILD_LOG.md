@@ -3056,3 +3056,71 @@ the customer's behalf that they were never asked about. And the completion recor
 `tsc` 0 · vitest 231 files / **2,462** (14 new) · migration 236 applied · **12 live assertions
 green** · isolation 20 tables · surfaces 82/82 · write-contract **255/255** · 0 broken links in the
 whole chain.
+
+## A5 · Estimate at completion — three of them, and never one
+
+The last Projects item, and deterministic for A3's reason. EAC is spend ÷ percent-complete: a
+formula with a name and a standard. A model producing it would produce a number nobody could check,
+against the rule this capability keeps — *a confident number you did not read is a lie.*
+
+### The hard part is the denominator, not the formula
+
+"Percent complete" is exactly the number `rollup.ts` refuses to produce, because cost, schedule and
+deliverables disagree and averaging them destroys the signal. So the forecast does not get a blended
+one: it is computed **once per basis**, and the answers sit side by side.
+
+**Three EACs that disagree is not a failure of the calculation — it is the finding.** *"On the
+deliverables we have accepted this lands at $1.4m; on schedule elapsed, $2.1m"* is the sentence a
+programme manager needs, and one averaged number destroys it while looking tidier. The note names
+the spread and **refuses to pick a headline**, because naming one would answer the question the
+spread is asking.
+
+Served in the **same response** as the roll-up it was computed from — a forecast on its own call can
+be read beside a stale measure and disagree with it.
+
+### Every way it can be a lie, refused
+
+| case | answer |
+|---|---|
+| no denominator | `null` + *"that measure has no denominator"* |
+| percent-complete is **0** | `null` — an EAC there is infinity, and a colossal number reads as a real forecast |
+| nothing spent yet | `null` — there is nothing to extrapolate |
+| no baseline | variance is `null`, never a comfortable zero |
+
+Variance is against the **frozen baseline** (mig 229), never the current plan: a rebaseline moves
+the plan, and measuring a forecast against a number that moved with it reports zero overrun forever.
+A test asserts exactly that by raising `plannedCost` to match an overrun and checking the variance
+still stands.
+
+Every estimate carries the `percentComplete` it divided by — a figure nobody can check is not a
+figure — and the disagreement threshold is **relative** (20% of the lower estimate), so it means the
+same thing on a $50k contract and a $50m one.
+
+### Verification
+
+`tsc` 0 · vitest 232 files / **2,481** (19 new) · **7 live assertions green**, including the cost EAC
+cross-checked by hand against the two numbers in the same payload rather than trusting the module to
+agree with itself · api-contract 133 · ui-vs-db green · mobile green at 390 and 820 · 0 broken links
+in the whole chain.
+
+---
+
+# The Projects backlog is complete
+
+All twelve P-items, four H-items, three G-items, and five A-items are built, driven live and pushed.
+The lifecycle drive now runs **23 phases end to end with zero broken links**, as the actors who
+perform each act, against a real worker and the emulated model.
+
+What the five agent items became is worth recording, because it was decided case by case rather than
+by category:
+
+| | built as | because |
+|---|---|---|
+| A1 `project_manager` | **agent** | "the blocked task, the slipping forecast and the open risk are one problem" is a judgement |
+| A2 `status_narrator` | **agent + a deterministic gate** | prose is a judgement; the figures in it are not, and a check rejects any the system did not compute |
+| A3 traceability | **deterministic** | every question is a foreign key |
+| A4 gate closer | **agent, strictly subordinate** | it may object to a close, never permit one |
+| A5 EAC/ETC | **deterministic** | a formula with a name |
+
+Three of five are agents, and each earns it by doing something SQL cannot. The other two would have
+been a model guessing at arithmetic in a document a customer reads.
