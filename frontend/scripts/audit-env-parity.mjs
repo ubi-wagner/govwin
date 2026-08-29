@@ -68,14 +68,6 @@ const MUST_DIFFER = {
     'the scheduled nudge sweep sends REAL MAIL to REAL CUSTOMERS from staging',
   POSTMARK_WEBHOOK_SECRET:
     'a production bounce could be accepted by staging, writing the suppression to the wrong DB',
-  AWS_ACCESS_KEY_ID:
-    'staging can write to — and overwrite — the production object store',
-  AWS_SECRET_ACCESS_KEY:
-    'staging can write to — and overwrite — the production object store',
-  AWS_S3_BUCKET:
-    'the SAME BUCKET NAME in both environments. Confirm the endpoint differs, or staging shares production\'s objects',
-  AWS_S3_BUCKET_NAME:
-    'legacy name for the same thing — see AWS_S3_BUCKET',
   AUTH_SECRET:
     'a production session cookie is valid on staging and vice versa',
   NEXTAUTH_SECRET:
@@ -102,6 +94,25 @@ const MUST_DIFFER = {
     'staging can send as, and sweep, the production mailboxes',
   VOYAGE_API_KEY: 'staging bills production\'s embedding spend (lower severity, still shared)',
   INITIAL_MASTER_ADMIN_PASSWORD: 'one password opens both environments\' first admin',
+};
+
+/**
+ * THE OBJECT STORE IS A CREDENTIAL GROUP, NOT FOUR INDEPENDENT VARIABLES.
+ *
+ * These were four `MUST_DIFFER` rows and that was a harness bug, not a finding — the same shape as
+ * asserting "the row is gone" after a DELETE that is a deactivation by design. When the PLATFORM
+ * provisions a bucket service per environment (Railway's own storage, rather than a Cloudflare
+ * token you create by hand), the credentials are injected, and two genuinely separate buckets can
+ * carry the SAME DISPLAY NAME. Flagging the matching name is then a confident false positive on a
+ * correctly-configured environment — and a lens that cries wolf on the correct case is one whose
+ * real findings get scrolled past.
+ *
+ * What actually means "staging can reach production's objects" is the ACCESS PAIR. So: judge the
+ * group, and say plainly which of the three states it is in.
+ */
+const STORE_GROUP = {
+  access: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+  identity: ['AWS_ENDPOINT_URL', 'AWS_S3_BUCKET', 'AWS_S3_BUCKET_NAME'],
 };
 
 /** Must be UNSET in staging. Each is a sandbox switch that makes staging silently not-staging. */
@@ -186,6 +197,26 @@ export function audit(envs) {
       }
     }
 
+    // ── the object store, judged as a group ────────────────────────────────────────────────────
+    const bothHave = (n) => p[n] !== undefined && s[n] !== undefined;
+    const sameOnes = (list) => list.filter((n) => bothHave(n) && p[n] === s[n]);
+    const diffOnes = (list) => list.filter((n) => bothHave(n) && p[n] !== s[n]);
+    const accessSame = sameOnes(STORE_GROUP.access);
+    const accessDiff = diffOnes(STORE_GROUP.access);
+    const identitySame = sameOnes(STORE_GROUP.identity);
+
+    if (accessSame.length && !accessDiff.length) {
+      findings.push({ severity: 'shared', service: svc, name: 'object store (AWS_*)',
+        hash: sha(accessSame.map((n) => s[n]).join('|')),
+        detail: `IDENTICAL ACCESS CREDENTIALS (${accessSame.join(', ')}) — staging can write to, and ` +
+                `overwrite, whatever production's keys can reach` });
+    } else if (accessDiff.length && identitySame.length) {
+      findings.push({ severity: 'note', service: svc, name: 'object store (AWS_*)',
+        detail: `credentials DIFFER (${accessDiff.join(', ')}) but ${identitySame.join(', ')} ` +
+                `match — expected when the PLATFORM provisions a bucket per environment, since two ` +
+                `separate stores can carry one display name. Not a finding; confirm functionally (§10.4)` });
+    }
+
     for (const [name, why] of Object.entries(MUST_BE_UNSET_IN_STAGING)) {
       if (s[name] !== undefined && s[name] !== '') {
         findings.push({ severity: 'sandbox-switch', service: svc, name, detail: why });
@@ -260,6 +291,28 @@ function selfTest() {
       expect: (f) => !f.some((x) => x.severity === 'mismatch-within'),
     },
     {
+      label: 'object store: identical ACCESS CREDENTIALS is a finding',
+      envs: { production: { frontend: { AWS_ACCESS_KEY_ID: 'ak', AWS_SECRET_ACCESS_KEY: 'sk', AWS_S3_BUCKET: 'b' } },
+              staging:    { frontend: { AWS_ACCESS_KEY_ID: 'ak', AWS_SECRET_ACCESS_KEY: 'sk', AWS_S3_BUCKET: 'b' } } },
+      expect: (f) => f.some((x) => x.severity === 'shared' && x.name.startsWith('object store')),
+    },
+    {
+      // THE REGRESSION THIS EXISTS TO PREVENT. A platform-provisioned bucket per environment
+      // injects different credentials while the display name is shared, and the first version of
+      // this instrument called that a shared production bucket.
+      label: 'object store: same BUCKET NAME with different credentials is a note, NOT a finding',
+      envs: { production: { frontend: { AWS_ACCESS_KEY_ID: 'akP', AWS_SECRET_ACCESS_KEY: 'skP', AWS_S3_BUCKET: 'rfp-pipeline-bucket' } },
+              staging:    { frontend: { AWS_ACCESS_KEY_ID: 'akS', AWS_SECRET_ACCESS_KEY: 'skS', AWS_S3_BUCKET: 'rfp-pipeline-bucket' } } },
+      expect: (f) => f.some((x) => x.severity === 'note' && x.name.startsWith('object store'))
+                  && !f.some((x) => x.severity === 'shared'),
+    },
+    {
+      label: 'object store: fully distinct is silent',
+      envs: { production: { frontend: { AWS_ACCESS_KEY_ID: 'akP', AWS_SECRET_ACCESS_KEY: 'skP', AWS_S3_BUCKET: 'bP' } },
+              staging:    { frontend: { AWS_ACCESS_KEY_ID: 'akS', AWS_SECRET_ACCESS_KEY: 'skS', AWS_S3_BUCKET: 'bS' } } },
+      expect: (f) => !f.some((x) => x.name.startsWith('object store')),
+    },
+    {
       label: 'a service dumped for only one environment is reported as UNCHECKED, not clean',
       envs: { production: { frontend: { ANTHROPIC_API_KEY: 'sk-live' } }, staging: {} },
       expect: (f) => f.some((x) => x.severity === 'gap'),
@@ -330,11 +383,11 @@ if (!envs.production || !envs.staging) {
 }
 
 const findings = audit(envs);
-const order = ['shared', 'points-at-prod', 'sandbox-switch', 'mismatch-within', 'missing', 'gap'];
+const order = ['shared', 'points-at-prod', 'sandbox-switch', 'mismatch-within', 'missing', 'gap', 'note'];
 const label = {
   shared: 'SHARED WITH PRODUCTION', 'points-at-prod': 'POINTS AT PRODUCTION',
   'sandbox-switch': 'SANDBOX SWITCH IS SET', 'mismatch-within': 'DISAGREES WITHIN STAGING',
-  missing: 'MISSING IN STAGING', gap: 'UNCHECKED',
+  missing: 'MISSING IN STAGING', gap: 'UNCHECKED', note: 'FOR INFORMATION — NOT A FINDING',
 };
 
 for (const sev of order) {
@@ -347,10 +400,15 @@ for (const sev of order) {
   console.log('');
 }
 
-if (!findings.length) {
-  console.log('✓ no shared credentials, no sandbox switches, no production URLs in staging.\n');
+// A `note` is deliberately NOT a finding and must not fail the run — a lens that cries wolf on a
+// correctly-configured environment is one whose real findings get scrolled past.
+const real = findings.filter((f) => f.severity !== 'note');
+if (!real.length) {
+  console.log('✓ no shared credentials, no sandbox switches, no production URLs in staging.');
+  if (findings.length) console.log('  (the note above is informational — read it, then carry on.)');
+  console.log('');
   process.exit(0);
 }
-console.log(`── ${findings.length} finding(s). Each one is a value pointed at the wrong world; none of`);
+console.log(`── ${real.length} finding(s). Each one is a value pointed at the wrong world; none of`);
 console.log(`   them shows up as an error, which is why this asks instead of waiting.\n`);
 process.exit(1);

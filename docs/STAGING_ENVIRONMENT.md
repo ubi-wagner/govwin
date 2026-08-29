@@ -50,7 +50,8 @@ Railway Project → environment: staging
 ├── Postgres-staging           MAIN DB, pgvector — frontend + pipeline
 └── cms-postgres-staging       rfp-crm's own DB
 
-rfp-pipeline-bucket-staging    Cloudflare R2 — separate bucket, separate token
+rfp-pipeline-bucket            Railway bucket service — provisioned PER ENVIRONMENT,
+                               credentials injected; the shared display name is expected
 ```
 
 **Every backing store is separate.** Sharing the production bucket or either database with staging
@@ -70,9 +71,31 @@ key removes exactly that property.
 | # | Service | What to create | Settings that matter | Set on |
 |---|---|---|---|---|
 | 1 | **Anthropic** — console.anthropic.com | A **separate Workspace** named `staging`, and an API key inside it | Set the workspace **monthly spend limit to $50**. That makes the provider's cap and the platform cap (`platform_agent_config.platform_monthly_cap`) agree, so a runaway is stopped twice by two independent mechanisms. | `ANTHROPIC_API_KEY` on **all three** services |
-| 2 | **Cloudflare R2** | A new bucket `rfp-pipeline-bucket-staging` and an **API token scoped to that bucket only** | Permission: *Object Read & Write*. Scope: this bucket. Not an account-wide token — a staging token that can reach the production bucket is a production credential wearing a different name. | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`, `AWS_S3_BUCKET`, `AWS_DEFAULT_REGION=auto` on frontend + pipeline (+ rfp-crm if it serves media) |
-| 3 | **Postmark** — postmarkapp.com | A **second Server** in the existing account, named `staging` | Create it as a **Sandbox server** first: it accepts every message and delivers none, which is exactly what you want while seeded data may still contain real addresses. Copy the **Server API Token**, not the Account token — that mix-up is documented in the driver's own header. Flip to a live server only for step 8.4. | `POSTMARK_SERVER_TOKEN` on frontend + rfp-crm |
-| 4 | **Railway** | The `staging` environment, plus two Postgres services and the R2 link | Enable **pgvector** on the main staging DB (mig 171 needs it) | — |
+| 2 | **Postmark** — postmarkapp.com | A **second Server** in the existing account, named `staging` | Create it as a **Sandbox server** first: it accepts every message and delivers none, which is exactly what you want while seeded data may still contain real addresses. Copy the **Server API Token**, not the Account token — that mix-up is documented in the driver's own header. Flip to a live server only for step 8.4. | `POSTMARK_SERVER_TOKEN` on frontend + rfp-crm |
+| 3 | **Railway** | The `staging` environment, two Postgres services, and a **bucket service** | Enable **pgvector** on the main staging DB (mig 171 needs it). The bucket is platform-provisioned — see below | — |
+
+### Object storage is provisioned by the platform, not obtained
+
+**There is no Cloudflare token to create.** The object store is a Railway bucket service kept in the
+same project as the app services and the databases, and Railway **injects** the credentials into
+whatever services the bucket is linked to. The staging work is therefore a *link*, not an
+acquisition:
+
+- add a bucket service to the `staging` environment,
+- **link it to `govtech-frontend` and `pipeline`** (and `rfp-crm` if it serves media),
+- set nothing by hand. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
+  `AWS_S3_BUCKET` and `AWS_DEFAULT_REGION` all arrive injected.
+
+Two consequences worth carrying:
+
+1. **The failure mode is a MISSING link, not a wrong key.** An unlinked bucket produces
+   `AWS_S3_BUCKET_NAME is required` at runtime — the recurring production error `SECRETS_INVENTORY`
+   records — rather than a permission denial.
+2. **Two separate buckets can share one display name.** Both environments show
+   `rfp-pipeline-bucket` in the project graph, and that is expected: a per-environment service
+   provisions a distinct store behind a name the operator chose. So a matching `AWS_S3_BUCKET`
+   across environments is **not** evidence of a shared store, and §8.0 deliberately does not treat
+   it as one. What means "staging can reach production's objects" is a matching **access pair**.
 
 ### 3.2 Obtain only if you want that capability on staging
 
@@ -350,7 +373,7 @@ agree. Two independent stops for one runaway.
 | | Monthly |
 |---|---|
 | Railway — 3 services + 2 Postgres, staging-sized | ~$20–40 |
-| Cloudflare R2 | ~$0–1 at staging volumes |
+| Object storage — Railway bucket service, staging volumes | ~$0–1 |
 | Postmark | free tier covers staging (sandbox sends are free) |
 | Anthropic | capped at $50 by the workspace limit; the verification pass itself is **under $20** |
 
@@ -426,24 +449,29 @@ It also cannot reach a database with no public endpoint, and the CRM database is
 design — so its CRM jobs will fail to connect, and the right response to that failure is to migrate
 from inside the deployment, not to open the database.
 
-### 10.4 Confirm the bucket is actually separate
+### 10.4 Confirm the bucket is actually separate — functionally
 
-The Railway graph showing production at 817 MB and staging as *empty* is good evidence, but the size
-readout is the service wrapper, not proof of a separate store. Compare the injected values across
-environments:
+The object store is platform-provisioned per environment, so two distinct buckets legitimately carry
+the same display name (§3.1). That makes **every name-based check inconclusive by construction**:
+
+- the graph showing production at 817 MB against staging *empty* is the service wrapper, not the store;
+- a matching `AWS_S3_BUCKET` is expected and proves nothing either way;
+- only a matching **access pair** (`AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`) is real evidence
+  of sharing, and that is what §8.0 flags.
+
+When it matters, do not infer — **write to one and look in the other.** The store is not separate
+until something that did not write the object has failed to find it:
 
 ```bash
-for env in production staging; do
-  echo "── $env"
-  railway variables --environment $env --service govtech-frontend --json \
-    | grep -E 'AWS_S3_BUCKET|AWS_ENDPOINT_URL'
-done
+# staging: put a probe object through the app's own upload path, then
+# production: list for that key. It must NOT be there.
+railway run --environment production --service pipeline -- \
+  python -c "from storage import client; print([o for o in client().list(prefix='parity-probe/')])"
 ```
 
-If both the bucket name **and** the endpoint are identical, the two environments share one store and
-a staging export or atomize run will write into production's objects. §8.0 flags an identical bucket
-name on its own, because the name matching is the signal worth stopping on even when the endpoint
-differs.
+That is the same rule the export harnesses follow — an artifact is not verified until an engine that
+did not write it has opened it. Applied here: a bucket is not separate until an environment that did
+not write the object cannot see it.
 
 ### 10.5 Afterwards
 
