@@ -192,3 +192,87 @@ test, and every step above changes both sides of it.
   highlight saying *directed energy deposition* still does not match a bucket keyed on *additive
   manufacturing* unless something relates the two. That is where `scoring_strategist` earns its place
   — reasoning over a curated corpus, which is a far better job than reasoning over 296 characters.
+
+---
+
+## 8 · The document invariant, and what it requires of this design
+
+**Stated:** every upload rides the opportunity through — across the bridge and into tenant space — on
+creation, on update, and on a new document uploaded to the OPP later. Whether that is implemented as
+push-on-bridge or as the pin-to-pull protocol, **the foundational uploads must remain accessible to
+the tenant as published by the issuing organization.**
+
+Copy-inward, never reference: the same rule the atom library and the template bridge already follow.
+
+### Where that stands today
+
+The pin protocol is `pin = full copy` (mig 094/095). Pinning copies every
+`solicitation_documents` row — `document_type='source'` first — into
+`customers/<slug>/pinned/<opp>/` via `copyObject`, recording a manifest in `pinned_docs` with the
+`sourceKey` retained for lineage. The customer owns a local, shard-safe copy.
+
+| The invariant | Today |
+|---|---|
+| **update / new upload propagates** | ✅ **holds.** A republish sets `pin_update_available`; `amendments.ts` triggers it; resync re-copies and clears the flag, with a watched-holder notification |
+| **accessible as published** | ✅ **holds once pinned.** `copyObject` is a byte copy — not a re-render, not an extract — so the tenant holds the organization's file as published |
+| **rides across the bridge** | ❌ **does not hold.** The card carries dates, amounts, description, summary, notes, lifecycle — **no document manifest at all** |
+| **into tenant space on creation** | ❌ **does not hold.** The copy happens on *pin*, not on card creation |
+
+The two gaps are the same gap seen twice: **before a tenant pins, they cannot see that the documents
+exist.** Not "cannot read them" — cannot know the solicitation has four attachments and an amendment.
+A tenant deciding whether an opportunity is worth pursuing is deciding without knowing what is in it.
+
+### What this design must therefore do
+
+**R1 · A highlight carries its excerpt TEXT, not only its anchor.**
+
+This was already the shape in §4/M2, but it is now a *requirement* rather than a choice, and the
+reason matters: an anchor is `{page, offset, length, docSegment}` into `full_text`, and an unpinned
+tenant **has no document for it to resolve against**. A panel built on anchors alone would render
+empty for exactly the tenants who have not yet committed to the opportunity — the ones it exists to
+persuade.
+
+So: the excerpt text rides the card and the panel works unpinned. The anchor rides too, and becomes
+*live* once pinned — "show me this in the document" resolves against the tenant's own copy, never
+against a central one.
+
+**R2 · The card carries a document manifest.**
+
+Filename, document type, size, published date, and whether it arrived as an amendment. No bytes —
+this is the *table of contents*, and it is what makes the invariant's "remain accessible" meaningful
+before a pin. It is a jsonb field on a jsonb column: no migration, and it rides the existing
+forward-only republish.
+
+That manifest is also what makes `pin_update_available` legible. Today the flag says *something
+changed*; with a manifest the tenant sees **which document arrived**, which is the difference between
+a notification and a reason to act.
+
+**R3 · Highlights must survive a republish, and be re-anchorable.**
+
+A new document changes `full_text`, so every character offset after the insertion point moves. The
+system's own highlights are re-derived on re-extraction and are fine. **Admin highlights are not** —
+they are hand-placed against offsets that a later upload silently invalidates.
+
+`solicitation_annotations` stores `source_location` as absolute `{page, offset, length}`. That is
+correct for a static document and wrong across an amendment. The excerpt text is the recovery path:
+re-locate by text search, and where the text no longer appears, mark the highlight **stale for
+review** rather than deleting it or, worse, leaving it pointing at whatever now occupies those bytes.
+
+This is the same principle the ruler and the provenance work already apply — *never claim a page we
+did not resolve*. A highlight that cannot re-anchor should say so.
+
+### On auto-copying every document to every tenant
+
+The invariant permits pin-to-pull, and pull is the right default. Copy-on-creation multiplies storage
+by tenants × opportunities for documents most tenants will never open; the production bucket is
+already 817 MB against a handful of tenants.
+
+**R2 gets the guarantee at near-zero cost.** The manifest is what makes the documents *visible and
+therefore accessible*; the pin is what makes them *the tenant's own*. If auto-copy is wanted later
+for a subset — pinned, or pursued, or a watched holder — that is a policy on top of a mechanism that
+already exists, not a redesign.
+
+> ⚠️ **`solicitation_documents` has 0 rows in the sandbox.** The pin copy path, the manifest, and
+> every offset-based anchor above are therefore untested against real documents on this box. Before
+> building R1–R3, shred one real multi-document BAA and re-measure — particularly `docSegment`
+> numbering across a file boundary, which is where anchors are most likely to be wrong.
