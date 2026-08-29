@@ -19,6 +19,26 @@ import { scoreCardForTenant } from '@/lib/bucket-ranking';
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
 
+/**
+ * One document of the solicitation as it reaches a tenant — the MANIFEST entry.
+ *
+ * The bytes are NOT here. `opportunity_bridge` is append-only and versioned, so text in the card
+ * would write another full copy of a 375,000-character document on every republish, forever; and
+ * the card jsonb is TOASTed as a unit, so a feed query selecting `card` would pull the corpus with
+ * it. The manifest rides the bridge; `copyCorpusInward` puts the bytes in the tenant's own
+ * `tenant_opportunity_documents` row at apply time (mig 238).
+ */
+export interface OppCardDoc {
+  sourceDocumentId: string;
+  documentType: string;
+  documentLabel: string | null;
+  filename: string;
+  isPrimary: boolean;
+  contentHash: string | null;
+  pageCount: number | null;
+  charCount: number;
+}
+
 /** The customer-visible face of the card (the only part that reaches a tenant). */
 export interface OppCard {
   opportunityId: string;
@@ -30,6 +50,18 @@ export interface OppCard {
   naicsCodes: string[] | null;
   setAsideType: string | null;
   programType: string | null;
+  /** Phase I vs Direct-to-Phase-II — a real discriminator for a small business, dropped until mig 238. */
+  phaseType: string | null;
+  /** The technology signal. Extracted by the AI shred, edited by the rfp_admin on the topic route,
+   *  read by `capture_strategist` — and carried by neither the bridge nor either scorer until now. */
+  techFocusAreas: string[] | null;
+  /** Topic identity, on a card that IS a topic (11 of 22 opportunities carry a topic_number). */
+  topicNumber: string | null;
+  topicBranch: string | null;
+  topicStatus: string | null;
+  /** Who to ask. */
+  pocName: string | null;
+  pocEmail: string | null;
   classificationCode: string | null;
   postedDate: string | null;
   preReleaseDate: string | null;
@@ -60,6 +92,8 @@ export interface OppCard {
     submissionFormat: string | null;
     volumeCount: number;
   } | null;
+  /** What the organization published, as published. Manifest only — see OppCardDoc. */
+  documents: OppCardDoc[];
   frozenAt: string;
 }
 
@@ -74,12 +108,31 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.pre_release_date, o.open_date, o.close_date, o.award_date, o.award_amount, o.awardee,
              o.estimated_value_min, o.estimated_value_max, o.description, o.expert_notes,
              o.lifecycle_status, o.submission_stage,
+             o.phase_type, o.tech_focus_areas, o.topic_number, o.topic_branch, o.topic_status,
+             o.poc_name, o.poc_email,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
              cs.namespace, cs.spotlight_summary, cs.build_complete,
              sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
              (SELECT count(*)::int FROM solicitation_volumes sv
-                WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
+                WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count,
+             -- The document MANIFEST (mig 238). Aliased camelCase because lib/db.ts applies
+             -- postgres.toCamel to every column — but a jsonb_build_object's KEYS are values, not
+             -- column names, so they pass through untouched and must be written camelCase here.
+             -- char_count is computed from the master text so the manifest can state the corpus
+             -- size without carrying it.
+             (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'sourceDocumentId', sd.id,
+                        'documentType',     sd.document_type,
+                        'documentLabel',    sd.document_label,
+                        'filename',         sd.original_filename,
+                        'isPrimary',        sd.is_primary,
+                        'contentHash',      sd.content_hash,
+                        'pageCount',        sd.page_count,
+                        'charCount',        length(COALESCE(sd.extracted_text, ''))
+                      ) ORDER BY sd.is_primary DESC, (sd.document_type = 'source') DESC, sd.created_at),
+                      '[]'::jsonb)
+                FROM solicitation_documents sd WHERE sd.solicitation_id = cs.id) AS documents
       FROM opportunities o
       -- Resolve the solicitation for BOTH the umbrella (cs.opportunity_id = o.id)
       -- and its topics (o.solicitation_id = cs.id). Without the topic arm, a topic
@@ -127,6 +180,13 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       naicsCodes: (o.naicsCodes as string[]) ?? null,
       setAsideType: (o.setAsideType as string) ?? null,
       programType: (o.programType as string) ?? null,
+      phaseType: (o.phaseType as string) ?? null,
+      techFocusAreas: (o.techFocusAreas as string[]) ?? null,
+      topicNumber: (o.topicNumber as string) ?? null,
+      topicBranch: (o.topicBranch as string) ?? null,
+      topicStatus: (o.topicStatus as string) ?? null,
+      pocName: (o.pocName as string) ?? null,
+      pocEmail: (o.pocEmail as string) ?? null,
       classificationCode: (o.classificationCode as string) ?? null,
       postedDate: str(o.postedDate),
       preReleaseDate: str(o.preReleaseDate),
@@ -149,6 +209,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       releasedBy: str(o.releasedBy),
       releasedByEmail: (o.releasedByEmail as string) ?? null,
       releasedAt: str(o.releasedAt),
+      documents: Array.isArray(o.documents) ? (o.documents as OppCardDoc[]) : [],
       frozenAt,
       complianceSummary: hasMatrix
         ? {
@@ -171,6 +232,32 @@ export interface BridgeEvent {
   version: number;
   eventType: BridgeEventType;
   card: OppCard;
+}
+
+/**
+ * Normalize a card read back out of stored jsonb.
+ *
+ * `OppCard` is the contract for a card this build PUBLISHES. A card read from `opportunity_bridge`
+ * was written by whatever build was deployed at the time, so the fields mig 238 added are simply
+ * absent on every row published before it — and a TS cast over stored jsonb asserts a shape the
+ * bytes do not have. That is the same class as the `sql<T>` trap the data-layer SOP documents: it
+ * compiles, and then `card.documents.map(...)` throws on a legacy row.
+ *
+ * Backfill and reconcile both replay historical bridge rows, so both go through here.
+ */
+export function normalizeCard(raw: unknown): OppCard {
+  const c = (raw ?? {}) as Partial<OppCard>;
+  return {
+    ...(c as OppCard),
+    phaseType: c.phaseType ?? null,
+    techFocusAreas: Array.isArray(c.techFocusAreas) ? c.techFocusAreas : null,
+    topicNumber: c.topicNumber ?? null,
+    topicBranch: c.topicBranch ?? null,
+    topicStatus: c.topicStatus ?? null,
+    pocName: c.pocName ?? null,
+    pocEmail: c.pocEmail ?? null,
+    documents: Array.isArray(c.documents) ? c.documents : [],
+  };
 }
 
 /** Publish a forward-only card version to the bridge (admin approve / update / close). */
@@ -211,6 +298,104 @@ export async function publishToBridge(
   } catch (e) {
     console.error('[bridge] publishToBridge failed', e);
     return null;
+  }
+}
+
+/**
+ * Copy the solicitation corpus INWARD — the bytes the manifest describes (mig 238).
+ *
+ * Runs after the card upsert, once per tenant per applied bridge version. The master
+ * (`solicitation_documents`) is RLS-off platform scope, so it is read on the bypass pool; the write
+ * lands in the tenant's FORCE-RLS `tenant_opportunity_documents` under `withTenant`.
+ *
+ * Three properties worth stating, because each is load-bearing:
+ *
+ *  · **Forward-only, like the card.** A stale event must not overwrite a newer copy, or an
+ *    out-of-order fan-out would restore a superseded amendment's text under a current card.
+ *  · **Hash short-circuit.** Documents rarely change; lifecycle republishes are frequent. Rewriting
+ *    375,000 characters per tenant because an opp reopened is real money for no information. When
+ *    the content hash matches what we already hold we advance `bridge_version` and leave the text.
+ *  · **Prune to the manifest, but only on success.** The mirror states what the organization has
+ *    published NOW; a document the admin withdrew must not linger. But an empty manifest from a
+ *    FAILED read would wipe a tenant's corpus, so the prune is inside the same try as the read and
+ *    an exception leaves the mirror exactly as it was.
+ *
+ * Best-effort throughout: a corpus failure must never fail the fan-out. The card still lands, the
+ * card_tsv still ranks, and `reconcileTenant` re-drives the copy on the next pass.
+ */
+async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promise<number> {
+  try {
+    // The master's own rows — the manifest on the card says WHICH, this reads the bytes.
+    const docs = await sqlBypass<Array<{
+      id: string; documentType: string; documentLabel: string | null; originalFilename: string;
+      isPrimary: boolean; contentHash: string | null; pageCount: number | null;
+      storageKey: string; extractedText: string | null;
+    }>>`
+      SELECT sd.id, sd.document_type, sd.document_label, sd.original_filename, sd.is_primary,
+             sd.content_hash, sd.page_count, sd.storage_key, sd.extracted_text
+      FROM solicitation_documents sd
+      JOIN opportunities o ON o.solicitation_id = sd.solicitation_id
+      WHERE o.id = ${ev.opportunityId}::uuid
+    `;
+    return await withTenant(tenantId, async (tx) => {
+      let written = 0;
+      for (const d of docs) {
+        const text = d.extractedText ?? '';
+        // The text is written only when the hash CHANGED (or we hold nothing). Otherwise this is a
+        // version bump on the row we already have. `EXCLUDED.bridge_version > current` keeps the
+        // whole thing forward-only; a stale event is a no-op with an empty RETURNING.
+        const rows = await tx`
+          INSERT INTO tenant_opportunity_documents (
+            tenant_id, opportunity_id, source_document_id, document_type, document_label,
+            original_filename, is_primary, content_hash, page_count, char_count,
+            storage_key, extracted_text, bridge_version)
+          VALUES (
+            ${tenantId}::uuid, ${ev.opportunityId}::uuid, ${d.id}::uuid, ${d.documentType},
+            ${d.documentLabel}, ${d.originalFilename}, ${d.isPrimary}, ${d.contentHash},
+            ${d.pageCount}, ${text.length}, ${d.storageKey}, ${text}, ${ev.version})
+          ON CONFLICT (tenant_id, opportunity_id, source_document_id) DO UPDATE SET
+            document_type     = EXCLUDED.document_type,
+            document_label    = EXCLUDED.document_label,
+            original_filename = EXCLUDED.original_filename,
+            is_primary        = EXCLUDED.is_primary,
+            page_count        = EXCLUDED.page_count,
+            storage_key       = EXCLUDED.storage_key,
+            bridge_version    = EXCLUDED.bridge_version,
+            -- Hash short-circuit: same content, keep the bytes we already TOASTed.
+            content_hash      = EXCLUDED.content_hash,
+            extracted_text    = CASE
+              WHEN tenant_opportunity_documents.content_hash IS NOT NULL
+               AND tenant_opportunity_documents.content_hash = EXCLUDED.content_hash
+              THEN tenant_opportunity_documents.extracted_text
+              ELSE EXCLUDED.extracted_text END,
+            char_count        = CASE
+              WHEN tenant_opportunity_documents.content_hash IS NOT NULL
+               AND tenant_opportunity_documents.content_hash = EXCLUDED.content_hash
+              THEN tenant_opportunity_documents.char_count
+              ELSE EXCLUDED.char_count END,
+            updated_at        = now()
+          WHERE EXCLUDED.bridge_version > tenant_opportunity_documents.bridge_version
+          RETURNING id
+        `;
+        if (rows.length > 0) written++;
+      }
+      // Prune to the manifest — inside the same try, so a failed read never wipes a corpus.
+      const keep = docs.map((d) => d.id);
+      if (keep.length > 0) {
+        await tx`
+          DELETE FROM tenant_opportunity_documents
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${ev.opportunityId}::uuid
+            AND source_document_id <> ALL(${keep}::uuid[])`;
+      } else {
+        await tx`
+          DELETE FROM tenant_opportunity_documents
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${ev.opportunityId}::uuid`;
+      }
+      return written;
+    });
+  } catch (e) {
+    console.error('[bridge] corpus copy-inward failed (non-fatal)', tenantId, ev.opportunityId, e);
+    return 0;
   }
 }
 
@@ -261,6 +446,11 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
     return { applied: rows.length > 0, existedBefore: !!prior };
   });
   if (!applied) return false;
+  // Corpus copy-inward (mig 238) BEFORE the cursor, the emit and the score. Ordering is the whole
+  // point: `capture:card.applied` triggers the pipeline rescore and `scoreCardForTenant` runs
+  // synchronously below, so a corpus landing after either would rank the card's first sighting on
+  // the 296-character blurb and only pick up the solicitation on some later, unrelated republish.
+  await copyCorpusInward(tenantId, ev);
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`
@@ -423,7 +613,7 @@ export async function backfillTenant(tenantId: string): Promise<number> {
   let applied = 0;
   for (const h of heads) {
     try {
-      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: h.card });
+      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: normalizeCard(h.card) });
       applied++;
     } catch (e) {
       console.error('[bridge] backfill apply failed', h.opportunityId, e);
@@ -468,7 +658,7 @@ export async function reconcileTenant(tenantId: string): Promise<number> {
   let applied = 0;
   for (const h of behind) {
     try {
-      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: h.card });
+      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: normalizeCard(h.card) });
       applied++;
     } catch (e) {
       console.error('[bridge] reconcile apply failed', h.opportunityId, e);
