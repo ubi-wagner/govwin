@@ -277,3 +277,111 @@ worth combining.
   seven — these are empirical questions and I have no data to settle them.
 - **Every number in the companion analysis came from a seeded sandbox.** This model should be sanity
   checked against a real corpus of a few hundred live topics before anyone builds the schema.
+
+---
+
+## 10 · Agency vocabularies — and why they cannot be merged
+
+The four core axes are **agency · technology · maturation · alignment**. Each agency has an
+authoritative classifier for technology, and they are **not the same shape**. That is the finding
+this section exists to record.
+
+| Agency | Authoritative technology axis | Organising principle | Maturation scale |
+|---|---|---|---|
+| **DoD** (OUSD R&E) | **14 Critical Technology Areas** — Biotechnology · Quantum Science · FutureG · Advanced Materials · Directed Energy · Hypersonics · Integrated Sensing & Cyber · Trusted AI & Autonomy · Integrated Network Systems-of-Systems · Microelectronics · Space Technology · Renewable Energy Generation & Storage · Advanced Computing & Software · Human-Machine Interfaces | **technology** | **TRL 1–9** |
+| **DARPA** | **6 technical offices** — BTO · DSO · I2O · MTO · STO · TTO *(2026 reporting: I2O→IPTO, MTO→MXO — verify before encoding)* | **organisational unit** | program-phase, not TRL |
+| **NSF** | **8 directorates** — BIO · CISE · ENG · GEO · MPS · SBE · EDU · TIP; plus ~**18 SBIR topic areas** (AI/ML, biotech, advanced materials, energy, quantum, robotics, semiconductors…) | **academic discipline** | **none formal** — Phase I/II is the only proxy |
+| **DOE** | **Office of Science: 7** — ASCR · BES · BER · FES · HEP · IRP · NP; plus applied offices (EERE · NE · FECM · OE) and **ARPA-E**; SBIR carries **60+ topics / 250+ subtopics** | **mission + discipline** | TRL for applied; none for SC basic |
+| **NIH** | **27 Institutes and Centers**; mechanism codes **R43/R44** (SBIR) and **R41/R42** (STTR) | **disease / organ system** | **T0–T4 translational continuum** |
+| **NASA** | **4 mission directorates** — Aeronautics Research · Human Exploration & Operations · Science · Space Technology; × **10 centers** | **mission** | **TRL 1–9** *(NASA originated it — Sadin, 1974, seven levels; formalised to nine in the 1990s)* |
+
+### These are different ontologies, not different lists
+
+- **DoD** classifies by *technology*.
+- **NSF** classifies by *academic discipline*.
+- **NIH** classifies by *disease and organ system*.
+- **DARPA and NASA** classify by *organisational unit and mission*.
+- **DOE** does both — Office of Science by discipline, applied offices by mission.
+
+An organ system is not a technology. A directorate is not a technology area. **Flattening them into
+one list destroys the meaning that makes each one authoritative**, and produces a vocabulary that no
+agency's own solicitations actually use — the §8c failure at a larger scale.
+
+---
+
+## 11 · Two corrections this forces
+
+### 11.1 "TRL band" was too narrow — maturation is a normalised axis with per-domain scales
+
+§4.1 called it *TRL band*. That is right for DoD, NASA and applied DOE, and **wrong everywhere else**:
+
+- **NIH** uses the **T0–T4 translational continuum** — basic → pre-clinical → clinical → practice →
+  population. Not TRL, and not convertible without loss.
+- **NSF** has **no formal maturation scale at all.** Phase I versus Phase II is the only signal, which
+  is a funding stage, not a technical maturity.
+- **DARPA** frames maturity by program phase and go/no-go milestones rather than a standing scale.
+
+So the dimension is **maturation**, held as a normalised band with each agency's native scale mapped
+onto it — TRL 1–9, T0–T4, or "stage unknown". A company declares its band once; the mapping is what
+lets a biotech firm's *pre-clinical* and a hardware firm's *TRL 4* both be understood.
+
+**And "stage unknown" must abstain, not default.** An NSF topic with no maturity statement should not
+be scored as though it were TRL 1 — that is the §8e rule applied to the axis that most tempts a
+default.
+
+### 11.2 The technology axis needs two layers
+
+One list cannot be both authoritative and cross-agency. So carry both:
+
+**Layer 1 — the agency-native classifier**, stored as the agency states it. A DoD topic carries its
+CTAs; an NIH funding opportunity carries its IC and activity code; an NSF solicitation carries its
+directorate and topic area. Nothing is translated, nothing is lost, and a company that works with
+that agency sees the vocabulary it already knows.
+
+**Layer 2 — a coarse cross-agency bridge axis**, deliberately small, that every native term maps
+onto. This is the *alignment* axis: it lets one bucket saying "quantum" reach a DoD CTA, an NSF topic
+area, a DOE BES program and a DARPA office — without pretending those four are the same thing.
+
+```
+   DoD CTA "Quantum Science" ─┐
+   NSF topic "Quantum"        ├──▶  bridge: QUANTUM  ◀── bucket says "quantum"
+   DOE BES quantum materials  │
+   DARPA MTO/MXO programs    ─┘
+
+   native layer: precise, authoritative, agency's own words
+   bridge layer: coarse, lossy, and the ONLY thing a cross-agency bucket matches on
+```
+
+**The bridge is lossy on purpose, and must be labelled as such.** A tenant matching on the bridge
+should see *"matched at the cross-agency level"* and be able to narrow to the native term when they
+care. Presenting a bridge match as though it were a native one is the same class of error as
+presenting a `default` value as though it were read from the source.
+
+### 11.3 Consequences for the three surfaces
+
+- **Onboarding** captures the bridge axis for everyone, plus native classifiers for the agencies a
+  company actually pursues. A firm that only does NIH work should never be asked to self-assess
+  against DoD CTAs.
+- **Ingest** records the native classifier as stated — with its provenance citation — and derives the
+  bridge term. Derivation is a mapping table, not a model: deterministic, reviewable, and correctable
+  by an admin.
+- **Buckets** may name either layer. A DoD-focused lens names CTAs; a technology-agnostic lens names
+  bridge terms; both work, and the score says which layer matched.
+
+---
+
+## 12 · What this changes in the plan
+
+| Item | Change |
+|---|---|
+| D2 · "TRL band" | **broaden to maturation band** with per-scale mapping; "unknown" abstains |
+| Technology classifier | **two layers** — native per agency, plus a small shared bridge |
+| Onboarding | agency-scoped: only ask for the native vocabularies a company actually pursues |
+| Ingest | native as stated + derived bridge, mapping table not model, admin-correctable |
+| The bridge mapping table | **new artefact**, and the one thing here that needs ongoing curation |
+
+**The honest cost:** the bridge mapping table is a maintained asset. Agency vocabularies drift —
+DARPA's offices were reportedly renamed in 2026, NSF added TIP in 2022, DoD's CTA list has been
+revised more than once. A mapping table nobody maintains becomes a source of confidently wrong
+matches, which is worse than no bridge at all. It needs an owner and a review cadence, and that
+should be decided before it is built rather than after it rots.
