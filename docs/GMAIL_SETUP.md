@@ -62,7 +62,7 @@ ADMIN_NOTIFICATION_EMAIL    = <where admin alerts land>
 
 | Record | Host | Value |
 |--------|------|-------|
-| **SPF** (TXT) | `@` | `v=spf1 include:_spf.google.com ~all` |
+| **SPF** (TXT) | `@` | `v=spf1 include:_spf.google.com include:spf.mtasv.net ~all` — Postmark's include is required too; see docs/EMAIL_INTERFACE_DESIGN.md |
 | **DKIM** (TXT) | `google._domainkey` | generate in Admin console → **Apps → Google Workspace → Gmail → Authenticate email**, then publish the TXT it gives you |
 | **DMARC** (TXT) | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@rfppipeline.com` (start at `p=none` to monitor, tighten to `p=quarantine` once clean) |
 

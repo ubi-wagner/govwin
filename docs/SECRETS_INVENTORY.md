@@ -68,7 +68,9 @@ two-voice sender model. It needs **one credential** to switch on.
    `platform@`, `eric@`, `automation@`, etc. — **the mechanism that "sweeps both mailboxes."**
 3. **Provision the mailboxes**: `automation@`, `eric@` (have), `platform@` (have), optionally `heather@`.
 4. **DNS for rfppipeline.com** (not a secret, but required or mail is spam-filtered): SPF
-   `v=spf1 include:_spf.google.com ~all`, DKIM (Workspace-generated), DMARC.
+   `v=spf1 include:_spf.google.com include:spf.mtasv.net ~all` — **BOTH includes**: Google sends the correspondence, Postmark sends the
+   transactional, and a record naming only one silently fails SPF for the other. DKIM twice too
+   (Workspace-generated AND Postmark's), plus DMARC.
 
 > Alternative single-mailbox send-only path (already used by the frontend welcome email):
 > `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` · `GOOGLE_REFRESH_TOKEN` · `GOOGLE_WORKSPACE_EMAIL`
