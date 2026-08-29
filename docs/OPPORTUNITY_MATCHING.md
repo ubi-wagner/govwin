@@ -26,9 +26,18 @@ The cost of that, measured:
 matters as much as it possibly could because real buckets set keywords and nothing else — making the
 keyword factor **two-thirds of the entire score**.
 
-The fix is not a better matching algorithm. It is **giving the matcher something to read**: a curated
-set of highlighted passages, drawn from what the system extracted and what an admin marked, carried
-onto the tenant's card and shown to them as *"Sections Highlighted by System or Admin."*
+The fix is not a better matching algorithm. It is **two thin things that multiply**, and both have to
+move:
+
+- **A thin corpus.** Give the matcher something to read — a curated set of highlighted passages, drawn
+  from what the system extracted and what an admin marked, carried onto the tenant's card and shown to
+  them as *"Sections Highlighted by System or Admin"* (§6).
+- **A thin query.** The bucket editor is four free-text comma-separated boxes with no prefill, no
+  taxonomy and no suggestions, so tenants fill the first and stop — which is *why* keywords are 67% of
+  the score. The capability record that would fill the rest already exists, one page away, and nothing
+  connects them (§8b).
+
+Fixing the corpus alone makes the keyword factor more accurate without making it less load-bearing.
 
 ---
 
@@ -306,6 +315,107 @@ Everything else is wiring.
 
 ---
 
+## 8b · The other half — bucket authoring
+
+Ranking is a query against a corpus. §1–§7 fixed the corpus. **The query is thin for its own,
+independent reason**, and the two multiply.
+
+### What a tenant is actually asked for
+
+The bucket editor is **four free-text, comma-separated inputs**:
+
+```
+placeholder="Name (e.g. AF Autonomy)"
+placeholder="keywords, comma-sep"
+placeholder="agencies, comma-sep"
+placeholder="program types (SBIR, STTR)"
+                         …and NAICS
+```
+
+No dropdowns. No checkboxes. No taxonomy. No prefill. No suggestion. Each field is an unaided act of
+recall, typed from memory, with no visible consequence for leaving one blank.
+
+**That is the causal explanation for the weight concentration in §3.** It is not that tenants do not
+care about NAICS or agencies — it is that every additional field is another memory exercise, so people
+fill the first one and stop. Four of five buckets: keywords only.
+
+### The capability record already exists, and nothing connects it
+
+`tenant_profiles` is a column-for-column match for what a bucket needs:
+
+| `tenant_profiles` | `BucketCriteria` |
+|---|---|
+| `naics_codes` | `naics` |
+| `keywords` | `keywords` |
+| `agency_priorities` · `target_agencies` | `agencies` |
+| `set_aside_types` | `setAsides` |
+| `technology_focus` · `research_areas` · `company_summary` | *(no equivalent — rich, unused)* |
+
+It is collected at `/portal/[tenant]/profile`, read by the dashboard, the manage page and the agent
+tools. **It is not read by bucket authoring.** A tenant fills in their capability profile, walks to
+the buckets page, and types keywords again from memory.
+
+And the profiles are barely populated — of two rows: one is empty across every field; the other has
+7 keywords, 3 research areas, 97 characters of technology focus and a 350-character company summary,
+with **zero** NAICS, agencies or set-asides. Same cause, one screen earlier.
+
+### The multiplication
+
+```
+thin corpus  ·  the ranker reads 296 characters          (§1)
+thin query   ·  the bucket carries one signal            (§8b)
+             ─────────────────────────────────────────
+             a 42% miss rate that costs two-thirds of the score
+```
+
+Fixing either alone helps. **Fixing the corpus while buckets still carry one signal leaves the whole
+score resting on that one signal being right** — a better corpus makes the keyword factor *more*
+accurate, not less load-bearing. They have to move together.
+
+### What already exists for the fix
+
+| Piece | Status |
+|---|---|
+| `tenant_profiles` | **built, unconnected** — the exact fields, collected on its own page |
+| `taxonomy_terms` | **built, seeded** — controlled vocabularies: agency 18 · kind 16 · party_role 11 · dept 11 · vol 39 · program 7 · phase 7 · fmt 6 · access 4 |
+| `library_atoms` + `atom_tags` | **built, populated** — evidence of what the tenant actually does, across 8 tag dimensions |
+| `onboarding_agent` | **designed, registered, dormant** — its stated outputs are *"profile enrichment suggestions", "spotlight buckets to seed", "readiness assessment (profile / library / buckets)"*, with tools `get_onboarding_context`, `search_library`, `get_tenant_profile` |
+| Authoring authority | **built** — `canManageBuckets`: tenant_admin+, or a delegated member with `can_manage_buckets` (mig 181); cap 25, rfp-admin settable |
+
+**The agent designed to do exactly this is already in the roster and asleep.**
+
+### The design — evidence-based authoring, not recall
+
+**B1 · Prefill from the profile.** *"Start from our company profile"* fills naics, agencies,
+set-asides and keywords in one click. The tenant edits rather than recalls. Zero new data.
+
+**B2 · Suggest from the library.** A tenant's atoms and their tags are evidence of what they do —
+far better evidence than what they remember on a Tuesday. Tag values map onto programme and vehicle
+criteria directly; atom text mines candidate keywords. *"Suggest criteria from my library."*
+
+**B3 · Controlled vocabulary where one exists.** `taxonomy_terms` already holds agency (18),
+programme (7) and phase (7). Those become **dropdowns and checkboxes**, not comma-separated recall.
+Keywords stay free text — that dimension is genuinely open — but with suggestions from B2 beside it.
+
+**B4 · Make the weight consequence visible.** This is the smallest change and possibly the highest
+leverage. A bucket carrying only keywords should say so:
+
+> *This lens scores on 1 of 6 signals. Keyword matches are **67%** of its score — a solicitation
+> that words things differently will rank near the bottom. Add agencies or NAICS to spread it.*
+
+That number is already computable from the criteria; it is the weight model told back to the person
+who set it. It makes the problem self-correcting instead of invisible.
+
+**B5 · Require breadth, not atoms specifically.** A hard requirement to include atoms fails the
+brand-new tenant who has none. **Require ≥2 signal dimensions**, with B1/B2 making the second one
+nearly free. Atoms are the best *source* when present, not a gate.
+
+**B6 · Wake `onboarding_agent` to propose the first set.** Advisory, per the fabric contract — it
+proposes buckets and profile enrichment; a human accepts. A new tenant then arrives with lenses
+derived from their own uploaded past performance rather than a blank form and a comma placeholder.
+
+---
+
 ## 9 · Sequence
 
 1. **Carry admin annotations onto the card and match them.** Wiring, not invention; immediately useful
@@ -318,6 +428,10 @@ Everything else is wiring.
    confirm-and-correct rather than find-and-type — the right division given the variety the shredder
    meets.
 5. **Summary generation from highlights, regenerable at the gate**, with provenance.
+5b. **Bucket authoring: prefill (B1), the weight-consequence line (B4), taxonomy dropdowns (B3).**
+   B4 alone is a few hours and tells every tenant why their lens is fragile. Do it early — it is the
+   cheapest item in this entire document and it changes behaviour rather than code.
+5c. **Library-derived suggestions (B2) and `onboarding_agent` (B6).**
 6. **`scoring_strategist`, last.** An LLM overlay on 296 characters inherits the same blindness; over a
    curated corpus it is doing the job it was designed for. ~$20–25/month platform-wide at 100 tenants.
 
