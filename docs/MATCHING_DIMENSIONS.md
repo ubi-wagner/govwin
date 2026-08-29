@@ -357,11 +357,82 @@ should see *"matched at the cross-agency level"* and be able to narrow to the na
 care. Presenting a bridge match as though it were a native one is the same class of error as
 presenting a `default` value as though it were read from the source.
 
+### 11.4 Effort is scoped. Reach is not. — the correction that matters most
+
+An earlier draft said onboarding should be *"agency-scoped: a firm that only does NIH work should
+never be asked to self-assess against DoD CTAs."* The first half is right and the second half, read
+as written, would have built **a filter bubble into the product's core value**.
+
+**Not required ≠ not shown.**
+
+| | Scoped? | |
+|---|---|---|
+| **Effort** — what a company fills in | **yes** | never make a biotech firm learn DoD's 14 CTAs to be onboarded |
+| **Reach** — what a company is shown | **never** | a DoD Biotechnology topic is often exactly the opportunity they would never have found alone |
+
+A firm that has only ever done NIH work **should absolutely learn about DoD-aligned opportunities.**
+That is not a nice-to-have on top of the pipeline; for many tenants it *is* the pipeline — the whole
+reason to use a discovery product rather than watching one agency's portal.
+
+### The bridge is not a convenience layer — it is the discovery mechanism
+
+§11.2 introduced the cross-agency bridge as a way to let one bucket match several vocabularies. That
+undersold it. **The bridge is what makes cross-agency reach possible without cross-agency data
+entry:**
+
+```
+company declares (native, NIH):        regenerative medicine · NIAMS/NIBIB · T2 translational
+                        │
+                        ▼  bridge derivation, same table, both directions
+company's bridge terms:                BIOTECHNOLOGY · ADVANCED MATERIALS
+                        │
+                        ▼
+reaches:                               DoD CTA "Biotechnology" topic
+                                       NSF BIO/TIP topic
+                                       DOE BER program
+```
+
+They never touched a DoD vocabulary, and a DoD topic still found them.
+
+**Three consequences follow.**
+
+**1 · Derivation must run symmetrically, on both sides.** If bridge terms are derived only for
+opportunities, the join has a native term on one side and nothing on the other and matches nothing.
+The company's declared native terms must derive bridge terms too, by the same table.
+
+**2 · The failure mode is worse than I said.** §12 called a stale mapping table *"a source of
+confidently wrong matches."* That is the lesser half. The greater half is **invisible absence** — a
+missing mapping means a tenant never sees an entire agency's worth of relevant work, and they cannot
+tell, because nothing appears. A wrong match is annoying and self-correcting; a silent gap is neither.
+
+That raises the stakes on the mapping table's ownership and cadence considerably, and it argues for a
+standing check: *for each bridge term, does every agency that plausibly funds it map onto it?* — an
+instrument, not a review meeting.
+
+**3 · A bridge match must explain itself, or it reads as noise.** A biotech firm shown a DoD topic
+will distrust the pipeline unless the card says why:
+
+> *Matched via **Biotechnology** — your NIH regenerative-medicine profile. This is a cross-agency
+> match; narrow to DoD Critical Technology Areas to tune it.*
+
+§11.2 called labelling a bridge match a correctness requirement, on the grounds that presenting it as
+a native match is like presenting a `default` as a value read from the source. That still holds — and
+it is also what makes an unexpected match **credible instead of alarming**, which is the difference
+between a tenant exploring a new agency and a tenant deciding the ranking is broken.
+
+### The model, corrected
+
+**The bridge axis is the universal floor, required of everyone. Native vocabularies are optional
+precision, offered per agency.** Filling in more improves ranking accuracy within that agency; filling
+in nothing beyond the floor still reaches every agency. Nothing a company declines to fill in ever
+narrows what it sees.
+
 ### 11.3 Consequences for the three surfaces
 
-- **Onboarding** captures the bridge axis for everyone, plus native classifiers for the agencies a
-  company actually pursues. A firm that only does NIH work should never be asked to self-assess
-  against DoD CTAs.
+- **Onboarding** captures the bridge axis for **everyone**, plus native classifiers as *optional
+  depth* for the agencies a company actively pursues. See §11.4 — the distinction between what a
+  company is **asked to fill in** and what it is **shown** is load-bearing, and an earlier draft of
+  this document got it wrong.
 - **Ingest** records the native classifier as stated — with its provenance citation — and derives the
   bridge term. Derivation is a mapping table, not a model: deterministic, reviewable, and correctable
   by an admin.
@@ -380,7 +451,9 @@ presenting a `default` value as though it were read from the source.
 | Ingest | native as stated + derived bridge, mapping table not model, admin-correctable |
 | The bridge mapping table | **new artefact**, and the one thing here that needs ongoing curation |
 
-**The honest cost:** the bridge mapping table is a maintained asset. Agency vocabularies drift —
+**The honest cost:** the bridge mapping table is a maintained asset — and per §11.4 it is also the
+**discovery mechanism**, not merely a matching convenience, so its failure mode includes a tenant
+silently never seeing an agency's work. Agency vocabularies drift —
 DARPA's offices were reportedly renamed in 2026, NSF added TIP in 2022, DoD's CTA list has been
 revised more than once. A mapping table nobody maintains becomes a source of confidently wrong
 matches, which is worse than no bridge at all. It needs an owner and a review cadence, and that
