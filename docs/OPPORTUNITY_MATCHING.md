@@ -1,5 +1,13 @@
 # Opportunity matching — analysis, design, and what to build
 
+> **⚑ A prior question is answered in `docs/MATCHING_DIMENSIONS.md`.** Everything below §8e extends
+> the scoring function that exists. That document asks what dimensions *should* discriminate a fit
+> for a small R&D business across the whole federal landscape, and concludes the flat weighted mean is
+> the modelling error — eligibility, capability, capacity and preference need four different
+> operators, not one average. Where the two disagree, that one is the target and this one is the
+> migration path. Two conclusions here are superseded there: **NAICS is eligibility, not a fit
+> signal**, and **TRL band is the highest-value missing dimension**.
+
 **Supersedes** `OPPORTUNITY_MATCHING_ANALYSIS.md` and `HIGHLIGHTED_SECTIONS_DESIGN.md`, which were
 written in sequence as the understanding changed. This is the consolidated account, including the two
 places the reasoning turned.
