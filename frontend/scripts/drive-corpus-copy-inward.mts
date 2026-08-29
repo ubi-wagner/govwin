@@ -18,18 +18,74 @@
  *   5  the ranking corpus grew, measured as lexemes, card vs corpus
  *   6  forward-only — replaying the same version is a no-op, and the hash short-circuit holds
  *
- * Usage:  node --experimental-strip-types frontend/scripts/drive-corpus-copy-inward.mts [--keep]
+ * Usage:  node --import tsx frontend/scripts/drive-corpus-copy-inward.mts [--keep]
+ *         The fixture is extracted from docs/*.pdf on first run and cached under the OS temp dir.
  */
 
 import postgres from 'postgres';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const OWNER = process.env.DATABASE_URL_OWNER ?? 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const APP = process.env.DATABASE_URL ?? 'postgresql://govtech_app:apppass@localhost:5432/govtech_intel';
-const DOCS = process.env.REAL_DOCS_JSON
-  ?? '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/real-docs.json';
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Cached under the OS temp dir, not a session scratchpad — a path tied to one session is a fixture
+// that rots the moment anyone else runs this. Rebuilt from the PDFs in docs/ when absent.
+const CACHE = join(tmpdir(), 'govwin-corpus-fixture', 'real-docs.json');
 const KEEP = process.argv.includes('--keep');
+
+/** The two real documents this drive runs on, and where they come from. */
+const SOURCE_PDFS: Record<string, string> = {
+  source: 'DoW 2026 SBIR BAA FULL_R1_04132026.pdf',
+  topic: 'DoW 2026 SBIR CSO FULL_R1_04132026.pdf',
+};
+
+/**
+ * Build the fixture from the PDFs committed in docs/, caching the extraction.
+ *
+ * Extracting 433 pages takes a few seconds, so it is cached — but the PDFs are the source of
+ * truth and they are in the repo, so this drive is self-sufficient on any box with PyMuPDF. If
+ * that is missing it exits 2 NAMING the reason, rather than running against a smaller document and
+ * reporting a green that measured something else.
+ */
+function buildFixture(): void {
+  if (existsSync(CACHE)) return;
+  const missing = Object.values(SOURCE_PDFS).filter((f) => !existsSync(join(REPO, 'docs', f)));
+  if (missing.length) {
+    console.error(`\nHARNESS CANNOT RUN: missing source PDF(s) under docs/ — ${missing.join(', ')}\n`);
+    process.exit(2);
+  }
+  mkdirSync(dirname(CACHE), { recursive: true });
+  const py = `
+import json, sys
+try:
+    import pymupdf
+except ImportError:
+    sys.stderr.write("PyMuPDF not installed")
+    raise SystemExit(3)
+out = {}
+for kind, f in json.loads(sys.argv[1]).items():
+    d = pymupdf.open(f)
+    t = "\\n".join(p.get_text() for p in d)
+    out[kind] = {"filename": f.rsplit("/", 1)[-1], "pages": d.page_count, "chars": len(t), "text": t}
+    d.close()
+json.dump(out, open(sys.argv[2], "w"))
+`;
+  const paths = Object.fromEntries(Object.entries(SOURCE_PDFS).map(([k, f]) => [k, join(REPO, 'docs', f)]));
+  try {
+    execFileSync('python3', ['-c', py, JSON.stringify(paths), CACHE], { stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (e) {
+    const err = (e as { stderr?: Buffer }).stderr?.toString() ?? String(e);
+    console.error(`\nHARNESS CANNOT RUN: could not extract the source PDFs.\n  ${err.trim()}\n` +
+      `  Install PyMuPDF (pip install pymupdf) — this drive measures a REAL 433-page solicitation\n` +
+      `  and running it against anything smaller would report a green about a different document.\n`);
+    process.exit(2);
+  }
+}
 
 const owner = postgres(OWNER, { transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } }, max: 4 });
 const app = postgres(APP, { transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } }, max: 4 });
@@ -44,13 +100,14 @@ const n = (v: unknown) => Number(v ?? 0).toLocaleString();
 async function main() {
   console.log('\ndrive-corpus-copy-inward — mig 238, on a real solicitation\n');
 
-  // ── Fixture: two real documents of the DoW 2026 SBIR set ───────────────────────────────────
+  // ── Fixture: two real documents of the DoW 2026 SBIR set, from the PDFs in docs/ ────────────
   type Doc = { filename: string; pages: number; chars: number; text: string };
+  buildFixture();
   let fixture: Record<string, Doc>;
   try {
-    fixture = JSON.parse(readFileSync(DOCS, 'utf8'));
-  } catch {
-    console.error(`\nFIXTURE MISSING: ${DOCS}\nExtract it from the PDFs in docs/ first (see the header).`);
+    fixture = JSON.parse(readFileSync(CACHE, 'utf8'));
+  } catch (e) {
+    console.error(`\nHARNESS DEFECT: the extracted fixture at ${CACHE} did not parse.\n${e}\n`);
     process.exit(2);
   }
 

@@ -291,6 +291,11 @@ DRIVES=(
   "tenant-workflow-setup|scripts/drive-tenant-workflow-setup.mts"
   "scout-intake|scripts/drive-scout-intake.mts"
   "opp-scout|scripts/drive-opp-scout.mts"
+  # mig 238 — the solicitation copied inward, on the REAL DoW 2026 SBIR set (433 pages, 1.32M
+  # chars). Red first: it refuses a verdict (exit 2) if the corpus already exists, because a green
+  # that was already green measures nothing. It stages documents and republishes, so it prints its
+  # mutation footprint and restores what it staged.
+  "corpus-copy-inward|scripts/drive-corpus-copy-inward.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
