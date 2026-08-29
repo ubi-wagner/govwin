@@ -1,5 +1,9 @@
 # Opportunity ingest → ranking — where the matching actually breaks
 
+> **SUPERSEDED — see `docs/OPPORTUNITY_MATCHING.md`.**
+> This file is kept for the record: it shows the reasoning as it stood, including the two places it
+> turned. The consolidated analysis carries the corrected design and the measurements that decided it.
+
 **Question:** an open topic that mentions manufacturing should reach an electronics researcher whose
 work fits it. Today it does not. Why, and what is worth fixing?
 **Method:** traced the live path and measured every stage against the sandbox corpus.

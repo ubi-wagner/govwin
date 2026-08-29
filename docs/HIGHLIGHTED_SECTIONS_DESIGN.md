@@ -1,5 +1,9 @@
 # Highlighted Sections — a curated matching corpus, visible to the tenant
 
+> **SUPERSEDED — see `docs/OPPORTUNITY_MATCHING.md`.**
+> This file is kept for the record: it shows the reasoning as it stood, including the two places it
+> turned. The consolidated analysis carries the corrected design and the measurements that decided it.
+
 **Supersedes** initiative I1 in `docs/OPPORTUNITY_MATCHING_ANALYSIS.md`, which proposed matching
 against `full_text`. That was wrong for a reason worth recording.
 
