@@ -190,3 +190,92 @@ mixed table silently leaves half the library outside the semantic axis.
 `selectForSection` behaves exactly as it does today, and turning it on later costs one backfill and
 about a dollar. That is a genuinely cheap option to keep open — which is the argument for deciding
 properly rather than quickly.
+
+---
+
+## 8 · Reconsidered — the axis is on the wrong side
+
+*Added after a challenge worth more than the original recommendation: atoms are curated, tagged, and
+revolve around the same teams and technologies each time; they are also rewritten by the drafter. So
+the marginal value of neural retrieval there is small. Opportunity ingestion and ranking is where the
+vocabulary is actually open.*
+
+**That is right, and the measurements say so.**
+
+### The atom side is a CLOSED vocabulary
+
+| Tenant | Atoms | Distinct tag values | Atoms per tag |
+|---|---:|---:|---:|
+| rfp-pipeline | 303 | 37 | 8.2 |
+| entrepreneurs-center | 303 | 37 | 8.2 |
+| immobileyes | 224 | 25 | 9.0 |
+
+And the tag dimensions are tiny controlled sets: `vehicle` 6 values, `context` 5, `kind` 4, `topic` 4,
+`agency` 3, `form` 3, `format` 3, `program` 3.
+
+**Thirty-seven tag values covering three hundred atoms.** That is not a synonym problem. The tenant
+authored both the atoms and the tags, in their own vocabulary, about their own recurring teams and
+technologies. Add that the drafter *rewrites* whatever it retrieves — retrieval only has to put the
+right general material in front of the model, not the perfect paragraph — and the case for a neural
+axis here is genuinely thin.
+
+### The ranking side is an OPEN vocabulary, and it is matched with `String.includes`
+
+`scoreCard`'s keyword factor is `hits / keywords.length`, where a hit is `keywordHit` — a lowercased
+**substring** test, with a word-boundary rule for tokens ≤3 chars. No stemming, no synonyms, no
+term weighting.
+
+Against the sandbox's own hand-curated data, where the keywords were *chosen* to match:
+
+```
+45 bucket scores · 19 with a keyword factor of exactly 0   → 42% literal miss
+```
+
+On real solicitations — written by agencies, in agency vocabulary, that the tenant never chose — it
+is worse by construction. A tenant whose bucket says `additive manufacturing` scores **zero** against
+a topic that says *directed energy deposition* or *large-format polymer extrusion*.
+
+**So the semantic axis sits where the vocabulary is closed and controlled, and is absent where it is
+open and adversarial.** That is backwards.
+
+### But the fix is not embeddings, and "Claude vectorizing" is not a thing
+
+**Anthropic does not offer an embeddings API.** That is exactly why `lib/embeddings.ts` calls Voyage
+"Anthropic's recommended embeddings partner" — the recommendation exists because there is no
+first-party option. So the in-boundary choice is not Claude-vs-Voyage.
+
+Three real options, cheapest first:
+
+**1 · Postgres, already installed, costs nothing.** `pg_trgm` and `tsvector` full-text search are both
+in the database as of migration 001. Stemming, stop words, term-frequency ranking and trigram
+fuzziness are all strictly better than `text.includes(k)`, need no subprocessor, and no data leaves.
+This is the obvious first move and it is currently unused for ranking.
+
+**2 · `scoring_strategist` — already designed, registered, and dormant.** The archetype exists:
+
+> *LLM-based scoring overlay on top of algorithmic scores, evaluating tenant-specific fit factors
+> that algorithms cannot capture.* Triggers on `finder.opportunity.ingested`; reads the tenant
+> profile (NAICS, keywords, agency history, tech focus) and past win/loss outcomes; outputs a score
+> adjustment of −15 to +15 **with a rationale, a factor breakdown, and a confidence level**. Runs on
+> Haiku. Per-tenant isolated.
+
+This is better than a vector axis for this job, for a reason a cosine cannot match: **it explains
+itself.** A customer asking "why is this ranked third?" gets sentences, not a similarity score. It
+also recalibrates on `capture.proposal.outcome_recorded` — the ranking learns from what that tenant
+actually won. And it stays inside the Anthropic boundary already in use, adding no new subprocessor.
+
+Cost is bounded and small: one Haiku call per opportunity per tenant. At 100 tenants × 50 new
+opportunities a month, roughly **$20–25/month platform-wide**, under the same caps as every other
+agent.
+
+**3 · Self-hosted open-weights embeddings**, if a vector axis is genuinely wanted later. Runs in the
+pipeline container, no data leaves, no per-token fee — at the cost of owning the ops.
+
+### Revised recommendation
+
+- **Ship V1 with the vector axis OFF.** It is inert by default; nothing changes.
+- **Do not buy Voyage yet.** The governance work in §4 is real, and it buys the smaller of the two wins.
+- **Fix ranking instead, in order:** full-text/trigram matching first because it is free and in-boundary,
+  then wake `scoring_strategist`, which is the capability this problem was already designed around.
+- Revisit embeddings only if a tenant library grows past the point where 37 tag values describe it —
+  and then evaluate self-hosted first.
