@@ -416,6 +416,101 @@ derived from their own uploaded past performance rather than a blank form and a 
 
 ---
 
+## 8c · Coupling them tightly, at zero steady-state cost
+
+**The constraint:** the two sides should converge by construction, with all cost paid at the two
+moments a human is already present — **opportunity ingest** on the admin side, **onboarding and
+bucket creation** on the tenant side. Nothing at match time, nothing at render time, no model call,
+no scan. After setup the coupling must be free.
+
+### The two sides populate DISJOINT dimensions
+
+This is the measurement that reframes everything above.
+
+| Dimension | Opportunity side | Bucket side | |
+|---|---|---|---|
+| `agency` | **22 / 22** populated | **0 / 5** buckets set it | one side ready, the other never asked |
+| `program_type` | **22 / 22** populated | 1 / 5 | one side ready, the other barely asked |
+| `set_aside` | 4 / 22 | 0 / 5 | thin on both |
+| `naics` | **0 / 22** | 0 / 5 | **empty on both — matching it is impossible today** |
+| `keywords` | *(free text, 296 chars)* | **5 / 5** | the only dimension both populate |
+
+**The two sides intersect on exactly one dimension, and it is the substring test over 296
+characters.** Agency and programme are fully populated on the opportunity side and simply never
+requested from the tenant. NAICS is asked for on neither and would match nothing if it were.
+
+So two dimensions are **already free wins requiring no ingest work at all** — the data is there,
+100% populated, and the tenant is never given the chance to use it.
+
+### The trap: a shared vocabulary only couples if both sides speak it
+
+`taxonomy_terms` holds a clean agency vocabulary — `army navy air_force space_force darpa mda dha
+socom dla diu osd nih nsf cdmrp arpa_h arpa_e other`. The opportunities carry free text:
+
+```
+Department of the Navy              — not in taxonomy
+Department of the Navy (DON)        — not in taxonomy      ← the same agency, twice
+Department of the Air Force         — not in taxonomy
+National Science Foundation         — not in taxonomy
+National Science Foundation (NSF)   — not in taxonomy      ← and again
+NASA · Department of Energy · Ohio Third Frontier · …
+```
+
+**Zero of twelve distinct agency values appear in the taxonomy**, and the free-text field has already
+fragmented into variants of the same agency.
+
+> ⚠️ **This means B3 shipped alone would make matching worse.** A dropdown giving the tenant `navy`
+> produces a criterion that matches **nothing**, because `scoreCard`'s agency test is
+> `agency.includes(criterion)` against free text reading *"Department of the Navy (DON)"*. Clean
+> vocabulary on one side of an uncontrolled join is a confident, silent regression.
+
+### The design — bind both sides to one vocabulary, at the moments already staffed
+
+```
+  INGEST (admin, once per solicitation)        TENANT (once at onboarding / bucket creation)
+  ────────────────────────────────────         ──────────────────────────────────────────────
+  shredder PROPOSES taxonomy terms             profile + library PROPOSE taxonomy terms
+  admin CONFIRMS at the curation gate          tenant CONFIRMS from dropdowns
+            │                                              │
+            └──────────────► taxonomy_terms ◄──────────────┘
+                          (one controlled vocabulary)
+                                   │
+                          array intersection on
+                          normalised slugs — indexed,
+                          deterministic, explainable
+                                   │
+                          ZERO cost at match time
+```
+
+**C1 · Normalise the opportunity onto the taxonomy at curation.** The shredder proposes
+(`Department of the Navy (DON)` → `navy`); the admin confirms in the same review already required for
+release. Store the normalised slugs alongside the free text — never replacing it, because the
+published wording is what the tenant should read.
+
+**C2 · The tenant picks from the same vocabulary.** Dropdowns at bucket creation, prefilled from the
+profile (B1) and suggested from the library (B2). The tenant never types an agency name again.
+
+**C3 · Match by set intersection on the normalised columns.** Indexed array overlap, not substring
+search. Deterministic, explainable — *"matched: navy, sbir"* — and it costs a bitmap index scan.
+
+**C4 · Keywords keep their free-text path,** now against the highlight corpus (§6). That dimension is
+genuinely open and should stay open; the point of C1–C3 is to stop it carrying 67% of the weight
+alone.
+
+### Why this satisfies the constraint
+
+| | |
+|---|---|
+| **System load** | one array column per side, indexed. Matching gets *cheaper* — an intersection replaces N substring scans |
+| **User load** | zero new moments. The admin already reviews before release; the tenant already creates a bucket. Both become *confirm* rather than *type* |
+| **AI load** | zero at match time. The shredder's proposal is part of the ingest pass that already runs; nothing is called per score, per render or per tenant |
+| **Steady state** | free. Both sides bound once; every match afterwards is set arithmetic |
+
+The coupling is tight **because both sides are constrained to the same closed vocabulary at the only
+moments a human is present** — not because anything clever happens later.
+
+---
+
 ## 9 · Sequence
 
 1. **Carry admin annotations onto the card and match them.** Wiring, not invention; immediately useful
@@ -428,9 +523,11 @@ derived from their own uploaded past performance rather than a blank form and a 
    confirm-and-correct rather than find-and-type — the right division given the variety the shredder
    meets.
 5. **Summary generation from highlights, regenerable at the gate**, with provenance.
-5b. **Bucket authoring: prefill (B1), the weight-consequence line (B4), taxonomy dropdowns (B3).**
-   B4 alone is a few hours and tells every tenant why their lens is fragile. Do it early — it is the
-   cheapest item in this entire document and it changes behaviour rather than code.
+5b. **Bucket authoring: prefill (B1) and the weight-consequence line (B4).** B4 alone is a few hours
+   and tells every tenant why their lens is fragile. Do it early — the cheapest item in this document,
+   and it changes behaviour rather than code.
+5b-ii. **Taxonomy normalisation, BOTH SIDES TOGETHER (C1–C3).** Never the dropdown alone: a clean
+   vocabulary on one side of an uncontrolled join is a silent regression (§8c).
 5c. **Library-derived suggestions (B2) and `onboarding_agent` (B6).**
 6. **`scoring_strategist`, last.** An LLM overlay on 296 characters inherits the same blindness; over a
    curated corpus it is doing the job it was designed for. ~$20–25/month platform-wide at 100 tenants.
