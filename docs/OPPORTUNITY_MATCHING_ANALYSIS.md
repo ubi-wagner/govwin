@@ -147,6 +147,26 @@ summary compresses away.
 
 ## 5 · Improvement initiatives, by leverage ÷ cost
 
+### I1 · Widen the ranking corpus — **SUPERSEDED, see docs/HIGHLIGHTED_SECTIONS_DESIGN.md**
+
+> ⚠️ As first written this said "match against `full_text`". That is wrong, and wrongly in the
+> dangerous direction. A solicitation is mostly FAR clauses, disclaimers and submission mechanics —
+> text near-identical across every BAA. Matching it does not add noise, it **inverts the signal**:
+> nearly every federal solicitation says "manufacturing" somewhere in a domestic-sourcing clause, so
+> a bucket keyed on it hits everything, and because the keyword factor is `hits / keywords.length`
+> boilerplate makes hits cheap enough that a genuine match and an accidental one score identically.
+> It gets worse as documents get longer, which is exactly backwards.
+>
+> The corpus must be **curated, not raw** — the text something deliberately marked as meaningful,
+> from `solicitation_annotations` (the admin capability is already built and unused) and
+> `pattern-extract`'s excerpts (already produced, currently only for compliance rules). Boilerplate
+> never enters because nothing highlights it: the absence of a highlight is the filter.
+>
+> Full design, including the tenant-visible "Sections Highlighted by System or Admin" panel and a
+> regenerable summary: **docs/HIGHLIGHTED_SECTIONS_DESIGN.md**.
+
+#### The original, for the record
+
 ### I1 · Widen the ranking corpus to `full_text` — **do this first**
 
 The data is already retained, already tenant-agnostic (it lives on the master solicitation, not the
