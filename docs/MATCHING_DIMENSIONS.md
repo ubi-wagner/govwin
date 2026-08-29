@@ -357,6 +357,20 @@ should see *"matched at the cross-agency level"* and be able to narrow to the na
 care. Presenting a bridge match as though it were a native one is the same class of error as
 presenting a `default` value as though it were read from the source.
 
+### 11.3 Consequences for the three surfaces
+
+- **Onboarding** captures the bridge axis for **everyone**, plus native classifiers as *optional
+  depth* for the agencies a company actively pursues. See §11.4 — the distinction between what a
+  company is **asked to fill in** and what it is **shown** is load-bearing, and an earlier draft of
+  this document got it wrong.
+- **Ingest** records the native classifier as stated — with its provenance citation — and derives the
+  bridge term. Derivation is a mapping table, not a model: deterministic, reviewable, and correctable
+  by an admin.
+- **Buckets** may name either layer. A DoD-focused lens names CTAs; a technology-agnostic lens names
+  bridge terms; both work, and the score says which layer matched.
+
+---
+
 ### 11.4 Effort is scoped. Reach is not. — the correction that matters most
 
 An earlier draft said onboarding should be *"agency-scoped: a firm that only does NIH work should
@@ -427,20 +441,6 @@ precision, offered per agency.** Filling in more improves ranking accuracy withi
 in nothing beyond the floor still reaches every agency. Nothing a company declines to fill in ever
 narrows what it sees.
 
-### 11.3 Consequences for the three surfaces
-
-- **Onboarding** captures the bridge axis for **everyone**, plus native classifiers as *optional
-  depth* for the agencies a company actively pursues. See §11.4 — the distinction between what a
-  company is **asked to fill in** and what it is **shown** is load-bearing, and an earlier draft of
-  this document got it wrong.
-- **Ingest** records the native classifier as stated — with its provenance citation — and derives the
-  bridge term. Derivation is a mapping table, not a model: deterministic, reviewable, and correctable
-  by an admin.
-- **Buckets** may name either layer. A DoD-focused lens names CTAs; a technology-agnostic lens names
-  bridge terms; both work, and the score says which layer matched.
-
----
-
 ## 12 · What this changes in the plan
 
 | Item | Change |
@@ -462,6 +462,11 @@ should be decided before it is built rather than after it rots.
 ---
 
 ## 13 · Where vocabulary maintenance lives — scouts and ingest
+
+> **⚑ OVER-SCOPED — see §15.** This section builds a live, scout-driven vocabulary-learning
+> apparatus for something that changes **once a year**. The detection instinct is right; the machinery
+> is too heavy for the cadence. §15 is the sharpened version, and it also corrects a conflation
+> running through §11–§14: **the bridge is not what a bucket is made of.**
 
 **Yes. And it is stronger than a maintenance convenience: it is the only place that can be current.**
 
@@ -568,3 +573,111 @@ The maintenance belongs in scouts and ingest, and I would build it in this order
 The thing I am least sure of is **band and vocabulary granularity** — how coarse the bridge must stay
 to remain useful. That is empirical, and D1 (validate against a real topic corpus) is where it gets
 answered. I would not fix the bridge's size by argument.
+
+
+---
+
+## 15 · Sharpened — three layers, three cadences
+
+Two corrections, both of which *remove* machinery rather than add it.
+
+### 15.1 The bridge is not the bucket
+
+§11–§14 slid between these as though they were one thing. They are not:
+
+| | **Bridge / agency floor** | **Bucket** |
+|---|---|---|
+| Owned by | the platform — rfp_admin | the tenant |
+| Scope | shared, cross-tenant | one tenant, one lens |
+| Granularity | deliberately coarse | **whatever the tenant wants** |
+| Purpose | *reach* — can this opportunity cross agency lines to me at all? | *priority* — what am I standing-watching for? |
+| Changes | annually | whenever the tenant edits it |
+
+**The bridge is what lets a bucket reach across agencies. It is not what a bucket is made of.** A
+tenant's lens can be as specific as they like — *"solid-state cooling for directed-energy thermal
+management"* — and that specificity has nothing to do with the floor vocabulary. Requiring buckets to
+be expressed in bridge terms would flatten exactly the precision a tenant is trying to express.
+
+### 15.2 The floor moves annually. Stop treating it like a stream.
+
+NSF added one directorate in 2022. NIH's institutes are effectively static. DoD's CTA list has been
+revised a handful of times. DARPA renames offices occasionally.
+
+**That is an annual review, not a live drift-detection system.** §13's machinery — scouts learning
+vocabulary, N=1 firing, a proposal queue, version stamping on every change — is built for a cadence
+that does not exist.
+
+What survives, and it is small:
+
+- **Ingest flags an unrecognised native term.** Cheap, already reading the document, and it is the
+  only signal that actually matters — *"this solicitation names something our floor does not know."*
+- **An annual review** consumes those flags, plus the year's published priority updates, and updates
+  the floor and the priority weights together.
+- **Priority weights are annual too** — fiscal-year shaped, set at the same review. No expiring
+  overlay, no effective-date machinery, no scout stream.
+
+That is the whole maintenance story. One scheduled act, fed by a flag the ingest already produces.
+
+### 15.3 The real work is per-topic, and no vocabulary reaches it
+
+This is the correction that matters most.
+
+> **Two topics both tagged *Advanced Materials* can be entirely different work.** One is ceramic
+> matrix composites for hypersonic leading edges; the other is self-healing polymer coatings for
+> corrosion control. Same CTA. Same bridge term. Different companies, different facilities, different
+> everything.
+
+**The vocabulary gets an opportunity into the right neighbourhood. It cannot discriminate within
+it** — and no amount of growing it ever will, because the distinction is not lexical. It is in the
+topic's own technical content.
+
+That discrimination is **case by case, per solicitation**, and it is carried by the mechanisms this
+analysis started with before it went down the vocabulary path:
+
+- the **highlight corpus** (§6 of the companion) — the topic's own technical language, curated
+- **maturation** — stated per topic, extracted per topic
+- **free-text keyword matching** over that corpus — with stemming, per M3
+- the tenant's own free-text lens language
+
+**This also gives the "don't grow the bridge" rule a better reason than the one in §13.** It is not
+mainly that a 400-entry bridge is an invisible gap — it is that **fine discrimination is a different
+mechanism entirely**, so enlarging the coarse layer degrades routing without improving matching. You
+cannot vocabulary your way to per-topic precision.
+
+### 15.4 The model, in three layers
+
+```
+  ANNUAL     agency floor / bridge      "is this even in my universe?"
+             small · reviewed · platform-owned · flags from ingest
+                        │  routes
+                        ▼
+  TENANT     bucket                     "what am I standing-watching for?"
+             any granularity · tenant-owned · edited when they choose
+                        │  prioritises
+                        ▼
+  PER-TOPIC  highlight corpus           "does THIS topic fit THIS company?"
+             + maturation + free text · curated at ingest, per solicitation
+                        │  discriminates
+                        ▼
+                    the ranking
+```
+
+**Coarse routes. Tenant prioritises. Fine discriminates.** Each layer has a different owner, a
+different cadence, and a different mechanism — and the failure of the earlier sections was asking one
+of them to do another's job.
+
+### 15.5 What changes in the plan
+
+| Item | Change |
+|---|---|
+| §13 scout vocabulary-learning | **cut to a flag** — ingest reports unrecognised native terms; no queue, no N=1 detector, no auto-proposal |
+| Priority overlay with effective dates | **cut** — annual weights set at the same review |
+| Taxonomy versioning | **keep, simplified** — annual versions, not per-change |
+| D5 bridge coverage instrument | **keep** — still the only guard against invisible absence, and cheap to run annually |
+| D6 symmetric derivation + match explanation | **keep unchanged** — both still required |
+| Bucket granularity | **corrected** — buckets are NOT expressed in bridge terms; they may be as specific as the tenant likes |
+| Everything per-topic (highlights, maturation, tsvector) | **unchanged, and now clearly the main event** |
+
+**Net: the vocabulary work shrinks to an annual review plus one ingest flag, and the effort moves back
+to the per-topic layer** — which is where the companion analysis had it before §10–§14 went looking
+for a taxonomy to solve a discrimination problem.
