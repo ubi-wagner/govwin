@@ -23,9 +23,9 @@ things already in the system.
 | **1 · abstention** | ✅ all five factors guard both sides; a non-matching value is still a real 0. **0 of 45 stored pairs moved** — latent while buckets stay thin, exactly as F11 predicted, and no longer a trap under step 4 |
 | **2 · `tech_focus_areas`** | ✅ plus `phaseType`, `topicNumber`, `topicBranch`, `topicStatus`, `pocName`, `pocEmail`, and a document manifest |
 | **3 · the corpus** | ✅ **not** the planned join, and **not** blocked. `tenant_opportunity_documents` (mig 238) holds each source document per tenant with a GENERATED `text_tsv`; one SQL pre-pass feeds a `corpus` factor to the still-pure scorer. Ranking reads **no master table at all** |
-| **4 · tenant side** | pending — prefill and the composition line |
-| **5 · attribution** | pending — `proposals.source_bucket`, `origin_card.bucket` |
-| **6 · re-measure** | partially done; see the numbers below |
+| **4 · tenant side** | ✅ prefill from `tenant_profiles` (fills, never replaces; an empty profile says so) + a composition line computed off `DEFAULT_WEIGHTS`, the table `scoreCard` itself reads. Driven as all three actors, the delegated one in **both** directions |
+| **5 · attribution** | ✅ and F13 was misdiagnosed: the write EXISTED, in a route whose own comment says the product never calls it. One shared `resolveSourceBucket` now backs both paths. Existing rows deliberately **not** backfilled |
+| **6 · re-measure** | ✅ below |
 
 **Measured on a real 433-page solicitation** (`drive-corpus-copy-inward.mts`, 16 checks, red first;
 `measure-ranking-change.mts`):
@@ -45,6 +45,23 @@ consumer selects by `document_type` and there is no order to get wrong.
 **R1 is now cheap and still not done.** The drafter's `full_text[:18000]` prefix has its fix sitting
 right there — per-document text, selectable by type — but it is a different consumer, so it stays
 out of this push until asked for.
+
+### Step 6 · the four motivating numbers
+
+| | before | after |
+|---|---|---|
+| ranking corpus | **296 chars** | **660,425** per copied document — 2,231× |
+| literal miss rate | 42% of scored cards | **4 scores now exist that did not**, on a card whose own text matched none of their keywords |
+| score gap on a miss | 12 vs 50 of 100 | those four moved **0 → 33** |
+| keyword share of the score | 67%, invisible | **stated on the form**, computed from the scorer's own table |
+
+Re-ranking is **idempotent**: a second full pass moves nothing. And the abstention fix moved **0 of
+45** stored pairs — latent while buckets stay thin, exactly as F11 predicted, which is why it had to
+land before prefill rather than after.
+
+**Honest limit.** One of nine opportunities on this box carries a corpus, because one is all that has
+been through a real ingest. The mechanism is proven end to end on a real 433-page solicitation; the
+*population* is a seeding question, not a code one.
 
 ---
 
