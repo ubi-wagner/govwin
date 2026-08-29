@@ -1,9 +1,50 @@
 # Plan of action — connecting what already exists
 
 Built directly from the thirteen findings in `ALIGNMENT_INGEST_TO_RANKING.md`. Every step connects
-things already in the system. **No new architecture, no new vocabularies, no new tables.**
+things already in the system.
 
 **Six steps.** Steps 0–3 are the work; 4–5 make it usable and measurable.
+
+---
+
+## Status — steps 0, 1, 2 and 3 are SHIPPED (mig 238)
+
+> The one architectural decision this plan did not anticipate: **copy the solicitation inward.**
+> The plan assumed the ranking corpus would be reached by a mirror-anchored JOIN to the master, and
+> that was overruled for a reason stronger than isolation — **the master is mutable.** An amendment
+> re-shreds `full_text`, so a tenant ranking against a joined master would see stored scores move
+> with no bridge version, no card update and no audit, which is the one thing a forward-only bridge
+> exists to prevent. The copy makes the corpus versioned WITH the card, so a score is reproducible
+> from the row that produced it. So there IS one new table, and it earns its place.
+
+| | |
+|---|---|
+| **0 · parity harness** | ✅ `verify-scorer-parity.mjs`, 37 fixtures, red-tested twice, wired into the branch suite so a divergence FAILS the run. Needed `lib/bucket-scoring.ts`, a zero-import leaf. **It found a live divergence before the comparator ran**: `new Date('Fri Aug 28')` is valid in JS and raises in Python |
+| **1 · abstention** | ✅ all five factors guard both sides; a non-matching value is still a real 0. **0 of 45 stored pairs moved** — latent while buckets stay thin, exactly as F11 predicted, and no longer a trap under step 4 |
+| **2 · `tech_focus_areas`** | ✅ plus `phaseType`, `topicNumber`, `topicBranch`, `topicStatus`, `pocName`, `pocEmail`, and a document manifest |
+| **3 · the corpus** | ✅ **not** the planned join, and **not** blocked. `tenant_opportunity_documents` (mig 238) holds each source document per tenant with a GENERATED `text_tsv`; one SQL pre-pass feeds a `corpus` factor to the still-pure scorer. Ranking reads **no master table at all** |
+| **4 · tenant side** | pending — prefill and the composition line |
+| **5 · attribution** | pending — `proposals.source_bucket`, `origin_card.bucket` |
+| **6 · re-measure** | partially done; see the numbers below |
+
+**Measured on a real 433-page solicitation** (`drive-corpus-copy-inward.mts`, 16 checks, red first;
+`measure-ranking-change.mts`):
+
+```
+ranking corpus          296 chars  →  660,425 mean per document      2,231×
+corpus lexemes vs card       35    →  11,409                           326×
+scores that exist ONLY because the solicitation matched:  4
+   (corpus 100, keyword 0 — the card's own text matched none of them)
+storage                 9,245,943 chars → 21 MB   (16 MB TOAST + 5 MB GIN)
+```
+
+**R2 is dissolved rather than done.** *"Does the topic land at char 20,000 or char 1,040,000?"* was
+only a question because `full_text` is a concatenation. The copy keeps documents **separate**, so a
+consumer selects by `document_type` and there is no order to get wrong.
+
+**R1 is now cheap and still not done.** The drafter's `full_text[:18000]` prefix has its fix sitting
+right there — per-document text, selectable by type — but it is a different consumer, so it stays
+out of this push until asked for.
 
 ---
 

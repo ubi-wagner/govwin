@@ -16,6 +16,37 @@ cosine similarity** off a per-atom pgvector index (`atom_embeddings`, mig 171, t
 when a **gated** engine is on — Voyage in prod (`VOYAGE_API_KEY`) or a dependency-free local-hash
 embedder (`ATOM_EMBED=local`); **inert by default** → byte-for-byte the pre-vector selector, zero
 regression. Isolation proven at rest · RLS · app-layer (docs/SEMANTIC_RETRIEVAL.md; `lib/embeddings.ts`).
+**The solicitation itself is COPIED INWARD (mig 238) — the mirror is now self-sufficient in fact,
+not just in the comment.** `tenant_opportunity_documents` holds each source document per tenant
+(FORCE-RLS, `text_tsv` GENERATED + GIN), copied by the bridge fan-out **before** the cursor, the
+`card.applied` emit and the synchronous score — ordering is load-bearing, or a card's first sighting
+ranks on the blurb. The alternative — a mirror-anchored JOIN out to `curated_solicitations` — works
+and is safe, and was rejected because **the master is MUTABLE**: an amendment re-shreds `full_text`,
+so a tenant ranking against a joined master would see stored scores move with no bridge version, no
+card update and no audit. The copy makes the corpus **versioned with the card**, so a score is
+reproducible from the row that produced it. **Per document, never one concatenation** — which
+dissolves the "does the topic land at char 20,000 or 1,040,000" question entirely, since a consumer
+selects by `document_type` rather than by offset. The bytes are NOT on the card: `opportunity_bridge`
+is append-only, so corpus-in-card would rewrite a megabyte per republish forever, and the card jsonb
+is TOASTed as a unit so every feed query would pull it — the bridge carries a MANIFEST, the tenant
+row carries the bytes. The card also finally carries `techFocusAreas` · `phaseType` · topic identity ·
+POC, plus `card_tsv` (GENERATED over the payload, and the only index containing `spotlight_summary`,
+which lives on `curated_solicitations` and so is structurally absent from `opportunities.full_text_tsv`
+— a trigger over five identity columns, mean 25 lexemes, that is NOT a document index despite its
+name). Ranking reads **no master table at all**. Measured on the real 433-page DoW 2026 SBIR set:
+296 chars → 660,425 per document (2,231×), 35 → 11,409 lexemes, 9.2M chars → 21 MB stored, and **4
+scores that exist only because the solicitation matched where the card's own text did not**.
+`drive-corpus-copy-inward.mts` (16 checks, red first) · `measure-ranking-change.mts`.
+**The two scorers are now ASSERTED to be a mirror pair**, not asserted-by-comment: `scoreCard`
+(`lib/bucket-scoring.ts` — a zero-import LEAF, split out so a pure function needs no DATABASE_URL to
+be tested) ↔ `score_card` (`rescore.py`), diffed over 37 shared fixtures by
+`verify-scorer-parity.mjs`, wired into `run-branch-drives.sh` where a divergence **fails the run**.
+It found a live divergence before the comparator ran: `new Date('Fri Aug 28')` is VALID in JS (2001,
+a year V8 invented) and raises in Python, so the same card got different denominators — `closeMs()`
+now requires ISO and assumes UTC when no zone is given. **Absent is not zero**: all five factors
+guard both sides, so a card is never charged for what ingest failed to capture, while a
+*non-matching* value still scores a real 0. A `corpus` factor (default weight 0.75, below keyword's
+1) comes from one SQL pre-pass over the tenant's own documents and **abstains when null**.
 The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and now **DROPPED**
 (mig 125, alongside 11 other superseded tables; the `library_units` family went in mig 121) —
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
@@ -26,7 +57,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 2484 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 2502 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +89,7 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **237** — mig 237 the freeze trigger that returned NEW on a DELETE and so
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **238** — mig 237 the freeze trigger that returned NEW on a DELETE and so
 cancelled it silently, leaving children without parents through a CASCADE; migs 228–236 the post-award build-out: 229 the milestone cost
 baseline after 228 collapsed `project_wbs_nodes` into `project_milestones`, 230 contract
 modifications, 231 invoicing, 232 the CDRL register, 233/234 the CLIN child-cascade correction,
@@ -429,7 +460,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (2484 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (2502 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and
