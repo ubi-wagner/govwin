@@ -532,12 +532,15 @@ against whether the opportunity side can actually feed it:
 
 ### The rule this makes explicit
 
-> **Never add a bucket dimension whose opportunity-side field is unpopulated.**
+> ~~**Never add a bucket dimension whose opportunity-side field is unpopulated.**~~
+> **Superseded by §8e.** This rule mistook a *bug* for a *constraint*: four of six factors score a
+> card **0** for the ingest side's missing data instead of abstaining. Fix the abstention and the
+> restriction disappears — dimensions become additive and optional on both sides, which is the
+> better design.
 
-Every one of them produces a criterion that silently matches nothing — and a tenant reads that as
-*"nothing fits me"*, not *"this filter is inert."* It is the agency-dropdown trap (§8c) with a
-different label, and the sequence is always the same: **populate the ingest side, then expose the
-criterion.**
+The reasoning that produced the wrong rule is still worth keeping, because it is right about *today's
+behaviour*: a criterion whose opportunity-side field is empty currently drags every score down. It is
+the agency-dropdown trap (§8c) in a different form. §8e fixes the cause rather than working around it.
 
 ### The one free expansion
 
@@ -580,6 +583,97 @@ topic matchable.
 
 ---
 
+## 8e · Abstain, don't zero — the change that makes optional classifiers safe
+
+*Written after a challenge to §8d: why not offer classifiers — types, systems, technology focus areas
+— on **both** sides, at the RFP-admin ingest and at bucket creation, adding specificity when selected
+and restricting nothing when not?*
+
+**That is right, and §8d's rule was wrong.** It treated the opportunity side as a fixed given and
+concluded "do not add the dimension." The better move is to populate both sides at the same two human
+moments — and the only thing standing in the way is a scoring bug.
+
+### Four of six factors penalise a card for the INGEST side's missing data
+
+```js
+if (criteria.agencies?.length) {                    // ← guards the BUCKET side only
+  const a = (card.agency ?? '').toLowerCase();      // ← absent card data becomes ''
+  parts.push({ key:'agency', v: …some(…) ? 1 : 0 }) // ← scores ZERO, and enters the denominator
+}
+```
+
+`agency`, `naics`, `program` and `accessibility` all do this. A card missing the field does not
+abstain — it **scores zero and still counts in the divisor**, so the card is punished for what the
+ingest side failed to record.
+
+**One factor gets it right, and says why:**
+
+```js
+if (criteria.useTimeline !== false && card.closeDate) {   // ← guards the CARD side too
+  if (Number.isFinite(t)) {
+    // "an invalid date must not change the denominator"
+```
+
+The newest factor already implements the correct principle. `rescore.py` mirrors both behaviours
+faithfully — the same four zero, and `if close_ms is not None` abstains.
+
+### Why this is latent today, and why that is the dangerous part
+
+No current bucket sets `naics` or `setAsides`, and `agency`/`programType` are 100% populated — so the
+bug bites nothing right now. **It is latent precisely because buckets are thin.**
+
+Which means it fires the moment a tenant does the sensible thing. And **B1 — prefill from the
+profile — is designed to do exactly that at scale**: it would push `naics` and `setAsides` into
+criteria, against card fields that are 0/22 and 0/63 populated, and every tenant's whole pipeline
+would score lower the day it shipped.
+
+> **Sequencing consequence: the abstention fix must land BEFORE prefill.** Otherwise the feature that
+> makes buckets richer is the feature that makes every score worse.
+
+### The rule, generalised
+
+> **A signal participates only when BOTH sides carry data. Absent either, it abstains — it does not
+> score zero, and it does not enter the denominator.**
+
+Applied consistently this is a small change to two mirrored files, and it is what makes the proposal
+in the challenge safe:
+
+- **Ingest side** — the admin tags an opportunity with types, systems, technology focus areas, from
+  an optional classifier set. Tags nothing? Those dimensions abstain for that card. No penalty.
+- **Tenant side** — the bucket selects from the same set. Selects nothing? Those dimensions never
+  enter their scoring. Already the behaviour.
+- **Both selected** — the dimension participates, adding real specificity.
+
+**Specificity when present on both sides; silence when either is absent.** Nothing is restricted by
+not selecting, which is exactly the property asked for.
+
+### What this unlocks
+
+With abstention correct, adding optional classifiers is **strictly non-harmful**, so the §8d table
+stops being a list of blockers and becomes a list of candidates ordered by value:
+
+| Classifier set | Both sides | Notes |
+|---|---|---|
+| technology / focus areas | admin at curation · tenant at bucket creation | the open-topic case (§5) — the highest-value addition |
+| system / platform type | same | "unmanned surface vessel", "ground vehicle", "satellite bus" |
+| phase (I · II · D2P2) | same | `taxonomy_terms` already has 7 values |
+| award ceiling band | same | banded, not exact — a range is a classifier, a dollar figure is not |
+| NAICS · set-aside | same | now safe to offer even while thinly populated |
+
+The controlled-vocabulary discipline from §8c still applies to each: **both sides bind to one term
+list**, or the join is uncontrolled and matches nothing. And per the challenge's own premise,
+technology *descriptions* stay free text — the classifier is the coarse axis, the highlight corpus
+(§6) carries the specific language.
+
+### What §8d still gets right
+
+**Eligibility is not a scoring dimension.** Clearance, ITAR, cost-share and PI-must-be-employee are
+disqualifiers, and abstention does not help them: a weighted average still cannot express "cannot
+bid". Those stay a separate mechanic — hard filters evaluated before scoring, each carrying the
+reason it fired.
+
+---
+
 ## 9 · Sequence
 
 1. **Carry admin annotations onto the card and match them.** Wiring, not invention; immediately useful
@@ -590,8 +684,9 @@ topic matchable.
    fragile — the cheapest item in this document, and it changes behaviour rather than code.
 4. **The tenant panel (R1) and the document manifest (R2).** Small, and what makes admins *want* to
    annotate: the lift becomes visible to the customer instead of vanishing into a score.
-5. **Prefill bucket criteria from the profile (B1).** Zero new data; the tenant edits rather than
-   recalls.
+5. **Fix abstention in both scorers (§8e), THEN prefill from the profile (B1).** In that order:
+   prefill pushes `naics` and `setAsides` into criteria against card fields that are 0/22 and 0/63
+   populated, so shipping it first would lower every tenant's scores the day it landed.
 6. **Taxonomy normalisation — BOTH SIDES TOGETHER (C1–C3).** Shredder proposes, admin confirms at the
    gate; tenant picks from the same vocabulary; match by indexed array intersection.
    **Never the dropdown alone** — a clean vocabulary on one side of an uncontrolled join is a silent
