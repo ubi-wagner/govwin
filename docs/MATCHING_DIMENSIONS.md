@@ -458,3 +458,113 @@ DARPA's offices were reportedly renamed in 2026, NSF added TIP in 2022, DoD's CT
 revised more than once. A mapping table nobody maintains becomes a source of confidently wrong
 matches, which is worse than no bridge at all. It needs an owner and a review cadence, and that
 should be decided before it is built rather than after it rots.
+
+---
+
+## 13 · Where vocabulary maintenance lives — scouts and ingest
+
+**Yes. And it is stronger than a maintenance convenience: it is the only place that can be current.**
+
+§12 flagged the bridge mapping table as a maintained asset that rots. The answer is not a review
+meeting — it is that **the vocabulary already lives in the corpus flowing past us every day.** A DoD
+BAA instructs proposers to identify their OUSD(R&E) Critical Technology Area. An NSF solicitation
+names its directorate. An NIH funding opportunity carries its IC and activity code. We are already
+reading these documents for compliance extraction; the vocabulary is *in* the text we already parse.
+
+A hand-curated table drifts **by definition** — it can only be as current as the last person who
+remembered. The ingest stream sees the new term the day it is published.
+
+### Why the SCOUTS specifically, not just ingest
+
+Ingest sees solicitations. **Scouts see earlier.** The HITL source-scout and the crawler leads read
+outside our own intake — and agency priority shifts appear in strategy documents, budget requests,
+posture statements and press releases **before** they appear in a solicitation. NSF's TIP directorate
+existed as an announcement before it appeared in a topic; a revised CTA list is published as a memo
+first.
+
+So the scouts are the earliest possible detector, and the ingest is the confirmation that a term has
+actually entered use. Those are two different signals and both are useful.
+
+### The split that keeps this from ruining the taxonomy
+
+A solicitation carries **three different things**, and conflating them is the way this goes wrong:
+
+| What the document carries | Example | Where it belongs | Lifecycle |
+|---|---|---|---|
+| a **vocabulary term** | *"Integrated Sensing and Cyber"* is a CTA | taxonomy row, after human confirm | durable · versioned |
+| a **priority / emphasis shift** | *"continued focus on distributed, autonomous, resilient"* | weighting overlay with an effective date | time-boxed · expires |
+| **topic-specific language** | *"directed energy deposition"* | the highlight corpus (§6) | per-solicitation |
+
+> **The failure mode is promoting topic language to taxonomy rows.** Do that a few hundred times and
+> the bridge stops being coarse — and coarseness is the *only* property that makes it a bridge.
+> "Directed energy deposition" is not a technology area; it is how one topic said *additive
+> manufacturing*. It belongs in the corpus that matches free language, not in the vocabulary that
+> joins agencies.
+
+Priorities and vocabulary also have **different clocks**. A CTA list revision is durable. A
+departmental emphasis has a fiscal-year shape and should expire on its own rather than silently
+becoming permanent. Running both through one pipe is fine; giving them one lifecycle is not.
+
+### The mechanism already exists
+
+`scout_findings` is a general **detect → classify → review → release** queue: `kind`, `title`, `url`,
+`snippet`, `raw` jsonb, `classification`, `status`, `reviewed_by`, `reviewed_at`, and a release path.
+It carries one finding type today (opportunity leads, classified NEW vs UPDATE). A vocabulary finding
+is the same shape — machine-detected, human-reviewed, released or dismissed. Only `released_kind`'s
+`CHECK (… IN ('new','update'))` is opportunity-specific.
+
+**This is a widening of an existing queue, not a new subsystem.** That matters: it inherits the
+advisory posture, the injection fencing, the platform scope and the review UI already built.
+
+### Four disciplines it must keep
+
+**1 · Propose, never auto-adopt.** Same provenance ladder as everything else in ingest. A taxonomy
+that edits itself cannot be reasoned about — and worse, yesterday's rankings become unexplainable
+because the vocabulary moved underneath them.
+
+**2 · Version the vocabulary.** A score must be explicable against the terms *in force when it was
+computed*. This is the same discipline as `canvas_versions` and the frozen project baseline: the
+number is only meaningful alongside the thing it was measured against.
+
+**3 · Frequency is not authority — fire at N=1.** A brand-new priority appears rarely at first;
+rarity is what *new* looks like. A detector requiring several sightings always lags the thing it
+exists to catch. Fire on first sighting into the review queue and **let the human be the threshold** —
+cheap, because a human is already reviewing scout findings, and it puts the judgement where judgement
+belongs.
+
+**4 · Corpus coverage is vocabulary health.** If we ingest mostly DSIP, the vocabulary drifts
+DoD-shaped and NIH terms stay thin — which is §11.4's **invisible absence** arriving through a new
+door: a tenant never sees NIH work because the vocabulary never learned to describe it. D5's coverage
+instrument must measure *both* directions — unmapped native terms, and bridge terms with no mapping
+from an agency that plausibly funds them.
+
+### What I would not do
+
+**Do not let the agent write taxonomy rows.** The agent-workforce contract is *advisory → guardrail →
+land-or-review*, and a controlled vocabulary is precisely the kind of shared, cross-tenant state that
+should never be auto-written. The scout proposes; an rfp_admin confirms at a gate that already exists.
+
+**Do not merge the native vocabularies while learning them.** The temptation, once terms are flowing
+in automatically, is to let the bridge grow to fit them. Resist it: the bridge stays small by
+decision, and a native term that has no good bridge home should be **flagged as unmapped** rather than
+given a new bridge term of its own. An unmapped term is a visible gap; a bridge with 400 entries is an
+invisible one.
+
+---
+
+## 14 · My opinion, stated plainly
+
+The maintenance belongs in scouts and ingest, and I would build it in this order:
+
+1. **Detect and queue only** — scouts propose vocabulary findings into `scout_findings`; nothing acts
+   on them. This is worth doing even before the bridge exists, because it starts accumulating the
+   evidence that tells you what the vocabulary should be.
+2. **Version the taxonomy** before the first automated proposal lands, not after — retrofitting
+   versions onto scores already computed is not possible.
+3. **Human release at the existing gate**, reusing the scout review UI.
+4. **Priorities as a separate, expiring overlay** — never taxonomy rows.
+5. **Coverage instrument (D5) from the start**, because its failure mode is silent.
+
+The thing I am least sure of is **band and vocabulary granularity** — how coarse the bridge must stay
+to remain useful. That is empirical, and D1 (validate against a real topic corpus) is where it gets
+answered. I would not fix the bridge's size by argument.
