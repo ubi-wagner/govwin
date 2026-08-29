@@ -246,6 +246,44 @@ Also:
 
 Point the existing instruments at staging. Nothing new needs writing.
 
+### 8.0 If staging was REPLICATED from production, run this first
+
+Duplicating an environment is the fastest way to get the topology right and the most dangerous way
+to get the variables wrong: services, volumes **and every variable** come across. The result boots,
+reports Online on every node, and holds production's Anthropic key, production's Postmark server,
+and a `PORTAL_BASE_URL` naming `www.rfppipeline.com`. Nothing about that is an error — every value
+is valid, just pointed at the wrong world — so it has to be asked about rather than waited for.
+
+```bash
+mkdir -p /tmp/envdump && cd /tmp/envdump
+for env in production staging; do
+  railway variables --environment $env --service govtech-frontend --json > $env.frontend.json
+  railway variables --environment $env --service pipeline         --json > $env.pipeline.json
+  railway variables --environment $env --service rfp-crm          --json > $env.rfp-crm.json
+done
+cd - && node frontend/scripts/audit-env-parity.mjs /tmp/envdump
+rm -rf /tmp/envdump        # they contain live secrets
+```
+
+It reports five classes and **never prints a value** — `same`/`differs` and a sha256 prefix only, so
+the output is safe to paste into a ticket:
+
+| Class | Meaning |
+|---|---|
+| **SHARED WITH PRODUCTION** | byte-identical where it must differ — each row names what goes wrong |
+| **POINTS AT PRODUCTION** | a staging URL naming the production host, whatever else is set |
+| **SANDBOX SWITCH IS SET** | `ANTHROPIC_BASE_URL`, `STORAGE_DRIVER` — staging quietly not being staging |
+| **DISAGREES WITHIN STAGING** | `API_KEY_ENCRYPTION_SECRET` frontend ≠ pipeline, `REVALIDATE_SECRET` frontend ≠ rfp-crm |
+| **UNCHECKED** | a service dumped for only one environment — uncovered, not clean |
+
+It self-tests against twelve hand-verified answers before reading anything real, and exits 2 as a
+harness defect if any fails.
+
+> **The bucket deserves a look by hand as well.** A duplicated environment may show an empty bucket
+> in the Railway graph while `AWS_S3_BUCKET` and `AWS_ENDPOINT_URL` still resolve to production's.
+> Compare both values across environments; the size shown in the dashboard is the service wrapper,
+> not proof of a separate store.
+
 ### 8.1 Schema and posture
 
 ```bash
@@ -321,11 +359,93 @@ it once is under $20.
 
 ---
 
-## 10 · Refresh and teardown
+## 10 · Clean relaunch
 
-Staging is disposable. To reset: delete both Postgres services and recreate them, then redeploy —
-the entrypoint re-runs every migration from scratch. Re-do §5.1 and §5.2 afterwards, since neither
-survives a fresh database.
+Staging is disposable, and a staging environment assembled by **replication** or carrying state from
+an earlier attempt is worth rebuilding rather than reasoning about. Inherited state is the thing you
+cannot audit: you can check the variables you thought to check, and the one you did not think of is
+the one that matters.
+
+> ### ⛔ PRODUCTION IS OUT OF SCOPE FOR EVERY STEP BELOW
+> `Postgres`, `cms-postgres` and `rfp-pipeline-bucket` in the **production** environment are live —
+> the bucket alone holds 817 MB of customer artifacts, and the databases hold everything else.
+> Nothing here touches them. Confirm the environment selector reads **staging** before each
+> destructive step; Railway's environment switcher is the only thing standing between the two, and
+> it is one click.
+
+### 10.1 What to destroy
+
+| Target | How | Why not something gentler |
+|---|---|---|
+| staging `Postgres` | delete the service, recreate it | `DROP SCHEMA` leaves roles, extensions, `_migration_history` and the `govtech_app` grant state behind — a fresh service is the only way to know what you have |
+| staging `cms-postgres` | delete the service, recreate it | same |
+| staging `rfp-pipeline-bucket` | empty it | already shows empty; confirm rather than assume (§10.4) |
+
+Deleting a Railway Postgres service deletes its volume with it. **Both new services get new
+connection strings**, so these four variables must be re-pointed afterwards — a relaunch that leaves
+any of them stale is a staging service quietly talking to a database that no longer exists, or to
+one that does:
+
+`DATABASE_URL` · `DATABASE_URL_OWNER` (frontend) · `SHARED_DATABASE_URL` (rfp-crm) · `CRM_DATABASE`
+(rfp-crm)
+
+### 10.2 The order
+
+1. **Delete** both staging Postgres services. Recreate them; confirm the image ships pgvector.
+2. **Re-point** the four connection variables above.
+3. **Set the rest of the variables from §4 explicitly** — do not inherit. If the environment was
+   replicated, run §8.0 first so you know what you are correcting, then set every row it flagged.
+4. **Redeploy frontend.** Its entrypoint runs `migrate.mjs` as `DATABASE_URL_OWNER` under `set -e`;
+   watch for head **237**. Nothing else needs to run migrations — see §10.3.
+5. **Re-do §5.1** — `ALTER ROLE govtech_app LOGIN PASSWORD …`. A fresh database recreates the role
+   `NOLOGIN` from migration 094, so this does **not** survive a relaunch. Then point `DATABASE_URL`
+   at it and redeploy.
+6. **Re-do §5.2** — the master admin seed re-runs from the two pipeline variables. Also does not
+   survive a relaunch.
+7. **Redeploy** pipeline and rfp-crm.
+8. Re-apply the §7 safety switches, re-enable DSIP, re-disable `sam_gov`, then run §8.
+
+Steps 5 and 6 are the two that catch people out on a rebuild specifically, because both succeeded
+the first time and neither is in the database any more.
+
+### 10.3 Do not use the migration workflow for this
+
+`.github/workflows/migrate.yml` already carries staging jobs (`Main DB → Staging`,
+`CRM DB → Staging`), gated on the repo secrets `STAGING_DATABASE_URL`, `CRM_STAGING_DATABASE` and
+`CMS_STAGING_DATABASE_URL`. It is **break-glass only** — `workflow_dispatch`, for ad-hoc recovery —
+and the in-deployment path handles a relaunch on its own. Running it during a deploy is two runners
+against one database, which is the race the in-deployment path exists to avoid.
+
+⚠️ **Those three repo secrets are exactly the kind of leftover this relaunch is about.** If they
+were set for an earlier staging attempt they now name a database that no longer exists — or one that
+does and should not be touched. After step 1, either update them to the new staging connection
+strings or delete them. A break-glass path pointed at the wrong database is worse than no
+break-glass path.
+
+It also cannot reach a database with no public endpoint, and the CRM database is internal by
+design — so its CRM jobs will fail to connect, and the right response to that failure is to migrate
+from inside the deployment, not to open the database.
+
+### 10.4 Confirm the bucket is actually separate
+
+The Railway graph showing production at 817 MB and staging as *empty* is good evidence, but the size
+readout is the service wrapper, not proof of a separate store. Compare the injected values across
+environments:
+
+```bash
+for env in production staging; do
+  echo "── $env"
+  railway variables --environment $env --service govtech-frontend --json \
+    | grep -E 'AWS_S3_BUCKET|AWS_ENDPOINT_URL'
+done
+```
+
+If both the bucket name **and** the endpoint are identical, the two environments share one store and
+a staging export or atomize run will write into production's objects. §8.0 flags an identical bucket
+name on its own, because the name matching is the signal worth stopping on even when the endpoint
+differs.
+
+### 10.5 Afterwards
 
 Rotate the staging Anthropic and R2 keys on the same schedule as production. A staging key that
 leaks is a smaller problem than a production key, but only if it was never a production key.
