@@ -67,42 +67,78 @@ One full Mode C build. 18 sections, 15 authorable (three are letters and a price
 |  | Figure | What it is |
 |---|---|---|
 | **LEDGER** | **$0.1462** · 24 calls | what `agent_task_log` recorded, and what every cap acts on. Under emulation this is a plumbing measurement. |
-| **LIVE-RATE** | **$1.34 – $1.78** | the forecast. Input **measured**, output **assumed**. |
+| **LIVE-RATE** | **$1.22 – $1.63** | the forecast. Input **measured**, output **measured in size, assumed in reuse**. |
 
 ```
-input   $1.09 – $1.46   MEASURED: 1,592,023 real characters the product assembled
-                        and sent across 92 requests
-output  $0.24 – $0.32   ASSUMED: 15 drafting calls × 3,817 chars (the observed mean
-                        of the 18 sections already drafted on the source proposal)
-                        + 9 advisory calls × 1,500 chars
+input   $1.09 – $1.45   MEASURED: 1,583,608 real characters the product assembled
+                        and sent across 91 requests
+output  $0.13 – $0.18   15 drafting calls × 1,654 prose chars — countDocCharacters
+                        over the 18 written sections (29,768 chars, 12 pages by the
+                        export ruler) + 9 advisory calls × 1,500 chars
 ```
 
 Band spans 4.0 → 3.0 chars/token. Blended rate $2.75 in / $13.75 out per M (88 % of calls are
 Sonnet; `stylist`, `library_seed_suggester` and `packaging_specialist` are Haiku, and the ledger's
 own arithmetic confirms the split — identical token counts billing at exactly one third).
 
-**≈ $0.09 – $0.12 per drafted section.**
+**≈ $0.08 – $0.11 per drafted section.**
+
+> **The output basis was wrong in the first version of this document, and the correction is
+> instructive.** `proposal_sections.content` holds the CANVAS JSON, not prose. Measuring its raw
+> length asks how verbose our serialisation is — 68,701 stored characters over a volume set whose
+> narrative limit is 7 pages, which is impossible as prose and is mostly markup. The count is now
+> `countDocCharacters`, the same one the agency character cap is enforced against: 29,768 chars.
+> Two smaller instrument defects fell out of the same look: `estimatePageCount` on a SINGLE section
+> floors at 1, so summing per section reported 18 pages for an 18-section proposal (the floor
+> talking, not the ruler — pages are now measured per volume); and the projection to the agency page
+> limit divided `page_limit_technical`, which bounds ONE volume, by a total spanning six volumes
+> including cost forms and letters, producing a confident 0.39× from two different denominators.
+> That projection now prints the per-volume table beside the limit and scales only when there is
+> exactly one volume.
+
+### Per programme
+
+Three builds, same method, on real ingested solicitations. **Input is 93–95 % of cost, and input per
+agent call is 62–66k characters across all three** — stable within 6 % while the proposals' own
+existing prose varies sevenfold (4,283 vs 29,768 chars). Context assembly is dominated by the
+*solicitation*, not by the proposal, so **cost tracks the number of sections, not how much is
+written in them**.
+
+| Programme | Sections | Drafted | Calls | Measured | Written out to the page limit |
+|---|---:|---:|---:|---|---|
+| Navy SBIR **Phase I** (10 pp technical) | 17 | 12 | 21 | $0.96 – $1.27 | **$1.00 – $1.40** |
+| Navy STTR **Direct to Phase II** (30 pp) | 16 | 10 | 19 | $0.85 – $1.13 | **$1.20 – $2.30** |
+| Ohio TVSF state grant (7 pp narrative) | 18 | 15 | 24 | $1.22 – $1.63 | already at limit |
+
+The Phase II range is **section count, not page count**: tripling the page limit adds ~$0.35 of
+output tokens, while each additional section is another drafting call at $0.055–$0.075. Whether a
+Phase II carries ~16 sections like this fixture or the ~25 a full work plan, schedule and transition
+plan imply is what actually moves the number.
+
+**Per proposal, all in:** the Studio runs three gated loops (Draft → Refine → Compliance), so a
+portal taken through the designed path is roughly 3× one build — **$3 – $7 of model spend per
+proposal**, or 7–16 complete proposals a month against a $50 tenant budget.
 
 ### Against the caps
 
 ```
 effective monthly budget   $50.00   (platform default — foundation has no tenant row)
 builds/month at LEDGER     341      the emulated figure. Do not plan on this.
-builds/month at LIVE-RATE  28 – 37  what the same cap actually buys
+builds/month at LIVE-RATE  30 – 40  what the same cap actually buys
 
-per agent call   ~66,300 input chars (mean over 24 calls, 3.8 requests each)
+per agent call   ~66,000 input chars (mean over 24 calls, 3.8 requests each)
                  largest single request 24,344 chars
-                 mean call $0.078 · bound $0.103 against the $0.50 per-call ceiling
-                 → 4.9× headroom even at the bound
+                 mean call $0.068 · bound $0.092 against the $0.50 per-call ceiling
+                 → 5.4× headroom even at the bound
 ```
 
 ---
 
 ## 3 · Three findings
 
-### 3.1 The ledger figure is ~12× low under emulation
+### 3.1 The ledger figure is ~11× low under emulation
 
-A budget sized against an emulated run would be exhausted after ~28 builds, not 341. The caps
+A budget sized against an emulated run would be exhausted after ~30 builds, not 341. The caps
 themselves are correct — they sum the right column with the right predicate — but **the number they
 sum is only real when the model is real.** Nothing on the emulated path can tell you otherwise,
 because the arithmetic is right at every step.
@@ -121,7 +157,7 @@ the ledger gains rows and the run looks like a full build. It is not one: `secti
 the 24 calls and the great majority of the input tokens — never fires. `agent_task_log` shows
 `section_drafter` had been invoked **once, ever**, before this measurement.
 
-`estimate-full-build-cost.mjs` therefore builds its own fixture and **refuses a verdict** (exit 2)
+`estimate-full-build-cost.mts` therefore builds its own fixture and **refuses a verdict** (exit 2)
 if the run drafts zero sections. Red-tested: with the tenant budget forced to `0`, the build drafted
 nothing and the script refused rather than reporting the review cohort's cost as a full build.
 
@@ -138,9 +174,11 @@ workflow.
 
 ## 4 · What this does NOT establish
 
-- **The output side of the forecast is an assumption**, not a measurement. It is sourced — the
-  observed lengths of real drafted sections on the same solicitation — but a live model may write
-  longer or shorter, and the estimate moves with it.
+- **The output side is measured in SIZE and assumed in REUSE.** The per-section character counts are
+  real — `countDocCharacters` over sections already written for that solicitation — but the
+  assumption is that a live model writes sections of about that length. It may write longer or
+  shorter, and the estimate moves with it. Output is 8–11 % of the total, so this is the smaller of
+  the two uncertainties.
 - **Input apportionment across models is approximate.** The emulator log does not name the calling
   archetype, so measured input bytes are priced at a blended rate weighted by each archetype's share
   of the run's calls.

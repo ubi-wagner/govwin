@@ -591,7 +591,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   column. 817 typed sites · 248 lying row types · ranked by whether the value is then read as a
   string, because a `Date` that only reaches `NextResponse.json` serialises to ISO and harms
   nobody.
-- **AI SPEND: the caps are proven, and the emulated dollar figure is ~12× LOW.** Two instruments,
+- **AI SPEND: the caps are proven, and the emulated dollar figure is ~11× LOW.** Two instruments,
   both in the branch suite; canonical **docs/AGENT_SPEND_AND_CAPS.md**.
   `pipeline/tests/verify_spend_guardrails.py` asserts all six caps (kill switch · platform cap ·
   framework ceiling · tenant budget · hourly rate · per-call) in BOTH directions — 11 passed — because
@@ -601,10 +601,14 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the answer needs care: **the emulator returns a CONSTANT usage block** (`input_tokens: 64`), so
   `agent_task_log.cost_usd` after an emulated run measures the CALL COUNT and the rate table, never
   spend. It reports two numbers and never blends them — LEDGER ($0.15/build) and LIVE-RATE
-  ($1.34–$1.78 for 18 sections, ≈$0.09–$0.12/section), the live figure's INPUT side measured from the
-  real bytes the product sent (the emulator now logs untruncated `chars`) and its OUTPUT side an
-  assumption sourced from observed drafted-section lengths. A $50 budget buys **28–37 builds, not
-  341**. Two traps it exists to stop: **every proposal on the box is `approved`, and `draft_v0` only
+  ($1.22–$1.63 for 18 sections, ≈$0.08–$0.11/section; **Phase I $1.00–$1.40, Phase II $1.20–$2.30**,
+  and the driver is SECTION COUNT not page count — input is 93–95% of cost and holds at 62–66k chars
+  per agent call while the proposal's own prose varies 7×, so context assembly is dominated by the
+  SOLICITATION). The live figure's INPUT side is measured from the real bytes the product sent (the
+  emulator now logs untruncated `chars`); its OUTPUT side is measured in SIZE — `countDocCharacters`,
+  never `length(content)`, which is canvas JSON and ran 2.3× the prose — and assumed in reuse. A $50
+  budget buys **30–40 builds, not 341**, or 7–16 whole proposals once the Studio's three gated loops
+  are counted. Two traps it exists to stop: **every proposal on the box is `approved`, and `draft_v0` only
   drafts `empty`/`ai_drafted`** — so a full draft fired at any of them returns
   `no_authorable_sections`, the review cohort runs and bills, and the run reads like a full build
   while `section_drafter` never fires (it had run **once, ever**). So the script clones its own
