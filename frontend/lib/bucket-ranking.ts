@@ -81,6 +81,54 @@ export async function corpusRanksForKeywords(
   return out;
 }
 
+/**
+ * Which lens surfaced the opportunity that became this build? (F13)
+ *
+ * The tenant's highest-scoring active bucket for this opportunity, resolved at PURCHASE time and
+ * frozen into `proposals.source_bucket` + `origin_card.bucket`. It is the only way to answer whether
+ * a customer's buckets are doing anything — without it, the ranking work can be judged by score
+ * distribution and never by outcome.
+ *
+ * ── WHY THIS IS A SHARED HELPER ──────────────────────────────────────────────────────────────
+ * This lookup already existed, correct and complete, in `app/api/portal/[tenantSlug]/proposals/
+ * create/route.ts` — a route whose own comment states *"the real product flow provisions proposals
+ * via portal release — provisionProposalForPortal — which never hits this route; this is the future
+ * billing hook."* Meanwhile `lib/provision-proposal.ts`, the path that actually runs, wrote
+ * `bucket: null` and `source_bucket: null` as literals. So the column read as "nothing writes it"
+ * when in fact something did, in a file that never executes. One helper, both callers — the same
+ * no-drift rule `provisionAndReleasePortal` follows for the two release paths.
+ *
+ * ── AND WHY IT SCOPES ITSELF ─────────────────────────────────────────────────────────────────
+ * `tenant_bucket_scores` is FORCE-RLS and `provisionProposal` is called BOTH by the tenant
+ * (self-provision) and by an rfp_admin releasing on a tenant's behalf. An admin caller has no
+ * ambient tenant context, so an unscoped read would match nothing and return null — silently, and
+ * indistinguishably from "this opportunity was never in a bucket". `withTenant` makes it explicit.
+ *
+ * Best-effort: attribution must never fail a provision. A null means "no bucket", which is a real
+ * and common answer (an admin-granted opportunity that was never spotlighted).
+ */
+export async function resolveSourceBucket(
+  tenantId: string,
+  opportunityId: string,
+): Promise<{ key: string; score: number } | null> {
+  try {
+    return await withTenant(tenantId, async (tx) => {
+      const [b] = await tx<Array<{ bucket: string; score: number }>>`
+        SELECT tsb.name AS bucket, s.score
+        FROM tenant_bucket_scores s
+        JOIN tenant_spotlight_buckets tsb ON tsb.id = s.bucket_id
+        WHERE s.tenant_id = ${tenantId}::uuid AND s.opportunity_id = ${opportunityId}::uuid
+          AND tsb.is_active
+        ORDER BY s.score DESC NULLS LAST, tsb.name
+        LIMIT 1`;
+      return b ? { key: b.bucket, score: Number(b.score) } : null;
+    });
+  } catch (e) {
+    console.error('[ranking] source bucket lookup failed (non-fatal)', tenantId, opportunityId, e);
+    return null;
+  }
+}
+
 // NOTE: card-arrival scoring is NOT done here. It moved tenant-side + event-driven — the
 // bridge fan-out emits capture:card.applied and the pipeline OnCardApplied workflow rescores
 // (pipeline/src/workflows/actions/rescore.py, a faithful port of scoreCard). The former

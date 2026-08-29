@@ -296,6 +296,11 @@ DRIVES=(
   # that was already green measures nothing. It stages documents and republishes, so it prints its
   # mutation footprint and restores what it staged.
   "corpus-copy-inward|scripts/drive-corpus-copy-inward.mts"
+  # The tenant side of the ranking spine as the THREE actors canManageBuckets admits: tenant_admin,
+  # a delegated member, and an rfp_admin (or above) descending. It GRANTS can_manage_buckets to a
+  # candidate for the run and reverts it, because no seeded account carries the column and the path
+  # would otherwise report uncovered forever — and it checks the refusal as well as the grant.
+  "bucket-authoring|scripts/drive-bucket-authoring.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

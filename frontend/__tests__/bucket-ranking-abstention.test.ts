@@ -17,6 +17,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { scoreCard } from '@/lib/bucket-ranking';
+import { describeComposition, DEFAULT_WEIGHTS } from '@/lib/bucket-scoring';
 
 const NOW = 1_787_011_200_000; // 2026-08-29T00:00:00Z
 const DAY = 86_400_000;
@@ -136,6 +137,89 @@ describe('the corpus factor', () => {
     const r = scoreCard({ title: 'x' }, { keywords: ['nope'], weights: { corpus: 2 } }, NOW, { corpusRank: 1 });
     // keyword 0 at weight 1, corpus 100 at weight 2 → 67
     expect(r.score).toBe(67);
+  });
+});
+
+describe('describeComposition — the sentence the customer reads about their own lens', () => {
+  /**
+   * The rule for this line: *confirm the percentage matches what scoreCard actually computes for
+   * that criteria set — a wrong number here is worse than none.* So this does not check the string;
+   * it drives the SCORER with a card that scores 100 on exactly one signal and 0 on the rest, and
+   * asserts the resulting score IS that signal's advertised share.
+   */
+  // Every field PRESENT, so nothing abstains and every signal is in the denominator. The close date
+  // is in the PAST, so timeline scores a real 0 like the other misses — a card closing soon would
+  // make timeline hit on every iteration and quietly inflate each expectation.
+  const card = (closeDays: number) => ({
+    title: 'concrete', agency: 'Navy', naicsCodes: ['541715'], programType: 'sbir',
+    setAsideType: 'small business', closeDate: new Date(NOW + closeDays * DAY).toISOString(),
+  });
+
+  it('every advertised share is the score that signal alone produces', () => {
+    const criteria = {
+      keywords: ['concrete'], naics: ['541715'], agencies: ['navy'], programTypes: ['sbir'],
+      setAsides: ['small business'], useAccessibility: true, useTimeline: true,
+    };
+    const { entries } = describeComposition(criteria, { hasCorpus: true });
+    expect(entries).toHaveLength(7); // all of them, or this proves less than it looks
+    for (const e of entries) {
+      // A criteria set where ONLY this signal can hit: every other criterion is given a value the
+      // card cannot match, so it contributes a real 0 and stays in the denominator.
+      const only: Record<string, unknown> = {
+        keywords: ['zzzz'], naics: ['999999'], agencies: ['zzzz'], programTypes: ['zzzz'],
+        setAsides: ['zzzz'], useAccessibility: true, useTimeline: true,
+      };
+      if (e.key === 'keyword') only.keywords = ['concrete'];
+      if (e.key === 'naics') only.naics = ['541715'];
+      if (e.key === 'agency') only.agencies = ['navy'];
+      if (e.key === 'program') only.programTypes = ['sbir'];
+      if (e.key === 'accessibility') only.setAsides = ['small business'];
+      const r = scoreCard(
+        card(e.key === 'timeline' ? 10 : -10),   // timeline hits only on its own iteration
+        only, NOW,
+        { corpusRank: e.key === 'corpus' ? 1 : 0 },
+      );
+      expect(r.score, `share advertised for "${e.key}"`).toBe(e.share);
+    }
+  });
+
+  it('shares sum to 100 and reflect a custom weight', () => {
+    const { entries } = describeComposition({ keywords: ['a'], useTimeline: true });
+    expect(entries.map((e) => e.key)).toEqual(['keyword', 'timeline']);
+    expect(entries.reduce((s, e) => s + e.share, 0)).toBe(100);
+    expect(entries[0].share).toBe(67); // 1 / 1.5
+
+    const weighted = describeComposition({ keywords: ['a'], useTimeline: true, weights: { timeline: 1 } });
+    expect(weighted.entries.map((e) => e.share)).toEqual([50, 50]);
+  });
+
+  it('lists nothing for an empty bucket, rather than a confident 0%', () => {
+    expect(describeComposition({ useTimeline: false }).entries).toEqual([]);
+    expect(describeComposition({ useTimeline: false }).totalWeight).toBe(0);
+  });
+
+  it('omits the corpus unless the tenant holds the solicitation', () => {
+    const without = describeComposition({ keywords: ['a'] });
+    const withIt = describeComposition({ keywords: ['a'] }, { hasCorpus: true });
+    expect(without.entries.some((e) => e.key === 'corpus')).toBe(false);
+    expect(withIt.entries.some((e) => e.key === 'corpus')).toBe(true);
+  });
+
+  it('marks as conditional exactly the signals that abstain on a missing card field', () => {
+    const { entries } = describeComposition({
+      keywords: ['a'], naics: ['1'], agencies: ['b'], programTypes: ['c'],
+      setAsides: ['d'], useAccessibility: true, useTimeline: true,
+    }, { hasCorpus: true });
+    // keyword is the only one a card effectively always has (a card without a title is broken).
+    expect(entries.filter((e) => !e.conditional).map((e) => e.key)).toEqual(['keyword']);
+  });
+
+  it('the weight table is the one the scorer uses', () => {
+    // Red-tests itself: change a default in DEFAULT_WEIGHTS and this fails, because the score is
+    // computed by scoreCard and the expectation is computed from the table.
+    const r = scoreCard({ title: 'x' }, { keywords: ['x'], useTimeline: false }, NOW, { corpusRank: 0 });
+    const expected = Math.round((100 * DEFAULT_WEIGHTS.keyword) / (DEFAULT_WEIGHTS.keyword + DEFAULT_WEIGHTS.corpus));
+    expect(r.score).toBe(expected);
   });
 });
 

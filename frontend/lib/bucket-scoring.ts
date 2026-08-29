@@ -130,6 +130,77 @@ export interface CardFields {
   topicBranch?: string | null;
 }
 
+/**
+ * The default weight of every signal, in ONE place.
+ *
+ * `describeComposition` tells a customer what their lens actually scores on, and a number in the UI
+ * that disagrees with the scorer is worse than no number at all — it is a confident lie about how
+ * their own bucket behaves. Both read this table, so they cannot drift. Changing a value here
+ * changes the scorer, the Python mirror's fixture expectations, and the sentence the customer reads,
+ * which is the correct blast radius.
+ */
+export const DEFAULT_WEIGHTS = {
+  keyword: 1,
+  naics: 1,
+  agency: 1,
+  program: 1,
+  accessibility: 1,
+  /** Below keyword on purpose: the solicitation ASSISTS a curated match, it does not outrank it. */
+  corpus: 0.75,
+  timeline: 0.5,
+} as const;
+
+/** How a bucket's score is composed — what the customer is shown about their own lens. */
+export interface CompositionEntry {
+  key: keyof typeof DEFAULT_WEIGHTS;
+  /** Plain-language name. Not the field name: a customer did not choose "programTypes". */
+  label: string;
+  weight: number;
+  /** Percentage of the score this signal carries, when every side has the data. */
+  share: number;
+  /**
+   * True when the signal only participates if the OPPORTUNITY carries the field. Stated because a
+   * lens naming NAICS codes against opportunities that have none is, in practice, scoring on
+   * something else entirely — and the customer should be able to see that rather than infer it.
+   */
+  conditional: boolean;
+}
+
+/**
+ * Describe how a bucket's criteria compose into a score.
+ *
+ * Enumerates exactly the signals `scoreCard` would use if every card field were present, in the
+ * same order and off the same weight table. `__tests__` pins it against what `scoreCard` actually
+ * produces for a fully-populated card, because the plan's rule for this line was: *confirm the
+ * percentage matches what scoreCard computes — a wrong number here is worse than none.*
+ */
+export function describeComposition(
+  criteria: BucketCriteria,
+  opts: { hasCorpus?: boolean } = {},
+): { entries: CompositionEntry[]; totalWeight: number } {
+  const c = criteria ?? {};
+  const w = c.weights ?? {};
+  const raw: Array<Omit<CompositionEntry, 'share'>> = [];
+  const add = (key: CompositionEntry['key'], label: string, conditional: boolean) =>
+    raw.push({ key, label, weight: w[key] ?? DEFAULT_WEIGHTS[key], conditional });
+
+  if (c.keywords?.length) add('keyword', `${c.keywords.length} keyword${c.keywords.length === 1 ? '' : 's'}`, false);
+  if (c.naics?.length) add('naics', 'NAICS codes', true);
+  if (c.agencies?.length) add('agency', 'agency', true);
+  if (c.programTypes?.length) add('program', 'program type', true);
+  if (c.useAccessibility && c.setAsides?.length) add('accessibility', 'set-aside', true);
+  // The corpus participates whenever the tenant holds the solicitation, which is a property of the
+  // opportunity rather than the bucket — so the caller says whether to show it.
+  if (opts.hasCorpus && c.keywords?.length) add('corpus', 'the solicitation text', true);
+  if (c.useTimeline !== false) add('timeline', 'closing date', true);
+
+  const totalWeight = raw.reduce((s, e) => s + e.weight, 0);
+  return {
+    entries: raw.map((e) => ({ ...e, share: totalWeight > 0 ? Math.round((100 * e.weight) / totalWeight) : 0 })),
+    totalWeight,
+  };
+}
+
 /** Optional per-card inputs a pure function cannot compute for itself. */
 export interface ScoreInputs {
   /**
@@ -180,29 +251,29 @@ export function scoreCard(
 
   if (criteria.keywords?.length && text !== '') {
     const hits = criteria.keywords.filter((k) => k && keywordHit(text, k)).length;
-    parts.push({ key: 'keyword', v: hits / criteria.keywords.length, weight: w.keyword ?? 1 });
+    parts.push({ key: 'keyword', v: hits / criteria.keywords.length, weight: w.keyword ?? DEFAULT_WEIGHTS.keyword });
   }
   if (criteria.naics?.length && (card.naicsCodes?.length ?? 0) > 0) {
     const cn = new Set((card.naicsCodes ?? []).map((n) => String(n)));
     const inter = criteria.naics.filter((n) => cn.has(String(n))).length;
-    parts.push({ key: 'naics', v: inter / criteria.naics.length, weight: w.naics ?? 1 });
+    parts.push({ key: 'naics', v: inter / criteria.naics.length, weight: w.naics ?? DEFAULT_WEIGHTS.naics });
   }
   if (criteria.agencies?.length && card.agency) {
     const a = card.agency.toLowerCase();
-    parts.push({ key: 'agency', v: criteria.agencies.some((x) => a.includes(x.toLowerCase())) ? 1 : 0, weight: w.agency ?? 1 });
+    parts.push({ key: 'agency', v: criteria.agencies.some((x) => a.includes(x.toLowerCase())) ? 1 : 0, weight: w.agency ?? DEFAULT_WEIGHTS.agency });
   }
   if (criteria.programTypes?.length && card.programType) {
     const p = card.programType.toLowerCase();
-    parts.push({ key: 'program', v: criteria.programTypes.some((x) => p === x.toLowerCase()) ? 1 : 0, weight: w.program ?? 1 });
+    parts.push({ key: 'program', v: criteria.programTypes.some((x) => p === x.toLowerCase()) ? 1 : 0, weight: w.program ?? DEFAULT_WEIGHTS.program });
   }
   if (criteria.useAccessibility && criteria.setAsides?.length && card.setAsideType) {
     const s = card.setAsideType.toLowerCase();
-    parts.push({ key: 'accessibility', v: criteria.setAsides.some((x) => s.includes(x.toLowerCase())) ? 1 : 0, weight: w.accessibility ?? 1 });
+    parts.push({ key: 'accessibility', v: criteria.setAsides.some((x) => s.includes(x.toLowerCase())) ? 1 : 0, weight: w.accessibility ?? DEFAULT_WEIGHTS.accessibility });
   }
   // The solicitation itself. Default weight 0.75 — deliberately BELOW keyword (1) so a corpus hit
   // assists a card whose curated blurb matched rather than outranking it. Raise only on measurement.
   if (inputs.corpusRank != null && Number.isFinite(inputs.corpusRank)) {
-    parts.push({ key: 'corpus', v: Math.max(0, Math.min(1, inputs.corpusRank)), weight: w.corpus ?? 0.75 });
+    parts.push({ key: 'corpus', v: Math.max(0, Math.min(1, inputs.corpusRank)), weight: w.corpus ?? DEFAULT_WEIGHTS.corpus });
   }
   if (criteria.useTimeline !== false && card.closeDate) {
     // Skip an UNPARSEABLE close date rather than pushing a phantom 0.1 timeline signal — parity with
@@ -211,7 +282,7 @@ export function scoreCard(
     if (t !== null) {
       const days = (t - nowMs) / 86_400_000;
       const v = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 0.6 : days <= 90 ? 0.3 : 0.1;
-      parts.push({ key: 'timeline', v, weight: w.timeline ?? 0.5 });
+      parts.push({ key: 'timeline', v, weight: w.timeline ?? DEFAULT_WEIGHTS.timeline });
     }
   }
 
