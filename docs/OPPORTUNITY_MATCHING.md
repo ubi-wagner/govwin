@@ -515,25 +515,33 @@ moments a human is present** — not because anything clever happens later.
 
 1. **Carry admin annotations onto the card and match them.** Wiring, not invention; immediately useful
    for any solicitation an admin annotates. Both scorers together (F7).
-2. **`tsvector`/`ts_rank` + `pg_trgm` instead of `String.includes`.** Already installed. Stemming alone
-   makes `manufacturing` match `manufacture`/`manufactured`. Zero cost, zero subprocessor.
-3. **The tenant panel (R1) and the document manifest (R2).** Small, and they are what make admins
-   *want* to annotate — the lift becomes visible to the customer instead of vanishing into a score.
-4. **Deterministic system highlight rules.** Now the set fills itself and the admin's job becomes
+2. **`tsvector`/`ts_rank` + `pg_trgm` instead of `String.includes`.** Already installed. Stemming
+   alone makes `manufacturing` match `manufacture`/`manufactured`. Zero cost, zero subprocessor.
+3. **The weight-consequence line (B4).** A few hours, and it tells every tenant why their lens is
+   fragile — the cheapest item in this document, and it changes behaviour rather than code.
+4. **The tenant panel (R1) and the document manifest (R2).** Small, and what makes admins *want* to
+   annotate: the lift becomes visible to the customer instead of vanishing into a score.
+5. **Prefill bucket criteria from the profile (B1).** Zero new data; the tenant edits rather than
+   recalls.
+6. **Taxonomy normalisation — BOTH SIDES TOGETHER (C1–C3).** Shredder proposes, admin confirms at the
+   gate; tenant picks from the same vocabulary; match by indexed array intersection.
+   **Never the dropdown alone** — a clean vocabulary on one side of an uncontrolled join is a silent
+   regression (§8c).
+7. **Deterministic system highlight rules.** The set fills itself; the admin's job becomes
    confirm-and-correct rather than find-and-type — the right division given the variety the shredder
    meets.
-5. **Summary generation from highlights, regenerable at the gate**, with provenance.
-5b. **Bucket authoring: prefill (B1) and the weight-consequence line (B4).** B4 alone is a few hours
-   and tells every tenant why their lens is fragile. Do it early — the cheapest item in this document,
-   and it changes behaviour rather than code.
-5b-ii. **Taxonomy normalisation, BOTH SIDES TOGETHER (C1–C3).** Never the dropdown alone: a clean
-   vocabulary on one side of an uncontrolled join is a silent regression (§8c).
-5c. **Library-derived suggestions (B2) and `onboarding_agent` (B6).**
-6. **`scoring_strategist`, last.** An LLM overlay on 296 characters inherits the same blindness; over a
-   curated corpus it is doing the job it was designed for. ~$20–25/month platform-wide at 100 tenants.
+8. **Library-derived suggestions (B2), summary generation from highlights (M4), and
+   `onboarding_agent` (B6).** A new tenant then arrives with lenses derived from their own past
+   performance rather than a blank form and a comma placeholder.
+9. **`scoring_strategist`, last.** An LLM overlay on 296 characters inherits the same blindness; over
+   a curated corpus it is doing the job it was designed for.
 
 **Independently, and early: a parity test for the two scorers.** It is a documented invariant with no
-test, and every step above changes both sides of it.
+test, and steps 1, 2 and 6 each change both sides of it.
+
+**Steps 1–6 need no model call at any point.** The AI-shaped work is step 7's optional second pass and
+step 9. That is deliberate: the constraint in §8c is that the coupling costs nothing at steady state,
+and most of this document honours it by not introducing anything that runs per match.
 
 ---
 
@@ -548,9 +556,15 @@ test, and every step above changes both sides of it.
 - **It remains lexical.** A highlight saying *directed energy deposition* will not match a bucket keyed
   on *additive manufacturing* unless something relates them. That is precisely where step 6 earns its
   place — and why it is last rather than never.
-- **Bucket authoring is untouched.** Every measured bucket sets keywords and nothing else, which is
-  what makes keywords 67% of the score. Better tenant-side guidance on NAICS, agencies and programme
-  types would spread the weight and reduce the blast radius of any single factor.
+- **NAICS stays unmatched, and §8c does not fix it.** It is empty on *both* sides — 0 of 22
+  opportunities and 0 of 5 buckets. Normalising agency and programme couples two dimensions that are
+  already populated on the ingest side; NAICS needs extraction that does not exist yet, so a tenant
+  setting it would still match nothing. Either build the extraction or do not offer the field.
+- **Set-asides are thin on the ingest side too** — 4 of 22. Same shape as NAICS, one degree less
+  severe.
+- **`scoreCard`'s weights are still flat.** Every signal is weight 1 (timeline 0.5). Once several
+  dimensions are actually populated, whether an agency match should count the same as a keyword match
+  becomes a real question this analysis has not asked.
 
 ---
 
