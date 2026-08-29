@@ -16,7 +16,7 @@ could have started earlier.
 | **Anthropic** | **required** | every AI path: drafting, shredding, compliance and colour-team review, opportunity analysis, CMS content |
 | **Postmark** | **required** | all transactional mail, bounce webhooks, the suppression list |
 | **Google Workspace** | **required** | correspondence (a human emailing a human) *and* the inbox sweep — neither of which Postmark can do |
-| **Voyage AI** | **a decision** | semantic atom retrieval. See below — this one is easy to get wrong by omission |
+| **Voyage AI** | **a decision** | semantic atom retrieval. Cost is negligible ($0.01 for today's library, 200M free tokens); the decision is data governance — **docs/VOYAGE_DECISION.md** |
 
 ### The Voyage decision, stated plainly
 
@@ -181,7 +181,7 @@ credentials. **Full function needs both.**
 3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_WORKSPACE_EMAIL`
    on **frontend**.
 
-### Staging — recommended: **skip Google entirely, at first**
+### Staging — **decided: production only. No Google in staging.**
 
 There is one Workspace domain. A staging service account with domain-wide delegation can impersonate
 and read your **real** mailboxes, which is how staging comes to email real people and read real mail.
