@@ -16,8 +16,10 @@ carry, or the automation does not fire on, or the agent that would use it is asl
 `opportunities.tech_focus_areas` is extracted by the AI shred, editable by the rfp_admin in the
 curation UI, read by an agent — and carried by neither the bridge nor either scorer.
 
-And underneath it, a second one: **the stemmed full-text search this pipeline needs has existed since
-migration 001, is populated, is GIN-indexed, and is queried by nothing.**
+And underneath it, a second one: **two GIN-indexed tsvectors have existed since migration 001 and are
+queried by nothing — and neither one contains a single field the rfp_admin curates.** One indexes five
+machine-ingested identity columns (25 lexemes); the other indexes the shredded document and is empty
+for all 63 cards. See F10, which corrects a first reading of this.
 
 ---
 
@@ -125,18 +127,40 @@ The live denominator is `keyword 1 + timeline 0.5`, making **keywords 67% of the
 | **Automation** | `capture:card.applied` → `rescore.py`, a faithful mirror of `scoreCard` |
 | **AI** | `scoring_strategist` — an LLM overlay on the algorithmic score — **dormant**. `capture_strategist` **already assembles both sides**: `tenant_profile.tech_focus` and `opportunity.tech_focus_areas`, into one prompt |
 
-**F10 · The full-text search is already installed and unused.** Since **migration 001**:
+**F10 · The full-text machinery is installed and unused — but the two indexes are nothing alike, and
+neither covers the admin's work.** Since **migration 001**:
 
-```
-opportunities.full_text_tsv        TSVECTOR + GIN index idx_opp_fts        22/22 populated
-curated_solicitations.full_text_tsv TSVECTOR GENERATED ALWAYS AS
-                                     to_tsvector('english', full_text)
-                                   + GIN index idx_csol_fts                 auto-maintained
-```
+| column | populated | mean size | built from |
+|---|---|---|---|
+| `opportunities.full_text_tsv` (GIN `idx_opp_fts`) | 22/22 | **25 lexemes** (max 34) | a BEFORE trigger over `title · description · agency · office · solicitation_number` |
+| `curated_solicitations.full_text_tsv` (GIN `idx_csol_fts`) | 6/18, **0 of 63 cards** | — | `GENERATED ALWAYS AS to_tsvector('english', full_text)` |
 
-Verified working — `websearch_to_tsquery('english','manufacturing')` ranks two opportunities through
-the existing index. **No code queries either column.** The `curated_solicitations` one is generated
-from the *entire shredded solicitation* and maintained by Postgres for free.
+> ⚠️ **This corrects an earlier reading of F10** — that "the stemmed full-text search this pipeline
+> needs has existed since migration 001, populated." The *machinery* has. The *corpus* has not. The
+> name `opportunities.full_text_tsv` implies a document index and it is not one: it is a stemmed copy
+> of roughly the same ~296 characters `scoreCard` already reads. Measured, not assumed.
+
+**And neither index contains a single field the rfp_admin curates.** The curated fields are split
+across the two tables, and each index misses the other's:
+
+| curated field | table | in a tsvector |
+|---|---|---|
+| `spotlight_summary` — *the artifact the release gate requires* | `curated_solicitations` | **no** — absent from the `opportunities` trigger's column list, and not part of `full_text` |
+| `expert_notes` | `opportunities` | **no** — not in the trigger's column list |
+| `tech_focus_areas` | `opportunities` | **no** — not in the trigger's column list |
+| `full_text` (the shredded document) | `curated_solicitations` | yes — and empty for every card |
+
+Verified directly: the one card matching the keyword `grant` carries it **only** in `spotlightSummary`;
+`opportunities.full_text_tsv @@ websearch_to_tsquery('grant')` is **false** for that row. Substituting
+that index for the literal matcher would silently drop the admin's blurb from matching.
+
+Per-keyword against the five live buckets, stemming gains **4** card-hits (`3d print`, `automated`,
+`automation`, `low carbon`) and **loses 3** (`cement`, `commercialization`, `grant`) — every loss for
+the reason above. And the tenants are already doing the stemmer's job by hand: `print`/`printing`,
+`material`/`materials`, `robotic`/`robotics`, `automated`/`automation` all appear as separate keywords
+in the live bucket lists.
+
+**No code queries either column.**
 
 **F11 · Four of six factors punish a card for the ingest side's missing data.** `agency`, `naics`,
 `program`, `accessibility` guard only the bucket side, so an absent card field scores **0** and still

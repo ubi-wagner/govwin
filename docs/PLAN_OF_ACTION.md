@@ -63,38 +63,77 @@ real discriminator for a small business.
 
 ---
 
-## Step 3 · Use the full-text index that has been there since migration 001 (F10)
+## Step 3 · Stemmed matching — over the mirror, not the master (F10)
 
-**The design decision, stated plainly.** `scoreCard` is a **pure function**; `full_text_tsv` lives in
+> **Revised after measurement.** The first version of this step said *"use the full-text index that has
+> been there since migration 001."* Both existing indexes were then measured, and **neither contains a
+> single field the rfp_admin curates** (F10). Using either as written would have been a regression. The
+> step below is what the measurement supports.
+
+**The design decision, stated plainly.** `scoreCard` is a **pure function**; a tsvector lives in
 Postgres. Do **not** move scoring into SQL — that splits the runtimes and makes parity untestable.
+One SQL pre-pass supplies one more input; the scorer stays pure, mirrored and testable.
 
-Instead: **one SQL pre-pass supplies one more input.**
+**And the index must be mirror-side.** The scored thing is the card. `tenant_opportunity_cards` is
+FORCE-RLS; `opportunities` and `curated_solicitations` are RLS-off platform scope, so a master-anchored
+query is unfenced — from one tenant's context it sees **18 solicitations and 22 opportunities against
+their 9 cards.** Anchoring on the mirror is what makes RLS the fence (verified: 9 cards visible, 9 after
+joining outward to the master).
+
+### 3a · A generated tsvector on the card — works today
+
+```sql
+ALTER TABLE tenant_opportunity_cards ADD COLUMN card_tsv tsvector
+  GENERATED ALWAYS AS (to_tsvector('english',
+    COALESCE(card->>'title','')            || ' ' ||
+    COALESCE(card->>'spotlightSummary','') || ' ' ||
+    COALESCE(card->>'description','')      || ' ' ||
+    COALESCE(card->>'office','')           || ' ' ||
+    COALESCE(card->>'agency','')           || ' ' ||
+    COALESCE(card->>'techFocusAreas','')   -- arrives with step 2
+  )) STORED;
+CREATE INDEX idx_toc_tsv ON tenant_opportunity_cards USING GIN (card_tsv);
+```
+
+**Proven on the box**, not asserted: the expression is accepted, and on a probe row it stems
+`printing`→`print` and `manufacturing`→`manufactur` *and* matches `grant` from `spotlightSummary` —
+the exact case `opportunities.full_text_tsv` misses.
+
+⚠️ **`concat_ws` is rejected** — *"generation expression is not immutable."* The `COALESCE(…) || ' ' || …`
+form above is the one that compiles. The obvious way to write it fails.
+
+**What this buys, honestly.** Stemming over the corpus we already have — *not* more corpus. Against the
+five live buckets it gains 4 card-hits and, unlike the `opportunities` index, loses none. It also
+retires work the tenants are visibly doing by hand: `print`/`printing`, `material`/`materials`,
+`robotic`/`robotics`, `automated`/`automation` are all separate keywords in the live lists today.
+
+**It composes with step 2 for free** — adding `techFocusAreas` to the card payload puts it in the index
+in the same migration.
+
+### 3b · The deep corpus — blocked, and say so
+
+`curated_solicitations.full_text_tsv` is the **entire shredded solicitation**, `GENERATED ALWAYS`,
+GIN-indexed, maintained by Postgres for free. It is reached by a mirror-anchored join:
 
 ```
-for each bucket:
-    SELECT solicitation_id, ts_rank(full_text_tsv, websearch_to_tsquery('english', <keywords>))
-    FROM curated_solicitations
-    WHERE full_text_tsv @@ websearch_to_tsquery('english', <keywords>)
-        ↓
-    scoreCard(card, criteria, now, { fullTextRank })   ← still pure, still mirrored, still testable
+tenant_opportunity_cards ⋈ opportunities ⋈ curated_solicitations
 ```
 
-`fullTextRank` becomes a scoring factor that **abstains when null** — consistent with step 1.
+**The join is proven for all 63 cards. The data is not there.** `full_text` is non-empty on 6 of 18
+solicitations, mean **147 characters**, and on **0 of the 63 card-bearing ones** — the fixtures were
+seeded, never shredded. So `ts_rank` over it would abstain for every card on this box, and the step's
+*value* is unmeasurable until a real solicitation goes through the product.
 
-**Why this is the corpus fix.** `curated_solicitations.full_text_tsv` is `GENERATED ALWAYS` from
-`full_text` — the **entire shredded solicitation**, stemmed, GIN-indexed, maintained by Postgres for
-free. It closes the 296-character gap without highlights, without new storage, without a
-subprocessor. Verified working: `websearch_to_tsquery('manufacturing')` already ranks through
-`idx_csol_fts`.
+Do not ship 3b on a green from seeded data. It gates on **R2** — a real multi-document ingest — and
+seven real BAAs and five CSOs have been sitting in `docs/` untouched.
 
-**It also gets stemming for free** — `manufacturing` matches `manufacture`, `manufactured`.
+**Weighting.** Whichever half lands, `fullTextRank` **abstains when null** (consistent with step 1) and
+starts *below* the existing keyword factor so it assists rather than overrides. Measure before raising.
 
-**Verify.** The 42% literal-miss set: how many now score > 0. Compare `ts_rank` ordering against the
-keyword factor on the same cards.
+**Verify.** The 42% literal-miss set: how many now score > 0, 3a alone. Compare rank ordering against
+the keyword factor on the same cards.
 
-**Size.** ~80 lines: one query in each runtime, one factor in each scorer, weight to be chosen.
-**Risk.** Weight calibration — start it *below* the existing keyword factor so it assists rather than
-overrides, and measure before raising.
+**Size.** 3a ~60 lines + a migration. 3b ~40 more, after R2.
 
 ---
 
@@ -153,7 +192,7 @@ evidence immediately.
 
 | | Why |
 |---|---|
-| **Highlights on the card** (F7) | `solicitation_annotations` has 0 rows *and* `save-annotation` captures no excerpt text — two changes plus UI. **Step 3 may make it much less urgent**: the tsvector already covers the full document for keyword matching. Re-evaluate after step 6. |
+| **Highlights on the card** (F7) | `solicitation_annotations` has 0 rows *and* `save-annotation` captures no excerpt text — two changes plus UI. ~~Step 3 may make it much less urgent.~~ **Reinstated as a live question:** step 3a adds stemming, not corpus, and 3b is blocked on a real shred — so nothing in this plan closes the 296-character gap. Re-evaluate at step 6 with that in hand. |
 | **Waking `scoring_strategist` / `onboarding_agent`** (F12) | both dormant by design; an LLM overlay is worth more once the deterministic signals are connected |
 | **Surfacing `techFocusAreas` at solicitation-level curation** (F3) | a genuine gap, but step 2 makes the *existing* per-topic data useful first. Do it if step 6 shows coverage is the limiter |
 | **The drafter's context window** (R1) | real and expensive — the 18,000-char prefix on a 330-page BAA is the table of contents — but it is a **different consumer**. Adjacent work, your call whether it rides along |
@@ -163,17 +202,19 @@ evidence immediately.
 ## Sequence and effort
 
 ```
-0  parity harness      ~150 lines   additive, no risk
-1  abstention fix       ~20 lines   + full rescore
-2  tech_focus_areas     ~30 lines   + rescore
-3  full_text_tsv        ~80 lines   + rescore, weight calibration
-4  tenant side         ~100 lines   UI, three actor paths
-5  attribution          ~20 lines   do early if convenient
-6  re-measure + gate         —      the verdict
+0   parity harness     ~150 lines   additive, no risk
+1   abstention fix      ~20 lines   + full rescore
+2   tech_focus_areas    ~30 lines   + rescore
+3a  card_tsv + stem     ~60 lines   + a migration; composes with step 2
+3b  deep corpus         ~40 lines   BLOCKED on R2 — a real shred
+4   tenant side        ~100 lines   UI, three actor paths
+5   attribution         ~20 lines   do early if convenient
+6   re-measure + gate        —      the verdict
 ```
 
-**Roughly 400 lines of code across six steps**, every one of them a connection between parts that
-already exist.
+**Roughly 400 lines of code**, every one of them a connection between parts that already exist —
+with **3b the one piece that cannot be validated on this box** and must not be shipped on a green from
+seeded data.
 
 **Start at 0 and 1** — the harness and the correctness fix. Neither depends on a decision, both are
 prerequisites, and step 1 is the one that must land before the tenant side is touched.
