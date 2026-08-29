@@ -47,15 +47,23 @@ is 1.8%.
 
 | Content | Page | Char offset |
 |---|---|---|
-| **Component-specific instructions — Navy, Army, Air Force** | **7** | **20,500** |
-| OSD instructions | 9 | 27,885 |
-| Evaluation criteria | 13 | 41,648 |
-| Phase I requirements | 18 | 59,293 |
+| `1.0 PROGRAM DESCRIPTION` — the real start of content | 4 | 10,105 |
+| **`4.0 METHOD OF SELECTION AND EVALUATION CRITERIA`** | **24** | **78,266** |
+| **`DEPARTMENT OF THE NAVY` — component instructions** | **31** | **99,803** |
+| `PHASE I EVALUATION AND SELECTION` (within Navy) | 36 | 113,525 |
 | Technology Readiness Level language | 162 | 501,524 |
-| DARPA instructions | 225 | 699,562 |
+| `DEPARTMENT OF THE AIR FORCE` | 175 | 541,886 |
+| `DARPA` | 225 | 699,562 |
+| `DHA` | 267 | 833,377 |
 
-> **A model writing a Navy SBIR proposal never sees Navy's instructions.** They begin 2,500
-> characters after the window closes.
+> **A model writing a Navy SBIR proposal never sees Navy's instructions.** They begin at char
+> **99,803 — 5.5× beyond the entire window.**
+
+> ⚠️ **Two earlier figures in this document were wrong, and both understated the problem.** A first
+> pass reported Navy at char 20,500 and evaluation criteria at 41,648. Those were *prose mentions and
+> table-of-contents entries*, not section starts — the same "a text search finds the changelog of the
+> thing, not the thing" failure this repo documents, arriving in a new form. The figures above are
+> heading-anchored: a page whose opening lines match a section heading. Verified rather than grepped.
 
 ### Why this is worse than the ranking problem
 
@@ -87,6 +95,51 @@ money.
 | "Whether a curated corpus beats a raw 18,000-char prefix is a follow-on, not a blocker" | **wrong.** It is the same fix, and the measurement above is the evidence |
 | "M0 blocks everything — shred a real BAA first" | **it was never blocked.** Seven real BAAs and five CSOs have been in `docs/` throughout |
 | "There is exactly one thin boundary" | **two.** curated → card, *and* curated → drafter. Both are prefix-or-blurb views of a million-character document |
+
+---
+
+## 3b · Why this is the argument for human highlighting at ingest
+
+The measurement rules out every automated alternative, one at a time:
+
+| Approach | Why it fails, on this document |
+|---|---|
+| **prefix window** | measured — 56% front matter, and Navy's rules are 5.5× beyond the edge |
+| **bigger prefix** | 100k reaches evaluation criteria and Navy, at ~5× input cost, and drags in every *other* component's section |
+| **whole document** | 1,027,823 chars per drafting call, most of it FAR clauses and other services' rules |
+| **semantic retrieval** | needs the embedding provider excluded for good reasons, and would still be guessing at relevance |
+| **deterministic extraction alone** | gets *structural* things — section headings, page limits. Cannot know that *this* topic makes p.36's Phase I evaluation language decisive and p.267's DHA section irrelevant |
+
+**What is left is judgement, and judgement is what a person applies once, at curation, while already
+reading the document to release it.** They know the proposal is Navy Phase I. That single fact makes
+char 99,803–113,525 essential and 833,377 noise — and no window function can derive it, because it is
+not a property of the document. It is a property of the *pairing*.
+
+### The reading already happens and is currently thrown away
+
+An admin reads this BAA before release. Today the entire residue of that reading is a **103-character
+blurb**. Everything else — that Navy's section starts at p.31, that Phase I evaluation is at p.36,
+that the CTA list is on p.6 — evaporates the moment they hit save.
+
+**Highlighting is not new work. It is capturing work that already happens.**
+
+### One act, two consumers
+
+| Consumer | Gets |
+|---|---|
+| **ranking** | the highlight set on the card — matchable text instead of a 296-char blurb |
+| **drafting** | the same highlights as the context slice — the component's rules and the topic, instead of a table of contents |
+
+The human reads once; two machines that currently both fail get the same curated corpus. That is a
+considerably stronger case than either consumer makes alone.
+
+### And it is the only option whose failure is visible
+
+A missed highlight is a **gap someone can see** — the curator, and per R1's tenant panel, the customer
+too. A truncation window silently drops 98% of the document, returns plausible prose, and errors
+nowhere. Every lens in this repo passed over it.
+
+**That is the design principle the whole codebase already runs on: prefer the failure you can see.**
 
 ---
 
