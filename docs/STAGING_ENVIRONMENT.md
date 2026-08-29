@@ -71,8 +71,25 @@ key removes exactly that property.
 | # | Service | What to create | Settings that matter | Set on |
 |---|---|---|---|---|
 | 1 | **Anthropic** — console.anthropic.com | A **separate Workspace** named `staging`, and an API key inside it | Set the workspace **monthly spend limit to $50**. That makes the provider's cap and the platform cap (`platform_agent_config.platform_monthly_cap`) agree, so a runaway is stopped twice by two independent mechanisms. | `ANTHROPIC_API_KEY` on **all three** services |
-| 2 | **Postmark** — postmarkapp.com | A **second Server** in the existing account, named `staging` | Create it as a **Sandbox server** first: it accepts every message and delivers none, which is exactly what you want while seeded data may still contain real addresses. Copy the **Server API Token**, not the Account token — that mix-up is documented in the driver's own header. Flip to a live server only for step 8.4. | `POSTMARK_SERVER_TOKEN` on frontend + rfp-crm |
+| 2 | **Postmark** — postmarkapp.com | A **second Server** in the existing account, named `staging` | Create it as a **Sandbox server** first: it accepts every message and delivers none, which is exactly what you want while seeded data may still contain real addresses. Copy the **Server API Token**, not the Account token — that mix-up is documented in the driver's own header. Flip to a live server only for step 8.4. **Plan: Pro** — see below. | `POSTMARK_SERVER_TOKEN` on frontend + rfp-crm |
 | 3 | **Railway** | The `staging` environment, two Postgres services, and a **bucket service** | Enable **pgvector** on the main staging DB (mig 171 needs it). The bucket is platform-provisioned — see below | — |
+
+### Which Postmark plan, and why the tier is not a volume decision
+
+All three paid tiers carry **the same 10,000 emails/month** — Basic $15, Pro $16.50, Platform $18 —
+so the choice is about features, not headroom.
+
+**Take Pro.** The $1.50/month delta over Basic buys inbound processing, 10 servers, 30 message
+streams and lower overage ($1.30 vs $1.80 per 1,000). Basic's 5 servers would cover production +
+staging today; Pro removes the question rather than answering it narrowly.
+
+On volume: 19 `NOTIFY` steps across 18 workflow templates, plus nine frontend modules calling
+`send()`, plus the recurring nudge sweep. A full proposal lifecycle touches roughly 40–80 messages
+across all participants. **10,000/month therefore covers on the order of 40–60 active tenants** —
+comfortably past commercial V1, and well into revenue before the next tier matters.
+
+⚠️ Worth confirming with Postmark directly: whether sends to a **Sandbox** server count against the
+monthly quota. If they do, a heavy staging drive could eat production's allowance.
 
 ### Object storage is provisioned by the platform, not obtained
 
