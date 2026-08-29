@@ -13,127 +13,72 @@ import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
 
-/**
- * True if `keyword` occurs in `text` (both compared lowercased). Precision rule: a short single-word
- * token (≤3 chars) matches only on a WORD BOUNDARY, so the default buckets' bare `ai`/`ml` no longer
- * false-positive on "email"/"html"; longer tokens and multi-word phrases keep substring matching
- * (deliberately fuzzy — "3d print" should hit "3d printing"). Deterministic. Mirror in
- * pipeline/src/workflows/actions/rescore.py::_keyword_hit.
- */
-export function keywordHit(text: string, keyword: string): boolean {
-  const k = keyword.trim().toLowerCase();
-  if (!k) return false;
-  if (k.length <= 3 && !/\s/.test(k)) {
-    const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`\\b${esc}\\b`).test(text);
-  }
-  return text.includes(k);
-}
-
-export interface BucketCriteria {
-  keywords?: string[];
-  naics?: string[];
-  agencies?: string[];
-  programTypes?: string[];
-  setAsides?: string[];
-  useAccessibility?: boolean;
-  useTimeline?: boolean;
-  includeClosed?: boolean;
-  trlBand?: string | null;           // reserved (needs opp-TRL extraction)
-  weights?: Record<string, number>;
-}
+// The pure scorer lives in a ZERO-IMPORT LEAF (lib/bucket-scoring.ts) so the TS↔Python parity
+// runner can load it without a DATABASE_URL — this module imports @/lib/db, which throws at module
+// scope without one. Re-exported here so every existing `from '@/lib/bucket-ranking'` still works.
+export {
+  keywordHit,
+  closeMs,
+  sanitizeBucketCriteria,
+  scoreCard,
+  type BucketCriteria,
+  type CardFields,
+  type ScoreInputs,
+} from '@/lib/bucket-scoring';
+import { scoreCard } from '@/lib/bucket-scoring';
+import type { BucketCriteria, CardFields } from '@/lib/bucket-scoring';
 
 /**
- * Coerce arbitrary client input into a valid BucketCriteria (docs/BUCKET_LOCKDOWN.md T2). Drops
- * junk rather than 400-ing: string-array fields keep only non-empty strings; toggles must be real
- * booleans; weights keep only finite, non-negative numbers. An explicit empty array is preserved
- * (so a client can clear keywords); an omitted field stays absent (so a PATCH can merge). Guarantees
- * the stored jsonb is always shaped the way scoreCard expects — no silent all-zero from bad shapes.
+ * One SQL pre-pass: how well does this bucket's keyword set match the tenant's OWN copy of each
+ * solicitation (`tenant_opportunity_documents.text_tsv`, mig 238)?
+ *
+ * ── WHY A PRE-PASS AND NOT SQL SCORING ───────────────────────────────────────────────────────
+ * `scoreCard` is a pure function with a second implementation in Python. Moving the scoring into
+ * SQL would split the runtimes structurally and make the parity check — the thing that actually
+ * holds the mirror pair together — impossible to write. So SQL supplies ONE MORE INPUT and the
+ * scorer stays pure, mirrored and testable.
+ *
+ * ── AND WHY IT NEEDS NO JOIN TO THE MASTER ───────────────────────────────────────────────────
+ * The corpus is in tenant space. This query touches one FORCE-RLS table under the tenant's own
+ * GUC, so isolation is structural rather than remembered. Ranking no longer reads a master table
+ * at all.
+ *
+ * Normalization: `ts_rank` is unbounded-ish and corpus-relative, so a raw value is not comparable
+ * between two solicitations of different lengths. Each opportunity's best document rank is divided
+ * by the highest rank in this pass, putting the result in [0,1] — a RELATIVE measure, which is what
+ * a ranking wants. With one matching card the winner is 1.0; with none the map is empty and every
+ * card ABSTAINS, which is the honest answer when there is no corpus to search.
  */
-export function sanitizeBucketCriteria(input: unknown): BucketCriteria {
-  const c = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
-  const strArr = (v: unknown): string[] | undefined =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()) : undefined;
-  const out: BucketCriteria = {};
-  const set = (k: 'keywords' | 'naics' | 'agencies' | 'programTypes' | 'setAsides') => {
-    const a = strArr(c[k]);
-    if (a !== undefined) out[k] = a;
-  };
-  set('keywords'); set('naics'); set('agencies'); set('programTypes'); set('setAsides');
-  if (typeof c.useAccessibility === 'boolean') out.useAccessibility = c.useAccessibility;
-  if (typeof c.useTimeline === 'boolean') out.useTimeline = c.useTimeline;
-  if (typeof c.includeClosed === 'boolean') out.includeClosed = c.includeClosed;
-  if (typeof c.trlBand === 'string' || c.trlBand === null) out.trlBand = c.trlBand as string | null;
-  if (c.weights && typeof c.weights === 'object' && !Array.isArray(c.weights)) {
-    const w: Record<string, number> = {};
-    for (const [k, v] of Object.entries(c.weights as Record<string, unknown>)) {
-      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) w[k] = v;
-    }
-    if (Object.keys(w).length) out.weights = w;
+export async function corpusRanksForKeywords(
+  tx: typeof sql,
+  tenantId: string,
+  keywords: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  // websearch_to_tsquery treats bare words as AND. A bucket's keywords are alternatives, not a
+  // conjunction, so they are OR-ed — quoted so a multi-word keyword stays a phrase and a stray
+  // operator character cannot change the query's shape.
+  const query = keywords
+    .map((k) => k.trim()).filter(Boolean)
+    .map((k) => `"${k.replace(/"/g, '')}"`)
+    .join(' OR ');
+  if (!query) return out;
+  try {
+    const rows = await tx<Array<{ opportunityId: string; rel: number }>>`
+      WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS tsq),
+      hits AS (
+        SELECT d.opportunity_id, max(ts_rank(d.text_tsv, q.tsq)) AS rank
+        FROM tenant_opportunity_documents d, q
+        WHERE d.tenant_id = ${tenantId}::uuid AND d.text_tsv @@ q.tsq
+        GROUP BY d.opportunity_id)
+      SELECT opportunity_id, (rank / NULLIF(max(rank) OVER (), 0))::float8 AS rel FROM hits`;
+    for (const r of rows) if (r.rel != null) out.set(r.opportunityId, Number(r.rel));
+  } catch (e) {
+    // A corpus failure must leave ranking working on the card alone, not break it. An empty map
+    // means every card abstains — the same state as a tenant whose corpus has not landed yet.
+    console.error('[ranking] corpus pre-pass failed (non-fatal)', tenantId, e);
   }
   return out;
-}
-
-export interface CardFields {
-  title?: string | null;
-  description?: string | null;
-  spotlightSummary?: string | null;   // admin's first-pass matching context (mig 107)
-  office?: string | null;
-  agency?: string | null;
-  naicsCodes?: string[] | null;
-  programType?: string | null;
-  setAsideType?: string | null;
-  closeDate?: string | null;
-}
-
-/** Score one card (0-100) against the bucket criteria; returns the per-signal factors too. */
-export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: number): { score: number; factors: Record<string, number> } {
-  const w = criteria.weights ?? {};
-  const parts: Array<{ key: string; v: number; weight: number }> = [];
-  // The admin's spotlight summary is authoritative matching context — it's the
-  // curated first-pass blurb built for exactly this ranking (mig 107).
-  const text = [card.title, card.spotlightSummary, card.description, card.office].filter(Boolean).join(' ').toLowerCase();
-
-  if (criteria.keywords?.length) {
-    const hits = criteria.keywords.filter((k) => k && keywordHit(text, k)).length;
-    parts.push({ key: 'keyword', v: hits / criteria.keywords.length, weight: w.keyword ?? 1 });
-  }
-  if (criteria.naics?.length) {
-    const cn = new Set((card.naicsCodes ?? []).map((n) => String(n)));
-    const inter = criteria.naics.filter((n) => cn.has(String(n))).length;
-    parts.push({ key: 'naics', v: inter / criteria.naics.length, weight: w.naics ?? 1 });
-  }
-  if (criteria.agencies?.length) {
-    const a = (card.agency ?? '').toLowerCase();
-    parts.push({ key: 'agency', v: criteria.agencies.some((x) => a.includes(x.toLowerCase())) ? 1 : 0, weight: w.agency ?? 1 });
-  }
-  if (criteria.programTypes?.length) {
-    const p = (card.programType ?? '').toLowerCase();
-    parts.push({ key: 'program', v: criteria.programTypes.some((x) => p === x.toLowerCase()) ? 1 : 0, weight: w.program ?? 1 });
-  }
-  if (criteria.useAccessibility && criteria.setAsides?.length) {
-    const s = (card.setAsideType ?? '').toLowerCase();
-    parts.push({ key: 'accessibility', v: criteria.setAsides.some((x) => s.includes(x.toLowerCase())) ? 1 : 0, weight: w.accessibility ?? 1 });
-  }
-  if (criteria.useTimeline !== false && card.closeDate) {
-    // Skip an UNPARSEABLE close date rather than pushing a phantom 0.1 timeline signal — parity with
-    // the Python scorer's `_close_ms is None` skip (an invalid date must not change the denominator).
-    const t = new Date(card.closeDate).getTime();
-    if (Number.isFinite(t)) {
-      const days = (t - nowMs) / 86_400_000;
-      const v = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 0.6 : days <= 90 ? 0.3 : 0.1;
-      parts.push({ key: 'timeline', v, weight: w.timeline ?? 0.5 });
-    }
-  }
-
-  const totalW = parts.reduce((s, p) => s + p.weight, 0);
-  // v ∈ [0,1] for every signal so the weighted average is already in range; clamp anyway to belt the
-  // DB CHECK(score BETWEEN 0 AND 100) (mig 180) — a negative/huge criteria weight can't leak a bad score.
-  const raw = totalW > 0 ? Math.round((100 * parts.reduce((s, p) => s + p.v * p.weight, 0)) / totalW) : 0;
-  const score = Math.max(0, Math.min(100, raw));
-  const factors: Record<string, number> = {};
-  for (const p of parts) factors[p.key] = Math.max(0, Math.min(100, Math.round(p.v * 100)));
-  return { score, factors };
 }
 
 // NOTE: card-arrival scoring is NOT done here. It moved tenant-side + event-driven — the
@@ -165,7 +110,15 @@ export async function scoreCardForTenant(tenantId: string, opportunityId: string
     for (const b of buckets) {
       const criteria = coerceJsonb<BucketCriteria>(b.criteria, {});
       if (!isOpen && !criteria.includeClosed) continue; // parity with rankBucket's card-set rule
-      const { score, factors } = scoreCard(cf, criteria, nowMs);
+      // Per bucket, because the corpus rank is a function of THIS bucket's keywords. The pre-pass
+      // spans the tenant's WHOLE corpus, not just this card — deliberately, so the normalization
+      // denominator is identical to the one rankBucket computes. Scoring one card must not give it
+      // a different number than scoring it as part of a full re-rank; that difference would surface
+      // as a card's score drifting depending on which writer touched it last.
+      const corpus = await corpusRanksForKeywords(tx, tenantId, criteria.keywords ?? []);
+      const { score, factors } = scoreCard(cf, criteria, nowMs, {
+        corpusRank: corpus.has(opportunityId) ? corpus.get(opportunityId)! : null,
+      });
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${b.id}::uuid, ${opportunityId}::uuid, ${score}, ${sql.json(factors)})
@@ -195,9 +148,14 @@ export async function rankBucket(tenantId: string, bucketId: string, nowMs: numb
       WHERE tenant_id = ${tenantId}::uuid
         ${criteria.includeClosed ? tx`` : tx`AND lifecycle_status = 'open'`}
     `;
+    // One pre-pass for the whole bucket (mig 238): the corpus rank depends on the bucket's keywords,
+    // not on the card, so it is computed once and looked up per card.
+    const corpus = await corpusRanksForKeywords(tx, tenantId, criteria.keywords ?? []);
     let ranked = 0;
     for (const c of cards) {
-      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs);
+      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs, {
+        corpusRank: corpus.has(c.opportunityId) ? corpus.get(c.opportunityId)! : null,
+      });
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${bucketId}::uuid, ${c.opportunityId}::uuid, ${score}, ${sql.json(factors)})

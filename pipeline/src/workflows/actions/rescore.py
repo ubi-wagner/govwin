@@ -99,46 +99,71 @@ def _close_ms(close_date: Any) -> Optional[float]:
     return dt.timestamp() * 1000.0
 
 
-def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
+def score_card(card: dict, criteria: dict, now_ms: float, corpus_rank: Optional[float] = None) -> dict:
     """Score one card (0-100) against a bucket's criteria. Faithful port of the
-    frontend scoreCard — same signals, same default weights, same rounding."""
+    frontend scoreCard — same signals, same default weights, same rounding.
+
+    ABSENT IS NOT ZERO. Every factor guards BOTH sides: a bucket naming agencies against a card
+    whose agency the ingest never captured contributes nothing and stays OUT of the denominator,
+    while a card with an agency that does not match scores a real 0 and stays in. Before mig 238
+    only `timeline` did this — the other four quietly charged the tenant's lens for the platform's
+    missing data.
+
+    `corpus_rank` is a normalized [0,1] relevance of the bucket's keywords against the tenant's OWN
+    copy of the solicitation (tenant_opportunity_documents.text_tsv, mig 238), from one SQL
+    pre-pass. None ABSTAINS; 0.0 is a real zero — searched, did not match.
+
+    Mirror of frontend/lib/bucket-ranking.ts::scoreCard. frontend/scripts/verify-scorer-parity.mjs
+    asserts they agree over a shared fixture set; this docstring is not the check.
+    """
     card = card or {}
     criteria = criteria or {}
     w = criteria.get("weights") or {}
     parts: list[tuple[str, float, float]] = []  # (key, v in [0,1], weight)
 
+    tfa = card.get("techFocusAreas")
     text = " ".join(
         str(x) for x in (
             card.get("title"), card.get("spotlightSummary"),
             card.get("description"), card.get("office"),
+            # mig 238. Not agency/programType/setAside: each already has its own weighted factor,
+            # and folding them in here too would double-count one signal as a silent weight change.
+            card.get("phaseType"), card.get("topicNumber"), card.get("topicBranch"),
+            *(tfa if isinstance(tfa, list) else ()),
         ) if x
     ).lower()
 
     kws = criteria.get("keywords") or []
-    if kws:
+    if kws and text != "":
         hits = sum(1 for k in kws if k and _keyword_hit(text, k))
         parts.append(("keyword", hits / len(kws), w.get("keyword", 1)))
 
     naics = criteria.get("naics") or []
-    if naics:
+    if naics and (card.get("naicsCodes") or []):
         cn = {str(n) for n in (card.get("naicsCodes") or [])}
         inter = sum(1 for n in naics if str(n) in cn)
         parts.append(("naics", inter / len(naics), w.get("naics", 1)))
 
     agencies = criteria.get("agencies") or []
-    if agencies:
-        a = (card.get("agency") or "").lower()
+    if agencies and card.get("agency"):
+        a = str(card.get("agency")).lower()
         parts.append(("agency", 1.0 if any(x.lower() in a for x in agencies) else 0.0, w.get("agency", 1)))
 
     ptypes = criteria.get("programTypes") or []
-    if ptypes:
-        p = (card.get("programType") or "").lower()
+    if ptypes and card.get("programType"):
+        p = str(card.get("programType")).lower()
         parts.append(("program", 1.0 if any(p == x.lower() for x in ptypes) else 0.0, w.get("program", 1)))
 
     setasides = criteria.get("setAsides") or []
-    if criteria.get("useAccessibility") and setasides:
-        s = (card.get("setAsideType") or "").lower()
+    if criteria.get("useAccessibility") and setasides and card.get("setAsideType"):
+        s = str(card.get("setAsideType")).lower()
         parts.append(("accessibility", 1.0 if any(x.lower() in s for x in setasides) else 0.0, w.get("accessibility", 1)))
+
+    # The solicitation itself. Default weight 0.75 — deliberately BELOW keyword (1) so a corpus hit
+    # assists a card whose curated blurb matched rather than outranking it. Raise only on measurement.
+    # `is not None` and not a truthiness test: 0.0 is a real zero, not an abstention.
+    if corpus_rank is not None and math.isfinite(float(corpus_rank)):
+        parts.append(("corpus", max(0.0, min(1.0, float(corpus_rank))), w.get("corpus", 0.75)))
 
     if criteria.get("useTimeline") is not False and card.get("closeDate"):
         close_ms = _close_ms(card.get("closeDate"))
@@ -153,6 +178,60 @@ def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
     score = max(0, min(100, raw))
     factors = {p[0]: max(0, min(100, _js_round(p[1] * 100))) for p in parts}
     return {"score": score, "factors": factors}
+
+
+def _corpus_tsquery(keywords: list) -> str:
+    """OR-joined, quoted tsquery text for a bucket's keywords.
+
+    websearch_to_tsquery treats bare words as AND. A bucket's keywords are ALTERNATIVES, not a
+    conjunction, so they are OR-ed; each is quoted so a multi-word keyword stays a phrase and a
+    stray operator character cannot reshape the query. Mirror of the TS corpusRanksForKeywords.
+    """
+    parts = ['"' + str(k).strip().replace('"', '') + '"'
+             for k in (keywords or []) if str(k).strip()]
+    return " OR ".join(parts)
+
+
+async def _corpus_ranks(conn: asyncpg.Connection, tenant_id: str, keywords: list) -> dict[str, float]:
+    """How well does this bucket's keyword set match the tenant's OWN copy of each solicitation?
+
+    Mirror of frontend/lib/bucket-ranking.ts::corpusRanksForKeywords (mig 238). One SQL pre-pass
+    supplies ONE MORE INPUT to the pure scorer — scoring itself stays in the two mirrored functions,
+    because moving it into SQL would split the runtimes and make the parity check unwritable.
+
+    Reads only tenant_opportunity_documents — ranking touches no master table at all.
+
+    ⚠️ The `tenant_id = $1` predicate IS the fence here, not RLS. The worker runs as a role RLS does
+    not apply to (db_role_preflight.py refuses to start otherwise, because a tenant-scope
+    process_instances INSERT would fail silently on the app role), so FORCE ROW LEVEL SECURITY on
+    that table protects the FRONTEND's reads and not these. Same as every other read in this file —
+    `_active_buckets` and the cards fetch carry the same explicit predicate for the same reason. The
+    TS twin gets RLS as well, because it runs under withTenant.
+
+    ts_rank is corpus-relative and not comparable across solicitations of different lengths, so each
+    opportunity's best document rank is divided by the highest in this pass: a RELATIVE measure in
+    [0,1], which is what a ranking wants. No matches → an empty dict → every card ABSTAINS, the
+    honest answer when there is no corpus to search.
+    """
+    q = _corpus_tsquery(keywords)
+    if not q:
+        return {}
+    try:
+        rows = await conn.fetch(
+            """WITH q AS (SELECT websearch_to_tsquery('english', $2) AS tsq),
+               hits AS (
+                 SELECT d.opportunity_id, max(ts_rank(d.text_tsv, q.tsq)) AS rank
+                 FROM tenant_opportunity_documents d, q
+                 WHERE d.tenant_id = $1 AND d.text_tsv @@ q.tsq
+                 GROUP BY d.opportunity_id)
+               SELECT opportunity_id, (rank / NULLIF(max(rank) OVER (), 0))::float8 AS rel FROM hits""",
+            str(tenant_id), q,
+        )
+    except Exception as exc:
+        # A corpus failure must leave ranking working on the card alone, never break it.
+        log.error("corpus pre-pass failed (non-fatal) for tenant %s: %s", tenant_id, exc)
+        return {}
+    return {str(r["opportunity_id"]): float(r["rel"]) for r in rows if r["rel"] is not None}
 
 
 async def _upsert_scores(
@@ -221,7 +300,12 @@ async def rescore_tenant_card(
         # scored only into buckets that include closed opps, so all writers agree on which pairs exist.
         if not is_open and not b["criteria"].get("includeClosed"):
             continue
-        r = score_card(card, b["criteria"], now_ms)
+        # Per bucket, because the corpus rank is a function of THIS bucket's keywords. The pre-pass
+        # spans the tenant's WHOLE corpus, not just this card, so the normalization denominator
+        # matches the one rescore_tenant computes — scoring one card must not give it a different
+        # number than scoring it inside a full re-rank.
+        corpus = await _corpus_ranks(conn, tenant_id, b["criteria"].get("keywords") or [])
+        r = score_card(card, b["criteria"], now_ms, corpus.get(str(opportunity_id)))
         to_write.append((b["id"], str(opportunity_id), r["score"], r["factors"]))
     written = await _upsert_scores(conn, tenant_id, to_write)
 
@@ -268,6 +352,13 @@ async def rescore_tenant(
         "WHERE tenant_id = $1 AND lifecycle_status <> 'archived'",
         str(tenant_id),
     )
+    # One corpus pre-pass PER BUCKET, before the card loop (mig 238): the rank depends on the
+    # bucket's keywords, not the card, so computing it inside the nested loop would run the same
+    # query once per card for no new information.
+    corpus_by_bucket = {
+        b["id"]: await _corpus_ranks(conn, tenant_id, b["criteria"].get("keywords") or [])
+        for b in buckets
+    }
     to_write: list[tuple[str, str, int, dict]] = []
     for c in cards:
         card = _coerce(c["card"], {})
@@ -276,7 +367,7 @@ async def rescore_tenant(
         for b in buckets:
             if not is_open and not b["criteria"].get("includeClosed"):
                 continue
-            r = score_card(card, b["criteria"], now_ms)
+            r = score_card(card, b["criteria"], now_ms, corpus_by_bucket[b["id"]].get(opp))
             to_write.append((b["id"], opp, r["score"], r["factors"]))
     written = await _upsert_scores(conn, tenant_id, to_write)
 

@@ -56,8 +56,12 @@ describe('scoreCard — parity with the Python port', () => {
   });
 
   it('custom weights (keyword v=1 w=3, naics v=0 w=1 → 75)', () => {
+    // The card carries a NAICS that does not match — a real zero, which stays in the denominator.
+    // It used to carry `naicsCodes: []`, which produced the same 75 for the wrong reason: absent
+    // data scoring 0. Since mig 238 an absent field ABSTAINS, so an empty array here would take
+    // naics out of the denominator and this weights test would silently stop testing weights.
     const r = scoreCard(
-      { title: 'quantum', naicsCodes: [] },
+      { title: 'quantum', naicsCodes: ['999999'] },
       { keywords: ['quantum'], naics: ['541715'], weights: { keyword: 3, naics: 1 } },
       NOW_MS,
     );

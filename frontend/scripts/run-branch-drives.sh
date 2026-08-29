@@ -178,6 +178,29 @@ else
 fi
 echo
 
+# The two scorers are a deliberate mirror pair — frontend/lib/bucket-scoring.ts::scoreCard and
+# pipeline/.../rescore.py::score_card — and until this check the only thing asserting it was each
+# file's comment about the other. They have already been observed mirroring each other INCLUDING a
+# bug, which is precisely the failure a comment cannot catch. A DIVERGENCE FAILS THE RUN: a
+# preflight that finds a violation and lets the suite report green is worse than no preflight
+# (B145), and here a divergence means every ranking number below was produced by whichever runtime
+# happened to touch the card last.
+if node scripts/verify-scorer-parity.mjs > "$OUT/scorer-parity.log" 2>&1; then
+  echo "Scorer parity: TS and Python agree on every fixture (rankings mean the same thing either side)"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ SCORER PARITY BROKEN — the TS and Python scorers disagree.                            ║"
+  echo "║ A card's score now depends on WHICH RUNTIME scored it last. Every ranking result      ║"
+  echo "║ below is unreliable. Fix before reading anything else.                                ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/scorer-parity.log" | head -20
+  # A COUNTER, not the FAILED array — that is declared 180 lines below this point, so an append
+  # here would be wiped by its `declare -a FAILED=()` and the run would exit 0 with the banner
+  # printed. Exactly the shape of B145.
+  PARITY_VIOLATION=1
+fi
+echo
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"
@@ -458,9 +481,13 @@ if [ "${INVARIANT_VIOLATION:-0}" -ne 0 ]; then
   echo "   ✗ CROSS-TENANT REFERENCES were found by the preflight — see $OUT/tenant-invariant.log"
   echo "     Every drive above may be green and the box is still in violation. This fails the run."
 fi
+if [ "${PARITY_VIOLATION:-0}" -ne 0 ]; then
+  echo "   ✗ SCORER PARITY BROKEN — see $OUT/scorer-parity.log"
+  echo "     A card's score depends on which runtime scored it last. This fails the run."
+fi
 # Decide on the COUNTERS, not on the array — an empty array expansion is exactly what tripped
 # `set -u` here and made a fully green run exit with a shell error.
-if [ $((fail + cantrun + missing + ${INVARIANT_VIOLATION:-0})) -gt 0 ]; then
+if [ $((fail + cantrun + missing + ${INVARIANT_VIOLATION:-0} + ${PARITY_VIOLATION:-0})) -gt 0 ]; then
   echo "logs for the failures:"
   for f in ${FAILED[@]+"${FAILED[@]}"}; do echo "  $OUT/${f%% *}.log"; done
   exit 1
