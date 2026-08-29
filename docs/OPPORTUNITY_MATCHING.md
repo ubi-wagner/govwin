@@ -511,6 +511,75 @@ moments a human is present** — not because anything clever happens later.
 
 ---
 
+## 8d · Do buckets need more dimensions?
+
+**Mostly not yet — and adding them now would repeat the mistake §8c just caught.** One expansion is
+free today; one is a different mechanic rather than a dimension; the rest are blocked on the ingest
+side.
+
+`BucketCriteria` has five: `keywords`, `naics`, `agencies`, `programTypes`, `setAsides` (plus
+`weights` and `useTimeline`). The card carries considerably more. Here is every plausible addition,
+against whether the opportunity side can actually feed it:
+
+| Candidate dimension | Tenant value | Opportunity side | Verdict |
+|---|---|---|---|
+| **days left to respond** (from `closeDate`) | high — bidding with six days left is a real decision | **42 / 63 populated** | ✅ **free today** |
+| phase (I · II · D2P2) | very high for SBIR — a Phase I shop and a Phase II shop are different businesses | `phase_like` **0 / 18**, and it never reaches the card | ingest first |
+| award ceiling / value | very high — "I cannot execute $5M", "$50K is not worth the bid" | `awardAmount` **0 / 63**, `estimatedValueMax` **0 / 63** | ingest first |
+| set-aside | high — eligibility, not preference | **0 / 63** on the card | bridge/ingest first |
+| NAICS | moderate | **0 / 22** | ingest first (§10) |
+| clearance · ITAR · cost-share · PI-must-be-employee | **highest** — these are disqualifiers | all **0 / 9** on `solicitation_compliance` | ingest first, **and see below** |
+
+### The rule this makes explicit
+
+> **Never add a bucket dimension whose opportunity-side field is unpopulated.**
+
+Every one of them produces a criterion that silently matches nothing — and a tenant reads that as
+*"nothing fits me"*, not *"this filter is inert."* It is the agency-dropdown trap (§8c) with a
+different label, and the sequence is always the same: **populate the ingest side, then expose the
+criterion.**
+
+### The one free expansion
+
+**Days left to respond**, derived from `closeDate` — already 42/63 populated, no ingest work at all.
+
+Note it is not the existing `timeline` factor. That is a *recency score* that nudges a weighted
+average; this is a **threshold a tenant sets** — *"do not surface anything with under 21 days."*
+Different mechanic, which brings us to the actual finding here.
+
+### The real expansion is not a dimension — it is a second mechanic
+
+**Buckets currently conflate two questions that behave differently:**
+
+- **Scoring** — *how well does this fit?* A weighted average over signals. What exists.
+- **Eligibility** — *can I bid at all?* Binary, and not a matter of degree.
+
+A weighted average **cannot express disqualification.** If a tenant has no cleared personnel, a
+clearance-required solicitation should not lose one sixth of its score and rank fourth — it should be
+excluded, or surfaced with the reason attached. Same for a cost-share they cannot fund, a
+PI-must-be-employee rule they cannot meet, or an ITAR restriction they are not registered for.
+
+Today those fields are extracted at ingest into `solicitation_compliance`, never reach the card, and
+would be nonsensical as weighted signals if they did.
+
+So the expansion worth designing is **hard filters alongside weighted signals** — a small set of
+`exclude` predicates evaluated before scoring, each carrying the reason it fired so the tenant sees
+*"hidden: requires Secret clearance"* rather than an unexplained absence. `tenant_profiles` already
+has `min_surface_score`, so a threshold concept exists; this is its eligibility sibling.
+
+That is worth building **after** the ingest side populates the fields, and it is worth designing now
+so the schema does not have to move twice.
+
+### What stays free text, and should
+
+Technology type, research areas, company summary, and the spotlight summary itself. These are
+genuinely open vocabulary — the whole point of §6 is that the *highlight corpus* is where open
+language gets matched, and of §8c that only the closed dimensions get a controlled vocabulary.
+Forcing a taxonomy onto technology description would lose exactly the specificity that makes an open
+topic matchable.
+
+---
+
 ## 9 · Sequence
 
 1. **Carry admin annotations onto the card and match them.** Wiring, not invention; immediately useful
