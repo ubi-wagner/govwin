@@ -15,6 +15,25 @@ places the reasoning turned.
 **Question that started it:** an open topic mentioning manufacturing should reach an electronics
 researcher whose work fits it. It does not. Why?
 
+> **⚑ STATUS, 2026-08-30 — five of the gaps below are now CLOSED, and one conclusion was wrong.**
+> Read the analysis for the reasoning; check it against this list before treating anything as a
+> to-do.
+>
+> | Below | Now |
+> |---|---|
+> | §F6 "documents do not cross the bridge; the card carries no manifest" | **closed** — mig 238 put a document manifest on every card, so a tenant sees what exists *before* copying anything |
+> | "an unpinned tenant has no document for an anchor to resolve against" | **closed** — mig 239 carries the curator's EXCERPT on the card, not just the anchor, so a highlight reads with no copy at all |
+> | "before pinning, a tenant cannot see the documents exist" | **closed** — the manifest, plus `/portal/[slug]/cards/[opp]/solicitation`, which renders the note and the marked passages whether or not the corpus was copied |
+> | "auto-copy for a subset is later a policy on an existing mechanism" | **superseded** — mig 240 split the VERDICT (👍/👎, `pursuit_status`) from the TRANSFER ("View Solicitation", `docs_copied`). Rating is free and copies nothing; the copy is a second, deliberate act. Pin-to-pull was right; pin-as-the-only-way-to-express-interest was the error |
+> | "the ranker reads ~296 characters" | **closed for the curated record** — the scorer now reads summary, expert notes, technology focus, phase, volumes, required items and the admin's highlights, plus an `affinity` factor learned from the tenant's own votes |
+>
+> **The one conclusion that was WRONG:** ranking against the full solicitation text. Migration 238
+> shipped it as a `ts_rank` factor and migration 239 removed it, because measured on one 330-page
+> BAA `ts_rank` returns the SAME value for unrelated terms — `agriculture` 0.0608 and `concrete`
+> 0.0608 and `submarine` 0.0608. A general solicitation mentions everything once, so ranking against
+> it measures document LENGTH. What ranks is the curated record: small, specific, and there because
+> a person decided it mattered.
+
 ---
 
 ## 0 · The answer, up front
@@ -93,7 +112,7 @@ source (DSIP / sbir.gov / grants.gov / admin upload / scout)
                   ├── scoreCard      → tenant_bucket_scores
                   │                    text = title + spotlightSummary + description + office
                   └── pin (opt-in)   → copyObject → customers/<slug>/pinned/<opp>/
-                                       manifest in pinned_docs
+                                       manifest in copied_docs
 ```
 
 **Two breaks are visible in the diagram.** `full_text` terminates at compliance extraction and never
@@ -184,7 +203,7 @@ reads.** The lift is in the right place; it is 103 characters.
 
 **F6 · Documents do not cross the bridge.** The card carries no manifest, so before pinning a tenant
 cannot know the solicitation *has* four attachments and an amendment. Update propagation, by
-contrast, works: republish sets `pin_update_available`, `amendments.ts` triggers it, resync re-copies.
+contrast, works: republish sets `docs_update_available`, `amendments.ts` triggers it, resync re-copies.
 
 **F7 · Two scorers must agree and nothing asserts it.** `scoreCard` (TS) and
 `rescore.py::_keyword_hit` are a deliberate mirror pair with a comment saying so and no test.
@@ -263,7 +282,7 @@ already follow.
 
 | | Today |
 |---|---|
-| update / new upload propagates | ✅ republish sets `pin_update_available`; `amendments.ts` triggers it; resync re-copies and clears, with a watched-holder notification |
+| update / new upload propagates | ✅ republish sets `docs_update_available`; `amendments.ts` triggers it; resync re-copies and clears, with a watched-holder notification |
 | accessible **as published** | ✅ once pinned — `copyObject` is a byte copy, not a re-render or an extract, `sourceKey` kept for lineage |
 | rides across the bridge | ❌ the card carries **no document manifest** |
 | into tenant space on creation | ❌ the copy happens on *pin* |
@@ -281,7 +300,7 @@ tenant's own copy, never a central one.
 
 **R2 · The card carries a document manifest.** Filename, type, size, published date, amendment flag.
 No bytes. A field on a jsonb column — no migration — riding the existing forward-only republish. It
-also makes `pin_update_available` legible: today the flag says *something changed*; with a manifest it
+also makes `docs_update_available` legible: today the flag says *something changed*; with a manifest it
 says **which document arrived**.
 
 **R3 · Highlights survive a republish, or say they cannot.** A new document changes `full_text`, so
@@ -309,7 +328,7 @@ visible and therefore accessible; the pin makes them the tenant's own. Auto-copy
 | Provenance model | **built** — mig 187 `field_provenance`, mig 188 the contract |
 | Card carrier | **built** — the card is jsonb; adding fields is not a migration |
 | Summary editor at the gate | **built** — and push already refuses without a summary |
-| Document copy + update propagation | **built** — pin, resync, `pin_update_available`, amendment trigger |
+| Document copy + update propagation | **built** — pin, resync, `docs_update_available`, amendment trigger |
 | Postgres text search | **installed, unused for ranking** — `pg_trgm` + `tsvector` since migration 001 |
 | `scoring_strategist` | **designed, registered, dormant** — Haiku overlay, tenant profile + past win/loss, −15..+15 with rationale, factor breakdown and confidence, recalibrating on `capture.proposal.outcome_recorded` |
 

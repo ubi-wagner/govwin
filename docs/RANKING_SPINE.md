@@ -31,7 +31,7 @@ spine is built; this pass closes named gaps and wires the last-mile capabilities
    > deterministic SQL over the tenant's own cards at creation and O(1) per card on arrival —
    > no model call — so the cap bounds `tenant_bucket_scores` STORAGE at O(buckets × cards) and
    > gives an operator a lever, rather than rationing compute. Until a tenant authors a lens,
-   > `/cards` falls back to `is_pinned` then `updated_at DESC`: recency-ordered, not blank.
+   > `/cards` falls back to `docs_copied` then `updated_at DESC`: recency-ordered, not blank.
    > Guarded by `__tests__/bucket-authoring-budget.test.ts`, which reads the SOURCE of all four
    > creation paths and fails if the seeder returns.
 3. **Admin pin** — rfp_admin arms **OPP-level** update tracking that fans out to every
@@ -65,14 +65,14 @@ spine is built; this pass closes named gaps and wires the last-mile capabilities
 ### ④ One mirror-OPP list + Buckets-1:N score array
 - ✅ `tenant_opportunity_cards` is the single list; the `/cards` route already assembles a
   per-card `rankings: [{bucketId, name, score}]` across all active buckets + a best-bucket
-  scalar (`topScore`); order is `is_pinned DESC, top_score DESC, updated_at DESC`.
+  scalar (`topScore`); order is `docs_copied DESC, top_score DESC, updated_at DESC`.
 - ❌ **RANK-5** the array is **display-only** — no bucket-selector to re-rank the one list by a
   chosen bucket; it's score-sorted + sparse, not a stable positional 1..N vector. Make it a
   stable per-card vector aligned to the tenant's bucket list + add the selector ("rank per
   bucket serially by OPP, parallel across buckets").
 
 ### ⑤ Pin for updates by admin
-- ✅ Customer pin (`is_pinned`/`pinned_docs`, `pin_update_available`→"Resync") = doc-copy
+- ✅ Customer pin (`docs_copied`/`copied_docs`, `docs_update_available`→"Resync") = doc-copy
   convenience; admin **amendment tracking** (`solicitation_amendments`→`proposal_amendment_flags`).
 - ❌ **RANK-8** amendment tracking only reaches opps that **already have a purchased proposal**.
   Add an rfp_admin **OPP-level watch** (mig 181 `opportunities.update_watch`) that fans update

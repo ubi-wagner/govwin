@@ -6,12 +6,16 @@
 > strong hint about FK DIRECTION and a weak one about anything else. The STRUCTURE — tables,
 > columns, types, constraints, foreign keys — is exact.
 >
-> **DO NOT EDIT.** Regenerate: `source scripts/sandbox-env.sh && node scripts/schema-map.mjs`
+> **DO NOT EDIT.** Regenerate **from the repo root** (not `frontend/` — both paths here are
+> root-relative, and running it from `frontend/` fails with a bare MODULE_NOT_FOUND that reads
+> like a missing generator):
+>
+>     source scripts/sandbox-env.sh && node scripts/schema-map.mjs
 > Run it after every migration. A hand-maintained copy of a schema that changes weekly
 > becomes wrong silently — which is exactly what happened to CLAUDE_CLIFFNOTES §1, frozen at
 > migration 067 while the body grew to 202.
 
-**Generated against** migration head `237_freeze_trigger_returns_old.sql` · **135 tables** · 1848 columns · 305 foreign keys
+**Generated against** migration head `240_verdict_and_copy_split.sql` · **136 tables** · 1869 columns · 306 foreign keys
 
 ## How to use this before writing SQL
 
@@ -42,7 +46,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 ## 2. Tables
 
-### `_migration_history`  · 237 rows
+### `_migration_history`  · 23 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -66,7 +70,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `scope` | text | yes |  |
 | `id_token` | text | yes |  |
 
-### `agent_performance`  · 10 rows · _RLS on · tenant-scoped_
+### `agent_performance`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -81,7 +85,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `avg_cost_usd` | numeric | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `agent_task_log`  · 215 rows · _RLS FORCED · tenant-scoped_
+### `agent_task_log`  · 2 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -108,7 +112,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `completed_at` | timestamp with time zone | yes |  |
 | `guardrail_decision` | text | yes |  |
 
-### `agent_task_queue`  · 3 rows · _RLS on · tenant-scoped_
+### `agent_task_queue`  · 2 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -131,7 +135,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `agent_task_queue_scope_level_check`: `CHECK (((scope_level IS NULL) OR (scope_level = ANY (ARRAY['node'::text, 'group'::text, 'section'::text, 'pages'::text, 'document'::text]))))`
 - CHECK `agent_task_queue_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text])))`
 
-### `agent_task_results`  · 3 rows · _RLS FORCED_
+### `agent_task_results`  · 2 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -140,7 +144,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `output` | jsonb | **no** |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `api_key_registry`  · 4 rows
+### `api_key_registry`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -153,7 +157,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `applications`  · 1 rows
+### `applications`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -196,7 +200,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `applications_source_check`: `CHECK ((source = ANY (ARRAY['public'::text, 'partner'::text])))`
 - CHECK `applications_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'under_review'::text, 'accepted'::text, 'rejected'::text, 'onboarded'::text, 'withdrawn'::text])))`
 
-### `atom_embeddings`  · 1,229 rows · _RLS FORCED · tenant-scoped_
+### `atom_embeddings`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -221,7 +225,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `atom_lineage_check`: `CHECK ((parent_atom_id <> child_atom_id))`
 - CHECK `atom_lineage_relation_check`: `CHECK ((relation = ANY (ARRAY['derived_from'::text, 'reused_from'::text])))`
 
-### `atom_members`  · 1,363 rows · _RLS FORCED_
+### `atom_members`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -232,7 +236,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `atom_members_check`: `CHECK ((group_atom_id <> member_atom_id))`
 
-### `atom_tags`  · 11,546 rows · _RLS FORCED_
+### `atom_tags`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -248,7 +252,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `atom_tags_tag_source_check`: `CHECK ((tag_source = ANY (ARRAY['auto'::text, 'admin'::text])))`
 
-### `automation_framework`  · 1 rows
+### `automation_framework`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -268,7 +272,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `automation_framework_id_check`: `CHECK ((id = 1))`
 
-### `automation_log`  · 10 rows
+### `automation_log`  · 1 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -285,7 +289,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `automation_log_status_check`: `CHECK ((status = ANY (ARRAY['running'::text, 'success'::text, 'failed'::text, 'skipped'::text, 'deferred'::text, 'error'::text])))`
 
-### `automation_rules`  · 17 rows
+### `automation_rules`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -307,7 +311,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `automation_rules_action_type_check`: `CHECK ((action_type = ANY (ARRAY['log_only'::text, 'queue_notification'::text, 'queue_job'::text, 'emit_event'::text, 'send_email'::text, 'notify_admin'::text, `
 
-### `canvas_versions`  · 8 rows · _RLS FORCED_
+### `canvas_versions`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -328,7 +332,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `canvas_versions_source_check`: `CHECK ((source = ANY (ARRAY['ai_draft'::text, 'human_edit'::text, 'ai_revision'::text, 'library_import'::text, 'template'::text, 'system'::text])))`
 
-### `cms_content`  · 130 rows
+### `cms_content`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -354,7 +358,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `cms_content_content_type_check`: `CHECK ((content_type = ANY (ARRAY['blog_post'::text, 'resource'::text, 'guide'::text, 'announcement'::text, 'faq'::text, 'testimonial'::text, 'team_member'::tex`
 - CHECK `cms_content_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'pending'::text, 'published'::text, 'private'::text, 'archived'::text])))`
 
-### `collaboration_vaults`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `collaboration_vaults`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -369,7 +373,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `collaboration_vaults_status_check`: `CHECK ((status = ANY (ARRAY['active'::text, 'closed'::text])))`
 
-### `collaborator_stage_access`  · 20 rows · _RLS FORCED_
+### `collaborator_stage_access`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -385,7 +389,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `collaborator_stage_access_permission_check`: `CHECK ((permission = ANY (ARRAY['view'::text, 'comment'::text, 'edit'::text])))`
 
-### `command_seen_state`  · 6 rows
+### `command_seen_state`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -395,7 +399,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `last_seen_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `compliance_presets`  · 6 rows
+### `compliance_presets`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -410,7 +414,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_by` | uuid | yes |  |
 | `created_at` | timestamp with time zone | yes | `now()` |
 
-### `compliance_variables`  · 25 rows
+### `compliance_variables`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -436,7 +440,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `accepted_at` | timestamp with time zone | **no** | `now()` |
 | `ip_address` | text | yes |  |
 
-### `content_pages`  · 74 rows · _archivable_
+### `content_pages`  · 0 rows · _archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -457,7 +461,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `content_pages_content_type_check`: `CHECK ((content_type = ANY (ARRAY['page'::text, 'blog_post'::text, 'resource'::text, 'guide'::text, 'testimonial'::text, 'team_member'::text])))`
 - CHECK `content_pages_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])))`
 
-### `contracts`  · 14 rows · _RLS on · tenant-scoped · archivable_
+### `contracts`  · 0 rows · _RLS on · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -478,7 +482,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `contracts_status_check`: `CHECK ((status = ANY (ARRAY['active'::text, 'closed'::text, 'terminated'::text])))`
 
-### `curated_solicitations`  · 24 rows
+### `curated_solicitations`  · 18 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -533,7 +537,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `curation_notes_body_check`: `CHECK (((length(body) >= 1) AND (length(body) <= 4000)))`
 
-### `curation_revisions`  · 12 rows
+### `curation_revisions`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -550,7 +554,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `curation_revisions_revision_type_check`: `CHECK ((revision_type = ANY (ARRAY['compliance_updated'::text, 'annotation_added'::text, 'annotation_removed'::text, 'outline_updated'::text, 'volume_added'::te`
 
-### `deploy_baseline`  · 2 rows
+### `deploy_baseline`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -558,7 +562,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `note` | text | yes |  |
 | `recorded_at` | timestamp with time zone | **no** | `now()` |
 
-### `document_cocoons`  · 6 rows · _RLS on · tenant-scoped_
+### `document_cocoons`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -576,7 +580,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `document_cocoons_scope_check`: `CHECK ((scope = ANY (ARRAY['section'::text, 'document'::text])))`
 - CHECK `document_cocoons_source_check`: `CHECK ((source = ANY (ARRAY['upload'::text, 'download'::text, 'system'::text, 'harvest'::text])))`
 
-### `document_templates`  · 9 rows · _RLS on · tenant-scoped_
+### `document_templates`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -599,7 +603,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `document_templates_template_type_check`: `CHECK ((template_type = ANY (ARRAY['technical_volume'::text, 'cost_volume'::text, 'slide_deck'::text, 'past_performance'::text, 'key_personnel'::text, 'commerci`
 
-### `email_send_ledger`  · 8 rows · _RLS FORCED · tenant-scoped_
+### `email_send_ledger`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -637,7 +641,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `email_suppressions_reason_check`: `CHECK ((reason = ANY (ARRAY['hard_bounce'::text, 'spam_complaint'::text, 'manual'::text])))`
 - CHECK `email_suppressions_source_check`: `CHECK ((source = ANY (ARRAY['postmark_webhook'::text, 'operator'::text])))`
 
-### `episodic_memories`  · 401 rows · _RLS FORCED · tenant-scoped_
+### `episodic_memories`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -662,7 +666,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `episodic_memories_memory_type_check`: `CHECK ((memory_type = ANY (ARRAY['observation'::text, 'interaction'::text, 'decision'::text, 'outcome'::text])))`
 
-### `expert_availability_blocks`  · 1 rows
+### `expert_availability_blocks`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -677,7 +681,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `eab_window_valid`: `CHECK ((end_at > start_at))`
 - CHECK `expert_availability_blocks_status_check`: `CHECK ((status = ANY (ARRAY['open'::text, 'booked'::text, 'cancelled'::text])))`
 
-### `expert_time_bookings`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `expert_time_bookings`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -697,7 +701,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `expert_time_bookings_minutes_check`: `CHECK ((minutes > 0))`
 - CHECK `expert_time_bookings_status_check`: `CHECK ((status = ANY (ARRAY['booked'::text, 'cancelled'::text])))`
 
-### `guardrail_templates`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `guardrail_templates`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -711,7 +715,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `library_atoms`  · 1,789 rows · _RLS FORCED · tenant-scoped · archivable_
+### `library_atoms`  · 0 rows · _RLS FORCED · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -753,7 +757,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `library_atoms_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'approved'::text, 'archived'::text])))`
 - CHECK `library_atoms_visibility_check`: `CHECK ((visibility = ANY (ARRAY['tenant'::text, 'owner_only'::text, 'shared_for_proposal'::text, 'admin_only'::text, 'vault'::text])))`
 
-### `library_seed_jobs`  · 1 rows · _RLS on · tenant-scoped_
+### `library_seed_jobs`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -771,7 +775,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `library_seed_jobs_status_check`: `CHECK ((status = ANY (ARRAY['analyzing'::text, 'awaiting_selection'::text, 'mapping'::text, 'awaiting_review'::text, 'applied'::text, 'skipped'::text])))`
 
-### `master_templates`  · 39 rows
+### `master_templates`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -791,7 +795,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `master_templates_format_check`: `CHECK ((format = ANY (ARRAY['document'::text, 'deck'::text, 'spreadsheet'::text])))`
 - CHECK `master_templates_status_check`: `CHECK ((status = ANY (ARRAY['active'::text, 'deprecated'::text])))`
 
-### `notification_read_state`  · 1 rows · _RLS on · tenant-scoped_
+### `notification_read_state`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -800,7 +804,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `last_read_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `opportunities`  · 28 rows
+### `opportunities`  · 22 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -862,7 +866,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `opportunities_submission_stage_check`: `CHECK ((submission_stage = ANY (ARRAY['nofo'::text, 'pre_release'::text, 'open'::text, 'updated'::text, 'closed'::text, 'archived'::text])))`
 - CHECK `opportunities_topic_status_check`: `CHECK ((topic_status = ANY (ARRAY['open'::text, 'pre_release'::text, 'closed'::text, 'awarded'::text, 'withdrawn'::text])))`
 
-### `opportunity_bridge`  · 27 rows
+### `opportunity_bridge`  · 10 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -892,7 +896,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `opportunity_lifecycle_actions_action_check`: `CHECK ((action = ANY (ARRAY['close'::text, 'reopen'::text, 'archive'::text, 'close_date_change'::text, 'set_stage'::text])))`
 
-### `page_views`  · 272 rows
+### `page_views`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -906,7 +910,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `utm_medium` | text | yes |  |
 | `utm_campaign` | text | yes |  |
 
-### `pipeline_jobs`  · 14 rows
+### `pipeline_jobs`  · 2 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -927,7 +931,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `pipeline_jobs_kind_check`: `CHECK ((kind = ANY (ARRAY['ingest'::text, 'shred_solicitation'::text, 'scout_source'::text, 'draft_section'::text, 'review_section'::text, 'expand_topics'::text`
 - CHECK `pipeline_jobs_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text])))`
 
-### `pipeline_schedules`  · 13 rows
+### `pipeline_schedules`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -940,7 +944,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `last_run_at` | timestamp with time zone | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `platform_agent_config`  · 1 rows
+### `platform_agent_config`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -975,7 +979,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 | `namespace` | text | yes |  |
 
-### `process_instance_transitions`  · 2,433 rows · _RLS FORCED_
+### `process_instance_transitions`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -993,7 +997,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `content_version_before` | integer | yes |  |
 | `content_version_after` | integer | yes |  |
 
-### `process_instances`  · 742 rows · _RLS on · tenant-scoped · archivable_
+### `process_instances`  · 186 rows · _RLS on · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1030,7 +1034,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `process_instances_source_check`: `CHECK ((source = ANY (ARRAY['pipeline'::text, 'cms'::text])))`
 - CHECK `process_instances_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'retrying'::text])))`
 
-### `process_templates`  · 37 rows
+### `process_templates`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1050,7 +1054,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `process_templates_source_check`: `CHECK ((source = ANY (ARRAY['pipeline'::text, 'cms'::text])))`
 
-### `project_acceptance_evidence`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_acceptance_evidence`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1074,7 +1078,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_acceptance_evidence_kind_check`: `CHECK ((kind = ANY (ARRAY['dd250'::text, 'cor_email'::text, 'signed_receipt'::text, 'transmittal'::text, 'other'::text])))`
 - CHECK `project_acceptance_evidence_note_len`: `CHECK (((note IS NULL) OR (length(note) <= 4000)))`
 
-### `project_assignments`  · 3 rows · _RLS FORCED · tenant-scoped_
+### `project_assignments`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1085,7 +1089,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `assigned_by` | uuid | **no** |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `project_cdrl_items`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_cdrl_items`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1116,7 +1120,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_cdrl_items_recurring_needs_a_start`: `CHECK (((frequency = ANY (ARRAY['one_time'::text, 'as_required'::text, 'with_each_milestone'::text])) OR (first_due IS NOT NULL)))`
 - CHECK `project_cdrl_items_title_check`: `CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 500)))`
 
-### `project_clins`  · 3 rows · _RLS FORCED · tenant-scoped_
+### `project_clins`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1132,7 +1136,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `sort_index` | integer | **no** | `0` |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `project_comments`  · 5 rows · _RLS FORCED · tenant-scoped_
+### `project_comments`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1156,7 +1160,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_comments_entity_type_check`: `CHECK ((entity_type = ANY (ARRAY['project'::text, 'milestone'::text, 'task'::text, 'deliverable'::text])))`
 - CHECK `project_comments_resolved_pair`: `CHECK (((resolved_at IS NULL) = (resolved_by IS NULL)))`
 
-### `project_deliverables`  · 7 rows · _RLS FORCED · tenant-scoped_
+### `project_deliverables`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1182,7 +1186,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `submitted_by` | uuid | yes |  |
 | `transmittal_ref` | text | yes |  |
 
-### `project_invoice_lines`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `project_invoice_lines`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1201,7 +1205,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_invoice_lines_description_check`: `CHECK (((length(btrim(description)) >= 1) AND (length(btrim(description)) <= 500)))`
 - CHECK `project_invoice_lines_source_check`: `CHECK ((source = ANY (ARRAY['milestone'::text, 'labour'::text, 'other_direct'::text, 'fee'::text, 'manual'::text])))`
 
-### `project_invoices`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `project_invoices`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1230,7 +1234,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_invoices_submitted_pair`: `CHECK (((status = ANY (ARRAY['submitted'::text, 'paid'::text])) = (submitted_on IS NOT NULL)))`
 - CHECK `project_invoices_void_reason`: `CHECK (((status <> 'void'::text) OR ((void_reason IS NOT NULL) AND (length(btrim(void_reason)) > 0))))`
 
-### `project_meetings`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_meetings`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1247,7 +1251,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `project_meetings_title_check`: `CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 500)))`
 
-### `project_milestone_tasks`  · 13 rows · _RLS FORCED · tenant-scoped_
+### `project_milestone_tasks`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1282,7 +1286,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_milestone_tasks_status_check`: `CHECK ((status = ANY (ARRAY['open'::text, 'done'::text, 'blocked'::text])))`
 - CHECK `project_milestone_tasks_title_check`: `CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 500)))`
 
-### `project_milestones`  · 9 rows · _RLS FORCED · tenant-scoped_
+### `project_milestones`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1317,7 +1321,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_milestones_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'met'::text, 'missed'::text, 'waived'::text])))`
 - CHECK `project_milestones_window_ordered`: `CHECK (((starts_on IS NULL) OR (forecast_date IS NULL) OR (forecast_date >= starts_on)))`
 
-### `project_modification_changes`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `project_modification_changes`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1338,7 +1342,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_modification_changes_field_check`: `CHECK (((field IS NULL) OR (field = ANY (ARRAY['title'::text, 'contract_type'::text, 'pop_start'::text, 'pop_end'::text, 'funded_amount'::text]))))`
 - CHECK `project_modification_changes_shape`: `CHECK ((((action = 'amend'::text) AND (clin_id IS NOT NULL) AND (field IS NOT NULL)) OR ((action = 'add_clin'::text) AND (field IS NULL))))`
 
-### `project_modifications`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_modifications`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1363,7 +1367,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_modifications_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'executed'::text])))`
 - CHECK `project_modifications_title_check`: `CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 500)))`
 
-### `project_provenance`  · 5 rows · _RLS FORCED · tenant-scoped_
+### `project_provenance`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1383,7 +1387,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `project_provenance_method_check`: `CHECK ((method = ANY (ARRAY['hitl'::text, 'verified'::text, 'override'::text, 'pattern_match'::text, 'ai'::text, 'default'::text])))`
 
-### `project_reviews`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `project_reviews`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1412,7 +1416,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_reviews_rejection_has_reason`: `CHECK (((status <> 'rejected'::text) OR ((reason IS NOT NULL) AND (length(btrim(reason)) > 0))))`
 - CHECK `project_reviews_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'withdrawn'::text])))`
 
-### `project_risks`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_risks`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1447,7 +1451,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_risks_status_check`: `CHECK ((status = ANY (ARRAY['open'::text, 'closed'::text])))`
 - CHECK `project_risks_title_check`: `CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 500)))`
 
-### `project_source_documents`  · 4 rows · _RLS FORCED · tenant-scoped_
+### `project_source_documents`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1464,7 +1468,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `project_source_documents_kind_check`: `CHECK ((kind = ANY (ARRAY['executed_contract'::text, 'submitted_proposal'::text])))`
 
-### `project_task_attachments`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `project_task_attachments`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1507,7 +1511,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `project_time_entries_note_len`: `CHECK (((note IS NULL) OR (length(note) <= 2000)))`
 - CHECK `project_time_entries_rate_positive`: `CHECK (((hourly_rate IS NULL) OR (hourly_rate >= (0)::numeric)))`
 
-### `projects`  · 4 rows · _RLS FORCED · tenant-scoped_
+### `projects`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1530,7 +1534,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `projects_closeout_metrics_is_object`: `CHECK (((closeout_metrics IS NULL) OR (jsonb_typeof(closeout_metrics) = 'object'::text)))`
 - CHECK `projects_status_check`: `CHECK ((status = ANY (ARRAY['planning'::text, 'active'::text, 'closing'::text, 'closed'::text])))`
 
-### `promo_codes`  · 33 rows
+### `promo_codes`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1554,7 +1558,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `promo_codes_kind_check`: `CHECK ((kind = ANY (ARRAY['comp'::text, 'percent'::text, 'amount'::text])))`
 - CHECK `promo_codes_revoked_inactive`: `CHECK (((revoked_at IS NULL) OR (active = false)))`
 
-### `proposal_activity_log`  · 99 rows · _RLS on · tenant-scoped_
+### `proposal_activity_log`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1573,7 +1577,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `proposal_activity_log_activity_type_check`: `CHECK ((activity_type = ANY (ARRAY['section_edited'::text, 'section_saved'::text, 'section_reverted'::text, 'section_assigned'::text, 'section_unassigned'::text`
 
-### `proposal_amendment_flags`  · 7 rows · _RLS on · tenant-scoped_
+### `proposal_amendment_flags`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1585,7 +1589,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `acknowledged_at` | timestamp with time zone | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `proposal_artifacts`  · 19 rows · _RLS FORCED_
+### `proposal_artifacts`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1608,7 +1612,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `proposal_artifacts_artifact_type_check`: `CHECK ((artifact_type = ANY (ARRAY['narrative'::text, 'cost'::text, 'form'::text, 'matrix'::text, 'other'::text])))`
 - CHECK `proposal_artifacts_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'in_progress'::text, 'locked'::text])))`
 
-### `proposal_collaborators`  · 10 rows · _RLS FORCED_
+### `proposal_collaborators`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1625,7 +1629,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `dropbox_enabled` | boolean | yes | `true` |
 | `revoked_at` | timestamp with time zone | yes |  |
 
-### `proposal_comments`  · 2 rows · _RLS FORCED_
+### `proposal_comments`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1642,7 +1646,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `proposal_comments_recommendation_type_check`: `CHECK ((recommendation_type = ANY (ARRAY['human'::text, 'ai_review'::text, 'ai_suggestion'::text])))`
 
-### `proposal_compliance_matrix`  · 68 rows · _RLS FORCED_
+### `proposal_compliance_matrix`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1659,7 +1663,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `proposal_compliance_matrix_status_check`: `CHECK ((status = ANY (ARRAY['not_addressed'::text, 'partial'::text, 'satisfied'::text, 'not_applicable'::text])))`
 
-### `proposal_portals`  · 5 rows · _RLS FORCED · tenant-scoped_
+### `proposal_portals`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1680,7 +1684,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `proposal_portals_status_check`: `CHECK ((status = ANY (ARRAY['guardrails_pending'::text, 'curation_pending'::text, 'launched'::text, 'executing'::text, 'closeout'::text, 'archived'::text, 'aban`
 
-### `proposal_sections`  · 68 rows · _RLS FORCED_
+### `proposal_sections`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1719,7 +1723,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `proposal_sections_status_check`: `CHECK ((status = ANY (ARRAY['empty'::text, 'ai_drafted'::text, 'in_progress'::text, 'complete'::text, 'approved'::text])))`
 
-### `proposal_stage_history`  · 23 rows · _RLS FORCED_
+### `proposal_stage_history`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1731,7 +1735,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `notes` | text | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `proposal_supporting_docs`  · 3 rows · _RLS on · tenant-scoped_
+### `proposal_supporting_docs`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1758,7 +1762,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `proposal_supporting_docs_category_check`: `CHECK ((category = ANY (ARRAY['supporting_document'::text, 'proposal_input'::text, 'other'::text])))`
 - CHECK `proposal_supporting_docs_status_check`: `CHECK ((status = ANY (ARRAY['missing'::text, 'uploaded'::text, 'reviewed'::text, 'approved'::text, 'waived'::text])))`
 
-### `proposals`  · 18 rows · _RLS FORCED · tenant-scoped · archivable_
+### `proposals`  · 0 rows · _RLS FORCED · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1792,7 +1796,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `proposals_studio_phase_check`: `CHECK (((studio_phase IS NULL) OR (studio_phase = ANY (ARRAY['draft'::text, 'refine'::text, 'compliance'::text, 'complete'::text]))))`
 - CHECK `proposals_studio_phase_status_check`: `CHECK (((studio_phase_status IS NULL) OR (studio_phase_status = ANY (ARRAY['running'::text, 'awaiting_review'::text]))))`
 
-### `purchases`  · 4 rows · _RLS on · tenant-scoped_
+### `purchases`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1812,7 +1816,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `purchases_product_type_check`: `CHECK ((product_type = ANY (ARRAY['finder_subscription'::text, 'proposal_phase1'::text, 'proposal_phase2'::text, 'expert_consulting'::text])))`
 - CHECK `purchases_status_check`: `CHECK ((status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'refunded'::text])))`
 
-### `rate_limit_state`  · 3 rows
+### `rate_limit_state`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1970,7 +1974,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `scout_runs_role_check`: `CHECK ((role = ANY (ARRAY['scout'::text, 'watcher'::text, 'publisher'::text])))`
 - CHECK `scout_runs_status_check`: `CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text])))`
 
-### `scout_sources`  · 3 rows
+### `scout_sources`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1990,7 +1994,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `scout_sources_kind_check`: `CHECK ((kind = ANY (ARRAY['website'::text, 'social'::text, 'rss'::text, 'sitemap'::text])))`
 - CHECK `scout_sources_purpose_check`: `CHECK ((purpose = ANY (ARRAY['content'::text, 'opportunity'::text, 'both'::text])))`
 
-### `section_standards`  · 21 rows
+### `section_standards`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2007,7 +2011,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `semantic_memories`  · 6 rows · _RLS FORCED · tenant-scoped_
+### `semantic_memories`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2042,7 +2046,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `user_id` | uuid | **no** |  |
 | `expires` | timestamp with time zone | **no** |  |
 
-### `shadow_admin_grants`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `shadow_admin_grants`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2060,7 +2064,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `shadow_admin_grants_source_check`: `CHECK ((source = ANY (ARRAY['t_and_c'::text, 'invite'::text])))`
 
-### `solicitation_amendments`  · 7 rows
+### `solicitation_amendments`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2096,10 +2100,11 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `compliance_variable_name` | text | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
+| `excerpt` | text | yes |  |
 
 - CHECK `solicitation_annotations_kind_check`: `CHECK ((kind = ANY (ARRAY['highlight'::text, 'text_box'::text, 'compliance_tag'::text])))`
 
-### `solicitation_compliance`  · 10 rows
+### `solicitation_compliance`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2144,7 +2149,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `field_provenance` | jsonb | **no** | `'{}'::jsonb` |
 | `character_limit_narrative` | integer | yes |  |
 
-### `solicitation_compliance_drafts`  · 2 rows
+### `solicitation_compliance_drafts`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2166,7 +2171,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `solicitation_compliance_drafts_phase_check`: `CHECK ((phase = ANY (ARRAY['extract'::text, 'matrix'::text, 'review'::text])))`
 - CHECK `solicitation_compliance_drafts_status_check`: `CHECK ((status = ANY (ARRAY['staged'::text, 'reviewed'::text, 'landed'::text, 'superseded'::text, 'rejected'::text])))`
 
-### `solicitation_documents`  · 1 rows
+### `solicitation_documents`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2202,7 +2207,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `solicitation_volumes`  · 22 rows
+### `solicitation_volumes`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2244,7 +2249,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `source_diffs_severity_check`: `CHECK ((severity = ANY (ARRAY['info'::text, 'low'::text, 'medium'::text, 'high'::text, 'critical'::text])))`
 
-### `source_health`  · 3 rows
+### `source_health`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2259,7 +2264,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `source_health_status_check`: `CHECK ((status = ANY (ARRAY['healthy'::text, 'degraded'::text, 'error'::text, 'unknown'::text])))`
 
-### `source_profiles`  · 6 rows
+### `source_profiles`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2317,7 +2322,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `raw_html_s3_key` | text | yes |  |
 | `captured_at` | timestamp with time zone | yes | `now()` |
 
-### `source_visits`  · 1 rows
+### `source_visits`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2334,7 +2339,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `source_visits_action_check`: `CHECK ((action = ANY (ARRAY['visit'::text, 'download'::text, 'upload'::text, 'paste_topics'::text, 'import_topics'::text, 'shred'::text, 'note'::text])))`
 
-### `stage_completion_snapshots`  · 1 rows · _RLS FORCED_
+### `stage_completion_snapshots`  · 0 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2369,7 +2374,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `stage_gate_requirements_requirement_type_check`: `CHECK ((requirement_type = ANY (ARRAY['all_sections_complete'::text, 'compliance_check_passed'::text, 'min_sections_approved'::text, 'admin_review_complete'::te`
 
-### `system_events`  · 19,638 rows · _tenant-scoped_
+### `system_events`  · 194 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2404,7 +2409,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `s3_reachable` | boolean | **no** | `true` |
 | `notes` | jsonb | yes | `'{}'::jsonb` |
 
-### `tasks`  · 713 rows · _RLS on · tenant-scoped_
+### `tasks`  · 1 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2433,7 +2438,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `tasks_assignee_present`: `CHECK (((assignee_role IS NOT NULL) OR (assignee_user_id IS NOT NULL) OR (tenant_id IS NOT NULL)))`
 - CHECK `tasks_status_check`: `CHECK ((status = ANY (ARRAY['open'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text, 'expired'::text])))`
 
-### `taxonomy_terms`  · 122 rows
+### `taxonomy_terms`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2446,7 +2451,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `is_active` | boolean | **no** | `true` |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 
-### `template_bridge`  · 43 rows
+### `template_bridge`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2460,7 +2465,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `template_bridge_event_type_check`: `CHECK ((event_type = ANY (ARRAY['published'::text, 'updated'::text, 'deprecated'::text, 'republished'::text])))`
 
-### `tenant_agent_config`  · 1 rows · _RLS on · tenant-scoped_
+### `tenant_agent_config`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2503,7 +2508,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `tenant_automation_policies_relative_anchor_check`: `CHECK ((relative_anchor = ANY (ARRAY['open_date'::text, 'close_date'::text, 'stage_entered'::text])))`
 - CHECK `tenant_automation_policies_scope_check`: `CHECK ((scope = ANY (ARRAY['discovery'::text, 'build'::text, 'project'::text])))`
 
-### `tenant_bridge_cursor`  · 8 rows · _tenant-scoped_
+### `tenant_bridge_cursor`  · 7 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2512,7 +2517,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `last_event_id` | uuid | yes |  |
 | `last_applied_at` | timestamp with time zone | **no** | `now()` |
 
-### `tenant_bucket_scores`  · 50 rows · _RLS FORCED · tenant-scoped_
+### `tenant_bucket_scores`  · 45 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2526,7 +2531,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `chk_tbs_score_range`: `CHECK (((score >= 0) AND (score <= 100)))`
 
-### `tenant_documents`  · 28 rows · _RLS on · tenant-scoped_
+### `tenant_documents`  · 0 rows · _RLS on · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2549,7 +2554,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `tenant_documents_doc_type_check`: `CHECK ((doc_type = ANY (ARRAY['technical_volume'::text, 'cost_volume'::text, 'slide_deck'::text, 'past_performance'::text, 'key_personnel'::text, 'commercializa`
 - CHECK `tenant_documents_status_check`: `CHECK ((status = ANY (ARRAY['draft'::text, 'final'::text])))`
 
-### `tenant_opportunity_cards`  · 80 rows · _RLS FORCED · tenant-scoped · archivable_
+### `tenant_opportunity_cards`  · 63 rows · _RLS FORCED · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2560,22 +2565,49 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `bridge_version` | integer | **no** | `0` |
 | `lifecycle_status` | text | **no** | `'open'::text` |
 | `pursuit_status` | text | **no** | `'unreviewed'::text` |
-| `is_pinned` | boolean | **no** | `false` |
-| `pin_update_available` | boolean | **no** | `false` |
-| `pinned_at` | timestamp with time zone | yes |  |
+| `docs_copied` | boolean | **no** | `false` |
+| `docs_update_available` | boolean | **no** | `false` |
+| `docs_copied_at` | timestamp with time zone | yes |  |
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
-| `pinned_docs` | jsonb | **no** | `'[]'::jsonb` |
+| `copied_docs` | jsonb | **no** | `'[]'::jsonb` |
 | `submission_stage` | text | **no** | `'open'::text` |
 | `archived_at` | timestamp with time zone | yes |  |
 | `start_nudges_sent` | integer | **no** | `0` |
 | `start_nudged_at` | timestamp with time zone | yes |  |
+| `card_tsv` | tsvector | yes |  |
+| `pursuit_set_at` | timestamp with time zone | yes |  |
 
 - CHECK `tenant_opportunity_cards_lifecycle_status_check`: `CHECK ((lifecycle_status = ANY (ARRAY['open'::text, 'closed'::text, 'archived'::text])))`
 - CHECK `tenant_opportunity_cards_pursuit_status_check`: `CHECK ((pursuit_status = ANY (ARRAY['unreviewed'::text, 'pursuing'::text, 'monitoring'::text, 'passed'::text])))`
 - CHECK `tenant_opportunity_cards_submission_stage_check`: `CHECK ((submission_stage = ANY (ARRAY['nofo'::text, 'pre_release'::text, 'open'::text, 'updated'::text, 'closed'::text, 'archived'::text])))`
 
-### `tenant_profiles`  · 2 rows · _RLS FORCED · tenant-scoped_
+### `tenant_opportunity_documents`  · 0 rows · _RLS FORCED · tenant-scoped_
+
+| column | type | null | default |
+|---|---|---|---|
+| `id` | uuid | **no** | `gen_random_uuid()` |
+| `tenant_id` | uuid | **no** |  |
+| `opportunity_id` | uuid | **no** |  |
+| `source_document_id` | uuid | **no** |  |
+| `document_type` | text | **no** |  |
+| `document_label` | text | yes |  |
+| `original_filename` | text | **no** |  |
+| `is_primary` | boolean | **no** | `false` |
+| `content_hash` | text | yes |  |
+| `page_count` | integer | yes |  |
+| `char_count` | integer | **no** | `0` |
+| `storage_key` | text | yes |  |
+| `pinned_key` | text | yes |  |
+| `extracted_text` | text | yes |  |
+| `text_tsv` | tsvector | yes |  |
+| `bridge_version` | integer | **no** | `0` |
+| `created_at` | timestamp with time zone | **no** | `now()` |
+| `updated_at` | timestamp with time zone | **no** | `now()` |
+
+- CHECK `tenant_opp_docs_type_check`: `CHECK ((document_type = ANY (ARRAY['source'::text, 'rfp'::text, 'nofo'::text, 'instructions'::text, 'amendment'::text, 'qa'::text, 'template'::text, 'supporting`
+
+### `tenant_profiles`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2593,7 +2625,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `tenant_spotlight_buckets`  · 5 rows · _RLS FORCED · tenant-scoped_
+### `tenant_spotlight_buckets`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2607,7 +2639,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `tenant_template_cards`  · 312 rows · _RLS FORCED · tenant-scoped_
+### `tenant_template_cards`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2625,7 +2657,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `tenants`  · 8 rows · _archivable_
+### `tenants`  · 0 rows · _archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2654,7 +2686,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `tenants_status_check`: `CHECK ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'churned'::text, 'trial'::text])))`
 - CHECK `tenants_subscription_status_check`: `CHECK ((subscription_status = ANY (ARRAY['none'::text, 'active'::text, 'past_due'::text, 'canceled'::text])))`
 
-### `tool_invocation_metrics`  · 59 rows · _tenant-scoped_
+### `tool_invocation_metrics`  · 0 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2671,7 +2703,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `tool_invocation_metrics_actor_type_check`: `CHECK ((actor_type = ANY (ARRAY['user'::text, 'system'::text, 'pipeline'::text, 'agent'::text])))`
 
-### `triage_actions`  · 13 rows
+### `triage_actions`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2687,7 +2719,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `triage_actions_action_check`: `CHECK ((action = ANY (ARRAY['claim'::text, 'release'::text, 'dismiss'::text, 'request_review'::text, 'approve'::text, 'reject'::text, 'push'::text, 'reclaim'::t`
 
-### `user_memberships`  · 24 rows · _tenant-scoped_
+### `user_memberships`  · 0 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2706,7 +2738,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `user_memberships_source_check`: `CHECK ((source = ANY (ARRAY['home'::text, 'shadow_t_and_c'::text, 'collaborator'::text, 'manual'::text, 'partner_manager'::text])))`
 - CHECK `user_memberships_status_check`: `CHECK ((status = ANY (ARRAY['active'::text, 'invited'::text, 'revoked'::text])))`
 
-### `users`  · 40 rows · _tenant-scoped_
+### `users`  · 0 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2726,7 +2758,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `users_role_check`: `CHECK ((role = ANY (ARRAY['master_admin'::text, 'rfp_admin'::text, 'partner_admin'::text, 'tenant_admin'::text, 'tenant_user'::text, 'partner_user'::text])))`
 
-### `vault_members`  · 1 rows · _RLS FORCED · tenant-scoped_
+### `vault_members`  · 0 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2752,7 +2784,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `token` | text | **no** |  |
 | `expires` | timestamp with time zone | **no** |  |
 
-### `visitor_sessions`  · 43 rows
+### `visitor_sessions`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2776,7 +2808,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `latitude` | double precision | yes |  |
 | `longitude` | double precision | yes |  |
 
-### `volume_required_items`  · 69 rows
+### `volume_required_items`  · 0 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2833,168 +2865,42 @@ because `locked` is not a member — the lock is `locked_at IS NOT NULL`.
 
 | column | values (count) |
 |---|---|
-| `agent_performance.agent_role` | `packaging_specialist(1)` · `section_drafter(1)` · `pp_matcher(1)` · `cost_estimator(1)` · `proposal_architect(1)` · `color_team_reviewer(1)` · `library_seed_suggester(1)` · `outcome_analyst(1)` · `research_scout(1)` · `capture_strategist(1)` |
-| `agent_task_log.status` | `completed(207)` · `failed(7)` |
-| `agent_task_queue.agent_role` | `color_team_reviewer(1)` · `library_seed_suggester(1)` · `librarian(1)` |
-| `agent_task_queue.status` | `completed(3)` |
-| `agent_task_queue.task_type` | `catalog(1)` · `review_section(1)` · `seed_suggest(1)` |
-| `api_key_registry.source` | `anthropic(1)` · `grants_gov(1)` · `sbir_gov(1)` · `sam_gov(1)` |
-| `applications.source` | `public(1)` |
-| `applications.status` | `accepted(1)` |
-| `atom_embeddings.model` | `local-hash-v1(1229)` |
-| `atom_tags.tag_source` | `admin(9810)` · `auto(1736)` |
-| `automation_log.action_taken` | `fired(8)` · `recorded(2)` |
-| `automation_log.action_type` | `create_todo(7)` · `send_email(2)` · `notify_admin(1)` |
-| `automation_log.status` | `success(8)` · `deferred(2)` |
-| `automation_rules.action_type` | `send_email(7)` · `notify_admin(5)` · `create_todo(2)` · `publish_content(1)` · `unpublish_content(1)` · `distribute_social(1)` |
-| `automation_rules.trigger_namespace` | `capture(6)` · `proposal(4)` · `finder(3)` · `system(2)` · `identity(1)` · `library(1)` |
-| `canvas_versions.source` | `human_edit(6)` · `system(1)` · `ai_draft(1)` |
-| `cms_content.content_type` | `page_block(116)` · `resource(8)` · `blog_post(3)` · `guide(2)` · `team_member(1)` |
-| `cms_content.status` | `published(130)` |
-| `collaboration_vaults.status` | `active(1)` |
-| `collaborator_stage_access.stage` | `draft(10)` · `final(10)` |
-| `command_seen_state.scope` | `admin(4)` · `tenant:17780cad-76c0-4cef-95ec-2a536bcf5c8f(1)` · `tenant:8f126bc2-1152-44e5-8473-3761c744d806(1)` |
-| `compliance_presets.phase_type` | `direct_to_phase_2(2)` · `phase_1(2)` · `tvsf(1)` · `phase_2(1)` |
-| `compliance_presets.program_type` | `sbir_phase_2(2)` · `sttr(1)` · `sbir_phase_1(1)` · `tvsf(1)` · `cso(1)` |
-| `compliance_variables.data_type` | `boolean(7)` · `select(5)` · `text(5)` · `number(4)` · `multiselect(4)` |
-| `content_pages.content_type` | `page(40)` · `guide(21)` · `resource(9)` · `blog_post(3)` · `team_member(1)` |
-| `content_pages.status` | `active(32)` · `archived(30)` · `draft(12)` |
-| `contracts.status` | `active(14)` |
-| `curated_solicitations.ingest_phase` | `not_started(23)` · `matrix(1)` |
-| `curated_solicitations.namespace` | `pending(17)` · `NSF:SBIR:Phase1(1)` · `DOD:unknown:BAA:Open(1)` · `DOE:SBIR:Phase1(1)` · `ARMY:A:STTR:Phase1(1)` · `NAVY:N:SBIR:Phase2(1)` · `CHEMICAL AND BIOLOGICAL DEFENSE:CBD:CSO:Open(1)` · `USAF:AF:SBIR:Phase1(1)` |
-| `curated_solicitations.solicitation_type` | `single(22)` · `multi_topic(2)` |
-| `curated_solicitations.status` | `new(14)` · `pushed_to_pipeline(7)` · `approved(3)` |
-| `curation_revisions.revision_type` | `review_requested(9)` · `status_changed(1)` · `review_approved(1)` · `compliance_updated(1)` |
-| `document_cocoons.scope` | `document(6)` |
-| `document_cocoons.source` | `upload(5)` · `download(1)` |
-| `document_templates.template_type` | `custom(6)` · `abstract(1)` · `slide_deck(1)` · `past_performance(1)` |
-| `email_send_ledger.kind` | `transactional(8)` |
-| `email_send_ledger.status` | `failed(8)` |
-| `episodic_memories.memory_type` | `interaction(253)` · `outcome(145)` · `decision(3)` |
-| `episodic_memories.namespace` | `DOD:unknown:BAA:Open(3)` |
-| `episodic_memories.source` | `fabric(253)` · `outcome_attributor(145)` · `f1123902-66b2-428b-81ac-469d1a5eb2a1(3)` |
-| `expert_availability_blocks.status` | `booked(1)` |
-| `expert_time_bookings.status` | `booked(1)` |
-| `library_atoms.creator_kind` | `admin(1788)` · `ai(1)` |
-| `library_atoms.outcome` | `pending(1788)` · `awarded(1)` |
-| `library_atoms.source` | `manual(925)` · `download_derivative(607)` · `upload(257)` |
-| `library_atoms.status` | `approved(1789)` |
-| `library_atoms.visibility` | `tenant(1789)` |
-| `library_seed_jobs.status` | `analyzing(1)` |
-| `master_templates.format` | `document(27)` · `spreadsheet(7)` · `deck(5)` |
-| `master_templates.status` | `active(39)` |
-| `opportunities.lifecycle_status` | `open(28)` |
-| `opportunities.phase_type` | `direct_to_phase_2(1)` · `phase_1(1)` · `other(1)` |
-| `opportunities.program_type` | `sbir_phase_1(16)` · `sbir(4)` · `tvsf(2)` · `sttr(2)` · `baa(1)` · `cso(1)` · `sttr_phase_1(1)` · `sbir_phase_2(1)` |
+| `agent_task_log.status` | `completed(25)` · `failed(9)` |
+| `agent_task_queue.agent_role` | `opportunity_analyst(1)` · `scoring_strategist(1)` · `librarian(1)` |
+| `agent_task_queue.status` | `failed(2)` · `completed(1)` |
+| `agent_task_queue.task_type` | `analyze_fit(1)` · `score_adjustment(1)` · `catalog(1)` |
+| `automation_log.action_taken` | `fired(3)` |
+| `automation_log.action_type` | `create_todo(2)` · `notify_admin(1)` |
+| `automation_log.status` | `success(3)` |
+| `curated_solicitations.ingest_phase` | `not_started(18)` |
+| `curated_solicitations.namespace` | `pending(12)` · `NSF:SBIR:Phase1(1)` · `DOE:SBIR:Phase1(1)` · `CHEMICAL AND BIOLOGICAL DEFENSE:CBD:CSO:Open(1)` · `NAVY:N:SBIR:Phase2(1)` · `USAF:AF:SBIR:Phase1(1)` · `ARMY:A:STTR:Phase1(1)` |
+| `curated_solicitations.solicitation_type` | `single(16)` · `multi_topic(2)` |
+| `curated_solicitations.status` | `new(9)` · `pushed_to_pipeline(6)` · `approved(3)` |
+| `opportunities.lifecycle_status` | `open(22)` |
+| `opportunities.phase_type` | `direct_to_phase_2(1)` · `other(1)` · `phase_1(1)` |
+| `opportunities.program_type` | `sbir_phase_1(11)` · `sbir(4)` · `tvsf(2)` · `sttr(2)` · `sttr_phase_1(1)` · `cso(1)` · `sbir_phase_2(1)` |
 | `opportunities.set_aside_type` | `Small Business SBIR/STTR Program(4)` |
-| `opportunities.source` | `intake:admin(14)` · `sbir_gov(6)` · `dsip(4)` · `manual(3)` · `manual_upload(1)` |
-| `opportunities.submission_stage` | `open(20)` · `pre_release(8)` |
-| `opportunities.topic_status` | `open(28)` |
-| `opportunity_bridge.event_type` | `updated(19)` · `published(8)` |
-| `pipeline_jobs.kind` | `ingest(9)` · `scout_source(5)` |
-| `pipeline_jobs.run_type` | `full(14)` |
-| `pipeline_jobs.source` | `sam_gov(4)` · `dsip(4)` · `scout_source(3)` · `scout(2)` · `sbir_gov(1)` |
-| `pipeline_jobs.status` | `completed(12)` · `failed(2)` |
-| `pipeline_schedules.run_type` | `full(6)` · `event(4)` · `incremental(3)` |
-| `process_instance_transitions.from_status` | `running(810)` · `pending(742)` · `paused(71)` · `retrying(68)` |
-| `process_instance_transitions.to_status` | `running(810)` · `pending(742)` · `completed(643)` · `paused(167)` · `retrying(68)` · `failed(3)` |
-| `process_instances.scope` | `contract(66)` · `opp(1)` |
-| `process_instances.source` | `pipeline(742)` |
-| `process_instances.status` | `completed(643)` · `paused(96)` · `failed(3)` |
-| `process_templates.source` | `pipeline(37)` |
-| `project_acceptance_evidence.content_type` | `message/rfc822(1)` |
-| `project_acceptance_evidence.customer_role` | `COR(1)` |
-| `project_acceptance_evidence.kind` | `cor_email(1)` |
-| `project_clins.contract_type` | `FFP(2)` · `CPFF(1)` |
-| `project_comments.entity_type` | `project(4)` · `milestone(1)` |
-| `project_deliverables.content_type` | `application/pdf(2)` |
-| `project_invoice_lines.source` | `manual(2)` |
-| `project_invoices.status` | `paid(1)` · `void(1)` |
-| `project_milestone_tasks.scope` | `milestone(9)` · `project(4)` |
-| `project_milestone_tasks.status` | `done(11)` · `open(1)` · `blocked(1)` |
-| `project_milestones.status` | `met(5)` · `pending(4)` |
-| `project_modification_changes.action` | `amend(2)` |
-| `project_modifications.kind` | `funding(1)` |
-| `project_modifications.status` | `executed(1)` |
-| `project_reviews.entity_type` | `deliverable(2)` |
-| `project_reviews.status` | `approved(1)` · `rejected(1)` |
-| `project_risks.kind` | `issue(1)` |
-| `project_risks.status` | `closed(1)` |
-| `project_source_documents.content_type` | `application/pdf(4)` |
-| `project_source_documents.kind` | `executed_contract(2)` · `submitted_proposal(2)` |
-| `project_task_attachments.content_type` | `application/pdf(1)` |
-| `projects.status` | `planning(2)` · `active(2)` |
-| `promo_codes.kind` | `comp(33)` |
-| `proposal_activity_log.activity_type` | `proposal_exported(62)` · `outcome_recorded(20)` · `collaborator_invited(9)` · `ai_draft_requested(7)` · `stage_advanced(1)` |
-| `proposal_activity_log.actor_role` | `tenant_admin(99)` |
-| `proposal_artifacts.artifact_type` | `form(9)` · `narrative(6)` · `cost(4)` |
-| `proposal_artifacts.status` | `locked(18)` · `draft(1)` |
-| `proposal_collaborators.role` | `external(10)` |
-| `proposal_comments.recommendation_type` | `ai_review(1)` · `human(1)` |
-| `proposal_compliance_matrix.requirement_source` | `Proposal(27)` · `Technical Volume(22)` · `Supporting Documents(3)` · `Budget(2)` · `Proposal Cover Sheet(2)` · `Fraud, Waste and Abuse Training(2)` · `Cost Volume(2)` · `Supporting Letters(2)` · `Company Commercialization Report(2)` · `RFP(1)` |
-| `proposal_compliance_matrix.status` | `satisfied(65)` · `not_addressed(3)` |
-| `proposal_portals.status` | `launched(4)` · `closeout(1)` |
-| `proposal_sections.completed_stage` | `draft(50)` · `final(15)` |
-| `proposal_sections.content_source` | `human_edit(48)` |
-| `proposal_sections.section_type` | `cost(2)` · `facilities(2)` · `technical.objectives(2)` · `team(1)` |
-| `proposal_sections.status` | `approved(65)` · `in_progress(3)` |
-| `proposal_stage_history.from_stage` | `submitted(20)` · `draft(1)` · `final(1)` |
-| `proposal_stage_history.to_stage` | `archived(20)` · `draft(1)` · `submitted(1)` · `final(1)` |
-| `proposal_supporting_docs.requirement_source` | `solicitation §5.2(1)` |
-| `proposal_supporting_docs.status` | `missing(3)` |
-| `proposals.stage` | `archived(13)` · `submitted(3)` · `draft(1)` · `final(1)` |
-| `purchases.product_type` | `proposal_phase1(4)` |
-| `purchases.status` | `completed(4)` |
-| `rate_limit_state.source` | `sam_gov(1)` · `grants_gov(1)` · `sbir_gov(1)` |
-| `scout_sources.kind` | `website(2)` · `rss(1)` |
-| `semantic_memories.agent_role` | `status_narrator(1)` · `advisory_manager(1)` · `outcome_analyst(1)` · `project_manager(1)` · `continuity_manager(1)` · `outcome_tracker(1)` |
-| `shadow_admin_grants.source` | `t_and_c(2)` |
-| `solicitation_amendments.severity` | `critical(7)` |
-| `solicitation_amendments.source` | `manual(7)` |
-| `solicitation_amendments.status` | `confirmed(7)` |
-| `solicitation_compliance.submission_format` | `SBIR/STTR technical volume(5)` · `DoW SBIR/STTR Innovation Portal (DSIP) — 8.5x11, single column, single-spaced(1)` · `Proposal (<=7 pages, Abstract excluded) + Budget(1)` · `Electronic submission via DSIP. PDF, 8.5x11, 1in margins, Times New Roman 11pt.(1)` · `DoW SBIR/STTR Innovation Portal (DSIP) — single PDF, 8.5x11, single column(1)` · `Proposal (≤7 pages, Abstract excluded) + Budget(1)` |
-| `solicitation_compliance_drafts.phase` | `matrix(2)` |
-| `solicitation_compliance_drafts.status` | `staged(1)` · `superseded(1)` |
-| `solicitation_documents.content_type` | `application/pdf(1)` |
-| `solicitation_documents.document_type` | `source(1)` |
-| `solicitation_volumes.volume_format` | `dsip_standard(12)` · `custom(10)` |
-| `source_health.source` | `sam_gov(1)` · `grants_gov(1)` · `sbir_gov(1)` |
-| `source_health.status` | `unknown(3)` |
-| `source_profiles.program_type` | `sbir(4)` · `ota(1)` |
-| `source_profiles.site_type` | `dsip(2)` · `nsf(1)` · `sam_gov(1)` · `xtech(1)` · `afwerx(1)` |
-| `source_visits.action` | `visit(1)` |
-| `stage_completion_snapshots.stage` | `draft(1)` |
-| `system_events.actor_type` | `system(8972)` · `user(8732)` · `pipeline(1328)` · `agent(606)` |
-| `system_events.namespace` | `system(9237)` · `project(2862)` · `proposal(1634)` · `identity(1394)` · `library(1361)` · `tool(1230)` · `finder(1051)` · `capture(869)` |
-| `system_events.phase` | `single(16903)` · `start(1371)` · `end(1364)` |
-| `tasks.assignee_role` | `tenant_admin(109)` · `tenant_user(48)` · `rfp_admin(41)` |
-| `tasks.entity_type` | `project_milestone_task(404)` · `project_review(82)` · `contract(77)` · `project_comment(44)` · `project_modification(32)` · `proposal(32)` · `solicitation(15)` · `content_pages(10)` · `source_profile(7)` · `portal(2)` |
-| `tasks.status` | `completed(532)` · `open(179)` · `expired(2)` |
-| `template_bridge.event_type` | `published(39)` · `republished(4)` |
-| `tenant_documents.doc_type` | `custom(28)` |
-| `tenant_documents.status` | `draft(28)` |
-| `tenant_opportunity_cards.lifecycle_status` | `open(80)` |
-| `tenant_opportunity_cards.pursuit_status` | `unreviewed(80)` |
-| `tenant_opportunity_cards.submission_stage` | `open(80)` |
-| `tenant_template_cards.format` | `document(216)` · `spreadsheet(56)` · `deck(40)` |
-| `tenants.kind` | `standard(6)` · `partner_org(2)` |
-| `tenants.lifecycle_stage` | `customer(8)` |
-| `tenants.product_tier` | `finder(7)` · `grinder(1)` |
-| `tenants.status` | `active(8)` |
-| `tenants.subscription_status` | `none(8)` |
-| `tool_invocation_metrics.actor_type` | `user(59)` |
-| `tool_invocation_metrics.tool_namespace` | `compliance(57)` · `solicitation(2)` |
-| `triage_actions.action` | `request_review(10)` · `push(1)` · `skip_shredder(1)` · `approve(1)` |
-| `triage_actions.from_state` | `curation_in_progress(10)` · `ai_analyzed(1)` · `approved(1)` · `review_requested(1)` |
-| `triage_actions.to_state` | `review_requested(10)` · `pushed_to_pipeline(1)` · `approved(1)` · `curation_in_progress(1)` |
-| `user_memberships.role` | `partner_user(10)` · `tenant_admin(10)` · `tenant_user(4)` |
-| `user_memberships.source` | `home(14)` · `collaborator(9)` · `partner_manager(1)` |
-| `user_memberships.status` | `active(24)` |
-| `users.role` | `partner_user(25)` · `tenant_admin(6)` · `tenant_user(5)` · `master_admin(2)` · `partner_admin(2)` |
-| `vault_members.role` | `partner_user(1)` |
-| `vault_members.status` | `active(1)` |
-| `visitor_sessions.device_type` | `desktop(43)` |
-| `volume_required_items.item_type` | `word_doc(32)` · `text(22)` · `pdf(5)` · `form_other(4)` · `spreadsheet(4)` · `form_sf424(2)` |
+| `opportunities.source` | `intake:admin(9)` · `sbir_gov(6)` · `dsip(4)` · `manual(3)` |
+| `opportunities.submission_stage` | `open(19)` · `pre_release(3)` |
+| `opportunities.topic_status` | `open(22)` |
+| `opportunity_bridge.event_type` | `updated(18)` · `published(6)` |
+| `pipeline_jobs.kind` | `ingest(9)` · `scout_source(4)` |
+| `pipeline_jobs.run_type` | `full(13)` |
+| `pipeline_jobs.source` | `sam_gov(4)` · `dsip(4)` · `scout(2)` · `scout_source(2)` · `sbir_gov(1)` |
+| `pipeline_jobs.status` | `completed(9)` · `failed(2)` · `pending(2)` |
+| `process_instances.scope` | `contract(4)` |
+| `process_instances.source` | `pipeline(186)` |
+| `process_instances.status` | `completed(179)` · `paused(7)` |
+| `system_events.actor_type` | `system(2957)` · `user(1228)` · `pipeline(257)` · `agent(94)` |
+| `system_events.namespace` | `system(2505)` · `library(518)` · `finder(456)` · `capture(339)` · `identity(314)` · `tool(194)` · `proposal(193)` · `project(17)` |
+| `system_events.phase` | `single(3966)` · `start(286)` · `end(284)` |
+| `tasks.assignee_role` | `rfp_admin(20)` · `tenant_admin(10)` |
+| `tasks.entity_type` | `content_pages(10)` · `proposal(8)` · `solicitation(5)` · `contract(2)` · `source_profile(2)` |
+| `tasks.status` | `open(19)` · `completed(11)` |
+| `tasks.task_type` | `content_publish(10)` · `triage_new_opportunities(5)` · `review(4)` · `proposal_full_draft_review(2)` · `admin_review(2)` · `source_review(2)` · `contract_kickoff(2)` · `record_outcome(2)` · `broadcast(1)` |
+| `tenant_opportunity_cards.lifecycle_status` | `open(63)` |
+| `tenant_opportunity_cards.pursuit_status` | `unreviewed(62)` · `monitoring(1)` |
+| `tenant_opportunity_cards.submission_stage` | `open(63)` |
 
 ---
 
@@ -3010,171 +2916,171 @@ NULL, so a join on the back-link found nothing and two separate drive scripts re
 | from | → to | filled |
 |---|---|---|
 | `accounts.user_id` | `users.id` | — |
-| `agent_performance.tenant_id` | `tenants.id` | 100% (10/10) |
-| `agent_task_log.proposal_id` | `proposals.id` | 57% (122/215) ⚠️ |
-| `agent_task_log.section_id` | `proposal_sections.id` | 3% (7/215) ⚠️ |
-| `agent_task_log.tenant_id` | `tenants.id` | 78% (167/215) ⚠️ |
-| `agent_task_queue.proposal_id` | `proposals.id` | 67% (2/3) ⚠️ |
-| `agent_task_queue.section_id` | `proposal_sections.id` | 33% (1/3) ⚠️ |
+| `agent_performance.tenant_id` | `tenants.id` | — |
+| `agent_task_log.proposal_id` | `proposals.id` | 44% (15/34) ⚠️ |
+| `agent_task_log.section_id` | `proposal_sections.id` | 3% (1/34) ⚠️ |
+| `agent_task_log.tenant_id` | `tenants.id` | 68% (23/34) ⚠️ |
+| `agent_task_queue.proposal_id` | `proposals.id` | 0% (0/3) ⚠️ |
+| `agent_task_queue.section_id` | `proposal_sections.id` | 0% (0/3) ⚠️ |
 | `agent_task_queue.tenant_id` | `tenants.id` | 100% (3/3) |
 | `agent_task_results.task_id` | `agent_task_queue.id` | 100% (3/3) |
-| `applications.reviewed_by` | `users.id` | 100% (1/1) |
-| `atom_embeddings.atom_id` | `library_atoms.id` | 100% (1229/1229) |
-| `atom_embeddings.tenant_id` | `tenants.id` | 100% (1229/1229) |
+| `applications.reviewed_by` | `users.id` | — |
+| `atom_embeddings.atom_id` | `library_atoms.id` | — |
+| `atom_embeddings.tenant_id` | `tenants.id` | — |
 | `atom_lineage.child_atom_id` | `library_atoms.id` | — |
 | `atom_lineage.parent_atom_id` | `library_atoms.id` | — |
-| `atom_members.group_atom_id` | `library_atoms.id` | 100% (1363/1363) |
-| `atom_members.member_atom_id` | `library_atoms.id` | 100% (1363/1363) |
-| `atom_tags.atom_id` | `library_atoms.id` | 100% (11546/11546) |
-| `atom_tags.confirmed_by` | `users.id` | 86% (9888/11546) ⚠️ |
-| `automation_framework.updated_by` | `users.id` | 100% (1/1) |
-| `automation_log.rule_id` | `automation_rules.id` | 100% (10/10) |
-| `automation_rules.created_by` | `users.id` | 0% (0/17) ⚠️ |
-| `canvas_versions.created_by` | `users.id` | 13% (1/8) ⚠️ |
-| `canvas_versions.parent_version_id` | `canvas_versions.id` | 0% (0/8) ⚠️ |
-| `canvas_versions.section_id` | `proposal_sections.id` | 100% (8/8) |
-| `cms_content.created_by` | `users.id` | 0% (0/130) ⚠️ |
-| `collaboration_vaults.created_by` | `users.id` | 100% (1/1) |
-| `collaboration_vaults.tenant_id` | `tenants.id` | 100% (1/1) |
-| `collaborator_stage_access.collaborator_id` | `proposal_collaborators.id` | 100% (20/20) |
-| `collaborator_stage_access.granted_by` | `users.id` | 100% (20/20) |
-| `collaborator_stage_access.proposal_id` | `proposals.id` | 100% (20/20) |
-| `command_seen_state.user_id` | `users.id` | 100% (6/6) |
-| `compliance_presets.created_by` | `users.id` | 0% (0/6) ⚠️ |
+| `atom_members.group_atom_id` | `library_atoms.id` | — |
+| `atom_members.member_atom_id` | `library_atoms.id` | — |
+| `atom_tags.atom_id` | `library_atoms.id` | — |
+| `atom_tags.confirmed_by` | `users.id` | — |
+| `automation_framework.updated_by` | `users.id` | — |
+| `automation_log.rule_id` | `automation_rules.id` | 100% (3/3) |
+| `automation_rules.created_by` | `users.id` | — |
+| `canvas_versions.created_by` | `users.id` | — |
+| `canvas_versions.parent_version_id` | `canvas_versions.id` | — |
+| `canvas_versions.section_id` | `proposal_sections.id` | — |
+| `cms_content.created_by` | `users.id` | — |
+| `collaboration_vaults.created_by` | `users.id` | — |
+| `collaboration_vaults.tenant_id` | `tenants.id` | — |
+| `collaborator_stage_access.collaborator_id` | `proposal_collaborators.id` | — |
+| `collaborator_stage_access.granted_by` | `users.id` | — |
+| `collaborator_stage_access.proposal_id` | `proposals.id` | — |
+| `command_seen_state.user_id` | `users.id` | — |
+| `compliance_presets.created_by` | `users.id` | — |
 | `consent_records.user_id` | `users.id` | — |
-| `contracts.opportunity_id` | `opportunities.id` | 100% (14/14) |
-| `contracts.proposal_id` | `proposals.id` | 86% (12/14) ⚠️ |
-| `contracts.tenant_id` | `tenants.id` | 100% (14/14) |
-| `curated_solicitations.ai_similar_to` | `curated_solicitations.id` | 0% (0/24) ⚠️ |
-| `curated_solicitations.approved_by` | `users.id` | 4% (1/24) ⚠️ |
-| `curated_solicitations.build_completed_by` | `users.id` | 8% (2/24) ⚠️ |
-| `curated_solicitations.claimed_by` | `users.id` | 0% (0/24) ⚠️ |
-| `curated_solicitations.curated_by` | `users.id` | 33% (8/24) ⚠️ |
-| `curated_solicitations.opportunity_id` | `opportunities.id` | 100% (24/24) |
-| `curated_solicitations.review_requested_for` | `users.id` | 0% (0/24) ⚠️ |
+| `contracts.opportunity_id` | `opportunities.id` | — |
+| `contracts.proposal_id` | `proposals.id` | — |
+| `contracts.tenant_id` | `tenants.id` | — |
+| `curated_solicitations.ai_similar_to` | `curated_solicitations.id` | 0% (0/18) ⚠️ |
+| `curated_solicitations.approved_by` | `users.id` | 0% (0/18) ⚠️ |
+| `curated_solicitations.build_completed_by` | `users.id` | 6% (1/18) ⚠️ |
+| `curated_solicitations.claimed_by` | `users.id` | 0% (0/18) ⚠️ |
+| `curated_solicitations.curated_by` | `users.id` | 11% (2/18) ⚠️ |
+| `curated_solicitations.opportunity_id` | `opportunities.id` | 100% (18/18) |
+| `curated_solicitations.review_requested_for` | `users.id` | 0% (0/18) ⚠️ |
 | `curation_notes.author_id` | `users.id` | — |
 | `curation_notes.solicitation_id` | `curated_solicitations.id` | — |
-| `curation_revisions.actor_id` | `users.id` | 100% (12/12) |
-| `curation_revisions.solicitation_id` | `curated_solicitations.id` | 100% (12/12) |
-| `document_cocoons.origin_document_id` | `tenant_documents.id` | 0% (0/6) ⚠️ |
-| `document_cocoons.tenant_id` | `tenants.id` | 100% (6/6) |
-| `document_templates.created_by` | `users.id` | 0% (0/9) ⚠️ |
-| `document_templates.tenant_id` | `tenants.id` | 0% (0/9) ⚠️ |
-| `email_send_ledger.tenant_id` | `tenants.id` | 100% (8/8) |
-| `episodic_memories.superseded_by` | `episodic_memories.id` | 0% (0/401) ⚠️ |
-| `episodic_memories.tenant_id` | `tenants.id` | 99% (398/401) |
-| `expert_availability_blocks.admin_user_id` | `users.id` | 100% (1/1) |
-| `expert_time_bookings.admin_user_id` | `users.id` | 100% (1/1) |
-| `expert_time_bookings.block_id` | `expert_availability_blocks.id` | 100% (1/1) |
-| `expert_time_bookings.booked_by_user_id` | `users.id` | 100% (1/1) |
-| `expert_time_bookings.tenant_id` | `tenants.id` | 100% (1/1) |
-| `guardrail_templates.created_by` | `users.id` | 0% (0/1) ⚠️ |
-| `guardrail_templates.tenant_id` | `tenants.id` | 0% (0/1) ⚠️ |
-| `library_atoms.cocoon_id` | `document_cocoons.id` | 14% (248/1789) ⚠️ |
-| `library_atoms.created_by` | `users.id` | 100% (1789/1789) |
-| `library_atoms.owner_user_id` | `users.id` | 99% (1779/1789) |
-| `library_atoms.tenant_id` | `tenants.id` | 100% (1789/1789) |
-| `library_atoms.vault_id` | `collaboration_vaults.id` | 0% (0/1789) ⚠️ |
-| `library_seed_jobs.proposal_id` | `proposals.id` | 100% (1/1) |
-| `library_seed_jobs.source_proposal_id` | `proposals.id` | 0% (0/1) ⚠️ |
-| `library_seed_jobs.tenant_id` | `tenants.id` | 100% (1/1) |
-| `master_templates.created_by` | `users.id` | 0% (0/39) ⚠️ |
-| `notification_read_state.tenant_id` | `tenants.id` | 100% (1/1) |
-| `notification_read_state.user_id` | `users.id` | 100% (1/1) |
-| `opportunities.built_by` | `users.id` | 32% (9/28) ⚠️ |
-| `opportunities.origin_document_id` | `solicitation_documents.id` | 0% (0/28) ⚠️ |
-| `opportunities.released_by` | `users.id` | 4% (1/28) ⚠️ |
-| `opportunities.solicitation_id` | `curated_solicitations.id` | 96% (27/28) |
-| `opportunities.update_watch_by` | `users.id` | 4% (1/28) ⚠️ |
-| `opportunity_bridge.opportunity_id` | `opportunities.id` | 100% (27/27) |
-| `opportunity_bridge.posted_by` | `users.id` | 63% (17/27) ⚠️ |
+| `curation_revisions.actor_id` | `users.id` | — |
+| `curation_revisions.solicitation_id` | `curated_solicitations.id` | — |
+| `document_cocoons.origin_document_id` | `tenant_documents.id` | — |
+| `document_cocoons.tenant_id` | `tenants.id` | — |
+| `document_templates.created_by` | `users.id` | — |
+| `document_templates.tenant_id` | `tenants.id` | — |
+| `email_send_ledger.tenant_id` | `tenants.id` | — |
+| `episodic_memories.superseded_by` | `episodic_memories.id` | — |
+| `episodic_memories.tenant_id` | `tenants.id` | — |
+| `expert_availability_blocks.admin_user_id` | `users.id` | — |
+| `expert_time_bookings.admin_user_id` | `users.id` | — |
+| `expert_time_bookings.block_id` | `expert_availability_blocks.id` | — |
+| `expert_time_bookings.booked_by_user_id` | `users.id` | — |
+| `expert_time_bookings.tenant_id` | `tenants.id` | — |
+| `guardrail_templates.created_by` | `users.id` | — |
+| `guardrail_templates.tenant_id` | `tenants.id` | — |
+| `library_atoms.cocoon_id` | `document_cocoons.id` | — |
+| `library_atoms.created_by` | `users.id` | — |
+| `library_atoms.owner_user_id` | `users.id` | — |
+| `library_atoms.tenant_id` | `tenants.id` | — |
+| `library_atoms.vault_id` | `collaboration_vaults.id` | — |
+| `library_seed_jobs.proposal_id` | `proposals.id` | — |
+| `library_seed_jobs.source_proposal_id` | `proposals.id` | — |
+| `library_seed_jobs.tenant_id` | `tenants.id` | — |
+| `master_templates.created_by` | `users.id` | — |
+| `notification_read_state.tenant_id` | `tenants.id` | — |
+| `notification_read_state.user_id` | `users.id` | — |
+| `opportunities.built_by` | `users.id` | 14% (3/22) ⚠️ |
+| `opportunities.origin_document_id` | `solicitation_documents.id` | 0% (0/22) ⚠️ |
+| `opportunities.released_by` | `users.id` | 0% (0/22) ⚠️ |
+| `opportunities.solicitation_id` | `curated_solicitations.id` | 100% (22/22) |
+| `opportunities.update_watch_by` | `users.id` | 5% (1/22) ⚠️ |
+| `opportunity_bridge.opportunity_id` | `opportunities.id` | 100% (24/24) |
+| `opportunity_bridge.posted_by` | `users.id` | 17% (4/24) ⚠️ |
 | `opportunity_lifecycle_actions.actor_id` | `users.id` | — |
 | `opportunity_lifecycle_actions.opportunity_id` | `opportunities.id` | — |
 | `procedural_memories.tenant_id` | `tenants.id` | — |
-| `process_instance_transitions.instance_id` | `process_instances.id` | 100% (2433/2433) |
-| `process_instances.tenant_id` | `tenants.id` | 92% (686/742) |
-| `process_instances.trigger_event_id` | `system_events.id` | 100% (742/742) |
-| `project_acceptance_evidence.deliverable_id` | `project_deliverables.id` | 100% (1/1) |
-| `project_acceptance_evidence.project_id` | `projects.id` | 100% (1/1) |
-| `project_acceptance_evidence.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_acceptance_evidence.uploaded_by` | `users.id` | 100% (1/1) |
-| `project_assignments.assigned_by` | `users.id` | 100% (3/3) |
-| `project_assignments.project_id` | `projects.id` | 100% (3/3) |
-| `project_assignments.tenant_id` | `tenants.id` | 100% (3/3) |
-| `project_assignments.user_id` | `users.id` | 100% (3/3) |
-| `project_cdrl_items.clin_id` | `project_clins.id` | 100% (1/1) |
-| `project_cdrl_items.created_by` | `users.id` | 100% (1/1) |
-| `project_cdrl_items.project_id` | `projects.id` | 100% (1/1) |
-| `project_cdrl_items.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_clins.project_id` | `projects.id` | 100% (3/3) |
-| `project_clins.tenant_id` | `tenants.id` | 100% (3/3) |
-| `project_comments.author_user_id` | `users.id` | 100% (5/5) |
-| `project_comments.parent_id` | `project_comments.id` | 40% (2/5) ⚠️ |
-| `project_comments.project_id` | `projects.id` | 100% (5/5) |
-| `project_comments.resolved_by` | `users.id` | 20% (1/5) ⚠️ |
-| `project_comments.tenant_id` | `tenants.id` | 100% (5/5) |
-| `project_deliverables.accepted_by` | `users.id` | 71% (5/7) ⚠️ |
-| `project_deliverables.cdrl_item_id` | `project_cdrl_items.id` | 29% (2/7) ⚠️ |
-| `project_deliverables.clin_id` | `project_clins.id` | 0% (0/7) ⚠️ |
-| `project_deliverables.document_id` | `tenant_documents.id` | 29% (2/7) ⚠️ |
-| `project_deliverables.milestone_id` | `project_milestones.id` | 100% (7/7) |
-| `project_deliverables.submitted_by` | `users.id` | 29% (2/7) ⚠️ |
-| `project_deliverables.tenant_id` | `tenants.id` | 100% (7/7) |
-| `project_deliverables.uploaded_by` | `users.id` | 57% (4/7) ⚠️ |
-| `project_invoice_lines.clin_id` | `project_clins.id` | 100% (2/2) |
-| `project_invoice_lines.invoice_id` | `project_invoices.id` | 100% (2/2) |
-| `project_invoice_lines.milestone_id` | `project_milestones.id` | 0% (0/2) ⚠️ |
-| `project_invoice_lines.tenant_id` | `tenants.id` | 100% (2/2) |
-| `project_invoices.created_by` | `users.id` | 100% (2/2) |
-| `project_invoices.document_id` | `tenant_documents.id` | 0% (0/2) ⚠️ |
-| `project_invoices.project_id` | `projects.id` | 100% (2/2) |
-| `project_invoices.tenant_id` | `tenants.id` | 100% (2/2) |
-| `project_meetings.created_by` | `users.id` | 100% (1/1) |
-| `project_meetings.document_id` | `tenant_documents.id` | 100% (1/1) |
-| `project_meetings.project_id` | `projects.id` | 100% (1/1) |
-| `project_meetings.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_milestone_tasks.assignee_user_id` | `users.id` | 85% (11/13) ⚠️ |
-| `project_milestone_tasks.completed_by` | `users.id` | 85% (11/13) ⚠️ |
-| `project_milestone_tasks.created_by` | `users.id` | 62% (8/13) ⚠️ |
-| `project_milestone_tasks.meeting_id` | `project_meetings.id` | 15% (2/13) ⚠️ |
-| `project_milestone_tasks.milestone_id` | `project_milestones.id` | 69% (9/13) ⚠️ |
-| `project_milestone_tasks.project_id` | `projects.id` | 100% (13/13) |
-| `project_milestone_tasks.tenant_id` | `tenants.id` | 100% (13/13) |
-| `project_milestones.clin_id` | `project_clins.id` | 89% (8/9) ⚠️ |
-| `project_milestones.depends_on_id` | `project_milestones.id` | 11% (1/9) ⚠️ |
-| `project_milestones.owner_user_id` | `users.id` | 0% (0/9) ⚠️ |
-| `project_milestones.project_id` | `projects.id` | 100% (9/9) |
-| `project_milestones.tenant_id` | `tenants.id` | 100% (9/9) |
-| `project_modification_changes.clin_id` | `project_clins.id` | 100% (2/2) |
-| `project_modification_changes.modification_id` | `project_modifications.id` | 100% (2/2) |
-| `project_modification_changes.tenant_id` | `tenants.id` | 100% (2/2) |
-| `project_modifications.created_by` | `users.id` | 100% (1/1) |
-| `project_modifications.executed_by` | `users.id` | 100% (1/1) |
-| `project_modifications.project_id` | `projects.id` | 100% (1/1) |
-| `project_modifications.source_doc_id` | `project_source_documents.id` | 100% (1/1) |
-| `project_modifications.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_provenance.created_by` | `users.id` | 100% (5/5) |
-| `project_provenance.project_id` | `projects.id` | 100% (5/5) |
-| `project_provenance.source_doc_id` | `project_source_documents.id` | 100% (5/5) |
-| `project_provenance.tenant_id` | `tenants.id` | 100% (5/5) |
-| `project_reviews.decided_by` | `users.id` | 100% (2/2) |
-| `project_reviews.project_id` | `projects.id` | 100% (2/2) |
-| `project_reviews.requested_by` | `users.id` | 100% (2/2) |
-| `project_reviews.reviewer_user_id` | `users.id` | 100% (2/2) |
-| `project_reviews.tenant_id` | `tenants.id` | 100% (2/2) |
-| `project_risks.closed_by` | `users.id` | 100% (1/1) |
-| `project_risks.created_by` | `users.id` | 100% (1/1) |
-| `project_risks.milestone_id` | `project_milestones.id` | 0% (0/1) ⚠️ |
-| `project_risks.owner_user_id` | `users.id` | 100% (1/1) |
-| `project_risks.project_id` | `projects.id` | 100% (1/1) |
-| `project_risks.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_source_documents.project_id` | `projects.id` | 100% (4/4) |
-| `project_source_documents.tenant_id` | `tenants.id` | 100% (4/4) |
-| `project_source_documents.uploaded_by` | `users.id` | 100% (4/4) |
-| `project_task_attachments.project_id` | `projects.id` | 100% (1/1) |
-| `project_task_attachments.task_id` | `project_milestone_tasks.id` | 100% (1/1) |
-| `project_task_attachments.tenant_id` | `tenants.id` | 100% (1/1) |
-| `project_task_attachments.uploaded_by` | `users.id` | 100% (1/1) |
+| `process_instance_transitions.instance_id` | `process_instances.id` | — |
+| `process_instances.tenant_id` | `tenants.id` | 90% (167/186) ⚠️ |
+| `process_instances.trigger_event_id` | `system_events.id` | 100% (186/186) |
+| `project_acceptance_evidence.deliverable_id` | `project_deliverables.id` | — |
+| `project_acceptance_evidence.project_id` | `projects.id` | — |
+| `project_acceptance_evidence.tenant_id` | `tenants.id` | — |
+| `project_acceptance_evidence.uploaded_by` | `users.id` | — |
+| `project_assignments.assigned_by` | `users.id` | — |
+| `project_assignments.project_id` | `projects.id` | — |
+| `project_assignments.tenant_id` | `tenants.id` | — |
+| `project_assignments.user_id` | `users.id` | — |
+| `project_cdrl_items.clin_id` | `project_clins.id` | — |
+| `project_cdrl_items.created_by` | `users.id` | — |
+| `project_cdrl_items.project_id` | `projects.id` | — |
+| `project_cdrl_items.tenant_id` | `tenants.id` | — |
+| `project_clins.project_id` | `projects.id` | — |
+| `project_clins.tenant_id` | `tenants.id` | — |
+| `project_comments.author_user_id` | `users.id` | — |
+| `project_comments.parent_id` | `project_comments.id` | — |
+| `project_comments.project_id` | `projects.id` | — |
+| `project_comments.resolved_by` | `users.id` | — |
+| `project_comments.tenant_id` | `tenants.id` | — |
+| `project_deliverables.accepted_by` | `users.id` | — |
+| `project_deliverables.cdrl_item_id` | `project_cdrl_items.id` | — |
+| `project_deliverables.clin_id` | `project_clins.id` | — |
+| `project_deliverables.document_id` | `tenant_documents.id` | — |
+| `project_deliverables.milestone_id` | `project_milestones.id` | — |
+| `project_deliverables.submitted_by` | `users.id` | — |
+| `project_deliverables.tenant_id` | `tenants.id` | — |
+| `project_deliverables.uploaded_by` | `users.id` | — |
+| `project_invoice_lines.clin_id` | `project_clins.id` | — |
+| `project_invoice_lines.invoice_id` | `project_invoices.id` | — |
+| `project_invoice_lines.milestone_id` | `project_milestones.id` | — |
+| `project_invoice_lines.tenant_id` | `tenants.id` | — |
+| `project_invoices.created_by` | `users.id` | — |
+| `project_invoices.document_id` | `tenant_documents.id` | — |
+| `project_invoices.project_id` | `projects.id` | — |
+| `project_invoices.tenant_id` | `tenants.id` | — |
+| `project_meetings.created_by` | `users.id` | — |
+| `project_meetings.document_id` | `tenant_documents.id` | — |
+| `project_meetings.project_id` | `projects.id` | — |
+| `project_meetings.tenant_id` | `tenants.id` | — |
+| `project_milestone_tasks.assignee_user_id` | `users.id` | — |
+| `project_milestone_tasks.completed_by` | `users.id` | — |
+| `project_milestone_tasks.created_by` | `users.id` | — |
+| `project_milestone_tasks.meeting_id` | `project_meetings.id` | — |
+| `project_milestone_tasks.milestone_id` | `project_milestones.id` | — |
+| `project_milestone_tasks.project_id` | `projects.id` | — |
+| `project_milestone_tasks.tenant_id` | `tenants.id` | — |
+| `project_milestones.clin_id` | `project_clins.id` | — |
+| `project_milestones.depends_on_id` | `project_milestones.id` | — |
+| `project_milestones.owner_user_id` | `users.id` | — |
+| `project_milestones.project_id` | `projects.id` | — |
+| `project_milestones.tenant_id` | `tenants.id` | — |
+| `project_modification_changes.clin_id` | `project_clins.id` | — |
+| `project_modification_changes.modification_id` | `project_modifications.id` | — |
+| `project_modification_changes.tenant_id` | `tenants.id` | — |
+| `project_modifications.created_by` | `users.id` | — |
+| `project_modifications.executed_by` | `users.id` | — |
+| `project_modifications.project_id` | `projects.id` | — |
+| `project_modifications.source_doc_id` | `project_source_documents.id` | — |
+| `project_modifications.tenant_id` | `tenants.id` | — |
+| `project_provenance.created_by` | `users.id` | — |
+| `project_provenance.project_id` | `projects.id` | — |
+| `project_provenance.source_doc_id` | `project_source_documents.id` | — |
+| `project_provenance.tenant_id` | `tenants.id` | — |
+| `project_reviews.decided_by` | `users.id` | — |
+| `project_reviews.project_id` | `projects.id` | — |
+| `project_reviews.requested_by` | `users.id` | — |
+| `project_reviews.reviewer_user_id` | `users.id` | — |
+| `project_reviews.tenant_id` | `tenants.id` | — |
+| `project_risks.closed_by` | `users.id` | — |
+| `project_risks.created_by` | `users.id` | — |
+| `project_risks.milestone_id` | `project_milestones.id` | — |
+| `project_risks.owner_user_id` | `users.id` | — |
+| `project_risks.project_id` | `projects.id` | — |
+| `project_risks.tenant_id` | `tenants.id` | — |
+| `project_source_documents.project_id` | `projects.id` | — |
+| `project_source_documents.tenant_id` | `tenants.id` | — |
+| `project_source_documents.uploaded_by` | `users.id` | — |
+| `project_task_attachments.project_id` | `projects.id` | — |
+| `project_task_attachments.task_id` | `project_milestone_tasks.id` | — |
+| `project_task_attachments.tenant_id` | `tenants.id` | — |
+| `project_task_attachments.uploaded_by` | `users.id` | — |
 | `project_time_entries.approved_by` | `users.id` | — |
 | `project_time_entries.invoice_line_id` | `project_invoice_lines.id` | — |
 | `project_time_entries.milestone_id` | `project_milestones.id` | — |
@@ -3182,138 +3088,139 @@ NULL, so a join on the back-link found nothing and two separate drive scripts re
 | `project_time_entries.task_id` | `project_milestone_tasks.id` | — |
 | `project_time_entries.tenant_id` | `tenants.id` | — |
 | `project_time_entries.user_id` | `users.id` | — |
-| `projects.closed_by` | `users.id` | 0% (0/4) ⚠️ |
-| `projects.contract_id` | `contracts.id` | 25% (1/4) ⚠️ |
-| `projects.created_by` | `users.id` | 50% (2/4) ⚠️ |
-| `projects.tenant_id` | `tenants.id` | 100% (4/4) |
-| `promo_codes.issued_by` | `users.id` | 97% (32/33) |
-| `promo_codes.redeemed_by_tenant_id` | `tenants.id` | 3% (1/33) ⚠️ |
-| `promo_codes.revoked_by` | `users.id` | 0% (0/33) ⚠️ |
-| `proposal_activity_log.actor_id` | `users.id` | 100% (99/99) |
-| `proposal_activity_log.proposal_id` | `proposals.id` | 100% (99/99) |
-| `proposal_activity_log.section_id` | `proposal_sections.id` | 0% (0/99) ⚠️ |
-| `proposal_activity_log.tenant_id` | `tenants.id` | 100% (99/99) |
-| `proposal_amendment_flags.acknowledged_by` | `users.id` | 100% (7/7) |
-| `proposal_amendment_flags.amendment_id` | `solicitation_amendments.id` | 100% (7/7) |
-| `proposal_amendment_flags.proposal_id` | `proposals.id` | 100% (7/7) |
-| `proposal_amendment_flags.tenant_id` | `tenants.id` | 100% (7/7) |
-| `proposal_artifacts.locked_by` | `users.id` | 95% (18/19) |
-| `proposal_artifacts.proposal_id` | `proposals.id` | 100% (19/19) |
-| `proposal_collaborators.invited_by` | `users.id` | 100% (10/10) |
-| `proposal_collaborators.proposal_id` | `proposals.id` | 100% (10/10) |
-| `proposal_collaborators.user_id` | `users.id` | 100% (10/10) |
-| `proposal_comments.proposal_id` | `proposals.id` | 100% (2/2) |
-| `proposal_comments.section_id` | `proposal_sections.id` | 100% (2/2) |
-| `proposal_comments.user_id` | `users.id` | 100% (2/2) |
-| `proposal_compliance_matrix.proposal_id` | `proposals.id` | 100% (68/68) |
-| `proposal_compliance_matrix.section_id` | `proposal_sections.id` | 100% (68/68) |
-| `proposal_portals.created_by` | `users.id` | 100% (5/5) |
-| `proposal_portals.proposal_id` | `proposals.id` | 100% (5/5) |
-| `proposal_portals.tenant_id` | `tenants.id` | 100% (5/5) |
-| `proposal_sections.accepted_by` | `users.id` | 96% (65/68) |
-| `proposal_sections.artifact_id` | `proposal_artifacts.id` | 100% (68/68) |
-| `proposal_sections.assigned_to` | `users.id` | 0% (0/68) ⚠️ |
-| `proposal_sections.editing_by` | `users.id` | 0% (0/68) ⚠️ |
-| `proposal_sections.last_modified_by` | `users.id` | 90% (61/68) ⚠️ |
-| `proposal_sections.locked_by` | `users.id` | 96% (65/68) |
-| `proposal_sections.proposal_id` | `proposals.id` | 100% (68/68) |
-| `proposal_stage_history.changed_by` | `users.id` | 96% (22/23) |
-| `proposal_stage_history.proposal_id` | `proposals.id` | 100% (23/23) |
-| `proposal_supporting_docs.proposal_id` | `proposals.id` | 100% (3/3) |
-| `proposal_supporting_docs.reviewed_by` | `users.id` | 0% (0/3) ⚠️ |
-| `proposal_supporting_docs.tenant_id` | `tenants.id` | 100% (3/3) |
-| `proposal_supporting_docs.uploaded_by` | `users.id` | 0% (0/3) ⚠️ |
-| `proposals.last_modified_by` | `users.id` | 22% (4/18) ⚠️ |
-| `proposals.opportunity_id` | `opportunities.id` | 100% (18/18) |
-| `proposals.solicitation_id` | `curated_solicitations.id` | 28% (5/18) ⚠️ |
-| `proposals.tenant_id` | `tenants.id` | 100% (18/18) |
-| `purchases.opportunity_id` | `opportunities.id` | 100% (4/4) |
-| `purchases.proposal_id` | `proposals.id` | 0% (0/4) ⚠️ |
-| `purchases.tenant_id` | `tenants.id` | 100% (4/4) |
+| `projects.closed_by` | `users.id` | — |
+| `projects.contract_id` | `contracts.id` | — |
+| `projects.created_by` | `users.id` | — |
+| `projects.tenant_id` | `tenants.id` | — |
+| `promo_codes.issued_by` | `users.id` | — |
+| `promo_codes.redeemed_by_tenant_id` | `tenants.id` | — |
+| `promo_codes.revoked_by` | `users.id` | — |
+| `proposal_activity_log.actor_id` | `users.id` | — |
+| `proposal_activity_log.proposal_id` | `proposals.id` | — |
+| `proposal_activity_log.section_id` | `proposal_sections.id` | — |
+| `proposal_activity_log.tenant_id` | `tenants.id` | — |
+| `proposal_amendment_flags.acknowledged_by` | `users.id` | — |
+| `proposal_amendment_flags.amendment_id` | `solicitation_amendments.id` | — |
+| `proposal_amendment_flags.proposal_id` | `proposals.id` | — |
+| `proposal_amendment_flags.tenant_id` | `tenants.id` | — |
+| `proposal_artifacts.locked_by` | `users.id` | — |
+| `proposal_artifacts.proposal_id` | `proposals.id` | — |
+| `proposal_collaborators.invited_by` | `users.id` | — |
+| `proposal_collaborators.proposal_id` | `proposals.id` | — |
+| `proposal_collaborators.user_id` | `users.id` | — |
+| `proposal_comments.proposal_id` | `proposals.id` | — |
+| `proposal_comments.section_id` | `proposal_sections.id` | — |
+| `proposal_comments.user_id` | `users.id` | — |
+| `proposal_compliance_matrix.proposal_id` | `proposals.id` | — |
+| `proposal_compliance_matrix.section_id` | `proposal_sections.id` | — |
+| `proposal_portals.created_by` | `users.id` | — |
+| `proposal_portals.proposal_id` | `proposals.id` | — |
+| `proposal_portals.tenant_id` | `tenants.id` | — |
+| `proposal_sections.accepted_by` | `users.id` | — |
+| `proposal_sections.artifact_id` | `proposal_artifacts.id` | — |
+| `proposal_sections.assigned_to` | `users.id` | — |
+| `proposal_sections.editing_by` | `users.id` | — |
+| `proposal_sections.last_modified_by` | `users.id` | — |
+| `proposal_sections.locked_by` | `users.id` | — |
+| `proposal_sections.proposal_id` | `proposals.id` | — |
+| `proposal_stage_history.changed_by` | `users.id` | — |
+| `proposal_stage_history.proposal_id` | `proposals.id` | — |
+| `proposal_supporting_docs.proposal_id` | `proposals.id` | — |
+| `proposal_supporting_docs.reviewed_by` | `users.id` | — |
+| `proposal_supporting_docs.tenant_id` | `tenants.id` | — |
+| `proposal_supporting_docs.uploaded_by` | `users.id` | — |
+| `proposals.last_modified_by` | `users.id` | — |
+| `proposals.opportunity_id` | `opportunities.id` | — |
+| `proposals.solicitation_id` | `curated_solicitations.id` | — |
+| `proposals.tenant_id` | `tenants.id` | — |
+| `purchases.opportunity_id` | `opportunities.id` | — |
+| `purchases.proposal_id` | `proposals.id` | — |
+| `purchases.tenant_id` | `tenants.id` | — |
 | `sbir_data_uploads.uploaded_by` | `users.id` | — |
 | `scout_findings.match_opportunity_id` | `opportunities.id` | — |
 | `scout_findings.reviewed_by` | `users.id` | — |
 | `scout_findings.source_id` | `scout_sources.id` | — |
 | `scout_runs.source_id` | `scout_sources.id` | — |
-| `section_standards.created_by` | `users.id` | 0% (0/21) ⚠️ |
-| `section_standards.parent_key` | `section_standards.key` | 48% (10/21) ⚠️ |
-| `semantic_memories.previous_version` | `semantic_memories.id` | 0% (0/6) ⚠️ |
-| `semantic_memories.tenant_id` | `tenants.id` | 100% (6/6) |
+| `section_standards.created_by` | `users.id` | — |
+| `section_standards.parent_key` | `section_standards.key` | — |
+| `semantic_memories.previous_version` | `semantic_memories.id` | — |
+| `semantic_memories.tenant_id` | `tenants.id` | — |
 | `sessions.user_id` | `users.id` | — |
-| `shadow_admin_grants.admin_user_id` | `users.id` | 0% (0/2) ⚠️ |
-| `shadow_admin_grants.granted_by` | `users.id` | 100% (2/2) |
-| `shadow_admin_grants.portal_id` | `proposal_portals.id` | 100% (2/2) |
-| `shadow_admin_grants.revoked_by` | `users.id` | 0% (0/2) ⚠️ |
-| `shadow_admin_grants.tenant_id` | `tenants.id` | 100% (2/2) |
-| `solicitation_amendments.detected_by` | `users.id` | 100% (7/7) |
-| `solicitation_amendments.document_id` | `solicitation_documents.id` | 0% (0/7) ⚠️ |
-| `solicitation_amendments.reviewed_by` | `users.id` | 100% (7/7) |
-| `solicitation_amendments.solicitation_id` | `curated_solicitations.id` | 100% (7/7) |
+| `shadow_admin_grants.admin_user_id` | `users.id` | — |
+| `shadow_admin_grants.granted_by` | `users.id` | — |
+| `shadow_admin_grants.portal_id` | `proposal_portals.id` | — |
+| `shadow_admin_grants.revoked_by` | `users.id` | — |
+| `shadow_admin_grants.tenant_id` | `tenants.id` | — |
+| `solicitation_amendments.detected_by` | `users.id` | — |
+| `solicitation_amendments.document_id` | `solicitation_documents.id` | — |
+| `solicitation_amendments.reviewed_by` | `users.id` | — |
+| `solicitation_amendments.solicitation_id` | `curated_solicitations.id` | — |
 | `solicitation_annotations.actor_id` | `users.id` | — |
 | `solicitation_annotations.solicitation_id` | `curated_solicitations.id` | — |
-| `solicitation_compliance.solicitation_id` | `curated_solicitations.id` | 100% (10/10) |
-| `solicitation_compliance.topic_id` | `opportunities.id` | 30% (3/10) ⚠️ |
-| `solicitation_compliance.verified_by` | `users.id` | 10% (1/10) ⚠️ |
-| `solicitation_compliance_drafts.created_by` | `users.id` | 100% (2/2) |
-| `solicitation_compliance_drafts.landed_by` | `users.id` | 0% (0/2) ⚠️ |
-| `solicitation_compliance_drafts.solicitation_id` | `curated_solicitations.id` | 100% (2/2) |
-| `solicitation_documents.solicitation_id` | `curated_solicitations.id` | 100% (1/1) |
-| `solicitation_documents.uploaded_by` | `users.id` | 100% (1/1) |
+| `solicitation_compliance.solicitation_id` | `curated_solicitations.id` | — |
+| `solicitation_compliance.topic_id` | `opportunities.id` | — |
+| `solicitation_compliance.verified_by` | `users.id` | — |
+| `solicitation_compliance_drafts.created_by` | `users.id` | — |
+| `solicitation_compliance_drafts.landed_by` | `users.id` | — |
+| `solicitation_compliance_drafts.solicitation_id` | `curated_solicitations.id` | — |
+| `solicitation_documents.solicitation_id` | `curated_solicitations.id` | — |
+| `solicitation_documents.uploaded_by` | `users.id` | — |
 | `solicitation_outlines.created_by` | `users.id` | — |
 | `solicitation_outlines.solicitation_id` | `curated_solicitations.id` | — |
-| `solicitation_volumes.created_by` | `users.id` | 0% (0/22) ⚠️ |
-| `solicitation_volumes.solicitation_id` | `curated_solicitations.id` | 100% (22/22) |
-| `solicitation_volumes.topic_id` | `opportunities.id` | 68% (15/22) ⚠️ |
+| `solicitation_volumes.created_by` | `users.id` | — |
+| `solicitation_volumes.solicitation_id` | `curated_solicitations.id` | — |
+| `solicitation_volumes.topic_id` | `opportunities.id` | — |
 | `source_diffs.next_snapshot_id` | `source_snapshots.id` | — |
 | `source_diffs.prev_snapshot_id` | `source_snapshots.id` | — |
 | `source_diffs.profile_id` | `source_profiles.id` | — |
 | `source_diffs.region_id` | `source_regions.id` | — |
 | `source_diffs.reviewed_by` | `users.id` | — |
-| `source_profiles.created_by` | `users.id` | 0% (0/6) ⚠️ |
-| `source_profiles.last_visited_by` | `users.id` | 17% (1/6) ⚠️ |
+| `source_profiles.created_by` | `users.id` | — |
+| `source_profiles.last_visited_by` | `users.id` | — |
 | `source_regions.profile_id` | `source_profiles.id` | — |
 | `source_snapshots.profile_id` | `source_profiles.id` | — |
 | `source_snapshots.region_id` | `source_regions.id` | — |
-| `source_visits.profile_id` | `source_profiles.id` | 100% (1/1) |
-| `source_visits.visited_by` | `users.id` | 100% (1/1) |
-| `stage_completion_snapshots.completed_by` | `users.id` | 100% (1/1) |
-| `stage_completion_snapshots.proposal_id` | `proposals.id` | 100% (1/1) |
+| `source_visits.profile_id` | `source_profiles.id` | — |
+| `source_visits.visited_by` | `users.id` | — |
+| `stage_completion_snapshots.completed_by` | `users.id` | — |
+| `stage_completion_snapshots.proposal_id` | `proposals.id` | — |
 | `stage_gate_requirements.met_by` | `users.id` | — |
 | `stage_gate_requirements.proposal_id` | `proposals.id` | — |
-| `system_events.parent_event_id` | `system_events.id` | 7% (1387/19638) ⚠️ |
-| `system_events.tenant_id` | `tenants.id` | 46% (8981/19638) ⚠️ |
-| `tasks.process_instance_id` | `process_instances.id` | 15% (107/713) ⚠️ |
-| `tasks.tenant_id` | `tenants.id` | 95% (674/713) |
-| `template_bridge.posted_by` | `users.id` | 9% (4/43) ⚠️ |
-| `template_bridge.template_id` | `master_templates.id` | 100% (43/43) |
-| `tenant_agent_config.tenant_id` | `tenants.id` | 100% (1/1) |
+| `system_events.parent_event_id` | `system_events.id` | 7% (304/4536) ⚠️ |
+| `system_events.tenant_id` | `tenants.id` | 29% (1314/4536) ⚠️ |
+| `tasks.process_instance_id` | `process_instances.id` | 37% (11/30) ⚠️ |
+| `tasks.tenant_id` | `tenants.id` | 37% (11/30) ⚠️ |
+| `template_bridge.posted_by` | `users.id` | — |
+| `template_bridge.template_id` | `master_templates.id` | — |
+| `tenant_agent_config.tenant_id` | `tenants.id` | — |
 | `tenant_automation_policies.tenant_id` | `tenants.id` | — |
-| `tenant_bridge_cursor.tenant_id` | `tenants.id` | 100% (8/8) |
-| `tenant_bucket_scores.bucket_id` | `tenant_spotlight_buckets.id` | 100% (50/50) |
-| `tenant_bucket_scores.tenant_id` | `tenants.id` | 100% (50/50) |
-| `tenant_documents.created_by` | `users.id` | 100% (28/28) |
-| `tenant_documents.source_template_id` | `document_templates.id` | 0% (0/28) ⚠️ |
-| `tenant_documents.tenant_id` | `tenants.id` | 100% (28/28) |
-| `tenant_opportunity_cards.tenant_id` | `tenants.id` | 100% (80/80) |
-| `tenant_profiles.tenant_id` | `tenants.id` | 100% (2/2) |
-| `tenant_spotlight_buckets.created_by` | `users.id` | 100% (5/5) |
-| `tenant_spotlight_buckets.tenant_id` | `tenants.id` | 100% (5/5) |
-| `tenant_template_cards.tenant_id` | `tenants.id` | 100% (312/312) |
-| `tenants.owner_id` | `users.id` | 38% (3/8) ⚠️ |
-| `tool_invocation_metrics.tenant_id` | `tenants.id` | 0% (0/59) ⚠️ |
-| `triage_actions.actor_id` | `users.id` | 100% (13/13) |
-| `triage_actions.solicitation_id` | `curated_solicitations.id` | 100% (13/13) |
-| `user_memberships.created_by` | `users.id` | 54% (13/24) ⚠️ |
-| `user_memberships.tenant_id` | `tenants.id` | 100% (24/24) |
-| `user_memberships.user_id` | `users.id` | 100% (24/24) |
-| `users.tenant_id` | `tenants.id` | 53% (21/40) ⚠️ |
-| `vault_members.invited_by` | `users.id` | 100% (1/1) |
-| `vault_members.tenant_id` | `tenants.id` | 100% (1/1) |
-| `vault_members.user_id` | `users.id` | 0% (0/1) ⚠️ |
-| `vault_members.vault_id` | `collaboration_vaults.id` | 100% (1/1) |
-| `volume_required_items.template_id` | `document_templates.id` | 0% (0/69) ⚠️ |
-| `volume_required_items.verified_by` | `users.id` | 0% (0/69) ⚠️ |
-| `volume_required_items.volume_id` | `solicitation_volumes.id` | 100% (69/69) |
+| `tenant_bridge_cursor.tenant_id` | `tenants.id` | 100% (7/7) |
+| `tenant_bucket_scores.bucket_id` | `tenant_spotlight_buckets.id` | 100% (45/45) |
+| `tenant_bucket_scores.tenant_id` | `tenants.id` | 100% (45/45) |
+| `tenant_documents.created_by` | `users.id` | — |
+| `tenant_documents.source_template_id` | `document_templates.id` | — |
+| `tenant_documents.tenant_id` | `tenants.id` | — |
+| `tenant_opportunity_cards.tenant_id` | `tenants.id` | 100% (63/63) |
+| `tenant_opportunity_documents.tenant_id` | `tenants.id` | — |
+| `tenant_profiles.tenant_id` | `tenants.id` | — |
+| `tenant_spotlight_buckets.created_by` | `users.id` | — |
+| `tenant_spotlight_buckets.tenant_id` | `tenants.id` | — |
+| `tenant_template_cards.tenant_id` | `tenants.id` | — |
+| `tenants.owner_id` | `users.id` | — |
+| `tool_invocation_metrics.tenant_id` | `tenants.id` | — |
+| `triage_actions.actor_id` | `users.id` | — |
+| `triage_actions.solicitation_id` | `curated_solicitations.id` | — |
+| `user_memberships.created_by` | `users.id` | — |
+| `user_memberships.tenant_id` | `tenants.id` | — |
+| `user_memberships.user_id` | `users.id` | — |
+| `users.tenant_id` | `tenants.id` | — |
+| `vault_members.invited_by` | `users.id` | — |
+| `vault_members.tenant_id` | `tenants.id` | — |
+| `vault_members.user_id` | `users.id` | — |
+| `vault_members.vault_id` | `collaboration_vaults.id` | — |
+| `volume_required_items.template_id` | `document_templates.id` | — |
+| `volume_required_items.verified_by` | `users.id` | — |
+| `volume_required_items.volume_id` | `solicitation_volumes.id` | — |
 
 ---
 
@@ -3396,6 +3303,7 @@ un-writable through the context-aware `sql`.
 | `tenant_bucket_scores` | yes | yes | **yes** |
 | `tenant_documents` | yes | yes | — |
 | `tenant_opportunity_cards` | yes | yes | **yes** |
+| `tenant_opportunity_documents` | yes | yes | **yes** |
 | `tenant_profiles` | yes | yes | **yes** |
 | `tenant_spotlight_buckets` | yes | yes | **yes** |
 | `tenant_template_cards` | yes | yes | **yes** |

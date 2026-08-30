@@ -315,7 +315,7 @@ workflow template as an actor" — both are agents-as-actors + kickoff trigger; 
 
 | Agent | Shape | Trigger / producer site | AI_INVOKE action |
 |---|---|---|---|
-| **scoring_strategist** | fan-out | card **pinned** → pin route producer (`cards/[oppId]/pin/route.ts:74`, `score_adjustment`) | `tool.opportunity.score` — *mapped but latent (no workflow uses it); fires via the queue producer. The `OnCardApplied` rescore is deterministic (`workflows/actions/rescore.py`), not this agent.* |
+| **scoring_strategist** | fan-out | card **pinned** → pin route producer (`cards/[oppId]/documents/route.ts:74`, `score_adjustment`) | `tool.opportunity.score` — *mapped but latent (no workflow uses it); fires via the queue producer. The `OnCardApplied` rescore is deterministic (`workflows/actions/rescore.py`), not this agent.* |
 | **opportunity_analyst** | fan-out | card **pinned** → pin route producer (`…/pin/route.ts:75`, `analyze_fit`) | `tool.opportunity.analyze` — *mapped; fires via the queue producer.* |
 | **proposal_architect** | single-entity step | `OnProposalCreated` (proposal provision) | `tool.proposal.architect` |
 | **packaging_specialist** | single-entity step | `OnProposalAdvancedToFinal` (all-sections-locked) | `tool.proposal.package` |

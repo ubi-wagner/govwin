@@ -212,12 +212,12 @@ Copy-inward, never reference: the same rule the atom library and the template br
 
 The pin protocol is `pin = full copy` (mig 094/095). Pinning copies every
 `solicitation_documents` row — `document_type='source'` first — into
-`customers/<slug>/pinned/<opp>/` via `copyObject`, recording a manifest in `pinned_docs` with the
+`customers/<slug>/pinned/<opp>/` via `copyObject`, recording a manifest in `copied_docs` with the
 `sourceKey` retained for lineage. The customer owns a local, shard-safe copy.
 
 | The invariant | Today |
 |---|---|
-| **update / new upload propagates** | ✅ **holds.** A republish sets `pin_update_available`; `amendments.ts` triggers it; resync re-copies and clears the flag, with a watched-holder notification |
+| **update / new upload propagates** | ✅ **holds.** A republish sets `docs_update_available`; `amendments.ts` triggers it; resync re-copies and clears the flag, with a watched-holder notification |
 | **accessible as published** | ✅ **holds once pinned.** `copyObject` is a byte copy — not a re-render, not an extract — so the tenant holds the organization's file as published |
 | **rides across the bridge** | ❌ **does not hold.** The card carries dates, amounts, description, summary, notes, lifecycle — **no document manifest at all** |
 | **into tenant space on creation** | ❌ **does not hold.** The copy happens on *pin*, not on card creation |
@@ -247,7 +247,7 @@ this is the *table of contents*, and it is what makes the invariant's "remain ac
 before a pin. It is a jsonb field on a jsonb column: no migration, and it rides the existing
 forward-only republish.
 
-That manifest is also what makes `pin_update_available` legible. Today the flag says *something
+That manifest is also what makes `docs_update_available` legible. Today the flag says *something
 changed*; with a manifest the tenant sees **which document arrived**, which is the difference between
 a notification and a reason to act.
 

@@ -22,7 +22,10 @@ import { chromium, type Page } from '@playwright/test';
 import postgres from 'postgres';
 import { describeComposition } from '../lib/bucket-scoring.ts';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.BASE_URL ?? process.env.GUIDE_BASE ?? 'http://localhost:3000';
 // The pinned build in /opt, not whatever Playwright's default resolver wants — the bundled
 // chrome-headless-shell is not installed here. Same constant verify-surfaces.mjs uses.
 const EXE = process.env.CHROMIUM_EXE ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';

@@ -168,21 +168,21 @@ odd one visible.
 | panel | tenant | `/portal/[tenantSlug]/buckets` | "Rank →" | `tenant__portal-tenantSlug-buckets__017-panel-Rank.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/buckets` | "✕" | `tenant__portal-tenantSlug-buckets__018-panel.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Unpin" | `tenant__portal-tenantSlug-cards__019-panel-Unpin.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__020-panel-Pin-to-pursue.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant__portal-tenantSlug-cards__020-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant__portal-tenantSlug-cards__021-panel-Not-interested.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__022-panel-Pin-to-pursue.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant__portal-tenantSlug-cards__022-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant__portal-tenantSlug-cards__023-panel-Not-interested.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__024-panel-Pin-to-pursue.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant__portal-tenantSlug-cards__024-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant__portal-tenantSlug-cards__025-panel-Not-interested.jpg` |
-| panel | tenant | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant__portal-tenantSlug-cards__026-panel-Pin-to-pursue.jpg` |
+| panel | tenant | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant__portal-tenantSlug-cards__026-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Unpin" | `tenant2__portal-tenantSlug-cards__115-panel-Unpin.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__116-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant2__portal-tenantSlug-cards__116-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__117-panel-Not-interested.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__118-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant2__portal-tenantSlug-cards__118-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__119-panel-Not-interested.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__120-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant2__portal-tenantSlug-cards__120-panel-Pin-to-pursue.jpg` |
 | panel | tenant2 | `/portal/[tenantSlug]/cards` | "Not interested" | `tenant2__portal-tenantSlug-cards__121-panel-Not-interested.jpg` |
-| panel | tenant2 | `/portal/[tenantSlug]/cards` | "Pin to pursue" | `tenant2__portal-tenantSlug-cards__122-panel-Pin-to-pursue.jpg` |
+| panel | tenant2 | `/portal/[tenantSlug]/cards` | "👍 Interested" | `tenant2__portal-tenantSlug-cards__122-panel-Pin-to-pursue.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "To-dos87" | `tenant__portal-tenantSlug-command__027-panel-To-dos87.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "Workflows" | `tenant__portal-tenantSlug-command__028-panel-Workflows.jpg` |
 | panel | tenant | `/portal/[tenantSlug]/command` | "Projects1" | `tenant__portal-tenantSlug-command__029-panel-Projects1.jpg` |

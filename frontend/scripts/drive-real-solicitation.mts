@@ -25,7 +25,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.BASE_URL ?? process.env.GUIDE_BASE ?? 'http://localhost:3000';
 const OWNER = process.env.DATABASE_URL_OWNER ?? 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const ADMIN_PW = process.env.ADMIN_PW ?? process.env.SANDBOX_PASSWORD ?? 'SandboxDrive2026!';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

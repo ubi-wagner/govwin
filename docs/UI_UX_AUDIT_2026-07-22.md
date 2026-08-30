@@ -28,7 +28,7 @@ and (E) mutating routes that don't emit a namespaced `system_event`.
 **Correctness — retired-table read (stale/empty UI):**
 `admin/rfp-curation/[solId]` "Customer Interest" panel joined the RETIRED
 `tenant_pipeline_items` → repointed to the live `tenant_opportunity_cards`
-(`COALESCE(pinned_at, created_at)`, archived cards/tenants excluded). **Live-proven:** panel
+(`COALESCE(docs_copied_at, created_at)`, archived cards/tenants excluded). **Live-proven:** panel
 now shows the pinned tenant (blocker-shots/07).
 
 **Runtime SSR crash (found by the live-drive, not the static pass):**

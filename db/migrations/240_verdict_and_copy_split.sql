@@ -55,7 +55,8 @@
 --
 -- So this migration adds one timestamp and renames four columns. No CHECK change.
 
-BEGIN;
+-- (No BEGIN/COMMIT: db/migrations/migrate.mjs already wraps each file in a transaction, and an
+--  inner pair makes every run print 'there is already a transaction in progress'.)
 
 -- ── 1 · The transfer columns say what they hold ──────────────────────────────────────────────
 -- RENAME preserves the data and every index/constraint on these columns; only the names move.
@@ -118,4 +119,3 @@ CREATE INDEX IF NOT EXISTS idx_toc_tenant_pursuit
   ON tenant_opportunity_cards (tenant_id, pursuit_status)
   WHERE pursuit_status IN ('monitoring', 'pursuing', 'passed');
 
-COMMIT;

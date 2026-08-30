@@ -27,7 +27,10 @@ import path from 'path';
 import postgres from 'postgres';
 import { countErrorSurfaces } from './lib/error-surface.mjs';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 // MUST be the database the SERVER under test is reading. This defaulted to the retired
 // :5433/claude cluster long after the sandbox moved to :5432, so every dynamic route was addressed
@@ -141,9 +144,27 @@ async function bindings() {
     SELECT a.id FROM library_atoms a JOIN tenants t ON t.id = a.tenant_id
     WHERE t.slug = 'foundation' AND a.grain = 'foundation' AND a.archived_at IS NULL
     ORDER BY a.id ASC LIMIT 1`;
+  /*
+   * The solicitation reading view (mig 240) — /portal/[slug]/cards/[opportunityId]/solicitation.
+   *
+   * TENANT-SCOPED, like every binding above it and for the same reason: the page redirects an
+   * opportunity this tenant holds no card for, so an id borrowed from another tenant would drive
+   * the CORRECT refusal and be scored either as a broken surface or, worse, as a clean render of a
+   * page that never rendered.
+   *
+   * Prefer a card the customer has actually judged and copied, because that is the state with the
+   * most on screen — the note, the marked passages AND the document bodies. A page bound to an
+   * untouched card still renders, but it exercises only the empty branches.
+   */
+  const [oppCard] = await sql`
+    SELECT c.opportunity_id AS id FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
+    WHERE t.slug = 'foundation' AND c.archived_at IS NULL AND c.card IS NOT NULL
+    ORDER BY c.docs_copied DESC, (c.pursuit_status <> 'unreviewed') DESC, c.opportunity_id ASC
+    LIMIT 1`.catch(() => [undefined]);
   return {
     projectId: project?.id,
     tenantSlug: 'foundation', proposalId: prop?.id, sectionId: sect?.id, solId: sol?.id,
+    opportunityId: oppCard?.id,
     topicId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
     documentId: tdoc?.id, pageKey: pageRow?.page_key,
     type: docPage?.content_type, slug: docPage?.page_key,

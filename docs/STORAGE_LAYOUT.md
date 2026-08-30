@@ -94,7 +94,7 @@ customers/{tenant_slug}/pinned/{opportunity_id}/{filename}
 **Copy-on-pin (mig 095).** Pinning a card is a **full copy**: the global read-only opportunity
 docs under `rfp-pipeline/{opportunity_id}/…` are copied into `customers/{slug}/pinned/{opportunity_id}/`
 so the tenant owns a local, shard-safe copy. The manifest of copied files is recorded on
-`tenant_opportunity_cards.pinned_docs` (JSONB). See `docs/MASTER_MIRROR_OPP_DESIGN.md` for the
+`tenant_opportunity_cards.copied_docs` (JSONB). See `docs/MASTER_MIRROR_OPP_DESIGN.md` for the
 opportunity→pin→purchase→proposal flow.
 
 ---

@@ -78,8 +78,19 @@ export AUTH_URL="http://localhost:3000"
 # like a broken box rather than an unrunnable check. Exporting it here gives the value one
 # definition that every harness reads, instead of six defaults to keep in agreement.
 #
-# Override for a box serving elsewhere: GUIDE_BASE=http://localhost:3001 <cmd>
-export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
+# ONE BASE URL, ONE PLACE — the same rule as the passwords above, for the same reason.
+#
+# GUIDE_BASE (the verify-* lenses) and BASE_URL (the drive-* harnesses) are two historic names for
+# one value. Because this file always EXPORTS GUIDE_BASE, a harness cannot tell "the caller chose
+# 3000" from "nobody said" — so `source sandbox-env.sh && BASE_URL=…:3101 node scripts/verify-x.mjs`
+# silently reads 3000 and fails with ERR_CONNECTION_REFUSED, which reads like the app is down.
+# Deriving both from whichever the caller set removes the trap; a per-command override must use
+# GUIDE_BASE (or set BASE_URL *before* sourcing this file).
+#
+#   GUIDE_BASE=http://localhost:3101 node frontend/scripts/verify-surfaces.mjs
+#   BASE_URL=http://localhost:3101 source scripts/sandbox-env.sh && node …/drive-x.mts
+export GUIDE_BASE="${GUIDE_BASE:-${BASE_URL:-http://localhost:3000}}"
+export BASE_URL="${BASE_URL:-$GUIDE_BASE}"
 
 # Emulated Claude: EMULATE=1 points the SDK at the local test harness so every AI-gated flow runs
 # end to end with no live key, mirroring the production wiring exactly (docs/AI_FLOWS_PROOF.md).

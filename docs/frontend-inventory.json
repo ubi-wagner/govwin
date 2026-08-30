@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 283,
-   "lines": 42849
+   "files": 284,
+   "lines": 43026
   },
   {
    "kind": "app-boundary",
@@ -15,7 +15,7 @@
   {
    "kind": "app-component",
    "files": 26,
-   "lines": 8940
+   "lines": 8960
   },
   {
    "kind": "auth",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 178,
-   "lines": 45163
+   "lines": 45654
   },
   {
    "kind": "e2e",
@@ -39,13 +39,13 @@
   },
   {
    "kind": "lib",
-   "files": 327,
-   "lines": 67638
+   "files": 328,
+   "lines": 68834
   },
   {
    "kind": "middleware",
    "files": 1,
-   "lines": 325
+   "lines": 330
   },
   {
    "kind": "other",
@@ -54,13 +54,13 @@
   },
   {
    "kind": "page",
-   "files": 118,
-   "lines": 18491
+   "files": 119,
+   "lines": 18721
   },
   {
    "kind": "script",
-   "files": 190,
-   "lines": 27797
+   "files": 202,
+   "lines": 30642
   },
   {
    "kind": "server-action",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 233,
-   "lines": 32695
+   "files": 236,
+   "lines": 33125
   }
  ],
  "records": [
@@ -2220,6 +2220,71 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/bucket-affinity.test.ts",
+   "kind": "test",
+   "lines": 117,
+   "bytes": 5995,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "scoreCard",
+      "buildAffinityProfile",
+      "affinityKeys",
+      "DEFAULT_WEIGHTS",
+      "CardFields"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "buildAffinityProfile",
+    "scoreCard",
+    "describe",
+    "it",
+    "expect(profile.net['agency:department of the navy']).toBe",
+    "expect",
+    "expect(profile.votes).toBe",
+    "expect(profile.net['agency:nasa']).toBe",
+    "expect(profile.net['tech:life support']).toBe",
+    "expect(p.votes).toBe",
+    "expect(p.net).toEqual",
+    "expect(p.net['tech:materials']).toBe",
+    "expect(affinityKeys({ agency: '  Department Of The NAVY ' })).toContain",
+    "affinityKeys",
+    "expect(factorsFor({ agency: 'Department of the Navy' }).affinity).toBe",
+    "factorsFor",
+    "expect(f.affinity).toBe",
+    "expect(withAffinity).toBeLessThan",
+    "expect(factorsFor({ agency: 'Department of the Interior' })).not.toHaveProperty",
+    "expect(factorsFor({ agency: 'NASA', programType: 'sbir' }).affinity).toBe",
+    "expect(f.affinity).toBeGreaterThan",
+    "expect(f.affinity).toBeLessThan",
+    "expect(factorsFor({ agency: 'Department of the Navy', verdict: 'monitoring' })).not.toHaveProperty",
+    "expect(factorsFor({ agency: 'Department of the Navy', verdict: 'passed' })).not.toHaveProperty",
+    "expect(factorsFor({ agency: 'Department of the Navy', verdict: 'unreviewed' }).affinity).toBe",
+    "expect(scoreCard({ title: 'zz', agency: 'Department of the Navy' }, KW, NOW, { affinity: empty }).factors)\n      .not.toHaveProperty",
+    "expect(scoreCard({ title: 'zz', agency: 'Department of the Navy' }, KW, NOW)).toEqual",
+    "expect(DEFAULT_WEIGHTS.affinity).toBeLessThan",
+    "expect(DEFAULT_WEIGHTS.affinity).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/bucket-authoring-budget.test.ts",
    "kind": "test",
    "lines": 106,
@@ -2302,10 +2367,74 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/bucket-ranking-abstention.test.ts",
+   "kind": "test",
+   "lines": 183,
+   "bytes": 9121,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-ranking",
+     "names": [
+      "scoreCard"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "describeComposition",
+      "DEFAULT_WEIGHTS"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "scoreCard",
+    "expect(absent.factors).not.toHaveProperty",
+    "expect",
+    "expect(absent.score).toBe",
+    "expect(wrong.factors.agency).toBe",
+    "expect(wrong.score).toBe",
+    "expect(scoreCard({ title: 'x' }, criteria, NOW).factors).not.toHaveProperty",
+    "expect(scoreCard({ title: 'x', naicsCodes: [] }, criteria, NOW).factors).not.toHaveProperty",
+    "expect(scoreCard({ title: 'x', naicsCodes: ['999999'] }, criteria, NOW).factors.naics).toBe",
+    "expect(scoreCard({ title: 'x', programType: 'sttr' }, criteria, NOW).factors.program).toBe",
+    "expect(scoreCard({ title: 'x', setAsideType: 'sdvosb' }, criteria, NOW).factors.accessibility).toBe",
+    "expect(scoreCard({}, { keywords: ['radar'] }, NOW).factors).not.toHaveProperty",
+    "expect(scoreCard({ title: 'sonar' }, { keywords: ['radar'] }, NOW).factors.keyword).toBe",
+    "expect(r.factors).toEqual",
+    "expect(r.score).toBe",
+    "expect(r.factors).not.toHaveProperty",
+    "expect(r.factors.keyword).toBe",
+    "expect(Object.keys(r.factors)).toEqual",
+    "Object.keys",
+    "new Date(NOW + 10 * DAY).toISOString",
+    "expect(Object.keys(r.factors).sort()).toEqual",
+    "Object.keys(r.factors).sort",
+    "expect(scoreCard({ title: 'x' }, {}, NOW)).toEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/bucket-ranking.test.ts",
    "kind": "test",
-   "lines": 137,
-   "bytes": 6698,
+   "lines": 141,
+   "bytes": 7095,
    "client": false,
    "exports": [],
    "imports": [
@@ -2368,6 +2497,69 @@
     "expect(sanitizeBucketCriteria(null)).toEqual",
     "expect(r.score).toBeGreaterThanOrEqual",
     "expect(r.score).toBeLessThanOrEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/bucket-signal-coverage.test.ts",
+   "kind": "test",
+   "lines": 126,
+   "bytes": 6339,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "measureCoverage",
+      "describeComposition",
+      "scoreCard",
+      "CardFields"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "measureCoverage",
+    "expect(cov.cards).toBe",
+    "expect",
+    "expect(cov.carried).toMatchObject",
+    "expect(cov.carried.naics ?? 0).toBe",
+    "expect(cov.carried.agency).toBe",
+    "expect(String(card.closeDate).trim()).not.toBe",
+    "String(card.closeDate).trim",
+    "String",
+    "expect(scoreCard(card, { keywords: ['x'], useTimeline: true }, NOW).factors).not.toHaveProperty",
+    "scoreCard",
+    "expect(measureCoverage([card], NOW).carried.timeline ?? 0).toBe",
+    "Object.keys",
+    "expect(cov.carried[k as keyof typeof cov.carried] ?? 0).toBe",
+    "describeComposition",
+    "expect(e.carried).toBeNull",
+    "expect(e.cards).toBeNull",
+    "entries.find",
+    "expect([naics.carried, naics.cards]).toEqual",
+    "expect([agency.carried, agency.cards]).toEqual",
+    "describeComposition(criteria, cov).entries.find",
+    "expect(kw.conditional).toBe",
+    "expect(kw.carried).toBeNull",
+    "describeComposition(criteria).entries.map",
+    "describeComposition(criteria, cov).entries.map",
+    "expect(b).toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -19727,8 +19919,8 @@
   {
    "file": "app/admin/architecture/page.tsx",
    "kind": "page",
-   "lines": 57,
-   "bytes": 2420,
+   "lines": 61,
+   "bytes": 2789,
    "client": false,
    "exports": [
     {
@@ -20125,7 +20317,7 @@
    "file": "app/admin/cards/page.tsx",
    "kind": "page",
    "lines": 164,
-   "bytes": 6435,
+   "bytes": 6437,
    "client": false,
    "exports": [
     {
@@ -21493,8 +21685,8 @@
   {
    "file": "app/admin/process/process-monitor-client.tsx",
    "kind": "app-component",
-   "lines": 468,
-   "bytes": 18663,
+   "lines": 485,
+   "bytes": 20413,
    "client": true,
    "exports": [
     {
@@ -22229,7 +22421,7 @@
    "file": "app/admin/rfp-curation/[solId]/page.tsx",
    "kind": "page",
    "lines": 424,
-   "bytes": 14659,
+   "bytes": 14702,
    "client": false,
    "exports": [
     {
@@ -22340,7 +22532,7 @@
     "d.createdAt.toISOString",
     "volumeRows.map",
     "interestRows.map",
-    "row.pinnedAt.toISOString",
+    "row.docsCopiedAt.toISOString",
     "row.proposalCreatedAt.toISOString",
     "annotationRows\n    .map((a) => ({\n      id: a.id,\n      pageNumber: a.sourceLocation?.page ?? 1,\n      sourceExcerpt: a.payload?.excerpt ?? '',\n      complianceVariableName: a.complianceVariableName,\n    })).filter",
     "annotationRows.map"
@@ -23954,8 +24146,8 @@
   {
    "file": "app/admin/system-state/system-state-client.tsx",
    "kind": "app-component",
-   "lines": 1282,
-   "bytes": 50685,
+   "lines": 1285,
+   "bytes": 50962,
    "client": true,
    "exports": [
     {
@@ -24116,7 +24308,7 @@
    "file": "app/admin/template-stable/page.tsx",
    "kind": "page",
    "lines": 187,
-   "bytes": 8366,
+   "bytes": 8382,
    "client": true,
    "exports": [
     {
@@ -24255,7 +24447,7 @@
    "file": "app/admin/templates/page.tsx",
    "kind": "page",
    "lines": 448,
-   "bytes": 18877,
+   "bytes": 18937,
    "client": true,
    "exports": [
     {
@@ -25964,7 +26156,7 @@
    "file": "app/api/admin/applications/[id]/accept/route.ts",
    "kind": "api-route",
    "lines": 377,
-   "bytes": 16470,
+   "bytes": 16472,
    "client": false,
    "exports": [
     {
@@ -28035,6 +28227,91 @@
    ],
    "runtime": null,
    "dynamic": true
+  },
+  {
+   "file": "app/api/admin/event-brackets/sweep/route.ts",
+   "kind": "api-route",
+   "lines": 66,
+   "bytes": 3417,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "closeAbandonedBrackets"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "request.headers.get",
+    "auth",
+    "NextResponse.json",
+    "request.json().catch",
+    "request.json",
+    "Number",
+    "Number.isFinite",
+    "Math.floor",
+    "closeAbandonedBrackets",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 41
+    },
+    {
+     "arg": "{ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 45
+    },
+    {
+     "arg": "{ data: { ...result, olderThanMinutes } }",
+     "opts": "",
+     "line": 60
+    },
+    {
+     "arg": "{ error: 'Internal server error', code: 'SWEEP_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 63
+    }
+   ],
+   "route": "/api/admin/event-brackets/sweep",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
   },
   {
    "file": "app/api/admin/expert-time/availability/route.ts",
@@ -33472,7 +33749,7 @@
    "file": "app/api/admin/rfp-upload/route.ts",
    "kind": "api-route",
    "lines": 675,
-   "bytes": 30333,
+   "bytes": 30334,
    "client": false,
    "exports": [
     {
@@ -44719,7 +44996,7 @@
    "file": "app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts",
    "kind": "api-route",
    "lines": 159,
-   "bytes": 8692,
+   "bytes": 8696,
    "client": false,
    "exports": [
     {
@@ -44939,8 +45216,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/buckets/route.ts",
    "kind": "api-route",
-   "lines": 104,
-   "bytes": 5919,
+   "lines": 130,
+   "bytes": 7522,
    "client": false,
    "exports": [
     {
@@ -44977,7 +45254,15 @@
      "spec": "@/lib/bucket-ranking",
      "names": [
       "rankBucket",
-      "sanitizeBucketCriteria"
+      "sanitizeBucketCriteria",
+      "measureCoverage",
+      "CardFields"
+     ]
+    },
+    {
+     "spec": "@/lib/jsonb",
+     "names": [
+      "coerceJsonb"
      ]
     },
     {
@@ -45028,6 +45313,12 @@
     "gate",
     "Promise.all",
     "withTenant",
+    "Date.now",
+    "coerceJsonb",
+    "measureCoverage",
+    "cards.filter((r: CardRow) => r.lifecycleStatus === 'open').map",
+    "cards.filter",
+    "cards.map",
     "getMaxBucketsPerTenant",
     "console.error",
     "canManageBuckets",
@@ -45036,8 +45327,7 @@
     "sql.json",
     "emitEventSingle",
     "userActor",
-    "rankBucket",
-    "Date.now"
+    "rankBucket"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -45046,67 +45336,67 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 20
+     "line": 21
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 28
+     "line": 29
     },
     {
-     "arg": "{ data: { buckets, cap } }",
+     "arg": "{ data: { ...read, cap } }",
      "opts": "",
-     "line": 46
+     "line": 72
     },
     {
      "arg": "{ error: 'Failed to load buckets', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 49
+     "line": 75
     },
     {
      "arg": "{ error: 'Bucket management not permitted', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 60
+     "line": 86
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 63
+     "line": 89
     },
     {
      "arg": "{ error: 'name is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 65
+     "line": 91
     },
     {
      "arg": "{ error: `You've reached the limit of ${cap} spotlight buckets. Delete one to add another.`, code: 'BUCKET_LIMIT' }",
      "opts": "{ status: 409 }",
-     "line": 82
+     "line": 108
     },
     {
      "arg": "{ data: { id: row.id } }",
      "opts": "",
-     "line": 98
+     "line": 124
     },
     {
      "arg": "{ error: 'Failed to create bucket', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 101
+     "line": 127
     }
    ],
    "route": "/api/portal/[tenantSlug]/buckets",
@@ -45118,10 +45408,10 @@
    "dynamic": false
   },
   {
-   "file": "app/api/portal/[tenantSlug]/cards/[opportunityId]/pin/route.ts",
+   "file": "app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts",
    "kind": "api-route",
-   "lines": 104,
-   "bytes": 6258,
+   "lines": 145,
+   "bytes": 8938,
    "client": false,
    "exports": [
     {
@@ -45202,11 +45492,11 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 64
+     "line": 105
     },
     {
      "tag": "sql",
-     "line": 67
+     "line": 108
     }
    ],
    "calls": [
@@ -45235,65 +45525,75 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 22
+     "line": 45
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 25
+     "line": 48
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 26
+     "line": 49
     },
     {
      "arg": "{ error: 'Invalid opportunity id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 27
+     "line": 50
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 29
+     "line": 52
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 31
+     "line": 54
     },
     {
-     "arg": "{ data: { resynced: true, docCount: docs.length } }",
+     "arg": "{ error: `Could not copy ${expected} document(s) — your existing copy is untouched. Try again.`,\n            code: 'RESYNC_COPY_FAILED' }",
+     "opts": "{ status: 502 }",
+     "line": 70
+    },
+    {
+     "arg": "{ data: { resynced: true, docCount: docs.length, expected } }",
      "opts": "",
-     "line": 44
+     "line": 75
+    },
+    {
+     "arg": "{ error: `Could not copy ${result.expected} document(s) for this opportunity. Nothing was pinned — try again.`,\n            code: 'PIN_COPY_FAILED' }",
+     "opts": "{ status: 502 }",
+     "line": 82
     },
     {
      "arg": "{ error: 'Card not found for this tenant', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 47
+     "line": 87
     },
     {
      "arg": "{ data: { pinned: true, docCount: result.docs.length, docs: result.docs } }",
      "opts": "",
-     "line": 77
+     "line": 118
     },
     {
      "arg": "{ error: 'Pin failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 80
+     "line": 121
     },
     {
      "arg": "{ data: { pinned: false } }",
      "opts": "",
-     "line": 98
+     "line": 139
     },
     {
      "arg": "{ error: 'Unpin failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 101
+     "line": 142
     }
    ],
-   "route": "/api/portal/[tenantSlug]/cards/[opportunityId]/pin",
+   "route": "/api/portal/[tenantSlug]/cards/[opportunityId]/documents",
    "methods": [
     "DELETE",
     "POST"
@@ -45304,8 +45604,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
    "kind": "api-route",
-   "lines": 68,
-   "bytes": 3723,
+   "lines": 100,
+   "bytes": 6179,
    "client": false,
    "exports": [
     {
@@ -45387,57 +45687,57 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 24
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 27
+     "line": 47
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 28
+     "line": 48
     },
     {
      "arg": "{ error: 'Invalid opportunity id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 29
+     "line": 49
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 32
+     "line": 52
     },
     {
      "arg": "{ error: `status must be one of ${PURSUIT.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 35
+     "line": 55
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 39
+     "line": 59
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 41
+     "line": 61
     },
     {
      "arg": "{ error: 'Card not found for this tenant', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 50
+     "line": 79
     },
     {
      "arg": "{ data: { status } }",
      "opts": "",
-     "line": 62
+     "line": 94
     },
     {
      "arg": "{ error: 'Could not update pursuit status', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 65
+     "line": 97
     }
    ],
    "route": "/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit",
@@ -45450,8 +45750,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/cards/route.ts",
    "kind": "api-route",
-   "lines": 125,
-   "bytes": 6877,
+   "lines": 150,
+   "bytes": 8631,
    "client": false,
    "exports": [
     {
@@ -45547,17 +45847,17 @@
     {
      "arg": "{ data: { cards, buckets } }",
      "opts": "",
-     "line": 115
+     "line": 140
     },
     {
      "arg": "{ error: 'Failed to load cards', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 118
+     "line": 143
     },
     {
      "arg": "{ error: 'Failed to load cards', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 122
+     "line": 147
     }
    ],
    "route": "/api/portal/[tenantSlug]/cards",
@@ -63918,8 +64218,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/create/route.ts",
    "kind": "api-route",
-   "lines": 824,
-   "bytes": 34944,
+   "lines": 811,
+   "bytes": 34357,
    "client": false,
    "exports": [
     {
@@ -63954,6 +64254,12 @@
      "spec": "@/lib/rls",
      "names": [
       "withTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-ranking",
+     "names": [
+      "resolveSourceBucket"
      ]
     },
     {
@@ -64043,43 +64349,39 @@
      ]
     }
    ],
-   "tryCount": 16,
+   "tryCount": 15,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 169
+     "line": 170
     },
     {
      "tag": "sql",
-     "line": 202
+     "line": 203
     },
     {
      "tag": "sql",
-     "line": 293
+     "line": 294
     },
     {
      "tag": "sql",
-     "line": 309
+     "line": 535
     },
     {
      "tag": "sql",
-     "line": 548
+     "line": 568
     },
     {
      "tag": "sql",
-     "line": 581
+     "line": 661
     },
     {
      "tag": "sql",
-     "line": 674
+     "line": 677
     },
     {
      "tag": "sql",
-     "line": 690
-    },
-    {
-     "tag": "sql",
-     "line": 698
+     "line": 685
     }
    ],
    "calls": [
@@ -64109,6 +64411,7 @@
     "userActor",
     "resolveTopicCompliance",
     "requiredItems.push",
+    "resolveSourceBucket",
     "new Date().toISOString",
     "withTenant",
     "sql.json",
@@ -64145,87 +64448,87 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 69
+     "line": 70
     },
     {
      "arg": "{ error: 'tenant_admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 81
+     "line": 82
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 86
+     "line": 87
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 92
+     "line": 93
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 98
+     "line": 99
     },
     {
      "arg": "{ error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' }",
      "opts": "{ status: 402 }",
-     "line": 113
+     "line": 114
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 126
+     "line": 127
     },
     {
      "arg": "{ error: 'topicId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 131
+     "line": 132
     },
     {
      "arg": "{ error: 'Invalid topicId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 134
+     "line": 135
     },
     {
      "arg": "{ error: `gate_config values must be from: ${DB_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 150
+     "line": 151
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 185
+     "line": 186
     },
     {
      "arg": "{ error: 'Topic not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 189
+     "line": 190
     },
     {
      "arg": "{ error: 'Topic has no linked solicitation', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 193
+     "line": 194
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 210
+     "line": 211
     },
     {
      "arg": "{ error: 'Proposal already exists for this topic', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 213
+     "line": 214
     },
     {
      "arg": "{\n      data: {\n        proposalId: proposal.id,\n        sectionCount,\n      },\n    }",
      "opts": "",
-     "line": 807
+     "line": 794
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 818
+     "line": 805
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/create",
@@ -70185,10 +70488,120 @@
    ]
   },
   {
+   "file": "app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx",
+   "kind": "page",
+   "lines": 223,
+   "bytes": 11598,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "SolicitationReadingPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "getTenantBySlug",
+      "verifyTenantAccess"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/rls",
+     "names": [
+      "withTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/jsonb",
+     "names": [
+      "coerceJsonb"
+     ]
+    },
+    {
+     "spec": "@/lib/validation",
+     "names": [
+      "isValidUUID"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "redirect",
+    "isRole",
+    "isValidUUID",
+    "getTenantBySlug",
+    "verifyTenantAccess",
+    "hasRoleAtLeast",
+    "withTenant",
+    "coerceJsonb",
+    "console.error",
+    "v.trim",
+    "(Array.isArray(card.highlights) ? (card.highlights as Array<Record<string, unknown>>) : []).filter",
+    "Array.isArray",
+    "(h.text as string).trim",
+    "str",
+    "highlights.map",
+    "String",
+    "h.variable.replace",
+    "manifest.map",
+    "docs.map",
+    "(d.charCount ?? d.extractedText?.length ?? 0).toLocaleString",
+    "d.extractedText.trim"
+   ],
+   "jsx": [
+    "Link"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "dynamic": true,
+   "params": [
+    "[tenantSlug]",
+    "[opportunityId]"
+   ]
+  },
+  {
    "file": "app/portal/[tenantSlug]/cards/page.tsx",
    "kind": "page",
    "lines": 33,
-   "bytes": 1527,
+   "bytes": 1586,
    "client": false,
    "exports": [
     {
@@ -70263,7 +70676,7 @@
    "file": "app/portal/[tenantSlug]/command/page.tsx",
    "kind": "page",
    "lines": 396,
-   "bytes": 18599,
+   "bytes": 18601,
    "client": false,
    "exports": [
     {
@@ -72916,8 +73329,8 @@
   {
    "file": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
    "kind": "page",
-   "lines": 648,
-   "bytes": 23559,
+   "lines": 651,
+   "bytes": 23880,
    "client": false,
    "exports": [
     {
@@ -75171,8 +75584,8 @@
   {
    "file": "components/admin/automation-health.tsx",
    "kind": "component",
-   "lines": 102,
-   "bytes": 5464,
+   "lines": 109,
+   "bytes": 6014,
    "client": false,
    "exports": [
     {
@@ -79306,7 +79719,7 @@
    "file": "components/cards/opportunity-card.tsx",
    "kind": "component",
    "lines": 158,
-   "bytes": 6724,
+   "bytes": 6756,
    "client": true,
    "exports": [
     {
@@ -80482,7 +80895,7 @@
    "file": "components/portal/atom-library.tsx",
    "kind": "component",
    "lines": 342,
-   "bytes": 22865,
+   "bytes": 22918,
    "client": true,
    "exports": [
     {
@@ -82406,8 +82819,8 @@
   {
    "file": "components/portal/pipeline-cards.tsx",
    "kind": "component",
-   "lines": 321,
-   "bytes": 18350,
+   "lines": 567,
+   "bytes": 31368,
    "client": true,
    "exports": [
     {
@@ -82443,8 +82856,32 @@
    "tryCount": 3,
    "sqlTags": [],
    "calls": [
-    "new Date(dateStr).getTime",
+    "Array.isArray",
     "Number.isFinite",
+    "n",
+    "parts.push",
+    "c.submissionFormat.trim",
+    "parts.join",
+    "useState",
+    "v.trim",
+    "(card[k] as unknown[]).filter",
+    "x.trim",
+    "text",
+    "list",
+    "(Array.isArray(card.highlights) ? (card.highlights as Array<Record<string, unknown>>) : []).filter",
+    "(h.text as string).trim",
+    "effortLine",
+    "focus.slice(0, 4).map",
+    "focus.slice",
+    "setOpen",
+    "highlights.slice(0, 8).map",
+    "highlights.slice",
+    "String(h.text).slice",
+    "String",
+    "volumes.join",
+    "docs.slice(0, 6).map",
+    "docs.slice",
+    "new Date(dateStr).getTime",
     "Math.ceil",
     "Date.now",
     "daysUntil",
@@ -82464,7 +82901,6 @@
     "(str(a, 'agency') ?? '').localeCompare",
     "(str(a, 'title') ?? '').localeCompare",
     "hasRoleAtLeast",
-    "useState",
     "useCallback",
     "setLoading",
     "qs.set",
@@ -82498,15 +82934,15 @@
     "closeChip",
     "fitFromOutput",
     "new Date(str(c, 'closeDate') as string).toLocaleDateString",
-    "Array.isArray",
     "c.rankings.slice(0, 4).map",
     "c.rankings.slice",
     "act",
-    "setPurchaseCard",
     "setPursuit",
+    "setPurchaseCard",
     "window.location.assign"
    ],
    "jsx": [
+    "CuratedRecord",
     "PurchaseModal"
    ],
    "snakeRowTypes": [],
@@ -83233,8 +83669,8 @@
   {
    "file": "components/portal/purchase-modal.tsx",
    "kind": "component",
-   "lines": 119,
-   "bytes": 4861,
+   "lines": 196,
+   "bytes": 9040,
    "client": true,
    "exports": [
     {
@@ -83254,6 +83690,19 @@
    "tryCount": 2,
    "sqlTags": [],
    "calls": [
+    "close.trim",
+    "Date.parse",
+    "Number.isFinite",
+    "Math.ceil",
+    "Date.now",
+    "out.push",
+    "new Date(t).toLocaleDateString",
+    "Array.isArray",
+    "num",
+    "String",
+    "c.submissionFormat.trim",
+    "(card.requiredItems as unknown[]).filter",
+    "decisionFacts",
     "useState",
     "code.trim",
     "setBusy",
@@ -83264,6 +83713,7 @@
     "res.json",
     "onPurchased",
     "e.stopPropagation",
+    "facts.map",
     "setCode",
     "completeWithCode"
    ],
@@ -83416,8 +83866,8 @@
   {
    "file": "components/portal/spotlight-buckets.tsx",
    "kind": "component",
-   "lines": 241,
-   "bytes": 14201,
+   "lines": 398,
+   "bytes": 23551,
    "client": true,
    "exports": [
     {
@@ -83432,6 +83882,7 @@
      "names": [
       "useCallback",
       "useEffect",
+      "useMemo",
       "useRef",
       "useState"
      ]
@@ -83441,19 +83892,35 @@
      "names": [
       "useRouter"
      ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "describeComposition",
+      "BucketCriteria",
+      "SignalCoverage"
+     ]
     }
    ],
-   "tryCount": 6,
+   "tryCount": 7,
    "sqlTags": [],
    "calls": [
     "useState",
     "useRouter",
     "useRef",
+    "useMemo",
+    "s.split(',').map((x) => x.trim()).filter",
+    "s.split(',').map",
+    "s.split",
+    "x.trim",
+    "split",
+    "describeComposition",
     "useCallback",
     "fetch",
     "res.json",
     "setBuckets",
     "setCap",
+    "setCoverage",
     "setErr",
     "setLoading",
     "useEffect",
@@ -83483,7 +83950,16 @@
     "setIncludeClosed",
     "router.refresh",
     "setEditingId",
+    "setPrefilled",
     "Array.isArray",
+    "v.filter",
+    "list",
+    "Object.values(sources).some",
+    "Object.values",
+    "current.trim",
+    "set",
+    "vals.join",
+    "fill",
     "(c[k] as unknown[]).filter((x): x is string => typeof x === 'string').join",
     "(c[k] as unknown[]).filter",
     "arr",
@@ -83493,6 +83969,14 @@
     "setReranking",
     "loadRanked",
     "setTimeout",
+    "composition.entries.map",
+    "composition.entries.filter",
+    "measured.filter",
+    "composition.entries.some",
+    "dead.map((e) => e.label).join",
+    "dead.map",
+    "dead.reduce",
+    "measured.map",
     "buckets.map",
     "rank",
     "startEdit",
@@ -85934,8 +86418,8 @@
   {
    "file": "components/rfp-curation/curation-workspace.tsx",
    "kind": "component",
-   "lines": 3497,
-   "bytes": 148766,
+   "lines": 3501,
+   "bytes": 149140,
    "client": true,
    "exports": [
     {
@@ -86174,7 +86658,7 @@
     "new Date(sol.postedDate).toLocaleDateString",
     "renderCombinedActivity",
     "customerInterest.map",
-    "new Date(ci.pinnedAt).toLocaleDateString",
+    "new Date(ci.docsCopiedAt).toLocaleDateString",
     "ci.proposalStage.replace",
     "Array.from",
     "setUploading",
@@ -89143,7 +89627,7 @@
    "file": "e2e/flex-midwindow-drive.spec.ts",
    "kind": "e2e",
    "lines": 377,
-   "bytes": 21358,
+   "bytes": 21366,
    "client": false,
    "exports": [],
    "imports": [
@@ -89279,7 +89763,7 @@
     "expect(Number(card!.bridgeVersion)).toBeGreaterThan",
     "expect(String(snap.spotlightSummary)).toContain",
     "expect(String(snap.expertNotes)).toContain",
-    "expect(card!.pinUpdateAvailable, 'pinned card + advanced version ⇒ the amber update badge').toBe",
+    "expect(card!.docsUpdateAvailable, 'pinned card + advanced version ⇒ the amber update badge').toBe",
     "String(Date.now() % 10000).padStart",
     "Date.now",
     "expect([200, 201], await up.text()).toContain",
@@ -90458,7 +90942,7 @@
    "file": "e2e/hitl-onboard-tvs-build.spec.ts",
    "kind": "e2e",
    "lines": 63,
-   "bytes": 3230,
+   "bytes": 3236,
    "client": false,
    "exports": [],
    "imports": [
@@ -94584,7 +95068,7 @@
    "file": "lib/amendments.ts",
    "kind": "lib",
    "lines": 238,
-   "bytes": 10870,
+   "bytes": 10871,
    "client": false,
    "exports": [
     {
@@ -96322,32 +96806,74 @@
   {
    "file": "lib/bucket-ranking.ts",
    "kind": "lib",
-   "lines": 212,
-   "bytes": 11325,
+   "lines": 183,
+   "bytes": 9897,
    "client": false,
    "exports": [
     {
      "name": "keywordHit",
-     "form": "function",
-     "async": false
+     "form": "re-export"
     },
     {
-     "name": "BucketCriteria",
-     "form": "type"
+     "name": "closeMs",
+     "form": "re-export"
     },
     {
      "name": "sanitizeBucketCriteria",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "CardFields",
-     "form": "type"
+     "form": "re-export"
     },
     {
      "name": "scoreCard",
+     "form": "re-export"
+    },
+    {
+     "name": "measureCoverage",
+     "form": "re-export"
+    },
+    {
+     "name": "buildAffinityProfile",
+     "form": "re-export"
+    },
+    {
+     "name": "affinityKeys",
+     "form": "re-export"
+    },
+    {
+     "name": "describeComposition",
+     "form": "re-export"
+    },
+    {
+     "name": "DEFAULT_WEIGHTS",
+     "form": "re-export"
+    },
+    {
+     "name": "BucketCriteria",
+     "form": "re-export"
+    },
+    {
+     "name": "CardFields",
+     "form": "re-export"
+    },
+    {
+     "name": "ScoreInputs",
+     "form": "re-export"
+    },
+    {
+     "name": "SignalCoverage",
+     "form": "re-export"
+    },
+    {
+     "name": "CompositionEntry",
+     "form": "re-export"
+    },
+    {
+     "name": "AffinityProfile",
+     "form": "re-export"
+    },
+    {
+     "name": "resolveSourceBucket",
      "form": "function",
-     "async": false
+     "async": true
     },
     {
      "name": "scoreCardForTenant",
@@ -96378,8 +96904,117 @@
      "names": [
       "coerceJsonb"
      ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "scoreCard",
+      "buildAffinityProfile"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-scoring",
+     "names": [
+      "BucketCriteria",
+      "CardFields"
+     ]
     }
    ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "withTenant",
+    "Number",
+    "console.error",
+    "coerceJsonb",
+    "scoreCard",
+    "sql.json",
+    "buildAffinityProfile",
+    "votedRows.map"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/bucket-scoring.ts",
+   "kind": "lib",
+   "lines": 554,
+   "bytes": 29026,
+   "client": false,
+   "exports": [
+    {
+     "name": "keywordHit",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "closeMs",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "BucketCriteria",
+     "form": "type"
+    },
+    {
+     "name": "sanitizeBucketCriteria",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "CardFields",
+     "form": "type"
+    },
+    {
+     "name": "DEFAULT_WEIGHTS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "CompositionEntry",
+     "form": "type"
+    },
+    {
+     "name": "SignalCoverage",
+     "form": "type"
+    },
+    {
+     "name": "describeComposition",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "measureCoverage",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "ScoreInputs",
+     "form": "type"
+    },
+    {
+     "name": "AffinityProfile",
+     "form": "type"
+    },
+    {
+     "name": "affinityKeys",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "buildAffinityProfile",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "scoreCard",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
    "tryCount": 0,
    "sqlTags": [],
    "calls": [
@@ -96389,6 +97024,14 @@
     "k.replace",
     "new RegExp(`\\\\b${esc}\\\\b`).test",
     "text.includes",
+    "Number.isFinite",
+    "closeDate.getTime",
+    "closeDate.trim",
+    "/^\\d{4}-\\d{2}-\\d{2}([T ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?)?(Z|[+-]\\d{2}:?\\d{2})?$/.test",
+    "/(Z|[+-]\\d{2}:?\\d{2})$/.test",
+    "/[T ]\\d{2}:/.test",
+    "s.replace",
+    "new Date(normalized).getTime",
     "Array.isArray",
     "v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map",
     "v.filter",
@@ -96396,11 +97039,23 @@
     "strArr",
     "set",
     "Object.entries",
-    "Number.isFinite",
     "Object.keys",
-    "[card.title, card.spotlightSummary, card.description, card.office].filter(Boolean).join(' ').toLowerCase",
-    "[card.title, card.spotlightSummary, card.description, card.office].filter(Boolean).join",
-    "[card.title, card.spotlightSummary, card.description, card.office].filter",
+    "raw.push",
+    "add",
+    "raw.reduce",
+    "raw.map",
+    "Math.round",
+    "Object.fromEntries",
+    "(Object.keys(DEFAULT_WEIGHTS) as Array<keyof typeof DEFAULT_WEIGHTS>).map",
+    "scoreCard",
+    "v.trim",
+    "out.push",
+    "v.trim().toLowerCase",
+    "affinityKeys",
+    "[\n    card.title, card.spotlightSummary, card.description, card.office,\n    // mig 238. Not agency/programType/setAside: those already have their own weighted factor, and\n    // folding them in here too would double-count one signal as a silent weight change.\n    card.phaseType, card.topicNumber, card.topicBranch,\n    ...(Array.isArray(card.techFocusAreas) ? card.techFocusAreas : []),\n    // The curated build-out (mig 239): what the admin decided this proposal is MADE OF.\n    // \"Commercialization Plan\", \"Phase I Work Plan\", \"Cost Volume\" says what the work IS.\n    ...(Array.isArray(card.volumes) ? card.volumes : []),\n    ...(Array.isArray(card.requiredItems) ? card.requiredItems : []),\n    // And what they MARKED while reading — the residue of a reading that otherwise evaporates\n    // into a 103-character blurb. This is the passage a person judged worth keeping, which is\n    // exactly what the raw document text is not.\n    ...(Array.isArray(card.highlights) ? card.highlights.map((h) => h?.text ?? '') : []),\n  ].filter(Boolean).join(' ').toLowerCase",
+    "[\n    card.title, card.spotlightSummary, card.description, card.office,\n    // mig 238. Not agency/programType/setAside: those already have their own weighted factor, and\n    // folding them in here too would double-count one signal as a silent weight change.\n    card.phaseType, card.topicNumber, card.topicBranch,\n    ...(Array.isArray(card.techFocusAreas) ? card.techFocusAreas : []),\n    // The curated build-out (mig 239): what the admin decided this proposal is MADE OF.\n    // \"Commercialization Plan\", \"Phase I Work Plan\", \"Cost Volume\" says what the work IS.\n    ...(Array.isArray(card.volumes) ? card.volumes : []),\n    ...(Array.isArray(card.requiredItems) ? card.requiredItems : []),\n    // And what they MARKED while reading — the residue of a reading that otherwise evaporates\n    // into a 103-character blurb. This is the passage a person judged worth keeping, which is\n    // exactly what the raw document text is not.\n    ...(Array.isArray(card.highlights) ? card.highlights.map((h) => h?.text ?? '') : []),\n  ].filter(Boolean).join",
+    "[\n    card.title, card.spotlightSummary, card.description, card.office,\n    // mig 238. Not agency/programType/setAside: those already have their own weighted factor, and\n    // folding them in here too would double-count one signal as a silent weight change.\n    card.phaseType, card.topicNumber, card.topicBranch,\n    ...(Array.isArray(card.techFocusAreas) ? card.techFocusAreas : []),\n    // The curated build-out (mig 239): what the admin decided this proposal is MADE OF.\n    // \"Commercialization Plan\", \"Phase I Work Plan\", \"Cost Volume\" says what the work IS.\n    ...(Array.isArray(card.volumes) ? card.volumes : []),\n    ...(Array.isArray(card.requiredItems) ? card.requiredItems : []),\n    // And what they MARKED while reading — the residue of a reading that otherwise evaporates\n    // into a 103-character blurb. This is the passage a person judged worth keeping, which is\n    // exactly what the raw document text is not.\n    ...(Array.isArray(card.highlights) ? card.highlights.map((h) => h?.text ?? '') : []),\n  ].filter",
+    "card.highlights.map",
     "criteria.keywords.filter",
     "keywordHit",
     "parts.push",
@@ -96408,24 +97063,24 @@
     "String",
     "criteria.naics.filter",
     "cn.has",
-    "(card.agency ?? '').toLowerCase",
+    "card.agency.toLowerCase",
     "criteria.agencies.some",
     "a.includes",
     "x.toLowerCase",
-    "(card.programType ?? '').toLowerCase",
+    "card.programType.toLowerCase",
     "criteria.programTypes.some",
-    "(card.setAsideType ?? '').toLowerCase",
+    "card.setAsideType.toLowerCase",
     "criteria.setAsides.some",
     "s.includes",
-    "new Date(card.closeDate).getTime",
+    "closeMs",
+    "[...seen].filter",
+    "k.slice",
+    "k.indexOf",
+    "known.reduce",
+    "dw",
     "parts.reduce",
-    "Math.round",
     "Math.max",
-    "Math.min",
-    "withTenant",
-    "coerceJsonb",
-    "scoreCard",
-    "sql.json"
+    "Math.min"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -98288,7 +98943,7 @@
    "file": "lib/curation/republish.ts",
    "kind": "lib",
    "lines": 217,
-   "bytes": 11282,
+   "bytes": 11283,
    "client": false,
    "exports": [
     {
@@ -99570,8 +100225,8 @@
   {
    "file": "lib/events.ts",
    "kind": "lib",
-   "lines": 406,
-   "bytes": 15075,
+   "lines": 491,
+   "bytes": 19770,
    "client": false,
    "exports": [
     {
@@ -99642,6 +100297,11 @@
      "async": true
     },
     {
+     "name": "closeAbandonedBrackets",
+     "form": "function",
+     "async": true
+    },
+    {
      "name": "emitEventSingleStrict",
      "form": "function",
      "async": true
@@ -99656,7 +100316,8 @@
     {
      "spec": "./db",
      "names": [
-      "sql"
+      "sql",
+      "sqlBypass"
      ]
     },
     {
@@ -99672,7 +100333,7 @@
      ]
     }
    ],
-   "tryCount": 5,
+   "tryCount": 6,
    "sqlTags": [
     {
      "tag": "sql",
@@ -99691,8 +100352,16 @@
      "line": 249
     },
     {
+     "tag": "sqlBypass",
+     "line": 324
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 341
+    },
+    {
      "tag": "sql",
-     "line": 307
+     "line": 392
     }
    ],
    "calls": [
@@ -99709,6 +100378,9 @@
     "startTimestamps.get",
     "startTimestamps.delete",
     "evaluateAutomationRules",
+    "Math.round",
+    "o.createdAt.getTime",
+    "new Date().toISOString",
     "emitEventStart",
     "fn",
     "emitEventEnd",
@@ -100792,8 +101464,8 @@
   {
    "file": "lib/extract-topics.ts",
    "kind": "lib",
-   "lines": 209,
-   "bytes": 6790,
+   "lines": 277,
+   "bytes": 11574,
    "client": false,
    "exports": [
     {
@@ -100822,24 +101494,37 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 131
+     "line": 199
     },
     {
      "tag": "sql",
-     "line": 148
+     "line": 216
     },
     {
      "tag": "sql",
-     "line": 189
+     "line": 257
     }
    ],
    "calls": [
-    "text.slice",
     "re.exec",
-    "/^[A-Z]{1,5}\\d/.test",
+    "/^[A-Z]{1,6}\\d/.test",
+    "/\\.[a-z]{2,4}$/.test",
     "matches.add",
     "Array.from",
     "text.indexOf",
+    "occurrences.push",
+    "text.slice(i + tn.length, i + tn.length + 140).replace",
+    "text.slice",
+    "(after.split('\\n')[0] ?? '').trim",
+    "after.split",
+    "/^(through|thru|to)\\b/i.test",
+    "/^[•o\\-*]\\s/.test",
+    "/[A-Z]{2,6}\\d{2}[A-Z]{1,3}\\d{2}-/.test",
+    "firstLine.split(/\\s+/).filter",
+    "firstLine.split",
+    "occurrences\n      .map((i) => ({ i, s: looksLikeEntry(i) })).sort",
+    "occurrences.map",
+    "looksLikeEntry",
     "Math.min",
     "block.split('\\n').map((l) => l.trim()).filter",
     "block.split('\\n').map",
@@ -100850,9 +101535,11 @@
     "firstLine.replace",
     "lines[1].replace(/^[\\s:–—-]+/, '').trim",
     "lines[1].replace",
+    "title.replace(/^TITLE\\s*[:\\-–—]\\s*/i, '').trim",
+    "title.replace",
     "title.slice",
-    "tn.slice(0, 2).toUpperCase",
-    "tn.slice",
+    "tn.toUpperCase",
+    "up.slice",
     "block.match",
     "descMatch[1].trim().slice",
     "descMatch[1].trim",
@@ -104308,8 +104995,8 @@
   {
    "file": "lib/opportunity-bridge.ts",
    "kind": "lib",
-   "lines": 500,
-   "bytes": 24785,
+   "lines": 788,
+   "bytes": 40750,
    "client": false,
    "exports": [
     {
@@ -104317,7 +105004,15 @@
      "form": "re-export"
     },
     {
+     "name": "OppCardDoc",
+     "form": "type"
+    },
+    {
      "name": "OppCard",
+     "form": "type"
+    },
+    {
+     "name": "OppCardHighlight",
      "form": "type"
     },
     {
@@ -104330,7 +105025,17 @@
      "form": "type"
     },
     {
+     "name": "normalizeCard",
+     "form": "function",
+     "async": false
+    },
+    {
      "name": "publishToBridge",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "copyCorpusInward",
      "form": "function",
      "async": true
     },
@@ -104404,39 +105109,43 @@
      ]
     }
    ],
-   "tryCount": 16,
+   "tryCount": 17,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 71
+     "line": 149
     },
     {
      "tag": "sql",
-     "line": 199
-    },
-    {
-     "tag": "sql",
-     "line": 266
-    },
-    {
-     "tag": "sql",
-     "line": 323
+     "line": 373
     },
     {
      "tag": "sqlBypass",
-     "line": 333
+     "line": 427
     },
     {
      "tag": "sql",
-     "line": 397
+     "line": 554
     },
     {
      "tag": "sql",
-     "line": 413
+     "line": 611
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 621
     },
     {
      "tag": "sql",
-     "line": 489
+     "line": 685
+    },
+    {
+     "tag": "sql",
+     "line": 701
+    },
+    {
+     "tag": "sql",
+     "line": 777
     }
    ],
    "calls": [
@@ -104444,14 +105153,27 @@
     "Number",
     "v.toISOString",
     "String",
+    "(Array.isArray(v) ? v : [])\n        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')\n        .map((x) => x.trim()).slice",
+    "(Array.isArray(v) ? v : [])\n        .filter((x): x is string => typeof x === 'string' && x.trim() !== '').map",
+    "(Array.isArray(v) ? v : []).filter",
+    "Array.isArray",
+    "x.trim",
     "num",
     "str",
     "isSubmissionStage",
+    "strList",
+    "(Array.isArray(o.highlights) ? (o.highlights as OppCardHighlight[]) : [])\n        .filter((h) => typeof h?.text === 'string' && h.text.trim() !== '')\n        .slice(0, MAX_HIGHLIGHTS).map",
+    "(Array.isArray(o.highlights) ? (o.highlights as OppCardHighlight[]) : [])\n        .filter((h) => typeof h?.text === 'string' && h.text.trim() !== '').slice",
+    "(Array.isArray(o.highlights) ? (o.highlights as OppCardHighlight[]) : []).filter",
+    "h.text.trim",
+    "h.text.trim().slice",
+    "Number.isFinite",
     "console.error",
     "buildCardSnapshot",
     "jsonParam",
-    "coarseStatus",
     "withTenant",
+    "docs.map",
+    "coarseStatus",
     "emitEventSingle",
     "systemActor",
     "scoreCardForTenant",
@@ -104462,6 +105184,7 @@
     "publishToBridge",
     "fanOutBridgeEvent",
     "publishAndFanOut",
+    "normalizeCard",
     "console.info",
     "out.push",
     "reconcileTenant"
@@ -104499,12 +105222,20 @@
   {
    "file": "lib/opportunity-pin.ts",
    "kind": "lib",
-   "lines": 96,
-   "bytes": 4149,
+   "lines": 275,
+   "bytes": 13633,
    "client": false,
    "exports": [
     {
      "name": "PinnedDoc",
+     "form": "type"
+    },
+    {
+     "name": "PinRefusal",
+     "form": "type"
+    },
+    {
+     "name": "PinResult",
      "form": "type"
     },
     {
@@ -104547,22 +105278,45 @@
      "names": [
       "customerPinnedPath"
      ]
+    },
+    {
+     "spec": "@/lib/opportunity-bridge",
+     "names": [
+      "copyCorpusInward",
+      "BridgeEvent"
+     ]
     }
    ],
-   "tryCount": 2,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 24
+     "line": 30
+    },
+    {
+     "tag": "sql",
+     "line": 79
+    },
+    {
+     "tag": "sql",
+     "line": 143
     }
    ],
    "calls": [
+    "copyCorpusInward",
     "console.error",
     "customerPinnedPath",
     "copyObject",
     "copied.push",
     "withTenant",
+    "Number",
+    "publishedDocCount",
     "copyOppFolder",
+    "copyPinnedText",
+    "rows.map",
+    "docs.map",
+    "withText.has",
+    "stampPinnedKeys",
     "sql.json"
    ],
    "jsx": [],
@@ -105138,7 +105892,7 @@
    "file": "lib/partner/create-partner-org.ts",
    "kind": "lib",
    "lines": 111,
-   "bytes": 5833,
+   "bytes": 5835,
    "client": false,
    "exports": [
     {
@@ -105348,7 +106102,7 @@
    "file": "lib/partner/own-org.ts",
    "kind": "lib",
    "lines": 78,
-   "bytes": 4356,
+   "bytes": 4358,
    "client": false,
    "exports": [
     {
@@ -113797,8 +114551,8 @@
   {
    "file": "lib/provision-proposal.ts",
    "kind": "lib",
-   "lines": 502,
-   "bytes": 33017,
+   "lines": 508,
+   "bytes": 33549,
    "client": false,
    "exports": [
     {
@@ -113837,6 +114591,12 @@
      "spec": "@/lib/tenant-context",
      "names": [
       "runInTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/bucket-ranking",
+     "names": [
+      "resolveSourceBucket"
      ]
     },
     {
@@ -113915,19 +114675,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 56
+     "line": 57
     },
     {
      "tag": "sql",
-     "line": 73
+     "line": 74
     },
     {
      "tag": "sql",
-     "line": 122
+     "line": 123
     },
     {
      "tag": "sql",
-     "line": 474
+     "line": 480
     }
    ],
    "calls": [
@@ -113937,6 +114697,7 @@
     "scoped",
     "authoredItems",
     "requiredItems.push",
+    "resolveSourceBucket",
     "new Date().toISOString",
     "emitEventStart",
     "withTenant",
@@ -114054,7 +114815,7 @@
    "file": "lib/provisioning/complete.ts",
    "kind": "lib",
    "lines": 97,
-   "bytes": 4934,
+   "bytes": 4935,
    "client": false,
    "exports": [
     {
@@ -115077,7 +115838,7 @@
    "file": "lib/spotlight/default-buckets.ts",
    "kind": "lib",
    "lines": 82,
-   "bytes": 4150,
+   "bytes": 4152,
    "client": false,
    "exports": [
     {
@@ -118173,7 +118934,7 @@
    "file": "lib/tenants/create-tenant.ts",
    "kind": "lib",
    "lines": 187,
-   "bytes": 9206,
+   "bytes": 9208,
    "client": false,
    "exports": [
     {
@@ -121242,8 +122003,8 @@
   {
    "file": "lib/tools/solicitation-save-annotation.ts",
    "kind": "lib",
-   "lines": 137,
-   "bytes": 4505,
+   "lines": 182,
+   "bytes": 7147,
    "client": false,
    "exports": [
     {
@@ -121294,18 +122055,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 60
+     "line": 104
     },
     {
      "tag": "sql",
-     "line": 73
+     "line": 117
     },
     {
      "tag": "sql",
-     "line": 91
+     "line": 136
     }
    ],
    "calls": [
+    "z.object({\n  page: z.number().int().min(1),\n  offset: z.number().int().min(0),\n  length: z.number().int().min(0),\n  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),\n}).passthrough",
     "z.object",
     "z.number().int().min",
     "z.number().int",
@@ -121315,14 +122077,20 @@
     "z.string().uuid",
     "z.string",
     "z.enum",
+    "z.string().max(2000).optional",
+    "z.string().max",
     "z.record(z.string(), z.unknown()).default",
     "z.record",
     "z.unknown",
     "z.string().max(128).optional",
-    "z.string().max",
+    "text.trim",
+    "explicit.slice",
+    "fromAnchor.trim",
+    "fromAnchor.trim().slice",
     "defineTool",
     "console.error",
     "sql.json",
+    "excerptOf",
     "emitEventSingle",
     "randomUUID",
     "ctx.log.info",
@@ -122931,8 +123699,8 @@
   {
    "file": "middleware.ts",
    "kind": "middleware",
-   "lines": 325,
-   "bytes": 14505,
+   "lines": 330,
+   "bytes": 14927,
    "client": false,
    "exports": [
     {
@@ -123017,17 +123785,17 @@
     {
      "arg": "{ error: 'unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 275
+     "line": 280
     },
     {
      "arg": "{ error: 'password change required', code: 'PASSWORD_CHANGE_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 296
+     "line": 301
     },
     {
      "arg": "{ error: 'forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 313
+     "line": 318
     }
    ]
   },
@@ -123357,6 +124125,115 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/capture-mobile-guide.mts",
+   "kind": "script",
+   "lines": 147,
+   "bytes": 9061,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "mkdirSync",
+      "writeFileSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "./lib/mobile-measure.mts",
+     "names": [
+      "overflowing",
+      "smallTargets"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 41
+    },
+    {
+     "tag": "sql",
+     "line": 45
+    }
+   ],
+   "calls": [
+    "path.resolve",
+    "console.error",
+    "process.exit",
+    "mkdirSync",
+    "postgres",
+    "sql.end",
+    "p.goto",
+    "p.fill",
+    "p.click",
+    "p.waitForTimeout",
+    "p.url().includes",
+    "p.url",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "overflowing",
+    "p.evaluate",
+    "Array.from(\n      document.querySelectorAll('button, a[href], input, select, textarea')).filter",
+    "Array.from",
+    "document.querySelectorAll",
+    "e.getBoundingClientRect",
+    "p.locator('button:has-text(\"☰\")').count",
+    "p.locator",
+    "p.locator('button[aria-label*=\"menu\" i]').count",
+    "p.screenshot",
+    "path.join",
+    "rows.push",
+    "console.log",
+    "'m-01-login'.padEnd",
+    "ctx.close",
+    "p.on",
+    "errs.push",
+    "String(e).slice",
+    "String",
+    "login",
+    "TARGETS.filter",
+    "r.status",
+    "smallTargets",
+    "Array.from(\n        document.querySelectorAll('button, a[href], input, select, textarea')).filter",
+    "Array.from(document.querySelectorAll('*')).some",
+    "getComputedStyle",
+    "t.name.padEnd",
+    "String(verdict).padEnd",
+    "browser.close",
+    "writeFileSync",
+    "JSON.stringify",
+    "rows.filter",
+    "['FULL','SCROLL','OVERFLOW'].map((v) => `${v} ${rows.filter((r) => r.verdict === v).length}`).join",
+    "['FULL','SCROLL','OVERFLOW'].map"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 2,
    "jsonResponses": []
   },
   {
@@ -124708,6 +125585,102 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-bucket-authoring.mts",
+   "kind": "script",
+   "lines": 286,
+   "bytes": 16868,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "@playwright/test",
+     "names": [
+      "chromium",
+      "Page"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "../lib/bucket-scoring.ts",
+     "names": [
+      "describeComposition"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "postgres",
+    "console.log",
+    "['master_admin', 'rfp_admin', 'partner_admin'].includes",
+    "page.goto",
+    "page.fill",
+    "Promise.all",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.click",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "console.error",
+    "process.exit",
+    "actors.find",
+    "chromium.launch",
+    "ok",
+    "browser.newContext",
+    "ctx.newPage",
+    "signIn",
+    "passwordFor",
+    "browser.close",
+    "owner.end",
+    "page.getByRole",
+    "btn.isVisible().catch",
+    "btn.isVisible",
+    "page.locator",
+    "kwInput.fill",
+    "btn.click",
+    "kwInput.inputValue",
+    "filled.trim",
+    "filled.slice",
+    "(profileKw[0]?.keywords ?? []).join",
+    "expected.slice",
+    "(await page.locator(`input[placeholder=\"${placeholder}\"]`).inputValue())\n            .split(',').map((x) => x.trim()).filter",
+    "(await page.locator(`input[placeholder=\"${placeholder}\"]`).inputValue())\n            .split(',').map",
+    "(await page.locator(`input[placeholder=\"${placeholder}\"]`).inputValue()).split",
+    "page.locator(`input[placeholder=\"${placeholder}\"]`).inputValue",
+    "x.trim",
+    "describeComposition",
+    "readField",
+    "page.locator('text=/Scores on \\\\d+ signal/').first().textContent().catch",
+    "page.locator('text=/Scores on \\\\d+ signal/').first().textContent",
+    "page.locator('text=/Scores on \\\\d+ signal/').first",
+    "line.slice",
+    "line.includes",
+    "ctx.close",
+    "page.locator('text=/nothing to copy/i').first().isVisible().catch",
+    "page.locator('text=/nothing to copy/i').first().isVisible",
+    "page.locator('text=/nothing to copy/i').first",
+    "page.locator('input[placeholder=\"keywords, comma-sep\"]').inputValue",
+    "kw.trim",
+    "page.getByRole('button', { name: /start from our company profile/i }).isVisible().catch",
+    "page.getByRole('button', { name: /start from our company profile/i }).isVisible",
+    "page.url().split('/').slice(3).join",
+    "page.url().split('/').slice",
+    "page.url().split",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-canvas-authoring.mts",
    "kind": "script",
    "lines": 620,
@@ -125199,6 +126172,139 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-card-decision.mts",
+   "kind": "script",
+   "lines": 313,
+   "bytes": 19700,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs/promises",
+     "names": [
+      "mkdir"
+     ]
+    },
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "postgres",
+    "console.log",
+    "['master_admin', 'rfp_admin', 'partner_admin'].includes",
+    "page.goto",
+    "page.fill",
+    "Promise.all",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.click",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "console.error",
+    "process.exit",
+    "passwordFor",
+    "curated?.title.slice",
+    "JSON.stringify",
+    "uncurated?.title.slice",
+    "chromium.launch({ executable_path: EXE } as never).catch",
+    "chromium.launch",
+    "browser.newPage",
+    "signIn",
+    "mkdir(SHOTS, { recursive: true }).catch",
+    "mkdir",
+    "page.locator(`#opp-${oppId}`).first().innerText().catch",
+    "page.locator(`#opp-${oppId}`).first().innerText",
+    "page.locator(`#opp-${oppId}`).first",
+    "page.locator",
+    "cardText",
+    "page.screenshot({ path: `${SHOTS}/card-curated.png` }).catch",
+    "page.screenshot",
+    "page.screenshot({ path: `${SHOTS}/card-uncurated.png` }).catch",
+    "ok",
+    "curatedText.includes",
+    "cs.submissionFormat.trim",
+    "cs.submissionFormat.trim().slice",
+    "/\\d+-page technical/.test",
+    "/\\d+ volumes?\\b/.test",
+    "r.opportunityId.slice",
+    "(await cardText(r.opportunityId)).includes",
+    "page.locator(`#opp-${curated.opportunityId}`).getByRole",
+    "buy.count",
+    "buy.first().click",
+    "buy.first",
+    "page.locator('text=Purchase proposal workspace').first()\n        .locator('xpath=ancestor::div[contains(@class,\"rounded-2xl\")]').innerText().catch",
+    "page.locator('text=Purchase proposal workspace').first()\n        .locator('xpath=ancestor::div[contains(@class,\"rounded-2xl\")]').innerText",
+    "page.locator('text=Purchase proposal workspace').first().locator",
+    "page.locator('text=Purchase proposal workspace').first",
+    "modal.includes",
+    "/Page limit/.test",
+    "/Volumes/.test",
+    "new Date(curated.closeDate).toLocaleDateString",
+    "modal.match(/Closes[\\s\\S]{0,40}/)?.[0].replace",
+    "modal.match",
+    "/Build-out complete/.test",
+    "page.screenshot({ path: `${SHOTS}/purchase-modal.png` }).catch",
+    "page.keyboard.press('Escape').catch",
+    "page.keyboard.press",
+    "page.locator('text=Cancel').first().click().catch",
+    "page.locator('text=Cancel').first().click",
+    "page.locator('text=Cancel').first",
+    "page.getByRole('button', { name: /New bucket|Create/ }).first",
+    "page.getByRole",
+    "newBucket.count",
+    "newBucket.click().catch",
+    "newBucket.click",
+    "page.locator('input').filter",
+    "page.getByPlaceholder(label).first",
+    "page.getByPlaceholder",
+    "byPlaceholder.count",
+    "byPlaceholder.fill",
+    "page.getByLabel(label).first",
+    "page.getByLabel",
+    "byLabel.count",
+    "byLabel.fill",
+    "typeInto",
+    "liveAgency.agency.split(' ').slice",
+    "liveAgency.agency.split",
+    "page.locator('text=/Scores on \\\\d+ signal/').first()\n      .locator('xpath=ancestor::div[1]').innerText().catch",
+    "page.locator('text=/Scores on \\\\d+ signal/').first()\n      .locator('xpath=ancestor::div[1]').innerText",
+    "page.locator('text=/Scores on \\\\d+ signal/').first().locator",
+    "page.locator('text=/Scores on \\\\d+ signal/').first",
+    "/Scores on \\d+ signal/.test",
+    "panel.split",
+    "new RegExp(`NAICS codes 0/${feed.n}`).test",
+    "panel.match",
+    "panel.slice",
+    "new RegExp(`None of your ${feed.n} opportunities carry NAICS codes`).test",
+    "new RegExp(`agency ${feed.n}/${feed.n}`).test",
+    "/A signal is skipped for any opportunity/.test",
+    "page.screenshot({ path: `${SHOTS}/bucket-coverage.png` }).catch",
+    "browser.close().catch",
+    "browser.close",
+    "owner.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-cms-generate.mts",
    "kind": "script",
    "lines": 126,
@@ -125615,6 +126721,126 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-corpus-copy-inward.mts",
+   "kind": "script",
+   "lines": 331,
+   "bytes": 20375,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "existsSync",
+      "mkdirSync"
+     ]
+    },
+    {
+     "spec": "node:child_process",
+     "names": [
+      "execFileSync"
+     ]
+    },
+    {
+     "spec": "node:crypto",
+     "names": [
+      "createHash"
+     ]
+    },
+    {
+     "spec": "node:os",
+     "names": [
+      "tmpdir"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join",
+      "resolve",
+      "dirname"
+     ]
+    },
+    {
+     "spec": "node:url",
+     "names": [
+      "fileURLToPath"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "resolve",
+    "dirname",
+    "fileURLToPath",
+    "join",
+    "tmpdir",
+    "process.argv.includes",
+    "existsSync",
+    "Object.values(SOURCE_PDFS).filter",
+    "Object.values",
+    "console.error",
+    "missing.join",
+    "process.exit",
+    "mkdirSync",
+    "Object.fromEntries",
+    "Object.entries(SOURCE_PDFS).map",
+    "Object.entries",
+    "execFileSync",
+    "JSON.stringify",
+    "(e as { stderr?: Buffer }).stderr.toString",
+    "String",
+    "err.trim",
+    "postgres",
+    "console.log",
+    "Number(v ?? 0).toLocaleString",
+    "Number",
+    "buildFixture",
+    "JSON.parse",
+    "readFileSync",
+    "target.title.slice",
+    "Object.values(fixture).reduce",
+    "ok",
+    "createHash('sha256').update(d.text).digest",
+    "createHash('sha256').update",
+    "createHash",
+    "staged.push",
+    "kind.padEnd",
+    "d.filename.slice(0, 42).padEnd",
+    "d.filename.slice",
+    "String(d.pages).padStart",
+    "n(d.chars).padStart",
+    "n",
+    "publishAndFanOut",
+    "new Date().toISOString",
+    "owner`SELECT card FROM tenant_opportunity_cards WHERE opportunity_id = ${target.opportunityId}::uuid LIMIT 1`.then",
+    "Array.isArray",
+    "pinCard(h.tenantId, h.slug, target.opportunityId).catch",
+    "pinCard",
+    "perTenant.every",
+    "perTenant.map",
+    "app.begin",
+    "resyncPinnedCard(h.tenantId, h.slug, target.opportunityId).catch",
+    "resyncPinnedCard",
+    "owner.end",
+    "app.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-corpus-verbatim.mts",
    "kind": "script",
    "lines": 132,
@@ -125709,6 +126935,117 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 11,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-curate-baa.mts",
+   "kind": "script",
+   "lines": 232,
+   "bytes": 13720,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "process.argv.includes",
+    "postgres",
+    "console.log",
+    "Number(v ?? 0).toLocaleString",
+    "Number",
+    "console.error",
+    "process.exit",
+    "topics.map",
+    "owner.end",
+    "n",
+    "label.padEnd",
+    "String((body.match(re) ?? []).length).padStart",
+    "String",
+    "body.match",
+    "body.lastIndexOf",
+    "Math.round",
+    "body.toLowerCase",
+    "needle.toLowerCase",
+    "low.indexOf",
+    "body.slice",
+    "/\\.{4,}/.test",
+    "/\\.\\s*\\d{1,3}\\s*$/.test",
+    "w.split",
+    "findProse",
+    "body.slice(at, at + 340).replace(/\\s+/g, ' ').trim",
+    "body.slice(at, at + 340).replace",
+    "Math.max",
+    "solicitationSaveAnnotationTool.handler",
+    "String(page).padStart",
+    "passage.slice",
+    "ok",
+    "extractTopicsForSolicitation",
+    "/-DV\\d/i.test",
+    "/direct to phase ii/i.test",
+    "b.branch.padEnd",
+    "String(b.n).padStart",
+    "publishAndFanOut",
+    "new Date().toISOString",
+    "(Number(body.length) / perCard).toFixed",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-curated-ranking.mts",
+   "kind": "script",
+   "lines": 166,
+   "bytes": 9700,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "postgres",
+    "console.log",
+    "console.error",
+    "process.exit",
+    "target.title.slice",
+    "ok",
+    "Number",
+    "owner.json",
+    "rankBucket",
+    "Date.now",
+    "scoreNow",
+    "solicitationSaveAnnotationTool.handler",
+    "(stored?.excerpt ?? '').includes",
+    "stored.excerpt.slice",
+    "publishAndFanOut",
+    "new Date().toISOString",
+    "(carried.sample ?? '').includes",
+    "carried.sample.slice",
+    "(after?.factors ?? '').includes",
+    "owner.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
    "jsonResponses": []
   },
   {
@@ -128180,6 +129517,48 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-pin-honesty.mts",
+   "kind": "script",
+   "lines": 157,
+   "bytes": 9979,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "postgres",
+    "console.log",
+    "console.error",
+    "process.exit",
+    "ok",
+    "Number",
+    "pinCard",
+    "held",
+    "Array.isArray",
+    "unpinCard",
+    "keys.every",
+    "String(keys[0].pk).slice",
+    "String",
+    "owner.json",
+    "resyncPinnedCard",
+    "owner.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-pin.mts",
    "kind": "script",
    "lines": 123,
@@ -129215,6 +130594,119 @@
     "bce.some",
     "provisionAndReleasePortal",
     "sqlBypass.end"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-real-solicitation.mts",
+   "kind": "script",
+   "lines": 299,
+   "bytes": 18053,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "@playwright/test",
+     "names": [
+      "chromium",
+      "APIRequestContext"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "node:url",
+     "names": [
+      "fileURLToPath"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "path.resolve",
+    "path.dirname",
+    "fileURLToPath",
+    "process.argv.includes",
+    "postgres",
+    "console.log",
+    "Number(v ?? 0).toLocaleString",
+    "Number",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "page.goto",
+    "page.fill",
+    "page.click",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "console.error",
+    "browser.close",
+    "process.exit",
+    "owner.end",
+    "opps.map",
+    "path.join",
+    "fs.existsSync",
+    "fs.readFileSync",
+    "n",
+    "authed",
+    "api.get",
+    "ok",
+    "probe0.status",
+    "close",
+    "api.post",
+    "new Date(Date.now() + 45 * 86_400_000).toISOString",
+    "Date.now",
+    "up.json().catch",
+    "up.json",
+    "up.status",
+    "JSON.stringify(upBody).slice",
+    "JSON.stringify",
+    "setTimeout",
+    "api.patch",
+    "patch.ok",
+    "patch.status",
+    "hay.toLowerCase",
+    "needle.toLowerCase",
+    "low.indexOf",
+    "hay.slice",
+    "/\\.{4,}/.test",
+    "/\\.\\s*\\d{1,3}\\s*$/.test",
+    "window.split",
+    "findProse",
+    "body.slice(at, at + 320).replace(/\\s+/g, ' ').trim",
+    "body.slice(at, at + 320).replace",
+    "body.slice",
+    "Math.max",
+    "Math.round",
+    "solicitationSaveAnnotationTool.handler",
+    "String(page).padStart",
+    "String",
+    "passage.slice",
+    "publishAndFanOut",
+    "new Date().toISOString",
+    "main().catch",
+    "main"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -131495,6 +132987,96 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-verdict-and-transfer.mts",
+   "kind": "script",
+   "lines": 269,
+   "bytes": 17013,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "postgres",
+    "console.log",
+    "['master_admin', 'rfp_admin', 'partner_admin'].includes",
+    "page.goto",
+    "page.fill",
+    "Promise.all",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.click",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "console.error",
+    "process.exit",
+    "passwordFor",
+    "up.title.slice",
+    "down.title.slice",
+    "chromium.launch",
+    "browser.newPage",
+    "signIn",
+    "page.locator(`#opp-${opp}`).first",
+    "page.locator",
+    "open",
+    "ok",
+    "cardEl.getByText('View Solicitation').count",
+    "cardEl.getByText",
+    "cardEl.getByRole('button', { name: /👍/ }).count",
+    "cardEl.getByRole",
+    "cardEl.getByRole('button', { name: /👎/ }).count",
+    "cardEl.getByRole('button', { name: /👍/ }).click",
+    "page.locator(`#opp-${up.opportunityId}`).first",
+    "owner.json",
+    "publishAndFanOut",
+    "new Date().toISOString",
+    "cardEl.getByText('View Solicitation').first().click",
+    "cardEl.getByText('View Solicitation').first",
+    "page.locator('body').innerText().catch",
+    "page.locator('body').innerText",
+    "/Application error|500|Internal Server/i.test",
+    "body.includes",
+    "(up.title ?? '').slice",
+    "expected.note.slice",
+    "/what our analysts marked/i.test",
+    "/page 12/.test",
+    "/published \\d+ document/.test",
+    "/has not published any documents/.test",
+    "/characters/.test",
+    "downEl.getByRole('button', { name: /👎/ }).click",
+    "downEl.getByRole",
+    "page.locator(`#opp-${down.opportunityId}`).count",
+    "page.getByText('Show passed').click().catch",
+    "page.getByText('Show passed').click",
+    "page.getByText",
+    "restore",
+    "browser.close().catch",
+    "browser.close",
+    "owner.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/dsip-plan-check.mts",
    "kind": "script",
    "lines": 22,
@@ -131608,6 +133190,258 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 4,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/estimate-full-build-cost.mts",
+   "kind": "script",
+   "lines": 454,
+   "bytes": 29286,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "@playwright/test",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "readdirSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:url",
+     "names": [
+      "fileURLToPath"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "dirname",
+      "join"
+     ]
+    },
+    {
+     "spec": "./lib/drive-actor.mjs",
+     "names": [
+      "CannotRun",
+      "resolveActor",
+      "loginOrDie",
+      "dieWell"
+     ]
+    },
+    {
+     "spec": "../lib/types/canvas-document",
+     "names": [
+      "countDocCharacters",
+      "estimatePageCount",
+      "docNodes"
+     ]
+    }
+   ],
+   "tryCount": 6,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 113
+    },
+    {
+     "tag": "sql",
+     "line": 115
+    },
+    {
+     "tag": "sql",
+     "line": 128
+    },
+    {
+     "tag": "sql",
+     "line": 176
+    },
+    {
+     "tag": "sql",
+     "line": 185
+    },
+    {
+     "tag": "sql",
+     "line": 186
+    },
+    {
+     "tag": "sql",
+     "line": 187
+    },
+    {
+     "tag": "sql",
+     "line": 191
+    },
+    {
+     "tag": "sql",
+     "line": 198
+    },
+    {
+     "tag": "sql",
+     "line": 235
+    },
+    {
+     "tag": "sql",
+     "line": 242
+    },
+    {
+     "tag": "sql",
+     "line": 380
+    },
+    {
+     "tag": "sql",
+     "line": 381
+    },
+    {
+     "tag": "sql",
+     "line": 383
+    },
+    {
+     "tag": "sql",
+     "line": 392
+    },
+    {
+     "tag": "sql",
+     "line": 413
+    },
+    {
+     "tag": "sql",
+     "line": 414
+    },
+    {
+     "tag": "sql",
+     "line": 416
+    },
+    {
+     "tag": "sql",
+     "line": 417
+    },
+    {
+     "tag": "sql",
+     "line": 424
+    },
+    {
+     "tag": "sql",
+     "line": 439
+    },
+    {
+     "tag": "sql",
+     "line": 440
+    }
+   ],
+   "calls": [
+    "dirname",
+    "fileURLToPath",
+    "join",
+    "process.argv.slice",
+    "argv.indexOf",
+    "arg",
+    "argv.includes",
+    "readdirSync(dir).filter",
+    "readdirSync",
+    "f.endsWith",
+    "readFileSync",
+    "src.replace(/#[^\\n]*/g, '').replace",
+    "src.replace",
+    "body.match",
+    "f.replace",
+    "n.toFixed",
+    "money",
+    "postgres",
+    "archetypeModels",
+    "JSON.parse",
+    "countDocCharacters",
+    "byVolume.has",
+    "byVolume.set",
+    "byVolume.get(key)!.nodes.push",
+    "byVolume.get",
+    "docNodes",
+    "byVolume.values",
+    "estimatePageCount",
+    "Math.round",
+    "sql`\n      SELECT page_limit_technical, character_limit_narrative, custom_variables\n      FROM solicitation_compliance WHERE solicitation_id = ${src.solicitationId}`.catch",
+    "resolveActor",
+    "Number",
+    "statSync",
+    "`[cost-probe] ${src.title}`.slice",
+    "sql.json",
+    "console.log",
+    "chromium.launch",
+    "browser.newContext",
+    "loginOrDie",
+    "Date.now",
+    "page.request.post",
+    "fired.text",
+    "fired.status",
+    "firedBody.slice",
+    "browser.close",
+    "page.waitForTimeout",
+    "page.request.get",
+    "r.json().catch",
+    "r.json",
+    "readFileSync(EMU_LOG, 'utf8').slice(emuOffset).trim",
+    "readFileSync(EMU_LOG, 'utf8').slice",
+    "tail.split('\\n').map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter",
+    "tail.split('\\n').map",
+    "tail.split",
+    "recs.filter",
+    "Number.isFinite",
+    "withChars.reduce",
+    "calls.reduce",
+    "console.table",
+    "calls.map",
+    "(models[r.agentRole] ?? DEFAULT_MODEL).replace",
+    "Number(r.cost).toFixed",
+    "calls.filter((r) => (models[r.agentRole] ?? DEFAULT_MODEL).includes('sonnet')).reduce",
+    "calls.filter",
+    "(models[r.agentRole] ?? DEFAULT_MODEL).includes",
+    "Math.max",
+    "calls.filter((r) => r.agentRole === 'section_drafter').reduce",
+    "band",
+    "realInputChars.toLocaleString",
+    "avgSectionChars.toLocaleString",
+    "proseChars.toLocaleString",
+    "blendedIn.toFixed",
+    "blendedOut.toFixed",
+    "withChars.map",
+    "costOf",
+    "Math.round(meanCallChars).toLocaleString",
+    "reqsPerCall.toFixed",
+    "maxReq.toLocaleString",
+    "(0.5 / boundCall).toFixed",
+    "String(p).padStart",
+    "String",
+    "String(pages).padStart",
+    "Math.abs",
+    "factor.toFixed",
+    "sql`SELECT default_monthly_budget, platform_monthly_cap, ai_enabled FROM platform_agent_config WHERE id = TRUE`.catch",
+    "sql`SELECT agent_monthly_budget_ceiling_usd FROM automation_framework WHERE id = 1`.catch",
+    "Math.floor",
+    "(liveHi / Math.max(ledgerCost, 1e-9)).toFixed",
+    "sql`DELETE FROM proposal_sections WHERE proposal_id = ${cloneId}`.catch",
+    "sql`DELETE FROM proposals WHERE id = ${cloneId}`.catch",
+    "sql.end",
+    "main().catch",
+    "main",
+    "console.error",
+    "process.exit"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 22,
    "jsonResponses": []
   },
   {
@@ -134174,6 +136008,91 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/measure-ranking-change.mts",
+   "kind": "script",
+   "lines": 157,
+   "bytes": 8738,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "process.argv.includes",
+    "postgres",
+    "Math.round",
+    "'█'.repeat",
+    "Math.max",
+    "rows.map",
+    "console.log",
+    "snapshot",
+    "Number(corpus.chars).toLocaleString",
+    "Number",
+    "pct",
+    "Number(reach.cardChars).toLocaleString",
+    "Number(reach.corpusChars).toLocaleString",
+    "Math.round(Number(reach.corpusChars) / Math.max(1, Number(reach.cardChars))).toLocaleString",
+    "Date.now",
+    "rankBucket",
+    "b.name.slice(0, 46).padEnd",
+    "b.name.slice",
+    "String(ranked).padStart",
+    "String",
+    "before.get",
+    "deltas.push",
+    "before.keys",
+    "after.has",
+    "deltas.reduce",
+    "mean.toFixed",
+    "bands.map",
+    "[...m.values()].filter",
+    "m.values",
+    "hist",
+    "'band'.padEnd",
+    "'before'.padStart",
+    "'after'.padStart",
+    "bands.forEach",
+    "label.padEnd",
+    "String(hb[i]).padStart",
+    "String(ha[i]).padStart",
+    "bar",
+    "after.values",
+    "Object.keys",
+    "share.set",
+    "share.get",
+    "before.values",
+    "shareBefore.set",
+    "shareBefore.get",
+    "[...new Set([...share.keys(), ...shareBefore.keys()])].sort",
+    "share.keys",
+    "shareBefore.keys",
+    "k.padEnd",
+    "String(b).padStart",
+    "String(a).padStart",
+    "[...after.values()].filter",
+    "corpusCarried.slice",
+    "(b?.name ?? '?').slice(0, 44).padEnd",
+    "(b?.name ?? '?').slice",
+    "String(r.score).padStart",
+    "owner.end",
+    "main().catch",
+    "main",
+    "console.error",
+    "process.exit"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/measure-table-row-height.mts",
    "kind": "script",
    "lines": 71,
@@ -135481,6 +137400,63 @@
     "main().catch",
     "main",
     "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/parity-score-ts.mts",
+   "kind": "script",
+   "lines": 34,
+   "bytes": 1627,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync"
+     ]
+    },
+    {
+     "spec": "node:url",
+     "names": [
+      "fileURLToPath"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "dirname",
+      "join"
+     ]
+    },
+    {
+     "spec": "../lib/bucket-scoring.ts",
+     "names": [
+      "scoreCard",
+      "buildAffinityProfile",
+      "BucketCriteria",
+      "CardFields",
+      "ScoreInputs"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "dirname",
+    "fileURLToPath",
+    "JSON.parse",
+    "readFileSync",
+    "join",
+    "fx.cases.map",
+    "buildAffinityProfile",
+    "scoreCard",
+    "process.stdout.write",
+    "JSON.stringify"
    ],
    "jsx": [],
    "snakeRowTypes": [],

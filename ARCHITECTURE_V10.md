@@ -250,7 +250,7 @@ every opportunity onto a new tenant.
 | Publish | `publishToBridge()` — `INSERT … version = max(version)+1` (append-only) |
 | Replicate | `fanOutBridgeEvent()` → `applyToTenant()` per `status IN ('active','trial')` tenant |
 | Tenant isolation | `applyToTenant` runs inside `withTenant(tenantId)` (SET LOCAL `app.tenant_id`) |
-| Pin-update signal | on re-publish, `pin_update_available` flips true only if the tenant pinned an older version |
+| Pin-update signal | on re-publish, `docs_update_available` flips true only if the tenant pinned an older version |
 | Lifecycle propagation | `republishIfReleased()` re-publishes + re-fans a released opp on stage/content edits |
 | New-customer backfill | `backfillTenant()` applies the head version of every opportunity (currently a manual admin route) |
 
@@ -374,7 +374,7 @@ the event, the DB flip, and the customer cards always agree.
 reads the tenant's cards under `withTenant()` and LATERAL-joins the card's **best** bucket score:
 
 ```sql
-ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
+ORDER BY c.docs_copied DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
 ```
 
 So the feed is genuinely **ranked** (pinned → best bucket score → recency), not recency with a "ranked
@@ -610,7 +610,7 @@ never hard-deleted; cascade + selection rules in **docs/ARCHIVABLE_CONTRACT.md**
 |-----------|------|
 | `093_collaborator_library_scope` | `library_unit_shares`, `collaborator_library_prefs` (per-collaborator scope on legacy `library_units` — **all three since dropped**, migs 121/125) |
 | `094_oppcard_bridge_spine` | **`opportunity_bridge`**, **`tenant_opportunity_cards`** (RLS forced), **`tenant_bridge_cursor`**; `govtech_app` role |
-| `095_oppcard_pin_docs` | `tenant_opportunity_cards.pinned_docs` jsonb (pin-pulls-docs-local manifest) |
+| `095_oppcard_pin_docs` | `tenant_opportunity_cards.copied_docs` jsonb (pin-pulls-docs-local manifest) |
 | `096_tenant_spotlight_buckets` | **`tenant_spotlight_buckets`**, **`tenant_bucket_scores`** (both RLS forced) |
 | `097_portals_shadow_guardrails` | `proposal_portals`, `shadow_admin_grants`, `guardrail_templates` (L3 execute layer, RLS) |
 | `098_portal_workflow_guardrails` | `proposal_portals.current_stage_index`; seeds a global guardrail template |
@@ -630,8 +630,8 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
 - **`opportunity_bridge`** — `(opportunity_id → opportunities, version, event_type, card jsonb, posted_by)`,
   UNIQUE `(opportunity_id, version)`, append-only, **not** RLS (global feed).
 - **`tenant_opportunity_cards`** — `(tenant_id → tenants, opportunity_id [soft ref, no FK], card jsonb,
-  bridge_version, lifecycle_status, submission_stage, pursuit_status, is_pinned, pin_update_available,
-  pinned_docs jsonb)`, UNIQUE `(tenant_id, opportunity_id)`, RLS ENABLE+FORCE on `app.tenant_id`.
+  bridge_version, lifecycle_status, submission_stage, pursuit_status, docs_copied, docs_update_available,
+  copied_docs jsonb)`, UNIQUE `(tenant_id, opportunity_id)`, RLS ENABLE+FORCE on `app.tenant_id`.
 - **`tenant_spotlight_buckets`** `(tenant_id, name, criteria jsonb, is_active)` + **`tenant_bucket_scores`**
   `(tenant_id, bucket_id CASCADE, opportunity_id, score, factors jsonb)` UNIQUE `(tenant_id, bucket_id,
   opportunity_id)` — both RLS forced.
@@ -704,7 +704,7 @@ retired table: the CMS `matched_opportunities` email variable (`services/cms/src
 `tenant_pipeline_items` (always 0); the rfp-curation **Customer Interest** panel
 (`app/admin/rfp-curation/[solId]`) joined the retired pins table; and `v_opportunity_rollup` counted off
 it. All three now read `tenant_opportunity_cards` (`lifecycle_status <> 'archived'`,
-`COALESCE(pinned_at, created_at)`, archived tenants excluded). Full ledger:
+`COALESCE(docs_copied_at, created_at)`, archived tenants excluded). Full ledger:
 `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
 
 ### RLS reality (updated from V9 §7.4 and migs 116/117)

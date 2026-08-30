@@ -18,7 +18,10 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3001';
 const DB = process.env.DATABASE_URL;
 if (!DB) { console.error('DATABASE_URL required'); process.exit(2); }
 

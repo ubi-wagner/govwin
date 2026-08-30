@@ -44,8 +44,8 @@ Two layers, data flows **down only**:
   ───────────────────────────────────────                ──────────────────────────────────────────
   opportunities                                           tenant_opportunity_cards   (L1 mirror)
   curated_solicitations (spotlight_summary)                 · card JSONB (snapshot at bridge_version)
-        │                                                    · is_pinned, pin_update_available
-        │  publishToBridge → next version                    · pinned_docs, submission_stage
+        │                                                    · docs_copied, docs_update_available
+        │  publishToBridge → next version                    · copied_docs, submission_stage
         ▼                                          one-way    · lifecycle_status / pursuit_status
   opportunity_bridge  (L0, append-only, vN) ═══════════════► (upsert per tenant on fan-out)
         │  fanOutBridgeEvent: every active/trial tenant   data
@@ -65,9 +65,9 @@ row a full customer-visible `card JSONB` snapshot. Grant is **`SELECT, INSERT` o
 UPDATE/DELETE — so it is structurally forward-only. Written by `publishToBridge`
 (`frontend/lib/opportunity-bridge.ts:151`, version = `max(version)+1`).
 
-**L1 — `tenant_opportunity_cards`** (`094:48-76`; `pinned_docs` from `095`, `submission_stage` from
+**L1 — `tenant_opportunity_cards`** (`094:48-76`; `copied_docs` from `095`, `submission_stage` from
 `100`): one denormalized row per `(tenant_id, opportunity_id)` (soft ref, **no cross-shard FK**),
-`bridge_version`, `is_pinned`, `pin_update_available`, pursuit/lifecycle status.
+`bridge_version`, `docs_copied`, `docs_update_available`, pursuit/lifecycle status.
 
 **Fan-out**: `applyToTenant` upserts one card (`opportunity-bridge.ts:175`, `ON CONFLICT
 (tenant_id, opportunity_id) DO UPDATE`) and, in the **same transaction**, `autoScoreCard`
@@ -76,7 +76,9 @@ UPDATE/DELETE — so it is structurally forward-only. Written by `publishToBridg
 `tenants WHERE status IN ('active','trial')`; `backfillTenant` (`:281`) catches up a new customer.
 
 **Update propagation**: `republishIfReleased` (`:260`) publishes a **new** bridge version and
-re-fans; on re-apply, `pin_update_available` flips to true only for **pinned** cards whose
+re-fans; on re-apply, `docs_update_available` flips to true only for cards whose documents this
+tenant has **copied** (`docs_copied`) — "your copy is out of date" is a statement about people who
+hold a copy — whose
 `bridge_version` advanced (`:194-200`) — the amber "update available" nudge.
 
 > **Backflow rule.** The bridge carries card data one way. The only "upward" signal is a **ToDo
@@ -110,8 +112,19 @@ The customer-discovery surface. Minimal by design.
   `submission_format` **and** a non-empty `spotlight_summary` (`:140-145`) → flips the solicitation
   to `pushed_to_pipeline`, activates the landing opp + all topics, and fans a bridge version to
   every tenant, auto-ranked (§1).
-- A customer **pin** copies the OPP's attached files into their space
-  (`tenant_opportunity_cards.pinned_docs`, `095`; `/…/cards/[oppId]/pin`) and arms nudges/pushes.
+- A customer **rates** the opportunity — 👍 / 👎, `tenant_opportunity_cards.pursuit_status` +
+  `pursuit_set_at` (`240`; `/…/cards/[oppId]/pursuit`). A VERDICT, and nothing else: one UPDATE, no
+  I/O, cannot fail. It sorts the feed, filters it, earns nudges, and feeds the affinity factor that
+  ranks opportunities the customer has not seen yet. It removes nothing — the mirror stays complete,
+  and a passed card keeps receiving every republish, because an advisor may yet say "pursue this".
+- A 👍 reveals **View Solicitation**, which is the TRANSFER: it copies the OPP's attached files into
+  the tenant's space (`copied_docs`, `095`/`240`; `/…/cards/[oppId]/documents`) and opens the reading
+  view at `/portal/[slug]/cards/[opp]/solicitation`. Separate from the verdict on purpose — this one
+  moves bytes and is allowed to fail loudly. Before `240` the two were one click, so every customer
+  triaging a feed paid a corpus copy for a maybe.
+- The card's curated record — the admin's note, their marked passages, the volume structure, the page
+  limits — rides the bridge to every tenant and needs no copy. The copy is for the full source
+  documents only.
 
 Everything a customer needs for Spotlight — purchased or not — stops here.
 
@@ -141,7 +154,7 @@ nudge that never reveals it was built for a specific buyer. As-built: an rfp_adm
 (`/admin/provisioning/[portalId]`) calls `completeBuildOut(solId)` → sets `curated_solicitations.build_complete`
 (mig 182) and RE-PUBLISHES every activated opp of it as a bridge **`updated`** version → the existing fan-out
 delivers it → `buildCardSnapshot` carries `provisionReady=true` on each `tenant_opportunity_cards.card` so the
-nudge surfaces like `pin_update_available`. The completion is bracketed `finder:opportunity.build_completed`
+nudge surfaces like `docs_update_available`. The completion is bracketed `finder:opportunity.build_completed`
 (start/end, carrying `cardsRefreshed` = the true reach). This is OUTCOME 1 (broadcast to the shared master);
 OUTCOME 2 (provision the buyer's private portal + kick off their workflow) is layered on the same action —
 one auditable two-outcome release. Proven live: `frontend/scripts/drive-provisioning-cockpit.mts` (23/23).
@@ -342,7 +355,8 @@ identical, tightly bound) — molds already exist → straight to step 12, no 72
 | Mirror L1 + fan-out | `tenant_opportunity_cards` | `applyToTenant` / `fanOutBridgeEvent` | `opportunity-bridge.ts:175,221` |
 | Auto-rank | `tenant_spotlight_buckets` / `tenant_bucket_scores` | `autoScoreCard` | `bucket-ranking.ts:88` |
 | Push (Release 1) | `curated_solicitations` | `solicitation.push` (gated on `spotlight_summary`) | `tools/solicitation-push.ts:53,140` |
-| Pin (copy files) | `tenant_opportunity_cards.pinned_docs` | `…/cards/[oppId]/pin` | `095` |
+| Rate (the verdict) | `tenant_opportunity_cards.pursuit_status` / `pursuit_set_at` | `…/cards/[oppId]/pursuit` | `240` |
+| View Solicitation (the transfer) | `tenant_opportunity_cards.copied_docs` / `tenant_opportunity_documents` | `…/cards/[oppId]/documents` | `095`, `238`, `240` |
 | Master skeleton | `solicitation_volumes` / `volume_required_items` / `solicitation_compliance` / `document_templates` | curation + template studio | `012`,`017`,`086` |
 | Provision (Release 2 → tenant) | `proposals` / `proposal_artifacts` / `proposal_sections` / `proposal_compliance_matrix` | `provisionProposalForPortal` | `provision-proposal.ts:35` |
 | Purchase | `proposal_portals` / `promo_codes` / `purchases` | `…/purchase/route.ts` | `105`, `route.ts:49` |
