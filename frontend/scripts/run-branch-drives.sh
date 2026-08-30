@@ -345,6 +345,11 @@ DRIVES=(
   # the mirror invariant checked as row counts and document counts before and after. Seeds a note and
   # one annotation through the real bridge when the box has none, and removes them after.
   "verdict-transfer|scripts/drive-verdict-and-transfer.mts"
+  # The UPWARD half of the signal: a customer's thumb reaching the RFP admin who decides what to
+  # build out next. Red half first — the admin row must show NO demand before any vote — then two
+  # tenants vote and the row must state the count, the drop-off between saying yes and opening the
+  # documents, and the narrow "interest · no build-out" case. Votes and restores; sandbox only.
+  "admin-demand|scripts/drive-admin-demand.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

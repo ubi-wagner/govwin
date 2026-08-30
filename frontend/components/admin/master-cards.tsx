@@ -39,9 +39,14 @@ export interface MasterCard {
   bridgeEvent: string | null;
   replicantCount: number;
   pinnedCount: number;
+  interestedCount: number;
+  reviewedCount: number;
+  passedCount: number;
+  buildComplete: boolean;
+  portalCount: number;
 }
 
-type SortKey = 'ingestedAt' | 'lastUpdate' | 'title' | 'curationStatus' | 'stage' | 'matrix' | 'bridgeVersion' | 'replicantCount' | 'closeDate';
+type SortKey = 'ingestedAt' | 'lastUpdate' | 'title' | 'curationStatus' | 'stage' | 'matrix' | 'bridgeVersion' | 'replicantCount' | 'interestedCount' | 'closeDate';
 type SortDir = 'asc' | 'desc';
 
 const CURATION_COLORS: Record<string, string> = {
@@ -130,6 +135,13 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
         case 'matrix': d = (a.volumeCount * 1000 + a.itemCount) - (b.volumeCount * 1000 + b.itemCount); break;
         case 'bridgeVersion': d = (a.bridgeVersion ?? -1) - (b.bridgeVersion ?? -1); break;
         case 'replicantCount': d = a.replicantCount - b.replicantCount; break;
+        // Sorting by DEMAND is the point of the column: an admin deciding what to build out next
+        // wants the opportunities customers asked for, not the ones that happened to fan widest
+        // (every card replicates to every tenant, so replicantCount barely varies).
+        // Tie-broken by how many got as far as opening the documents — the stronger signal.
+        case 'interestedCount':
+          d = (a.interestedCount - b.interestedCount) || (a.reviewedCount - b.reviewedCount);
+          break;
         case 'closeDate': d = ms(a.closeDate) - ms(b.closeDate); break;
         case 'lastUpdate': d = lastUpdateMs(a) - lastUpdateMs(b); break;
         case 'ingestedAt': default: d = ms(a.ingestedAt) - ms(b.ingestedAt); break;
@@ -182,7 +194,7 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
                 <Th label="Curation" k="curationStatus" />
                 <Th label="Matrix" k="matrix" />
                 <Th label="Bridge" k="bridgeVersion" />
-                <Th label="Replicated" k="replicantCount" />
+                <Th label="Demand" k="interestedCount" />
                 <Th label="Stage" k="stage" />
                 <Th label="Ingested" k="ingestedAt" className="whitespace-nowrap" />
                 <Th label="Last update" k="lastUpdate" className="whitespace-nowrap" />
@@ -229,10 +241,43 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
                         ? <span className="text-gray-700">v{c.bridgeVersion}<span className="text-gray-400"> · {c.bridgeEvent}</span></span>
                         : <span className="text-gray-300">not published</span>}
                     </td>
+                    {/*
+                      DEMAND, WHERE THE BUILD-OUT DECISION IS MADE.
+
+                      Interest has been recorded since the pin shipped, emitted as
+                      capture:topic.pinned, and countable the whole time — and it reached an admin
+                      only if they went looking for it. The gap between "said yes" and "opened the
+                      documents" is the one worth reading: it is where interest dies, and it is the
+                      case for building this one out before the next.
+
+                      The amber flag is deliberately narrow: interest, no build-out, nobody has
+                      bought. That is a specific, actionable state, not a decoration on any card
+                      with a number in it.
+                    */}
                     <td className="px-3 py-2 text-xs whitespace-nowrap">
-                      {c.replicantCount > 0
-                        ? <span className="text-gray-700">{c.replicantCount} tenants{c.pinnedCount > 0 ? <span className="text-blue-600"> · {c.pinnedCount} pinned</span> : null}</span>
-                        : <span className="text-gray-300">—</span>}
+                      {c.replicantCount > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-gray-700">
+                            {c.replicantCount} tenants
+                            {c.interestedCount > 0 && (
+                              <span className="text-blue-600 font-medium"> · 👍 {c.interestedCount}</span>
+                            )}
+                            {c.passedCount > 0 && <span className="text-gray-400"> · 👎 {c.passedCount}</span>}
+                          </span>
+                          {c.interestedCount > 0 && (
+                            <span className="text-[11px] text-gray-500">
+                              {c.reviewedCount} opened the documents
+                              {c.portalCount > 0 && <span className="text-emerald-700"> · {c.portalCount} bought</span>}
+                            </span>
+                          )}
+                          {c.interestedCount > 0 && !c.buildComplete && c.portalCount === 0 && (
+                            <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-800"
+                                  title="Tenants have flagged this and nobody has bought it. Building out the volumes and molds is what turns interest into a purchase.">
+                              interest · no build-out
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2">
                       {(() => {
