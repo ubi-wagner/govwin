@@ -35,6 +35,17 @@
    "nearMiss": true
   },
   {
+   "route": "/api/admin/event-brackets/sweep",
+   "file": "app/api/admin/event-brackets/sweep/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": null,
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
    "route": "/api/admin/opportunities/[oppId]/publish",
    "file": "app/api/admin/opportunities/[oppId]/publish/route.ts",
    "methods": [
@@ -780,7 +791,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 237
+   "rows": 241
   },
   {
    "name": "deploy_baseline",
@@ -818,7 +829,7 @@
    "archetype": "color_team_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "compliance_reviewer",
@@ -866,7 +877,7 @@
    "archetype": "ingest_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "librarian",
@@ -896,13 +907,13 @@
    "archetype": "matrix_stager",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "onboarding_agent",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "opportunity_analyst",
@@ -950,7 +961,7 @@
    "archetype": "project_manager",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "proposal_architect",
@@ -992,13 +1003,13 @@
    "archetype": "section_drafter",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "skeleton_architect",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "social_scheduler",
@@ -1010,7 +1021,7 @@
    "archetype": "status_narrator",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "stylist",
@@ -1054,7 +1065,7 @@
    "template": "on_contract_started",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "template": "on_full_draft_requested",
@@ -1096,7 +1107,7 @@
    "template": "on_project_health_requested",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "template": "on_proposal_advanced",
@@ -1132,7 +1143,7 @@
    "template": "on_rfp_uploaded",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "template": "on_social_schedule_requested",
@@ -1144,7 +1155,7 @@
    "template": "on_solicitation_pushed",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "template": "on_solicitation_review_requested",
@@ -1168,7 +1179,7 @@
    "template": "on_status_narrative_requested",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "template": "on_tenant_rescore",
@@ -1181,7 +1192,6 @@
   "amendment.acknowledged",
   "amendment.flagged",
   "artifact.exported",
-  "artifact.locked",
   "atom.archived",
   "atom.curated",
   "atom.restored",
@@ -1189,14 +1199,10 @@
   "document.created",
   "document.exported",
   "document.updated",
-  "draft.completed",
   "outcome.attributed",
   "portal.stage_advanced",
-  "preview.generated",
   "project.collaboration_requested",
-  "purchase.completed",
   "task.assigned",
-  "template.applied",
-  "tenant.cards_backfilled"
+  "template.applied"
  ]
 }

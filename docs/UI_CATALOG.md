@@ -9,13 +9,13 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 
 | | count |
 |---|---:|
-| addressable routes | 118 |
+| addressable routes | 119 |
 | components | 200 |
-| event handlers (total) | 1604 |
-| …of which BIND behaviour (on a DOM element) | 1363 |
+| event handlers (total) | 1608 |
+| …of which BIND behaviour (on a DOM element) | 1367 |
 | …of which PASS a prop to a child component | 241 |
-| `fetch` call sites | 352 |
-| `<form>` · `<input>` · `<button>` | 24 · 518 · 752 |
+| `fetch` call sites | 354 |
+| `<form>` · `<input>` · `<button>` | 24 · 520 · 754 |
 | components NO route can reach (orphans) | **1** |
 
 ## 1. Routes — the addressable surface
@@ -103,6 +103,7 @@ tree carries far more, listed per component in §2.
 | `/portal/[tenantSlug]/billing` | app/portal/[tenantSlug]/billing/page.tsx | server | 0 | 0 | 0/0/0 | BillingPanel |
 | `/portal/[tenantSlug]/buckets` | app/portal/[tenantSlug]/buckets/page.tsx | server | 0 | 0 | 0/0/0 | SpotlightBuckets |
 | `/portal/[tenantSlug]/cards` | app/portal/[tenantSlug]/cards/page.tsx | server | 0 | 0 | 0/0/0 | PipelineCards |
+| `/portal/[tenantSlug]/cards/[opportunityId]/solicitation` | app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/command` | app/portal/[tenantSlug]/command/page.tsx | server | 0 | 0 | 0/0/0 | Link, PipelineCards, OpportunitiesBody, TodosPanel, ProcessesClient, ProjectsBody +2 |
 | `/portal/[tenantSlug]/contracts` | app/portal/[tenantSlug]/contracts/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/portal/[tenantSlug]/contracts/[contractId]` | app/portal/[tenantSlug]/contracts/[contractId]/page.tsx | server | 0 | 0 | 0/0/0 | Link |
@@ -155,7 +156,7 @@ tree carries far more, listed per component in §2.
 | app/admin/processes/admin-processes-client.tsx | client | 4/0 | 1 | /admin/processes |
 | app/admin/provisioning/[portalId]/release-panel.tsx | client | 3/0 | 1 | /admin/provisioning/[portalId], /admin/provisioning |
 | app/admin/provisioning/instant-release-button.tsx | client | 1/0 | 1 | /admin/provisioning |
-| app/admin/rfp-curation/[solId]/spotlight-summary-editor.tsx | client | 3/0 | 2 | /admin/rfp-curation/[solId] |
+| app/admin/rfp-curation/[solId]/spotlight-summary-editor.tsx | client | 5/0 | 3 | /admin/rfp-curation/[solId] |
 | app/admin/rfp-curation/triage-todos.tsx | server | 0/0 | 0 | /admin/rfp-curation |
 | app/admin/site/[pageKey]/editor-client.tsx | client | 15/1 | 2 | /admin/site/[pageKey] |
 | app/admin/site/docs/[type]/[slug]/doc-canvas-editor.tsx | client | 12/3 | 3 | /admin/site/docs/[type]/[slug] |
@@ -206,7 +207,7 @@ tree carries far more, listed per component in §2.
 | components/analytics/tracker.tsx | client | 0/0 | 1 | /about, /apply, /blog/[slug] +20 |
 | components/atomization/atom-bubble-rail.tsx | client | 8/0 | 0 | /admin/documents/[documentId], /admin/site/docs/[type]/[slug], /admin/templates/[templateId]/edit +4 |
 | components/auth/change-password-form.tsx | client | 4/0 | 1 | /change-password |
-| components/auth/sign-out-button.tsx | client | 1/0 | 0 | /dashboard, /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents +39 |
+| components/auth/sign-out-button.tsx | client | 1/0 | 0 | /dashboard, /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents +40 |
 | components/canvas/ai-revision-panel.tsx | client | 5/0 | 0 | /admin/documents/[documentId], /admin/site/docs/[type]/[slug], /admin/templates/[templateId]/edit +3 |
 | components/canvas/bounding-box-overlay.tsx | client | 0/0 | 0 | /admin/templates, /admin/documents/[documentId], /admin/site/docs/[type]/[slug] +6 |
 | components/canvas/canvas-editor-page.tsx | client | 0/20 | 2 | /portal/[tenantSlug]/documents/[documentId], /portal/[tenantSlug]/library/foundation/[foundationId], /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] |
@@ -272,11 +273,11 @@ tree carries far more, listed per component in §2.
 | components/portal/manager-request-actions.tsx | client | 2/0 | 1 | /portal/[tenantSlug]/team |
 | components/portal/member-scope-control.tsx | client | 6/0 | 1 | /portal/[tenantSlug]/team |
 | components/portal/new-document-chooser.tsx | client | 4/1 | 2 | /portal/[tenantSlug]/documents/new |
-| components/portal/notification-panel.tsx | client | 2/0 | 2 | /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents, /portal/[tenantSlug]/atoms +34 |
+| components/portal/notification-panel.tsx | client | 2/0 | 2 | /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents, /portal/[tenantSlug]/atoms +35 |
 | components/portal/outcome-recorder.tsx | client | 4/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/package-atomizer.tsx | client | 13/0 | 1 | /portal/[tenantSlug]/atoms |
 | components/portal/pending-build-banner.tsx | client | 0/0 | 0 | /portal/[tenantSlug]/dashboard |
-| components/portal/pipeline-cards.tsx | client | 10/2 | 3 | /portal/[tenantSlug]/cards, /portal/[tenantSlug]/command, /portal/[tenantSlug]/dashboard |
+| components/portal/pipeline-cards.tsx | client | 11/2 | 3 | /portal/[tenantSlug]/cards, /portal/[tenantSlug]/command, /portal/[tenantSlug]/dashboard |
 | components/portal/portal-nav-link.tsx | client | 0/0 | 0 | **no route** |
 | components/portal/profile-editor.tsx | client | 5/11 | 1 | /portal/[tenantSlug]/profile, /portal/[tenantSlug]/manage |
 | components/portal/proposal-admin-panel.tsx | client | 19/0 | 10 | /portal/[tenantSlug]/proposals/[proposalId] |
@@ -289,8 +290,8 @@ tree carries far more, listed per component in §2.
 | components/portal/purchase-modal.tsx | client | 7/0 | 2 | /portal/[tenantSlug]/cards, /portal/[tenantSlug]/command, /portal/[tenantSlug]/dashboard |
 | components/portal/save-as-template.tsx | client | 6/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/section-compliance-chip.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/documents/[documentId], /portal/[tenantSlug]/library/foundation/[foundationId], /portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId] +1 |
-| components/portal/shadow-space-banner.tsx | client | 3/0 | 1 | /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents, /portal/[tenantSlug]/atoms +34 |
-| components/portal/spotlight-buckets.tsx | client | 11/0 | 6 | /portal/[tenantSlug]/buckets, /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage |
+| components/portal/shadow-space-banner.tsx | client | 3/0 | 1 | /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents, /portal/[tenantSlug]/atoms +35 |
+| components/portal/spotlight-buckets.tsx | client | 12/0 | 7 | /portal/[tenantSlug]/buckets, /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage |
 | components/portal/stage-control.tsx | client | 7/0 | 5 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/starter-catalog.tsx | client | 2/0 | 4 | /portal/[tenantSlug]/atoms |
 | components/portal/strategy-panel.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
@@ -343,9 +344,9 @@ tree carries far more, listed per component in §2.
 | components/ui/advisory-overlay.tsx | client | 3/0 | 0 | /admin/rfp-curation/[solId] |
 | components/ui/autocomplete.tsx | client | 5/0 | 0 | /admin/rfp-curation/[solId], /admin/rfp-curation/upload |
 | components/ui/count-badge.tsx | server | 0/0 | 0 | /admin/command, /portal/[tenantSlug]/command |
-| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +80 |
+| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +81 |
 | components/ui/modal.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/portals, /portal/[tenantSlug]/manage |
-| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +80 |
+| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +81 |
 | components/ui/tabs.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId], /admin/command, /portal/[tenantSlug]/command |
 | components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +12 |
 
@@ -353,8 +354,8 @@ tree carries far more, listed per component in §2.
 
 | handler | count | distinct files |
 |---|---:|---:|
-| `onClick` | 769 | 163 |
-| `onChange` | 505 | 114 |
+| `onClick` | 771 | 163 |
+| `onChange` | 507 | 114 |
 | `onClose` | 39 | 11 |
 | `onKeyDown` | 24 | 16 |
 | `onSubmit` | 21 | 18 |
@@ -649,7 +650,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/notifications` | 1 |
 | `POST /api/portal/:p/proposals/:p/outcome` | 1 |
 | `GET /api/portal/:p/cards:p : ''}` | 1 |
-| `GET /api/portal/:p/cards/:p/pin:p` | 1 |
+| `GET /api/portal/:p/cards/:p/documents:p` | 1 |
 | `POST /api/portal/:p/cards/:p/pursuit` | 1 |
 | `PATCH /api/portal/:p/profile` | 1 |
 | `POST /api/portal/:p/proposals/:p/package?format=:p` | 1 |
@@ -667,6 +668,7 @@ tree carries far more, listed per component in §2.
 | `POST '/api/admin/shadow-transition'` | 1 |
 | `GET /api/portal/:p/buckets` | 1 |
 | `POST /api/portal/:p/buckets` | 1 |
+| `GET /api/portal/:p/profile` | 1 |
 | `PATCH /api/portal/:p/buckets/:p` | 1 |
 | `DELETE /api/portal/:p/buckets/:p` | 1 |
 | `GET /api/portal/:p/buckets/:p` | 1 |

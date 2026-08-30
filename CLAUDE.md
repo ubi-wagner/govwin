@@ -517,8 +517,8 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   read.** Platform-injected and harness-only names are EXEMPT with a stated reason each — an
   unexplained exclusion is how a real variable leaves an operator's checklist.
 - **The UI has its own two documents, and a route sweep is not a UI sweep.** `docs/UI_CATALOG.md`
-  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 118 routes, 200 components,
-  **1,604 event handlers** (1,363 bound to a DOM element, 241 passed as a prop), 352 fetch sites — with the render graph both ways so an orphan is
+  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 119 routes, 200 components,
+  **1,608 event handlers** (1,367 bound to a DOM element, 241 passed as a prop), 354 fetch sites — with the render graph both ways so an orphan is
   visible. `docs/UI_ATLAS.md` (`capture-ui-atlas.mjs` + `build-ui-contact-sheets.mjs`) PHOTOGRAPHS
   every route as the actor who owns it: 150 shots, 6 lanes, 13 contact sheets, each caption carrying
   the live DOM's button/link/input counts. **Look at the sheets.** A page can answer 200, return a
@@ -544,7 +544,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   because the first three were all green while the dashboard told a customer with 8 builds they had
   6 (B80). Its rule: the expectation must be the page's **own query, copied from its source** — a
   predicate you believe is equivalent manufactures confident, wrong findings.
-  `verify-write-contract` — the 213 POST/PATCH/PUT/DELETE verbs NO lens walked, because calling
+  `verify-write-contract` — the 256 POST/PATCH/PUT/DELETE verbs NO lens walked, because calling
   every write mutates the box being measured. It binds every `[param]` to a fresh UUID owning
   nothing and asserts the one property needing no successful write: **a client error answers 4xx
   with both `error` and `code`, never 500** (a 500 on bad input means validation ran after the DB
