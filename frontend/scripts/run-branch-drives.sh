@@ -306,6 +306,11 @@ DRIVES=(
   # missing returned {pinned:true, docs:[]} and stamped pinned_at. Also asserts the pair a
   # withdrawal and a failed copy make: identical from outside, opposite handling.
   "pin-honesty|scripts/drive-pin-honesty.mts"
+  # The whole curated-ranking claim in one pass, red first: a lens scores an opportunity ZERO, an
+  # admin highlights one sentence containing the lens's keyword, and the same lens then scores it
+  # 100 — through the real tool, the real bridge and the real scorer. It is the claim that replaced
+  # "rank the whole solicitation", and none of it had ever carried a real highlight.
+  "curated-ranking|scripts/drive-curated-ranking.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

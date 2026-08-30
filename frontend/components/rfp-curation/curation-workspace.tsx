@@ -432,6 +432,10 @@ export function CurationWorkspace({
         {
           solicitationId: sol.id,
           kind: 'compliance_tag',
+          // The selected passage, explicitly. It also rides inside the anchor, and the tool falls
+          // back to that — but a curator's highlight is the ranking signal now (mig 239), so the
+          // field that carries it should be stated rather than inferred from a nested key.
+          text: args.sourceExcerpt,
           sourceLocation: {
             ...fullAnchor,
             // Keep the flat fields the tool expects
