@@ -171,7 +171,26 @@ async function main() {
         ${parent.programType}, ${isD2P2 ? 'direct_to_phase_2' : 'phase_1'},
         ${parent.closeDate}, ${t.description}, ${t.topicNumber}, ${t.branch},
         'open', 'open', 'open', true)
-      ON CONFLICT (source, source_id) DO UPDATE SET title = EXCLUDED.title
+      /*
+       * ⚠️ RE-HOME ON CONFLICT, not just re-title.
+       *
+       * This drive creates a NEW curated_solicitation each run and then upserts the 66 topics by
+       * (source, source_id) — which is stable across runs. Updating only the title left
+       * solicitation_id pointing at the PREVIOUS run's solicitation, so the very next assertion
+       * ("each topic is its own opportunity", counted against the current sol.id) found 0 of 66
+       * while the insert loop happily reported "66 created this run".
+       *
+       * It therefore passed exactly once, on a virgin box, and failed every run after — the
+       * B146/B147 family: a drive that reports the order it was run in rather than the state of
+       * the product. Re-homing is also what a real re-ingest of the same instrument does.
+       */
+      ON CONFLICT (source, source_id) DO UPDATE SET
+        title = EXCLUDED.title,
+        solicitation_id = EXCLUDED.solicitation_id,
+        topic_status = EXCLUDED.topic_status,
+        lifecycle_status = EXCLUDED.lifecycle_status,
+        submission_stage = EXCLUDED.submission_stage,
+        is_active = EXCLUDED.is_active
       RETURNING id`;
     if (row) created++;
   }

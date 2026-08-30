@@ -14,7 +14,25 @@
  * ("Module declaration names may only use ' or \" quoted strings") names nothing to do with SQL.
  * A guard that points at the offending line costs nothing and ends the class.
  *
- * Documentation did not prevent it. A check does.
+ * ── SCOPE, AND WHAT THIS DELIBERATELY DOES NOT COVER ─────────────────────────────────────────
+ * It walks .ts/.tsx/.mts/.mjs/.js — widened after the SIXTH instance landed in a .mjs harness the
+ * first version did not read.
+ *
+ * It matches `--` comment lines only. In this tree those appear exclusively inside tagged template
+ * literals, which makes the rule EXACT: no context inference, no false positives, no judgement.
+ *
+ * The SEVENTH instance was a JS block comment (`*`) inside a template, which this cannot see, and
+ * the attempt to see it is why the limit is written down rather than papered over. Tracking
+ * template depth by counting backticks fails on the first JSDoc that quotes an identifier — an odd
+ * count flips the tracker and every line after it is reported. That version named eight offenders,
+ * all of them ordinary prose in files containing no SQL. A noisy check is worse than a narrow one:
+ * a narrow check is trusted for what it covers, and a noisy one is turned off.
+ *
+ * Doing it properly needs the TypeScript compiler API to locate template literals exactly — the
+ * approach inventory-frontend.mjs already uses. Worth it if an eighth appears; not before.
+ * `tsc` catches every one of these immediately regardless. What the guard adds is the LINE, since
+ * TypeScript reports the failure wherever the resumed string next breaks the grammar, under a
+ * message about module declarations.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -46,6 +64,9 @@ describe('a SQL comment must not contain a backtick', () => {
       lines.forEach((line, i) => {
         // A line whose first non-space characters are `--` is a SQL comment; in this tree those
         // occur only inside tagged template literals. A backtick on such a line ends the template.
+        // A line whose first non-space characters are `--` is a SQL comment; in this tree those
+        // occur only inside tagged template literals, which makes this rule EXACT — no context
+        // inference, no false positives.
         if (/^\s*--/.test(line) && line.includes('`')) offenders.push(`${file}:${i + 1}  ${line.trim().slice(0, 90)}`);
       });
     }
