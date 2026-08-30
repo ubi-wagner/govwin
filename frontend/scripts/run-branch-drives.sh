@@ -339,6 +339,12 @@ DRIVES=(
   # (naics_codes is an empty array on every master row, so a lens naming it scored on nothing while
   # the page reported it at 29%). Pins and unpins one card; sandbox only.
   "card-decision|scripts/drive-card-decision.mts"
+  # The verdict/transfer split (mig 240) end to end: the thumb writes an opinion and copies nothing,
+  # the up-vote REVEALS "View Solicitation", the transfer lands in a reading view that leads with the
+  # analyst's note and marked passages, and a thumbs-down sorts and filters while removing nothing —
+  # the mirror invariant checked as row counts and document counts before and after. Seeds a note and
+  # one annotation through the real bridge when the box has none, and removes them after.
+  "verdict-transfer|scripts/drive-verdict-and-transfer.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

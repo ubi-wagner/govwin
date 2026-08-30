@@ -138,7 +138,7 @@ test('F2 · kate sees the card, pins it, and buys the portal (comp code)', async
   V_AT_PIN = Number(card!.bridgeVersion ?? 0);
   expect(V_AT_PIN).toBeGreaterThanOrEqual(1);
 
-  const pin = await page.request.post(`/api/portal/${SLUG}/cards/${OPP}/pin`, { data: {} });
+  const pin = await page.request.post(`/api/portal/${SLUG}/cards/${OPP}/documents`, { data: {} });
   expect(pin.status(), await pin.text()).toBe(200);
 
   const buy = await page.request.post(`/api/portal/${SLUG}/purchase`, {

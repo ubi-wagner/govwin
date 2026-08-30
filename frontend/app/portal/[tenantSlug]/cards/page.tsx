@@ -24,7 +24,7 @@ export default async function CardsPage({ params }: { params: Promise<{ tenantSl
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Opportunity Pipeline</h1>
-        <p className="text-gray-500 mt-1 text-sm">Your live opportunity cards — pin to pull the docs local; ranked by your spotlight buckets.</p>
+        <p className="text-gray-500 mt-1 text-sm">Every opportunity we carry, ranked by your spotlight buckets. Rate them 👍 / 👎 — that ranks what arrives next, and 👍 lets you pull the documents in.</p>
       </div>
       <PipelineCards tenantSlug={tenantSlug} role={role} />
     </div>

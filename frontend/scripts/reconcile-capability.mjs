@@ -103,7 +103,7 @@ const norm = (u) => String(u)
   .split('?')[0]
   .replace(/\$\{[^}]*\}/g, ':p')
   .replace(/\[\.\.\.[^\]]+\]|\[[^\]]+\]/g, ':p')
-  // A QUERY STRING BUILT INTO A VARIABLE. `` `/api/…/cards/${opp}/pin${qs}` `` carries no literal
+  // A QUERY STRING BUILT INTO A VARIABLE. `` `/api/…/cards/${opp}/documents${qs}` `` carries no literal
   // `?` for the split above to find, so the collapse yields `…/pin:p` and the route `…/pin` never
   // matches — the pin/unpin buttons in `portal/pipeline-cards.tsx` are right there on the card and
   // the join called the route unreachable. A `:p` GLUED to a segment (no `/` before it) is never a
@@ -578,8 +578,8 @@ const T = [
     !uncalled.some((u) => u.route === '/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft')],
   ['a webhook IS reported, but annotated', !!uncalled.find((u) => u.route === '/api/stripe/webhook')?.reason],
   // Both learned by finding them wrong. Each fails on the code as it stood before the fix above it.
-  ['a route called with a built query suffix (`…/pin${qs}`) is NOT reported',
-    !uncalled.some((u) => u.route === '/api/portal/[tenantSlug]/cards/[opportunityId]/pin')],
+  ['a route called with a built query suffix (`…/documents${qs}`) is NOT reported',
+    !uncalled.some((u) => u.route === '/api/portal/[tenantSlug]/cards/[opportunityId]/documents')],
   ['a route called only from a static .html asset is NOT reported',
     !uncalled.some((u) => u.route.startsWith('/api/admin/architecture/'))],
   // Verified by hand: app/admin/site/[pageKey]/page.tsx and the route both import getPage().

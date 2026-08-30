@@ -316,7 +316,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const act = useCallback(async (opp: string, method: 'POST' | 'DELETE', qs = '') => {
     setBusy(opp); setErr(null);
     try {
-      const res = await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pin${qs}`, { method });
+      const res = await fetch(`/api/portal/${tenantSlug}/cards/${opp}/documents${qs}`, { method });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setErr(j.error || 'That action could not be completed — please try again.');
@@ -460,34 +460,89 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                 <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST', '?action=resync')} className="text-[11px] font-medium text-amber-800 hover:underline">Resync</button>
               </div>
             )}
-            <div className="mt-3 flex items-center gap-2">
-              {c.docsCopied ? (
-                <>
-                  <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">Pinned</span>
-                  <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-1">Unpin</button>
-                  {canBuy && (
-                    <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
-                  )}
-                </>
-              ) : c.pursuitStatus === 'passed' ? (
-                <>
-                  <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 font-medium">Passed</span>
-                  <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'unreviewed')} className="text-xs text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">Restore</button>
-                </>
-              ) : (
-                <>
-                  <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST')} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50">
-                    {busy === c.opportunityId ? '…' : 'Pin to pursue'}
-                  </button>
-                  <button disabled={busy === c.opportunityId} onClick={() => setPursuit(c.opportunityId, 'passed')} className="text-xs text-gray-400 hover:text-gray-700" title="Hide this from your feed — trains your matches">Not interested</button>
-                </>
-              )}
+            {/*
+              THE VERDICT, THEN THE TRANSFER — two rows, in that order, because they are two
+              different commitments (mig 240).
+
+              Row 1 is the thumb: an opinion, one UPDATE, no I/O, cannot fail. It is meant to be
+              pressed liberally while scanning a feed, which is the whole reason it must not drag a
+              document copy behind it.
+
+              Row 2 appears only ONCE the customer has said yes, and it is the one that moves bytes.
+              "View Solicitation" names what the customer gets rather than what the system does, and
+              it navigates into the reading view — the copy is plumbing underneath a destination, not
+              a chore between them and the content.
+
+              Nothing here removes anything. A thumbs-down sorts the card last and drops it from the
+              default view; the row stays in the mirror, keeps receiving every republish, and keeps
+              any copy already made. "Release my copy" is a deliberate, separate control.
+            */}
+            <div className="mt-3 flex items-center gap-1.5">
+              <button
+                disabled={busy === c.opportunityId}
+                aria-pressed={c.pursuitStatus === 'monitoring' || c.pursuitStatus === 'pursuing'}
+                onClick={() => setPursuit(c.opportunityId, c.pursuitStatus === 'monitoring' ? 'unreviewed' : 'monitoring')}
+                title={c.pursuitStatus === 'monitoring'
+                  ? 'Interested — ranks similar opportunities higher and lets us nudge you before it closes. Click to undo.'
+                  : 'Interested — ranks similar opportunities higher and lets us nudge you before it closes.'}
+                className={`text-xs rounded px-2.5 py-1 border font-medium disabled:opacity-50 ${
+                  c.pursuitStatus === 'monitoring' || c.pursuitStatus === 'pursuing'
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}
+              >
+                👍{c.pursuitStatus === 'pursuing' ? ' Pursuing' : c.pursuitStatus === 'monitoring' ? ' Interested' : ''}
+              </button>
+              <button
+                disabled={busy === c.opportunityId}
+                aria-pressed={c.pursuitStatus === 'passed'}
+                onClick={() => setPursuit(c.opportunityId, c.pursuitStatus === 'passed' ? 'unreviewed' : 'passed')}
+                title={c.pursuitStatus === 'passed'
+                  ? 'Not a fit — sorted last and hidden from your feed. It stays in your list and keeps updating. Click to undo.'
+                  : 'Not a fit — sorts it last, hides it from your feed, and teaches your ranking. Nothing is deleted.'}
+                className={`text-xs rounded px-2.5 py-1 border font-medium disabled:opacity-50 ${
+                  c.pursuitStatus === 'passed'
+                    ? 'bg-gray-700 border-gray-700 text-white'
+                    : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                👎{c.pursuitStatus === 'passed' ? ' Passed' : ''}
+              </button>
               {canBuy ? (
                 <a href={`/portal/${tenantSlug}/portals?opp=${c.opportunityId}`} className="text-xs text-gray-600 hover:text-gray-900 ml-auto">Build →</a>
               ) : (
-                <span className="text-xs text-gray-400 ml-auto" title="Only a company admin can purchase a proposal portal. Pin what you want and ask yours to buy it.">Admin buys</span>
+                <span className="text-xs text-gray-400 ml-auto" title="Only a company admin can purchase a proposal portal. Mark what you want and ask yours to buy it.">Admin buys</span>
               )}
             </div>
+
+            {/* Revealed by the up-vote: the transfer, and the money. Purchase is no longer GATED on a
+                verdict — the route never required one — but it belongs beside the opportunities the
+                customer has actually said yes to rather than on all sixty. */}
+            {(c.pursuitStatus === 'monitoring' || c.pursuitStatus === 'pursuing') && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                {c.docsCopied ? (
+                  <>
+                    <a href={`/portal/${tenantSlug}/cards/${c.opportunityId}/solicitation`}
+                       className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1">
+                      View Solicitation
+                    </a>
+                    <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')}
+                            title="Remove your local copy of the documents. Your rating and the opportunity stay."
+                            className="text-xs text-gray-400 hover:text-gray-700">Release copy</button>
+                  </>
+                ) : (
+                  <button
+                    disabled={busy === c.opportunityId}
+                    onClick={() => act(c.opportunityId, 'POST')}
+                    title="Copy the solicitation documents into your library so you can read them with our analysts' highlights."
+                    className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50"
+                  >
+                    {busy === c.opportunityId ? 'Fetching…' : 'View Solicitation'}
+                  </button>
+                )}
+                {canBuy && (
+                  <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

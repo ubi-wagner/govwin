@@ -1,10 +1,33 @@
 /**
- * POST   /api/portal/[tenantSlug]/cards/[opportunityId]/pin           — pin = full copy
- * POST   /api/portal/[tenantSlug]/cards/[opportunityId]/pin?action=resync — re-copy after an update
- * DELETE /api/portal/[tenantSlug]/cards/[opportunityId]/pin           — unpin (forward-looking)
+ * POST   …/cards/[opportunityId]/documents                — "View Solicitation": copy them here
+ * POST   …/cards/[opportunityId]/documents?action=resync  — re-copy after the master republished
+ * DELETE …/cards/[opportunityId]/documents                — release this tenant's local copy
  *
- * Pinning copies the global read-only opp folder into the tenant's space and records
- * the manifest on the card (mig 095). RLS-scoped throughout.
+ * THE TRANSFER (mig 240). This route moves bytes; it does not record an opinion.
+ *
+ * ── WHY IT IS SEPARATE FROM THE VERDICT ──────────────────────────────────────────────────────
+ * It used to be `…/pin`, and pinning meant BOTH "I'm interested" and "give me the documents".
+ * Two consequences, both bad. Every customer triaging their feed paid a corpus copy for a maybe —
+ * migration 239 moved the copy off fan-out onto pin, which was right and incomplete, because pin
+ * was still the only way to express interest at all. And an opinion could be REFUSED: `pinCard`
+ * declines when documents are published and none copied, which is indefensible for a verdict and
+ * exactly right here. A thumbs-up (POST …/pursuit) is now a pure state change that cannot fail;
+ * it reveals the "View Solicitation" control, and this route runs when the customer uses it.
+ *
+ * So this endpoint is ALLOWED TO FAIL, and should fail loudly: a customer who asked for the
+ * documents and got none must be told, not shown a success and an empty folder.
+ *
+ * ── DELETE IS MANUAL, AND NOTHING CALLS IT AUTOMATICALLY ─────────────────────────────────────
+ * Releasing a local copy is a legitimate thing to ask for. It is NOT what a thumbs-down does: this
+ * codebase hard-deletes nothing (docs/ARCHIVABLE_CONTRACT.md), and a destructive write behind a
+ * filter toggle would teach customers to hesitate over the one control whose whole value is being
+ * cheap to press. A passed card keeps its copy, keeps its row, and keeps receiving republishes.
+ *
+ * The card's own curated record — the admin's highlights, the expert note, the volume structure,
+ * the page limits — rides the bridge and needs no copy at all. That is what keeps the un-copied
+ * tier informative rather than a paywall: the copy is for the full source documents only.
+ *
+ * RLS-scoped throughout; the manifest lands on the card (mig 095, renamed in 240).
  */
 
 import { NextResponse } from 'next/server';
