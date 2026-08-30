@@ -83,6 +83,35 @@ async function main() {
     ok('pinned_at was NOT stamped', s2.pinnedAt === null);
     ok('no pointer was written', Array.isArray(s2.docs) && s2.docs.length === 0);
 
+    // ── 2b · The local row must point at the tenant's OWN object ─────────────────────────────
+    // `pinned_key` was declared in mig 238 with a comment saying pin rewrites it, and nothing did:
+    // every row carried only `storage_key`, the MASTER path. A tenant holding a local copy whose
+    // only object pointer addresses the shared original is not holding a local copy.
+    console.log('\n2b · a successful pin points the local row at the tenant\'s own object');
+    const [real] = await owner<Array<{ tenantId: string; opportunityId: string; slug: string }>>`
+      SELECT c.tenant_id, c.opportunity_id, t.slug
+      FROM tenant_opportunity_cards c
+      JOIN opportunities o ON o.id = c.opportunity_id
+      JOIN tenants t ON t.id = c.tenant_id
+      WHERE o.topic_number IS NOT NULL AND c.archived_at IS NULL AND NOT c.is_pinned
+        AND EXISTS (SELECT 1 FROM solicitation_documents d WHERE d.solicitation_id = o.solicitation_id)
+      LIMIT 1`;
+    if (!real) { console.log('  (no unpinned card with a real document — UNCOVERED, not passing)'); }
+    else {
+      const rp = await pinCard(real.tenantId, real.slug, real.opportunityId);
+      const keys = await owner<Array<{ sk: string | null; pk: string | null }>>`
+        SELECT storage_key AS sk, pinned_key AS pk FROM tenant_opportunity_documents
+        WHERE tenant_id = ${real.tenantId}::uuid AND opportunity_id = ${real.opportunityId}::uuid`;
+      ok('the pin succeeded on a real document', rp.pinned, `${rp.docs.length} doc(s)`);
+      ok('pinned_key is set', keys.every((k) => !!k.pk), keys[0]?.pk ?? 'null');
+      ok('and it differs from the master path', keys.every((k) => k.pk !== k.sk),
+        keys[0] ? `${String(keys[0].pk).slice(0, 46)}…` : '');
+      await owner`UPDATE tenant_opportunity_cards SET is_pinned=false, pinned_at=NULL, pinned_docs='[]'::jsonb
+                  WHERE tenant_id=${real.tenantId}::uuid AND opportunity_id=${real.opportunityId}::uuid`;
+      await owner`DELETE FROM tenant_opportunity_documents
+                  WHERE tenant_id=${real.tenantId}::uuid AND opportunity_id=${real.opportunityId}::uuid`;
+    }
+
     // ── 3 · A resync that fails must not erase what the tenant already holds ──────────────────
     console.log('\n3 · a resync whose copies fail — the existing record survives');
     // Give the card a pin with a recorded pointer, as if an earlier copy had worked.

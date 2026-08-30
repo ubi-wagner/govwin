@@ -100,6 +100,43 @@ async function copyOppFolder(tenantSlug: string, opportunityId: string): Promise
   return copied;
 }
 
+/**
+ * Point each local text row at the tenant's OWN object copy (mig 238's `pinned_key`).
+ *
+ * ── IT WAS DECLARED AND NEVER WRITTEN ────────────────────────────────────────────────────────
+ * mig 238 created `pinned_key` and its own comment says *"on pin, opportunity-pin.ts rewrites it to
+ * the tenant's own copy."* Nothing did. Every row carried only `storage_key`, which is the MASTER
+ * path — so a tenant who pinned a document held its text locally while the only object pointer on
+ * that row still addressed the shared original.
+ *
+ * Third field in this work declared, documented and left dry, and all three were mine. The pattern
+ * is always the same: the column and the prose arrive in the migration, the write arrives never,
+ * and nothing fails.
+ *
+ * Matched on `original_filename` because that is what both halves of a pin agree on — the object
+ * copier keys its destination path off the filename, and the text copier stores it verbatim.
+ */
+async function stampPinnedKeys(tenantId: string, opportunityId: string, docs: PinnedDoc[]): Promise<number> {
+  if (docs.length === 0) return 0;
+  try {
+    return await withTenant(tenantId, async (tx) => {
+      let stamped = 0;
+      for (const d of docs) {
+        const rows = await tx`
+          UPDATE tenant_opportunity_documents SET pinned_key = ${d.key}, updated_at = now()
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+            AND original_filename = ${d.filename}
+          RETURNING id`;
+        if (rows.length > 0) stamped++;
+      }
+      return stamped;
+    });
+  } catch (e) {
+    console.error('[pin] pinned_key stamp failed (non-fatal)', tenantId, opportunityId, e);
+    return 0;
+  }
+}
+
 /** How many documents does the organization publish for this opportunity? */
 async function publishedDocCount(opportunityId: string): Promise<number> {
   try {
@@ -162,6 +199,8 @@ export async function pinCard(tenantId: string, tenantSlug: string, opportunityI
     return new Set(rows.map((r: { originalFilename: string }) => r.originalFilename));
   });
   const recorded: PinnedDoc[] = docs.map((d) => ({ ...d, hasText: withText.has(d.filename) }));
+  // The local text row must address the tenant's OWN object, not the shared original.
+  await stampPinnedKeys(tenantId, opportunityId, recorded);
 
   await withTenant(tenantId, async (tx) => {
     await tx`
@@ -211,6 +250,7 @@ export async function resyncPinnedCard(
     return new Set(rows.map((r: { originalFilename: string }) => r.originalFilename));
   });
   const recorded: PinnedDoc[] = docs.map((d) => ({ ...d, hasText: withText.has(d.filename) }));
+  await stampPinnedKeys(tenantId, opportunityId, recorded);
 
   await withTenant(tenantId, async (tx) => {
     await tx`
