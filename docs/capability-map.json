@@ -1,0 +1,4182 @@
+{
+  "summary": {
+    "generatedAt": "2026-08-30T00:41:03.501Z",
+    "pages": {
+      "total": 118,
+      "rfp_admin": 46,
+      "tenant": 38,
+      "partner_admin": 1,
+      "shared": 33
+    },
+    "apiRoutes": {
+      "total": 281,
+      "rfp_admin": 105,
+      "tenant": 149,
+      "partner_admin": 6,
+      "shared": 21
+    },
+    "verbs": {
+      "total": 409,
+      "rfp_admin": 147,
+      "tenant": 230,
+      "partner_admin": 7,
+      "shared": 25
+    },
+    "tools": {
+      "total": 32,
+      "byRole": {
+        "rfp_admin": 25,
+        "master_admin": 3,
+        "tenant_user": 4
+      },
+      "platformScope": 28,
+      "excludedBaseShapes": 1,
+      "warnings": []
+    },
+    "ranks": {
+      "master_admin": 100,
+      "rfp_admin": 80,
+      "tenant_admin": 60,
+      "partner_admin": 50,
+      "tenant_user": 40,
+      "partner_user": 20
+    }
+  },
+  "pages": [
+    {
+      "route": "/",
+      "file": "app/(marketing)/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/about",
+      "file": "app/(marketing)/about/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin",
+      "file": "app/admin/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/agents",
+      "file": "app/admin/agents/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/analytics",
+      "file": "app/admin/analytics/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/applications",
+      "file": "app/admin/applications/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/architecture",
+      "file": "app/admin/architecture/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/automation",
+      "file": "app/admin/automation/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/automation-framework",
+      "file": "app/admin/automation-framework/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/billing",
+      "file": "app/admin/billing/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/cards",
+      "file": "app/admin/cards/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/command",
+      "file": "app/admin/command/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/crm",
+      "file": "app/admin/crm/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/dashboard",
+      "file": "app/admin/dashboard/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/documents",
+      "file": "app/admin/documents/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/documents/[documentId]",
+      "file": "app/admin/documents/[documentId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/events",
+      "file": "app/admin/events/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/expert-time",
+      "file": "app/admin/expert-time/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/guardrail-defaults",
+      "file": "app/admin/guardrail-defaults/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/intake",
+      "file": "app/admin/intake/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/opportunities",
+      "file": "app/admin/opportunities/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/pipeline",
+      "file": "app/admin/pipeline/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/process",
+      "file": "app/admin/process/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/processes",
+      "file": "app/admin/processes/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/proposals",
+      "file": "app/admin/proposals/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/provisioning",
+      "file": "app/admin/provisioning/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/provisioning/[portalId]",
+      "file": "app/admin/provisioning/[portalId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/purchases",
+      "file": "app/admin/purchases/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/rfp-curation",
+      "file": "app/admin/rfp-curation/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/rfp-curation/[solId]",
+      "file": "app/admin/rfp-curation/[solId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
+      "file": "app/admin/rfp-curation/[solId]/topic/[topicId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/rfp-curation/upload",
+      "file": "app/admin/rfp-curation/upload/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/scouts",
+      "file": "app/admin/scouts/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/site",
+      "file": "app/admin/site/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/site/[pageKey]",
+      "file": "app/admin/site/[pageKey]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/site/docs/[type]/[slug]",
+      "file": "app/admin/site/docs/[type]/[slug]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/sources",
+      "file": "app/admin/sources/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/sources/[profileId]",
+      "file": "app/admin/sources/[profileId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/storage",
+      "file": "app/admin/storage/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/system",
+      "file": "app/admin/system/page.tsx",
+      "prefixRole": "master_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/system-state",
+      "file": "app/admin/system-state/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/template-stable",
+      "file": "app/admin/template-stable/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/templates",
+      "file": "app/admin/templates/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/templates/[templateId]/edit",
+      "file": "app/admin/templates/[templateId]/edit/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/tenants",
+      "file": "app/admin/tenants/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/tenants/[tenantId]",
+      "file": "app/admin/tenants/[tenantId]/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/waitlist",
+      "file": "app/admin/waitlist/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/admin/workflows",
+      "file": "app/admin/workflows/page.tsx",
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/apply",
+      "file": "app/(marketing)/apply/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/blog/[slug]",
+      "file": "app/(marketing)/blog/[slug]/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/change-password",
+      "file": "app/(auth)/change-password/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/customers",
+      "file": "app/(marketing)/customers/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/dashboard",
+      "file": "app/dashboard/page.tsx",
+      "prefixRole": "tenant_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/engine",
+      "file": "app/(marketing)/engine/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/features",
+      "file": "app/(marketing)/features/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/federal-rd-101",
+      "file": "app/(marketing)/federal-rd-101/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/forgot-password",
+      "file": "app/(auth)/forgot-password/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/get-started",
+      "file": "app/(marketing)/get-started/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/go",
+      "file": "app/go/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/how-it-works",
+      "file": "app/(marketing)/how-it-works/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/infosec",
+      "file": "app/(marketing)/infosec/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/invite/[token]",
+      "file": "app/invite/[token]/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/legal",
+      "file": "app/(marketing)/legal/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/legal/acceptable-use",
+      "file": "app/(marketing)/legal/acceptable-use/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/legal/ai-disclosure",
+      "file": "app/(marketing)/legal/ai-disclosure/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/legal/privacy",
+      "file": "app/(marketing)/legal/privacy/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/legal/terms",
+      "file": "app/(marketing)/legal/terms/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/login",
+      "file": "app/(auth)/login/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/partner",
+      "file": "app/partner/page.tsx",
+      "prefixRole": "partner_admin",
+      "guards": [
+        "canManagePartnerTenants"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal",
+      "file": "app/portal/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]",
+      "file": "app/portal/[tenantSlug]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/activity",
+      "file": "app/portal/[tenantSlug]/activity/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/agents",
+      "file": "app/portal/[tenantSlug]/agents/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/atoms",
+      "file": "app/portal/[tenantSlug]/atoms/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/automation",
+      "file": "app/portal/[tenantSlug]/automation/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/billing",
+      "file": "app/portal/[tenantSlug]/billing/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/buckets",
+      "file": "app/portal/[tenantSlug]/buckets/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "canManageBuckets",
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": true
+    },
+    {
+      "route": "/portal/[tenantSlug]/cards",
+      "file": "app/portal/[tenantSlug]/cards/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "canManageBuckets",
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": true
+    },
+    {
+      "route": "/portal/[tenantSlug]/command",
+      "file": "app/portal/[tenantSlug]/command/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/contracts",
+      "file": "app/portal/[tenantSlug]/contracts/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/contracts/[contractId]",
+      "file": "app/portal/[tenantSlug]/contracts/[contractId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/dashboard",
+      "file": "app/portal/[tenantSlug]/dashboard/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/documents",
+      "file": "app/portal/[tenantSlug]/documents/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/documents/[documentId]",
+      "file": "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/documents/new",
+      "file": "app/portal/[tenantSlug]/documents/new/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/library",
+      "file": "app/portal/[tenantSlug]/library/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+      "file": "app/portal/[tenantSlug]/library/foundation/[foundationId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/library/review",
+      "file": "app/portal/[tenantSlug]/library/review/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/library/upload",
+      "file": "app/portal/[tenantSlug]/library/upload/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/manage",
+      "file": "app/portal/[tenantSlug]/manage/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/pipeline",
+      "file": "app/portal/[tenantSlug]/pipeline/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/portals",
+      "file": "app/portal/[tenantSlug]/portals/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/portals/[portalId]",
+      "file": "app/portal/[tenantSlug]/portals/[portalId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/processes",
+      "file": "app/portal/[tenantSlug]/processes/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/profile",
+      "file": "app/portal/[tenantSlug]/profile/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/projects",
+      "file": "app/portal/[tenantSlug]/projects/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/projects/[projectId]",
+      "file": "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/proposals",
+      "file": "app/portal/[tenantSlug]/proposals/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/proposals/[proposalId]",
+      "file": "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+      "file": "app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/spotlights",
+      "file": "app/portal/[tenantSlug]/spotlights/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
+      "file": "app/portal/[tenantSlug]/spotlights/[spotlightId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/team",
+      "file": "app/portal/[tenantSlug]/team/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/templates",
+      "file": "app/portal/[tenantSlug]/templates/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/todos",
+      "file": "app/portal/[tenantSlug]/todos/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/vaults",
+      "file": "app/portal/[tenantSlug]/vaults/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/portal/[tenantSlug]/vaults/[vaultId]",
+      "file": "app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx",
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/pricing",
+      "file": "app/(marketing)/pricing/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/reset-password",
+      "file": "app/(auth)/reset-password/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/resources",
+      "file": "app/(marketing)/resources/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/resources/[slug]",
+      "file": "app/(marketing)/resources/[slug]/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/security",
+      "file": "app/(marketing)/security/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/select-company",
+      "file": "app/select-company/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/team",
+      "file": "app/(marketing)/team/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/the-expert",
+      "file": "app/(marketing)/the-expert/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/value",
+      "file": "app/(marketing)/value/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/vaults",
+      "file": "app/vaults/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    },
+    {
+      "route": "/vaults/[vaultId]",
+      "file": "app/vaults/[vaultId]/page.tsx",
+      "prefixRole": null,
+      "guards": [],
+      "redirectsUnless": false
+    }
+  ],
+  "apis": [
+    {
+      "route": "/admin/site/content/[id]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/admin/site/content/[id]/route.ts"
+    },
+    {
+      "route": "/api/admin/agent-gates/sweep",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/agent-gates/sweep/route.ts"
+    },
+    {
+      "route": "/api/admin/agents",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/agents/route.ts"
+    },
+    {
+      "route": "/api/admin/agents/platform-config",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/agents/platform-config/route.ts"
+    },
+    {
+      "route": "/api/admin/agents/usage",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/agents/usage/route.ts"
+    },
+    {
+      "route": "/api/admin/agents/workforce",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/agents/workforce/route.ts"
+    },
+    {
+      "route": "/api/admin/applications/[id]/accept",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/applications/[id]/accept/route.ts"
+    },
+    {
+      "route": "/api/admin/applications/[id]/reject",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/applications/[id]/reject/route.ts"
+    },
+    {
+      "route": "/api/admin/applications/[id]/status",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/applications/[id]/status/route.ts"
+    },
+    {
+      "route": "/api/admin/architecture/schema",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/architecture/schema/route.ts"
+    },
+    {
+      "route": "/api/admin/architecture/stats",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/architecture/stats/route.ts"
+    },
+    {
+      "route": "/api/admin/automation",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/automation/route.ts"
+    },
+    {
+      "route": "/api/admin/automation-framework",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/automation-framework/route.ts"
+    },
+    {
+      "route": "/api/admin/automation/[ruleId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/automation/[ruleId]/route.ts"
+    },
+    {
+      "route": "/api/admin/compliance-presets",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/compliance-presets/route.ts"
+    },
+    {
+      "route": "/api/admin/compliance-suggest",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/compliance-suggest/route.ts"
+    },
+    {
+      "route": "/api/admin/documents",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/documents/route.ts"
+    },
+    {
+      "route": "/api/admin/documents/[documentId]",
+      "verbs": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/documents/[documentId]/route.ts"
+    },
+    {
+      "route": "/api/admin/documents/[documentId]/export",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/documents/[documentId]/export/route.ts"
+    },
+    {
+      "route": "/api/admin/documents/upload-image",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/documents/upload-image/route.ts"
+    },
+    {
+      "route": "/api/admin/event-brackets/sweep",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/event-brackets/sweep/route.ts"
+    },
+    {
+      "route": "/api/admin/expert-time/availability",
+      "verbs": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/expert-time/availability/route.ts"
+    },
+    {
+      "route": "/api/admin/extract-topics",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/extract-topics/route.ts"
+    },
+    {
+      "route": "/api/admin/guardrail-defaults",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/guardrail-defaults/route.ts"
+    },
+    {
+      "route": "/api/admin/intake",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/intake/route.ts"
+    },
+    {
+      "route": "/api/admin/opportunities/[oppId]/lifecycle",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/opportunities/[oppId]/lifecycle/route.ts"
+    },
+    {
+      "route": "/api/admin/opportunities/[oppId]/publish",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/opportunities/[oppId]/publish/route.ts"
+    },
+    {
+      "route": "/api/admin/opportunities/[oppId]/watch",
+      "verbs": [
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/opportunities/[oppId]/watch/route.ts"
+    },
+    {
+      "route": "/api/admin/partners",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/partners/route.ts"
+    },
+    {
+      "route": "/api/admin/promo-codes",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/promo-codes/route.ts"
+    },
+    {
+      "route": "/api/admin/proposals",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/proposals/route.ts"
+    },
+    {
+      "route": "/api/admin/proposals/[proposalId]/full-draft",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/proposals/[proposalId]/full-draft/route.ts"
+    },
+    {
+      "route": "/api/admin/proposals/[proposalId]/studio",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/proposals/[proposalId]/studio/route.ts"
+    },
+    {
+      "route": "/api/admin/provisioning/[portalId]/release",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/provisioning/[portalId]/release/route.ts"
+    },
+    {
+      "route": "/api/admin/reconcile-cards",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/reconcile-cards/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/amendments",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/amendments/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/amendments/[amendmentId]",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/amendments/[amendmentId]/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/annotations",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/annotations/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/annotations/[annotationId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/annotations/[annotationId]/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/apply-preset",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/apply-preset/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/assess-ingest",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/assess-ingest/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/assessment",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/assessment/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/broadcast",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/broadcast/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/complete-buildout",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/complete-buildout/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/compliance",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/compliance/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/force-release",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/force-release/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/ingest-assist",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/ingest-assist/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/ingest-phase",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/ingest-phase/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/items/[itemId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/items/[itemId]/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/notes",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/notes/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/shred-audit",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/shred-audit/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance",
+      "verbs": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/triage",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-curation/[solId]/triage/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-curation/[solId]/volumes/[volumeId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/rfp-curation/[solId]/volumes/[volumeId]/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-document/[id]/set-primary",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-document/[id]/set-primary/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-document/[id]/signed-url",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-document/[id]/signed-url/route.ts"
+    },
+    {
+      "route": "/api/admin/rfp-upload",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/rfp-upload/route.ts"
+    },
+    {
+      "route": "/api/admin/sbir-data/ingest",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sbir-data/ingest/route.ts"
+    },
+    {
+      "route": "/api/admin/sbir-data/lookup",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sbir-data/lookup/route.ts"
+    },
+    {
+      "route": "/api/admin/scout-review",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/scout-review/route.ts"
+    },
+    {
+      "route": "/api/admin/scout-review/[findingId]",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/scout-review/[findingId]/route.ts"
+    },
+    {
+      "route": "/api/admin/section-standards",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/section-standards/route.ts"
+    },
+    {
+      "route": "/api/admin/shadow-transition",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/shadow-transition/route.ts"
+    },
+    {
+      "route": "/api/admin/site/docs",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/docs/route.ts"
+    },
+    {
+      "route": "/api/admin/site/docs/[type]/[slug]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/docs/[type]/[slug]/route.ts"
+    },
+    {
+      "route": "/api/admin/site/docs/[type]/[slug]/publish",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/docs/[type]/[slug]/publish/route.ts"
+    },
+    {
+      "route": "/api/admin/site/docs/[type]/[slug]/save",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/docs/[type]/[slug]/save/route.ts"
+    },
+    {
+      "route": "/api/admin/site/docs/[type]/[slug]/status",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/docs/[type]/[slug]/status/route.ts"
+    },
+    {
+      "route": "/api/admin/site/pages",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/pages/route.ts"
+    },
+    {
+      "route": "/api/admin/site/pages/[pageKey]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/pages/[pageKey]/route.ts"
+    },
+    {
+      "route": "/api/admin/site/pages/[pageKey]/publish",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/pages/[pageKey]/publish/route.ts"
+    },
+    {
+      "route": "/api/admin/site/pages/[pageKey]/save",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/pages/[pageKey]/save/route.ts"
+    },
+    {
+      "route": "/api/admin/site/pages/[pageKey]/versions",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/pages/[pageKey]/versions/route.ts"
+    },
+    {
+      "route": "/api/admin/site/upload-image",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/site/upload-image/route.ts"
+    },
+    {
+      "route": "/api/admin/sources",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/diffs",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/diffs/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/expand-topics",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/expand-topics/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/regions",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/regions/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/regions/[regionId]",
+      "verbs": [
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/regions/[regionId]/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/scout",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/scout/route.ts"
+    },
+    {
+      "route": "/api/admin/sources/[profileId]/visit",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/sources/[profileId]/visit/route.ts"
+    },
+    {
+      "route": "/api/admin/storage",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH",
+        "PUT",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/storage/route.ts"
+    },
+    {
+      "route": "/api/admin/tasks",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/tasks/route.ts"
+    },
+    {
+      "route": "/api/admin/template-stable",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/template-stable/route.ts"
+    },
+    {
+      "route": "/api/admin/template-stable/[id]/publish",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/template-stable/[id]/publish/route.ts"
+    },
+    {
+      "route": "/api/admin/template-stable/sync",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/template-stable/sync/route.ts"
+    },
+    {
+      "route": "/api/admin/templates",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/templates/route.ts"
+    },
+    {
+      "route": "/api/admin/templates/[templateId]",
+      "verbs": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/templates/[templateId]/route.ts"
+    },
+    {
+      "route": "/api/admin/tenants",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/tenants/route.ts"
+    },
+    {
+      "route": "/api/admin/tenants/[tenantId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/tenants/[tenantId]/route.ts"
+    },
+    {
+      "route": "/api/admin/tenants/[tenantId]/agent-config",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/tenants/[tenantId]/agent-config/route.ts"
+    },
+    {
+      "route": "/api/admin/tenants/[tenantId]/archive",
+      "verbs": [
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/tenants/[tenantId]/archive/route.ts"
+    },
+    {
+      "route": "/api/admin/tenants/[tenantId]/backfill-cards",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/tenants/[tenantId]/backfill-cards/route.ts"
+    },
+    {
+      "route": "/api/admin/topics/[id]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/topics/[id]/route.ts"
+    },
+    {
+      "route": "/api/admin/upload-topic-files",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [],
+      "file": "app/api/admin/upload-topic-files/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/[instanceId]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/[instanceId]/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/[instanceId]/advance",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/[instanceId]/advance/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/[instanceId]/cancel",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/[instanceId]/cancel/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/[instanceId]/retry",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/[instanceId]/retry/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/launch-collaboration",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/launch-collaboration/route.ts"
+    },
+    {
+      "route": "/api/admin/workflows/templates",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "rfp_admin",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/admin/workflows/templates/route.ts"
+    },
+    {
+      "route": "/api/analytics/pageview",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/analytics/pageview/route.ts"
+    },
+    {
+      "route": "/api/applications",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/applications/route.ts"
+    },
+    {
+      "route": "/api/auth/forgot-password",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/auth/forgot-password/route.ts"
+    },
+    {
+      "route": "/api/auth/reset-password",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/auth/reset-password/route.ts"
+    },
+    {
+      "route": "/api/cms/revalidate",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/cms/revalidate/route.ts"
+    },
+    {
+      "route": "/api/command/seen",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/command/seen/route.ts"
+    },
+    {
+      "route": "/api/consent",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/consent/route.ts"
+    },
+    {
+      "route": "/api/content/[slug]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/content/[slug]/route.ts"
+    },
+    {
+      "route": "/api/enter",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": null,
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/enter/route.ts"
+    },
+    {
+      "route": "/api/events",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/events/route.ts"
+    },
+    {
+      "route": "/api/health",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/health/route.ts"
+    },
+    {
+      "route": "/api/invite",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/invite/route.ts"
+    },
+    {
+      "route": "/api/partner/enter",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/enter/route.ts"
+    },
+    {
+      "route": "/api/partner/exit",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/exit/route.ts"
+    },
+    {
+      "route": "/api/partner/manager-requests",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/manager-requests/route.ts"
+    },
+    {
+      "route": "/api/partner/registrations",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/registrations/route.ts"
+    },
+    {
+      "route": "/api/partner/tenants",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/tenants/route.ts"
+    },
+    {
+      "route": "/api/partner/tenants/precheck",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_admin",
+      "guards": [],
+      "file": "app/api/partner/tenants/precheck/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/agents/usage",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/agents/usage/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/[atomId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/[atomId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/[atomId]/archive",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/[atomId]/archive/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/apply-librarian-tags",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/atomize-package",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/bulk",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/bulk/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/capture",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/capture/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/propose-regions",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/propose-regions/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/review",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/review/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/select",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/select/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/atoms/upload",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/atoms/upload/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/automation-overview",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/automation-overview/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/automation-policies",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/automation-policies/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/buckets",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "canManageBuckets",
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/buckets/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/buckets/[bucketId]",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "canManageBuckets",
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/cards",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/cards/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/cards/[opportunityId]/pin",
+      "verbs": [
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/cards/[opportunityId]/pin/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/dashboard",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/dashboard/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/documents",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/documents/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/documents/[documentId]/export",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/documents/[documentId]/lock",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/documents/[documentId]/save",
+      "verbs": [
+        "PUT"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/guardrail-templates",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/guardrail-templates/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/atoms",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/atoms/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/atoms/[atomId]/download",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/atoms/[atomId]/download/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/canvas",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/canvas/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/foundation/[foundationId]/export",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/foundation/[foundationId]/save",
+      "verbs": [
+        "PUT"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/past-proposals",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/past-proposals/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/library/system-templates",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/library/system-templates/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/manager-requests/[taskId]",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/manager-requests/[taskId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/managers/[membershipId]",
+      "verbs": [
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/managers/[membershipId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/members/[userId]/scope",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/members/[userId]/scope/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/notifications",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/notifications/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/portals",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/portals/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/portals/[portalId]",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/portals/[portalId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/portals/[portalId]/workflow",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/portals/[portalId]/workflow/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/processes/[instanceId]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/processes/[instanceId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/processes/[instanceId]/advance",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/processes/[instanceId]/advance/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/profile",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/profile/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/assess-health",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
+      "verbs": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/baseline",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/cdrl",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/clins",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
+      "verbs": [
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/documents",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/gate-closer",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/invoices",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/modifications",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/notifications",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/rollup",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments",
+      "verbs": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/time",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/traceability",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/projects/[projectId]/wbs",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/activity",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/advance",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/amendments",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/archive",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/archive/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]",
+      "verbs": [
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/comments",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/compliance",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/compliance/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/document",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox",
+      "verbs": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/findings",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/gates",
+      "verbs": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/lock",
+      "verbs": [
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/outcome",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/package",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/package-review",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/package-review/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/preview",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/preview/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/readiness",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/readiness/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock",
+      "verbs": [
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save",
+      "verbs": [
+        "PUT"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/stage",
+      "verbs": [
+        "GET",
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/strategy",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/strategy/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/studio",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/studio/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]",
+      "verbs": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/proposals/create",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/proposals/create/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/purchase",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/purchase/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/purchases",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/purchases/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/section-standards",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/section-standards/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/storage",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/storage/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/tasks",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/tasks/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/tasks/[taskId]",
+      "verbs": [
+        "PATCH"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess"
+      ],
+      "file": "app/api/portal/[tenantSlug]/tasks/[taskId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/tasks/assign",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/tasks/assign/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/taxonomy",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/taxonomy/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/team",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/team/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/team/[userId]",
+      "verbs": [
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/team/[userId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/template-cards",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/template-cards/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/template-cards/[cardId]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/template-cards/[cardId]/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/template-cards/[cardId]/ack",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/template-cards/[cardId]/ack/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/template-cards/[cardId]/use",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/template-cards/[cardId]/use/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/templates",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/templates/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/templates/extract",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/templates/extract/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/uploads",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/uploads/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/uploads/image",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/uploads/image/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/vaults",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/vaults/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [],
+      "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest/route.ts"
+    },
+    {
+      "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/members",
+      "verbs": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "prefixRole": "partner_user",
+      "guards": [
+        "verifyTenantAccess",
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts"
+    },
+    {
+      "route": "/api/storage/local/[...key]",
+      "verbs": [
+        "GET",
+        "PUT"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/storage/local/[...key]/route.ts"
+    },
+    {
+      "route": "/api/stripe/checkout",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/stripe/checkout/route.ts"
+    },
+    {
+      "route": "/api/stripe/portal",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [
+        "hasRoleAtLeast"
+      ],
+      "file": "app/api/stripe/portal/route.ts"
+    },
+    {
+      "route": "/api/stripe/webhook",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/stripe/webhook/route.ts"
+    },
+    {
+      "route": "/api/tools/[name]",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/tools/[name]/route.ts"
+    },
+    {
+      "route": "/api/uploads/[...key]",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/uploads/[...key]/route.ts"
+    },
+    {
+      "route": "/api/waitlist",
+      "verbs": [
+        "GET",
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/waitlist/route.ts"
+    },
+    {
+      "route": "/api/webhooks/postmark",
+      "verbs": [
+        "POST"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/api/webhooks/postmark/route.ts"
+    },
+    {
+      "route": "/blog/feed.xml",
+      "verbs": [
+        "GET"
+      ],
+      "prefixRole": null,
+      "guards": [],
+      "file": "app/blog/feed.xml/route.ts"
+    }
+  ],
+  "tools": [
+    {
+      "name": "compliance.add_variable",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/compliance-add-variable.ts"
+    },
+    {
+      "name": "compliance.extract_from_text",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/compliance-extract-from-text.ts"
+    },
+    {
+      "name": "compliance.list_variables",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/compliance-list-variables.ts"
+    },
+    {
+      "name": "compliance.save_variable_value",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/compliance-save-variable-value.ts"
+    },
+    {
+      "name": "ingest.get_run_detail",
+      "role": "master_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/ingest-get-run-detail.ts"
+    },
+    {
+      "name": "ingest.list_recent_runs",
+      "role": "master_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/ingest-list-recent-runs.ts"
+    },
+    {
+      "name": "ingest.trigger_manual",
+      "role": "master_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/ingest-trigger-manual.ts"
+    },
+    {
+      "name": "library.search_atoms",
+      "role": "tenant_user",
+      "tenantScoped": "true",
+      "file": "lib/tools/library-search-atoms.ts"
+    },
+    {
+      "name": "memory.search",
+      "role": "tenant_user",
+      "tenantScoped": "true",
+      "file": "lib/tools/memory-search.ts"
+    },
+    {
+      "name": "memory.write",
+      "role": "tenant_user",
+      "tenantScoped": "true",
+      "file": "lib/tools/memory-write.ts"
+    },
+    {
+      "name": "opportunity.add_topic",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/opportunity-add-topic.ts"
+    },
+    {
+      "name": "opportunity.bulk_add_topics",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/opportunity-bulk-add-topics.ts"
+    },
+    {
+      "name": "opportunity.get_by_id",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/opportunity-get-by-id.ts"
+    },
+    {
+      "name": "opportunity.update_topic",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/opportunity-update-topic.ts"
+    },
+    {
+      "name": "proposal.draft_section",
+      "role": "tenant_user",
+      "tenantScoped": "true",
+      "file": "lib/tools/proposal-draft-section.ts"
+    },
+    {
+      "name": "solicitation.approve",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-approve.ts"
+    },
+    {
+      "name": "solicitation.claim",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-claim.ts"
+    },
+    {
+      "name": "solicitation.delete_annotation",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-delete-annotation.ts"
+    },
+    {
+      "name": "solicitation.dismiss",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-dismiss.ts"
+    },
+    {
+      "name": "solicitation.get_detail",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-get-detail.ts"
+    },
+    {
+      "name": "solicitation.list_triage",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-list-triage.ts"
+    },
+    {
+      "name": "solicitation.push",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-push.ts"
+    },
+    {
+      "name": "solicitation.reject_review",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-reject-review.ts"
+    },
+    {
+      "name": "solicitation.release",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-release.ts"
+    },
+    {
+      "name": "solicitation.request_review",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-request-review.ts"
+    },
+    {
+      "name": "solicitation.save_annotation",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/solicitation-save-annotation.ts"
+    },
+    {
+      "name": "finder.scout_source",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/source-scout.ts"
+    },
+    {
+      "name": "volume.add_required_item",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/volume-add-required-item.ts"
+    },
+    {
+      "name": "volume.add",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/volume-add.ts"
+    },
+    {
+      "name": "volume.delete_required_item",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/volume-delete-required-item.ts"
+    },
+    {
+      "name": "volume.delete",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/volume-delete.ts"
+    },
+    {
+      "name": "volume.update_required_item",
+      "role": "rfp_admin",
+      "tenantScoped": "false",
+      "file": "lib/tools/volume-update-required-item.ts"
+    }
+  ]
+}

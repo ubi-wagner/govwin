@@ -1,0 +1,205 @@
+{
+  "capturedAt": "2026-08-30T00:41:51.331Z",
+  "shots": [
+    {
+      "stage": 1,
+      "title": "Upload a solicitation",
+      "route": "/admin/rfp-curation/upload",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Where a solicitation enters. Documents shred here; their text is what now reaches ranking.",
+      "file": "s1-upload-a-solicitation.png",
+      "bytes": 193062
+    },
+    {
+      "stage": 1,
+      "title": "Intake queue",
+      "route": "/admin/intake",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "stageIntake is the one entry point — admin uploads and released scout findings both funnel through it.",
+      "file": "s1-intake-queue.png",
+      "bytes": 151023
+    },
+    {
+      "stage": 1,
+      "title": "Scout findings",
+      "route": "/admin/scouts",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Crawler leads and HITL scout extractions, classified NEW vs UPDATE, released or dismissed.",
+      "file": "s1-scout-findings.png",
+      "bytes": 237092
+    },
+    {
+      "stage": 2,
+      "title": "Curation queue",
+      "route": "/admin/rfp-curation",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Every solicitation awaiting curation, with its ingest phase.",
+      "file": "s2-curation-queue.png",
+      "bytes": 508969
+    },
+    {
+      "stage": 2,
+      "title": "Ingest Studio",
+      "route": "/admin/rfp-curation/7b70cdbf-cf08-40f2-96a7-dc92c0b10703",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "The solicitation workspace: compliance matrix, volumes, spotlight summary. The release gate reads the summary.",
+      "file": "s2-ingest-studio.png",
+      "bytes": 383517
+    },
+    {
+      "stage": 2,
+      "title": "Topic — technology focus areas",
+      "route": "/admin/rfp-curation/7b70cdbf-cf08-40f2-96a7-dc92c0b10703/topic/74afe7dc-5ea8-4bcd-a01f-d6e0b9920b3f",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Where techFocusAreas is edited. It crosses the bridge as of mig 238; before that it stopped here.",
+      "file": "s2-topic-technology-focus-areas.png",
+      "bytes": 132024
+    },
+    {
+      "stage": 3,
+      "title": "Opportunities — approve and push",
+      "route": "/admin/opportunities",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "The gate: submission_format present and a non-empty spotlight summary. Approval fans every activated opportunity onto the bridge.",
+      "file": "s3-opportunities-approve-and-push.png",
+      "bytes": 219313
+    },
+    {
+      "stage": 4,
+      "title": "Mirror cards, all tenants",
+      "route": "/admin/cards",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "What each tenant received. The card now carries tech focus, phase, topic identity, POC and a document manifest.",
+      "file": "s4-mirror-cards-all-tenants.png",
+      "bytes": 522591
+    },
+    {
+      "stage": 4,
+      "title": "Workflow map",
+      "route": "/admin/workflows",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "The automation behind the fan-out — templates as DAGs plus live per-instance overlays.",
+      "file": "s4-workflow-map.png",
+      "bytes": 392456
+    },
+    {
+      "stage": 7,
+      "title": "Provisioning queue",
+      "route": "/admin/provisioning",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Purchases awaiting release, against the 72-hour SLA.",
+      "file": "s7-provisioning-queue.png",
+      "bytes": 122137
+    },
+    {
+      "stage": 7,
+      "title": "Provisioning cockpit",
+      "route": "/admin/provisioning/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
+      "actor": "rfp_admin",
+      "tenant": null,
+      "note": "Buyer, SLA countdown, build-out readiness, and the two-outcome Complete & Release.",
+      "file": "s7-provisioning-cockpit.png",
+      "bytes": 198254
+    },
+    {
+      "stage": 5,
+      "title": "Buckets — a new customer sees this",
+      "route": "/portal/immobileyes/buckets",
+      "actor": "tenant_admin",
+      "tenant": "immobileyes",
+      "note": "No lenses yet. It says what a bucket IS and states the fallback, because \"no buckets\" must not read as \"your opportunities are missing\".",
+      "file": "s5-buckets-a-new-customer-sees-this.png",
+      "bytes": 102369
+    },
+    {
+      "stage": 5,
+      "title": "Prefilled from the company profile",
+      "route": "/portal/immobileyes/buckets",
+      "actor": "tenant_admin",
+      "tenant": "immobileyes",
+      "note": "One click copies naics_codes, keywords and agency priorities off tenant_profiles. It FILLS — a field already typed into is left alone.",
+      "file": "s5-prefilled-from-the-company-profile.png",
+      "bytes": 114152
+    },
+    {
+      "stage": 5,
+      "title": "The composition line",
+      "route": "/portal/immobileyes/buckets",
+      "actor": "tenant_admin",
+      "tenant": "immobileyes",
+      "note": "What the lens will actually score on, computed off the SCORER's own weight table so the number cannot drift from the score it describes.",
+      "file": "s5-the-composition-line.png",
+      "bytes": 113813
+    },
+    {
+      "stage": 6,
+      "title": "Buckets — five live lenses",
+      "route": "/portal/foundation/buckets",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "Each bucket scores the WHOLE mirror. A bucket is a sort order over every card, not a filter on some of them.",
+      "file": "s6-buckets-five-live-lenses.png",
+      "bytes": 101753
+    },
+    {
+      "stage": 6,
+      "title": "A bucket ranked",
+      "route": "/portal/foundation/buckets",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "\"Additive Construction & 3D Printing\" ranked against the tenant's whole opportunity mirror, with the per-signal factors behind each score.",
+      "file": "s6-a-bucket-ranked.png",
+      "bytes": 199627
+    },
+    {
+      "stage": 6,
+      "title": "Opportunity cards",
+      "route": "/portal/foundation/cards",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "The mirror itself — searchable and sortable across every card the tenant holds.",
+      "file": "s6-opportunity-cards.png",
+      "bytes": 202634
+    },
+    {
+      "stage": 6,
+      "title": "Command Center",
+      "route": "/portal/foundation/command",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "What is new since the customer last looked.",
+      "file": "s6-command-center.png",
+      "bytes": 235731
+    },
+    {
+      "stage": 7,
+      "title": "Proposals",
+      "route": "/portal/foundation/proposals",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "Every build this tenant owns.",
+      "file": "s7-proposals.png",
+      "bytes": 123385
+    },
+    {
+      "stage": 7,
+      "title": "Proposal workspace",
+      "route": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4",
+      "actor": "tenant_admin",
+      "tenant": "foundation",
+      "note": "Volumes, sections, compliance and readiness. source_bucket is frozen here at provisioning — which lens surfaced the opportunity that became this build.",
+      "file": "s7-proposal-workspace.png",
+      "bytes": 315305
+    }
+  ]
+}
