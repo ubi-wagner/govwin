@@ -49,6 +49,9 @@ export async function GET(
     const url = new URL(request.url);
     const includeClosed = url.searchParams.get('includeClosed') === 'true';
     const includePassed = url.searchParams.get('includePassed') === 'true';
+    // ?pinned=true now means "the ones I said yes to", not "the ones whose bytes I hold" — the
+    // param name is kept because it is an addressable public filter with no in-tree caller to
+    // update, and renaming a query string breaks anyone's saved link for no gain.
     const pinnedOnly = url.searchParams.get('pinned') === 'true';
 
     try {
@@ -100,8 +103,30 @@ export async function GET(
                   still-'open' card) is filtered client-side, where the badge computes it. */
               includeClosed ? tx`` : tx`AND c.lifecycle_status = 'open'`}
             ${includePassed ? tx`` : tx`AND c.pursuit_status <> 'passed'`}
-            ${pinnedOnly ? tx`AND c.docs_copied = true` : tx``}
-          ORDER BY c.docs_copied DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
+            ${pinnedOnly ? tx`AND c.pursuit_status IN ('monitoring', 'pursuing')` : tx``}
+          /*
+           * THE VERDICT SORTS; THE BUCKET SCORES (mig 240).
+           *
+           * This ordered by is_pinned DESC (and carries no backticks: one would END the
+           * tagged template this comment lives inside — the documented footgun) — the flag that has since become "documents copied" —
+           * so the feed was ranked by a STORAGE fact. A customer who up-voted six opportunities and
+           * opened the documents on one saw the one they had read float above the five they were
+           * still weighing.
+           *
+           * The thumb is deliberately NOT a scoring factor. scoreCard has an exact Python mirror
+           * asserted over 39 fixtures, and folding a per-card verdict into a per-bucket score would
+           * mean every rescore in either runtime had to know the tenant's votes — they would drift,
+           * and a 40 would stop meaning one thing ("weak match") and start meaning two ("weak match,
+           * or a good match I rejected"). So it lives here, in the ORDER BY, where it is instant,
+           * needs no rescore, and cannot desynchronise anything.
+           *
+           * Passed last rather than absent: the default feed filters them out above, but with
+           * "Show passed" ticked they belong at the bottom, not interleaved.
+           */
+          ORDER BY (c.pursuit_status = 'passed'),
+                   (c.pursuit_status IN ('monitoring', 'pursuing')) DESC,
+                   bs.top_score DESC NULLS LAST,
+                   c.updated_at DESC
           LIMIT 1000
         `;
         // The tenant's active buckets — the single mirror-OPP list carries a per-card `rankings`

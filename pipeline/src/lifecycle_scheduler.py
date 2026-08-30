@@ -259,8 +259,10 @@ async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
 async def _run_start_nudges(conn: asyncpg.Connection) -> None:
     """Pre-purchase START nudge (RANK-9).
 
-    A HOT (best bucket score >= threshold), UNPURSUED, SOON-CLOSING mirror card nudges the customer to
-    start a proposal — in-app (capture:opportunity.start_recommended, per card → the notification bell +
+    A SOON-CLOSING mirror card the customer has not bought and has not rejected nudges them to start
+    a proposal — either because the ranking thinks it matches (best bucket score >= threshold) or,
+    since mig 240, because THEY SAID SO with a thumbs-up. An explicit verdict outranks a score and
+    bypasses the threshold; it used to do the opposite, suppressing the nudge entirely. — in-app (capture:opportunity.start_recommended, per card → the notification bell +
     Command Center) AND email (one grouped system:notification.requested, template `start_nudge`, gated
     per tenant by their notify_on_new_priority_opp preference — the same delivery path as the digest).
 
@@ -298,6 +300,7 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
             """
             SELECT c.tenant_id::text AS tenant_id, c.opportunity_id::text AS opportunity_id,
                    c.card->>'title' AS title, bs.top_score::int AS top_score,
+                   c.pursuit_status, c.docs_copied,
                    GREATEST(0, EXTRACT(DAY FROM (o.close_date - now()))::int) AS days_to_close
             FROM tenant_opportunity_cards c
             JOIN opportunities o ON o.id = c.opportunity_id
@@ -307,19 +310,30 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
             ) bs ON true
             WHERE c.lifecycle_status = 'open'
               AND c.archived_at IS NULL
-              AND c.docs_copied = false
+              -- INTEREST EARNS THE NUDGE; it used to suppress it. This clause read
+              -- `is_pinned = false` (mechanically `docs_copied = false` after mig 240), so the one
+              -- population that had explicitly raised its hand was the one population that could
+              -- never be reminded. The two conditions that legitimately silence a nudge are already
+              -- below and are unaffected: `pursuing`/`passed`, and an existing portal.
               AND c.pursuit_status NOT IN ('pursuing', 'passed')
               AND o.close_date IS NOT NULL
               AND o.close_date > now()
               AND o.close_date <= now() + make_interval(days => $1)
-              AND bs.top_score >= $2
+              -- A VERDICT OUTRANKS A SCORE. The threshold exists to stop us pestering people about
+              -- weak matches an algorithm found. It has no business gating an opportunity the
+              -- customer THEMSELVES marked as interesting: "you flagged this and it closes in nine
+              -- days" is the most useful message this sweep can send, and a bucket score of 43 was
+              -- silencing it.
+              AND (bs.top_score >= $2 OR c.pursuit_status = 'monitoring')
               AND c.start_nudges_sent < $3
               AND (c.start_nudged_at IS NULL OR c.start_nudged_at < now() - make_interval(days => $4))
               AND NOT EXISTS (
                 SELECT 1 FROM proposal_portals pp
                 WHERE pp.tenant_id = c.tenant_id AND pp.opportunity_id = c.opportunity_id
               )
-            ORDER BY bs.top_score DESC
+            -- Up-voted first, then by score, then by urgency. The cap is per card, but the LIMIT is
+            -- per sweep, so on a busy week the order decides whose nudges actually go out.
+            ORDER BY (c.pursuit_status = 'monitoring') DESC, bs.top_score DESC, o.close_date
             LIMIT 500
             """,
             WINDOW_DAYS, THRESHOLD, max_nudges, SPACING_DAYS,
@@ -334,7 +348,11 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
                         conn, namespace="capture", type="opportunity.start_recommended", phase="single",
                         actor_type="system", actor_id="lifecycle_scheduler", tenant_id=tid,
                         parent_event_id=start_id or None,
+                        # The verdict and whether they ever opened the documents ride along:
+                        # "we think this matches you" and "you said this matches you, and never
+                        # opened it" are different messages about different people.
                         payload={"tenantId": tid, "opportunityId": opp, "title": r["title"],
+                                 "verdict": r["pursuit_status"], "docsCopied": r["docs_copied"],
                                  "topScore": r["top_score"], "daysToClose": r["days_to_close"]},
                     )
                     await conn.execute(
@@ -623,8 +641,12 @@ async def _run_discovery_digest(conn: asyncpg.Connection) -> None:
             ) bs ON true
             WHERE c.created_at >= now() - interval '7 days'
               AND c.lifecycle_status = 'open'
-              AND c.docs_copied = false
-              AND c.pursuit_status <> 'passed'
+              -- "NEW TO YOU" IS A VERDICT QUESTION, NOT A STORAGE ONE. This excluded cards whose
+              -- documents had been copied, which was a proxy for "they already found it" and a bad
+              -- one: after mig 240 a customer can up-vote or reject a card without copying
+              -- anything, and a digest that re-announces something they already judged is noise
+              -- dressed as discovery. `unreviewed` is the set that is genuinely new to them.
+              AND c.pursuit_status = 'unreviewed'
               AND c.archived_at IS NULL
             GROUP BY c.tenant_id
             HAVING count(*) > 0
