@@ -28,6 +28,7 @@
 import postgres from 'postgres';
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
+import { fmtDate } from '../lib/fmt.ts';
 
 // One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
 // a harness that silently ignores the one you passed fails with a connection error that reads
@@ -236,11 +237,18 @@ async function main() {
       ok('states the price (unchanged)', modal.includes('$1,999'));
       if (wantPages) ok('states the page limit before payment', /Page limit/.test(modal));
       if (wantVols) ok('states the volume count before payment', /Volumes/.test(modal));
-      // Not just the LABEL: a `<dt>Closes</dt>` with an empty `<dd>` would satisfy /Closes/ and tell
-      // the buyer nothing. Assert the card's own close date, formatted the way the modal formats it.
-      const wantClose = curated.closeDate
-        ? new Date(curated.closeDate).toLocaleDateString(undefined, { timeZone: 'UTC' })
-        : null;
+      /*
+       * Not just the LABEL: a `<dt>Closes</dt>` with an empty `<dd>` would satisfy /Closes/ and tell
+       * the buyer nothing. Assert the card's own close date — formatted by THE PRODUCT'S OWN
+       * FORMATTER, not by a re-typed equivalent.
+       *
+       * This drive previously built the expectation with
+       * `toLocaleDateString(undefined, { timeZone: 'UTC' })`, which matched right up until the
+       * locale sweep pinned every client format through lib/fmt.ts. The product then rendered
+       * "Aug 20, 2026" while the harness expected "8/20/2026", and the drive reported a product
+       * failure that was its own stale copy of a format. Copy the predicate from the source.
+       */
+      const wantClose = curated.closeDate ? fmtDate(curated.closeDate) : null;
       ok('states the deadline before payment', wantClose ? modal.includes(wantClose) : false,
         wantClose ? `${wantClose} · ${modal.match(/Closes[\s\S]{0,40}/)?.[0]?.replace(/\s+/g, ' ') ?? ''}` : 'card carries no close date');
       if (curated.ready) ok('states that the build-out is complete', /Build-out complete/.test(modal));

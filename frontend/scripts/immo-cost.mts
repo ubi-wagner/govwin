@@ -11,7 +11,11 @@ import { buildCostVolume } from '@/lib/proposal/cost-forms';
 import { computeBudget } from '@/lib/proposal/cost-model';
 import type { LaborLine, OtherDirectCost, IndirectRates } from '@/lib/proposal/cost-model';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const SLUG = 'immobileyes';
 const PROPOSAL = 'd4b6de67-eb3a-482b-84eb-4b0457687f19';
 

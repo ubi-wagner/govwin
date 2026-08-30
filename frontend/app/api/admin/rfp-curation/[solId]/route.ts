@@ -183,7 +183,10 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
     if (!UUID_RE.test(solId)) {
       return NextResponse.json({ error: 'Invalid solicitation ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    let body: { spotlightSummary?: unknown; expertNotes?: unknown; awardAmount?: unknown; awardBasis?: unknown };
+    let body: {
+      spotlightSummary?: unknown; expertNotes?: unknown; awardAmount?: unknown; awardBasis?: unknown;
+      fieldBasis?: unknown;
+    };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     const hasSummary = typeof body.spotlightSummary === 'string';
     const hasExpertNotes = typeof body.expertNotes === 'string';
@@ -216,15 +219,54 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
         { error: 'awardAmount (a non-negative number) is required unless awardBasis is not_stated', code: 'VALIDATION_ERROR' },
         { status: 400 });
     }
-    if (!hasSummary && !hasExpertNotes && !hasAwardBasis) {
-      return NextResponse.json({ error: 'spotlightSummary, expertNotes or awardBasis is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    /*
+     * THE OTHER TWO DECISIONS THE RELEASE GATE ASKS FOR (mig 241).
+     *
+     * ⚠️ This is the gap the end-to-end drive found. `solicitation.push` refuses to release until
+     * `source_documents` and `highlights` are decided — and until now NOTHING COULD RECORD THEM.
+     * A gate with a condition that has no way in is not a gate, it is an outage: the canonical
+     * happy-path drive stopped at 422 with no route to satisfy it, which is exactly the
+     * "carried but unreachable" shape the award-size work existed to fix, reintroduced two commits
+     * later by the same hand.
+     *
+     * Each vocabulary is closed, and each value is a FINDING rather than a blank: "the organization
+     * published none" and "no passages need marking" are things a curator concluded.
+     */
+    const BASIS_VOCAB: Record<string, readonly string[]> = {
+      source_documents: ['attached', 'none_published'],
+      highlights: ['marked', 'none_needed'],
+      naics_codes: ['stated', 'not_stated'],
+      set_aside_type: ['stated', 'not_stated'],
+    };
+    const rawBasis = body.fieldBasis;
+    const hasFieldBasis = !!rawBasis && typeof rawBasis === 'object' && !Array.isArray(rawBasis);
+    const fieldBasis: Record<string, string> = {};
+    if (hasFieldBasis) {
+      for (const [k, v] of Object.entries(rawBasis as Record<string, unknown>)) {
+        const allowed = BASIS_VOCAB[k];
+        if (!allowed) {
+          return NextResponse.json(
+            { error: `fieldBasis key must be one of ${Object.keys(BASIS_VOCAB).join(', ')}`, code: 'VALIDATION_ERROR' }, { status: 400 });
+        }
+        if (typeof v !== 'string' || !allowed.includes(v)) {
+          return NextResponse.json(
+            { error: `fieldBasis.${k} must be one of ${allowed.join(', ')}`, code: 'VALIDATION_ERROR' }, { status: 400 });
+        }
+        fieldBasis[k] = v;
+      }
+      if (Object.keys(fieldBasis).length === 0) {
+        return NextResponse.json({ error: 'fieldBasis must name at least one field', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
+    }
+    if (!hasSummary && !hasExpertNotes && !hasAwardBasis && !hasFieldBasis) {
+      return NextResponse.json({ error: 'spotlightSummary, expertNotes, awardBasis or fieldBasis is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     const summary = hasSummary ? (body.spotlightSummary as string).slice(0, 5000) : null;
     const expertNotes = hasExpertNotes ? (body.expertNotes as string).slice(0, 5000) : null;
     // Pre-flight BEFORE any write: an umbrella can legally exist without a landing opp
     // (mig 013), and the expert note lives ON the landing opp. Checking after the summary
     // UPDATE committed a partial, unaudited write and mislabelled it 404.
-    if (hasExpertNotes || hasAwardBasis) {
+    if (hasExpertNotes || hasAwardBasis || hasFieldBasis) {
       try {
         const [pre] = await sql<{ opportunityId: string | null }[]>`
           SELECT opportunity_id AS "opportunityId" FROM curated_solicitations WHERE id = ${solId}::uuid`;
@@ -258,6 +300,19 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
           return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
         }
       }
+      if (hasFieldBasis) {
+        // On the UMBRELLA only: source_documents and highlights are facts about the solicitation,
+        // and the push gate reads them from exactly that row.
+        const rows = await sql<{ id: string }[]>`
+          UPDATE opportunities
+             SET field_basis = field_basis || ${sql.json(fieldBasis as Parameters<typeof sql.json>[0])},
+                 updated_at = now()
+           WHERE id = (SELECT opportunity_id FROM curated_solicitations WHERE id = ${solId}::uuid)
+          RETURNING id`;
+        if (rows.length === 0) {
+          return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+        }
+      }
       if (hasAwardBasis) {
         // Applied to the umbrella AND every topic: the release gate reads each activated
         // opportunity, and a 66-topic BAA states one award size for all of them. `||` merges rather
@@ -282,7 +337,8 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
       namespace: 'finder',
       type: hasSummary ? 'solicitation.summary_updated'
         : hasExpertNotes ? 'solicitation.expert_notes_updated'
-        : 'solicitation.award_basis_set',
+        : hasAwardBasis ? 'solicitation.award_basis_set'
+        : 'solicitation.field_basis_set',
       actor: userActor(u.id ?? '', u.email ?? undefined),
       tenantId: null,
       payload: { solicitationId: solId, fields: [hasSummary && 'spotlightSummary', hasExpertNotes && 'expertNotes'].filter(Boolean) },

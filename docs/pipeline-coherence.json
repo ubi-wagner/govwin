@@ -177,6 +177,7 @@
    "adopted": [
     "app/api/admin/documents/[documentId]/route.ts",
     "app/api/admin/documents/route.ts",
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts",
@@ -184,7 +185,7 @@
     "lib/documents/atomize-on-export.ts"
    ],
    "bespoke": [],
-   "candidates": 7
+   "candidates": 8
   },
   "opportunity:events": {
    "adopted": [
@@ -193,13 +194,12 @@
     "app/api/admin/opportunities/[oppId]/watch/route.ts",
     "app/api/admin/reconcile-cards/route.ts",
     "app/api/admin/tenants/[tenantId]/backfill-cards/route.ts",
-    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pin/route.ts",
     "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
     "lib/amendments.ts",
     "lib/opportunity-bridge.ts"
    ],
    "bespoke": [],
-   "candidates": 9
+   "candidates": 8
   },
   "proposal-build:canvas": {
    "adopted": [
@@ -347,23 +347,9 @@
    "bespoke": [],
    "candidates": 3
   },
-  "opportunity:tenant": {
-   "adopted": [
-    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pin/route.ts",
-    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
-    "app/api/portal/[tenantSlug]/cards/route.ts",
-    "app/portal/[tenantSlug]/cards/page.tsx"
-   ],
-   "bespoke": [],
-   "candidates": 4
-  },
-  "opportunity:agents": {
-   "adopted": [],
-   "bespoke": [],
-   "candidates": 2
-  },
   "documents:tenant": {
    "adopted": [
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts",
     "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts",
@@ -373,7 +359,22 @@
     "app/portal/[tenantSlug]/documents/page.tsx"
    ],
    "bespoke": [],
-   "candidates": 7
+   "candidates": 8
+  },
+  "opportunity:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
+    "app/api/portal/[tenantSlug]/cards/route.ts",
+    "app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx",
+    "app/portal/[tenantSlug]/cards/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 4
+  },
+  "opportunity:agents": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 2
   },
   "templating:tenant": {
    "adopted": [
@@ -633,6 +634,11 @@
    ],
    "bespoke": [],
    "candidates": 15
+  },
+  "opportunity:dates": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
   },
   "projects:toast": {
    "adopted": [

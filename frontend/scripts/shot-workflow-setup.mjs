@@ -1,7 +1,11 @@
 // Browser drive of the tenant Workflow Setup page (TW-6): log in as a tenant_admin, open the required
 // setup for a launched _setup:pending portal (recommender-prefilled), screenshot it, click Accept & Start.
 import { chromium } from 'playwright';
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const SLUG = process.env.SLUG || 'foundation';
 const PORTAL = process.env.PORTAL || '72e4c91b-ca21-49c7-adc5-3c21c69c344c';
 const OUT = process.env.OUT || '.';

@@ -33,6 +33,10 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
   const [awardBasisSaved, setAwardBasisSaved] = useState('');
   const [awardAmount, setAwardAmount] = useState('');
   const [awardAmountSaved, setAwardAmountSaved] = useState('');
+  /** The other two decisions the release gate asks for (mig 241). */
+  const [docsBasis, setDocsBasis] = useState('');
+  const [hlBasis, setHlBasis] = useState('');
+  const [basisSaved, setBasisSaved] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -53,6 +57,9 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
           const a = d.data?.solicitation?.awardAmount;
           const aStr = typeof a === 'number' ? String(a) : '';
           setAwardBasis(b); setAwardBasisSaved(b);
+          const db = (fb && typeof fb === 'object' && typeof fb.source_documents === 'string') ? fb.source_documents : '';
+          const hb = (fb && typeof fb === 'object' && typeof fb.highlights === 'string') ? fb.highlights : '';
+          setDocsBasis(db); setHlBasis(hb); setBasisSaved(`${db}|${hb}`);
           setAwardAmount(aStr); setAwardAmountSaved(aStr);
         }
       } catch { /* ignore */ } finally {
@@ -79,6 +86,21 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
           })
         : new Response(JSON.stringify({ data: {} }), { status: 200 });
+      if (`${docsBasis}|${hlBasis}` !== basisSaved) {
+        const fb: Record<string, string> = {};
+        if (docsBasis) fb.source_documents = docsBasis;
+        if (hlBasis) fb.highlights = hlBasis;
+        if (Object.keys(fb).length > 0) {
+          const br = await fetch(`/api/admin/rfp-curation/${solId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fieldBasis: fb }),
+          });
+          if (!br.ok) {
+            const j = await br.json().catch(() => ({}));
+            setErr(j.error || 'Could not save the release decisions.'); setBusy(false); return;
+          }
+          setBasisSaved(`${docsBasis}|${hlBasis}`);
+        }
+      }
       if (awardBody) {
         const ar = await fetch(`/api/admin/rfp-curation/${solId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(awardBody),
@@ -112,7 +134,8 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
   };
 
   const dirty = value !== (saved ?? '') || note !== (noteSaved ?? '')
-    || awardBasis !== awardBasisSaved || awardAmount !== awardAmountSaved;
+    || awardBasis !== awardBasisSaved || awardAmount !== awardAmountSaved
+    || `${docsBasis}|${hlBasis}` !== basisSaved;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 mb-4">
@@ -200,6 +223,40 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
         {awardBasis === 'not_stated' && (
           <span className="text-[11px] text-gray-500">Shown to customers as &ldquo;Award size not stated&rdquo;</span>
         )}
+      </div>
+
+      {/*
+        THE REST OF THE MINIMUM RELEASE SET (mig 241).
+        Each is satisfiable by recording an ABSENCE, because absence is a finding: an umbrella BAA
+        whose governing text lives in the component instructions genuinely needs no highlights, and
+        an opportunity the organization published no files for is a real and common state. What
+        release will not accept is silence — that and "the document is silent" are different facts.
+      */}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600">
+            Source documents <span className="text-rose-600">*</span>
+          </label>
+          <select value={docsBasis} onChange={(e) => { setDocsBasis(e.target.value); setErr(null); }}
+                  disabled={!loaded || busy}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="">— not decided —</option>
+            <option value="attached">Attached to this solicitation</option>
+            <option value="none_published">The organization published none</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600">
+            Highlighted passages <span className="text-rose-600">*</span>
+          </label>
+          <select value={hlBasis} onChange={(e) => { setHlBasis(e.target.value); setErr(null); }}
+                  disabled={!loaded || busy}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="">— not decided —</option>
+            <option value="marked">Marked in the document</option>
+            <option value="none_needed">None needed for this instrument</option>
+          </select>
+        </div>
       </div>
 
       <div className="mt-2 flex items-center gap-3">
