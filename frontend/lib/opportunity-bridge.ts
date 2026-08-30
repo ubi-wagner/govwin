@@ -76,6 +76,15 @@ export interface OppCard {
    * soon it closes, so an inferred date moves a customer's ranking exactly like a real one.
    */
   datesEstimated: boolean;
+  /**
+   * Per-field release basis (mig 241) — how the RFP admin came by each value.
+   *
+   * `{"award_amount": "estimated"}` is the case that earns it: an admin often knows what a Phase I
+   * runs when the topic is silent, and that knowledge is worth showing — but showing it the same
+   * way as a figure read from the document would be a lie. Same rule as `datesEstimated`, one level
+   * more general, and the same rule the ingest-provenance spine applies to compliance values.
+   */
+  fieldBasis: Record<string, string>;
   postedDate: string | null;
   preReleaseDate: string | null;
   openDate: string | null;
@@ -153,7 +162,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.estimated_value_min, o.estimated_value_max, o.description, o.expert_notes,
              o.lifecycle_status, o.submission_stage,
              o.phase_type, o.tech_focus_areas, o.topic_number, o.topic_branch, o.topic_status,
-             o.poc_name, o.poc_email, o.dates_estimated,
+             o.poc_name, o.poc_email, o.dates_estimated, o.field_basis,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
              cs.namespace, cs.spotlight_summary, cs.build_complete,
@@ -263,6 +272,16 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       pocEmail: (o.pocEmail as string) ?? null,
       classificationCode: (o.classificationCode as string) ?? null,
       datesEstimated: o.datesEstimated === true,
+      fieldBasis: (() => {
+        // Only string values survive: the map is rendered directly, and a nested object or a number
+        // arriving from a future writer must not reach a customer as "[object Object]".
+        const raw = o.fieldBasis;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+        return Object.fromEntries(
+          Object.entries(raw as Record<string, unknown>)
+            .filter(([, v]) => typeof v === 'string' && v.trim() !== ''),
+        ) as Record<string, string>;
+      })(),
       postedDate: str(o.postedDate),
       preReleaseDate: str(o.preReleaseDate),
       openDate: str(o.openDate),

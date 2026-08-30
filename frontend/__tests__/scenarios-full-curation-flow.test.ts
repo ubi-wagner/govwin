@@ -204,6 +204,9 @@ describe('Phase 1 §E24 — full curation flow', () => {
         submissionFormat: 'DSIP', pageLimitTechnical: 15, customVariables: {},
         hasSubmissionFormat: true,
         spotlightSummary: 'Navy CV property-intelligence SBIR — agencies: Navy/DoD; tech: computer vision, edge inference.',
+        // The minimum release set (mig 241): this scenario drives a curator who did the work, so it
+        // satisfies the gate. The gate's own refusals are covered in tools-solicitation-review.
+        docCount: 2, excerptCount: 3, undecided: [], fieldBasis: { award_amount: 'stated' },
       }])
       .mockResolvedValueOnce([{ n: 0 }])                  // date-guard: no undated opps (⑤)
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol

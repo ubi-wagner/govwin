@@ -5,17 +5,34 @@ import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 
 /**
- * What the RFP team found in the solicitation, on the customer's card.
+ * What this opportunity pays, said the way we came by it (mig 241).
  *
- * Every field here already rode the bridge and was already matched by both scorers; none of it
- * had ever reached a screen. A ranking a customer cannot see the reason for is a number they have
- * to trust rather than read.
+ * Three renderings from two fields, and the middle one is why the basis exists: an RFP admin often
+ * knows what a Phase I runs when the topic is silent, and that estimate is worth showing — but
+ * showing it identically to a figure read from the document would be exactly the fabrication
+ * docs/INGEST_PROVENANCE.md forbids. Same rule as the "dates estimated" chip beside it.
  *
- * The rule for the highlights, which is what makes this worth showing at all: an excerpt is only
- * rendered when it EXISTS. A highlight carried as a bare page anchor would render as an empty row
- * with a page number, which is worse than omitting it — it advertises that something was found and
- * then declines to say what.
+ *   stated      →  "$250,000"
+ *   estimated   →  "$250,000 · our estimate"
+ *   not_stated  →  "Award size not stated"
+ *
+ * Returns null when nobody has decided — which release now refuses, so it should only be reachable
+ * on cards published before the gate existed.
  */
+function awardLine(card: Record<string, unknown>): { text: string; estimated: boolean } | null {
+  const basis = card.fieldBasis && typeof card.fieldBasis === 'object' && !Array.isArray(card.fieldBasis)
+    ? (card.fieldBasis as Record<string, unknown>).award_amount
+    : undefined;
+  const amount = typeof card.awardAmount === 'number' && Number.isFinite(card.awardAmount)
+    ? (card.awardAmount as number)
+    : null;
+  if (basis === 'not_stated') return { text: 'Award size not stated', estimated: false };
+  if (amount === null) return null;
+  const money = `$${amount.toLocaleString()}`;
+  if (basis === 'estimated') return { text: `${money} · our estimate`, estimated: true };
+  return { text: money, estimated: false };
+}
+
 /**
  * How much work the solicitation asks for, in one line — the SIZE-OF-JOB signal.
  *
@@ -46,6 +63,18 @@ function effortLine(card: Record<string, unknown>): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/**
+ * What the RFP team found in the solicitation, on the customer's card.
+ *
+ * Every field here already rode the bridge and was already matched by both scorers; none of it
+ * had ever reached a screen. A ranking a customer cannot see the reason for is a number they have
+ * to trust rather than read.
+ *
+ * The rule for the highlights, which is what makes this worth showing at all: an excerpt is only
+ * rendered when it EXISTS. A highlight carried as a bare page anchor would render as an empty row
+ * with a page number, which is worse than omitting it — it advertises that something was found and
+ * then declines to say what.
+ */
 function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
   const [open, setOpen] = useState(false);
   if (!card) return null;
@@ -66,9 +95,11 @@ function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
     .filter((h) => typeof h.text === 'string' && (h.text as string).trim() !== '');
   const estimated = card.datesEstimated === true;
   const effort = effortLine(card);
+  const award = awardLine(card);
   const ready = card.provisionReady === true;
 
-  if (!summary && focus.length === 0 && highlights.length === 0 && docs.length === 0 && volumes.length === 0 && !effort && !ready)
+  if (!summary && focus.length === 0 && highlights.length === 0 && docs.length === 0 && volumes.length === 0
+      && !effort && !ready && !award)
     return null;
 
   return (
@@ -105,8 +136,16 @@ function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
         built out yet is normal, and saying "not ready" about it would be a verdict we have not
         reached. So the badge appears when true and nothing appears when it is not.
       */}
-      {(effort || ready) && (
+      {(effort || ready || award) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {award && (
+            <span className={`text-[11px] font-medium ${award.estimated ? 'text-amber-700' : 'text-gray-700'}`}
+                  title={award.estimated
+                    ? 'Our RFP team\'s estimate — the solicitation does not state an award size.'
+                    : 'Read from the solicitation.'}>
+              {award.text}
+            </span>
+          )}
           {effort && (
             <span className="text-[11px] text-gray-600" title="What the solicitation requires, from our compliance matrix">
               📄 {effort}

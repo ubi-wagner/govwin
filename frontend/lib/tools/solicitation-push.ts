@@ -50,6 +50,18 @@ const REQUIRED_COMPLIANCE = [
   'submission_format',
 ] as const;
 
+/**
+ * Has an admin recorded a basis for `field` on the SOLICITATION-level opportunity?
+ *
+ * Read off the umbrella row: `source_documents` and `highlights` are facts about the solicitation,
+ * not about each of its 66 topics, so asking every topic to carry them would make a curator record
+ * the same decision 66 times to say one thing.
+ */
+function basisOf(r: { fieldBasis?: Record<string, unknown> | null }, field: string): string | null {
+  const v = r.fieldBasis?.[field];
+  return typeof v === 'string' && v.trim() !== '' ? v : null;
+}
+
 export const solicitationPushTool = defineTool<Input, Output>({
   name: 'solicitation.push',
   namespace: 'solicitation',
@@ -75,6 +87,10 @@ export const solicitationPushTool = defineTool<Input, Output>({
         pageLimitTechnical: number | null;
         customVariables: Record<string, unknown> | null;
         hasSubmissionFormat: boolean;
+        docCount: number;
+        excerptCount: number;
+        undecided: string[] | null;
+        fieldBasis: Record<string, unknown> | null;
       }[]
     >`
       SELECT cs.status, cs.namespace, cs.opportunity_id, cs.spotlight_summary,
@@ -91,7 +107,28 @@ export const solicitationPushTool = defineTool<Input, Output>({
                  NULLIF(x.submission_format, '') IS NOT NULL
                  OR NULLIF(x.custom_variables->'submission_format'->>'value', '') IS NOT NULL
                )
-             ) AS has_submission_format
+             ) AS has_submission_format,
+             -- ── THE MINIMUM SET (mig 241) ────────────────────────────────────────────────
+             -- What an RFP admin must have DECIDED before a customer is told this exists.
+             (SELECT count(*)::int FROM solicitation_documents sd
+               WHERE sd.solicitation_id = cs.id) AS doc_count,
+             (SELECT count(*)::int FROM solicitation_annotations sa
+               WHERE sa.solicitation_id = cs.id AND COALESCE(sa.excerpt, '') <> '') AS excerpt_count,
+             -- Every opportunity in this release — the umbrella AND its topics — that is missing a
+             -- decision. Aggregated in SQL because a 66-topic BAA must report ALL of them at once:
+             -- a gate that names one problem per attempt turns a release into 66 round trips.
+             (SELECT array_agg(DISTINCT m.label ORDER BY m.label) FROM (
+                SELECT CASE
+                         WHEN NOT (o.field_basis ? 'award_amount') THEN 'award size'
+                         WHEN NULLIF(o.agency, '') IS NULL THEN 'agency'
+                         WHEN NULLIF(o.program_type, '') IS NULL THEN 'program type'
+                       END AS label
+                  FROM opportunities o
+                 WHERE o.solicitation_id = cs.id OR o.id = cs.opportunity_id) m
+               WHERE m.label IS NOT NULL) AS undecided,
+             -- The umbrella basis map. source_documents and highlights are facts about the
+             -- SOLICITATION, so they are recorded once here, not on all 66 topics.
+             (SELECT o.field_basis FROM opportunities o WHERE o.id = cs.opportunity_id) AS field_basis
       FROM curated_solicitations cs
       -- Read the solicitation-level row (topic_id IS NULL) — the same row
       -- buildCardSnapshot uses, so the gate and the customer card agree.
@@ -167,6 +204,38 @@ export const solicitationPushTool = defineTool<Input, Output>({
       throw new ValidationError(
         `cannot push: ${undatedCount} opportunity/topic(s) have no close date — set an expected (or official) close date in curation before releasing (estimates are allowed)`,
         { solicitationId, undatedOpportunities: undatedCount, missing: 'close_date' },
+      );
+    }
+
+    /*
+     * 2d · THE MINIMUM SET — what must be DECIDED, not merely present (mig 241).
+     *
+     * Release is the moment an opportunity stops being ours and starts being a customer's basis for
+     * spending money. Before mig 241 the gate asked for three things; everything else a small
+     * business actually weighs — what it pays, who is buying, what kind of programme, what the
+     * source even is — was optional, and "optional" measured as 0 of 22 for the award amount.
+     *
+     * DECIDED, not PRESENT, is the whole point. Each check below is satisfiable by recording that
+     * the solicitation does not say — which is a finding, and renders as one. What it will not
+     * accept is silence, because silence and "the document is silent" are different facts and only
+     * one of them is safe to show a customer.
+     */
+    const missing2: string[] = [];
+    if ((r.docCount ?? 0) === 0 && basisOf(r, 'source_documents') === null) {
+      missing2.push('the source documents (attach them, or record that the organization published none)');
+    }
+    if ((r.excerptCount ?? 0) === 0 && basisOf(r, 'highlights') === null) {
+      missing2.push('highlighted passages (mark what governs a bid, or record that none are needed)');
+    }
+    for (const label of r.undecided ?? []) {
+      missing2.push(label === 'award size'
+        ? 'award size (enter the stated amount, add an admin estimate, or record that the solicitation does not state one)'
+        : label);
+    }
+    if (missing2.length > 0) {
+      throw new ValidationError(
+        `cannot push: ${missing2.length} item(s) in the minimum release set are undecided — ${missing2.join('; ')}`,
+        { solicitationId, missing: missing2 },
       );
     }
 

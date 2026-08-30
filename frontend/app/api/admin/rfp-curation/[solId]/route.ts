@@ -183,26 +183,55 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
     if (!UUID_RE.test(solId)) {
       return NextResponse.json({ error: 'Invalid solicitation ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    let body: { spotlightSummary?: unknown; expertNotes?: unknown };
+    let body: { spotlightSummary?: unknown; expertNotes?: unknown; awardAmount?: unknown; awardBasis?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
     const hasSummary = typeof body.spotlightSummary === 'string';
     const hasExpertNotes = typeof body.expertNotes === 'string';
-    if (!hasSummary && !hasExpertNotes) {
-      return NextResponse.json({ error: 'spotlightSummary or expertNotes (string) is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    /*
+     * AWARD SIZE — the field a small business asks about first, and the one that had no way in
+     * (mig 241). `award_amount` had zero writers in the tree; `estimated_value_min/max` was written
+     * only by the SAM-feed ingest. So it measured 0 of 22 on the box while the bridge dutifully
+     * carried it onto every card.
+     *
+     * The BASIS is the point, not the number. Requiring a figure outright would leave an admin
+     * facing a silent BAA two options — block the release, or invent one — and inventing it is what
+     * INGEST_PROVENANCE forbids. So: stated (read from the document) · estimated (the admin's own
+     * judgement, badged as such to the customer) · not_stated (the document is silent, which is a
+     * finding and renders as one).
+     */
+    const AWARD_BASES = ['stated', 'estimated', 'not_stated'] as const;
+    const hasAwardBasis = typeof body.awardBasis === 'string';
+    if (hasAwardBasis && !(AWARD_BASES as readonly string[]).includes(body.awardBasis as string)) {
+      return NextResponse.json(
+        { error: `awardBasis must be one of ${AWARD_BASES.join(', ')}`, code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    const awardBasis = hasAwardBasis ? (body.awardBasis as string) : null;
+    // A figure is REQUIRED for stated/estimated and REFUSED for not_stated — otherwise the two
+    // could disagree on the card ("Award size not stated · $250,000"), which is worse than either.
+    const rawAmount = body.awardAmount;
+    const awardAmount = typeof rawAmount === 'number' && Number.isFinite(rawAmount) && rawAmount >= 0
+      ? Math.round(rawAmount) : null;
+    if (hasAwardBasis && awardBasis !== 'not_stated' && awardAmount === null) {
+      return NextResponse.json(
+        { error: 'awardAmount (a non-negative number) is required unless awardBasis is not_stated', code: 'VALIDATION_ERROR' },
+        { status: 400 });
+    }
+    if (!hasSummary && !hasExpertNotes && !hasAwardBasis) {
+      return NextResponse.json({ error: 'spotlightSummary, expertNotes or awardBasis is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     const summary = hasSummary ? (body.spotlightSummary as string).slice(0, 5000) : null;
     const expertNotes = hasExpertNotes ? (body.expertNotes as string).slice(0, 5000) : null;
     // Pre-flight BEFORE any write: an umbrella can legally exist without a landing opp
     // (mig 013), and the expert note lives ON the landing opp. Checking after the summary
     // UPDATE committed a partial, unaudited write and mislabelled it 404.
-    if (hasExpertNotes) {
+    if (hasExpertNotes || hasAwardBasis) {
       try {
         const [pre] = await sql<{ opportunityId: string | null }[]>`
           SELECT opportunity_id AS "opportunityId" FROM curated_solicitations WHERE id = ${solId}::uuid`;
         if (!pre) return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
         if (!pre.opportunityId) {
           return NextResponse.json({
-            error: 'This solicitation has no landing opportunity — the expert note lives on the opportunity card.',
+            error: 'This solicitation has no landing opportunity — the expert note and the award size live on the opportunity card.',
             code: 'NO_LANDING_OPPORTUNITY',
           }, { status: 409 });
         }
@@ -229,13 +258,31 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
           return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
         }
       }
+      if (hasAwardBasis) {
+        // Applied to the umbrella AND every topic: the release gate reads each activated
+        // opportunity, and a 66-topic BAA states one award size for all of them. `||` merges rather
+        // than replaces, so a basis recorded for another field is not silently dropped.
+        const rows = await sql<{ id: string }[]>`
+          UPDATE opportunities
+             SET award_amount = ${awardBasis === 'not_stated' ? null : awardAmount},
+                 field_basis = field_basis || ${sql.json({ award_amount: awardBasis } as Parameters<typeof sql.json>[0])},
+                 updated_at = now()
+           WHERE solicitation_id = ${solId}::uuid
+              OR id = (SELECT opportunity_id FROM curated_solicitations WHERE id = ${solId}::uuid)
+          RETURNING id`;
+        if (rows.length === 0) {
+          return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+        }
+      }
     } catch (err) {
       console.error('[rfp-curation] PATCH curation fields failed:', err);
       return NextResponse.json({ error: 'Failed to update solicitation', code: 'DB_ERROR' }, { status: 500 });
     }
     await emitEventSingle({
       namespace: 'finder',
-      type: hasSummary ? 'solicitation.summary_updated' : 'solicitation.expert_notes_updated',
+      type: hasSummary ? 'solicitation.summary_updated'
+        : hasExpertNotes ? 'solicitation.expert_notes_updated'
+        : 'solicitation.award_basis_set',
       actor: userActor(u.id ?? '', u.email ?? undefined),
       tenantId: null,
       payload: { solicitationId: solId, fields: [hasSummary && 'spotlightSummary', hasExpertNotes && 'expertNotes'].filter(Boolean) },

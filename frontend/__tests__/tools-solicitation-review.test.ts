@@ -263,12 +263,88 @@ describe('solicitation.reject_review', () => {
 describe('solicitation.push', () => {
   const OPP_ID = '44444444-4444-4444-8444-444444444444';
 
+  /**
+   * THE MINIMUM RELEASE SET (mig 241).
+   *
+   * Release is the moment an opportunity stops being ours and becomes a customer's basis for
+   * spending $1,999 and a fortnight. Before this, the gate asked for a submission format, a
+   * spotlight summary and a close date; award size — the first question a small business asks —
+   * was optional, and measured 0 of 22 on the live box with no writer anywhere in the tree.
+   *
+   * Each case below pairs the refusal with the thing that satisfies it, because a gate that cannot
+   * be satisfied is an outage and a gate that cannot refuse is decoration.
+   */
+  const OK = {
+    status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
+    submissionFormat: 'DSIP', pageLimitTechnical: 15, customVariables: {}, hasSubmissionFormat: true,
+    spotlightSummary: 'A summary long enough to be real.',
+    docCount: 2, excerptCount: 3, undecided: [] as string[],
+    fieldBasis: { award_amount: 'stated' } as Record<string, unknown>,
+  };
+  const pushWith = (over: Record<string, unknown>) => {
+    sqlMock.mockResolvedValueOnce([{ ...OK, ...over }]).mockResolvedValueOnce([{ n: 0 }]);
+    return invoke('solicitation.push', { solicitationId: SOL_ID }, ctx());
+  };
+
+  it('refuses a release whose award size nobody has decided', async () => {
+    await expect(pushWith({ undecided: ['award size'] })).rejects.toThrow(/award size/);
+  });
+
+  it('…and the refusal says HOW to satisfy it, including the estimate', async () => {
+    // A gate that names a missing field without naming the escape leaves an admin two options:
+    // block the release, or invent a figure. Inventing it is what INGEST_PROVENANCE forbids.
+    await expect(pushWith({ undecided: ['award size'] }))
+      .rejects.toThrow(/admin estimate|does not state one/);
+  });
+
+  it('accepts "the solicitation does not state one" as a decision', async () => {
+    // The basis is recorded, so the aggregate finds nothing undecided — absence became a finding.
+    sqlMock
+      .mockResolvedValueOnce([{ ...OK, undecided: [], fieldBasis: { award_amount: 'not_stated' } }])
+      .mockResolvedValueOnce([{ n: 0 }])
+      .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
+      .mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce(undefined);
+    await expect(invoke('solicitation.push', { solicitationId: SOL_ID }, ctx())).resolves.toBeTruthy();
+  });
+
+  it('refuses a release with no source documents and no decision about them', async () => {
+    await expect(pushWith({ docCount: 0, fieldBasis: { award_amount: 'stated' } }))
+      .rejects.toThrow(/source documents/);
+  });
+
+  it('…but accepts one where the organization published none, recorded as such', async () => {
+    sqlMock
+      .mockResolvedValueOnce([{ ...OK, docCount: 0,
+        fieldBasis: { award_amount: 'stated', source_documents: 'none_published' } }])
+      .mockResolvedValueOnce([{ n: 0 }])
+      .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
+      .mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce(undefined);
+    await expect(invoke('solicitation.push', { solicitationId: SOL_ID }, ctx())).resolves.toBeTruthy();
+  });
+
+  it('refuses when nothing was highlighted and nobody said none were needed', async () => {
+    await expect(pushWith({ excerptCount: 0 })).rejects.toThrow(/[Hh]ighlighted passages/);
+  });
+
+  it('reports EVERY undecided item at once, not one per attempt', async () => {
+    // A 66-topic BAA must not need 66 round trips to learn what is missing.
+    await expect(pushWith({ docCount: 0, excerptCount: 0, undecided: ['agency', 'award size'] }))
+      .rejects.toThrow(/4 item\(s\)/);
+  });
+
   it('happy path: validates, flips status + is_active, writes memory', async () => {
     sqlMock
       .mockResolvedValueOnce([{
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15,
         customVariables: {}, hasSubmissionFormat: true,
+        // The minimum release set (mig 241) — satisfied here so these cases keep testing what they
+        // were written to test. `undecided: []` is the SQL aggregate finding nothing missing.
+        docCount: 2, excerptCount: 3, undecided: [], fieldBasis: { award_amount: 'stated' },
         spotlightSummary: 'Navy CV property-intelligence SBIR — agencies: Navy/DoD; tech: computer vision, edge inference.',
       }])
       .mockResolvedValueOnce([{ n: 0 }]) // date-guard: 0 activated opps missing close_date (⑤)
