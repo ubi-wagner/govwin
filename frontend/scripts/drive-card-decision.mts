@@ -208,13 +208,22 @@ async function main() {
 
     // ── 3 · THE PURCHASE MODAL ───────────────────────────────────────────────────────────────
     console.log('\n3 · The decision itself — $1,999 against a title, or against the facts?');
-    await owner`UPDATE tenant_opportunity_cards SET docs_copied = true, docs_copied_at = now()
-                WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid AND docs_copied = false`;
+    /*
+     * ⚠️ THE SETUP FOLLOWS THE PRODUCT, NOT THE OTHER WAY ROUND (mig 240).
+     *
+     * This used to force `is_pinned = true`, because Purchase lived behind a pin. It now lives
+     * behind the VERDICT — an up-vote reveals the transfer and the money together — so a drive that
+     * kept setting the copy flag reported "Purchase is offered on the pinned card: button not
+     * found" against a product working exactly as designed. A harness asserting a contract the
+     * system no longer has is a harness bug, not a finding.
+     */
+    await owner`UPDATE tenant_opportunity_cards SET pursuit_status = 'monitoring', pursuit_set_at = now()
+                WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid`;
     pinnedHere = true;
     await cardText(curated.opportunityId); // re-open the focused card now that it is pinned
     const buy = page.locator(`#opp-${curated.opportunityId}`).getByRole('button', { name: 'Purchase' });
     if (await buy.count() === 0) {
-      ok('Purchase is offered on the pinned card', false, 'button not found — modal path UNCOVERED');
+      ok('Purchase is offered once the customer has up-voted', false, 'button not found — modal path UNCOVERED');
     } else {
       await buy.first().click();
       await page.waitForTimeout(900);
@@ -288,9 +297,9 @@ async function main() {
     }
   } finally {
     if (pinnedHere) {
-      await owner`UPDATE tenant_opportunity_cards SET docs_copied = false, docs_copied_at = NULL
+      await owner`UPDATE tenant_opportunity_cards SET pursuit_status = 'unreviewed', pursuit_set_at = NULL
                   WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid`;
-      console.log('\n  (restored: card unpinned)');
+      console.log('\n  (restored: verdict cleared)');
     }
     await browser.close().catch(() => {});
     await owner.end();
