@@ -355,6 +355,11 @@ DRIVES=(
   # schema for the 146 array/jsonb columns, self-tests against 7 hand-verified cases before reading
   # a file, and separates applied migrations from actionable code. Read-only.
   "empty-not-null|scripts/audit-empty-not-null.mjs"
+  # Two routes verify-surfaces reported UNCOVERED, closed by USING the capabilities behind them
+  # rather than seeding rows: the tenant copies the shared starter set into its own library, and
+  # creates a blank document. Deliberately leaves both behind — a tenant that has done either is a
+  # normal state, and the leftovers are what let the lens bind those routes on the next run.
+  "library-starter-copy|scripts/drive-library-starter-copy.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
