@@ -160,7 +160,7 @@ export function CreateCanvasButton({ tenantSlug }: { tenantSlug: string }) {
                     {templates.map((t) => (
                       <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-2">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-gray-800">{t.title || 'Untitled'}</div>
+                          <div className="truncate text-sm font-medium text-gray-800" title={t.title || 'Untitled'}>{t.title || 'Untitled'}</div>
                           <div className="mt-0.5 flex gap-1 text-[10px] text-gray-400">
                             {t.form && <span className="rounded bg-gray-100 px-1.5 py-0.5">{t.form}</span>}
                             {t.context && <span className="rounded bg-gray-100 px-1.5 py-0.5">{t.context}</span>}
