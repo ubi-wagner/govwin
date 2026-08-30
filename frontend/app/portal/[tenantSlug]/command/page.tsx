@@ -198,7 +198,7 @@ export default async function TenantCommandCenterPage({
   // ── Opportunities: pinned cards + in-flight builds ──
   const pinnedCards = await count('pinned', sql`
     SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards
-    WHERE tenant_id = ${tenantId} AND is_pinned = true
+    WHERE tenant_id = ${tenantId} AND docs_copied = true
       AND lifecycle_status <> 'archived' AND archived_at IS NULL`);
   const activeProposalCount = await count('proposals', sql`
     SELECT COUNT(*)::text AS count FROM proposals

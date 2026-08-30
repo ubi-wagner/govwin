@@ -132,7 +132,7 @@ export async function createTenantWithAdmin(
     // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
     // they open empty and fill — so the product imposes none, and the cap is a pure authoring
     // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
-    // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
+    // one, /cards falls back to docs_copied then updated_at DESC: recency-ordered, not blank.
     let cardsBackfilled = 0;
     try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[create-tenant] backfill failed', e); }
 

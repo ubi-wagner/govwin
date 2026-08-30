@@ -639,7 +639,7 @@ export async function POST(request: Request) {
   });
 
   // Attach-to-existing on a PUSHED solicitation: bump the bridge so pinned mirror
-  // cards flip pin_update_available — the tenant's resync then re-copies the doc
+  // cards flip docs_update_available — the tenant's resync then re-copies the doc
   // set, which is how a late attachment actually reaches a customer. No-op pre-push.
   let propagation: Awaited<ReturnType<typeof republishSolicitationCards>> | undefined;
   if (existingSolId) {

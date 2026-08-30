@@ -34,7 +34,7 @@ export async function completeBuildOut(
   // Idempotency gate on the BROADCAST: once build_complete is set, re-running (a release retry
   // after PROVISION_FAILED, or a second buyer's release of the same master) must not re-fan-out
   // 'updated' to every tenant — each re-publish re-pings watched-opp holders and re-arms
-  // pin_update_available. Genuinely-changed master edits already republish via the change-gated
+  // docs_update_available. Genuinely-changed master edits already republish via the change-gated
   // mid-window propagation (MID_WINDOW_RULES B5), so nothing is lost by skipping here.
   try {
     const [prior] = await sqlBypass<Array<{ buildComplete: boolean | null }>>`

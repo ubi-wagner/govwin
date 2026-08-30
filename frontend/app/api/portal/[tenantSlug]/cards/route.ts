@@ -60,7 +60,7 @@ export async function GET(
         // — not just recency with a "ranked by your buckets" label.
         const cards = await tx`
           SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
-                 c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
+                 c.docs_copied, c.docs_update_available, c.docs_copied_at, c.created_at, c.updated_at,
                  bs.top_score, bs.top_bucket_id,
                  COALESCE(rk.rankings, '[]'::json) AS rankings,
                  fit.fit_output AS "fitOutput"
@@ -100,8 +100,8 @@ export async function GET(
                   still-'open' card) is filtered client-side, where the badge computes it. */
               includeClosed ? tx`` : tx`AND c.lifecycle_status = 'open'`}
             ${includePassed ? tx`` : tx`AND c.pursuit_status <> 'passed'`}
-            ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}
-          ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
+            ${pinnedOnly ? tx`AND c.docs_copied = true` : tx``}
+          ORDER BY c.docs_copied DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
           LIMIT 1000
         `;
         // The tenant's active buckets — the single mirror-OPP list carries a per-card `rankings`

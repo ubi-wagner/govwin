@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { describeComposition, type BucketCriteria, type SignalCoverage } from '@/lib/bucket-scoring';
 
 interface Bucket { id: string; name: string; description: string | null; criteria: Record<string, unknown> }
-interface RankedRow { opportunityId: string; score: number; factors: Record<string, number>; card: Record<string, unknown> | null; isPinned: boolean }
+interface RankedRow { opportunityId: string; score: number; factors: Record<string, number>; card: Record<string, unknown> | null; docsCopied: boolean }
 
 export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: string; canEdit: boolean }) {
   const [buckets, setBuckets] = useState<Bucket[]>([]);
@@ -376,7 +376,7 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-gray-400 w-6">#{i + 1}</span>
                   <span className="flex-1 text-sm text-gray-800 truncate">{str(r.card, 'title') ?? r.opportunityId}</span>
-                  {r.isPinned && <span className="text-[10px] text-blue-600">pinned</span>}
+                  {r.docsCopied && <span className="text-[10px] text-blue-600">pinned</span>}
                   <span className="text-sm font-semibold text-gray-700 w-10 text-right">{r.score}</span>
                 </div>
                 {r.factors && Object.keys(r.factors).length > 0 && (

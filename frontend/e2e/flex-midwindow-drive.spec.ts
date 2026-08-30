@@ -9,7 +9,7 @@
  *                  cockpit Complete & Release (Release 2).
  *   TENANT (kate)  sees the card · pins · purchases (comp code, 72h window opens) · sees every
  *                  mid-window edit land on her mirror (bridge version advances, summary/note
- *                  refresh, pin_update_available) · opens the released portal with the
+ *                  refresh, docs_update_available) · opens the released portal with the
  *                  amendment REPLAYED (flag + document) and acknowledges it.
  *
  * Serial by design — this is one continuous curation story.
@@ -259,7 +259,7 @@ test('F4 · kate’s mirror card advanced: version, summary, expert note, update
   const snap = card!.card as Record<string, unknown>;
   expect(String(snap.spotlightSummary)).toContain('UPDATED mid-window');
   expect(String(snap.expertNotes)).toContain('Component-specific instructions');
-  expect(card!.pinUpdateAvailable, 'pinned card + advanced version ⇒ the amber update badge').toBe(true);
+  expect(card!.docsUpdateAvailable, 'pinned card + advanced version ⇒ the amber update badge').toBe(true);
 });
 
 // ═════════════ F5 · ADMIN — late topic: date guard parks it, close date releases it ═════════════

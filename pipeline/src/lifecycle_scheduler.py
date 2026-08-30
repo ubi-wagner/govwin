@@ -307,7 +307,7 @@ async def _run_start_nudges(conn: asyncpg.Connection) -> None:
             ) bs ON true
             WHERE c.lifecycle_status = 'open'
               AND c.archived_at IS NULL
-              AND c.is_pinned = false
+              AND c.docs_copied = false
               AND c.pursuit_status NOT IN ('pursuing', 'passed')
               AND o.close_date IS NOT NULL
               AND o.close_date > now()
@@ -623,7 +623,7 @@ async def _run_discovery_digest(conn: asyncpg.Connection) -> None:
             ) bs ON true
             WHERE c.created_at >= now() - interval '7 days'
               AND c.lifecycle_status = 'open'
-              AND c.is_pinned = false
+              AND c.docs_copied = false
               AND c.pursuit_status <> 'passed'
               AND c.archived_at IS NULL
             GROUP BY c.tenant_id

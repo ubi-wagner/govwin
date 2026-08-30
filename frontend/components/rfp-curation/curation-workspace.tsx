@@ -145,8 +145,8 @@ interface CustomerInterestItem {
   tenantSlug: string;
   topicNumber: string | null;
   topicTitle: string;
-  isPinned: boolean;
-  pinnedAt: string;
+  docsCopied: boolean;
+  docsCopiedAt: string;
   proposalId: string | null;
   proposalStage: string | null;
   proposalCreatedAt: string | null;
@@ -1628,7 +1628,7 @@ export function CurationWorkspace({
                       )}
                     </td>
                     <td className="py-2 pr-4 text-gray-500">
-                      {new Date(ci.pinnedAt).toLocaleDateString()}
+                      {new Date(ci.docsCopiedAt).toLocaleDateString()}
                     </td>
                     <td className="py-2 pr-4">
                       {ci.proposalId ? (

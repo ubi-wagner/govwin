@@ -535,9 +535,9 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
         bridge_version = EXCLUDED.bridge_version,
         lifecycle_status = EXCLUDED.lifecycle_status,
         submission_stage = EXCLUDED.submission_stage,
-        pin_update_available = CASE
-          WHEN tenant_opportunity_cards.is_pinned AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
-          THEN true ELSE tenant_opportunity_cards.pin_update_available END,
+        docs_update_available = CASE
+          WHEN tenant_opportunity_cards.docs_copied AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
+          THEN true ELSE tenant_opportunity_cards.docs_update_available END,
         updated_at = now()
       WHERE EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
       RETURNING tenant_id
@@ -547,7 +547,7 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
   if (!applied) return false;
   // NO corpus copy here (mig 239). It used to run on every apply for every holder; the documents
   // are reference material and now arrive at PIN. A tenant who has already pinned gets
-  // `pin_update_available` set by the upsert above, and resyncing re-copies against the new
+  // `docs_update_available` set by the upsert above, and resyncing re-copies against the new
   // version — so an amendment still reaches the people who asked for the document.
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.

@@ -155,7 +155,7 @@ for (const table of ['tenant_opportunity_cards', 'tenant_opportunity_documents']
      */
     const isGen = gen === 'ALWAYS';
     // `SET a = 1, b = 2` puts b after a COMMA, not after SET — the first version only matched the
-    // first assignment in a statement, so `pinned_at` came out with zero writers.
+    // first assignment in a statement, so `docs_copied_at` came out with zero writers.
     const writers = FILES.filter(({ f, code }) =>
       new RegExp(`(\\b${c}\\s*=|${c}\\s*=\\s*EXCLUDED|INSERT INTO[^;]{0,600}\\b${c}\\b)`, 'is').test(code)
       && !f.endsWith('audit-card-fields.mjs')).map(({ f }) => rel(f));

@@ -2,13 +2,13 @@
  * drive-pin-honesty — a local-copy pointer exists only when the local copy does.
  *
  * The OPP card is a mirrorable row. `card` is the half that mirrors and is replaced wholesale on
- * every fan-out; `pinned_docs` / `is_pinned` / `pinned_at` / `pursuit_status` are the tenant's own
+ * every fan-out; `copied_docs` / `docs_copied` / `docs_copied_at` / `pursuit_status` are the tenant's own
  * and survive it. This drives the invariant that binds the two halves:
  *
  *     A POINTER TO A LOCAL COPY EXISTS ONLY WHEN THAT COPY DOES.
  *
  * It exists because the opposite shipped. Measured before the fix: pinning an opportunity whose
- * objects are missing from storage returned `{pinned: true, docs: []}` and set `pinned_at` — a card
+ * objects are missing from storage returned `{pinned: true, docs: []}` and set `docs_copied_at` — a card
  * claiming a local copy of nothing, and a customer sent to an empty folder.
  *
  * The hard part is that a WITHDRAWAL and a FAILED COPY look identical from outside — both produce
@@ -39,12 +39,12 @@ async function main() {
     FROM tenant_opportunity_cards c
     JOIN tenants t ON t.id = c.tenant_id
     JOIN opportunities o ON o.id = c.opportunity_id
-    WHERE c.archived_at IS NULL AND NOT c.is_pinned AND o.solicitation_id IS NOT NULL
+    WHERE c.archived_at IS NULL AND NOT c.docs_copied AND o.solicitation_id IS NOT NULL
     ORDER BY c.created_at LIMIT 1`;
   if (!card) { console.error('HARNESS CANNOT RUN: no unpinned card with a solicitation'); process.exit(2); }
 
-  const held = async () => (await owner<Array<{ isPinned: boolean; pinnedAt: Date | null; docs: unknown[]; text: number }>>`
-    SELECT c.is_pinned, c.pinned_at, c.pinned_docs AS docs,
+  const held = async () => (await owner<Array<{ docsCopied: boolean; docsCopiedAt: Date | null; docs: unknown[]; text: number }>>`
+    SELECT c.docs_copied, c.docs_copied_at, c.copied_docs AS docs,
            (SELECT count(*)::int FROM tenant_opportunity_documents d
              WHERE d.tenant_id = c.tenant_id AND d.opportunity_id = c.opportunity_id) AS text
     FROM tenant_opportunity_cards c
@@ -62,7 +62,7 @@ async function main() {
   ok('and it holds nothing, honestly', Array.isArray(s1.docs) && s1.docs.length === 0 && Number(s1.text) === 0,
     `${(s1.docs as unknown[]).length} doc(s) · ${s1.text} text row(s)`);
   await unpinCard(card.tenantId, card.opportunityId);
-  await owner`UPDATE tenant_opportunity_cards SET pinned_at = NULL, pinned_docs = '[]'::jsonb
+  await owner`UPDATE tenant_opportunity_cards SET docs_copied_at = NULL, copied_docs = '[]'::jsonb
               WHERE tenant_id = ${card.tenantId}::uuid AND opportunity_id = ${card.opportunityId}::uuid`;
 
   // ── 2 · RED — something published, nothing copyable ─────────────────────────────────────────
@@ -79,8 +79,8 @@ async function main() {
     ok('the reason distinguishes a failed copy from a missing card',
       refused.reason === 'copy_failed', `${refused.reason}`);
     ok('it reports what a complete copy WOULD have held', Number(refused.expected) === 1, `${refused.expected}`);
-    ok('is_pinned was NOT set', s2.isPinned === false);
-    ok('pinned_at was NOT stamped', s2.pinnedAt === null);
+    ok('docs_copied was NOT set', s2.docsCopied === false);
+    ok('docs_copied_at was NOT stamped', s2.docsCopiedAt === null);
     ok('no pointer was written', Array.isArray(s2.docs) && s2.docs.length === 0);
 
     // ── 2b · The local row must point at the tenant's OWN object ─────────────────────────────
@@ -93,7 +93,7 @@ async function main() {
       FROM tenant_opportunity_cards c
       JOIN opportunities o ON o.id = c.opportunity_id
       JOIN tenants t ON t.id = c.tenant_id
-      WHERE o.topic_number IS NOT NULL AND c.archived_at IS NULL AND NOT c.is_pinned
+      WHERE o.topic_number IS NOT NULL AND c.archived_at IS NULL AND NOT c.docs_copied
         AND EXISTS (SELECT 1 FROM solicitation_documents d WHERE d.solicitation_id = o.solicitation_id)
       LIMIT 1`;
     if (!real) { console.log('  (no unpinned card with a real document — UNCOVERED, not passing)'); }
@@ -106,7 +106,7 @@ async function main() {
       ok('pinned_key is set', keys.every((k) => !!k.pk), keys[0]?.pk ?? 'null');
       ok('and it differs from the master path', keys.every((k) => k.pk !== k.sk),
         keys[0] ? `${String(keys[0].pk).slice(0, 46)}…` : '');
-      await owner`UPDATE tenant_opportunity_cards SET is_pinned=false, pinned_at=NULL, pinned_docs='[]'::jsonb
+      await owner`UPDATE tenant_opportunity_cards SET docs_copied=false, docs_copied_at=NULL, copied_docs='[]'::jsonb
                   WHERE tenant_id=${real.tenantId}::uuid AND opportunity_id=${real.opportunityId}::uuid`;
       await owner`DELETE FROM tenant_opportunity_documents
                   WHERE tenant_id=${real.tenantId}::uuid AND opportunity_id=${real.opportunityId}::uuid`;
@@ -117,8 +117,8 @@ async function main() {
     // Give the card a pin with a recorded pointer, as if an earlier copy had worked.
     await owner`
       UPDATE tenant_opportunity_cards
-      SET is_pinned = true, pinned_at = now(), pin_update_available = true,
-          pinned_docs = ${owner.json([{ filename: 'earlier.pdf', key: 'tenant/earlier.pdf', documentType: 'source', sourceKey: 'x', hasText: false }] as never)}
+      SET docs_copied = true, docs_copied_at = now(), docs_update_available = true,
+          copied_docs = ${owner.json([{ filename: 'earlier.pdf', key: 'tenant/earlier.pdf', documentType: 'source', sourceKey: 'x', hasText: false }] as never)}
       WHERE tenant_id = ${card.tenantId}::uuid AND opportunity_id = ${card.opportunityId}::uuid`;
     const r = await resyncPinnedCard(card.tenantId, card.slug, card.opportunityId);
     const s3 = await held();
@@ -127,7 +127,7 @@ async function main() {
       (s3.docs as Array<{ filename?: string }>)[0]?.filename === 'earlier.pdf',
       `${(s3.docs as unknown[]).length} pointer(s)`);
     const [flag] = await owner<Array<{ f: boolean }>>`
-      SELECT pin_update_available AS f FROM tenant_opportunity_cards
+      SELECT docs_update_available AS f FROM tenant_opportunity_cards
       WHERE tenant_id = ${card.tenantId}::uuid AND opportunity_id = ${card.opportunityId}::uuid`;
     ok('and they are still told they are behind', flag.f === true);
 
@@ -142,7 +142,7 @@ async function main() {
   } finally {
     await owner`DELETE FROM solicitation_documents WHERE id = ${staged.id}::uuid`;
     await owner`UPDATE tenant_opportunity_cards
-                SET is_pinned = false, pinned_at = NULL, pin_update_available = false, pinned_docs = '[]'::jsonb
+                SET docs_copied = false, docs_copied_at = NULL, docs_update_available = false, copied_docs = '[]'::jsonb
                 WHERE tenant_id = ${card.tenantId}::uuid AND opportunity_id = ${card.opportunityId}::uuid`;
     await owner`DELETE FROM tenant_opportunity_documents
                 WHERE tenant_id = ${card.tenantId}::uuid AND opportunity_id = ${card.opportunityId}::uuid`;

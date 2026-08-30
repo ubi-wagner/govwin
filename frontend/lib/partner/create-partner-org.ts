@@ -92,7 +92,7 @@ export async function createPartnerOrg(input: CreatePartnerOrgInput): Promise<Cr
   // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
   // they open empty and fill — so the product imposes none, and the cap is a pure authoring
   // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
-  // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
+  // one, /cards falls back to docs_copied then updated_at DESC: recency-ordered, not blank.
   try { await backfillTenant(created.tenantId); } catch (e) { console.error('[create-partner-org] backfill failed:', e); }
   try { await scoreTenantCards(created.tenantId); } catch (e) { console.error('[create-partner-org] scoring failed:', e); }
   try { await copyStarterSetToTenant(created.tenantId, { id: created.userId }); } catch (e) { console.error('[create-partner-org] starter copy failed:', e); }

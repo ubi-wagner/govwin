@@ -96,7 +96,7 @@ export default async function AdminMasterCardsPage() {
       LEFT JOIN (
         SELECT opportunity_id,
                count(*) AS replicant_count,
-               count(*) FILTER (WHERE is_pinned) AS pinned_count
+               count(*) FILTER (WHERE docs_copied) AS pinned_count
         FROM tenant_opportunity_cards GROUP BY opportunity_id
       ) r ON r.opportunity_id = o.id
       ORDER BY o.created_at DESC

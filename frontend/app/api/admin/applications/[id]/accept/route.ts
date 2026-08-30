@@ -264,7 +264,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
     // they open empty and fill — so the product imposes none, and the cap is a pure authoring
     // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
-    // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
+    // one, /cards falls back to docs_copied then updated_at DESC: recency-ordered, not blank.
 
     // The question this application asked has been answered, so the ToDos that asked it are moot
     // (bug log B51 — three accepted applications still carrying six open "review this" ToDos).

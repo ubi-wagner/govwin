@@ -208,8 +208,8 @@ async function main() {
 
     // ── 3 · THE PURCHASE MODAL ───────────────────────────────────────────────────────────────
     console.log('\n3 · The decision itself — $1,999 against a title, or against the facts?');
-    await owner`UPDATE tenant_opportunity_cards SET is_pinned = true, pinned_at = now()
-                WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid AND is_pinned = false`;
+    await owner`UPDATE tenant_opportunity_cards SET docs_copied = true, docs_copied_at = now()
+                WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid AND docs_copied = false`;
     pinnedHere = true;
     await cardText(curated.opportunityId); // re-open the focused card now that it is pinned
     const buy = page.locator(`#opp-${curated.opportunityId}`).getByRole('button', { name: 'Purchase' });
@@ -288,7 +288,7 @@ async function main() {
     }
   } finally {
     if (pinnedHere) {
-      await owner`UPDATE tenant_opportunity_cards SET is_pinned = false, pinned_at = NULL
+      await owner`UPDATE tenant_opportunity_cards SET docs_copied = false, docs_copied_at = NULL
                   WHERE tenant_id = ${t.tenantId}::uuid AND opportunity_id = ${curated.opportunityId}::uuid`;
       console.log('\n  (restored: card unpinned)');
     }

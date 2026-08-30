@@ -188,8 +188,8 @@ interface Card {
   lifecycleStatus: string;
   submissionStage: string;
   pursuitStatus: string;
-  isPinned: boolean;
-  pinUpdateAvailable: boolean;
+  docsCopied: boolean;
+  docsUpdateAvailable: boolean;
   /** Per-bucket ranking array — one card, N scoring lenses (mig 096 · bucket id·name·summary·score). */
   rankings?: { bucketId: string; name: string; summary: string | null; score: number }[];
   /** Latest opportunity_analyst assessment (its output.text is a match analysis); null until the agent runs. */
@@ -244,7 +244,7 @@ const bucketScore = (c: Card, bucketId: string): number => c.rankings?.find((r) 
 function sortCards(cards: Card[], sortBy: string): Card[] {
   const bucketId = sortBy.startsWith('bucket:') ? sortBy.slice(7) : null;
   return [...cards].sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.docsCopied !== b.docsCopied) return a.docsCopied ? -1 : 1;
     if (bucketId) return bucketScore(b, bucketId) - bucketScore(a, bucketId);
     if (sortBy === 'close') {
       const da = str(a, 'closeDate'); const db = str(b, 'closeDate');
@@ -400,7 +400,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
             className={`border rounded-xl p-4 bg-white scroll-mt-24 ${
               focusOpp === c.opportunityId
                 ? 'border-amber-400 ring-2 ring-amber-200'
-                : c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'
+                : c.docsCopied ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'
             }`}
           >
             <div className="flex items-start justify-between gap-2 mb-1">
@@ -454,14 +454,14 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
               first technology areas sit inline, and the analyst's marked passages open on demand.
             */}
             <CuratedRecord card={c.card as Record<string, unknown>} />
-            {c.pinUpdateAvailable && (
+            {c.docsUpdateAvailable && (
               <div className="mt-2 flex items-center justify-between rounded bg-amber-50 border border-amber-200 px-2 py-1">
                 <span className="text-[11px] text-amber-700">Update available</span>
                 <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST', '?action=resync')} className="text-[11px] font-medium text-amber-800 hover:underline">Resync</button>
               </div>
             )}
             <div className="mt-3 flex items-center gap-2">
-              {c.isPinned ? (
+              {c.docsCopied ? (
                 <>
                   <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">Pinned</span>
                   <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-1">Unpin</button>

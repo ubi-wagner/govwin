@@ -291,7 +291,7 @@ async function main() {
   // pinned copy is the TENANT'S — deleting it out from under them because the organization
   // withdrew the file would be the product silently removing something they were told they owned.
   //
-  // So: the republish FLAGS them (`pin_update_available`, which the card upsert already sets), and
+  // So: the republish FLAGS them (`docs_update_available`, which the card upsert already sets), and
   // the prune happens when they resync. Told, then acted on — never acted on without being told.
   console.log('\n8 · a withdrawn document — flagged first, pruned on resync');
   await owner`DELETE FROM solicitation_documents WHERE id = ANY(${staged}::uuid[])`;
@@ -299,7 +299,7 @@ async function main() {
 
   const [flagged] = await owner<Array<{ n: number }>>`
     SELECT count(*)::int AS n FROM tenant_opportunity_cards
-    WHERE opportunity_id = ${target.opportunityId}::uuid AND is_pinned AND pin_update_available`;
+    WHERE opportunity_id = ${target.opportunityId}::uuid AND docs_copied AND docs_update_available`;
   ok('every pinned holder is FLAGGED that something changed', Number(flagged.n) === holders.length,
     `${flagged.n} of ${holders.length}`);
 

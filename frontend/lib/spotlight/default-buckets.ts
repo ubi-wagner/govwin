@@ -8,7 +8,7 @@
  * headroom; #189 removed the seeding instead, which is the root.
  *
  * A spotlight bucket is the CUSTOMER's own ranking lens — a 1:n they open empty and fill. The
- * product imposes none. Until a tenant authors one, /cards falls back to `is_pinned` then
+ * product imposes none. Until a tenant authors one, /cards falls back to `docs_copied` then
  * `updated_at DESC`: recency-ordered, not blank.
  *
  * What this module is FOR now:

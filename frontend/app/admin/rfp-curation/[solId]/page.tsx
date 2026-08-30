@@ -318,8 +318,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
     tenantSlug: string;
     topicNumber: string | null;
     topicTitle: string;
-    isPinned: boolean;
-    pinnedAt: string;
+    docsCopied: boolean;
+    docsCopiedAt: string;
     proposalId: string | null;
     proposalStage: string | null;
     proposalCreatedAt: string | null;
@@ -332,8 +332,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
       tenantSlug: string;
       topicNumber: string | null;
       topicTitle: string;
-      isPinned: boolean;
-      pinnedAt: Date;
+      docsCopied: boolean;
+      docsCopiedAt: Date;
       proposalId: string | null;
       proposalStage: string | null;
       proposalCreatedAt: Date | null;
@@ -344,18 +344,18 @@ export default async function CurationWorkspacePage({ params }: Props) {
         t.slug AS tenant_slug,
         o.topic_number,
         o.title AS topic_title,
-        toc.is_pinned,
-        COALESCE(toc.pinned_at, toc.created_at) AS pinned_at,
+        toc.docs_copied,
+        COALESCE(toc.docs_copied_at, toc.created_at) AS docs_copied_at,
         p.id AS proposal_id,
         p.stage AS proposal_stage,
         p.created_at AS proposal_created_at
       FROM opportunities o
       JOIN tenant_opportunity_cards toc
-        ON toc.opportunity_id = o.id AND toc.is_pinned = true AND toc.lifecycle_status <> 'archived'
+        ON toc.opportunity_id = o.id AND toc.docs_copied = true AND toc.lifecycle_status <> 'archived'
       JOIN tenants t ON t.id = toc.tenant_id AND t.archived_at IS NULL
       LEFT JOIN proposals p ON p.opportunity_id = o.id AND p.tenant_id = toc.tenant_id
       WHERE o.solicitation_id = ${solId}::uuid
-      ORDER BY COALESCE(toc.pinned_at, toc.created_at) DESC
+      ORDER BY COALESCE(toc.docs_copied_at, toc.created_at) DESC
     `;
 
     customerInterest = interestRows.map((row) => ({
@@ -364,8 +364,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
       tenantSlug: row.tenantSlug,
       topicNumber: row.topicNumber,
       topicTitle: row.topicTitle,
-      isPinned: row.isPinned,
-      pinnedAt: row.pinnedAt.toISOString(),
+      docsCopied: row.docsCopied,
+      docsCopiedAt: row.docsCopiedAt.toISOString(),
       proposalId: row.proposalId,
       proposalStage: row.proposalStage,
       proposalCreatedAt: row.proposalCreatedAt?.toISOString() ?? null,

@@ -2,7 +2,7 @@
  * Pin = full copy (greenfield, mig 094/095). Pinning a card copies the global
  * read-only opportunity folder into the tenant's own space and records the manifest
  * on the card, so the customer owns a local, shard-safe copy. A pushed update sets
- * pin_update_available; resync re-copies and clears the flag.
+ * docs_update_available; resync re-copies and clears the flag.
  */
 
 import { sql } from '@/lib/db';
@@ -47,10 +47,10 @@ async function copyPinnedText(tenantId: string, opportunityId: string): Promise<
  * made, or that failed — a card that lists a local file it does not have sends a customer to an
  * empty folder and calls it their copy.
  *
- * It lives in the `pinned_docs` COLUMN and not inside the `card` jsonb, and that is not incidental:
+ * It lives in the `copied_docs` COLUMN and not inside the `card` jsonb, and that is not incidental:
  * the fan-out replaces `card` wholesale on every revision, so anything tenant-owned written into it
  * is destroyed the next time the organization publishes. The row is the mirrorable item; `card` is
- * the part of it that mirrors, and `pinned_docs` / `is_pinned` / `pinned_at` / `pursuit_status` are
+ * the part of it that mirrors, and `copied_docs` / `docs_copied` / `docs_copied_at` / `pursuit_status` are
  * the parts that are the tenant's own and survive.
  */
 export interface PinnedDoc {
@@ -155,8 +155,8 @@ async function publishedDocCount(opportunityId: string): Promise<number> {
  * Pin a card: copy the opp folder AND its text, record what actually landed, clear the update flag.
  *
  * ── IT REFUSES RATHER THAN CLAIMING A COPY IT DOES NOT HAVE ──────────────────────────────────
- * It used to flip `is_pinned` unconditionally. Measured: pinning an opportunity whose objects are
- * missing from storage returned `{pinned: true, docs: []}` and set `pinned_at`, leaving a card that
+ * It used to flip `docs_copied` unconditionally. Measured: pinning an opportunity whose objects are
+ * missing from storage returned `{pinned: true, docs: []}` and set `docs_copied_at`, leaving a card that
  * says the tenant holds a local copy of nothing.
  *
  * The distinction that matters is between an EMPTY publication and a FAILED copy, and they look
@@ -164,7 +164,7 @@ async function publishedDocCount(opportunityId: string): Promise<number> {
  *
  *   the organization publishes nothing   →  pin succeeds, holds nothing, honestly. Pinning is
  *                                           still meaningful: the tenant is tracking the opp.
- *   it publishes N and some landed       →  pin succeeds, and pinned_docs lists exactly those.
+ *   it publishes N and some landed       →  pin succeeds, and copied_docs lists exactly those.
  *   it publishes N and NONE landed       →  REFUSE. A retryable failure must not become a
  *                                           permanent pin pointing at an empty folder.
  */
@@ -205,8 +205,8 @@ export async function pinCard(tenantId: string, tenantSlug: string, opportunityI
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards
-      SET is_pinned = true, pinned_at = COALESCE(pinned_at, now()),
-          pin_update_available = false, pinned_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}
+      SET docs_copied = true, docs_copied_at = COALESCE(docs_copied_at, now()),
+          docs_update_available = false, copied_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}
       WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
     `;
   });
@@ -226,7 +226,7 @@ export async function resyncPinnedCard(
   /**
    * A WITHDRAWAL and a FAILED COPY produce the same empty result, and they need opposite handling.
    *
-   *   expected === 0            the organization withdrew everything. Clearing pinned_docs is
+   *   expected === 0            the organization withdrew everything. Clearing copied_docs is
    *                             correct — the tenant's record should stop listing files that are
    *                             no longer published.
    *   expected > 0, none landed a transient copy failure. Overwriting with [] would erase the
@@ -237,7 +237,7 @@ export async function resyncPinnedCard(
    */
   const rewrote = expected === 0 || docs.length > 0;
   if (!rewrote) {
-    console.error('[pin] resync copied nothing though %d published — LEAVING pinned_docs intact', expected, opportunityId);
+    console.error('[pin] resync copied nothing though %d published — LEAVING copied_docs intact', expected, opportunityId);
     // The update flag stays SET: the tenant is still behind, and telling them they are current
     // when the resync failed is the same lie in a different field.
     return { docs: [], expected, rewrote: false };
@@ -255,8 +255,8 @@ export async function resyncPinnedCard(
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards
-      SET pin_update_available = false, pinned_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}, updated_at = now()
-      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid AND is_pinned = true
+      SET docs_update_available = false, copied_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}, updated_at = now()
+      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid AND docs_copied = true
     `;
   });
   return { docs: recorded, expected, rewrote: true };
@@ -267,7 +267,7 @@ export async function unpinCard(tenantId: string, opportunityId: string): Promis
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards
-      SET is_pinned = false, pin_update_available = false
+      SET docs_copied = false, docs_update_available = false
       WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
     `;
   });
