@@ -447,7 +447,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
   the 325 scripts and whether it still drives identifiers that exist. 52 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **55 drives**, because two of them are filed elsewhere (RULER,
+  `run-branch-drives.sh` registers **56 drives**, because two of them are filed elsewhere (RULER,
   and the deck probe under DOCUMENTED) and one is the first **Python** entry the runner has ever
   had (`spend-guardrails`, dispatched by extension — never via the `pytest` on PATH, which is a uv
   tool that cannot see asyncpg); both

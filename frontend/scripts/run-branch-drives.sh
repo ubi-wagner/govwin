@@ -350,6 +350,11 @@ DRIVES=(
   # tenants vote and the row must state the count, the drop-off between saying yes and opening the
   # documents, and the narrow "interest · no build-out" case. Votes and restores; sandbox only.
   "admin-demand|scripts/drive-admin-demand.mts"
+  # Every SQL predicate that mistakes an EMPTY container for a missing one — the class named by
+  # naics_codes being NOT NULL on 22 of 22 opportunities and NON-EMPTY on zero. Reads the live
+  # schema for the 146 array/jsonb columns, self-tests against 7 hand-verified cases before reading
+  # a file, and separates applied migrations from actionable code. Read-only.
+  "empty-not-null|scripts/audit-empty-not-null.mjs"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

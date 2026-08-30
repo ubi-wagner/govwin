@@ -105,7 +105,7 @@ async function ids() {
   // the editor on a blank page and a guide illustrated with one teaches nothing.
   const [tpl] = await sql`
     SELECT id FROM document_templates
-    WHERE canvas_document IS NOT NULL
+    WHERE canvas_document <> '{}'::jsonb
     ORDER BY jsonb_array_length(COALESCE(canvas_document->'nodes', '[]'::jsonb)) DESC,
              created_at DESC
     LIMIT 1`;

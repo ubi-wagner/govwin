@@ -109,7 +109,10 @@ try {
   // ── What the library actually holds — reported, not asserted ────────────────────────────────
   const [lib] = await sql`
     SELECT count(*)::int AS total,
-           count(*) FILTER (WHERE canvas_nodes IS NOT NULL)::int AS structured
+           -- "structured" means it HAS nodes. An empty '[]' is non-null, so IS NOT NULL counted
+          -- unstructured atoms as structured — a metric overstating the thing it measures.
+          count(*) FILTER (WHERE jsonb_typeof(canvas_nodes) = 'array'
+                             AND jsonb_array_length(canvas_nodes) > 0)::int AS structured
     FROM library_atoms WHERE tenant_id = ${foundation.id}::uuid AND archived_at IS NULL`;
   console.log(`· Foundation library: ${lib.total} atom(s), ${lib.structured} carrying canvas nodes`);
   if (lib.total === 0) {

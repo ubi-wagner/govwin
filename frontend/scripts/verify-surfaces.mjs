@@ -158,7 +158,9 @@ async function bindings() {
    */
   const [oppCard] = await sql`
     SELECT c.opportunity_id AS id FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
-    WHERE t.slug = 'foundation' AND c.archived_at IS NULL AND c.card IS NOT NULL
+    -- An empty-object test, not IS NOT NULL: an empty card is non-null and would bind the reading
+    -- view to a page with nothing on it, which renders clean and proves nothing.
+    WHERE t.slug = 'foundation' AND c.archived_at IS NULL AND c.card <> '{}'::jsonb
     ORDER BY c.docs_copied DESC, (c.pursuit_status <> 'unreviewed') DESC, c.opportunity_id ASC
     LIMIT 1`.catch(() => [undefined]);
   return {

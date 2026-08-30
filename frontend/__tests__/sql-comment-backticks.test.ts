@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ROOTS = ['app', 'lib', 'components', 'scripts'];
+const ROOTS = ['app', 'lib', 'components', 'scripts', 'e2e'];
 const SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '__tests__']);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -29,7 +29,11 @@ function walk(dir: string, out: string[] = []): string[] {
     if (SKIP.has(name)) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.(ts|tsx|mts)$/.test(name)) out.push(full);
+    // ⚠️ .mjs and .mts BOTH, and .py: the first version walked only .ts/.tsx/.mts, and the sixth
+    // occurrence of this bug landed in a .mjs harness — the guard written to end the class could
+    // not see it. A check with a narrower scope than the defect is a check that will be trusted
+    // wrongly.
+    else if (/\.(ts|tsx|mts|mjs|js)$/.test(name)) out.push(full);
   }
   return out;
 }
