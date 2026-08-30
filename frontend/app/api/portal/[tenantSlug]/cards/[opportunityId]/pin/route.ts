@@ -40,11 +40,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     enterTenant(r.tenantId); // RLS choke point
     const action = new URL(request.url).searchParams.get('action');
     if (action === 'resync') {
-      const { docs } = await resyncPinnedCard(r.tenantId, r.tenantSlug, opportunityId);
-      return NextResponse.json({ data: { resynced: true, docCount: docs.length } });
+      const { docs, expected, rewrote } = await resyncPinnedCard(r.tenantId, r.tenantSlug, opportunityId);
+      // A resync that copied nothing where something is published has NOT resynced. Saying it did
+      // would leave the customer believing they hold the amendment they do not.
+      if (!rewrote) {
+        return NextResponse.json(
+          { error: `Could not copy ${expected} document(s) — your existing copy is untouched. Try again.`,
+            code: 'RESYNC_COPY_FAILED' },
+          { status: 502 });
+      }
+      return NextResponse.json({ data: { resynced: true, docCount: docs.length, expected } });
     }
     const result = await pinCard(r.tenantId, r.tenantSlug, opportunityId);
-    if (!result.pinned) return NextResponse.json({ error: 'Card not found for this tenant', code: 'NOT_FOUND' }, { status: 404 });
+    if (!result.pinned) {
+      // Two different refusals, and collapsing them into one 404 told a customer their opportunity
+      // did not exist when in fact the copy had failed and was worth retrying.
+      if (result.reason === 'copy_failed') {
+        return NextResponse.json(
+          { error: `Could not copy ${result.expected} document(s) for this opportunity. Nothing was pinned — try again.`,
+            code: 'PIN_COPY_FAILED' },
+          { status: 502 });
+      }
+      return NextResponse.json({ error: 'Card not found for this tenant', code: 'NOT_FOUND' }, { status: 404 });
+    }
     // Audit + trigger: a customer pinning a topic is a first-class event (the
     // `capture:topic.pinned` automation rule + admin activity feed both read it).
     await emitEventSingle({

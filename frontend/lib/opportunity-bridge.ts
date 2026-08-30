@@ -399,6 +399,12 @@ export async function publishToBridge(
  *
  * Best-effort throughout: a corpus failure must never fail the fan-out. The card still lands, the
  * card_tsv still ranks, and `reconcileTenant` re-drives the copy on the next pass.
+ *
+ * ── RETURNS THE NUMBER OF DOCUMENTS WHOSE TEXT ACTUALLY LANDED ───────────────────────────────
+ * Not the number of ROWS written. A document that exists but has not been shredded yet upserts a
+ * row with an empty `extracted_text` — a legitimate state, and not a copy of anything. Counting it
+ * let `pinCard` believe a copy had succeeded when nothing readable had arrived, so a pin that
+ * should have been refused went through. Absent is not zero, one layer down.
  */
 export async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promise<number> {
   try {
@@ -454,7 +460,8 @@ export async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promi
           WHERE EXCLUDED.bridge_version > tenant_opportunity_documents.bridge_version
           RETURNING id
         `;
-        if (rows.length > 0) written++;
+        // Only a row carrying TEXT counts as a copy — see the note on the return value above.
+        if (rows.length > 0 && text.length > 0) written++;
       }
       // Prune to the manifest — inside the same try, so a failed read never wipes a corpus.
       const keep = docs.map((d) => d.id);

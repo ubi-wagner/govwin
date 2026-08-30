@@ -39,11 +39,37 @@ async function copyPinnedText(tenantId: string, opportunityId: string): Promise<
   }
 }
 
+/**
+ * A pointer to something the tenant ACTUALLY HOLDS.
+ *
+ * ── THE RULE ─────────────────────────────────────────────────────────────────────────────────
+ * An entry exists here only when the copy landed. Never a pointer to a copy that was going to be
+ * made, or that failed — a card that lists a local file it does not have sends a customer to an
+ * empty folder and calls it their copy.
+ *
+ * It lives in the `pinned_docs` COLUMN and not inside the `card` jsonb, and that is not incidental:
+ * the fan-out replaces `card` wholesale on every revision, so anything tenant-owned written into it
+ * is destroyed the next time the organization publishes. The row is the mirrorable item; `card` is
+ * the part of it that mirrors, and `pinned_docs` / `is_pinned` / `pinned_at` / `pursuit_status` are
+ * the parts that are the tenant's own and survive.
+ */
 export interface PinnedDoc {
   filename: string;
   key: string;          // destination key in the tenant's pinned folder
   documentType: string;
   sourceKey: string;
+  /** True when the extracted TEXT also landed, in tenant_opportunity_documents (mig 239). */
+  hasText?: boolean;
+}
+
+export type PinRefusal = 'not_found' | 'copy_failed';
+
+export interface PinResult {
+  pinned: boolean;
+  docs: PinnedDoc[];
+  /** How many documents the ORGANIZATION publishes — what a complete copy would hold. */
+  expected: number;
+  reason?: PinRefusal;
 }
 
 /** Copy the opportunity's global docs into the tenant's pinned folder. Best-effort per file. */
@@ -74,8 +100,38 @@ async function copyOppFolder(tenantSlug: string, opportunityId: string): Promise
   return copied;
 }
 
-/** Pin a card: flip is_pinned, copy the opp folder, record the manifest, clear the update flag. */
-export async function pinCard(tenantId: string, tenantSlug: string, opportunityId: string): Promise<{ pinned: boolean; docs: PinnedDoc[] }> {
+/** How many documents does the organization publish for this opportunity? */
+async function publishedDocCount(opportunityId: string): Promise<number> {
+  try {
+    const [r] = await sql<Array<{ n: number }>>`
+      SELECT count(*)::int AS n FROM solicitation_documents sd
+      JOIN opportunities o ON o.solicitation_id = sd.solicitation_id
+      WHERE o.id = ${opportunityId}::uuid`;
+    return Number(r?.n ?? 0);
+  } catch (e) {
+    console.error('[pin] published doc count failed', opportunityId, e);
+    return 0;
+  }
+}
+
+/**
+ * Pin a card: copy the opp folder AND its text, record what actually landed, clear the update flag.
+ *
+ * ── IT REFUSES RATHER THAN CLAIMING A COPY IT DOES NOT HAVE ──────────────────────────────────
+ * It used to flip `is_pinned` unconditionally. Measured: pinning an opportunity whose objects are
+ * missing from storage returned `{pinned: true, docs: []}` and set `pinned_at`, leaving a card that
+ * says the tenant holds a local copy of nothing.
+ *
+ * The distinction that matters is between an EMPTY publication and a FAILED copy, and they look
+ * identical from the outside:
+ *
+ *   the organization publishes nothing   →  pin succeeds, holds nothing, honestly. Pinning is
+ *                                           still meaningful: the tenant is tracking the opp.
+ *   it publishes N and some landed       →  pin succeeds, and pinned_docs lists exactly those.
+ *   it publishes N and NONE landed       →  REFUSE. A retryable failure must not become a
+ *                                           permanent pin pointing at an empty folder.
+ */
+export async function pinCard(tenantId: string, tenantSlug: string, opportunityId: string): Promise<PinResult> {
   // Confirm the card exists for this tenant (RLS-scoped).
   const exists = await withTenant(tenantId, async (tx) => {
     const rows = await tx<Array<{ id: string }>>`
@@ -84,37 +140,86 @@ export async function pinCard(tenantId: string, tenantSlug: string, opportunityI
     `;
     return rows.length > 0;
   });
-  if (!exists) return { pinned: false, docs: [] };
+  if (!exists) return { pinned: false, docs: [], expected: 0, reason: 'not_found' };
 
+  const expected = await publishedDocCount(opportunityId);
   const docs = await copyOppFolder(tenantSlug, opportunityId);
   // The other half of the copy: the extracted TEXT, into the tenant's own rows (mig 239).
-  await copyPinnedText(tenantId, opportunityId);
+  const textRows = await copyPinnedText(tenantId, opportunityId);
+
+  // Nothing landed where something was published. Do not record a pin.
+  if (expected > 0 && docs.length === 0 && textRows === 0) {
+    console.error('[pin] refusing to pin: %d document(s) published, none copied', expected, opportunityId);
+    return { pinned: false, docs: [], expected, reason: 'copy_failed' };
+  }
+
+  // Which of the copied files also have their text locally — so ONE tenant-owned field answers
+  // "what do I actually hold", without a join.
+  const withText = await withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ originalFilename: string }>>`
+      SELECT original_filename FROM tenant_opportunity_documents
+      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid`;
+    return new Set(rows.map((r: { originalFilename: string }) => r.originalFilename));
+  });
+  const recorded: PinnedDoc[] = docs.map((d) => ({ ...d, hasText: withText.has(d.filename) }));
 
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards
       SET is_pinned = true, pinned_at = COALESCE(pinned_at, now()),
-          pin_update_available = false, pinned_docs = ${sql.json(docs as unknown as Parameters<typeof sql.json>[0])}
+          pin_update_available = false, pinned_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}
       WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
     `;
   });
-  return { pinned: true, docs };
+  return { pinned: true, docs: recorded, expected };
 }
 
 /** Resync a pinned card after a pushed update: re-copy the folder + clear the flag. */
-export async function resyncPinnedCard(tenantId: string, tenantSlug: string, opportunityId: string): Promise<{ docs: PinnedDoc[] }> {
+export async function resyncPinnedCard(
+  tenantId: string, tenantSlug: string, opportunityId: string,
+): Promise<{ docs: PinnedDoc[]; expected: number; rewrote: boolean }> {
+  const expected = await publishedDocCount(opportunityId);
   const docs = await copyOppFolder(tenantSlug, opportunityId);
   // Re-copy the text too, forward-only against the new bridge version — an amendment that replaced
   // a document must replace the tenant's copy of its text, not leave the superseded one in place.
   await copyPinnedText(tenantId, opportunityId);
+
+  /**
+   * A WITHDRAWAL and a FAILED COPY produce the same empty result, and they need opposite handling.
+   *
+   *   expected === 0            the organization withdrew everything. Clearing pinned_docs is
+   *                             correct — the tenant's record should stop listing files that are
+   *                             no longer published.
+   *   expected > 0, none landed a transient copy failure. Overwriting with [] would erase the
+   *                             record of files the tenant STILL HAS on disk, turning a retryable
+   *                             failure into permanent data loss from the customer's point of view.
+   *
+   * So the write happens only when it is one of those two, and never on the third.
+   */
+  const rewrote = expected === 0 || docs.length > 0;
+  if (!rewrote) {
+    console.error('[pin] resync copied nothing though %d published — LEAVING pinned_docs intact', expected, opportunityId);
+    // The update flag stays SET: the tenant is still behind, and telling them they are current
+    // when the resync failed is the same lie in a different field.
+    return { docs: [], expected, rewrote: false };
+  }
+
+  const withText = await withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ originalFilename: string }>>`
+      SELECT original_filename FROM tenant_opportunity_documents
+      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid`;
+    return new Set(rows.map((r: { originalFilename: string }) => r.originalFilename));
+  });
+  const recorded: PinnedDoc[] = docs.map((d) => ({ ...d, hasText: withText.has(d.filename) }));
+
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards
-      SET pin_update_available = false, pinned_docs = ${sql.json(docs as unknown as Parameters<typeof sql.json>[0])}, updated_at = now()
+      SET pin_update_available = false, pinned_docs = ${sql.json(recorded as unknown as Parameters<typeof sql.json>[0])}, updated_at = now()
       WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid AND is_pinned = true
     `;
   });
-  return { docs };
+  return { docs: recorded, expected, rewrote: true };
 }
 
 /** Unpin (forward-looking): flip the flag. The already-copied folder is retained (audited, cleaned on archive). */

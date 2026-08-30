@@ -301,6 +301,11 @@ DRIVES=(
   # candidate for the run and reverts it, because no seeded account carries the column and the path
   # would otherwise report uncovered forever — and it checks the refusal as well as the grant.
   "bucket-authoring|scripts/drive-bucket-authoring.mts"
+  # The invariant binding the two halves of the mirrorable row: a pointer to a local copy exists
+  # only when that copy does. It exists because the opposite shipped — a pin whose objects were
+  # missing returned {pinned:true, docs:[]} and stamped pinned_at. Also asserts the pair a
+  # withdrawal and a failed copy make: identical from outside, opposite handling.
+  "pin-honesty|scripts/drive-pin-honesty.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
