@@ -64,6 +64,18 @@ export interface OppCard {
   pocName: string | null;
   pocEmail: string | null;
   classificationCode: string | null;
+  /**
+   * Were these dates READ from the solicitation, or inferred? (mig 240)
+   *
+   * `opportunities.dates_estimated` is populated on every master row and reached the card on none
+   * of them. It is the dates' provenance, and this project's own rule is that *a value the product
+   * did not read from the solicitation must never look like one it did* — which a close date
+   * cannot honour if the flag saying it was estimated stops at the master.
+   *
+   * It matters most where it is least visible: a bucket's timeline factor scores a card by how
+   * soon it closes, so an inferred date moves a customer's ranking exactly like a real one.
+   */
+  datesEstimated: boolean;
   postedDate: string | null;
   preReleaseDate: string | null;
   openDate: string | null;
@@ -141,7 +153,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.estimated_value_min, o.estimated_value_max, o.description, o.expert_notes,
              o.lifecycle_status, o.submission_stage,
              o.phase_type, o.tech_focus_areas, o.topic_number, o.topic_branch, o.topic_status,
-             o.poc_name, o.poc_email,
+             o.poc_name, o.poc_email, o.dates_estimated,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
              cs.namespace, cs.spotlight_summary, cs.build_complete,
@@ -250,6 +262,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       pocName: (o.pocName as string) ?? null,
       pocEmail: (o.pocEmail as string) ?? null,
       classificationCode: (o.classificationCode as string) ?? null,
+      datesEstimated: o.datesEstimated === true,
       postedDate: str(o.postedDate),
       preReleaseDate: str(o.preReleaseDate),
       openDate: str(o.openDate),
@@ -322,6 +335,7 @@ export function normalizeCard(raw: unknown): OppCard {
   const c = (raw ?? {}) as Partial<OppCard>;
   return {
     ...(c as OppCard),
+    datesEstimated: c.datesEstimated === true,
     phaseType: c.phaseType ?? null,
     techFocusAreas: Array.isArray(c.techFocusAreas) ? c.techFocusAreas : null,
     topicNumber: c.topicNumber ?? null,

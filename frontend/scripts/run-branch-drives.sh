@@ -201,6 +201,19 @@ else
 fi
 echo
 
+# Every OPP card field and mirror column: written? read? A field declared and written by nothing
+# has shipped three times in this tree, each found by hand. A divergence FAILS the run.
+if node scripts/audit-card-fields.mjs > "$OUT/card-fields.log" 2>&1; then
+  echo "Card fields: nothing declared-and-unwritten"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ A CARD FIELD IS DECLARED AND WRITTEN BY NOTHING — see $OUT/card-fields.log            ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/card-fields.log" | tail -12
+  PARITY_VIOLATION=1
+fi
+echo
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"

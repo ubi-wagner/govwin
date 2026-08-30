@@ -4,6 +4,120 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 
+/**
+ * What the RFP team found in the solicitation, on the customer's card.
+ *
+ * Every field here already rode the bridge and was already matched by both scorers; none of it
+ * had ever reached a screen. A ranking a customer cannot see the reason for is a number they have
+ * to trust rather than read.
+ *
+ * The rule for the highlights, which is what makes this worth showing at all: an excerpt is only
+ * rendered when it EXISTS. A highlight carried as a bare page anchor would render as an empty row
+ * with a page number, which is worse than omitting it — it advertises that something was found and
+ * then declines to say what.
+ */
+function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
+  const [open, setOpen] = useState(false);
+  if (!card) return null;
+
+  const text = (k: string): string | null => {
+    const v = card[k];
+    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+  };
+  const list = (k: string): string[] =>
+    Array.isArray(card[k]) ? (card[k] as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+
+  const summary = text('spotlightSummary');
+  const focus = list('techFocusAreas');
+  const volumes = list('volumes');
+  const items = list('requiredItems');
+  const docs = Array.isArray(card.documents) ? (card.documents as Array<Record<string, unknown>>) : [];
+  const highlights = (Array.isArray(card.highlights) ? (card.highlights as Array<Record<string, unknown>>) : [])
+    .filter((h) => typeof h.text === 'string' && (h.text as string).trim() !== '');
+  const estimated = card.datesEstimated === true;
+
+  if (!summary && focus.length === 0 && highlights.length === 0 && docs.length === 0 && volumes.length === 0) return null;
+
+  return (
+    <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+      {summary && <p className="text-[12px] leading-relaxed text-gray-600">{summary}</p>}
+
+      {(focus.length > 0 || estimated) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {focus.slice(0, 4).map((f) => (
+            <span key={f} className="rounded bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-700">{f}</span>
+          ))}
+          {focus.length > 4 && <span className="text-[10px] text-gray-400">+{focus.length - 4}</span>}
+          {/* Provenance, not decoration: an inferred close date moves the timeline score exactly
+              like a real one, so the customer is told which kind they are looking at. */}
+          {estimated && (
+            <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-700"
+                  title="These dates were inferred during ingest, not read from the solicitation.">
+              dates estimated
+            </span>
+          )}
+        </div>
+      )}
+
+      {(highlights.length > 0 || docs.length > 0 || volumes.length > 0) && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mt-2 text-[11px] font-medium text-blue-700 hover:underline"
+        >
+          {open ? 'Hide' : 'What our analysts found'}
+          {highlights.length > 0 && ` · ${highlights.length} passage${highlights.length === 1 ? '' : 's'}`}
+        </button>
+      )}
+
+      {open && (
+        <div className="mt-2 space-y-2.5">
+          {highlights.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Highlighted by our analysts</p>
+              <ul className="mt-1 space-y-1.5">
+                {highlights.slice(0, 8).map((h, i) => (
+                  <li key={i} className="border-l-2 border-blue-200 pl-2">
+                    <p className="text-[11.5px] leading-relaxed text-gray-700">“{String(h.text).slice(0, 320)}”</p>
+                    {typeof h.page === 'number' && <p className="text-[10px] text-gray-400">page {h.page}</p>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {volumes.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">What you would have to write</p>
+              <p className="mt-1 text-[11.5px] text-gray-600">{volumes.join(' · ')}</p>
+              {items.length > 0 && (
+                <p className="mt-0.5 text-[11px] text-gray-500">{items.length} required item{items.length === 1 ? '' : 's'}</p>
+              )}
+            </div>
+          )}
+
+          {docs.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Published documents</p>
+              <ul className="mt-1 space-y-0.5">
+                {docs.slice(0, 6).map((d, i) => (
+                  <li key={i} className="text-[11.5px] text-gray-600">
+                    {String(d.filename ?? 'document')}
+                    {typeof d.pageCount === 'number' && <span className="text-gray-400"> · {d.pageCount} pages</span>}
+                  </li>
+                ))}
+              </ul>
+              {/* The manifest lists what the organization published. Pin is what makes it yours. */}
+              <p className="mt-1 text-[10px] text-gray-400">Pin this opportunity to copy them into your own library.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Card {
   id: string;
   opportunityId: string;
@@ -264,6 +378,20 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                 {c.rankings.length > 4 && <span className="self-center text-[10px] text-gray-400">+{c.rankings.length - 4}</span>}
               </div>
             )}
+            {/*
+              WHAT THE CURATOR PRODUCED — until now, carried and invisible.
+
+              The bridge has been putting the summary, the technology focus, the volume structure,
+              the document manifest and the admin's highlights on every card, and both scorers have
+              been matching them. The customer's card showed a title, an agency and a score. So the
+              ranking was explainable only to the ranker: a lens surfaced an opportunity and the
+              person reading it had no way to see WHY, or what the analyst had already found in a
+              330-page solicitation on their behalf.
+
+              Deliberately collapsed. A card in a list is scanned, not read — the summary and the
+              first technology areas sit inline, and the analyst's marked passages open on demand.
+            */}
+            <CuratedRecord card={c.card as Record<string, unknown>} />
             {c.pinUpdateAvailable && (
               <div className="mt-2 flex items-center justify-between rounded bg-amber-50 border border-amber-200 px-2 py-1">
                 <span className="text-[11px] text-amber-700">Update available</span>
