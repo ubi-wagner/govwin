@@ -169,6 +169,41 @@ export interface CompositionEntry {
    * something else entirely — and the customer should be able to see that rather than infer it.
    */
   conditional: boolean;
+  /**
+   * How many of the tenant's OWN cards carry the field this signal reads — `null` when not measured.
+   *
+   * `conditional` says the signal *can* be skipped. This says how often it *is*. They are not the
+   * same sentence, and only the second one is actionable.
+   */
+  carried: number | null;
+  /** The denominator for `carried` — cards in this tenant's feed. `null` when not measured. */
+  cards: number | null;
+}
+
+/**
+ * How many of a tenant's cards carry each conditional signal's field.
+ *
+ * ── WHY A HEDGE IS NOT A MEASUREMENT ─────────────────────────────────────────────────────────
+ * `conditional` already told the customer a signal "is skipped for any opportunity that does not
+ * carry that field". True, and useless: it is the same sentence whether the field is present on
+ * every opportunity or on none. On this box `naicsCodes` is an EMPTY ARRAY on all 22 master
+ * opportunities and therefore on all 63 cards — so a lens that names NAICS codes and is told they
+ * carry 25% of its score is scoring on keywords and closing date alone, at 100%, and has no way to
+ * find that out. `setAsideType` and `techFocusAreas` are the same story.
+ *
+ * The scorer is already right about this — `scoreCard` abstains rather than charging a card for
+ * what ingest never captured (see ABSENT IS NOT ZERO below). This type carries that fact FORWARD to
+ * the person authoring the lens, which is the only place it can change a decision: they can drop
+ * the criterion, or add keywords to carry the weight, or ask us why the field is empty.
+ *
+ * Measured over the tenant's own mirror, not the platform: what matters is what THIS customer's
+ * feed carries.
+ */
+export interface SignalCoverage {
+  /** Cards in the tenant's feed. */
+  cards: number;
+  /** Per-signal count of cards carrying the field that signal reads. */
+  carried: Partial<Record<keyof typeof DEFAULT_WEIGHTS, number>>;
 }
 
 /**
@@ -178,15 +213,38 @@ export interface CompositionEntry {
  * same order and off the same weight table. `__tests__` pins it against what `scoreCard` actually
  * produces for a fully-populated card, because the plan's rule for this line was: *confirm the
  * percentage matches what scoreCard computes — a wrong number here is worse than none.*
+ *
+ * Pass `coverage` to also state how many of the tenant's cards each conditional signal can actually
+ * reach. Omitted → every entry reports `carried: null`, which renders as no claim at all rather
+ * than as a confident zero.
  */
 export function describeComposition(
   criteria: BucketCriteria,
+  coverage?: SignalCoverage | null,
 ): { entries: CompositionEntry[]; totalWeight: number } {
   const c = criteria ?? {};
   const w = c.weights ?? {};
   const raw: Array<Omit<CompositionEntry, 'share'>> = [];
-  const add = (key: CompositionEntry['key'], label: string, conditional: boolean) =>
-    raw.push({ key, label, weight: w[key] ?? DEFAULT_WEIGHTS[key], conditional });
+  const add = (key: CompositionEntry['key'], label: string, conditional: boolean) => {
+    /**
+     * Only a CONDITIONAL signal has coverage: `keyword` reads the title, which every card has, so
+     * "carried by 63 of 63" would be noise dressed as information.
+     *
+     * ⚠️ The presence of `coverage` decides this, NOT the presence of a count inside it. A signal
+     * that reached no card is missing from a naively-built map, and gating on the count would then
+     * render "no claim" for exactly the case worth reporting — 0 of 63. (`measureCoverage` seeds
+     * zeros for this reason too; both halves, because either alone is a silent revert.)
+     */
+    const measured = conditional && !!coverage;
+    raw.push({
+      key,
+      label,
+      weight: w[key] ?? DEFAULT_WEIGHTS[key],
+      conditional,
+      carried: measured ? (coverage!.carried[key] ?? 0) : null,
+      cards: measured ? coverage!.cards : null,
+    });
+  };
 
   if (c.keywords?.length) add('keyword', `${c.keywords.length} keyword${c.keywords.length === 1 ? '' : 's'}`, false);
   if (c.naics?.length) add('naics', 'NAICS codes', true);
@@ -200,6 +258,59 @@ export function describeComposition(
     entries: raw.map((e) => ({ ...e, share: totalWeight > 0 ? Math.round((100 * e.weight) / totalWeight) : 0 })),
     totalWeight,
   };
+}
+
+/**
+ * Measure, over a tenant's own cards, how many each signal can actually reach.
+ *
+ * ── THE PREDICATE IS `scoreCard` ITSELF, NOT A COPY OF IT ────────────────────────────────────
+ * The obvious implementation is a SQL aggregate — `count(*) FILTER (WHERE card->>'agency' <> '')`
+ * and one clause per signal. It is also the implementation this repo has been burned by: it
+ * re-types a predicate the scorer already owns, in a second language, and the two drift silently.
+ * `closeDate` alone makes the point — the scorer requires ISO-8601 (`closeMs`), so a card holding
+ * `"Fri Aug 28 2026 00:00:00 GMT+0000"` is non-empty in SQL and ABSTAINS in the ranker. A SQL
+ * count would report that signal as covered while it reached nothing, which is the exact failure
+ * this function exists to expose.
+ *
+ * So instead: score every card against a probe that names every signal with a token no card can
+ * match, and count which factors come back. A factor is present in `factors` if and only if the
+ * signal participated — that IS "the card carries the field", by definition rather than by
+ * restatement. A signal added to `scoreCard` later is measured correctly with no change here.
+ *
+ * The probe deliberately matches NOTHING (`\u0000`): coverage asks whether a signal is *in the
+ * denominator*, never whether it scored well. The returned scores are discarded.
+ *
+ * Pure and cheap — arithmetic over the ≤1,000 cards a feed holds — so it runs inline on the
+ * request that lists buckets rather than needing storage of its own.
+ */
+export function measureCoverage(cards: CardFields[], nowMs: number): SignalCoverage {
+  const NEVER = '\u0000';
+  const probe: BucketCriteria = {
+    keywords: [NEVER],
+    naics: [NEVER],
+    agencies: [NEVER],
+    programTypes: [NEVER],
+    setAsides: [NEVER],
+    useAccessibility: true,
+    useTimeline: true,
+  };
+  /**
+   * Seeded with an explicit 0 for every signal, which is the whole point of the measurement.
+   *
+   * Leaving a signal that matched nothing ABSENT from the map makes "reached no card" and "was
+   * never measured" the same value — and the first is precisely the finding this function exists
+   * to report. Seeded off `DEFAULT_WEIGHTS`, so a signal added to the scorer is seeded with it.
+   */
+  const carried: SignalCoverage['carried'] = Object.fromEntries(
+    (Object.keys(DEFAULT_WEIGHTS) as Array<keyof typeof DEFAULT_WEIGHTS>).map((k) => [k, 0]),
+  ) as SignalCoverage['carried'];
+  for (const card of cards) {
+    const { factors } = scoreCard(card, probe, nowMs);
+    for (const k of Object.keys(factors) as Array<keyof typeof DEFAULT_WEIGHTS>) {
+      carried[k] = (carried[k] ?? 0) + 1;
+    }
+  }
+  return { cards: cards.length, carried };
 }
 
 /**

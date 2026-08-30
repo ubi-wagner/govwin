@@ -16,6 +16,36 @@ import PurchaseModal from './purchase-modal';
  * with a page number, which is worse than omitting it — it advertises that something was found and
  * then declines to say what.
  */
+/**
+ * How much work the solicitation asks for, in one line — the SIZE-OF-JOB signal.
+ *
+ * `complianceSummary` (page limits · submission format · volume count) is written onto every card
+ * by the bridge the moment the RFP team fills in a compliance matrix, was populated on 42 of the 63
+ * cards on this box, and until now was read by NO code at all — the same "carried but invisible"
+ * shape as the curated record. It is the difference between a seven-page Phase I abstract and a
+ * two-volume Direct-to-Phase-II package, which is the single fact most likely to change whether a
+ * small business pursues an opportunity at all.
+ *
+ * Returns null when the RFP team has not curated the matrix yet, so an uncurated card says nothing
+ * rather than saying "0 volumes" — absent is not zero.
+ */
+function effortLine(card: Record<string, unknown>): string | null {
+  const cs = card.complianceSummary;
+  if (!cs || typeof cs !== 'object' || Array.isArray(cs)) return null;
+  const c = cs as Record<string, unknown>;
+  const n = (k: string): number | null => (typeof c[k] === 'number' && Number.isFinite(c[k]) ? (c[k] as number) : null);
+  const parts: string[] = [];
+  const tech = n('pageLimitTechnical');
+  const cost = n('pageLimitCost');
+  if (tech !== null) parts.push(`${tech}-page technical`);
+  if (cost !== null) parts.push(`${cost}-page cost`);
+  const vols = n('volumeCount');
+  if (vols !== null && vols > 0) parts.push(`${vols} volume${vols === 1 ? '' : 's'}`);
+  const fmt = typeof c.submissionFormat === 'string' ? c.submissionFormat.trim() : '';
+  if (fmt) parts.push(fmt);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
   const [open, setOpen] = useState(false);
   if (!card) return null;
@@ -35,8 +65,11 @@ function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
   const highlights = (Array.isArray(card.highlights) ? (card.highlights as Array<Record<string, unknown>>) : [])
     .filter((h) => typeof h.text === 'string' && (h.text as string).trim() !== '');
   const estimated = card.datesEstimated === true;
+  const effort = effortLine(card);
+  const ready = card.provisionReady === true;
 
-  if (!summary && focus.length === 0 && highlights.length === 0 && docs.length === 0 && volumes.length === 0) return null;
+  if (!summary && focus.length === 0 && highlights.length === 0 && docs.length === 0 && volumes.length === 0 && !effort && !ready)
+    return null;
 
   return (
     <div className="mt-2.5 border-t border-gray-100 pt-2.5">
@@ -54,6 +87,35 @@ function CuratedRecord({ card }: { card: Record<string, unknown> | null }) {
             <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-700"
                   title="These dates were inferred during ingest, not read from the solicitation.">
               dates estimated
+            </span>
+          )}
+        </div>
+      )}
+
+      {/*
+        THE BUY DECISION, ON THE CARD.
+
+        Two facts the bridge has always carried and nothing ever rendered. Both bear on the same
+        question — whether to spend $1,999 and several weeks on this opportunity — and both were
+        answerable only by buying and finding out.
+
+        `provisionReady` mirrors the master's build_complete flag (mig 182); lib/provisioning/
+        complete.ts describes releasing a build-out as the moment "the provisionReady badge flips
+        on", and there was no badge. Its absence is NOT a negative claim: an opportunity nobody has
+        built out yet is normal, and saying "not ready" about it would be a verdict we have not
+        reached. So the badge appears when true and nothing appears when it is not.
+      */}
+      {(effort || ready) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {effort && (
+            <span className="text-[11px] text-gray-600" title="What the solicitation requires, from our compliance matrix">
+              📄 {effort}
+            </span>
+          )}
+          {ready && (
+            <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700"
+                  title="Our RFP team has finished the build-out for this opportunity — the compliance matrix, volumes and section molds are ready, so a workspace opens fully set up.">
+              Ready to build
             </span>
           )}
         </div>
@@ -435,6 +497,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
           tenantSlug={tenantSlug}
           opportunityId={purchaseCard.opportunityId}
           title={str(purchaseCard, 'title') ?? 'Untitled opportunity'}
+          card={purchaseCard.card}
           onClose={() => setPurchaseCard(null)}
           onPurchased={() => {
             const opp = purchaseCard.opportunityId;

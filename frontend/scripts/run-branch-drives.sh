@@ -333,6 +333,12 @@ DRIVES=(
   # every bid, segment the 66 topics into their own opportunities, release all 67. Requires
   # real-solicitation to have run first; --cleanup removes the topics and annotations.
   "curate-baa|scripts/drive-curate-baa.mts"
+  # The two questions the expanded card did NOT answer, driven with both halves: does the card say
+  # how much work the solicitation is (complianceSummary + provisionReady — both carried by the
+  # bridge and read by no code until now), and does a bucket criterion reach any opportunity at all
+  # (naics_codes is an empty array on every master row, so a lens naming it scored on nothing while
+  # the page reported it at 29%). Pins and unpins one card; sandbox only.
+  "card-decision|scripts/drive-card-decision.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"

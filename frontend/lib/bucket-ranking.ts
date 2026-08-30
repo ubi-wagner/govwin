@@ -21,9 +21,14 @@ export {
   closeMs,
   sanitizeBucketCriteria,
   scoreCard,
+  measureCoverage,
+  describeComposition,
+  DEFAULT_WEIGHTS,
   type BucketCriteria,
   type CardFields,
   type ScoreInputs,
+  type SignalCoverage,
+  type CompositionEntry,
 } from '@/lib/bucket-scoring';
 import { scoreCard } from '@/lib/bucket-scoring';
 import type { BucketCriteria, CardFields } from '@/lib/bucket-scoring';

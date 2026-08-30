@@ -50,6 +50,10 @@ services/cms/static/
 # Local scratch/working directory (transient: logs, figure crops, working notes)
 scratchpad/
 
+# Per-run drive screenshots (drive-card-decision.mts and friends). Regenerate, don't commit —
+# the reviewable UI record is docs/ui-atlas/ and docs/ui-states/, which ARE tracked.
+frontend/.artifacts/
+
 # sandbox test-harness runtime logs
 frontend/scripts/test-harness/*.log.jsonl
 frontend/scripts/test-harness/*.out

@@ -16,11 +16,59 @@ interface PurchaseModalProps {
   tenantSlug: string;
   opportunityId: string;
   title: string;
+  /**
+   * The card being bought — the denormalized snapshot the customer has been reading in the feed.
+   *
+   * Optional so a caller with only an id still works, but every caller in the product has the card
+   * in hand: this modal was asking for $1,999 against a title and a paragraph of boilerplate, while
+   * the close date, page limits, volume structure and build-out readiness sat one prop away.
+   */
+  card?: Record<string, unknown> | null;
   onClose: () => void;
   onPurchased: (data: { portalId: string; status: string; curationDueAt: string }) => void;
 }
 
-export default function PurchaseModal({ tenantSlug, opportunityId, title, onClose, onPurchased }: PurchaseModalProps) {
+/** A card fact worth stating at the moment of purchase, or null when we do not have it. */
+function decisionFacts(card: Record<string, unknown> | null | undefined): Array<{ label: string; value: string; alert?: boolean }> {
+  if (!card) return [];
+  const out: Array<{ label: string; value: string; alert?: boolean }> = [];
+  const close = card.closeDate;
+  if (typeof close === 'string' && close.trim()) {
+    const t = Date.parse(close);
+    if (Number.isFinite(t)) {
+      const days = Math.ceil((t - Date.now()) / 86_400_000);
+      // The estimate flag rides along: a deadline we inferred must not read like one we were told.
+      const est = card.datesEstimated === true ? ' (estimated)' : '';
+      out.push({
+        label: 'Closes',
+        value: `${new Date(t).toLocaleDateString(undefined, { timeZone: 'UTC' })}${days >= 0 ? ` · ${days} day${days === 1 ? '' : 's'} left` : ' · closed'}${est}`,
+        // A past deadline is the one fact here that should stop someone mid-purchase, so it is not
+        // left to read as another gray row. Nothing is BLOCKED — a customer may well want the
+        // workspace for a solicitation that reopens, or to reuse the build-out — but they should
+        // not find out afterwards.
+        alert: days < 0,
+      });
+    }
+  }
+  const cs = card.complianceSummary;
+  if (cs && typeof cs === 'object' && !Array.isArray(cs)) {
+    const c = cs as Record<string, unknown>;
+    const num = (k: string) => (typeof c[k] === 'number' && Number.isFinite(c[k]) ? (c[k] as number) : null);
+    const tech = num('pageLimitTechnical');
+    const vols = num('volumeCount');
+    if (tech !== null) out.push({ label: 'Page limit', value: `${tech} pages (technical)` });
+    if (vols !== null && vols > 0) out.push({ label: 'Volumes', value: String(vols) });
+    const fmt = typeof c.submissionFormat === 'string' ? c.submissionFormat.trim() : '';
+    if (fmt) out.push({ label: 'Submission', value: fmt });
+  }
+  const items = Array.isArray(card.requiredItems) ? (card.requiredItems as unknown[]).filter(Boolean).length : 0;
+  if (items > 0) out.push({ label: 'Required items', value: String(items) });
+  return out;
+}
+
+export default function PurchaseModal({ tenantSlug, opportunityId, title, card, onClose, onPurchased }: PurchaseModalProps) {
+  const facts = decisionFacts(card);
+  const ready = card?.provisionReady === true;
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'code' | 'card' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +115,35 @@ export default function PurchaseModal({ tenantSlug, opportunityId, title, onClos
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-semibold text-gray-900">Purchase proposal workspace</h2>
         <p className="mt-1 text-sm text-gray-600">{title}</p>
+
+        {/*
+          WHAT YOU ARE BUYING INTO — the facts that decide it, at the moment it is decided.
+
+          Every value here already rode the bridge onto the card the customer just clicked. Asking
+          someone to commit $1,999 and a fortnight of writing against a title and a price, when the
+          deadline and the page limits are one prop away, is the same omission as a ranking with no
+          visible reason. Rendered only when we have it: a card the RFP team has not curated yet
+          shows nothing, rather than zeros.
+        */}
+        {(facts.length > 0 || ready) && (
+          <div className="mt-3 rounded-lg border border-gray-200 p-3">
+            {facts.length > 0 && (
+              <dl className="space-y-1">
+                {facts.map((f) => (
+                  <div key={f.label} className="flex justify-between gap-3 text-xs">
+                    <dt className="text-gray-500">{f.label}</dt>
+                    <dd className={`text-right font-medium ${f.alert ? 'text-rose-700' : 'text-gray-800'}`}>{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {ready && (
+              <p className={`text-[11px] text-emerald-700 ${facts.length > 0 ? 'mt-2 border-t border-gray-100 pt-2' : ''}`}>
+                ✓ Build-out complete — your workspace opens with the compliance matrix, volumes and section molds already in place.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
           <div className="flex items-center justify-between">
