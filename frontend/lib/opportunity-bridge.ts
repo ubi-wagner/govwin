@@ -398,7 +398,8 @@ export async function publishToBridge(
  *    an exception leaves the mirror exactly as it was.
  *
  * Best-effort throughout: a corpus failure must never fail the fan-out. The card still lands, the
- * card_tsv still ranks, and `reconcileTenant` re-drives the copy on the next pass.
+ * card's own curated record still ranks, and `reconcileTenant` re-drives the copy on the next pass.
+ * (Not `card_tsv` — the scorer matches literally, and that index is not a scoring input today.)
  *
  * ── RETURNS THE NUMBER OF DOCUMENTS WHOSE TEXT ACTUALLY LANDED ───────────────────────────────
  * Not the number of ROWS written. A document that exists but has not been shredded yet upserts a

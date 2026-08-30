@@ -132,10 +132,54 @@ console.log(`   cards carrying a summary      ${reach.haveSummary} of ${reach.ca
 console.log(`   cards carrying volumes        ${reach.haveVolumes} of ${reach.cards}`);
 console.log(`   cards carrying highlights     ${reach.haveHighlights} of ${reach.cards}`);
 
+// ── 3b · Indexes that are built and not queried ────────────────────────────────────────────────
+// The exact pattern this project already found once and named: an index maintained by Postgres on
+// every write, with no reader. It costs write throughput and buys nothing, and it reads to a future
+// maintainer as though stemming is in play when the scorer matches literally.
+import { execSync } from 'node:child_process';
+
+/**
+ * Which source files READ this column — with comments stripped first.
+ *
+ * The naive grep counted a COMMENT that names the column as a reader, and reported "USED" for an
+ * index nothing queries. That is this repo's documented trap running in a new direction: a text
+ * search for a thing finds the prose ABOUT the thing, and prose clusters exactly where the most
+ * care was taken. Strip comments to ask what a file DOES; read the full text to ask what it is
+ * ABOUT. These are different questions and only the first one is being asked here.
+ */
+const queried = (col) => {
+  let files = [];
+  try {
+    const out = execSync(
+      `grep -rl "${col}" --include=*.ts --include=*.tsx --include=*.py ` +
+      `"${path.join(ROOT, 'lib')}" "${path.join(ROOT, 'app')}" "${path.join(ROOT, '..', 'pipeline/src')}" 2>/dev/null || true`,
+      { encoding: 'utf8' });
+    files = out.split('\n').filter(Boolean);
+  } catch { return []; }
+  return files.filter((f) => {
+    const text = fs.readFileSync(f, 'utf8');
+    const code = text
+      .replace(/\/\*[\s\S]*?\*\//g, '')      // block comments
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')    // line comments, not a URL's //
+      .replace(/^\s*#.*$/gm, '')             // python comments
+      .replace(/'''[\s\S]*?'''|\"\"\"[\s\S]*?\"\"\"/g, ''); // python docstrings
+    return code.includes(col);
+  });
+};
+const tsvReaders = queried('card_tsv');
+console.log('\n3b · INDEXES BUILT AND NOT QUERIED\n');
+console.log(`   card_tsv          maintained on every card write · read by ${tsvReaders.length} source file(s)`);
+if (tsvReaders.length === 0) {
+  console.log('     ◀ NOT A SCORING INPUT. scoreCard matches with String.includes and a word-boundary');
+  console.log('       regex, so "printing" does not match "print" and tenants hand-expand morphology');
+  console.log('       in their own keyword lists. The stemmed index of exactly that text sits unread.');
+}
+
 // ── 4 · The verdict, stated as two verdicts ────────────────────────────────────────────────────
 const emptySignals = rows.filter(([, have]) => have === 0).map(([l]) => l);
 console.log('\n4 · VERDICT — two of them, deliberately\n');
 console.log(`   PIPE   ${broken.length === 0 ? 'COMPLETE' : 'INCOMPLETE'} — every curated signal reaches the card, the index and both scorers.`);
+console.log(`   INDEX  ${tsvReaders.length ? 'USED' : 'BUILT, UNQUERIED — card_tsv has no reader'}`);
 console.log(`   DATA   ${emptySignals.length === 0 ? 'FED' : 'THIN'}${emptySignals.length ? ` — ${emptySignals.length} signal(s) carry nothing: ${emptySignals.join(', ')}` : ''}`);
 if (emptySignals.length) {
   console.log('\n   An empty signal is not a broken one. It is a curation step nobody has performed');
