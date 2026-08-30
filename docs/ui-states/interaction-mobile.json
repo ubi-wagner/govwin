@@ -91,10 +91,10 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 35,
+   "opened": 36,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 326
+   "smallTargets": 330
   },
   {
    "lane": "tenant",
@@ -184,7 +184,7 @@
    "opened": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 229
+   "smallTargets": 250
   },
   {
    "lane": "admin",
