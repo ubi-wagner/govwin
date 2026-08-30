@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
+import { fmtDate, fmtMoney } from '@/lib/fmt';
 
 /**
  * What this opportunity pays, said the way we came by it (mig 241).
@@ -28,7 +29,9 @@ function awardLine(card: Record<string, unknown>): { text: string; estimated: bo
     : null;
   if (basis === 'not_stated') return { text: 'Award size not stated', estimated: false };
   if (amount === null) return null;
-  const money = `$${amount.toLocaleString()}`;
+  // Locale-pinned: "$250,000" on the server and "250.000" in a de-DE browser is a hydration
+  // mismatch AND a different number to the reader.
+  const money = fmtMoney(amount);
   if (basis === 'estimated') return { text: `${money} · our estimate`, estimated: true };
   return { text: money, estimated: false };
 }
@@ -462,7 +465,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
               if (!chip && !fit) return null;
               return (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  {chip && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chip.cls}`} title={str(c, 'closeDate') ? `Closes ${new Date(str(c, 'closeDate') as string).toLocaleDateString()}` : undefined}>{chip.label}</span>}
+                  {chip && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chip.cls}`} title={str(c, 'closeDate') ? `Closes ${fmtDate(str(c, 'closeDate') as string)}` : undefined}>{chip.label}</span>}
                   {fit && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${fit.cls}`} title={fit.full}>✨ {fit.label}</span>}
                 </div>
               );

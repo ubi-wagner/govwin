@@ -21,6 +21,7 @@ import { AmendmentsPanel } from './amendments-panel';
 import { CurationNotesPanel } from './curation-notes-panel';
 import { IngestPlanPanel } from './ingest-plan-panel';
 import { IngestStudio } from './ingest-studio';
+import { fmtDate, fmtDateTime } from '@/lib/fmt';
 
 interface Solicitation {
   id: string;
@@ -1549,11 +1550,11 @@ export function CurationWorkspace({
               </div>
               <div>
                 <dt className="text-gray-500">Close Date</dt>
-                <dd>{sol.closeDate ? new Date(sol.closeDate).toLocaleDateString() : '—'}</dd>
+                <dd>{sol.closeDate ? fmtDate(sol.closeDate) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Posted Date</dt>
-                <dd>{sol.postedDate ? new Date(sol.postedDate).toLocaleDateString() : '—'}</dd>
+                <dd>{sol.postedDate ? fmtDate(sol.postedDate) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Claimed By</dt>
@@ -1628,7 +1629,7 @@ export function CurationWorkspace({
                       )}
                     </td>
                     <td className="py-2 pr-4 text-gray-500">
-                      {new Date(ci.docsCopiedAt).toLocaleDateString()}
+                      {fmtDate(ci.docsCopiedAt)}
                     </td>
                     <td className="py-2 pr-4">
                       {ci.proposalId ? (
@@ -2162,7 +2163,7 @@ function renderCombinedActivity(
           <div className="text-gray-500 text-xs mt-0.5 italic">&ldquo;{u.notes}&rdquo;</div>
         )}
         <div className="text-gray-400 text-xs mt-0.5">
-          {when.toLocaleString()}
+          {fmtDateTime(when)}
         </div>
       </div>
     );

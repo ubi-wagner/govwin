@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
+import { fmtDate } from '@/lib/fmt';
 
 interface Collaborator {
   id: string;
@@ -212,7 +213,7 @@ export function TeamManager({
                   {!collab.active ? (
                     <span
                       className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500"
-                      title={`Inactive${collab.revokedAt ? ` since ${new Date(collab.revokedAt).toLocaleDateString()}` : ''} — re-invite to restore`}
+                      title={`Inactive${collab.revokedAt ? ` since ${fmtDate(collab.revokedAt)}` : ''} — re-invite to restore`}
                     >
                       Inactive
                     </span>

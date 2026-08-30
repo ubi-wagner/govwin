@@ -185,6 +185,54 @@ async function main() {
       ok('it is the document, not a refusal', !/doesn\u2019t exist|does not exist|Not found/i.test(b),
         doc.title?.slice(0, 44) ?? '(untitled)');
     }
+
+    /*
+     * 6 · THE THIRD ROUTE — /admin/documents/[documentId], the one the atlas calls "broken".
+     *
+     * It is not broken. The page fetches its document client-side and renders its own error state
+     * when the fetch 404s, which is CORRECT for an id that does not exist — and the id does not
+     * exist because the object store on this box is empty, so verify-surfaces declines to bind it
+     * and the atlas binds one anyway. A page rendering a truthful "not found" is being photographed
+     * and filed as a crash.
+     *
+     * Same remedy as the two above: use the capability. An admin creates a document, and the route
+     * has something real to open.
+     */
+    console.log('\n6 · The admin document route — real id, not a photographed 404');
+    const ADMIN_PW = process.env.ADMIN_PW ?? process.env.MASTER_PW ?? process.env.SANDBOX_PASSWORD ?? '';
+    const [platformAdmin] = await owner<Array<{ email: string }>>`
+      SELECT email FROM users WHERE role IN ('rfp_admin','master_admin') AND is_active
+        AND COALESCE(temp_password, false) = false
+      ORDER BY CASE role WHEN 'rfp_admin' THEN 0 ELSE 1 END, created_at LIMIT 1`;
+    if (!platformAdmin || !ADMIN_PW) {
+      ok('a platform admin can create the fixture', false, 'no signable admin / ADMIN_PW unset — UNCOVERED');
+    } else {
+      const ap = await browser.newPage();
+      try {
+        if (!(await signIn(ap, platformAdmin.email, ADMIN_PW))) {
+          ok('the admin signs in', false, platformAdmin.email);
+        } else {
+          const made = await ap.evaluate(async () => {
+            const r = await fetch('/api/admin/documents', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: 'Coverage fixture — admin letter', preset: 'letter_standard' }),
+            });
+            return { status: r.status, body: await r.json().catch(() => ({})) };
+          });
+          const docId = (made.body as { data?: { documentId?: string; id?: string } })?.data?.documentId
+            ?? (made.body as { data?: { id?: string } })?.data?.id ?? '';
+          ok('the admin document is created', (made.status === 200 || made.status === 201) && !!docId,
+            `HTTP ${made.status} ${JSON.stringify(made.body).slice(0, 80)}`);
+          if (docId) {
+            await ap.goto(`${BASE}/admin/documents/${docId}`, { waitUntil: 'domcontentloaded' });
+            await ap.waitForTimeout(3000);
+            const ab = await ap.locator('body').innerText().catch(() => '');
+            ok('the admin editor renders the document', ab.length > 0 && !/Failed to load|Network error/i.test(ab),
+              `${ab.length} chars`);
+          }
+        }
+      } finally { await ap.close().catch(() => {}); }
+    }
   } finally {
     // No cleanup, by design — see the header. The copied library IS the fixture.
     console.log('\n  (left in place: a tenant that has added the starter set is a normal state)');

@@ -14,6 +14,7 @@ import type { ComplianceSummary, OriginCard } from '@/lib/cards/card';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { bucketLabel, complianceProgress, stageMeta, toneClass } from '@/components/cards/card-format';
 import { oppBrandAccent } from '@/lib/proposal/brand';
+import { fmtDate } from '@/lib/fmt';
 
 export interface OpportunityCardView {
   proposalId: string;
@@ -27,12 +28,6 @@ export interface OpportunityCardView {
   sourceBucket: string | null;
   origin: OriginCard;
   compliance: ComplianceSummary;
-}
-
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
 
 function Chip({ tone, children }: { tone: Parameters<typeof toneClass>[0]; children: React.ReactNode }) {

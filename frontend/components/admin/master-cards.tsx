@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { STAGE_LABEL, allowedTransitions, isSubmissionStage, type SubmissionStage } from '@/lib/lifecycle';
+import { fmtDate, fmtDateTime } from '@/lib/fmt';
 
 export interface MasterCard {
   opportunityId: string;
@@ -70,11 +71,9 @@ const STAGE_RANK: Record<string, number> = { nofo: 0, pre_release: 1, open: 2, u
 
 const ms = (s: string | null): number => (s ? new Date(s).getTime() : 0);
 const lastUpdateMs = (c: MasterCard): number => Math.max(ms(c.ingestedAt), ms(c.oppUpdatedAt), ms(c.curationUpdatedAt), ms(c.lastPublishedAt));
-const fmtDate = (s: string | null): string => (s ? new Date(s).toLocaleDateString() : '—');
-const fmtDateTime = (s: string | null): string => (s ? new Date(s).toLocaleString() : '—');
 // ms-based formatters — guard against NaN/0 so a missing timestamp never throws (new Date(NaN).toISOString()).
-const fmtMs = (n: number): string => (Number.isFinite(n) && n > 0 ? new Date(n).toLocaleDateString() : '—');
-const fmtMsTime = (n: number): string => (Number.isFinite(n) && n > 0 ? new Date(n).toLocaleString() : '—');
+const fmtMs = (n: number): string => (Number.isFinite(n) && n > 0 ? fmtDate(n) : '—');
+const fmtMsTime = (n: number): string => (Number.isFinite(n) && n > 0 ? fmtDateTime(n) : '—');
 
 export function MasterCards({ cards }: { cards: MasterCard[] }) {
   const router = useRouter();

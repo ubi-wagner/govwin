@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { describeEvent as describeEventLabel } from '@/lib/event-labels';
+import { fmtDateTime } from '@/lib/fmt';
 
 export type SerializedActivityEvent = {
   id: string;
@@ -92,7 +93,7 @@ function describeEvent(
 /* ------------------------------------------------------------------ */
 
 function absoluteTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return fmtDateTime(iso);
 }
 
 function PhaseBadge({ phase }: { phase: string | null }) {

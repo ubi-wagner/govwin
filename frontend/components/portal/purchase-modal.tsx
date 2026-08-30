@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react';
+import { fmtDate } from '@/lib/fmt';
 
 interface PurchaseModalProps {
   tenantSlug: string;
@@ -41,7 +42,7 @@ function decisionFacts(card: Record<string, unknown> | null | undefined): Array<
       const est = card.datesEstimated === true ? ' (estimated)' : '';
       out.push({
         label: 'Closes',
-        value: `${new Date(t).toLocaleDateString(undefined, { timeZone: 'UTC' })}${days >= 0 ? ` · ${days} day${days === 1 ? '' : 's'} left` : ' · closed'}${est}`,
+        value: `${fmtDate(t)}${days >= 0 ? ` · ${days} day${days === 1 ? '' : 's'} left` : ' · closed'}${est}`,
         // A past deadline is the one fact here that should stop someone mid-purchase, so it is not
         // left to read as another gray row. Nothing is BLOCKED — a customer may well want the
         // workspace for a solicitation that reopens, or to reuse the build-out — but they should

@@ -5,6 +5,7 @@ import type { PageVersion, PageBlock } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 import { MarketingIcon, ICON_CATALOG } from '@/components/marketing/icons';
+import { fmtDate } from '@/lib/fmt';
 
 function shortActor(s: string | null): string {
   return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
@@ -12,7 +13,7 @@ function shortActor(s: string | null): string {
 function fmtWhen(d: Date | string | null): string {
   if (!d) return '—';
   const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return Number.isNaN(dt.getTime()) ? '—' : fmtDate(dt);
 }
 
 /**

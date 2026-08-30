@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/lib/toast';
+import { fmtDate } from '@/lib/fmt';
 
 type CodeState = 'outstanding' | 'redeemed' | 'revoked' | 'expired' | 'exhausted';
 
@@ -46,7 +47,7 @@ const STATE_LABEL: Record<CodeState, string> = {
   revoked: 'Revoked',
 };
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '—');
+const fmt = (iso: string | null) => (iso ? fmtDate(iso) : '—');
 
 export function CompCodesPanel() {
   const [codes, setCodes] = useState<Code[]>([]);

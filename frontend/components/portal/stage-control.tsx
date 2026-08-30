@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { fmtDate } from '@/lib/fmt';
 
 interface GateRequirement {
   id: string;
@@ -422,7 +423,7 @@ export function StageControl({
                   )}
                   {req.isMet && req.metAt && (
                     <p className="text-xs text-emerald-600 mt-0.5">
-                      Met {new Date(req.metAt).toLocaleDateString()}
+                      Met {fmtDate(req.metAt)}
                       {req.metBy && ` by ${req.metBy}`}
                     </p>
                   )}

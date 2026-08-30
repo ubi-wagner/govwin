@@ -13,6 +13,7 @@ import type {
   ContentPipelineData,
   EmailAutomationData,
 } from './page';
+import { fmtDateTime, fmtNum } from '@/lib/fmt';
 
 // ─── Constants ────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ function HealthBar({ health }: { health: HealthSummary }) {
           className={`border-l-4 rounded-lg p-3 ${c.color}`}
         >
           <p className="text-xs text-gray-500 uppercase font-medium">{c.label}</p>
-          <p className={`text-2xl font-bold mt-1 ${c.accent}`}>{c.value.toLocaleString()}</p>
+          <p className={`text-2xl font-bold mt-1 ${c.accent}`}>{fmtNum(c.value)}</p>
         </div>
       ))}
     </div>
@@ -235,7 +236,7 @@ function WorkflowCard({
             )}
             <div>
               <span className="text-gray-500">Started:</span>{' '}
-              <span className="text-gray-700">{workflow.startedAt ? new Date(workflow.startedAt).toLocaleString() : '--'}</span>
+              <span className="text-gray-700">{workflow.startedAt ? fmtDateTime(workflow.startedAt) : '--'}</span>
             </div>
           </div>
 

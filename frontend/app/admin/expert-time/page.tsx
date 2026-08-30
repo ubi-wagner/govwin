@@ -5,6 +5,7 @@
  * who's booked what, cancel open ones. rfp_admin+ (API-gated).
  */
 import { useCallback, useEffect, useState } from 'react';
+import { fmtShortDateTime } from '@/lib/fmt';
 
 interface AdminBlock {
   id: string;
@@ -20,9 +21,7 @@ const DURATIONS = [15, 30, 45, 60];
 
 function fmt(iso: string): string {
   try {
-    return new Date(iso).toLocaleString(undefined, {
-      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
+    return fmtShortDateTime(iso);
   } catch {
     return iso;
   }

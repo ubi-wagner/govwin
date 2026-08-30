@@ -1,7 +1,7 @@
 {
- "base": "http://localhost:3000",
- "considered": 118,
- "reached": 115,
+ "base": "http://localhost:3106",
+ "considered": 119,
+ "reached": 118,
  "shots": [
   {
    "lane": "anon",
@@ -179,7 +179,7 @@
     "links": 30,
     "inputs": 0,
     "forms": 0,
-    "text": 1268,
+    "text": 1279,
     "h1": "A 25-year record of funded outcomes."
    },
    "declared": {
@@ -341,7 +341,7 @@
     "links": 34,
     "inputs": 0,
     "forms": 0,
-    "text": 3850,
+    "text": 3861,
     "h1": "Acceptable Use Policy"
    },
    "declared": {
@@ -368,7 +368,7 @@
     "links": 34,
     "inputs": 0,
     "forms": 0,
-    "text": 4368,
+    "text": 4379,
     "h1": "AI Usage Disclosure"
    },
    "declared": {
@@ -395,7 +395,7 @@
     "links": 37,
     "inputs": 0,
     "forms": 0,
-    "text": 852,
+    "text": 863,
     "h1": "Legal"
    },
    "declared": {
@@ -422,7 +422,7 @@
     "links": 34,
     "inputs": 0,
     "forms": 0,
-    "text": 4675,
+    "text": 4686,
     "h1": "Privacy Policy"
    },
    "declared": {
@@ -449,7 +449,7 @@
     "links": 33,
     "inputs": 0,
     "forms": 0,
-    "text": 11267,
+    "text": 11278,
     "h1": "Terms of Service"
    },
    "declared": {
@@ -701,6 +701,1167 @@
     "links": 1,
     "forms": 1,
     "handlers": 3
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/change-password",
+   "url": "/change-password",
+   "file": "tenant__change-password.png",
+   "status": 200,
+   "finalUrl": "/change-password",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1,
+    "links": 0,
+    "inputs": 3,
+    "forms": 1,
+    "text": 124,
+    "h1": "Change password"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/federal-rd-101",
+   "url": "/federal-rd-101",
+   "file": "tenant__federal-rd-101.png",
+   "status": 200,
+   "finalUrl": "/federal-rd-101",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 31,
+    "inputs": 2,
+    "forms": 1,
+    "text": 2281,
+    "h1": "There's non-dilutive money for your R&D. You probably qualify."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/dashboard",
+   "url": "/dashboard",
+   "file": "tenant__dashboard.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/go",
+   "url": "/go",
+   "file": "tenant__go.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/activity",
+   "url": "/portal/foundation/activity",
+   "file": "tenant__portal-tenantSlug-activity.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/activity",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 182,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 20632,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/agents",
+   "url": "/portal/foundation/agents",
+   "file": "tenant__portal-tenantSlug-agents.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/agents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 6,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 2045,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/atoms",
+   "url": "/portal/foundation/atoms",
+   "file": "tenant__portal-tenantSlug-atoms.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/atoms",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1781,
+    "links": 57,
+    "inputs": 204,
+    "forms": 0,
+    "text": 45734,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/automation",
+   "url": "/portal/foundation/automation",
+   "file": "tenant__portal-tenantSlug-automation.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/automation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 21,
+    "links": 21,
+    "inputs": 12,
+    "forms": 0,
+    "text": 3452,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/billing",
+   "url": "/portal/foundation/billing",
+   "file": "tenant__portal-tenantSlug-billing.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/billing",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 5,
+    "links": 21,
+    "inputs": 1,
+    "forms": 0,
+    "text": 1244,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/buckets",
+   "url": "/portal/foundation/buckets",
+   "file": "tenant__portal-tenantSlug-buckets.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/buckets",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 20,
+    "links": 21,
+    "inputs": 6,
+    "forms": 0,
+    "text": 764,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "url": "/portal/foundation/cards/7f3a1c9e-2b64-4d15-9e83-0a1b2c3d4e5f/solicitation",
+   "file": "tenant__portal-tenantSlug-cards-opportunityId-solicitation.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards/7f3a1c9e-2b64-4d15-9e83-0a1b2c3d4e5f/solicitation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 454,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/cards",
+   "url": "/portal/foundation/cards",
+   "file": "tenant__portal-tenantSlug-cards.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 27,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3015,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/command",
+   "url": "/portal/foundation/command",
+   "file": "tenant__portal-tenantSlug-command.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/command",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 21,
+    "links": 30,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3161,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 3,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/contracts/[contractId]",
+   "url": "/portal/foundation/contracts/741322ea-5c01-45f5-98c6-40b17312d4a8",
+   "file": "tenant__portal-tenantSlug-contracts-contractId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/contracts/741322ea-5c01-45f5-98c6-40b17312d4a8",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 23,
+    "inputs": 0,
+    "forms": 0,
+    "text": 534,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 4,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/contracts",
+   "url": "/portal/foundation/contracts",
+   "file": "tenant__portal-tenantSlug-contracts.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/contracts",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 468,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/dashboard",
+   "url": "/portal/foundation/dashboard",
+   "file": "tenant__portal-tenantSlug-dashboard.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 6,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "url": "/portal/foundation/documents/402598fc-5520-4ad1-920c-db96e6dd547d",
+   "file": "tenant__portal-tenantSlug-documents-documentId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/documents/402598fc-5520-4ad1-920c-db96e6dd547d",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 59,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1240,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/new",
+   "url": "/portal/foundation/documents/new",
+   "file": "tenant__portal-tenantSlug-documents-new.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/documents/new",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 7,
+    "links": 23,
+    "inputs": 2,
+    "forms": 0,
+    "text": 944,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents",
+   "url": "/portal/foundation/documents",
+   "file": "tenant__portal-tenantSlug-documents.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/documents",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 186,
+    "inputs": 0,
+    "forms": 0,
+    "text": 14578,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 12,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "url": "/portal/foundation/library/foundation/ff364517-6eab-4c8a-9c79-0c9e990e2b44",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/library/foundation/ff364517-6eab-4c8a-9c79-0c9e990e2b44",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 31,
+    "links": 22,
+    "inputs": 8,
+    "forms": 0,
+    "text": 839,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library",
+   "url": "/portal/foundation/library",
+   "file": "tenant__portal-tenantSlug-library.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1781,
+    "links": 57,
+    "inputs": 204,
+    "forms": 0,
+    "text": 45734,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/review",
+   "url": "/portal/foundation/library/review",
+   "file": "tenant__portal-tenantSlug-library-review.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1781,
+    "links": 57,
+    "inputs": 204,
+    "forms": 0,
+    "text": 45734,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/upload",
+   "url": "/portal/foundation/library/upload",
+   "file": "tenant__portal-tenantSlug-library-upload.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/atoms",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 1781,
+    "links": 57,
+    "inputs": 204,
+    "forms": 0,
+    "text": 45734,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/manage",
+   "url": "/portal/foundation/manage",
+   "file": "tenant__portal-tenantSlug-manage.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/manage",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 23,
+    "inputs": 0,
+    "forms": 0,
+    "text": 749,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]",
+   "url": "/portal/foundation",
+   "file": "tenant__portal-tenantSlug.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/pipeline",
+   "url": "/portal/foundation/pipeline",
+   "file": "tenant__portal-tenantSlug-pipeline.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 27,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3015,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/portals/[portalId]",
+   "url": "/portal/foundation/portals/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
+   "file": "tenant__portal-tenantSlug-portals-portalId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/portals/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 24,
+    "links": 22,
+    "inputs": 35,
+    "forms": 0,
+    "text": 1816,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/portals",
+   "url": "/portal/foundation/portals",
+   "file": "tenant__portal-tenantSlug-portals.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/portals",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 11,
+    "links": 37,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1018,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/processes",
+   "url": "/portal/foundation/processes",
+   "file": "tenant__portal-tenantSlug-processes.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/processes",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 80,
+    "links": 21,
+    "inputs": 1,
+    "forms": 0,
+    "text": 3349,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/profile",
+   "url": "/portal/foundation/profile",
+   "file": "tenant__portal-tenantSlug-profile.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/profile",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 830,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects/[projectId]",
+   "url": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "file": "tenant__portal-tenantSlug-projects-projectId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 36,
+    "links": 22,
+    "inputs": 8,
+    "forms": 0,
+    "text": 5526,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects",
+   "url": "/portal/foundation/projects",
+   "file": "tenant__portal-tenantSlug-projects.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 409,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
+   "url": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 63,
+    "links": 21,
+    "inputs": 7,
+    "forms": 1,
+    "text": 34026,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "url": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4/sections/dc9be2c3-45b6-4050-914f-aa203834ae62",
+   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-sectionId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4/sections/dc9be2c3-45b6-4050-914f-aa203834ae62",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 20,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 2291,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/proposals",
+   "url": "/portal/foundation/proposals",
+   "file": "tenant__portal-tenantSlug-proposals.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/proposals",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1078,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
+   "url": "/portal/foundation/spotlights/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "file": "tenant__portal-tenantSlug-spotlights-spotlightId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 27,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3015,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/spotlights",
+   "url": "/portal/foundation/spotlights",
+   "file": "tenant__portal-tenantSlug-spotlights.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 27,
+    "inputs": 3,
+    "forms": 0,
+    "text": 3015,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/team",
+   "url": "/portal/foundation/team",
+   "file": "tenant__portal-tenantSlug-team.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/team",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 14,
+    "links": 21,
+    "inputs": 6,
+    "forms": 1,
+    "text": 1191,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/templates",
+   "url": "/portal/foundation/templates",
+   "file": "tenant__portal-tenantSlug-templates.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/templates",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 85,
+    "links": 22,
+    "inputs": 1,
+    "forms": 0,
+    "text": 3065,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/todos",
+   "url": "/portal/foundation/todos",
+   "file": "tenant__portal-tenantSlug-todos.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/todos",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 16,
+    "links": 27,
+    "inputs": 0,
+    "forms": 0,
+    "text": 1523,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/vaults",
+   "url": "/portal/foundation/vaults",
+   "file": "tenant__portal-tenantSlug-vaults.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/vaults",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 4,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 627,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal",
+   "url": "/portal",
+   "file": "tenant__portal.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/select-company",
+   "url": "/select-company",
+   "file": "tenant__select-company.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/dashboard",
+   "redirected": true,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 8,
+    "links": 25,
+    "inputs": 0,
+    "forms": 0,
+    "text": 924,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 1,
+    "inputs": 1,
+    "links": 0,
+    "forms": 1,
+    "handlers": 0
    },
    "ok": true,
    "errors": []
@@ -958,17 +2119,44 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 4,
+    "buttons": 5,
     "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 728,
+    "text": 824,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "url": "/portal/immobileyes/cards/d53a22e4-792d-4fe7-8253-a42270fd9981/solicitation",
+   "file": "tenant2__portal-tenantSlug-cards-opportunityId-solicitation.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards/d53a22e4-792d-4fe7-8253-a42270fd9981/solicitation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 665,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -985,11 +2173,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 16,
+    "links": 27,
     "inputs": 3,
     "forms": 0,
-    "text": 1565,
+    "text": 1808,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1012,17 +2200,17 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 22,
-    "links": 31,
+    "buttons": 21,
+    "links": 30,
     "inputs": 3,
     "forms": 0,
-    "text": 1703,
+    "text": 1896,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
-    "links": 2,
+    "links": 3,
     "forms": 0,
     "handlers": 0
    },
@@ -1336,11 +2524,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 16,
+    "links": 27,
     "inputs": 3,
     "forms": 0,
-    "text": 1565,
+    "text": 1808,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1552,11 +2740,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 16,
+    "links": 27,
     "inputs": 3,
     "forms": 0,
-    "text": 1565,
+    "text": 1808,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1579,11 +2767,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 28,
+    "buttons": 16,
+    "links": 27,
     "inputs": 3,
     "forms": 0,
-    "text": 1565,
+    "text": 1808,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1799,7 +2987,7 @@
     "links": 41,
     "inputs": 8,
     "forms": 0,
-    "text": 13871,
+    "text": 13790,
     "h1": "AI Tools & Agents"
    },
    "declared": {
@@ -1822,11 +3010,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 39,
+    "buttons": 41,
     "links": 49,
     "inputs": 0,
     "forms": 0,
-    "text": 3868,
+    "text": 3975,
     "h1": "Analytics"
    },
    "declared": {
@@ -1907,7 +3095,7 @@
     "links": 64,
     "inputs": 0,
     "forms": 0,
-    "text": 4474,
+    "text": 4525,
     "h1": "Automation Rules"
    },
    "declared": {
@@ -1988,7 +3176,7 @@
     "links": 53,
     "inputs": 23,
     "forms": 0,
-    "text": 6920,
+    "text": 7134,
     "h1": "Opportunity Cards"
    },
    "declared": {
@@ -2015,7 +3203,7 @@
     "links": 63,
     "inputs": 0,
     "forms": 0,
-    "text": 1345,
+    "text": 1346,
     "h1": "Command Center"
    },
    "declared": {
@@ -2069,7 +3257,7 @@
     "links": 69,
     "inputs": 0,
     "forms": 0,
-    "text": 3908,
+    "text": 3935,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -2084,6 +3272,33 @@
   },
   {
    "lane": "admin",
+   "route": "/admin/documents/[documentId]",
+   "url": "/admin/documents/932ea6f5-21c6-477e-92e5-62cd642d9722",
+   "file": "admin__admin-documents-documentId.png",
+   "status": 200,
+   "finalUrl": "/admin/documents/932ea6f5-21c6-477e-92e5-62cd642d9722",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 48,
+    "links": 52,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1407,
+    "h1": "Coverage fixture — admin letter"
+   },
+   "declared": {
+    "buttons": 2,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 4
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
    "route": "/admin/documents",
    "url": "/admin/documents",
    "file": "admin__admin-documents.png",
@@ -2092,11 +3307,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 2,
-    "links": 51,
+    "buttons": 3,
+    "links": 53,
     "inputs": 0,
     "forms": 0,
-    "text": 884,
+    "text": 986,
     "h1": "Document Builder"
    },
    "declared": {
@@ -2119,11 +3334,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 449,
+    "buttons": 92,
     "links": 52,
     "inputs": 3,
     "forms": 1,
-    "text": 68730,
+    "text": 13714,
     "h1": "Event Stream"
    },
    "declared": {
@@ -2150,7 +3365,7 @@
     "links": 51,
     "inputs": 2,
     "forms": 1,
-    "text": 1030,
+    "text": 1046,
     "h1": "Expert Time"
    },
    "declared": {
@@ -2177,7 +3392,7 @@
     "links": 51,
     "inputs": 4,
     "forms": 0,
-    "text": 1322,
+    "text": 1338,
     "h1": "Guardrail Defaults"
    },
    "declared": {
@@ -2204,7 +3419,7 @@
     "links": 57,
     "inputs": 15,
     "forms": 0,
-    "text": 1340,
+    "text": 1358,
     "h1": "Stage Opportunity Intake"
    },
    "declared": {
@@ -2231,7 +3446,7 @@
     "links": 51,
     "inputs": 0,
     "forms": 0,
-    "text": 2347,
+    "text": 2355,
     "h1": "Opportunity Rollup"
    },
    "declared": {
@@ -2258,7 +3473,7 @@
     "links": 69,
     "inputs": 0,
     "forms": 0,
-    "text": 3920,
+    "text": 3968,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -2285,7 +3500,7 @@
     "links": 51,
     "inputs": 0,
     "forms": 0,
-    "text": 2128,
+    "text": 2298,
     "h1": "Pipeline Monitor"
    },
    "declared": {
@@ -2308,11 +3523,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 34,
-    "links": 54,
+    "buttons": 17,
+    "links": 53,
     "inputs": 0,
     "forms": 0,
-    "text": 4515,
+    "text": 2803,
     "h1": "Process Monitor"
    },
    "declared": {
@@ -2335,11 +3550,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 5,
+    "buttons": 10,
     "links": 51,
     "inputs": 1,
     "forms": 0,
-    "text": 1210,
+    "text": 1538,
     "h1": "Processes"
    },
    "declared": {
@@ -2366,7 +3581,7 @@
     "links": 61,
     "inputs": 0,
     "forms": 0,
-    "text": 1920,
+    "text": 1939,
     "h1": "All Proposals"
    },
    "declared": {
@@ -2393,7 +3608,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 1912,
+    "text": 1917,
     "h1": "TVSF-R45: Ohio TVSF Round 45 — Technology Validation & Startup Fund (D"
    },
    "declared": {
@@ -2447,7 +3662,7 @@
     "links": 54,
     "inputs": 3,
     "forms": 0,
-    "text": 1880,
+    "text": 1913,
     "h1": "Purchases"
    },
    "declared": {
@@ -2472,9 +3687,9 @@
    "rendered": {
     "buttons": 21,
     "links": 52,
-    "inputs": 6,
+    "inputs": 7,
     "forms": 0,
-    "text": 3425,
+    "text": 3662,
     "h1": "AGENTS-LIVE probe 8df03882 — Directed Energy Counter-UAS (live opportu"
    },
    "declared": {
@@ -2528,7 +3743,7 @@
     "links": 63,
     "inputs": 1,
     "forms": 0,
-    "text": 6063,
+    "text": 6117,
     "h1": "Your To-Dos8"
    },
    "declared": {
@@ -2582,7 +3797,7 @@
     "links": 64,
     "inputs": 0,
     "forms": 0,
-    "text": 2402,
+    "text": 2432,
     "h1": "Scout Monitor"
    },
    "declared": {
@@ -2771,7 +3986,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 10424,
+    "text": 10675,
     "h1": "System Health"
    },
    "declared": {
@@ -2794,11 +4009,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 15,
+    "buttons": 17,
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 2222,
+    "text": 2651,
     "h1": "System State"
    },
    "declared": {
@@ -2906,7 +4121,7 @@
     "links": 56,
     "inputs": 3,
     "forms": 0,
-    "text": 3250,
+    "text": 3169,
     "h1": "Foundation"
    },
    "declared": {
@@ -2933,7 +4148,7 @@
     "links": 65,
     "inputs": 0,
     "forms": 0,
-    "text": 1295,
+    "text": 1296,
     "h1": "Tenant Management"
    },
    "declared": {
@@ -2983,11 +4198,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 21,
+    "buttons": 28,
     "links": 63,
     "inputs": 20,
     "forms": 3,
-    "text": 3526,
+    "text": 3559,
     "h1": "Workflow Monitor"
    },
    "declared": {
@@ -3011,10 +4226,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1,
-    "links": 12,
+    "links": 14,
     "inputs": 0,
     "forms": 0,
-    "text": 1517,
+    "text": 1690,
     "h1": "Partner Console"
    },
    "declared": {
@@ -3053,1154 +4268,24 @@
    },
    "ok": true,
    "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/change-password",
-   "url": "/change-password",
-   "file": "tenant__change-password.png",
-   "status": 200,
-   "finalUrl": "/change-password",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 1,
-    "links": 0,
-    "inputs": 3,
-    "forms": 1,
-    "text": 124,
-    "h1": "Change password"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/federal-rd-101",
-   "url": "/federal-rd-101",
-   "file": "tenant__federal-rd-101.png",
-   "status": 200,
-   "finalUrl": "/federal-rd-101",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 31,
-    "inputs": 2,
-    "forms": 1,
-    "text": 2281,
-    "h1": "There's non-dilutive money for your R&D. You probably qualify."
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 2,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/dashboard",
-   "url": "/dashboard",
-   "file": "tenant__dashboard.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/go",
-   "url": "/go",
-   "file": "tenant__go.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/activity",
-   "url": "/portal/foundation/activity",
-   "file": "tenant__portal-tenantSlug-activity.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/activity",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 183,
-    "links": 22,
-    "inputs": 1,
-    "forms": 0,
-    "text": 17428,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/agents",
-   "url": "/portal/foundation/agents",
-   "file": "tenant__portal-tenantSlug-agents.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/agents",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 6,
-    "links": 21,
-    "inputs": 0,
-    "forms": 0,
-    "text": 2147,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/atoms",
-   "url": "/portal/foundation/atoms",
-   "file": "tenant__portal-tenantSlug-atoms.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/atoms",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 1623,
-    "links": 81,
-    "inputs": 204,
-    "forms": 0,
-    "text": 46173,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/automation",
-   "url": "/portal/foundation/automation",
-   "file": "tenant__portal-tenantSlug-automation.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/automation",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 21,
-    "links": 21,
-    "inputs": 12,
-    "forms": 0,
-    "text": 5621,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/billing",
-   "url": "/portal/foundation/billing",
-   "file": "tenant__portal-tenantSlug-billing.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/billing",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 5,
-    "links": 21,
-    "inputs": 1,
-    "forms": 0,
-    "text": 1238,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/buckets",
-   "url": "/portal/foundation/buckets",
-   "file": "tenant__portal-tenantSlug-buckets.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/buckets",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 19,
-    "links": 21,
-    "inputs": 6,
-    "forms": 0,
-    "text": 671,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/cards",
-   "url": "/portal/foundation/cards",
-   "file": "tenant__portal-tenantSlug-cards.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/cards",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 20,
-    "links": 29,
-    "inputs": 3,
-    "forms": 0,
-    "text": 3199,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/command",
-   "url": "/portal/foundation/command",
-   "file": "tenant__portal-tenantSlug-command.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/command",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 25,
-    "links": 32,
-    "inputs": 3,
-    "forms": 0,
-    "text": 3406,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 2,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/contracts/[contractId]",
-   "url": "/portal/foundation/contracts/741322ea-5c01-45f5-98c6-40b17312d4a8",
-   "file": "tenant__portal-tenantSlug-contracts-contractId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/contracts/741322ea-5c01-45f5-98c6-40b17312d4a8",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 23,
-    "inputs": 0,
-    "forms": 0,
-    "text": 537,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 4,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/contracts",
-   "url": "/portal/foundation/contracts",
-   "file": "tenant__portal-tenantSlug-contracts.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/contracts",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 34,
-    "inputs": 0,
-    "forms": 0,
-    "text": 1487,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 2,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/dashboard",
-   "url": "/portal/foundation/dashboard",
-   "file": "tenant__portal-tenantSlug-dashboard.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 6,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/documents/[documentId]",
-   "url": "/portal/foundation/documents/9d047cbb-4ea9-4a61-9709-c39e51d28f1d",
-   "file": "tenant__portal-tenantSlug-documents-documentId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/documents/9d047cbb-4ea9-4a61-9709-c39e51d28f1d",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 60,
-    "links": 22,
-    "inputs": 2,
-    "forms": 0,
-    "text": 2501,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/documents/new",
-   "url": "/portal/foundation/documents/new",
-   "file": "tenant__portal-tenantSlug-documents-new.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/documents/new",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 7,
-    "links": 23,
-    "inputs": 2,
-    "forms": 0,
-    "text": 947,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/documents",
-   "url": "/portal/foundation/documents",
-   "file": "tenant__portal-tenantSlug-documents.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/documents",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 205,
-    "inputs": 0,
-    "forms": 0,
-    "text": 15804,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 12,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
-   "url": "/portal/foundation/library/foundation/e31166fe-d62a-44ad-9ff4-2cf480f765dd",
-   "file": "tenant__portal-tenantSlug-library-foundation-foundationId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/library/foundation/e31166fe-d62a-44ad-9ff4-2cf480f765dd",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 58,
-    "links": 22,
-    "inputs": 2,
-    "forms": 0,
-    "text": 1279,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/library",
-   "url": "/portal/foundation/library",
-   "file": "tenant__portal-tenantSlug-library.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/atoms",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 1623,
-    "links": 81,
-    "inputs": 204,
-    "forms": 0,
-    "text": 46173,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/library/review",
-   "url": "/portal/foundation/library/review",
-   "file": "tenant__portal-tenantSlug-library-review.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/atoms",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 1623,
-    "links": 81,
-    "inputs": 204,
-    "forms": 0,
-    "text": 46173,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/library/upload",
-   "url": "/portal/foundation/library/upload",
-   "file": "tenant__portal-tenantSlug-library-upload.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/atoms",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 1623,
-    "links": 81,
-    "inputs": 204,
-    "forms": 0,
-    "text": 46173,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/manage",
-   "url": "/portal/foundation/manage",
-   "file": "tenant__portal-tenantSlug-manage.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/manage",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 16,
-    "links": 23,
-    "inputs": 0,
-    "forms": 0,
-    "text": 755,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]",
-   "url": "/portal/foundation",
-   "file": "tenant__portal-tenantSlug.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/pipeline",
-   "url": "/portal/foundation/pipeline",
-   "file": "tenant__portal-tenantSlug-pipeline.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/cards",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 20,
-    "links": 29,
-    "inputs": 3,
-    "forms": 0,
-    "text": 3199,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/portals/[portalId]",
-   "url": "/portal/foundation/portals/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
-   "file": "tenant__portal-tenantSlug-portals-portalId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/portals/181b1c4d-4749-43a6-a07f-24ff4fbc61a9",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 24,
-    "links": 22,
-    "inputs": 35,
-    "forms": 0,
-    "text": 1819,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/portals",
-   "url": "/portal/foundation/portals",
-   "file": "tenant__portal-tenantSlug-portals.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/portals",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 11,
-    "links": 37,
-    "inputs": 0,
-    "forms": 0,
-    "text": 1021,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/processes",
-   "url": "/portal/foundation/processes",
-   "file": "tenant__portal-tenantSlug-processes.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/processes",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 106,
-    "links": 21,
-    "inputs": 1,
-    "forms": 0,
-    "text": 4045,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/profile",
-   "url": "/portal/foundation/profile",
-   "file": "tenant__portal-tenantSlug-profile.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/profile",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 4,
-    "links": 21,
-    "inputs": 0,
-    "forms": 0,
-    "text": 833,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/projects/[projectId]",
-   "url": "/portal/foundation/projects/a2780650-071d-4446-acb4-c4dcec363808",
-   "file": "tenant__portal-tenantSlug-projects-projectId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/projects/a2780650-071d-4446-acb4-c4dcec363808",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 48,
-    "links": 25,
-    "inputs": 5,
-    "forms": 0,
-    "text": 6841,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/projects",
-   "url": "/portal/foundation/projects",
-   "file": "tenant__portal-tenantSlug-projects.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/projects",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 3,
-    "links": 24,
-    "inputs": 0,
-    "forms": 0,
-    "text": 513,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
-   "url": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 63,
-    "links": 21,
-    "inputs": 7,
-    "forms": 1,
-    "text": 34029,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "url": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4/sections/dc9be2c3-45b6-4050-914f-aa203834ae62",
-   "file": "tenant__portal-tenantSlug-proposals-proposalId-sections-sectionId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/proposals/bbd6a058-3299-4b98-96e0-1e07e43aa1c4/sections/dc9be2c3-45b6-4050-914f-aa203834ae62",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 20,
-    "links": 22,
-    "inputs": 1,
-    "forms": 0,
-    "text": 2294,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/proposals",
-   "url": "/portal/foundation/proposals",
-   "file": "tenant__portal-tenantSlug-proposals.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/proposals",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 4,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 1111,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 2,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
-   "url": "/portal/foundation/spotlights/e0721470-88cd-478a-9ffb-c19dafcbd30d",
-   "file": "tenant__portal-tenantSlug-spotlights-spotlightId.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/cards",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 20,
-    "links": 29,
-    "inputs": 3,
-    "forms": 0,
-    "text": 3199,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/spotlights",
-   "url": "/portal/foundation/spotlights",
-   "file": "tenant__portal-tenantSlug-spotlights.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/cards",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 20,
-    "links": 29,
-    "inputs": 3,
-    "forms": 0,
-    "text": 3199,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/team",
-   "url": "/portal/foundation/team",
-   "file": "tenant__portal-tenantSlug-team.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/team",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 14,
-    "links": 21,
-    "inputs": 6,
-    "forms": 1,
-    "text": 1194,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 1,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/templates",
-   "url": "/portal/foundation/templates",
-   "file": "tenant__portal-tenantSlug-templates.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/templates",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 85,
-    "links": 22,
-    "inputs": 1,
-    "forms": 0,
-    "text": 3068,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/todos",
-   "url": "/portal/foundation/todos",
-   "file": "tenant__portal-tenantSlug-todos.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/todos",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 170,
-    "links": 91,
-    "inputs": 0,
-    "forms": 0,
-    "text": 19567,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal/[tenantSlug]/vaults",
-   "url": "/portal/foundation/vaults",
-   "file": "tenant__portal-tenantSlug-vaults.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/vaults",
-   "redirected": false,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 4,
-    "links": 21,
-    "inputs": 0,
-    "forms": 0,
-    "text": 630,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/portal",
-   "url": "/portal",
-   "file": "tenant__portal.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 0,
-    "inputs": 0,
-    "links": 0,
-    "forms": 0,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
-  },
-  {
-   "lane": "tenant",
-   "route": "/select-company",
-   "url": "/select-company",
-   "file": "tenant__select-company.png",
-   "status": 200,
-   "finalUrl": "/portal/foundation/dashboard",
-   "redirected": true,
-   "boundary": 0,
-   "rendered": {
-    "buttons": 8,
-    "links": 25,
-    "inputs": 0,
-    "forms": 0,
-    "text": 931,
-    "h1": "Foundation"
-   },
-   "declared": {
-    "buttons": 1,
-    "inputs": 1,
-    "links": 0,
-    "forms": 1,
-    "handlers": 0
-   },
-   "ok": true,
-   "errors": []
   }
  ],
  "unbound": {
   "/portal/[tenantSlug]/vaults/[vaultId]": [
    "tenant: no [vaultId]"
+  ],
+  "/portal/[tenantSlug]/documents/[documentId]": [
+   "tenant2: no [documentId]"
+  ],
+  "/portal/[tenantSlug]/portals/[portalId]": [
+   "tenant2: no [portalId]"
+  ],
+  "/portal/[tenantSlug]/projects/[projectId]": [
+   "tenant2: no [projectId]"
+  ],
+  "/vaults/[vaultId]": [
+   "collab: no [vaultId]"
   ]
  },
- "noLane": [],
- "partialLanes": [
-  "tenant"
- ],
- "laneRun": {
-  "lane": "tenant",
-  "considered": 43,
-  "reached": 42
- }
+ "noLane": []
 }

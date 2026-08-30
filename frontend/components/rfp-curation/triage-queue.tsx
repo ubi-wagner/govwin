@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { toast } from '@/lib/toast';
+import { fmtDate } from '@/lib/fmt';
 
 interface TriageItem {
   solicitationId: string;
@@ -266,7 +267,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
                   {item.namespace ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-gray-500">
-                  {new Date(item.createdAt).toLocaleDateString()}
+                  {fmtDate(item.createdAt)}
                 </td>
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   {rowActions(item)}
@@ -295,7 +296,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
             </div>
             <dl className="mt-2 text-xs text-gray-500 space-y-0.5">
               <div><span className="text-gray-400">Agency:</span> {item.agency ?? '—'}</div>
-              <div><span className="text-gray-400">Source:</span> {SOURCE_LABELS[item.source] ?? item.source} · {new Date(item.createdAt).toLocaleDateString()}</div>
+              <div><span className="text-gray-400">Source:</span> {SOURCE_LABELS[item.source] ?? item.source} · {fmtDate(item.createdAt)}</div>
             </dl>
             <div className="mt-3">{rowActions(item, true)}</div>
           </div>

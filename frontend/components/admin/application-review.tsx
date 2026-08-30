@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fmtDate, fmtMoney } from '@/lib/fmt';
 
 interface SbirLookupResult {
   company: {
@@ -298,7 +299,7 @@ export function ApplicationReview({ applications }: Props) {
                   <span>{app.contactName}</span>
                   <span>{app.contactEmail}</span>
                   <span>
-                    {new Date(app.createdAt).toLocaleDateString()}
+                    {fmtDate(app.createdAt)}
                   </span>
                 </div>
               </div>
@@ -501,7 +502,7 @@ export function ApplicationReview({ applications }: Props) {
                                   <span className="text-gray-500">{award.agency} · {award.phase} · {award.program} · {award.topicCode}</span>
                                 </div>
                                 <div className="text-right flex-shrink-0 ml-2">
-                                  <span className="font-medium text-gray-800">${award.awardAmount?.toLocaleString() || 'N/A'}</span>
+                                  <span className="font-medium text-gray-800">{fmtMoney(award.awardAmount)}</span>
                                   <span className="block text-gray-500">{award.awardYear}</span>
                                 </div>
                               </div>

@@ -17,6 +17,7 @@ import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { PageVersion } from '@/lib/content-admin';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { fmtDate } from '@/lib/fmt';
 
 // Public detail path per doc type (matches the publish route). Only blog_post/resource/guide have a
 // detail page; testimonial/team_member surface on a list page, so "View live" targets the list there.
@@ -34,7 +35,7 @@ function shortActor(s: string | null): string {
 function fmtWhen(d: Date | string | null): string {
   if (!d) return '—';
   const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return Number.isNaN(dt.getTime()) ? '—' : fmtDate(dt);
 }
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);

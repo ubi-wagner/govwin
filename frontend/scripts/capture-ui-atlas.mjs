@@ -250,14 +250,47 @@ const capturedRoutes = new Set();
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 try {
+  /*
+   * The admin document index lives in OBJECT STORAGE, not Postgres, so it cannot be bound by the
+   * SQL block above. Read through the product's own helper — the same one the route uses — so the
+   * id is real or the route is honestly reported unbound.
+   */
+  let adminDocId;
+  try {
+    const { getObjectBuffer } = await import('../lib/storage/s3-client.ts');
+    const buf = await getObjectBuffer('reference/documents/_index.json');
+    const idx = buf ? JSON.parse(buf.toString('utf8')) : [];
+    adminDocId = Array.isArray(idx) && idx.length > 0 ? idx[idx.length - 1].id : undefined;
+  } catch (e) {
+    console.log(`  · admin document index unreadable (${String(e.message).slice(0, 50)}) — that route will report as unbound`);
+  }
+
   for (const [laneId, lane] of Object.entries(LANES)) {
     if (onlyLane && onlyLane !== laneId) continue;
     const mine = ROUTES.filter((r) => lanesFor(r.route).includes(laneId));
     if (!mine.length) continue;
     // Bindings are per LANE, from the tenant that lane signs in as — see the note on bindings().
     const B = await bindings(lane.slug ?? 'foundation');
-    const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[k] ?? `[${k}]`);
-    const addressable = (r) => (r.match(/\[(\w+)\]/g) ?? []).every((s) => !!B[s.slice(1, -1)]);
+    /*
+     * ⚠️ ONE PARAM NAME, TWO STORES.
+     *
+     * `[documentId]` means a `tenant_documents` ROW under /portal, and an OBJECT-STORAGE index
+     * entry (reference/documents/_index.json) under /admin. They are different stores with
+     * different ids, and this file bound one value for both — so /admin/documents/[documentId] was
+     * driven with a tenant document's id, got the page's perfectly correct "Failed to load
+     * document", and was filed as BROKEN on every run.
+     *
+     * The sibling lens already knew: verify-surfaces declines that route with "addressed by the
+     * object-storage document index, not a table row". The knowledge never reached here, and the
+     * atlas has been reporting a false failure ever since.
+     *
+     * Resolved per ROUTE, not per param, because the collision is real and no single value is
+     * right for both.
+     */
+    const PER_ROUTE = { '/admin/documents/[documentId]': { documentId: adminDocId } };
+    const bindFor = (r, k) => PER_ROUTE[r]?.[k] ?? B[k];
+    const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => bindFor(r, k) ?? `[${k}]`);
+    const addressable = (r) => (r.match(/\[(\w+)\]/g) ?? []).every((s) => !!bindFor(r, s.slice(1, -1)));
 
     console.log(`\n── ${laneId} · ${lane.label} · ${mine.length} route(s) ──`);
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });

@@ -12,6 +12,7 @@
 
 import { useState } from 'react';
 import type { NodeEdit } from '@/lib/types/canvas-document';
+import { fmtDateTime, fmtShortDateTime } from '@/lib/fmt';
 
 // ─── Actor color assignment ─────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export function ChangeIndicator({ history, compact = true }: ChangeIndicatorProp
 
   if (compact) {
     return (
-      <div className={`inline-flex items-center gap-1 text-[9px] ${color.text}`} title={`${lastEdit.actor_name} ${lastEdit.action} at ${new Date(lastEdit.timestamp).toLocaleString()}`}>
+      <div className={`inline-flex items-center gap-1 text-[9px] ${color.text}`} title={`${lastEdit.actor_name} ${lastEdit.action} at ${fmtDateTime(lastEdit.timestamp)}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
         <span>{lastEdit.actor_name?.split(' ')[0]}</span>
       </div>
@@ -62,7 +63,7 @@ export function ChangeIndicator({ history, compact = true }: ChangeIndicatorProp
       <span className="font-medium">{lastEdit.actor_name}</span>
       <span className="text-gray-500"> {lastEdit.action}</span>
       <span className="text-gray-400 ml-1">
-        {new Date(lastEdit.timestamp).toLocaleTimeString()}
+        {fmtShortDateTime(lastEdit.timestamp)}
       </span>
     </div>
   );
@@ -117,7 +118,7 @@ export function CommentThread({ comments, onAddComment, onResolve, canComment = 
                   <span className="ml-1 text-[10px] font-normal text-indigo-400">· {c.category}</span>
                 ) : null}
               </span>
-              <span className="text-[10px] text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
+              <span className="text-[10px] text-gray-400">{fmtDateTime(c.timestamp)}</span>
             </div>
             {c.anchor?.quote ? (
               <blockquote className="mt-1 border-l-2 border-amber-300 bg-amber-50 pl-2 pr-1 py-0.5 text-[11px] italic text-amber-800">

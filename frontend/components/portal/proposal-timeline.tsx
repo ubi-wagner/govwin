@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { describeEvent as describeEventLabel } from '@/lib/event-labels';
 import { TimeAgo } from '@/components/ui/time-ago';
+import { fmtDateTime } from '@/lib/fmt';
 
 type TimelineEvent = {
   id: string;
@@ -103,7 +104,7 @@ export function ProposalTimeline({ events }: { events: TimelineEvent[] }) {
                   </div>
 
                   {/* Timestamp */}
-                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0" title={new Date(ev.createdAt).toLocaleString()}>
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0" title={fmtDateTime(ev.createdAt)}>
                     <TimeAgo iso={ev.createdAt} />
                   </span>
                 </div>

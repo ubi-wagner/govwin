@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fmtNum } from '@/lib/fmt';
 
 interface UsageSummary {
   totalCalls: number;
@@ -56,11 +57,11 @@ export function AgentUsageSummary() {
   if (!summary) return null;
 
   const stats = [
-    { label: 'Total Calls (30d)', value: summary.totalCalls.toLocaleString() },
+    { label: 'Total Calls (30d)', value: fmtNum(summary.totalCalls) },
     { label: 'Total Cost', value: `$${summary.totalCostUsd.toFixed(2)}` },
     { label: 'Avg Cost / Call', value: `$${summary.avgCostPerCall.toFixed(4)}` },
-    { label: 'Input Tokens', value: summary.totalInputTokens.toLocaleString() },
-    { label: 'Output Tokens', value: summary.totalOutputTokens.toLocaleString() },
+    { label: 'Input Tokens', value: fmtNum(summary.totalInputTokens) },
+    { label: 'Output Tokens', value: fmtNum(summary.totalOutputTokens) },
     { label: 'Active Tenants', value: summary.uniqueTenants.toString() },
   ];
 
