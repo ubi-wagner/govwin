@@ -22,6 +22,8 @@ export {
   sanitizeBucketCriteria,
   scoreCard,
   measureCoverage,
+  buildAffinityProfile,
+  affinityKeys,
   describeComposition,
   DEFAULT_WEIGHTS,
   type BucketCriteria,
@@ -29,8 +31,9 @@ export {
   type ScoreInputs,
   type SignalCoverage,
   type CompositionEntry,
+  type AffinityProfile,
 } from '@/lib/bucket-scoring';
-import { scoreCard } from '@/lib/bucket-scoring';
+import { scoreCard, buildAffinityProfile } from '@/lib/bucket-scoring';
 import type { BucketCriteria, CardFields } from '@/lib/bucket-scoring';
 
 /**
@@ -135,14 +138,37 @@ export async function rankBucket(tenantId: string, bucketId: string, nowMs: numb
     // object (docs/BUCKET_LOCKDOWN.md T2; the repo's #1 jsonb footgun, lib/jsonb.ts).
     const criteria = coerceJsonb<BucketCriteria>(bucket[0].criteria, {});
 
-    const cards = await tx<Array<{ opportunityId: string; card: CardFields }>>`
-      SELECT opportunity_id, card FROM tenant_opportunity_cards
+    // `pursuit_status` rides along so the scorer can keep the affinity factor off cards the
+    // customer has already judged — the guard that stops a vote from boosting its own card.
+    const cards = await tx<Array<{ opportunityId: string; card: CardFields; pursuitStatus: string | null }>>`
+      SELECT opportunity_id, card, pursuit_status FROM tenant_opportunity_cards
       WHERE tenant_id = ${tenantId}::uuid
         ${criteria.includeClosed ? tx`` : tx`AND lifecycle_status = 'open'`}
     `;
+    /*
+     * The affinity profile is built ONCE per pass, from every card this tenant has judged —
+     * including ones outside this bucket's scope. A verdict is a fact about the customer, not about
+     * the lens they happen to be looking through, so a card they passed on last month should still
+     * inform a bucket created today.
+     *
+     * Read separately rather than filtered out of `cards` above, because `includeClosed` would
+     * otherwise silently shrink the profile: a lens that hides closed opportunities would forget
+     * every opinion the customer ever formed about one.
+     */
+    type VotedRow = { card: CardFields | null; pursuitStatus: string | null };
+    const votedRows = (await tx`
+      SELECT card, pursuit_status FROM tenant_opportunity_cards
+      WHERE tenant_id = ${tenantId}::uuid
+        AND pursuit_status IN ('monitoring', 'pursuing', 'passed')
+    `) as unknown as VotedRow[];
+    const affinity = buildAffinityProfile(
+      votedRows.map((r: VotedRow) => ({ card: coerceJsonb<CardFields>(r.card, {}), verdict: r.pursuitStatus })),
+    );
     let ranked = 0;
     for (const c of cards) {
-      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs);
+      const fields = coerceJsonb<CardFields>(c.card, {});
+      fields.verdict = c.pursuitStatus;
+      const { score, factors } = scoreCard(fields, criteria, nowMs, { affinity });
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${bucketId}::uuid, ${c.opportunityId}::uuid, ${score}, ${sql.json(factors)})

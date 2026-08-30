@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from workflows.actions.rescore import score_card  # noqa: E402
+from workflows.actions.rescore import score_card, build_affinity_profile  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parents[2] / "frontend" / "scripts" / "fixtures" / "scorer-parity.json"
 
@@ -23,7 +23,11 @@ def main() -> int:
     fx = json.loads(FIXTURES.read_text())
     out = []
     for c in fx["cases"]:
-        r = score_card(c["card"], c["criteria"], fx["nowMs"])
+        # The profile is built by the SHIPPING builder from the fixture's judged cards, never read
+        # from the fixture directly — a hand-written profile would let the two sides agree on a
+        # shape the product never produces.
+        inputs = {"affinity": build_affinity_profile(c["voted"])} if c.get("voted") else None
+        r = score_card(c["card"], c["criteria"], fx["nowMs"], inputs)
         out.append({"name": c["name"], "score": r["score"], "factors": r["factors"]})
     sys.stdout.write(json.dumps(out, separators=(",", ":")))
     return 0

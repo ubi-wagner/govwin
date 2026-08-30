@@ -134,6 +134,15 @@ export interface CardFields {
    */
   volumes?: string[] | null;
   requiredItems?: string[] | null;
+  /**
+   * THIS TENANT'S OWN VERDICT on the card (`pursuit_status`), when the caller has it.
+   *
+   * Not part of the bridge payload and never written into `card` jsonb — it is per-tenant state
+   * that `rankBucket` attaches to the row it is scoring. It exists here for exactly one purpose:
+   * to keep the affinity factor off cards the customer has already judged, which is what stops a
+   * vote from boosting its own card.
+   */
+  verdict?: string | null;
   highlights?: Array<{ text?: string | null }> | null;
 }
 
@@ -153,6 +162,15 @@ export const DEFAULT_WEIGHTS = {
   program: 1,
   accessibility: 1,
   timeline: 0.5,
+  /**
+   * LEARNED, not declared — so it sits below the criteria the customer actually wrote.
+   *
+   * Same weight as `timeline`: a real signal that should nudge an ordering, never one that should
+   * overrule a lens someone authored on purpose. It is also the only factor here derived from the
+   * tenant's own behaviour rather than from the opportunity, which is a reason for humility, not
+   * for prominence.
+   */
+  affinity: 0.5,
 } as const;
 
 /** How a bucket's score is composed — what the customer is shown about their own lens. */
@@ -314,26 +332,98 @@ export function measureCoverage(cards: CardFields[], nowMs: number): SignalCover
 }
 
 /**
- * Optional per-card inputs a pure function cannot compute for itself.
+ * Optional per-tenant inputs a pure function cannot compute for itself.
  *
- * ── THE CORPUS FACTOR WAS REMOVED (mig 239) ──────────────────────────────────────────────────
+ * ── THE CORPUS FACTOR WAS REMOVED (mig 239), AND THIS SEAM IS WHY IT STAYED ──────────────────
  * mig 238 fed a `ts_rank` over the tenant's copy of the whole solicitation. Measured on one
  * 330-page general BAA, `ts_rank` returns the SAME value for terms the document has nothing to do
- * with — `agriculture` 0.0608 and `concrete` 0.0608 and `submarine` 0.0608, `manufacturing` 0.0827
- * and `quantum` 0.0827. A general solicitation mentions everything once, so ranking against it
- * measures document LENGTH, not relevance; the normalization then turned "appears once" into 100
- * and four unrelated buckets scored one card at ceiling.
+ * with — `agriculture` 0.0608 and `concrete` 0.0608 and `submarine` 0.0608. A general solicitation
+ * mentions everything once, so ranking against it measures document LENGTH, not relevance.
  *
- * What ranks instead is the CURATED record on the card — summary, expert notes, technology focus,
- * volumes, required items and the admin's highlights. All of it small, specific, and there because
- * a person decided it mattered.
- *
- * The interface stays because the shape is right and a future input (a tenant's own past-award
- * history, say) belongs here rather than in the card.
+ * What ranks instead is the CURATED record on the card. The interface survived because the SHAPE
+ * was right: a per-tenant fact that is not a property of the opportunity belongs here rather than
+ * being smuggled onto the card. `affinity` is the first real occupant.
  */
 export interface ScoreInputs {
-  /** Reserved. No inputs today — see the note above. */
-  readonly _?: never;
+  /** What this tenant has up- and down-voted, folded into a lookup. Absent → the factor abstains. */
+  affinity?: AffinityProfile | null;
+}
+
+/**
+ * What a tenant's thumbs say about the ATTRIBUTES they like, not the cards they liked.
+ *
+ * ── WHY A PROFILE AND NOT A PER-CARD FLAG ────────────────────────────────────────────────────
+ * The verdict on a card is already handled: it sorts (in the feed's ORDER BY) and it gates nudges.
+ * What it could not do was help with the card the customer has NOT seen yet — which is the entire
+ * point of "rank new opportunities like the ones I marked". That needs the vote generalised into
+ * its attributes: a customer who up-votes three Navy SBIR additive-manufacturing topics has said
+ * something about Navy, about SBIR, and about additive manufacturing, and the fourth such topic
+ * should arrive near the top before anyone has looked at it.
+ *
+ * `net` is up-votes minus down-votes per `dimension:value`. Negative signal is carried with exactly
+ * the same machinery as positive, because a customer rejecting six of an agency's topics has told
+ * us as much as one who liked six.
+ */
+export interface AffinityProfile {
+  /** `"agency:department of the navy"` → net votes (positive liked, negative disliked). */
+  net: Record<string, number>;
+  /** How many cards carry a verdict. Reported to the customer; never scales the score. */
+  votes: number;
+}
+
+/**
+ * How much each attribute DIMENSION says about a customer's taste.
+ *
+ * ── WHY NOT ALL DIMENSIONS ARE ONE ───────────────────────────────────────────────────────────
+ * Measured on this box the first time the factor ran live: one up-vote of a DOE opportunity lifted
+ * three unrelated cards to affinity 100, because all four are `programType: sbir` — an attribute
+ * 63 of 63 cards carry. Treating "it is an SBIR" as equal evidence to "it is additive
+ * manufacturing" makes the factor nearly a constant when it agrees, and indiscriminate when it
+ * does not: one down-vote would zero every SBIR in the feed.
+ *
+ * The principled fix is inverse document frequency, which needs corpus statistics in both runtimes
+ * and would have to be recomputed and mirrored on every pass. A fixed specificity table gets most
+ * of the benefit for none of that: a technology area names what a company actually does, an agency
+ * names who they sell to, and a program type barely narrows anything.
+ */
+const AFFINITY_DIMENSION_WEIGHT: Record<string, number> = {
+  tech: 1, naics: 0.9, agency: 0.7, phase: 0.5, program: 0.3,
+};
+
+/** One card's attribute keys, lowercased. The shared vocabulary of the profile and the factor. */
+export function affinityKeys(card: CardFields): string[] {
+  const out: string[] = [];
+  const add = (dim: string, v: unknown) => {
+    if (typeof v === 'string' && v.trim() !== '') out.push(`${dim}:${v.trim().toLowerCase()}`);
+  };
+  add('agency', card.agency);
+  add('program', card.programType);
+  add('phase', card.phaseType);
+  for (const t of Array.isArray(card.techFocusAreas) ? card.techFocusAreas : []) add('tech', t);
+  for (const n of Array.isArray(card.naicsCodes) ? card.naicsCodes : []) add('naics', n);
+  return out;
+}
+
+/**
+ * Fold a tenant's voted cards into an attribute profile.
+ *
+ * `verdict` is the raw `pursuit_status`. `pursuing` counts as a like — buying is the strongest
+ * endorsement there is — and `unreviewed` contributes nothing, which is the point of only counting
+ * cards a person actually judged.
+ */
+export function buildAffinityProfile(
+  voted: Array<{ card: CardFields; verdict: string | null | undefined }>,
+): AffinityProfile {
+  const net: Record<string, number> = {};
+  let votes = 0;
+  for (const { card, verdict } of voted) {
+    const delta = verdict === 'monitoring' || verdict === 'pursuing' ? 1 : verdict === 'passed' ? -1 : 0;
+    if (delta === 0) continue;
+    votes++;
+    // De-duplicated per card: a card listing the same tech area twice is one opinion, not two.
+    for (const k of new Set(affinityKeys(card))) net[k] = (net[k] ?? 0) + delta;
+  }
+  return { net, votes };
 }
 
 /**
@@ -409,6 +499,46 @@ export function scoreCard(
       const days = (t - nowMs) / 86_400_000;
       const v = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 0.6 : days <= 90 ? 0.3 : 0.1;
       parts.push({ key: 'timeline', v, weight: w.timeline ?? DEFAULT_WEIGHTS.timeline });
+    }
+  }
+
+  /*
+   * AFFINITY — what the tenant's own thumbs say about a card they have NOT judged.
+   *
+   * Three deliberate constraints, each of which is the difference between a signal and a bug:
+   *
+   *  · **Only on unjudged cards.** A card carrying a verdict is skipped entirely. Scoring an
+   *    up-voted card by its similarity to up-voted cards is a self-reinforcing loop — it would
+   *    always match itself perfectly — and the verdict is ALREADY expressed, in the feed's ORDER BY.
+   *    Ranking matters for the cards nobody has looked at; that is exactly where this applies.
+   *  · **Absent is not zero, twice over.** No profile, no votes, or a card whose attributes appear
+   *    nowhere in the profile → the factor abstains and stays out of the denominator. A customer
+   *    who has voted on power systems has said nothing whatsoever about maritime sensors, and
+   *    scoring that card 0 would punish it for their silence.
+   *  · **Signed, and symmetric.** A disliked attribute scores 0, a liked one 1, a contested one
+   *    (equal ups and downs) 0.5. Negative signal is carried by the same machinery as positive,
+   *    because six rejections of an agency say as much as six approvals.
+   *
+   * Mirror in rescore.py::score_card.
+   */
+  const profile = inputs.affinity;
+  /*
+   * ⚠️ `!card.verdict` IS NOT THE GUARD — 'unreviewed' is a truthy string, and it is the column
+   * DEFAULT, so that version skipped the affinity factor on every card nobody had judged: the
+   * entire population it exists to serve. Caught by the unit case before it shipped, which is the
+   * only reason it is a comment rather than an incident.
+   */
+  const judged = card.verdict === 'monitoring' || card.verdict === 'pursuing' || card.verdict === 'passed';
+  if (profile && profile.votes > 0 && !judged) {
+    const seen = new Set(affinityKeys(card));
+    const known = [...seen].filter((k) => (profile.net[k] ?? 0) !== 0);
+    if (known.length > 0) {
+      // A weighted mean over the matched dimensions, so a technology match outweighs "it is an
+      // SBIR". Unknown dimension → 0.5, which is a shrug rather than a vote either way.
+      const dw = (k: string) => AFFINITY_DIMENSION_WEIGHT[k.slice(0, k.indexOf(':'))] ?? 0.5;
+      const num = known.reduce((acc, k) => acc + (profile.net[k] > 0 ? 1 : 0) * dw(k), 0);
+      const den = known.reduce((acc, k) => acc + dw(k), 0);
+      parts.push({ key: 'affinity', v: num / den, weight: w.affinity ?? DEFAULT_WEIGHTS.affinity });
     }
   }
 

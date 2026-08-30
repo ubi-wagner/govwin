@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "Shared fixtures for the TS↔Python scorer parity check. `scoreCard` (bucket-ranking.ts) and",
+    "Shared fixtures for the TS\u2194Python scorer parity check. `scoreCard` (bucket-ranking.ts) and",
     "`score_card` (rescore.py) are a deliberate mirror pair with a comment saying so and, until this",
     "file, nothing asserting it. They have already been observed mirroring each other INCLUDING a bug.",
     "",
@@ -9,7 +9,8 @@
     "The happy path proves almost nothing. What earns the green is the ASYMMETRIC set below: a card",
     "missing each field a criterion reads, a bucket setting each criterion alone, an unparseable date,",
     "an empty criteria object, the <=3-char word-boundary rule, and the .5 rounding boundary where",
-    "The corpus cases were REMOVED with the factor (mig 239) and replaced by the curated record the scorer reads instead: volumes, required items and the admin's highlights, plus the shapes each can arrive in wrong — a non-array, a null text, whitespace only."
+    "The corpus cases were REMOVED with the factor (mig 239) and replaced by the curated record the scorer reads instead: volumes, required items and the admin's highlights, plus the shapes each can arrive in wrong \u2014 a non-array, a null text, whitespace only.",
+    "Affinity cases (the learned factor): a liked attribute, a disliked one scoring a real 0, an unjudged one ABSTAINING, a mixed card averaging rather than vetoing, the self-loop guard on a card the customer already judged, and an all-`unreviewed` voter set that must produce no factor at all. The profile is built by each side's SHIPPING builder from `voted`, never read from the fixture \u2014 otherwise the two could agree on a shape the product never produces."
   ],
   "nowMs": 1787011200000,
   "cases": [
@@ -59,14 +60,14 @@
       }
     },
     {
-      "name": "empty criteria — no signals, no denominator",
+      "name": "empty criteria \u2014 no signals, no denominator",
       "card": {
         "title": "Anything"
       },
       "criteria": {}
     },
     {
-      "name": "empty card, all criteria — the abstention case",
+      "name": "empty card, all criteria \u2014 the abstention case",
       "card": {},
       "criteria": {
         "keywords": [
@@ -163,7 +164,7 @@
       }
     },
     {
-      "name": "setAsides present but useAccessibility OFF — factor must not appear",
+      "name": "setAsides present but useAccessibility OFF \u2014 factor must not appear",
       "card": {
         "title": "x",
         "setAsideType": "8(a)"
@@ -176,7 +177,7 @@
       }
     },
     {
-      "name": "unparseable close date — must not enter the denominator",
+      "name": "unparseable close date \u2014 must not enter the denominator",
       "card": {
         "title": "x",
         "closeDate": "Fri Aug 28"
@@ -202,7 +203,7 @@
       }
     },
     {
-      "name": "timeline bands — already closed",
+      "name": "timeline bands \u2014 already closed",
       "card": {
         "title": "x",
         "closeDate": "2026-08-01T00:00:00.000Z"
@@ -212,7 +213,7 @@
       }
     },
     {
-      "name": "timeline bands — 30 day",
+      "name": "timeline bands \u2014 30 day",
       "card": {
         "title": "x",
         "closeDate": "2026-09-20T00:00:00.000Z"
@@ -222,7 +223,7 @@
       }
     },
     {
-      "name": "timeline bands — 60 day",
+      "name": "timeline bands \u2014 60 day",
       "card": {
         "title": "x",
         "closeDate": "2026-10-20T00:00:00.000Z"
@@ -232,7 +233,7 @@
       }
     },
     {
-      "name": "timeline bands — 90 day",
+      "name": "timeline bands \u2014 90 day",
       "card": {
         "title": "x",
         "closeDate": "2026-11-20T00:00:00.000Z"
@@ -242,7 +243,7 @@
       }
     },
     {
-      "name": "timeline bands — far out",
+      "name": "timeline bands \u2014 far out",
       "card": {
         "title": "x",
         "closeDate": "2027-06-20T00:00:00.000Z"
@@ -252,7 +253,7 @@
       }
     },
     {
-      "name": "useTimeline omitted entirely — defaults ON",
+      "name": "useTimeline omitted entirely \u2014 defaults ON",
       "card": {
         "title": "x",
         "closeDate": "2026-09-20T00:00:00.000Z"
@@ -264,7 +265,7 @@
       }
     },
     {
-      "name": "short-token word boundary — 'ai' must NOT hit 'email'",
+      "name": "short-token word boundary \u2014 'ai' must NOT hit 'email'",
       "card": {
         "title": "Send email to the office",
         "office": "HTML shop"
@@ -277,7 +278,7 @@
       }
     },
     {
-      "name": "short-token word boundary — 'ai' DOES hit a standalone 'AI'",
+      "name": "short-token word boundary \u2014 'ai' DOES hit a standalone 'AI'",
       "card": {
         "title": "AI and autonomy"
       },
@@ -323,7 +324,7 @@
       }
     },
     {
-      "name": "rounding boundary — one hit of three, weight 1",
+      "name": "rounding boundary \u2014 one hit of three, weight 1",
       "card": {
         "title": "concrete"
       },
@@ -336,7 +337,7 @@
       }
     },
     {
-      "name": "rounding boundary — half of two signals",
+      "name": "rounding boundary \u2014 half of two signals",
       "card": {
         "title": "concrete",
         "agency": "Navy"
@@ -369,7 +370,7 @@
       }
     },
     {
-      "name": "all weights zero — denominator is zero",
+      "name": "all weights zero \u2014 denominator is zero",
       "card": {
         "title": "concrete"
       },
@@ -580,6 +581,374 @@
           "hypersonic"
         ]
       }
+    },
+    {
+      "name": "affinity \u2014 attributes the tenant up-voted",
+      "card": {
+        "title": "zz",
+        "agency": "Department of the Navy"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 attributes the tenant down-voted score a real 0",
+      "card": {
+        "title": "zz",
+        "agency": "NASA"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 an attribute the tenant has never judged ABSTAINS",
+      "card": {
+        "title": "zz",
+        "agency": "Department of the Interior"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 mixed attributes average, they do not veto",
+      "card": {
+        "title": "zz",
+        "agency": "NASA",
+        "programType": "sbir"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 a card the customer already judged is SKIPPED (no self-loop)",
+      "card": {
+        "title": "zz",
+        "agency": "Department of the Navy",
+        "verdict": "monitoring"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 an unreviewed voter contributes nothing, so a profile of only those abstains",
+      "card": {
+        "title": "zz",
+        "agency": "DOE"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 tech areas count, and de-dupe within one card",
+      "card": {
+        "title": "zz",
+        "techFocusAreas": [
+          "materials",
+          "materials"
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
+    },
+    {
+      "name": "affinity \u2014 no voted cards at all means no factor",
+      "card": {
+        "title": "zz",
+        "agency": "Department of the Navy"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": []
+    },
+    {
+      "name": "affinity \u2014 an explicit 'unreviewed' verdict is NOT judged, so the factor still applies",
+      "card": {
+        "title": "zz",
+        "agency": "Department of the Navy",
+        "verdict": "unreviewed"
+      },
+      "criteria": {
+        "keywords": [
+          "zz"
+        ]
+      },
+      "voted": [
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "programType": "sbir",
+            "techFocusAreas": [
+              "additive manufacturing",
+              "materials"
+            ]
+          },
+          "verdict": "monitoring"
+        },
+        {
+          "card": {
+            "agency": "Department of the Navy",
+            "phaseType": "Direct to Phase II"
+          },
+          "verdict": "pursuing"
+        },
+        {
+          "card": {
+            "agency": "NASA",
+            "techFocusAreas": [
+              "life support"
+            ]
+          },
+          "verdict": "passed"
+        },
+        {
+          "card": {
+            "agency": "DOE"
+          },
+          "verdict": "unreviewed"
+        }
+      ]
     }
   ]
 }

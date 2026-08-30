@@ -99,7 +99,58 @@ def _close_ms(close_date: Any) -> Optional[float]:
     return dt.timestamp() * 1000.0
 
 
-def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
+# How much each attribute DIMENSION says about a customer's taste. Mirror of
+# AFFINITY_DIMENSION_WEIGHT in lib/bucket-scoring.ts — see that comment for the measurement that
+# motivated it (one up-vote lifting three unrelated cards because all four were "sbir").
+_AFFINITY_DIMENSION_WEIGHT = {"tech": 1.0, "naics": 0.9, "agency": 0.7, "phase": 0.5, "program": 0.3}
+
+
+def _affinity_keys(card: dict) -> list[str]:
+    """One card's attribute keys, lowercased. Mirror of affinityKeys in lib/bucket-scoring.ts.
+
+    The vocabulary is shared by the profile builder and the factor, so a dimension added to one is
+    added to both by construction — the failure mode a second hand-written list guarantees.
+    """
+    out: list[str] = []
+
+    def add(dim: str, v) -> None:
+        if isinstance(v, str) and v.strip():
+            out.append(f"{dim}:{v.strip().lower()}")
+
+    add("agency", card.get("agency"))
+    add("program", card.get("programType"))
+    add("phase", card.get("phaseType"))
+    for t in card.get("techFocusAreas") or []:
+        add("tech", t)
+    for n in card.get("naicsCodes") or []:
+        add("naics", n)
+    return out
+
+
+def build_affinity_profile(voted: list[dict]) -> dict:
+    """Fold a tenant's judged cards into an attribute profile.
+
+    Each entry is ``{"card": {...}, "verdict": "monitoring"|"pursuing"|"passed"|...}``. `pursuing`
+    counts as a like — buying is the strongest endorsement there is — and anything else contributes
+    nothing, which is the point of only counting cards a person actually judged.
+
+    Mirror of buildAffinityProfile in lib/bucket-scoring.ts.
+    """
+    net: dict[str, int] = {}
+    votes = 0
+    for entry in voted or []:
+        verdict = entry.get("verdict")
+        delta = 1 if verdict in ("monitoring", "pursuing") else -1 if verdict == "passed" else 0
+        if delta == 0:
+            continue
+        votes += 1
+        # De-duplicated per card: a card listing the same tech area twice is one opinion, not two.
+        for k in set(_affinity_keys(entry.get("card") or {})):
+            net[k] = net.get(k, 0) + delta
+    return {"net": net, "votes": votes}
+
+
+def score_card(card: dict, criteria: dict, now_ms: float, inputs: dict | None = None) -> dict:
     """Score one card (0-100) against a bucket's criteria. Faithful port of the
     frontend scoreCard — same signals, same default weights, same rounding.
 
@@ -180,6 +231,30 @@ def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
             days = (close_ms - now_ms) / 86_400_000.0
             v = 0.0 if days <= 0 else 1.0 if days <= 30 else 0.6 if days <= 60 else 0.3 if days <= 90 else 0.1
             parts.append(("timeline", v, w.get("timeline", 0.5)))
+
+    # ── AFFINITY — what this tenant's own thumbs say about a card they have NOT judged ─────────
+    # Mirror of lib/bucket-scoring.ts. Three constraints, each load-bearing:
+    #   · only on UNJUDGED cards — scoring an up-voted card by its similarity to up-voted cards is a
+    #     self-reinforcing loop (it always matches itself), and the verdict is already expressed in
+    #     the feed's ORDER BY. Ranking matters where nobody has looked yet.
+    #   · absent is not zero, twice: no profile, no votes, or no overlapping attribute → abstain.
+    #     A customer who voted on power systems has said nothing about maritime sensors.
+    #   · signed and symmetric: disliked 0, liked 1, contested 0.5.
+    profile = (inputs or {}).get("affinity") or {}
+    net = profile.get("net") or {}
+    # NOT `not card.get("verdict")`: 'unreviewed' is truthy AND is the column default, so that
+    # version skips every card nobody has judged — the population this factor exists for.
+    _judged = card.get("verdict") in ("monitoring", "pursuing", "passed")
+    if profile.get("votes", 0) > 0 and not _judged:
+        known = [k for k in set(_affinity_keys(card)) if net.get(k, 0) != 0]
+        if known:
+            # Weighted mean over matched dimensions; an unknown dimension is 0.5 — a shrug.
+            def _dw(k: str) -> float:
+                return _AFFINITY_DIMENSION_WEIGHT.get(k.split(":", 1)[0], 0.5)
+
+            num = sum((1.0 if net[k] > 0 else 0.0) * _dw(k) for k in known)
+            den = sum(_dw(k) for k in known)
+            parts.append(("affinity", num / den, w.get("affinity", 0.5)))
 
     total_w = sum(p[2] for p in parts)
     # Clamp to [0,100] to belt the DB CHECK (mig 180) — matches frontend scoreCard.
