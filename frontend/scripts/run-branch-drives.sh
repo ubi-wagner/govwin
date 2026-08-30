@@ -311,6 +311,11 @@ DRIVES=(
   # 100 — through the real tool, the real bridge and the real scorer. It is the claim that replaced
   # "rank the whole solicitation", and none of it had ever carried a real highlight.
   "curated-ranking|scripts/drive-curated-ranking.mts"
+  # A REAL government solicitation through the REAL product: 3 MB PDF uploaded via the multipart
+  # route as a signed-in rfp_admin, shredded by the workflow processor, curated, highlighted from
+  # the extracted text, released. Needs the worker and the Claude emulator up (scripts/sandbox-up.sh)
+  # and leaves the solicitation on the box; --cleanup removes it.
+  "real-solicitation|scripts/drive-real-solicitation.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
