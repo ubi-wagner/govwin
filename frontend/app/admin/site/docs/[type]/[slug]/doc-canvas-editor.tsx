@@ -154,7 +154,9 @@ export function SiteDocCanvasEditor({
   return (
     <div className="h-screen flex flex-col">
       {/* Top ribbon — identity + lifecycle actions */}
-      <div className="bg-white border-b px-4 py-2 flex items-center gap-3 shrink-0">
+      {/* Wraps at narrow widths: the identity block and the lifecycle verbs together need more
+          than 390px, and `ml-auto` on a non-wrapping row pushes the verbs off the screen. */}
+      <div className="bg-white border-b px-4 py-2 flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
         <Link href="/admin/site" className="text-sm text-blue-600 hover:text-blue-800 whitespace-nowrap">&larr; Site Content</Link>
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{title || slug || `New ${typeLabel}`}</div>
@@ -165,7 +167,7 @@ export function SiteDocCanvasEditor({
             {!active && !isNew && <span>not live</span>}
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={() => setPanelOpen((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50" title="Title, slug, excerpt, tags, featured image">
             {panelOpen ? 'Hide details' : 'Post details'}
           </button>

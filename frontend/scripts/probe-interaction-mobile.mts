@@ -119,6 +119,103 @@ async function bindRoutes() {
 }
 
 /**
+ * Every remaining `[param]` in the manifest, resolved from the database.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────────────────────
+ * The width sweep below used to DROP any route still carrying a bracket after `[tenantSlug]` was
+ * substituted, and count it as unaddressable. That was honest — it said so out loud, and the
+ * numbers were 19 routes needing an id plus 8 that failed to load, reported every run as
+ * "27 route(s) measured nothing. That is uncovered, not passing."
+ *
+ * Honest is not the same as finished. Those 19 are the id-bearing pages — a build workspace, a
+ * curation workspace, a topic, a portal, a contract, a vault — which is to say the DENSE half of
+ * the product, and the half a phone has the most trouble with. Sweeping only the list pages and
+ * declaring the width clean measured the easy routes.
+ *
+ * ── TENANT-SCOPED, LIKE EVERY BINDING IN THIS TREE ───────────────────────────────────────────
+ * Portal ids come from the tenant the portal lane signs in as. An id borrowed from another tenant
+ * drives the page's CORRECT refusal, and a refusal is a short page that never overflows — so a
+ * cross-tenant binding would report a clean width for a page it never rendered. Admin ids are
+ * platform-scope and need no tenant.
+ *
+ * A param that cannot be resolved is left bracketed and reported, exactly as before. What changes
+ * is that "cannot" now means the box genuinely holds no such row, not that nobody wrote the query.
+ */
+async function bindParams(slug: string): Promise<Record<string, string>> {
+  if (!DB) return {};
+  const sql = postgres(DB, { max: 2, onnotice: () => {} });
+  const one = async (q: Promise<Array<{ v: string | null }>>): Promise<string | undefined> => {
+    try { const [r] = await q; return r?.v ?? undefined; } catch { return undefined; }
+  };
+  try {
+    const out: Record<string, string | undefined> = {
+      // ── portal, scoped to the lane's own tenant ───────────────────────────────────────────
+      proposalId: await one(sql`SELECT p.id::text AS v FROM proposals p JOIN tenants t ON t.id = p.tenant_id
+        WHERE t.slug = ${slug} AND p.archived_at IS NULL
+          AND EXISTS (SELECT 1 FROM proposal_sections s WHERE s.proposal_id = p.id)
+        ORDER BY p.created_at LIMIT 1`),
+      sectionId: await one(sql`SELECT s.id::text AS v FROM proposal_sections s
+        JOIN proposals p ON p.id = s.proposal_id JOIN tenants t ON t.id = p.tenant_id
+        WHERE t.slug = ${slug} ORDER BY s.sort_index LIMIT 1`),
+      projectId: await one(sql`SELECT d.id::text AS v FROM projects d JOIN tenants t ON t.id = d.tenant_id
+        WHERE t.slug = ${slug} ORDER BY d.created_at LIMIT 1`),
+      contractId: await one(sql`SELECT c.id::text AS v FROM contracts c JOIN tenants t ON t.id = c.tenant_id
+        WHERE t.slug = ${slug} ORDER BY c.created_at LIMIT 1`),
+      // `collaboration_vaults`, not `vaults` — there is no table by the latter name, and because
+      // `one()` swallows a query error to keep one missing fixture from failing the sweep, a WRONG
+      // TABLE NAME reads exactly like "the box holds none". It reported this route unbindable for a
+      // reason that was a typo. The swallow stays (a genuinely absent fixture must not fail the
+      // run) which is precisely why the name has to be right.
+      vaultId: await one(sql`SELECT v.id::text AS v FROM collaboration_vaults v
+        JOIN tenants t ON t.id = v.tenant_id WHERE t.slug = ${slug} ORDER BY v.created_at LIMIT 1`),
+      portalId: await one(sql`SELECT pp.id::text AS v FROM proposal_portals pp JOIN tenants t ON t.id = pp.tenant_id
+        WHERE t.slug = ${slug} ORDER BY pp.created_at LIMIT 1`),
+      documentId: await one(sql`SELECT d.id::text AS v FROM tenant_documents d JOIN tenants t ON t.id = d.tenant_id
+        WHERE t.slug = ${slug} ORDER BY d.created_at DESC LIMIT 1`),
+      foundationId: await one(sql`SELECT a.id::text AS v FROM library_atoms a JOIN tenants t ON t.id = a.tenant_id
+        WHERE t.slug = ${slug} AND a.grain = 'foundation' AND a.archived_at IS NULL
+        ORDER BY a.created_at DESC LIMIT 1`),
+      // The reading view and the spotlight detail both take an OPPORTUNITY id; prefer a card the
+      // tenant has judged and copied, which is the state with the most on the page.
+      opportunityId: await one(sql`SELECT c.opportunity_id::text AS v FROM tenant_opportunity_cards c
+        JOIN tenants t ON t.id = c.tenant_id
+        WHERE t.slug = ${slug} AND c.archived_at IS NULL AND c.card <> '{}'::jsonb
+        ORDER BY c.docs_copied DESC, (c.pursuit_status <> 'unreviewed') DESC, c.opportunity_id LIMIT 1`),
+      // ── admin, platform-scope ─────────────────────────────────────────────────────────────
+      // The legacy spotlight detail is a pure redirect to /cards and never reads the id, so any
+      // real opportunity binds it. Bound rather than skipped so the redirect itself is swept —
+      // a redirect that 500s is still a broken route.
+      spotlightId: await one(sql`SELECT c.opportunity_id::text AS v FROM tenant_opportunity_cards c
+        JOIN tenants t ON t.id = c.tenant_id WHERE t.slug = ${slug} ORDER BY c.opportunity_id LIMIT 1`),
+      solId: await one(sql`SELECT cs.id::text AS v FROM curated_solicitations cs ORDER BY cs.created_at DESC LIMIT 1`),
+      topicId: await one(sql`SELECT o.id::text AS v FROM opportunities o
+        WHERE o.topic_number IS NOT NULL AND o.solicitation_id IS NOT NULL ORDER BY o.created_at DESC LIMIT 1`),
+      templateId: await one(sql`SELECT dt.id::text AS v FROM document_templates dt ORDER BY dt.created_at DESC LIMIT 1`),
+      tenantId: await one(sql`SELECT t.id::text AS v FROM tenants t WHERE t.slug = ${slug} LIMIT 1`),
+      profileId: await one(sql`SELECT sp.id::text AS v FROM source_profiles sp ORDER BY sp.created_at LIMIT 1`),
+      pageKey: await one(sql`SELECT cp.page_key AS v FROM content_pages cp WHERE cp.content_type = 'page' LIMIT 1`),
+    };
+    // /admin/site/docs/[type]/[slug] needs BOTH halves of one row, or it addresses a document of
+    // one type under another type's slug — a 404 dressed as coverage.
+    try {
+      const [doc] = await sql<Array<{ ctype: string; pkey: string }>>`
+        SELECT content_type AS ctype, page_key AS pkey FROM content_pages
+        WHERE content_type <> 'page' AND page_key IS NOT NULL ORDER BY created_at DESC LIMIT 1`;
+      if (doc) { out.type = doc.ctype; out.slug = doc.pkey; }
+    } catch { /* left unbound, and reported */ }
+    // The admin document index lives in OBJECT STORAGE, not Postgres — a different store from the
+    // tenant one, sharing a param name. Bound separately or the admin route opens a tenant id.
+    try {
+      const { getObjectBuffer } = await import('../lib/storage/s3-client.ts');
+      const buf = await getObjectBuffer('reference/documents/_index.json');
+      const idx = buf ? JSON.parse(buf.toString('utf8')) : [];
+      if (Array.isArray(idx) && idx.length > 0) out.adminDocumentId = idx[idx.length - 1].id;
+    } catch { /* left unbound, and reported */ }
+    return Object.fromEntries(Object.entries(out).filter(([, v]) => !!v)) as Record<string, string>;
+  } finally { await sql.end(); }
+}
+
+/**
  * REFUSE A VERDICT ON AN UNSTYLED PAGE.
  *
  * ── HOW THIS INSTRUMENT LIED, ONCE, LOUDLY ───────────────────────────────────────────────────
@@ -229,6 +326,7 @@ async function probeRoute(browser: Browser, lane: Lane, route: string) {
 async function sweepWidths(browser: Browser) {
   const invPath = '/home/user/govwin/docs/frontend-inventory.json';
   const unaddressable: string[] = [];
+  const params = await bindParams('foundation');
   let routes: string[] = [];
   try {
     const inv = JSON.parse(readFileSync(invPath, 'utf8')) as { records: Array<{ kind: string; route?: string }> };
@@ -242,8 +340,17 @@ async function sweepWidths(browser: Browser) {
       // routes" and the run reported findings only in admin. A scanner that discards what it
       // cannot address and says nothing is the defect this whole sweep exists to catch.
       .map((r) => r.replace('[tenantSlug]', 'foundation'))
-      // What remains bracketed needs an id nobody can guess. The curated list above binds the two
-      // that matter from the database; the rest are counted as unaddressable, out loud.
+      // What remains bracketed is BOUND from the database (bindParams) rather than dropped. Only a
+      // param the box genuinely holds no row for stays bracketed, and those are still reported out
+      // loud — "cannot" now means the data is absent, not that nobody wrote the query.
+      //
+      // `/admin/documents/[documentId]` takes the OBJECT-STORE id, not the tenant_documents one:
+      // the same param name addresses two different stores, and binding one for both drives the
+      // admin page's correct "Failed to load document" and photographs it as coverage.
+      .map((r) => r.replace(/\[(\w+)\]/g, (m, k: string) => {
+        const key = r.startsWith('/admin/documents/') && k === 'documentId' ? 'adminDocumentId' : k;
+        return params[key] ?? m;
+      }))
       .filter((r) => {
         if (!r.includes('[')) return true;
         unaddressable.push(r);
