@@ -23,7 +23,7 @@ def main() -> int:
     fx = json.loads(FIXTURES.read_text())
     out = []
     for c in fx["cases"]:
-        r = score_card(c["card"], c["criteria"], fx["nowMs"], corpus_rank=c.get("corpusRank"))
+        r = score_card(c["card"], c["criteria"], fx["nowMs"])
         out.append({"name": c["name"], "score": r["score"], "factors": r["factors"]})
     sys.stdout.write(json.dumps(out, separators=(",", ":")))
     return 0

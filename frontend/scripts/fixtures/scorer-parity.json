@@ -9,7 +9,7 @@
     "The happy path proves almost nothing. What earns the green is the ASYMMETRIC set below: a card",
     "missing each field a criterion reads, a bucket setting each criterion alone, an unparseable date,",
     "an empty criteria object, the <=3-char word-boundary rule, and the .5 rounding boundary where",
-    "Python's banker's rounding diverges from Math.round unless _js_round is used."
+    "The corpus cases were REMOVED with the factor (mig 239) and replaced by the curated record the scorer reads instead: volumes, required items and the admin's highlights, plus the shapes each can arrive in wrong — a non-array, a null text, whitespace only."
   ],
   "nowMs": 1787011200000,
   "cases": [
@@ -21,153 +21,565 @@
         "description": "Robotic automation for built environment manufacturing.",
         "office": "Air Force Research Laboratory",
         "agency": "Department of the Air Force",
-        "naicsCodes": ["541715", "236220"],
+        "naicsCodes": [
+          "541715",
+          "236220"
+        ],
         "programType": "sbir",
         "setAsideType": "small business",
         "phaseType": "Phase I",
-        "techFocusAreas": ["advanced materials", "autonomy"],
+        "techFocusAreas": [
+          "advanced materials",
+          "autonomy"
+        ],
         "topicNumber": "AF261-0001",
         "topicBranch": "USAF",
         "closeDate": "2026-09-20T00:00:00.000Z"
       },
       "criteria": {
-        "keywords": ["concrete", "3d print", "hypersonic"],
-        "naics": ["541715"],
-        "agencies": ["air force"],
-        "programTypes": ["sbir"],
-        "setAsides": ["small business"],
+        "keywords": [
+          "concrete",
+          "3d print",
+          "hypersonic"
+        ],
+        "naics": [
+          "541715"
+        ],
+        "agencies": [
+          "air force"
+        ],
+        "programTypes": [
+          "sbir"
+        ],
+        "setAsides": [
+          "small business"
+        ],
         "useAccessibility": true,
         "useTimeline": true
       }
     },
-
-    { "name": "empty criteria — no signals, no denominator",
-      "card": { "title": "Anything" }, "criteria": {} },
-
-    { "name": "empty card, all criteria — the abstention case",
+    {
+      "name": "empty criteria — no signals, no denominator",
+      "card": {
+        "title": "Anything"
+      },
+      "criteria": {}
+    },
+    {
+      "name": "empty card, all criteria — the abstention case",
       "card": {},
       "criteria": {
-        "keywords": ["concrete"], "naics": ["541715"], "agencies": ["navy"],
-        "programTypes": ["sttr"], "setAsides": ["8(a)"],
-        "useAccessibility": true, "useTimeline": true } },
-
-    { "name": "card missing agency ONLY",
-      "card": { "title": "Concrete printing", "naicsCodes": ["541715"], "programType": "sbir", "setAsideType": "sdvosb", "closeDate": "2026-09-20T00:00:00.000Z" },
-      "criteria": { "keywords": ["concrete"], "agencies": ["navy"] } },
-
-    { "name": "card missing naicsCodes ONLY",
-      "card": { "title": "Concrete printing", "agency": "Navy", "programType": "sbir", "closeDate": "2026-09-20T00:00:00.000Z" },
-      "criteria": { "keywords": ["concrete"], "naics": ["541715"] } },
-
-    { "name": "card with EMPTY naicsCodes array",
-      "card": { "title": "Concrete printing", "naicsCodes": [], "agency": "Navy" },
-      "criteria": { "naics": ["541715"] } },
-
-    { "name": "card missing programType ONLY",
-      "card": { "title": "Concrete printing", "agency": "Navy" },
-      "criteria": { "programTypes": ["sbir"] } },
-
-    { "name": "card missing setAsideType, accessibility ON",
-      "card": { "title": "Concrete printing" },
-      "criteria": { "setAsides": ["8(a)"], "useAccessibility": true } },
-
-    { "name": "setAsides present but useAccessibility OFF — factor must not appear",
-      "card": { "title": "x", "setAsideType": "8(a)" },
-      "criteria": { "setAsides": ["8(a)"], "useAccessibility": false } },
-
-    { "name": "unparseable close date — must not enter the denominator",
-      "card": { "title": "x", "closeDate": "Fri Aug 28" },
-      "criteria": { "keywords": ["x"], "useTimeline": true } },
-
-    { "name": "close date is a bare YYYY-MM-DD",
-      "card": { "title": "x", "closeDate": "2026-09-20" },
-      "criteria": { "keywords": ["x"], "useTimeline": true } },
-
-    { "name": "timeline bands — already closed",
-      "card": { "title": "x", "closeDate": "2026-08-01T00:00:00.000Z" },
-      "criteria": { "useTimeline": true } },
-    { "name": "timeline bands — 30 day",
-      "card": { "title": "x", "closeDate": "2026-09-20T00:00:00.000Z" },
-      "criteria": { "useTimeline": true } },
-    { "name": "timeline bands — 60 day",
-      "card": { "title": "x", "closeDate": "2026-10-20T00:00:00.000Z" },
-      "criteria": { "useTimeline": true } },
-    { "name": "timeline bands — 90 day",
-      "card": { "title": "x", "closeDate": "2026-11-20T00:00:00.000Z" },
-      "criteria": { "useTimeline": true } },
-    { "name": "timeline bands — far out",
-      "card": { "title": "x", "closeDate": "2027-06-20T00:00:00.000Z" },
-      "criteria": { "useTimeline": true } },
-    { "name": "useTimeline omitted entirely — defaults ON",
-      "card": { "title": "x", "closeDate": "2026-09-20T00:00:00.000Z" },
-      "criteria": { "keywords": ["x"] } },
-
-    { "name": "short-token word boundary — 'ai' must NOT hit 'email'",
-      "card": { "title": "Send email to the office", "office": "HTML shop" },
-      "criteria": { "keywords": ["ai", "ml"] } },
-    { "name": "short-token word boundary — 'ai' DOES hit a standalone 'AI'",
-      "card": { "title": "AI and autonomy" },
-      "criteria": { "keywords": ["ai"] } },
-    { "name": "multi-word short token keeps substring matching",
-      "card": { "title": "3D printing of concrete" },
-      "criteria": { "keywords": ["3d print"] } },
-    { "name": "regex metacharacters in a short keyword",
-      "card": { "title": "C++ and c# work" },
-      "criteria": { "keywords": ["c++", "c#"] } },
-    { "name": "keyword with surrounding whitespace",
-      "card": { "title": "concrete" },
-      "criteria": { "keywords": ["  concrete  ", ""] } },
-
-    { "name": "rounding boundary — one hit of three, weight 1",
-      "card": { "title": "concrete" },
-      "criteria": { "keywords": ["concrete", "steel", "timber"] } },
-    { "name": "rounding boundary — half of two signals",
-      "card": { "title": "concrete", "agency": "Navy" },
-      "criteria": { "keywords": ["concrete"], "agencies": ["army"] } },
-    { "name": "explicit zero weight on a signal",
-      "card": { "title": "concrete", "agency": "Navy" },
-      "criteria": { "keywords": ["concrete"], "agencies": ["navy"], "weights": { "agency": 0 } } },
-    { "name": "all weights zero — denominator is zero",
-      "card": { "title": "concrete" },
-      "criteria": { "keywords": ["concrete"], "weights": { "keyword": 0 } } },
-
-    { "name": "naics given as numbers on one side, strings on the other",
-      "card": { "title": "x", "naicsCodes": [541715] },
-      "criteria": { "naics": ["541715"] } },
-
-    { "name": "agency substring match is case-insensitive both ways",
-      "card": { "title": "x", "agency": "DEPARTMENT OF THE NAVY" },
-      "criteria": { "agencies": ["navy"] } },
-
-    { "name": "programType is EQUALITY, not substring",
-      "card": { "title": "x", "programType": "sbir_phase_ii" },
-      "criteria": { "programTypes": ["sbir"] } },
-
-    { "name": "techFocusAreas is the only place the keyword appears",
-      "card": { "title": "Open topic", "techFocusAreas": ["advanced manufacturing", "autonomy"] },
-      "criteria": { "keywords": ["manufacturing"] } },
-
-    { "name": "phaseType is the only place the keyword appears",
-      "card": { "title": "Open topic", "phaseType": "Direct to Phase II" },
-      "criteria": { "keywords": ["direct to phase ii"] } },
-
-    { "name": "corpus abstains when null",
-      "card": { "title": "x" }, "corpusRank": null,
-      "criteria": { "keywords": ["x"] } },
-    { "name": "corpus present, no other signal",
-      "card": { "title": "x" }, "corpusRank": 0.42,
-      "criteria": { "keywords": ["nothing"] } },
-    { "name": "corpus at zero is a REAL zero, not an abstention",
-      "card": { "title": "x" }, "corpusRank": 0,
-      "criteria": { "keywords": ["x"] } },
-    { "name": "corpus at one, with keyword and timeline",
-      "card": { "title": "concrete", "closeDate": "2026-09-20T00:00:00.000Z" }, "corpusRank": 1,
-      "criteria": { "keywords": ["concrete"], "useTimeline": true } },
-    { "name": "corpus out of range is clamped identically",
-      "card": { "title": "x" }, "corpusRank": 7.5,
-      "criteria": { "keywords": ["x"] } },
-    { "name": "corpus with an explicit weight",
-      "card": { "title": "x" }, "corpusRank": 0.5,
-      "criteria": { "keywords": ["nothing"], "weights": { "corpus": 2 } } }
+        "keywords": [
+          "concrete"
+        ],
+        "naics": [
+          "541715"
+        ],
+        "agencies": [
+          "navy"
+        ],
+        "programTypes": [
+          "sttr"
+        ],
+        "setAsides": [
+          "8(a)"
+        ],
+        "useAccessibility": true,
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "card missing agency ONLY",
+      "card": {
+        "title": "Concrete printing",
+        "naicsCodes": [
+          "541715"
+        ],
+        "programType": "sbir",
+        "setAsideType": "sdvosb",
+        "closeDate": "2026-09-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete"
+        ],
+        "agencies": [
+          "navy"
+        ]
+      }
+    },
+    {
+      "name": "card missing naicsCodes ONLY",
+      "card": {
+        "title": "Concrete printing",
+        "agency": "Navy",
+        "programType": "sbir",
+        "closeDate": "2026-09-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete"
+        ],
+        "naics": [
+          "541715"
+        ]
+      }
+    },
+    {
+      "name": "card with EMPTY naicsCodes array",
+      "card": {
+        "title": "Concrete printing",
+        "naicsCodes": [],
+        "agency": "Navy"
+      },
+      "criteria": {
+        "naics": [
+          "541715"
+        ]
+      }
+    },
+    {
+      "name": "card missing programType ONLY",
+      "card": {
+        "title": "Concrete printing",
+        "agency": "Navy"
+      },
+      "criteria": {
+        "programTypes": [
+          "sbir"
+        ]
+      }
+    },
+    {
+      "name": "card missing setAsideType, accessibility ON",
+      "card": {
+        "title": "Concrete printing"
+      },
+      "criteria": {
+        "setAsides": [
+          "8(a)"
+        ],
+        "useAccessibility": true
+      }
+    },
+    {
+      "name": "setAsides present but useAccessibility OFF — factor must not appear",
+      "card": {
+        "title": "x",
+        "setAsideType": "8(a)"
+      },
+      "criteria": {
+        "setAsides": [
+          "8(a)"
+        ],
+        "useAccessibility": false
+      }
+    },
+    {
+      "name": "unparseable close date — must not enter the denominator",
+      "card": {
+        "title": "x",
+        "closeDate": "Fri Aug 28"
+      },
+      "criteria": {
+        "keywords": [
+          "x"
+        ],
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "close date is a bare YYYY-MM-DD",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-09-20"
+      },
+      "criteria": {
+        "keywords": [
+          "x"
+        ],
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "timeline bands — already closed",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-08-01T00:00:00.000Z"
+      },
+      "criteria": {
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "timeline bands — 30 day",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-09-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "timeline bands — 60 day",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-10-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "timeline bands — 90 day",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-11-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "timeline bands — far out",
+      "card": {
+        "title": "x",
+        "closeDate": "2027-06-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "useTimeline": true
+      }
+    },
+    {
+      "name": "useTimeline omitted entirely — defaults ON",
+      "card": {
+        "title": "x",
+        "closeDate": "2026-09-20T00:00:00.000Z"
+      },
+      "criteria": {
+        "keywords": [
+          "x"
+        ]
+      }
+    },
+    {
+      "name": "short-token word boundary — 'ai' must NOT hit 'email'",
+      "card": {
+        "title": "Send email to the office",
+        "office": "HTML shop"
+      },
+      "criteria": {
+        "keywords": [
+          "ai",
+          "ml"
+        ]
+      }
+    },
+    {
+      "name": "short-token word boundary — 'ai' DOES hit a standalone 'AI'",
+      "card": {
+        "title": "AI and autonomy"
+      },
+      "criteria": {
+        "keywords": [
+          "ai"
+        ]
+      }
+    },
+    {
+      "name": "multi-word short token keeps substring matching",
+      "card": {
+        "title": "3D printing of concrete"
+      },
+      "criteria": {
+        "keywords": [
+          "3d print"
+        ]
+      }
+    },
+    {
+      "name": "regex metacharacters in a short keyword",
+      "card": {
+        "title": "C++ and c# work"
+      },
+      "criteria": {
+        "keywords": [
+          "c++",
+          "c#"
+        ]
+      }
+    },
+    {
+      "name": "keyword with surrounding whitespace",
+      "card": {
+        "title": "concrete"
+      },
+      "criteria": {
+        "keywords": [
+          "  concrete  ",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "rounding boundary — one hit of three, weight 1",
+      "card": {
+        "title": "concrete"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete",
+          "steel",
+          "timber"
+        ]
+      }
+    },
+    {
+      "name": "rounding boundary — half of two signals",
+      "card": {
+        "title": "concrete",
+        "agency": "Navy"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete"
+        ],
+        "agencies": [
+          "army"
+        ]
+      }
+    },
+    {
+      "name": "explicit zero weight on a signal",
+      "card": {
+        "title": "concrete",
+        "agency": "Navy"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete"
+        ],
+        "agencies": [
+          "navy"
+        ],
+        "weights": {
+          "agency": 0
+        }
+      }
+    },
+    {
+      "name": "all weights zero — denominator is zero",
+      "card": {
+        "title": "concrete"
+      },
+      "criteria": {
+        "keywords": [
+          "concrete"
+        ],
+        "weights": {
+          "keyword": 0
+        }
+      }
+    },
+    {
+      "name": "naics given as numbers on one side, strings on the other",
+      "card": {
+        "title": "x",
+        "naicsCodes": [
+          541715
+        ]
+      },
+      "criteria": {
+        "naics": [
+          "541715"
+        ]
+      }
+    },
+    {
+      "name": "agency substring match is case-insensitive both ways",
+      "card": {
+        "title": "x",
+        "agency": "DEPARTMENT OF THE NAVY"
+      },
+      "criteria": {
+        "agencies": [
+          "navy"
+        ]
+      }
+    },
+    {
+      "name": "programType is EQUALITY, not substring",
+      "card": {
+        "title": "x",
+        "programType": "sbir_phase_ii"
+      },
+      "criteria": {
+        "programTypes": [
+          "sbir"
+        ]
+      }
+    },
+    {
+      "name": "techFocusAreas is the only place the keyword appears",
+      "card": {
+        "title": "Open topic",
+        "techFocusAreas": [
+          "advanced manufacturing",
+          "autonomy"
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "manufacturing"
+        ]
+      }
+    },
+    {
+      "name": "phaseType is the only place the keyword appears",
+      "card": {
+        "title": "Open topic",
+        "phaseType": "Direct to Phase II"
+      },
+      "criteria": {
+        "keywords": [
+          "direct to phase ii"
+        ]
+      }
+    },
+    {
+      "name": "volumes are the only place the keyword appears",
+      "card": {
+        "title": "Open topic",
+        "volumes": [
+          "Technical Volume",
+          "Commercialization Plan"
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "commercialization"
+        ]
+      }
+    },
+    {
+      "name": "required items are the only place the keyword appears",
+      "card": {
+        "title": "Open topic",
+        "requiredItems": [
+          "Phase I Work Plan",
+          "Letters of Support"
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "work plan"
+        ]
+      }
+    },
+    {
+      "name": "a highlight is the only place the keyword appears",
+      "card": {
+        "title": "Open topic",
+        "highlights": [
+          {
+            "text": "Proposals must address additive construction of expeditionary structures."
+          }
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "expeditionary"
+        ]
+      }
+    },
+    {
+      "name": "a highlight with no text contributes nothing",
+      "card": {
+        "title": "Open topic",
+        "highlights": [
+          {
+            "text": null
+          },
+          {
+            "text": "   "
+          }
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "expeditionary"
+        ]
+      }
+    },
+    {
+      "name": "highlights is not an array",
+      "card": {
+        "title": "Open topic",
+        "highlights": "not a list"
+      },
+      "criteria": {
+        "keywords": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "volumes is not an array",
+      "card": {
+        "title": "Open topic",
+        "volumes": {
+          "a": 1
+        },
+        "requiredItems": null
+      },
+      "criteria": {
+        "keywords": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "empty curated record still abstains on empty text",
+      "card": {
+        "volumes": [],
+        "requiredItems": [],
+        "highlights": []
+      },
+      "criteria": {
+        "keywords": [
+          "anything"
+        ]
+      }
+    },
+    {
+      "name": "the whole curated record together",
+      "card": {
+        "title": "Additive Construction",
+        "spotlightSummary": "Ohio TVSF round 45.",
+        "techFocusAreas": [
+          "advanced materials"
+        ],
+        "volumes": [
+          "Cost Volume"
+        ],
+        "requiredItems": [
+          "Budget Justification"
+        ],
+        "highlights": [
+          {
+            "text": "Cost share is not required for Phase I."
+          }
+        ]
+      },
+      "criteria": {
+        "keywords": [
+          "cost share",
+          "budget",
+          "advanced materials",
+          "hypersonic"
+        ]
+      }
+    }
   ]
 }

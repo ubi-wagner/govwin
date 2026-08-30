@@ -128,6 +128,13 @@ export interface CardFields {
   phaseType?: string | null;
   topicNumber?: string | null;
   topicBranch?: string | null;
+  /**
+   * The curated build-out and the curator's marks (mig 239) — what ranking reads INSTEAD of the
+   * solicitation text. See `ScoreInputs` for the measurement that settled it.
+   */
+  volumes?: string[] | null;
+  requiredItems?: string[] | null;
+  highlights?: Array<{ text?: string | null }> | null;
 }
 
 /**
@@ -145,8 +152,6 @@ export const DEFAULT_WEIGHTS = {
   agency: 1,
   program: 1,
   accessibility: 1,
-  /** Below keyword on purpose: the solicitation ASSISTS a curated match, it does not outrank it. */
-  corpus: 0.75,
   timeline: 0.5,
 } as const;
 
@@ -176,7 +181,6 @@ export interface CompositionEntry {
  */
 export function describeComposition(
   criteria: BucketCriteria,
-  opts: { hasCorpus?: boolean } = {},
 ): { entries: CompositionEntry[]; totalWeight: number } {
   const c = criteria ?? {};
   const w = c.weights ?? {};
@@ -189,9 +193,6 @@ export function describeComposition(
   if (c.agencies?.length) add('agency', 'agency', true);
   if (c.programTypes?.length) add('program', 'program type', true);
   if (c.useAccessibility && c.setAsides?.length) add('accessibility', 'set-aside', true);
-  // The corpus participates whenever the tenant holds the solicitation, which is a property of the
-  // opportunity rather than the bucket — so the caller says whether to show it.
-  if (opts.hasCorpus && c.keywords?.length) add('corpus', 'the solicitation text', true);
   if (c.useTimeline !== false) add('timeline', 'closing date', true);
 
   const totalWeight = raw.reduce((s, e) => s + e.weight, 0);
@@ -201,16 +202,27 @@ export function describeComposition(
   };
 }
 
-/** Optional per-card inputs a pure function cannot compute for itself. */
+/**
+ * Optional per-card inputs a pure function cannot compute for itself.
+ *
+ * ── THE CORPUS FACTOR WAS REMOVED (mig 239) ──────────────────────────────────────────────────
+ * mig 238 fed a `ts_rank` over the tenant's copy of the whole solicitation. Measured on one
+ * 330-page general BAA, `ts_rank` returns the SAME value for terms the document has nothing to do
+ * with — `agriculture` 0.0608 and `concrete` 0.0608 and `submarine` 0.0608, `manufacturing` 0.0827
+ * and `quantum` 0.0827. A general solicitation mentions everything once, so ranking against it
+ * measures document LENGTH, not relevance; the normalization then turned "appears once" into 100
+ * and four unrelated buckets scored one card at ceiling.
+ *
+ * What ranks instead is the CURATED record on the card — summary, expert notes, technology focus,
+ * volumes, required items and the admin's highlights. All of it small, specific, and there because
+ * a person decided it mattered.
+ *
+ * The interface stays because the shape is right and a future input (a tenant's own past-award
+ * history, say) belongs here rather than in the card.
+ */
 export interface ScoreInputs {
-  /**
-   * Normalized [0,1] relevance of the bucket's keywords against the tenant's OWN copy of the
-   * solicitation (`tenant_opportunity_documents.text_tsv`, mig 238), from one SQL pre-pass.
-   *
-   * `null`/omitted ABSTAINS — no corpus, no opinion. `0` is a real zero: the corpus was searched
-   * and did not match. Those are different facts and the denominator must tell them apart.
-   */
-  corpusRank?: number | null;
+  /** Reserved. No inputs today — see the note above. */
+  readonly _?: never;
 }
 
 /**
@@ -247,6 +259,14 @@ export function scoreCard(
     // folding them in here too would double-count one signal as a silent weight change.
     card.phaseType, card.topicNumber, card.topicBranch,
     ...(Array.isArray(card.techFocusAreas) ? card.techFocusAreas : []),
+    // The curated build-out (mig 239): what the admin decided this proposal is MADE OF.
+    // "Commercialization Plan", "Phase I Work Plan", "Cost Volume" says what the work IS.
+    ...(Array.isArray(card.volumes) ? card.volumes : []),
+    ...(Array.isArray(card.requiredItems) ? card.requiredItems : []),
+    // And what they MARKED while reading — the residue of a reading that otherwise evaporates
+    // into a 103-character blurb. This is the passage a person judged worth keeping, which is
+    // exactly what the raw document text is not.
+    ...(Array.isArray(card.highlights) ? card.highlights.map((h) => h?.text ?? '') : []),
   ].filter(Boolean).join(' ').toLowerCase();
 
   if (criteria.keywords?.length && text !== '') {
@@ -269,11 +289,6 @@ export function scoreCard(
   if (criteria.useAccessibility && criteria.setAsides?.length && card.setAsideType) {
     const s = card.setAsideType.toLowerCase();
     parts.push({ key: 'accessibility', v: criteria.setAsides.some((x) => s.includes(x.toLowerCase())) ? 1 : 0, weight: w.accessibility ?? DEFAULT_WEIGHTS.accessibility });
-  }
-  // The solicitation itself. Default weight 0.75 — deliberately BELOW keyword (1) so a corpus hit
-  // assists a card whose curated blurb matched rather than outranking it. Raise only on measurement.
-  if (inputs.corpusRank != null && Number.isFinite(inputs.corpusRank)) {
-    parts.push({ key: 'corpus', v: Math.max(0, Math.min(1, inputs.corpusRank)), weight: w.corpus ?? DEFAULT_WEIGHTS.corpus });
   }
   if (criteria.useTimeline !== false && card.closeDate) {
     // Skip an UNPARSEABLE close date rather than pushing a phantom 0.1 timeline signal — parity with

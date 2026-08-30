@@ -22,11 +22,12 @@ export type { BridgeEventType };
 /**
  * One document of the solicitation as it reaches a tenant — the MANIFEST entry.
  *
- * The bytes are NOT here. `opportunity_bridge` is append-only and versioned, so text in the card
- * would write another full copy of a 375,000-character document on every republish, forever; and
- * the card jsonb is TOASTed as a unit, so a feed query selecting `card` would pull the corpus with
- * it. The manifest rides the bridge; `copyCorpusInward` puts the bytes in the tenant's own
- * `tenant_opportunity_documents` row at apply time (mig 238).
+ * The bytes are NOT here, and as of mig 239 they do not arrive at fan-out either. The manifest says
+ * WHAT the organization published so a tenant can see it before deciding; `copyCorpusInward` copies
+ * the text into their own `tenant_opportunity_documents` rows when they PIN.
+ *
+ * The documents are REFERENCE. They are not what ranks — see the header of mig 239 for the
+ * measurement that settled it.
  */
 export interface OppCardDoc {
   sourceDocumentId: string;
@@ -94,8 +95,39 @@ export interface OppCard {
   } | null;
   /** What the organization published, as published. Manifest only — see OppCardDoc. */
   documents: OppCardDoc[];
+  /**
+   * The curated build-out — "volumes and skeletons" (mig 239).
+   *
+   * What the admin decided this proposal is MADE OF: the volume names and the required items inside
+   * them. Small, specific, and every entry exists because a person decided it belonged. This is a
+   * ranking signal in a way the solicitation text is not — "Technical Volume", "Commercialization
+   * Plan", "Phase I Work Plan" says what the work IS, where 330 pages of BAA says only that the
+   * document is long.
+   */
+  volumes: string[];
+  requiredItems: string[];
+  /**
+   * What the curator MARKED while reading (mig 239). The residue of a reading that otherwise
+   * evaporates into a 103-character blurb. Bounded at the bridge — a card is read on every list
+   * render, so the cap belongs here rather than in the input.
+   */
+  highlights: OppCardHighlight[];
   frozenAt: string;
 }
+
+/** One admin highlight as it reaches a tenant. */
+export interface OppCardHighlight {
+  text: string;
+  kind: string;
+  page: number | null;
+  /** The compliance variable it anchors, when it was made to justify one. */
+  variable: string | null;
+}
+
+/** Bounds for what rides the card. A card is read on every list render. */
+const MAX_HIGHLIGHTS = 24;
+const MAX_HIGHLIGHT_CHARS = 400;
+const MAX_VOLUME_ENTRIES = 40;
 
 const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
 
@@ -121,6 +153,30 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              -- column names, so they pass through untouched and must be written camelCase here.
              -- char_count is computed from the master text so the manifest can state the corpus
              -- size without carrying it.
+             -- The curated build-out (mig 239): volume names and the required items inside them.
+             -- Umbrella-level only (topic_id IS NULL) so a topic card is not handed another
+             -- topic's skeleton. DISTINCT because one volume name can carry many items.
+             (SELECT COALESCE(jsonb_agg(DISTINCT sv.volume_name ORDER BY sv.volume_name), '[]'::jsonb)
+                FROM solicitation_volumes sv
+               WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL
+                 AND COALESCE(sv.volume_name, '') <> '') AS volumes,
+             (SELECT COALESCE(jsonb_agg(DISTINCT vri.item_name ORDER BY vri.item_name), '[]'::jsonb)
+                FROM volume_required_items vri
+                JOIN solicitation_volumes sv2 ON sv2.id = vri.volume_id
+               WHERE sv2.solicitation_id = cs.id AND sv2.topic_id IS NULL
+                 AND COALESCE(vri.item_name, '') <> '') AS required_items,
+             -- What the curator MARKED. Bounded in SQL as well as in TS, so a pathological
+             -- annotation set cannot make one card payload enormous before it reaches the cap.
+             (SELECT COALESCE(jsonb_agg(h ORDER BY h->>'page'), '[]'::jsonb) FROM (
+                SELECT jsonb_build_object(
+                         'text', left(sa.excerpt, 400),
+                         'kind', sa.kind,
+                         'page', (sa.source_location->>'page')::int,
+                         'variable', sa.compliance_variable_name) AS h
+                  FROM solicitation_annotations sa
+                 WHERE sa.solicitation_id = cs.id AND COALESCE(sa.excerpt, '') <> ''
+                 ORDER BY sa.created_at
+                 LIMIT 24) q) AS highlights,
              (SELECT COALESCE(jsonb_agg(jsonb_build_object(
                         'sourceDocumentId', sd.id,
                         'documentType',     sd.document_type,
@@ -169,6 +225,12 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
      */
     const str = (v: unknown): string | null =>
       v == null ? null : v instanceof Date ? v.toISOString() : String(v);
+    /** A jsonb string array, cleaned and bounded. */
+    const strList = (v: unknown, cap: number): string[] =>
+      (Array.isArray(v) ? v : [])
+        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+        .map((x) => x.trim())
+        .slice(0, cap);
     const hasMatrix = o.pageLimitTechnical != null || o.pageLimitCost != null || (num(o.volumeCount) ?? 0) > 0;
     return {
       opportunityId,
@@ -210,6 +272,17 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       releasedByEmail: (o.releasedByEmail as string) ?? null,
       releasedAt: str(o.releasedAt),
       documents: Array.isArray(o.documents) ? (o.documents as OppCardDoc[]) : [],
+      volumes: strList(o.volumes, MAX_VOLUME_ENTRIES),
+      requiredItems: strList(o.requiredItems, MAX_VOLUME_ENTRIES),
+      highlights: (Array.isArray(o.highlights) ? (o.highlights as OppCardHighlight[]) : [])
+        .filter((h) => typeof h?.text === 'string' && h.text.trim() !== '')
+        .slice(0, MAX_HIGHLIGHTS)
+        .map((h) => ({
+          text: h.text.trim().slice(0, MAX_HIGHLIGHT_CHARS),
+          kind: typeof h.kind === 'string' ? h.kind : 'highlight',
+          page: Number.isFinite(Number(h.page)) ? Number(h.page) : null,
+          variable: typeof h.variable === 'string' ? h.variable : null,
+        })),
       frozenAt,
       complianceSummary: hasMatrix
         ? {
@@ -304,9 +377,13 @@ export async function publishToBridge(
 /**
  * Copy the solicitation corpus INWARD — the bytes the manifest describes (mig 238).
  *
- * Runs after the card upsert, once per tenant per applied bridge version. The master
- * (`solicitation_documents`) is RLS-off platform scope, so it is read on the bypass pool; the write
- * lands in the tenant's FORCE-RLS `tenant_opportunity_documents` under `withTenant`.
+ * ⚠️ CALLED AT PIN, NOT AT FAN-OUT (mig 239). It ran on every apply, for every holder, whether or
+ * not any of them ever opened the document — 21 MB per opportunity across seven tenants on this
+ * box. The documents are REFERENCE: the card's manifest says what exists, and the bytes arrive
+ * when a tenant pins. What ranks is the curated record on the card, not this.
+ *
+ * The master (`solicitation_documents`) is RLS-off platform scope, so it is read on the bypass
+ * pool; the write lands in the tenant's FORCE-RLS `tenant_opportunity_documents` under `withTenant`.
  *
  * Three properties worth stating, because each is load-bearing:
  *
@@ -323,7 +400,7 @@ export async function publishToBridge(
  * Best-effort throughout: a corpus failure must never fail the fan-out. The card still lands, the
  * card_tsv still ranks, and `reconcileTenant` re-drives the copy on the next pass.
  */
-async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promise<number> {
+export async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promise<number> {
   try {
     // The master's own rows — the manifest on the card says WHICH, this reads the bytes.
     const docs = await sqlBypass<Array<{
@@ -446,11 +523,10 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
     return { applied: rows.length > 0, existedBefore: !!prior };
   });
   if (!applied) return false;
-  // Corpus copy-inward (mig 238) BEFORE the cursor, the emit and the score. Ordering is the whole
-  // point: `capture:card.applied` triggers the pipeline rescore and `scoreCardForTenant` runs
-  // synchronously below, so a corpus landing after either would rank the card's first sighting on
-  // the 296-character blurb and only pick up the solicitation on some later, unrelated republish.
-  await copyCorpusInward(tenantId, ev);
+  // NO corpus copy here (mig 239). It used to run on every apply for every holder; the documents
+  // are reference material and now arrive at PIN. A tenant who has already pinned gets
+  // `pin_update_available` set by the upsert above, and resyncing re-copies against the new
+  // version — so an amendment still reaches the people who asked for the document.
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`

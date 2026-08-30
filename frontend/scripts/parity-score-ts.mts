@@ -16,11 +16,11 @@ import { scoreCard, type BucketCriteria, type CardFields } from '../lib/bucket-s
 const here = dirname(fileURLToPath(import.meta.url));
 const fx = JSON.parse(readFileSync(join(here, 'fixtures', 'scorer-parity.json'), 'utf8')) as {
   nowMs: number;
-  cases: Array<{ name: string; card: CardFields; criteria: BucketCriteria; corpusRank?: number | null }>;
+  cases: Array<{ name: string; card: CardFields; criteria: BucketCriteria }>;
 };
 
 const out = fx.cases.map((c) => {
-  const r = scoreCard(c.card, c.criteria, fx.nowMs, { corpusRank: c.corpusRank ?? null });
+  const r = scoreCard(c.card, c.criteria, fx.nowMs);
   return { name: c.name, score: r.score, factors: r.factors };
 });
 

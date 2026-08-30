@@ -25,6 +25,18 @@ const InputSchema = z.object({
   solicitationId: z.string().uuid(),
   kind: z.enum(['highlight', 'text_box', 'compliance_tag']),
   sourceLocation: SourceLocation,
+  /**
+   * The SELECTED TEXT, not just where it was.
+   *
+   * An anchor alone is useless anywhere the document is not open. A tenant who has not pinned the
+   * solicitation has no local copy for `{page, offset, length}` to resolve against, so a highlight
+   * carried as an anchor renders empty for exactly the customer it exists to inform — and it cannot
+   * be matched by a ranker at all, since there is nothing to match.
+   *
+   * Capped at 2,000: a highlight is a passage a curator marked, not a chapter. The anchor stays
+   * alongside it and becomes live once a tenant pins, resolving against their own copy.
+   */
+  text: z.string().max(2000).optional(),
   payload: z.record(z.string(), z.unknown()).default({}),
   /** If the annotation is anchored to a specific compliance variable
    *  (e.g. highlighting the sentence where the page limit is stated),
@@ -51,7 +63,7 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
   tenantScoped: false,
   async handler(input, ctx) {
     const actorId = ctx.actor.id;
-    const { solicitationId, kind, sourceLocation, payload, complianceVariableName } = input;
+    const { solicitationId, kind, sourceLocation, text, payload, complianceVariableName } = input;
 
     // Verify solicitation exists (FK will catch it at INSERT, but a
     // pre-check gives a cleaner error).
@@ -73,11 +85,12 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
       rows = await sql<{ id: string; createdAt: Date }[]>`
         INSERT INTO solicitation_annotations
           (solicitation_id, actor_id, kind, compliance_variable_name,
-           source_location, payload)
+           source_location, excerpt, payload)
         VALUES
           (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
            ${complianceVariableName ?? null},
            ${sql.json(sourceLocation)},
+           ${text?.trim() ? text.trim() : null},
            ${sql.json((payload) as Parameters<typeof sql.json>[0])})
         RETURNING id, created_at
       `;

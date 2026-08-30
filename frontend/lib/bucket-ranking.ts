@@ -29,59 +29,6 @@ import { scoreCard } from '@/lib/bucket-scoring';
 import type { BucketCriteria, CardFields } from '@/lib/bucket-scoring';
 
 /**
- * One SQL pre-pass: how well does this bucket's keyword set match the tenant's OWN copy of each
- * solicitation (`tenant_opportunity_documents.text_tsv`, mig 238)?
- *
- * ── WHY A PRE-PASS AND NOT SQL SCORING ───────────────────────────────────────────────────────
- * `scoreCard` is a pure function with a second implementation in Python. Moving the scoring into
- * SQL would split the runtimes structurally and make the parity check — the thing that actually
- * holds the mirror pair together — impossible to write. So SQL supplies ONE MORE INPUT and the
- * scorer stays pure, mirrored and testable.
- *
- * ── AND WHY IT NEEDS NO JOIN TO THE MASTER ───────────────────────────────────────────────────
- * The corpus is in tenant space. This query touches one FORCE-RLS table under the tenant's own
- * GUC, so isolation is structural rather than remembered. Ranking no longer reads a master table
- * at all.
- *
- * Normalization: `ts_rank` is unbounded-ish and corpus-relative, so a raw value is not comparable
- * between two solicitations of different lengths. Each opportunity's best document rank is divided
- * by the highest rank in this pass, putting the result in [0,1] — a RELATIVE measure, which is what
- * a ranking wants. With one matching card the winner is 1.0; with none the map is empty and every
- * card ABSTAINS, which is the honest answer when there is no corpus to search.
- */
-export async function corpusRanksForKeywords(
-  tx: typeof sql,
-  tenantId: string,
-  keywords: string[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  // websearch_to_tsquery treats bare words as AND. A bucket's keywords are alternatives, not a
-  // conjunction, so they are OR-ed — quoted so a multi-word keyword stays a phrase and a stray
-  // operator character cannot change the query's shape.
-  const query = keywords
-    .map((k) => k.trim()).filter(Boolean)
-    .map((k) => `"${k.replace(/"/g, '')}"`)
-    .join(' OR ');
-  if (!query) return out;
-  try {
-    const rows = await tx<Array<{ opportunityId: string; rel: number }>>`
-      WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS tsq),
-      hits AS (
-        SELECT d.opportunity_id, max(ts_rank(d.text_tsv, q.tsq)) AS rank
-        FROM tenant_opportunity_documents d, q
-        WHERE d.tenant_id = ${tenantId}::uuid AND d.text_tsv @@ q.tsq
-        GROUP BY d.opportunity_id)
-      SELECT opportunity_id, (rank / NULLIF(max(rank) OVER (), 0))::float8 AS rel FROM hits`;
-    for (const r of rows) if (r.rel != null) out.set(r.opportunityId, Number(r.rel));
-  } catch (e) {
-    // A corpus failure must leave ranking working on the card alone, not break it. An empty map
-    // means every card abstains — the same state as a tenant whose corpus has not landed yet.
-    console.error('[ranking] corpus pre-pass failed (non-fatal)', tenantId, e);
-  }
-  return out;
-}
-
-/**
  * Which lens surfaced the opportunity that became this build? (F13)
  *
  * The tenant's highest-scoring active bucket for this opportunity, resolved at PURCHASE time and
@@ -158,15 +105,7 @@ export async function scoreCardForTenant(tenantId: string, opportunityId: string
     for (const b of buckets) {
       const criteria = coerceJsonb<BucketCriteria>(b.criteria, {});
       if (!isOpen && !criteria.includeClosed) continue; // parity with rankBucket's card-set rule
-      // Per bucket, because the corpus rank is a function of THIS bucket's keywords. The pre-pass
-      // spans the tenant's WHOLE corpus, not just this card — deliberately, so the normalization
-      // denominator is identical to the one rankBucket computes. Scoring one card must not give it
-      // a different number than scoring it as part of a full re-rank; that difference would surface
-      // as a card's score drifting depending on which writer touched it last.
-      const corpus = await corpusRanksForKeywords(tx, tenantId, criteria.keywords ?? []);
-      const { score, factors } = scoreCard(cf, criteria, nowMs, {
-        corpusRank: corpus.has(opportunityId) ? corpus.get(opportunityId)! : null,
-      });
+      const { score, factors } = scoreCard(cf, criteria, nowMs);
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${b.id}::uuid, ${opportunityId}::uuid, ${score}, ${sql.json(factors)})
@@ -196,14 +135,9 @@ export async function rankBucket(tenantId: string, bucketId: string, nowMs: numb
       WHERE tenant_id = ${tenantId}::uuid
         ${criteria.includeClosed ? tx`` : tx`AND lifecycle_status = 'open'`}
     `;
-    // One pre-pass for the whole bucket (mig 238): the corpus rank depends on the bucket's keywords,
-    // not on the card, so it is computed once and looked up per card.
-    const corpus = await corpusRanksForKeywords(tx, tenantId, criteria.keywords ?? []);
     let ranked = 0;
     for (const c of cards) {
-      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs, {
-        corpusRank: corpus.has(c.opportunityId) ? corpus.get(c.opportunityId)! : null,
-      });
+      const { score, factors } = scoreCard(coerceJsonb<CardFields>(c.card, {}), criteria, nowMs);
       await tx`
         INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
         VALUES (${tenantId}::uuid, ${bucketId}::uuid, ${c.opportunityId}::uuid, ${score}, ${sql.json(factors)})

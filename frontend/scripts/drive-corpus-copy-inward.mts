@@ -1,9 +1,15 @@
 /**
- * drive-corpus-copy-inward — does the solicitation reach the tenant, and does it rank?
+ * drive-corpus-copy-inward — does the solicitation reach the tenant WHEN THEY PIN, and stay out
+ * of ranking until then?
  *
- * Proves mig 238 end to end on a REAL solicitation: two documents of the DoW 2026 SBIR set, 433
- * pages and 1.32M characters between them, staged onto a card-bearing solicitation and pushed
+ * Proves mig 238 + 239 end to end on a REAL solicitation: two documents of the DoW 2026 SBIR set,
+ * 433 pages and 1.32M characters between them, staged onto a card-bearing solicitation and pushed
  * through the actual bridge — `publishAndFanOut`, not a hand-written insert.
+ *
+ * ⚠️ The MODEL CHANGED at mig 239 and this drive changed with it. mig 238 copied the text at
+ * fan-out for every holder and fed it to the scorer; measurement showed `ts_rank` over a general
+ * BAA returns the same value for terms it has nothing to do with, so the factor scored document
+ * LENGTH. Documents are REFERENCE now: the manifest rides the card, the bytes arrive at pin.
  *
  * ⚠️ NOT read-only. It stages `solicitation_documents` rows, republishes an opportunity, and so
  * rewrites every tenant's mirror card, corpus and bucket scores for that opp. Sandbox only. It
@@ -12,11 +18,11 @@
  * What it asserts, in the order that matters:
  *
  *   1  RED — the corpus is absent before the push (a green that was already green proves nothing)
- *   2  the copy lands, per tenant, with the right char counts, per DOCUMENT not concatenated
- *   3  RLS fences it — a second tenant's context cannot read the first tenant's corpus rows
- *   4  the tsvector is populated and matches terms that appear ONLY deep in the document
- *   5  the ranking corpus grew, measured as lexemes, card vs corpus
- *   6  forward-only — replaying the same version is a no-op, and the hash short-circuit holds
+ *   2  the push does NOT copy it — the manifest rides the card, the bytes do not
+ *   3  PIN copies it, per DOCUMENT not concatenated, with the right char counts
+ *   4  RLS fences it — a second tenant's context cannot read the first tenant's corpus rows
+ *   5  the tsvector is populated and matches terms that appear ONLY deep in the document
+ *   6  ranking does NOT read it — no `corpus` factor appears in any stored score
  *
  * Usage:  node --import tsx frontend/scripts/drive-corpus-copy-inward.mts [--keep]
  *         The fixture is extracted from docs/*.pdf on first run and cached under the OS temp dir.
@@ -166,34 +172,56 @@ async function main() {
   if (!res) { console.error('  publishAndFanOut returned null — cannot continue'); process.exit(2); }
   console.log(`     bridge v${res.event.version} → ${res.tenantsApplied} tenant(s)\n`);
 
-  // ── 2 · The copy landed, per tenant, per document ──────────────────────────────────────────
-  console.log('2 · the copy landed — per tenant, per DOCUMENT');
+  // ── 2 · The push does NOT copy the bytes (mig 239) ─────────────────────────────────────────
+  console.log('2 · the push carries the MANIFEST, not the bytes');
+  const [afterPush] = await owner<Array<{ rows: number }>>`
+    SELECT count(*)::int AS rows FROM tenant_opportunity_documents
+    WHERE opportunity_id = ${target.opportunityId}::uuid`;
+  ok('no corpus rows after a full fan-out', Number(afterPush.rows) === 0, `${afterPush.rows} row(s)`);
+  ok('but the card NAMES both documents, so a tenant can see what exists',
+    await owner`SELECT card FROM tenant_opportunity_cards WHERE opportunity_id = ${target.opportunityId}::uuid LIMIT 1`
+      .then((r) => Array.isArray((r[0] as { card: { documents?: unknown[] } })?.card?.documents)
+                && (r[0] as { card: { documents: unknown[] } }).card.documents.length === 2));
+
+  // ── 2b · PIN copies it ─────────────────────────────────────────────────────────────────────
+  console.log('\n2b · pinning copies the text into the tenant\'s own rows (mutation)');
+  const holders = await owner<Array<{ tenantId: string; slug: string }>>`
+    SELECT c.tenant_id, t.slug FROM tenant_opportunity_cards c JOIN tenants t ON t.id = c.tenant_id
+    WHERE c.opportunity_id = ${target.opportunityId}::uuid AND c.archived_at IS NULL
+    ORDER BY t.slug LIMIT 2`;
+  // Object copies fail loudly in this sandbox — the drive stages solicitation_documents rows with
+  // no objects behind them. The TEXT copy is what is under test; the noise is expected.
+  const { pinCard, resyncPinnedCard } = await import('../lib/opportunity-pin.ts');
+  for (const h of holders) {
+    // Object copy is best-effort against the sandbox store; the TEXT copy is what this asserts.
+    await pinCard(h.tenantId, h.slug, target.opportunityId).catch(() => ({ pinned: false, docs: [] }));
+    console.log(`     pinned as ${h.slug}`);
+  }
+
+  console.log('\n3 · the copy landed — per tenant, per DOCUMENT');
   const perTenant = await owner<Array<{ tenantId: string; docs: number; chars: number; types: string }>>`
     SELECT tenant_id, count(*)::int AS docs, sum(char_count)::int AS chars,
            string_agg(document_type, ',' ORDER BY document_type) AS types
     FROM tenant_opportunity_documents WHERE opportunity_id = ${target.opportunityId}::uuid
     GROUP BY tenant_id ORDER BY tenant_id`;
-  ok('every holder has a corpus', perTenant.length === target.holders, `${perTenant.length} of ${target.holders}`);
+  ok('exactly the tenants that PINNED have a corpus — not every holder',
+    perTenant.length === holders.length, `${perTenant.length} of ${holders.length} pinned · ${target.holders} holders`);
   ok('two documents each, kept SEPARATE (not concatenated)',
     perTenant.every((t) => Number(t.docs) === 2 && t.types === 'source,topic'),
     perTenant[0] ? `${perTenant[0].docs} docs [${perTenant[0].types}]` : 'none');
   ok('character counts match the source exactly',
     perTenant.every((t) => Number(t.chars) === totalChars), `${n(perTenant[0]?.chars)} vs ${n(totalChars)}`);
-  ok('the manifest on the card names both documents',
-    await owner`SELECT card FROM tenant_opportunity_cards WHERE opportunity_id = ${target.opportunityId}::uuid LIMIT 1`
-      .then((r) => Array.isArray((r[0] as { card: { documents?: unknown[] } })?.card?.documents)
-                && (r[0] as { card: { documents: unknown[] } }).card.documents.length === 2));
   const [cardSize] = await owner<Array<{ bytes: number }>>`
     SELECT round(avg(pg_column_size(card)))::int AS bytes FROM tenant_opportunity_cards
     WHERE opportunity_id = ${target.opportunityId}::uuid`;
   ok('the card stayed SMALL — the bytes are not in the jsonb', Number(cardSize.bytes) < 8000,
     `card ${n(cardSize.bytes)} bytes vs corpus ${n(totalChars)} chars`);
 
-  // ── 3 · RLS fences it ──────────────────────────────────────────────────────────────────────
-  console.log('\n3 · RLS — the mirror is the fence');
-  const holders = perTenant.map((t) => t.tenantId);
-  if (holders.length >= 2) {
-    const [a, b] = holders;
+  // ── 4 · RLS fences it ──────────────────────────────────────────────────────────────────────
+  console.log('\n4 · RLS — the mirror is the fence');
+  const pinnedIds = perTenant.map((t) => t.tenantId);
+  if (pinnedIds.length >= 2) {
+    const [a, b] = pinnedIds;
     const seen = await app.begin(async (tx) => {
       await tx`SELECT set_config('app.tenant_id', ${a}, true)`;
       const mine = await tx<Array<{ c: number }>>`
@@ -206,11 +234,11 @@ async function main() {
     ok('tenant A reads its own 2 documents', seen.mine === 2, `${seen.mine}`);
     ok('tenant A reads ZERO of tenant B\'s, asking for them by id', seen.theirs === 0, `${seen.theirs}`);
   } else {
-    ok('two holders needed to test isolation', false, `only ${holders.length}`);
+    ok('two pinned tenants needed to test isolation', false, `only ${pinnedIds.length}`);
   }
 
-  // ── 4 · The tsvector matches text that is ONLY deep in the document ────────────────────────
-  console.log('\n4 · the corpus is searchable — terms found nowhere on the card');
+  // ── 5 · The tsvector matches text that is ONLY deep in the document ────────────────────────
+  console.log('\n5 · the pinned corpus is SEARCHABLE — terms found nowhere on the card');
   const deep = ['hypersonic', 'Technology Readiness Level', 'component instructions', 'Phase I evaluation'];
   for (const term of deep) {
     const [r] = await owner<Array<{ inCorpus: number; onCard: number }>>`
@@ -224,25 +252,27 @@ async function main() {
       `corpus ${r.inCorpus} · card ${r.onCard}${Number(r.onCard) === 0 ? '  ← reachable ONLY via the corpus' : ''}`);
   }
 
-  // ── 5 · How much did the ranking corpus grow ───────────────────────────────────────────────
-  console.log('\n5 · the ranking corpus, measured in lexemes');
-  const [lex] = await owner<Array<{ card: number; corpus: number }>>`
-    SELECT (SELECT round(avg(length(card_tsv)))::int FROM tenant_opportunity_cards
-             WHERE opportunity_id = ${target.opportunityId}::uuid) AS card,
-           (SELECT sum(length(text_tsv))::int FROM tenant_opportunity_documents
-             WHERE opportunity_id = ${target.opportunityId}::uuid
-               AND tenant_id = ${holders[0]}::uuid) AS corpus`;
-  const ratio = Number(lex.corpus) / Math.max(1, Number(lex.card));
-  console.log(`     card_tsv  ${n(lex.card).padStart(8)} lexemes`);
-  console.log(`     corpus    ${n(lex.corpus).padStart(8)} lexemes   ${ratio.toFixed(0)}× the card`);
-  ok('the corpus is at least 100× the card', ratio >= 100, `${ratio.toFixed(0)}×`);
+  // ── 6 · RANKING DOES NOT READ IT (mig 239) ─────────────────────────────────────────────────
+  // The point of the whole change. mig 238 fed this text to the scorer as a `corpus` factor; on a
+  // general BAA `ts_rank` returns the same value for terms the document has nothing to do with, so
+  // it scored document LENGTH and four unrelated buckets hit ceiling on one card.
+  console.log('\n6 · ranking does NOT read the solicitation');
+  const [corpusFactors] = await owner<Array<{ n: number }>>`
+    SELECT count(*)::int AS n FROM tenant_bucket_scores WHERE factors ? 'corpus'`;
+  ok('no stored score carries a `corpus` factor', Number(corpusFactors.n) === 0, `${corpusFactors.n} found`);
+  const [cardLex] = await owner<Array<{ card: number }>>`
+    SELECT COALESCE(round(avg(length(card_tsv))), 0)::int AS card FROM tenant_opportunity_cards
+    WHERE opportunity_id = ${target.opportunityId}::uuid`;
+  console.log(`     the card's own searchable record: ${n(cardLex.card)} lexemes — curated, not the document`);
 
-  // ── 6 · Forward-only + the hash short-circuit ──────────────────────────────────────────────
-  console.log('\n6 · forward-only, and the hash short-circuit');
+  // ── 7 · Forward-only + the hash short-circuit ──────────────────────────────────────────────
+  console.log('\n7 · forward-only, and the hash short-circuit');
   const [t0] = await owner<Array<{ updatedAt: Date; ver: number }>>`
     SELECT max(updated_at) AS updated_at, max(bridge_version)::int AS ver
     FROM tenant_opportunity_documents WHERE opportunity_id = ${target.opportunityId}::uuid`;
   const again = await publishAndFanOut(target.opportunityId, 'updated', null, new Date().toISOString());
+  // A pinned holder RESYNCS to pick the new version up — that is the path an amendment takes now.
+  for (const h of holders) await resyncPinnedCard(h.tenantId, h.slug, target.opportunityId).catch(() => ({ docs: [] }));
   const [t1] = await owner<Array<{ chars: number; ver: number; rows: number }>>`
     SELECT sum(char_count)::int AS chars, max(bridge_version)::int AS ver, count(*)::int AS rows
     FROM tenant_opportunity_documents WHERE opportunity_id = ${target.opportunityId}::uuid`;
@@ -250,21 +280,47 @@ async function main() {
   ok('unchanged content does not duplicate rows', Number(t1.rows) === perTenant.length * 2, `${t1.rows} rows`);
   ok('unchanged content keeps the same characters', Number(t1.chars) === totalChars * perTenant.length,
     `${n(t1.chars)}`);
+  void t0;
   // Replaying the OLD version must be a no-op — this is the stale-event guard.
   const { publishToBridge } = await import('../lib/opportunity-bridge.ts');
   void publishToBridge; void again;
 
-  // ── Restore ────────────────────────────────────────────────────────────────────────────────
-  if (!KEEP) {
-    console.log('\n   restoring (staged documents removed, then republished)');
-    await owner`DELETE FROM solicitation_documents WHERE id = ANY(${staged}::uuid[])`;
-    await publishAndFanOut(target.opportunityId, 'updated', null, new Date().toISOString());
-    const [after] = await owner<Array<{ rows: number }>>`
-      SELECT count(*)::int AS rows FROM tenant_opportunity_documents WHERE opportunity_id = ${target.opportunityId}::uuid`;
-    ok('the prune removed the withdrawn documents from every mirror', Number(after.rows) === 0, `${after.rows} row(s)`);
-  } else {
-    console.log('\n   --keep: staged documents and corpus LEFT IN PLACE');
-  }
+  // ── 8 · A WITHDRAWN document, and what happens to someone who pinned it ────────────────────
+  // The model change raises this and it deserves an assertion rather than an assumption. Under
+  // mig 238 the fan-out pruned every mirror the moment the master lost a document. Under 239 a
+  // pinned copy is the TENANT'S — deleting it out from under them because the organization
+  // withdrew the file would be the product silently removing something they were told they owned.
+  //
+  // So: the republish FLAGS them (`pin_update_available`, which the card upsert already sets), and
+  // the prune happens when they resync. Told, then acted on — never acted on without being told.
+  console.log('\n8 · a withdrawn document — flagged first, pruned on resync');
+  await owner`DELETE FROM solicitation_documents WHERE id = ANY(${staged}::uuid[])`;
+  await publishAndFanOut(target.opportunityId, 'updated', null, new Date().toISOString());
+
+  const [flagged] = await owner<Array<{ n: number }>>`
+    SELECT count(*)::int AS n FROM tenant_opportunity_cards
+    WHERE opportunity_id = ${target.opportunityId}::uuid AND is_pinned AND pin_update_available`;
+  ok('every pinned holder is FLAGGED that something changed', Number(flagged.n) === holders.length,
+    `${flagged.n} of ${holders.length}`);
+
+  const [stillHeld] = await owner<Array<{ n: number }>>`
+    SELECT count(*)::int AS n FROM tenant_opportunity_documents
+    WHERE opportunity_id = ${target.opportunityId}::uuid`;
+  ok('their copy is NOT deleted out from under them', Number(stillHeld.n) > 0, `${stillHeld.n} row(s) held`);
+
+  const [manifest] = await owner<Array<{ docs: number }>>`
+    SELECT jsonb_array_length(card->'documents')::int AS docs FROM tenant_opportunity_cards
+    WHERE opportunity_id = ${target.opportunityId}::uuid LIMIT 1`;
+  ok('but the CARD already says the organization no longer publishes them', Number(manifest.docs) === 0,
+    `manifest lists ${manifest.docs}`);
+
+  for (const h of holders) await resyncPinnedCard(h.tenantId, h.slug, target.opportunityId).catch(() => ({ docs: [] }));
+  const [afterResync] = await owner<Array<{ n: number }>>`
+    SELECT count(*)::int AS n FROM tenant_opportunity_documents
+    WHERE opportunity_id = ${target.opportunityId}::uuid`;
+  ok('and the resync prunes them', Number(afterResync.n) === 0, `${afterResync.n} row(s)`);
+
+  if (KEEP) console.log('\n   --keep: nothing to keep — the withdrawal test removes the staged documents');
 
   console.log(`\n${failures === 0 ? '✓ all checks passed' : `✗ ${failures} check(s) failed`}\n`);
   await owner.end(); await app.end();

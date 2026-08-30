@@ -9,6 +9,35 @@ import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { copyObject } from '@/lib/storage/s3-client';
 import { customerPinnedPath } from '@/lib/storage/paths';
+import { copyCorpusInward, type BridgeEvent } from '@/lib/opportunity-bridge';
+
+/**
+ * Copy the solicitation TEXT into the tenant's own rows, alongside the object copy (mig 239).
+ *
+ * Pin already meant "make me a local copy of the folder". The text is the other half of that: the
+ * objects are what a person opens, the extracted text is what the product can search, quote and
+ * draft from. Until mig 239 the text was copied at fan-out for every holder whether or not anyone
+ * opened it; here it arrives because someone asked.
+ *
+ * Best-effort. A corpus failure must not fail the pin — the files are already copied and the
+ * manifest on the card still says what exists, so a resync re-drives it.
+ */
+async function copyPinnedText(tenantId: string, opportunityId: string): Promise<number> {
+  try {
+    // The corpus copier is keyed on a bridge event because it stamps `bridge_version`, which is
+    // what makes a resync after an amendment REPLACE the text rather than layer it. Read the head
+    // version rather than inventing one: a copy stamped 0 would look permanently stale.
+    const [head] = await sql<Array<{ id: string; version: number }>>`
+      SELECT id, version FROM opportunity_bridge
+      WHERE opportunity_id = ${opportunityId}::uuid ORDER BY version DESC LIMIT 1`;
+    if (!head) return 0;
+    const ev = { id: head.id, opportunityId, version: head.version, eventType: 'updated', card: null } as unknown as BridgeEvent;
+    return await copyCorpusInward(tenantId, ev);
+  } catch (e) {
+    console.error('[pin] text copy failed (non-fatal)', tenantId, opportunityId, e);
+    return 0;
+  }
+}
 
 export interface PinnedDoc {
   filename: string;
@@ -58,6 +87,8 @@ export async function pinCard(tenantId: string, tenantSlug: string, opportunityI
   if (!exists) return { pinned: false, docs: [] };
 
   const docs = await copyOppFolder(tenantSlug, opportunityId);
+  // The other half of the copy: the extracted TEXT, into the tenant's own rows (mig 239).
+  await copyPinnedText(tenantId, opportunityId);
 
   await withTenant(tenantId, async (tx) => {
     await tx`
@@ -73,6 +104,9 @@ export async function pinCard(tenantId: string, tenantSlug: string, opportunityI
 /** Resync a pinned card after a pushed update: re-copy the folder + clear the flag. */
 export async function resyncPinnedCard(tenantId: string, tenantSlug: string, opportunityId: string): Promise<{ docs: PinnedDoc[] }> {
   const docs = await copyOppFolder(tenantSlug, opportunityId);
+  // Re-copy the text too, forward-only against the new bridge version — an amendment that replaced
+  // a document must replace the tenant's copy of its text, not leave the superseded one in place.
+  await copyPinnedText(tenantId, opportunityId);
   await withTenant(tenantId, async (tx) => {
     await tx`
       UPDATE tenant_opportunity_cards

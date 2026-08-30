@@ -1,5 +1,5 @@
 /**
- * Abstention, the corpus factor, and the fields that finally cross the bridge (mig 238).
+ * Abstention, the curated ranking corpus, and the fields that cross the bridge (mig 238 · 239).
  *
  * ── THE BUG THIS PINS ────────────────────────────────────────────────────────────────────────
  * Four of six factors — agency, naics, program, accessibility — guarded only the BUCKET side. So a
@@ -100,126 +100,66 @@ describe('the fields that finally cross the bridge (mig 238)', () => {
   });
 });
 
-describe('the corpus factor', () => {
-  it('abstains when null or omitted', () => {
-    expect(scoreCard({ title: 'x' }, { keywords: ['x'] }, NOW).factors).not.toHaveProperty('corpus');
-    expect(scoreCard({ title: 'x' }, { keywords: ['x'] }, NOW, { corpusRank: null }).factors)
-      .not.toHaveProperty('corpus');
-  });
-
-  it('zero is a REAL zero — the corpus was searched and did not match', () => {
-    const r = scoreCard({ title: 'x' }, { keywords: ['x'] }, NOW, { corpusRank: 0 });
-    expect(r.factors.corpus).toBe(0);
-  });
-
-  it('carries a card the card text alone would have missed', () => {
-    // The whole point: "hypersonic" appears 14 times in the solicitation and zero times on the card.
-    const without = scoreCard({ title: 'Open topic' }, { keywords: ['hypersonic'] }, NOW);
-    const withCorpus = scoreCard({ title: 'Open topic' }, { keywords: ['hypersonic'] }, NOW, { corpusRank: 0.8 });
-    expect(without.score).toBe(0);
-    expect(withCorpus.score).toBeGreaterThan(0);
-  });
-
-  it('assists rather than overrides — its default weight is below keyword', () => {
-    // A corpus hit must not outrank a card whose curated summary actually matched.
-    const cardHit = scoreCard({ title: 'hypersonic glide' }, { keywords: ['hypersonic'] }, NOW, { corpusRank: 0 });
-    const corpusOnly = scoreCard({ title: 'Open topic' }, { keywords: ['hypersonic'] }, NOW, { corpusRank: 1 });
-    expect(cardHit.score).toBeGreaterThan(corpusOnly.score);
-  });
-
-  it('is clamped, so an out-of-range rank cannot leak a bad score', () => {
-    const r = scoreCard({ title: 'x' }, { keywords: ['x'] }, NOW, { corpusRank: 7.5 });
-    expect(r.factors.corpus).toBe(100);
-    expect(r.score).toBeLessThanOrEqual(100);
-  });
-
-  it('respects an explicit weight', () => {
-    const r = scoreCard({ title: 'x' }, { keywords: ['nope'], weights: { corpus: 2 } }, NOW, { corpusRank: 1 });
-    // keyword 0 at weight 1, corpus 100 at weight 2 → 67
-    expect(r.score).toBe(67);
-  });
-});
-
-describe('describeComposition — the sentence the customer reads about their own lens', () => {
+describe('the curated record — what ranking reads instead of the solicitation (mig 239)', () => {
   /**
-   * The rule for this line: *confirm the percentage matches what scoreCard actually computes for
-   * that criteria set — a wrong number here is worse than none.* So this does not check the string;
-   * it drives the SCORER with a card that scores 100 on exactly one signal and 0 on the rest, and
-   * asserts the resulting score IS that signal's advertised share.
+   * mig 238 fed a ts_rank over the tenant's copy of the whole solicitation. Measured on one
+   * 330-page general BAA, ts_rank returns the SAME value for terms the document has nothing to do
+   * with — agriculture, concrete and submarine all 0.0608 — because a general solicitation mentions
+   * everything once. The factor measured document LENGTH. What replaces it is what a curator
+   * PRODUCED while reading: small, specific, and there because a person decided it mattered.
    */
-  // Every field PRESENT, so nothing abstains and every signal is in the denominator. The close date
-  // is in the PAST, so timeline scores a real 0 like the other misses — a card closing soon would
-  // make timeline hit on every iteration and quietly inflate each expectation.
-  const card = (closeDays: number) => ({
-    title: 'concrete', agency: 'Navy', naicsCodes: ['541715'], programType: 'sbir',
-    setAsideType: 'small business', closeDate: new Date(NOW + closeDays * DAY).toISOString(),
+  it('a volume name is matchable', () => {
+    const r = scoreCard({ title: 'Open topic', volumes: ['Technical Volume', 'Commercialization Plan'] },
+      { keywords: ['commercialization'] }, NOW);
+    expect(r.factors.keyword).toBe(100);
   });
 
-  it('every advertised share is the score that signal alone produces', () => {
-    const criteria = {
-      keywords: ['concrete'], naics: ['541715'], agencies: ['navy'], programTypes: ['sbir'],
-      setAsides: ['small business'], useAccessibility: true, useTimeline: true,
-    };
-    const { entries } = describeComposition(criteria, { hasCorpus: true });
-    expect(entries).toHaveLength(7); // all of them, or this proves less than it looks
-    for (const e of entries) {
-      // A criteria set where ONLY this signal can hit: every other criterion is given a value the
-      // card cannot match, so it contributes a real 0 and stays in the denominator.
-      const only: Record<string, unknown> = {
-        keywords: ['zzzz'], naics: ['999999'], agencies: ['zzzz'], programTypes: ['zzzz'],
-        setAsides: ['zzzz'], useAccessibility: true, useTimeline: true,
-      };
-      if (e.key === 'keyword') only.keywords = ['concrete'];
-      if (e.key === 'naics') only.naics = ['541715'];
-      if (e.key === 'agency') only.agencies = ['navy'];
-      if (e.key === 'program') only.programTypes = ['sbir'];
-      if (e.key === 'accessibility') only.setAsides = ['small business'];
-      const r = scoreCard(
-        card(e.key === 'timeline' ? 10 : -10),   // timeline hits only on its own iteration
-        only, NOW,
-        { corpusRank: e.key === 'corpus' ? 1 : 0 },
-      );
-      expect(r.score, `share advertised for "${e.key}"`).toBe(e.share);
-    }
+  it('a required item is matchable — the skeleton says what the work IS', () => {
+    const r = scoreCard({ title: 'Open topic', requiredItems: ['Phase I Work Plan', 'Letters of Support'] },
+      { keywords: ['work plan'] }, NOW);
+    expect(r.factors.keyword).toBe(100);
   });
 
-  it('shares sum to 100 and reflect a custom weight', () => {
-    const { entries } = describeComposition({ keywords: ['a'], useTimeline: true });
-    expect(entries.map((e) => e.key)).toEqual(['keyword', 'timeline']);
-    expect(entries.reduce((s, e) => s + e.share, 0)).toBe(100);
-    expect(entries[0].share).toBe(67); // 1 / 1.5
-
-    const weighted = describeComposition({ keywords: ['a'], useTimeline: true, weights: { timeline: 1 } });
-    expect(weighted.entries.map((e) => e.share)).toEqual([50, 50]);
+  it("an admin's highlight is matchable — the residue of a reading that otherwise evaporates", () => {
+    const r = scoreCard({
+      title: 'Open topic',
+      highlights: [{ text: 'Proposals must address additive construction of expeditionary structures.' }],
+    }, { keywords: ['expeditionary'] }, NOW);
+    expect(r.factors.keyword).toBe(100);
   });
 
-  it('lists nothing for an empty bucket, rather than a confident 0%', () => {
-    expect(describeComposition({ useTimeline: false }).entries).toEqual([]);
-    expect(describeComposition({ useTimeline: false }).totalWeight).toBe(0);
+  it('a highlight with no text contributes nothing, and does not throw', () => {
+    const r = scoreCard({ title: 'Open topic', highlights: [{ text: null }, { text: '   ' }] },
+      { keywords: ['expeditionary'] }, NOW);
+    expect(r.factors.keyword).toBe(0);
   });
 
-  it('omits the corpus unless the tenant holds the solicitation', () => {
-    const without = describeComposition({ keywords: ['a'] });
-    const withIt = describeComposition({ keywords: ['a'] }, { hasCorpus: true });
-    expect(without.entries.some((e) => e.key === 'corpus')).toBe(false);
-    expect(withIt.entries.some((e) => e.key === 'corpus')).toBe(true);
+  it('survives every field arriving as the wrong shape', () => {
+    // Stored jsonb of an older vintage, or a hand-edited row. The scorer must not throw on it.
+    const r = scoreCard({
+      title: 'Open topic',
+      volumes: 'not a list' as unknown as string[],
+      requiredItems: null,
+      highlights: { nope: true } as unknown as Array<{ text: string }>,
+    }, { keywords: ['open'] }, NOW);
+    expect(r.factors.keyword).toBe(100);
   });
 
-  it('marks as conditional exactly the signals that abstain on a missing card field', () => {
-    const { entries } = describeComposition({
-      keywords: ['a'], naics: ['1'], agencies: ['b'], programTypes: ['c'],
-      setAsides: ['d'], useAccessibility: true, useTimeline: true,
-    }, { hasCorpus: true });
-    // keyword is the only one a card effectively always has (a card without a title is broken).
-    expect(entries.filter((e) => !e.conditional).map((e) => e.key)).toEqual(['keyword']);
+  it('there is NO corpus factor any more', () => {
+    const r = scoreCard({
+      title: 'x', volumes: ['Technical Volume'], requiredItems: ['Work Plan'],
+      highlights: [{ text: 'anything' }],
+    }, { keywords: ['x'] }, NOW);
+    expect(r.factors).not.toHaveProperty('corpus');
+    expect(Object.keys(r.factors)).toEqual(['keyword']);
   });
 
-  it('the weight table is the one the scorer uses', () => {
-    // Red-tests itself: change a default in DEFAULT_WEIGHTS and this fails, because the score is
-    // computed by scoreCard and the expectation is computed from the table.
-    const r = scoreCard({ title: 'x' }, { keywords: ['x'], useTimeline: false }, NOW, { corpusRank: 0 });
-    const expected = Math.round((100 * DEFAULT_WEIGHTS.keyword) / (DEFAULT_WEIGHTS.keyword + DEFAULT_WEIGHTS.corpus));
-    expect(r.score).toBe(expected);
+  it('the curated record does not manufacture a factor of its own', () => {
+    // It widens the TEXT the keyword factor matches. It is not a separate signal with a weight,
+    // because a separate signal is what let a 330-page document score at ceiling on every bucket.
+    const r = scoreCard({ volumes: ['Cost Volume'] }, { keywords: ['cost'] }, NOW);
+    expect(Object.keys(r.factors)).toEqual(['keyword']);
+    expect(r.score).toBe(100);
   });
 });
 
