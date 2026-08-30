@@ -316,6 +316,10 @@ DRIVES=(
   # the extracted text, released. Needs the worker and the Claude emulator up (scripts/sandbox-up.sh)
   # and leaves the solicitation on the box; --cleanup removes it.
   "real-solicitation|scripts/drive-real-solicitation.mts"
+  # The curator's pass on that solicitation: count the boilerplate, mark the passages that govern
+  # every bid, segment the 66 topics into their own opportunities, release all 67. Requires
+  # real-solicitation to have run first; --cleanup removes the topics and annotations.
+  "curate-baa|scripts/drive-curate-baa.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
