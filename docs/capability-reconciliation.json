@@ -829,7 +829,7 @@
    "archetype": "color_team_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "compliance_reviewer",
@@ -877,7 +877,7 @@
    "archetype": "ingest_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "librarian",
@@ -907,7 +907,7 @@
    "archetype": "matrix_stager",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "onboarding_agent",
@@ -919,7 +919,7 @@
    "archetype": "opportunity_analyst",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "opportunity_scout",
@@ -961,7 +961,7 @@
    "archetype": "project_manager",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "proposal_architect",
@@ -997,19 +997,19 @@
    "archetype": "scoring_strategist",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "section_drafter",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "skeleton_architect",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "social_scheduler",
@@ -1021,7 +1021,7 @@
    "archetype": "status_narrator",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "stylist",
@@ -1065,7 +1065,7 @@
    "template": "on_contract_started",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_full_draft_requested",
@@ -1107,7 +1107,7 @@
    "template": "on_project_health_requested",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_proposal_advanced",
@@ -1143,7 +1143,7 @@
    "template": "on_rfp_uploaded",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_social_schedule_requested",
@@ -1155,7 +1155,7 @@
    "template": "on_solicitation_pushed",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_solicitation_review_requested",
@@ -1179,7 +1179,7 @@
    "template": "on_status_narrative_requested",
    "namedInUi": true,
    "viaEnumerator": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "template": "on_tenant_rescore",
@@ -1192,6 +1192,7 @@
   "amendment.acknowledged",
   "amendment.flagged",
   "artifact.exported",
+  "artifact.locked",
   "atom.archived",
   "atom.curated",
   "atom.restored",
@@ -1199,9 +1200,14 @@
   "document.created",
   "document.exported",
   "document.updated",
+  "draft.completed",
+  "opportunity.pursuit_set",
   "outcome.attributed",
   "portal.stage_advanced",
+  "preview.generated",
   "project.collaboration_requested",
+  "purchase.completed",
+  "starter_set.added",
   "task.assigned",
   "template.applied"
  ]
