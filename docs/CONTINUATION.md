@@ -1,11 +1,26 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-28 (migration head **237** — see "The post-award build-out + doc-currency
-pass" immediately below. Earlier context from 2026-08-24 at head **213** follows.) (migration head **213** — see "The isolation pass" immediately below: migs
+**Last updated:** 2026-08-31 (migration head **241**, and **`main` is now at that head** — PR #213
+merged the entire arc; see the Branch line below before doing anything else. Earlier: head **237** —
+see "The post-award build-out + doc-currency pass" below. Earlier context from 2026-08-24 at head **213** follows.) (migration head **213** — see "The isolation pass" immediately below: migs
 212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
 was found 100% inert and fixed, and five instruments were found reporting green over a scope smaller
 than their claim. Earlier context from 2026-08-23 at head **205** follows.) (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
-**Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
+**Branch:** `claude/nice-hamilton-kBqtD` — **MERGED and RESTARTED FROM `main` on 2026-08-31.**
+PR **#213** took the whole 151-commit arc (heads 215–241: the email seam · Projects · the matching
+corpus) into `main` at `c5529120`, CI green on all four jobs, and the branch was then reset to that
+commit. It carries **nothing unmerged**.
+
+> ⚠️ The line that used to live here said *"Do NOT restart it from `origin/main` — that would discard
+> the unmerged arc."* That was true until #213 and is now **exactly backwards**: there is no unmerged
+> arc, and building on the pre-merge history would stack new work on commits `main` already has. If a
+> session finds this branch behind `main`, restart it —
+> `git fetch origin main && git checkout -B claude/nice-hamilton-kBqtD origin/main`.
+> A merged pull request is finished; follow-up work is a new PR.
+
+Fetch before you push — more than one session works this branch, and they have collided (2026-08-31:
+two sessions independently built the same rename; the divergent line was preserved on a side branch
+rather than force-pushed).
 
 ---
 
