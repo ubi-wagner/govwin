@@ -352,6 +352,20 @@ Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't pre
 (platform inactivity, no pin) — on one it writes `needs-rehydrate`; recovery is
 `bash frontend/scripts/rehydrate-sandbox.sh`.
 
+> ⚠️ **`login?error=invalid` has a SECOND cause, and it is not the rotated admin hashes below.**
+> `sandbox-heartbeat.sh` used to carry its own `DATABASE_URL` literal with the OWNER's password
+> (`changeme`) for the `govtech_app` role, whose password in `scripts/sandbox-env.sh` is `apppass`.
+> It therefore started the app server with credentials that cannot authenticate, and **every** sign-in
+> — admin and tenant alike — answered `login?error=invalid`, so every lens died at its first login.
+> `sandbox-reset-passwords.mjs` does not help: the user hash was never the problem.
+>
+> Only the server log says what it is: `[auth.findUserByEmail] db error PostgresError: password
+> authentication failed for user "govtech_app"`. If sign-in fails EVERYWHERE, read
+> `/proc/<server-pid>/environ` and compare its `DATABASE_URL` to `sandbox-env.sh` before believing
+> anything else. The heartbeat now sources `sandbox-env.sh` (occurrence FIVE of one credential in two
+> places — B146/B147), and note the pool caches credentials at connect time, so fixing the role
+> password requires a server RESTART, not just an `ALTER ROLE`.
+
 **2. Verify dispatched agents.** ALWAYS re-derive a sub-agent's finding against the actual code/schema before
 acting on it — agents have returned stale/incomplete generation (this session: a "readiness uses the cheap
 page estimate" gap that was already closed; inconsistent agent live/dormant counts). Trust nothing an agent

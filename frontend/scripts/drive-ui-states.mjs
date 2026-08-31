@@ -439,6 +439,9 @@ console.log(`· serving ${BASE} · driving overlays on ${atlas.shots.length} cap
 const before = await tableCounts();
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 let totalOpened = 0, totalConfirms = 0, totalPanels = 0, routesDriven = 0;
+/** Routes whose first navigation aborted and whose retry then succeeded. Reported, not hidden:
+ *  a tab that had to be replaced is worth knowing about even when the data is complete. */
+const recoveries = [];
 
 try {
   for (const [laneId, lane] of Object.entries(LANES)) {
@@ -452,6 +455,13 @@ try {
     catch (e) { console.log(`  ✗ lane unavailable — ${String(e.message).slice(0, 60)}`); await ctx.close(); continue; }
 
     for (const s of mine) {
+      // Remember where this route's findings begin, so a RECOVERED navigation can withdraw the
+      // first attempt's. Without this the retry below could succeed, capture every state, and the
+      // run would STILL report the route as failed and exit 1 — which is what happened on three
+      // consecutive sweeps: `/portal/[tenantSlug]/manage` was listed as a finding while its 14
+      // states sat in the index. A report that cannot tell "recovered" from "never measured" is
+      // reporting on itself, and the two need opposite responses.
+      const findingsBefore = findings.length;
       let r = await driveRoute(page, laneId, s.route, s.url);
       // A tab that cannot navigate is spent — give the lane a fresh one and re-drive this route
       // once, so a single bad click costs one route rather than every route after it.
@@ -459,7 +469,15 @@ try {
         try {
           await page.close().catch(() => {});
           page = await ctx.newPage();
-          r = await driveRoute(page, laneId, s.route, s.url);
+          const retry = await driveRoute(page, laneId, s.route, s.url);
+          if (!retry.navFailed) {
+            // Recovered. Drop the first attempt's harness findings and keep the retry's states —
+            // the route WAS measured, on a fresh tab, which is exactly what the retry is for.
+            const recovered = findings.splice(findingsBefore, findings.length - findingsBefore)
+              .filter((f) => f.harness).length;
+            recoveries.push({ lane: laneId, route: s.route, withdrew: recovered });
+          }
+          r = retry;
         } catch { /* the lane is genuinely broken; the finding already records it */ }
       }
       routesDriven++; totalOpened += r.opened; totalConfirms += r.confirms; totalPanels += r.panels ?? 0;
@@ -484,10 +502,14 @@ console.log(`\n  ${totalOpened} overlay(s) opened · ${totalPanels} panel state(
 console.log(`\nmutation footprint: ${drift.length ? drift.length + ' table(s) changed' : 'nothing changed'}`);
 for (const d of drift) console.log(`  · ${d}`);
 
+if (recoveries.length) {
+  console.log(`\n· ${recoveries.length} route(s) RECOVERED on a fresh tab (first navigation aborted, retry drove them):`);
+  for (const r of recoveries) console.log(`  · [${r.lane}] ${r.route}`);
+}
 if (findings.length) {
   console.log(`\n✗ ${findings.length} finding(s):`);
   for (const f of findings) console.log(`  · [${f.lane}] ${f.route}${f.trigger ? ` — "${f.trigger}"` : ''}: ${f.what}`);
 }
-fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ base: BASE, routesDriven, shots, findings, drift }, null, 1));
+fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ base: BASE, routesDriven, shots, findings, recoveries, drift }, null, 1));
 console.log(`\nwrote ${shots.length} screenshot(s) + index.json to docs/ui-states/`);
 process.exit(findings.length ? 1 : 0);

@@ -199,6 +199,20 @@ if (states.findings?.length) {
   for (const f of states.findings) S.push(`| ${f.lane} | \`${esc(f.route)}\` | ${esc(f.trigger ? `"${f.trigger}" — ` : '')}${esc(f.what)} |`);
   S.push('');
 }
+if (states.recoveries?.length) {
+  S.push('## Recovered — first navigation aborted, retry drove the route');
+  S.push('');
+  S.push('A spent tab is replaced and the route re-driven. These ARE measured; they are listed because');
+  S.push('a tab that had to be replaced is worth knowing about. Before this was separated out, a');
+  S.push('recovered route stayed in the FINDINGS list, so a clean run reported two failures and exited 1');
+  S.push('while their states sat in the index — a report that cannot tell "recovered" from "never');
+  S.push('measured" is reporting on itself, and the two need opposite responses.');
+  S.push('');
+  S.push('| lane | route |');
+  S.push('|---|---|');
+  for (const r of states.recoveries) S.push(`| ${r.lane} | \`${esc(r.route)}\` |`);
+  S.push('');
+}
 S.push('## Contact sheets — start here');
 S.push('');
 S.push('Sheets group by KIND, not by route: twenty validation messages side by side is what makes the');
