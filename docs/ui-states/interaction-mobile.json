@@ -92,10 +92,10 @@
    "status": 200,
    "probed": true,
    "opened": 35,
-   "candidates": 223,
+   "candidates": 226,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 325
+   "smallTargets": 329
   },
   {
    "lane": "tenant",
@@ -190,11 +190,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 10,
-   "candidates": 162,
+   "opened": 12,
+   "candidates": 177,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 237
+   "smallTargets": 252
   },
   {
    "lane": "admin",

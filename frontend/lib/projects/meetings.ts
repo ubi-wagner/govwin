@@ -22,7 +22,7 @@
  * is a management act wherever it starts, and there should be one rule about that in one place.
  */
 import { randomUUID } from 'crypto';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { starterFromPreset, countNodes } from '@/lib/documents/starter';
 import { createNode, type CanvasNode } from '@/lib/types/canvas-document';
@@ -148,11 +148,6 @@ export async function recordMeeting(
       tenantId: actor.tenantId,
       payload: { projectId, meetingId: row.id, title, heldOn, attendees: attendees.length, documentId },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.meeting_recorded',
-      entityType: 'project_meeting', entityId: row.id,
-      metadata: { projectId, title, heldOn },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/meetings] recordMeeting failed:', err);
@@ -238,11 +233,6 @@ export async function raiseActionItems(
         projectId, meetingId, title: meeting.title,
         raised: taskIds.length, refused: refused.length,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.meeting_actions_raised',
-      entityType: 'project_meeting', entityId: meetingId,
-      metadata: { projectId, raised: taskIds.length, refused: refused.length },
     });
     return { ok: true, data: { meetingId, taskIds, refused } };
   } catch (err) {

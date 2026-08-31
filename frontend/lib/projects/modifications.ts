@@ -22,7 +22,7 @@
  * **ToDo** asking a person to do it. Two writers on the plan's dates is how a schedule stops being
  * explainable, and an automatic rebaseline would be the second.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
@@ -316,11 +316,6 @@ export async function draftModification(
       tenantId: actor.tenantId,
       payload: { projectId, modificationId: mod.id, modNumber, kind, changes: changes.length },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.modification_drafted',
-      entityType: 'project_modification', entityId: mod.id,
-      metadata: { projectId, modNumber, kind, changes: changes.length },
-    });
 
     return { ok: true, data: { ...mod, changes: [] } };
   } catch (err) {
@@ -575,11 +570,6 @@ export async function executeModification(
         movedPeriodOfPerformance: movedPop,
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.modification_executed',
-      entityType: 'project_modification', entityId: modificationId,
-      metadata: { projectId, modNumber: mod.modNumber, executedOn, ...out },
-    });
 
     return {
       ok: true,
@@ -630,10 +620,12 @@ export async function deleteModification(
     await sql`
       DELETE FROM project_modifications
        WHERE id = ${modificationId}::uuid AND tenant_id = ${actor.tenantId}::uuid AND status = 'draft'`;
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.modification_discarded',
-      entityType: 'project_modification', entityId: modificationId,
-      metadata: { projectId, modNumber: row.modNumber },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'modification.discarded',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, modificationId },
     });
     return { ok: true, data: { modificationId } };
   } catch (err) {

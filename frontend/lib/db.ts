@@ -1,9 +1,6 @@
 import postgres from 'postgres';
 import { hasRoleAtLeast, isRole } from './rbac';
 import { currentTenantContext, enterTenant } from '@/lib/tenant-context';
-// A ZERO-IMPORT LEAF, on purpose: lib/events.ts imports sql from this file, so this file cannot
-// import lib/events.ts back. The registry lives on its own so both sides can read it.
-import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 
 // Re-export the choke-point primitives so a portal route can `import { sql,
 // verifyTenantAccess, enterTenant } from '@/lib/db'` in ONE line. The RLS cutover
@@ -254,55 +251,30 @@ export async function verifyProposalAccess(
   }
 }
 
-/**
- * A domain audit record.
+/*
+ * `auditLog()` USED TO LIVE HERE. It is gone, and this note is why — so nobody adds it back.
  *
- * ── IT WROTE TO A TABLE THAT WAS DROPPED 74 MIGRATIONS AGO ───────────────────────────────────
- * This inserted into `audit_log` until this fix. Migration 142 dropped that table — deliberately,
- * annotated `→ system_events (live audit trail)` — and nothing updated this function. Because the
- * body is wrapped in a catch that only logs, every call since has failed silently: the INSERT
- * raised `relation "audit_log" does not exist`, the error went to stderr, and the caller carried on
- * believing it had left a record.
+ * It inserted into `audit_log`, which migration 142 DROPPED, annotated `→ system_events (live
+ * audit trail)`. Nothing updated the function, and its body was wrapped in a catch that only
+ * logged, so every call raised `relation "audit_log" does not exist`, printed to stderr, and
+ * returned normally. It had been a no-op for 74 migrations.
  *
- * There are 46 call sites, and ALL of them are the post-award Projects tree — a tree written long
- * after mig 142, against a helper that was already dead. So the entire Projects audit trail
- * (baselines, gate closures, invoice submission, CLIN edits, member assignment) has never recorded
- * one row, and no lens could see it: the function returns void, swallows its own failure, and the
- * pages that matter never read it back.
+ * The tempting fix was to point it at `system_events`. That was tried here and was WRONG, and the
+ * way it was wrong is the interesting part. Of its 45 call sites — every one in the post-award
+ * Projects tree — 36 sat DIRECTLY BELOW an `emitEventSingle`/`withEventBracket` recording the same
+ * fact with a conformant type. Redirecting therefore did not restore a missing audit trail; the
+ * trail was never missing. It DOUBLED it, with a second malformed row per action: `baseline.set`
+ * beside `baseline_set`, `clin.created` beside `clin_created`. Those flat types also violate the
+ * `entity.action_past_tense` contract, so nothing had a written label and the customer's feed
+ * rendered them as de-punctuated identifiers — which is exactly how the project-lifecycle drive
+ * caught it, one run after the redirect shipped.
  *
- * The fix is what mig 142 said to do. `action` is already `namespace.type` at every call site, and
- * every namespace used is registered, so the mapping is mechanical.
+ * So: the 36 duplicates were deleted, and the 9 sites where `auditLog` really was the only record
+ * became `emitEventSingle` calls with proper dotted types (`member.assigned`,
+ * `milestone.gate_closer_set`, `task.created`, `milestone.created`, `deliverable.created`,
+ * `modification.discarded`, `risk.closed`, `wbs_node.created`, `member.unassigned`).
  *
- * ── WHY THIS DOES NOT CALL emitEventSingle ───────────────────────────────────────────────────
- * `lib/events.ts` imports `sql` from this file. Importing it back would be a cycle, so the INSERT
- * is mirrored here instead. `event-namespaces` is safe to import — it is a zero-import leaf, which
- * is exactly why it exists. Keep this INSERT in step with `emitEventSingle`.
+ * There is ONE audit trail — `system_events` — and one way into it: the `emitEvent*` helpers in
+ * `lib/events.ts`. A second, parallel "domain audit" concept is what allowed a dead writer to sit
+ * unnoticed beside a working one. `__tests__/audit-log-destination.test.ts` keeps it that way.
  */
-export async function auditLog(params: { tenantId?: string; userId?: string; action: string; entityType?: string; entityId?: string; metadata?: Record<string, unknown> }) {
-  try {
-    const dot = params.action.indexOf('.');
-    const namespace = dot > 0 ? params.action.slice(0, dot) : '';
-    const type = dot > 0 ? params.action.slice(dot + 1) : params.action;
-    // A row with an unregistered namespace violates system_events_namespace_chk and would throw
-    // into the catch below — i.e. it would go silent again, which is the whole bug. Say it instead.
-    if (!(EVENT_NAMESPACES as readonly string[]).includes(namespace)) {
-      console.error(`[auditLog] action "${params.action}" has no registered namespace — not recorded. `
-        + `Use <namespace>.<action_past_tense> with one of: ${EVENT_NAMESPACES.join(', ')}`);
-      return;
-    }
-    await sql`
-      INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, tenant_id, payload)
-      VALUES (
-        ${namespace}, ${type}, 'single',
-        ${params.userId ? 'user' : 'system'}, ${params.userId ?? 'system'},
-        ${params.tenantId ?? null},
-        ${sql.json({
-          ...(params.metadata ?? {}),
-          ...(params.entityType ? { entityType: params.entityType } : {}),
-          ...(params.entityId ? { entityId: params.entityId } : {}),
-        } as Parameters<typeof sql.json>[0])}
-      )`;
-  } catch (e) {
-    console.error('[auditLog] Error:', e);
-  }
-}

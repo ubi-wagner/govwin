@@ -70,8 +70,10 @@ start_server() {
       AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
       NEXTAUTH_URL='http://localhost:3000' AUTH_URL='http://localhost:3000' \
       PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production \
-      FOUNDING_COHORT_BYPASS=true ATOM_EMBED=local STORAGE_DRIVER=local \
-      LOCAL_STORAGE_DIR=/tmp/govwin-storage AWS_S3_BUCKET=rfp-pipeline-local AWS_REGION=us-east-1 \
+      FOUNDING_COHORT_BYPASS=true ATOM_EMBED=local \
+      STORAGE_DRIVER="${STORAGE_DRIVER:-local}" \
+      LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-/home/user/.govwin/storage}" \
+      AWS_S3_BUCKET="${AWS_S3_BUCKET:-rfp-pipeline-local}" AWS_REGION="${AWS_REGION:-us-east-1}" \
       PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers $(emu_env) \
       node server.js >> "$SCR/server.log" 2>&1 & )
 }

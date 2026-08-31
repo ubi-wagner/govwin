@@ -841,7 +841,7 @@
    "archetype": "content_curator",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "content_generator",
@@ -913,7 +913,7 @@
    "archetype": "onboarding_agent",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": false
+   "everRan": true
   },
   {
    "archetype": "opportunity_analyst",
@@ -1209,6 +1209,7 @@
   "purchase.completed",
   "starter_set.added",
   "task.assigned",
-  "template.applied"
+  "template.applied",
+  "tenant.cards_backfilled"
  ]
 }

@@ -21,7 +21,7 @@
  * The ninth time this capability draws that line. Submitting is a claim; payment is cash arriving,
  * later, often partial. `amount_paid` is its own number for that reason.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
@@ -493,11 +493,6 @@ export async function submitInvoice(
       tenantId: actor.tenantId,
       payload: { projectId, invoiceId, invoiceNumber: inv.invoiceNumber, submittedOn, total },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_submitted',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: inv.invoiceNumber, total, submittedOn },
-    });
     return { ok: true, data: { invoiceId, total } };
   } catch (err) {
     const mapped = fromTrigger(err);
@@ -576,11 +571,6 @@ export async function recordPayment(
         amount, amountPaid: paidNow, total: money(total), settled, paidOn,
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_payment_recorded',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: inv.invoiceNumber, amount, amountPaid: paidNow, settled },
-    });
     return { ok: true, data: { invoiceId, amountPaid: paidNow, settled } };
   } catch (err) {
     const mapped = fromTrigger(err);
@@ -649,11 +639,6 @@ export async function voidInvoice(
         projectId, invoiceId, invoiceNumber: out.invoiceNumber,
         reason: why, hoursReleased: out.released,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_voided',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: out.invoiceNumber, reason: why, hoursReleased: out.released },
     });
     return { ok: true, data: { invoiceId, hoursReleased: out.released } };
   } catch (err) {

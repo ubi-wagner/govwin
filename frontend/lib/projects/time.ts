@@ -25,7 +25,7 @@
  * what a customer is billed for and "somebody typed it" is not the same claim as "a manager
  * checked it".
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import type { Fail, Ok } from './project';
@@ -210,11 +210,6 @@ export async function approveTime(
         actor: userActor(actor.userId),
         tenantId: actor.tenantId,
         payload: { projectId, entries: rows.length, cost: Math.round(total * 100) / 100 },
-      });
-      await auditLog({
-        tenantId: actor.tenantId, userId: actor.userId, action: 'project.time_approved',
-        entityType: 'project', entityId: projectId,
-        metadata: { entries: rows.length, cost: total },
       });
     }
     return { ok: true, data: { approved: rows.length } };

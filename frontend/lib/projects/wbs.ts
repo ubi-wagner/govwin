@@ -21,7 +21,8 @@
  * fixed for `proposal_sections.section_number`. The code is an identifier; the order is an integer.
  */
 import { randomUUID } from 'crypto';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode } from '@/lib/types/canvas-document';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import type { Fail, Ok } from './project';
@@ -163,9 +164,12 @@ export async function createWbsNode(
                 starts_on AS planned_start, forecast_date AS planned_end,
                 planned_cost, actual_cost, sort_index`;
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.wbs_node_created',
-      entityType: 'project_milestone', entityId: row.id, metadata: { projectId, code, title },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'wbs_node.created',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, nodeId: row.id },
     });
     return { ok: true, data: row };
   } catch (err) {

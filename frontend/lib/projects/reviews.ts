@@ -22,7 +22,7 @@
  * tenant_admin, because a gate anyone can open is not a gate. WITHDRAWING belongs to whoever asked
  * or a tenant_admin, so a request made in error cannot hold a deliverable hostage.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
 import type { Role } from '@/lib/rbac';
@@ -217,11 +217,6 @@ export async function requestReview(
         reviewer: reviewerUserId ?? reviewerRole, dueOn: due,
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.review_requested',
-      entityType: 'project_review', entityId: row.id,
-      metadata: { projectId, anchor: input.entityType, reviewer: reviewerUserId ?? reviewerRole },
-    });
 
     await notifyReviewer(actor, projectId, row).catch((e) => {
       console.error('[projects/reviews] notifyReviewer failed:', e);
@@ -375,11 +370,6 @@ export async function decideReview(
         projectId, reviewId, entityType: row.entityType, entityId: row.entityId,
         ...(why ? { reason: why } : {}),
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: `project.review_${decision}`,
-      entityType: 'project_review', entityId: reviewId,
-      metadata: { projectId, anchor: row.entityType, ...(why ? { reason: why } : {}) },
     });
 
     // Tell whoever asked. A decision nobody hears about is the meeting this replaces.

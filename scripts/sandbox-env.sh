@@ -102,8 +102,24 @@ export ANTHROPIC_API_KEY="emulated-claude"
 export ATOM_EMBED="local"
 
 # Object storage: the local filesystem driver standing in for R2. NOT under /tmp any more.
+#
+# ── ONE STORE, ONE PLACE — occurrence SIX of B146/B147 ───────────────────────────────────────
+# `sandbox-heartbeat.sh` used to hardcode its OWN pair of these when it started the server:
+# LOCAL_STORAGE_DIR=/tmp/govwin-storage and AWS_S3_BUCKET=rfp-pipeline-local, while this file
+# said /home/user/.govwin/storage and named no bucket at all. So the app server wrote uploads
+# into one filesystem tree and every in-process drive read a DIFFERENT one — 88 objects on one
+# side, 207 on the other, both live.
+#
+# It presents as a product defect, and a convincing one: drive-pin-honesty reported that pinning
+# REFUSED to copy a published document, naming the exact key, and the key was really there —
+# in the other store. Nothing in the failure points at configuration.
+#
+# So both values are owned HERE, and the heartbeat resolves them from this file the same way it
+# resolves the database URLs (which is the fix that was applied the last time this happened).
 export STORAGE_DRIVER="local"
 export LOCAL_STORAGE_DIR="/home/user/.govwin/storage"
+export AWS_S3_BUCKET="rfp-pipeline-local"
+export AWS_REGION="${AWS_REGION:-us-east-1}"
 
 export API_KEY_ENCRYPTION_SECRET="sandbox-api-key-encryption-secret-32bytes!"
 export NODE_ENV="production"

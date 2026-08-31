@@ -83,11 +83,23 @@ async function main() {
     if (!(await signIn(page, admin.email, ADMIN_PW))) {
       console.error(`\nHARNESS CANNOT RUN: sign-in failed for ${admin.email}\n`); process.exit(2);
     }
-    // The one row, read by the opportunity title — the table has no per-row id to address.
+    // The one row, addressed BY ID.
+    //
+    // It used to be located by the first 34 characters of the title, with `.first()`, because the
+    // table carried no per-row id. Two solicitations can hold the same title — two releases of one
+    // BAA do, and re-ingesting the same document for a scenario makes another — so that locator
+    // read whichever row sorted first, which is not the row this drive had just changed. It then
+    // reported the demand count as never reaching the admin: three failing checks describing a
+    // product defect that did not exist. `data-opportunity-id` was added to the row for this.
     const rowText = async (): Promise<string> => {
       await page.goto(`${BASE}/admin/cards`, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(2500);
-      const row = page.locator('tr', { hasText: (target.title ?? '').slice(0, 34) }).first();
+      const row = page.locator(`tr[data-opportunity-id="${target.opportunityId}"]`);
+      if (await row.count() !== 1) {
+        // Say it rather than fall back to a title match: a drive that cannot address its own row
+        // has nothing to report, and a near-miss row would be read as evidence.
+        throw new Error(`expected exactly 1 row for ${target.opportunityId}, found ${await row.count()}`);
+      }
       return (await row.innerText().catch(() => '')) ?? '';
     };
 

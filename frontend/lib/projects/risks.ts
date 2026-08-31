@@ -23,7 +23,7 @@
  * rarely the manager, and a register only a manager may write is a register that lags reality by a
  * week. CLOSING one is `tenant_admin` — deciding a risk is behind us is a management call.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, listAssignees, type ProjectActor } from './access';
 import { createMilestoneTask } from './milestone-tasks';
@@ -157,12 +157,6 @@ export async function raiseRisk(
       tenantId: actor.tenantId,
       payload: { projectId, riskId: row.id, title, score: row.score, kind },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId,
-      action: input.asIssue ? 'project.issue_raised' : 'project.risk_raised',
-      entityType: 'project_risk', entityId: row.id,
-      metadata: { projectId, title, score: row.score },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/risks] raiseRisk failed:', err);
@@ -272,11 +266,6 @@ export async function raiseAsIssue(
       tenantId: actor.tenantId,
       payload: { projectId, riskId, title: row.title, score: row.score },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.risk_became_issue',
-      entityType: 'project_risk', entityId: riskId,
-      metadata: { projectId, title: row.title, score: row.score },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/risks] raiseAsIssue failed:', err);
@@ -317,10 +306,6 @@ export async function closeRisk(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, riskId, title: row.title, ...(row.closedNote ? { note: row.closedNote } : {}) },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.risk_closed',
-      entityType: 'project_risk', entityId: riskId, metadata: { projectId, kind: row.kind },
     });
     return { ok: true, data: row };
   } catch (err) {

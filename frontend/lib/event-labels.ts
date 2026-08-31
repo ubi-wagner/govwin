@@ -217,6 +217,37 @@ export function describeEvent(ev: EventLike): string {
         return phase === 'start'
           ? 'Assessing project health — advisory, nothing will be changed'
           : 'Project health assessment requested';
+      // ── the nine that used to be auditLog() ────────────────────────────────────────────────
+      // These were `auditLog({action: 'project.member_assigned'})` and friends, writing to a table
+      // dropped in migration 142 — so they recorded nothing, and needed no label. They are real
+      // events now, which means a person reads them, which means they need sentences. An event
+      // with no label renders as its own de-punctuated identifier ("member assigned"), and that is
+      // what a customer sees.
+      case 'member.assigned':
+        return `${str(payload.email) ?? 'Someone'} was staffed onto the project`;
+      case 'member.unassigned':
+        return 'Someone was taken off the project';
+      case 'milestone.gate_closer_set':
+        // WHO closes the gate is the consequential half — a human reviewer and an AI manager are
+        // different promises about how this milestone will advance.
+        return payload.gateCloser === 'ai_manager'
+          ? 'Gate closing handed to the AI manager for this milestone'
+          : 'Gate closing set to a human reviewer for this milestone';
+      case 'task.created':
+        return `Task added: ${str(payload.title) ?? 'a task'}`;
+      case 'milestone.created':
+        return `Milestone added: ${str(payload.title) ?? 'a milestone'}`;
+      case 'deliverable.created':
+        // "Added", not "delivered". Creating the obligation and meeting it are different rows, and
+        // this capability keeps them apart everywhere else too.
+        return `Deliverable added: ${str(payload.title) ?? 'a deliverable'}`;
+      case 'modification.discarded':
+        return 'A draft modification was discarded — the contract is unchanged';
+      // NOT `risk.closed` — it already has a richer label further down (with the title and the
+      // closing note), and an earlier case in the same switch would shadow it silently.
+      case 'wbs_node.created':
+        return 'Work-breakdown item added';
+
       case 'cdrl.registered': {
         const dist = str(payload.distribution);
         return `CDRL ${str(payload.cdrlNumber) ?? ''} registered — ${str(payload.title) ?? 'a data item'}`

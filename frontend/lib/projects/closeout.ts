@@ -18,7 +18,7 @@
  * with docs/ARCHIVABLE_CONTRACT.md — and close-out is NOT archive: a closed project is finished
  * business that stays visible, an archived one is out of sight.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { closeTodosUnder } from './todos';
@@ -130,10 +130,6 @@ export async function closeProject(
       tenantId: actor.tenantId,
       payload: { projectId, milestones, ...(note ? { note } : {}), ...(metrics ? { metrics } : {}) },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.closed',
-      entityType: 'project', entityId: projectId, metadata: { milestones },
-    });
     return { ok: true, data: { projectId, status: row.status, closedAt: row.closedAt, milestones } };
   } catch (err) {
     console.error('[projects/closeout] closeProject failed:', err);
@@ -171,10 +167,6 @@ export async function reopenProject(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, ...(why ? { reason: why } : {}) },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.reopened',
-      entityType: 'project', entityId: projectId, metadata: { reason: why },
     });
     return { ok: true, data: { projectId, status: row.status, closedAt: null, milestones: 0 } };
   } catch (err) {

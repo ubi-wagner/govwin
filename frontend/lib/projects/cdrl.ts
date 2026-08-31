@@ -20,7 +20,7 @@
  * What comes BACK is already modelled — `project_acceptance_evidence` (mig 224) records a claim
  * ABOUT the customer, uploaded by an admin, never the customer's own act.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { isoDate } from './dates';
@@ -265,11 +265,6 @@ export async function addCdrlItem(
       tenantId: actor.tenantId,
       payload: { projectId, cdrlItemId: row.id, cdrlNumber, title, frequency, distribution },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.cdrl_registered',
-      entityType: 'project_cdrl_item', entityId: row.id,
-      metadata: { projectId, cdrlNumber, title, frequency },
-    });
     return { ok: true, data: row };
   } catch (err) {
     const e = err as { code?: string };
@@ -369,11 +364,6 @@ export async function markSubmitted(
         projectId, deliverableId, title: d.title, cdrlNumber: d.cdrlNumber,
         submittedAt, transmittalRef: (input.transmittalRef ?? '').trim() || null, daysLate,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.cdrl_submitted',
-      entityType: 'project_deliverable', entityId: deliverableId,
-      metadata: { projectId, cdrlNumber: d.cdrlNumber, submittedAt, daysLate },
     });
     return { ok: true, data: { deliverableId, daysLate } };
   } catch (err) {

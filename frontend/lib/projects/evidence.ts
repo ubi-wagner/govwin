@@ -22,7 +22,7 @@
  * record reads "accepted by <the admin>, evidence: COR email 2026-04-02", which is what happened.
  */
 import { randomUUID } from 'crypto';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
@@ -179,11 +179,6 @@ export async function fileAcceptanceEvidence(
         title: deliverable.title, filedBy: actor.userId,
         customerName: row.customerName, occurredOn,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.acceptance_evidence_filed',
-      entityType: 'project_deliverable', entityId: deliverableId,
-      metadata: { projectId, evidenceId: row.id, kind: input.kind, customerName: row.customerName },
     });
     return { ok: true, data: row };
   } catch (err) {

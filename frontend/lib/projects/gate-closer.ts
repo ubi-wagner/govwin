@@ -27,7 +27,7 @@
  * That asymmetry is worth stating plainly because the opposite is the intuitive design: people
  * expect "the AI decides it's done". Here the rows decide it is done and the AI may object.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, type ProjectActor } from './access';
 import { markMilestoneMet } from './milestones';
@@ -67,10 +67,12 @@ export async function setGateCloser(
       RETURNING id`;
     if (!row) return { ok: false, status: 404, error: 'Milestone not found', code: 'NOT_FOUND' };
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.gate_closer_set',
-      entityType: 'project_milestone', entityId: milestoneId,
-      metadata: { projectId, gateCloser: closer },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'milestone.gate_closer_set',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, milestoneId, gateCloser: closer },
     });
     return { ok: true, data: { milestoneId, gateCloser: closer } };
   } catch (err) {
@@ -163,11 +165,6 @@ export async function attemptAutoClose(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, milestoneId, title: ms.title },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_auto_closed',
-      entityType: 'project_milestone', entityId: milestoneId,
-      metadata: { projectId, title: ms.title },
     });
     return { milestoneId, closed: true, reason: `"${ms.title}" was closed by the AI manager.`, objections: [] };
   } catch (err) {

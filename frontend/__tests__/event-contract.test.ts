@@ -55,10 +55,6 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
   'auth.ts': 'identity login / login_failed — raw because NextAuth authorize() must not import the automation-triggering emit layer; literals are conformant',
   'lib/process/launch-template.ts': 'workflow-trigger emit (namespace/type from a validated template)',
   'app/api/events/route.ts': 'admin-only client-facing emit endpoint — validates namespace + type before insert',
-  'lib/db.ts': 'auditLog() — lib/events.ts imports sql FROM lib/db.ts, so db.ts cannot import the '
-    + 'emitters back without a cycle. The insert mirrors emitEventSingle and validates the '
-    + 'namespace against EVENT_NAMESPACES (a zero-import leaf) before writing. Keep it in step '
-    + 'with emitEventSingle; __tests__/audit-log-destination.test.ts guards the call sites.',
 };
 
 function walk(dir: string): string[] {
