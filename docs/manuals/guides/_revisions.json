@@ -1,0 +1,48 @@
+{
+  "guides": {
+    "rfp-admin": {
+      "capture": {
+        "runId": "rfp-admin-mtglz8w1",
+        "at": "2026-08-31T02:17:53.089Z",
+        "base": "http://localhost:3109",
+        "commit": "dafc96dc",
+        "shots": 32,
+        "crops": 61
+      },
+      "revision": 1,
+      "revised": "2026-08-31",
+      "commit": "dafc96dc",
+      "summary": "Minimum release set (award size + its three-valued basis, source documents, highlighted passages); Demand column on Opportunity Cards with the interest→read→buy drop-off; Customer Interest reworded from pins to ratings. Screenshots re-captured from a live run.",
+      "history": [
+        {
+          "revision": 1,
+          "date": "2026-08-31",
+          "commit": "dafc96dc",
+          "summary": "Minimum release set (award size + its three-valued basis, source documents, highlighted passages); Demand column on Opportunity Cards with the interest→read→buy drop-off; Customer Interest reworded from pins to ratings. Screenshots re-captured from a live run."
+        }
+      ]
+    },
+    "customer-admin": {
+      "capture": {
+        "runId": "customer-admin-mtgm0i4i",
+        "at": "2026-08-31T02:18:51.714Z",
+        "base": "http://localhost:3109",
+        "commit": "dafc96dc",
+        "shots": 28,
+        "crops": 60
+      },
+      "revision": 1,
+      "revised": "2026-08-31",
+      "commit": "dafc96dc",
+      "summary": "Pin replaced by the 👍/👎 verdict and View Solicitation; the reading view with our analysts' notes; buy-decision facts in the purchase modal; bucket signal-coverage and the affinity signal; starter-bucket copy replaced (buckets now start empty). Screenshots re-captured from a live run.",
+      "history": [
+        {
+          "revision": 1,
+          "date": "2026-08-31",
+          "commit": "dafc96dc",
+          "summary": "Pin replaced by the 👍/👎 verdict and View Solicitation; the reading view with our analysts' notes; buy-decision facts in the purchase modal; bucket signal-coverage and the affinity signal; starter-bucket copy replaced (buckets now start empty). Screenshots re-captured from a live run."
+        }
+      ]
+    }
+  }
+}
