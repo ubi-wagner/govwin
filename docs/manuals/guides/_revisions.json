@@ -43,6 +43,28 @@
           "summary": "Pin replaced by the 👍/👎 verdict and View Solicitation; the reading view with our analysts' notes; buy-decision facts in the purchase modal; bucket signal-coverage and the affinity signal; starter-bucket copy replaced (buckets now start empty). Screenshots re-captured from a live run."
         }
       ]
+    },
+    "collaborator": {
+      "capture": {
+        "runId": "collaborator-mtgtethk",
+        "at": "2026-08-31T05:45:56.936Z",
+        "base": "http://localhost:3109",
+        "commit": "1d36ddcf",
+        "shots": 4,
+        "crops": 0
+      },
+      "revision": 1,
+      "revised": "2026-08-31",
+      "commit": "1d36ddcf",
+      "summary": "Screenshots re-captured as a REAL scoped partner_user with three assigned sections — the previous three images were one identical picture of an empty collaborator ('0 active proposals'), captioned three ways, and were never produced by any capture. Vaults and company-wide activity are now answered in words: both redirect a scoped collaborator back to their proposals, and the capture refuses to photograph a redirect.",
+      "history": [
+        {
+          "revision": 1,
+          "date": "2026-08-31",
+          "commit": "1d36ddcf",
+          "summary": "Screenshots re-captured as a REAL scoped partner_user with three assigned sections — the previous three images were one identical picture of an empty collaborator ('0 active proposals'), captioned three ways, and were never produced by any capture. Vaults and company-wide activity are now answered in words: both redirect a scoped collaborator back to their proposals, and the capture refuses to photograph a redirect."
+        }
+      ]
     }
   }
 }
