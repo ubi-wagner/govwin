@@ -94,7 +94,7 @@
    "opened": 37,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 338
+   "smallTargets": 342
   },
   {
    "lane": "tenant",
@@ -184,7 +184,7 @@
    "opened": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 298
+   "smallTargets": 313
   },
   {
    "lane": "admin",
