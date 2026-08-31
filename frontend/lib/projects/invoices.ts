@@ -222,7 +222,13 @@ export async function billableHours(
          -- an already-invoiced entry billed a second time is the failure the link exists to stop.
          AND e.approved_at IS NOT NULL AND e.invoice_line_id IS NULL
          AND (${upTo ?? null}::date IS NULL OR e.worked_on <= ${upTo ?? null}::date)
-       GROUP BY e.milestone_id, m.title, m.clin_id
+       -- m.sort_index is in the GROUP BY because the ORDER BY reads it. Without it Postgres
+       -- refuses the whole statement ("must appear in the GROUP BY clause or be used in an
+       -- aggregate function") — and the catch below turns that refusal into an empty array, so
+       -- the invoicing page told a builder there was nothing to bill while approved, unbilled
+       -- hours sat in the table. A caught error that returns a plausible-looking empty result is
+       -- worse than a throw: nothing upstream can tell "none" from "the query never ran".
+       GROUP BY e.milestone_id, m.title, m.clin_id, m.sort_index
        ORDER BY m.sort_index, m.title`;
   } catch (err) {
     console.error('[projects/invoices] billableHours failed:', err);

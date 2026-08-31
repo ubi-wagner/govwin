@@ -1,6 +1,9 @@
 import postgres from 'postgres';
 import { hasRoleAtLeast, isRole } from './rbac';
 import { currentTenantContext, enterTenant } from '@/lib/tenant-context';
+// A ZERO-IMPORT LEAF, on purpose: lib/events.ts imports sql from this file, so this file cannot
+// import lib/events.ts back. The registry lives on its own so both sides can read it.
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 
 // Re-export the choke-point primitives so a portal route can `import { sql,
 // verifyTenantAccess, enterTenant } from '@/lib/db'` in ONE line. The RLS cutover
@@ -251,9 +254,54 @@ export async function verifyProposalAccess(
   }
 }
 
+/**
+ * A domain audit record.
+ *
+ * ── IT WROTE TO A TABLE THAT WAS DROPPED 74 MIGRATIONS AGO ───────────────────────────────────
+ * This inserted into `audit_log` until this fix. Migration 142 dropped that table — deliberately,
+ * annotated `→ system_events (live audit trail)` — and nothing updated this function. Because the
+ * body is wrapped in a catch that only logs, every call since has failed silently: the INSERT
+ * raised `relation "audit_log" does not exist`, the error went to stderr, and the caller carried on
+ * believing it had left a record.
+ *
+ * There are 46 call sites, and ALL of them are the post-award Projects tree — a tree written long
+ * after mig 142, against a helper that was already dead. So the entire Projects audit trail
+ * (baselines, gate closures, invoice submission, CLIN edits, member assignment) has never recorded
+ * one row, and no lens could see it: the function returns void, swallows its own failure, and the
+ * pages that matter never read it back.
+ *
+ * The fix is what mig 142 said to do. `action` is already `namespace.type` at every call site, and
+ * every namespace used is registered, so the mapping is mechanical.
+ *
+ * ── WHY THIS DOES NOT CALL emitEventSingle ───────────────────────────────────────────────────
+ * `lib/events.ts` imports `sql` from this file. Importing it back would be a cycle, so the INSERT
+ * is mirrored here instead. `event-namespaces` is safe to import — it is a zero-import leaf, which
+ * is exactly why it exists. Keep this INSERT in step with `emitEventSingle`.
+ */
 export async function auditLog(params: { tenantId?: string; userId?: string; action: string; entityType?: string; entityId?: string; metadata?: Record<string, unknown> }) {
   try {
-    await sql`INSERT INTO audit_log (tenant_id, user_id, action, entity_type, entity_id, metadata) VALUES (${params.tenantId ?? null}, ${params.userId ?? null}, ${params.action}, ${params.entityType ?? null}, ${params.entityId ?? null}, ${sql.json((params.metadata ?? {}) as Parameters<typeof sql.json>[0])})`;
+    const dot = params.action.indexOf('.');
+    const namespace = dot > 0 ? params.action.slice(0, dot) : '';
+    const type = dot > 0 ? params.action.slice(dot + 1) : params.action;
+    // A row with an unregistered namespace violates system_events_namespace_chk and would throw
+    // into the catch below — i.e. it would go silent again, which is the whole bug. Say it instead.
+    if (!(EVENT_NAMESPACES as readonly string[]).includes(namespace)) {
+      console.error(`[auditLog] action "${params.action}" has no registered namespace — not recorded. `
+        + `Use <namespace>.<action_past_tense> with one of: ${EVENT_NAMESPACES.join(', ')}`);
+      return;
+    }
+    await sql`
+      INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, tenant_id, payload)
+      VALUES (
+        ${namespace}, ${type}, 'single',
+        ${params.userId ? 'user' : 'system'}, ${params.userId ?? 'system'},
+        ${params.tenantId ?? null},
+        ${sql.json({
+          ...(params.metadata ?? {}),
+          ...(params.entityType ? { entityType: params.entityType } : {}),
+          ...(params.entityId ? { entityId: params.entityId } : {}),
+        } as Parameters<typeof sql.json>[0])}
+      )`;
   } catch (e) {
     console.error('[auditLog] Error:', e);
   }
