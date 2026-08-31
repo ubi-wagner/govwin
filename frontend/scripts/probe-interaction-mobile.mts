@@ -35,7 +35,7 @@
  */
 import { chromium, type Page, type Browser } from 'playwright';
 import postgres from 'postgres';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs';
 import { overflowing, smallTargets, clipped, openEverything, selfTestClipped } from './lib/mobile-measure.mts';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
@@ -332,8 +332,23 @@ async function probeRoute(browser: Browser, lane: Lane, route: string) {
       ? `: ${small.slice(0, 4).map((s) => `${s.tag}"${s.label}" ${s.w}×${s.h}`).join(', ')}` : ''}`);
 
     const file = `probe__${lane.id}-${route.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 46)}__vp-phone-open.jpg`;
-    await page.screenshot({ path: `${OUT}/${file}`, type: 'jpeg', quality: 80, fullPage: true });
-    shots.push({ lane: lane.id, route, viewport: VP.name, width: VP.w, file });
+    // A CAPTURE THAT WROTE NOTHING IS NOT EVIDENCE.
+    // `/portal/foundation/cards` with 35 disclosures open is tens of thousands of pixels tall, and
+    // the fullPage screenshot came back as a ZERO-BYTE file. Playwright did not throw, the route
+    // was reported clean, and the contact sheet had a blank tile nobody would read as a failure —
+    // which is worse than a missing image, because the sweep counted it as looked-at. The whole
+    // point of this tree is that a page at rest is not the UI and somebody has to LOOK; an empty
+    // file silently removes the looking.
+    await page.screenshot({ path: `${OUT}/${file}`, type: 'jpeg', quality: 80, fullPage: true })
+      .catch((e) => { console.log(`    ⚠ screenshot failed — ${(e as Error).message.slice(0, 70)}`); });
+    let bytes = 0;
+    try { bytes = statSync(`${OUT}/${file}`).size; } catch { /* never written */ }
+    if (bytes === 0) {
+      unearned += 1;
+      console.log('    ⚠ SCREENSHOT IS EMPTY — nothing was captured for this route, so nobody can');
+      console.log('      look at it. Uncovered, not passing (the measurements above still stand).');
+    }
+    shots.push({ lane: lane.id, route, viewport: VP.name, width: VP.w, file, bytes });
     summary.push({
       lane: lane.id, route, status, probed: true, opened, candidates,
       overflow: over.length, clipped: cut.length, smallTargets: small.length,

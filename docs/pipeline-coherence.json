@@ -504,7 +504,7 @@
     "lib/projects/todos.ts"
    ],
    "bespoke": [],
-   "candidates": 20
+   "candidates": 22
   },
   "projects:tenant": {
    "adopted": [
@@ -734,31 +734,6 @@
    "adopted": [],
    "bespoke": [],
    "candidates": 2
-  },
-  "projects:audit": {
-   "adopted": [
-    "lib/projects/access.ts",
-    "lib/projects/baseline.ts",
-    "lib/projects/cdrl.ts",
-    "lib/projects/clins.ts",
-    "lib/projects/closeout.ts",
-    "lib/projects/comments.ts",
-    "lib/projects/evidence.ts",
-    "lib/projects/gate-closer.ts",
-    "lib/projects/invoices.ts",
-    "lib/projects/meetings.ts",
-    "lib/projects/milestone-tasks.ts",
-    "lib/projects/milestones.ts",
-    "lib/projects/modifications.ts",
-    "lib/projects/project.ts",
-    "lib/projects/reviews.ts",
-    "lib/projects/risks.ts",
-    "lib/projects/task-attachments.ts",
-    "lib/projects/time.ts",
-    "lib/projects/wbs.ts"
-   ],
-   "bespoke": [],
-   "candidates": 19
   },
   "projects:agents": {
    "adopted": [
