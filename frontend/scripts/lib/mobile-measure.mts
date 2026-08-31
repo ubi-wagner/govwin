@@ -88,9 +88,26 @@ export async function smallTargets(page: Page): Promise<SmallTarget[]> {
  * `title` or `aria-label` carrying it means yes. Nothing carrying it means a word is simply gone,
  * and the page photographs as tidy either way. That also makes the check STRONGER than the naive
  * version: a `truncate` added later without a title now fails, where before it was lost in noise.
+ *
+ * ── WHY IT WALKS THE WHOLE ANCESTOR CHAIN ────────────────────────────────────────────────────
+ * It used to look at the element and its immediate parent only, and that is not where a tooltip
+ * comes from. A browser shows the title of the NEAREST ANCESTOR that has one, at any depth — so a
+ * component that puts the title on the card and truncates a span two levels inside it is correctly
+ * recoverable, and this reported it as text with no way back. That is what it did to the workflow
+ * map: every node carries `title={label — sublabel}` on the node box, the label span sits inside a
+ * flex row inside that box, and four node labels were reported as unrecoverable on a page whose
+ * recovery works fine by hand.
+ *
+ * The walk stays honest because the title must still CONTAIN the clipped text. An ancestor with
+ * some unrelated title does not launder a truncation, and an element with no titled ancestor at
+ * all still fails — which is the case the check exists to catch.
  */
 export async function clipped(page: Page): Promise<Clipped[]> {
   return page.evaluate(() => {
+    // NO NAMED HELPERS IN HERE. This body is serialised and evaluated in the browser, where
+    // esbuild's keep-names shim does not exist — a `const f = (…) => …` compiles to a call to
+    // `__name`, and the whole probe dies with "__name is not defined" at the first route. Inline
+    // the condition instead.
     const out: Array<{ text: string; cls: string }> = [];
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       const e = el as HTMLElement;
@@ -100,10 +117,15 @@ export async function clipped(page: Page): Promise<Clipped[]> {
       if (e.scrollWidth <= e.clientWidth + 2) continue;
       const text = (e.innerText ?? '').trim();
       if (!text) continue;
-      const recoverable = [e, e.parentElement].some((n) =>
-        n instanceof HTMLElement
-        && ((n.title && n.title.includes(text.replace(/…$/, '').trim().slice(0, 12)))
-          || (n.getAttribute('aria-label') ?? '').includes(text.slice(0, 12))));
+      // The ellipsis is painted by CSS, so it is not in the string; strip a literal one anyway for
+      // the cases where the app truncated the text itself.
+      const needle = text.replace(/…$/, '').trim().slice(0, 12);
+      if (!needle) continue;
+      let recoverable = false;
+      for (let n: HTMLElement | null = e; n && n !== document.body; n = n.parentElement) {
+        if ((n.title ?? '').includes(needle)
+            || (n.getAttribute('aria-label') ?? '').includes(needle)) { recoverable = true; break; }
+      }
       if (recoverable) continue;
       out.push({ text: text.slice(0, 50), cls: String(e.className).slice(0, 50) });
     }
@@ -124,7 +146,7 @@ export async function clipped(page: Page): Promise<Clipped[]> {
  * Clicks are best-effort and individually timed out. A disclosure that navigates away, or a
  * button that is disabled, must not take the whole route down with it.
  */
-export async function openEverything(page: Page): Promise<number> {
+export async function openEverything(page: Page): Promise<{ opened: number; candidates: number }> {
   let opened = 0;
   const click = async (loc: { click: (o: { timeout: number }) => Promise<void> }) => {
     try { await loc.click({ timeout: 1500 }); opened += 1; } catch { /* not openable here */ }
@@ -133,10 +155,18 @@ export async function openEverything(page: Page): Promise<number> {
   // ARIA disclosures first: the honest signal, and the one the codebase uses for its own panels.
   for (const b of await page.locator('button[aria-expanded="false"]').all()) await click(b);
 
-  // Then the verbs that reveal an inline editor. Named rather than matched by shape, because
-  // "every button on the page" would submit forms and navigate away — this probe is READ-ONLY and
-  // a click that writes would make it a mutation harness nobody thinks it is.
-  for (const name of ['Edit', 'Add someone', 'Add task', 'Comment', 'Reply', 'Show more', 'Details']) {
+  // Then the verbs that reveal a panel, a modal or an inline editor. Named rather than matched by
+  // shape, because "every button on the page" would submit forms and navigate away — this probe is
+  // READ-ONLY and a click that writes would make it a mutation harness nobody thinks it is.
+  //
+  // Every verb below was checked against its handler before being added, and the ones deliberately
+  // NOT here are the reason the list is short: "Use this template", "Atomize", "Archive", "Save",
+  // "Advance", "Cancel" and "Apply" all sit on these same routes and all write.
+  //   · 'Preview' opens a read-only CanvasDocument modal (TemplatePreviewer / template-stable-
+  //     gallery openPreview) — it is a dialog, so it correctly carries no aria-expanded and the
+  //     first loop can never reach it. It is also the densest overlay the templates routes have.
+  for (const name of ['Edit', 'Add someone', 'Add task', 'Comment', 'Reply', 'Show more', 'Details',
+                      'Preview']) {
     for (const b of await page.getByRole('button', { name, exact: false }).all()) await click(b);
   }
 
@@ -144,5 +174,64 @@ export async function openEverything(page: Page): Promise<number> {
   for (const d of await page.locator('details:not([open]) > summary').all()) await click(d);
 
   await page.waitForTimeout(500);
-  return opened;
+
+  // ── WHY THE SECOND NUMBER EXISTS ────────────────────────────────────────────────────────────
+  // "opened 0" has two completely different meanings and the caller could not tell them apart:
+  // a page that genuinely has nothing to open (the tenant documents index is nav plus a list —
+  // three buttons, all chrome), and a page dense with disclosures this probe simply cannot name
+  // (the workflow monitor carries 164 buttons). The first is covered; the second is a harness
+  // gap wearing the same words. Counting the non-chrome controls that EXIST separates them, so
+  // the report can say which one it is instead of making the reader guess.
+  const candidates = await page.evaluate(() => {
+    const chrome = /^(sign out|☰|\d+\+?|)$/i;
+    return Array.from(document.querySelectorAll('button, [role="button"], details > summary'))
+      .filter((el) => {
+        const t = (el.textContent || '').trim();
+        if (chrome.test(t)) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;      // a control nobody can see is not a disclosure
+      }).length;
+  });
+  return { opened, candidates };
+}
+
+/**
+ * THE INSTRUMENT BEFORE THE FINDING — a known-answer test for `clipped()`.
+ *
+ * `clipped()` is the subtlest check in this file: it must ignore truncation the page gives you a
+ * way back from, and report truncation it does not. Both halves are easy to break in the same
+ * edit, and neither shows up as an error — a too-strict version buries the real finding in noise
+ * about the workflow map, a too-loose one reports a clean page forever. Nothing downstream can
+ * tell which you have.
+ *
+ * So it is run against a fixture with a known answer BEFORE any route is measured, and the caller
+ * exits 2 as a HARNESS DEFECT if it disagrees. Same contract as `verify-surfaces` opening each
+ * actor lane on a page that is definitely broken: a clean sweep below an unvalidated instrument is
+ * unearned. Three cases, and the middle one is the one that matters — it is the check itself.
+ */
+export async function selfTestClipped(page: Page): Promise<{ ok: boolean; detail: string }> {
+  const saved = await page.evaluate(() => document.body.innerHTML);
+  await page.setContent(`<body style="margin:0">
+    <div title="project.collaboration_requested — full"><div style="display:flex;min-width:0">
+      <span style="display:block;width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">project.collaboration_requested</span>
+    </div></div>
+    <div><div style="display:flex;min-width:0">
+      <span style="display:block;width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">schedule login reminder now</span>
+    </div></div>
+    <div title="something else entirely"><div>
+      <span style="display:block;width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ai onboarding concierge</span>
+    </div></div>
+  </body>`);
+  const texts = (await clipped(page)).map((c) => c.text);
+  const titledAncestor = texts.some((t) => t.startsWith('project.collaboration'));  // must be CLEAN
+  const noTitle = texts.some((t) => t.startsWith('schedule login'));                // must be FOUND
+  const unrelated = texts.some((t) => t.startsWith('ai onboarding'));               // must be FOUND
+  await page.setContent(`<body>${saved}</body>`).catch(() => {});
+  const ok = !titledAncestor && noTitle && unrelated;
+  return {
+    ok,
+    detail: `titled-ancestor ${titledAncestor ? 'REPORTED (false positive)' : 'clean'} · `
+          + `no-title ${noTitle ? 'found' : 'MISSED (blind)'} · `
+          + `unrelated-title ${unrelated ? 'found' : 'MISSED (laundered)'}`,
+  };
 }

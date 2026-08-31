@@ -96,8 +96,8 @@ async function main() {
 
       // OPEN EVERYTHING. The collapsed page is what the responsive pass already covers; what has
       // never been seen at this width is a comment composer and an inline task edit row.
-      const opened = await openEverything(page);
-      A(opened > 0, 'the probe actually opened something', `${opened} control(s)`);
+      const { opened, candidates } = await openEverything(page);
+      A(opened > 0, 'the probe actually opened something', `${opened} of ${candidates} candidate control(s)`);
 
       const over = await overflowing(page, vp.w);
       A(over.length === 0, `nothing runs past the ${vp.w}px viewport with every panel open`,

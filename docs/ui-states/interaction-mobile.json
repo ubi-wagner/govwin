@@ -91,10 +91,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 37,
+   "opened": 35,
+   "candidates": 223,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 342
+   "smallTargets": 325
   },
   {
    "lane": "tenant",
@@ -102,6 +103,7 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 17,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 46
@@ -112,9 +114,10 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 1778,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2041
   },
   {
    "lane": "tenant",
@@ -122,9 +125,10 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 1778,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2041
   },
   {
    "lane": "tenant",
@@ -132,19 +136,21 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 126
+   "smallTargets": 124
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/templates",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 1,
+   "candidates": 84,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 107
+   "smallTargets": 108
   },
   {
    "lane": "tenant",
@@ -152,6 +158,7 @@
    "status": 200,
    "probed": true,
    "opened": 2,
+   "candidates": 26,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 54
@@ -162,6 +169,7 @@
    "status": 200,
    "probed": true,
    "opened": 13,
+   "candidates": 38,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 71
@@ -172,6 +180,7 @@
    "status": 200,
    "probed": true,
    "opened": 2,
+   "candidates": 22,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 70
@@ -181,10 +190,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 10,
+   "candidates": 162,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 313
+   "smallTargets": 237
   },
   {
    "lane": "admin",
@@ -192,6 +202,7 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 2,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 51
@@ -201,10 +212,11 @@
    "route": "/admin/templates",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 1,
+   "candidates": 5,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 47
+   "smallTargets": 48
   }
  ]
 }

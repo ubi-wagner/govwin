@@ -505,8 +505,15 @@ export function WorkflowMonitorClient({
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* aria-expanded is not decoration here: this button IS a disclosure, and
+                          without the attribute a screen reader announces it as a plain action with
+                          no hint that a step timeline appears below. It is also the signal the
+                          mobile interaction probe leads with, so an unannotated disclosure reads to
+                          that harness as "this route has nothing to open" — which is how the
+                          workflow monitor's densest state went unmeasured at 390px. */}
                       <button
                         onClick={() => toggleTimeline(w.id)}
+                        aria-expanded={openTimelines.has(w.id)}
                         className="px-2.5 py-1 text-xs font-medium rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
                       >
                         {openTimelines.has(w.id) ? 'Hide steps' : 'Steps'}

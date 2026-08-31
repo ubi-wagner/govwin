@@ -381,6 +381,30 @@ Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't pre
 > places — B146/B147), and note the pool caches credentials at connect time, so fixing the role
 > password requires a server RESTART, not just an `ALTER ROLE`.
 
+**1b. A LONG-LIVED PROCESS SERVING CODE THAT NO LONGER EXISTS — twice in one hour, two different
+processes, and both looked like product defects.**
+
+*The server.* `next build` replaces `.next/standalone` underneath a running server. The old process
+keeps serving HTML that references the OLD chunk hashes, which are gone, so every
+`/_next/static/chunks/*.js` answers `400 text/html` and the browser refuses to execute it. The page
+still renders — it is server HTML — and `/login` still answers **200**. Nothing hydrates: no handler
+fires, no form accepts a file, no toast appears. It presents as *"the upload form rejects my PDF"*,
+and the arc drive reported exactly that. **A 200 on `/login` is not evidence the build under it still
+exists** — the heartbeat now pulls a chunk URL out of the HTML it just fetched and requires it to
+come back as JavaScript.
+
+*The worker.* The pipeline worker imports every archetype and workflow ONCE, at boot. Check out a
+branch that adds two and the process keeps serving `:8080` knowing nothing about them — the event
+fires, no instance is created, and the drive reports *"the workflow engine created an instance from
+the event — none"*, which reads as a broken bridge. A worker booted with **36** archetypes against a
+checkout that has **38** made two live archetypes look dead. The heartbeat now restarts a worker when
+any file under `pipeline/src` is newer than the process.
+
+The shared lesson, and it is the same one the lenses keep teaching: **liveness is not currency.**
+`:3000` answering and `:8080` listening are both true of a process running code you deleted an hour
+ago. After ANY `next build`, branch switch, merge or rebase, restart both — or read their start times
+against the tree before believing a failure.
+
 **2. Verify dispatched agents.** ALWAYS re-derive a sub-agent's finding against the actual code/schema before
 acting on it — agents have returned stale/incomplete generation (this session: a "readiness uses the cheap
 page estimate" gap that was already closed; inconsistent agent live/dormant counts). Trust nothing an agent

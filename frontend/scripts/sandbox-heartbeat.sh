@@ -91,6 +91,42 @@ port_busy() {
   command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":$1" && return 0
   return 1
 }
+port_pid() { fuser -n tcp "$1" 2>/dev/null | tr -d ' \n'; }
+
+# ── KILL BY PORT. NEVER BY CMDLINE. ──────────────────────────────────────────────────────────
+# Next retitles its own process to `next-server (v15…)` once it boots. So `pkill -f
+# "standalone/server.js"` — the obvious spelling, the one used here and by hand all session —
+# MATCHES NOTHING, silently. Every "restart" was a no-op: the kill hit nothing, `start_server`
+# spawned a replacement that could not bind :3000 because the old process still held it, the
+# replacement died, and `port_busy` then reported the port healthy. A server started at 18:04
+# survived four deliberate restarts that way and served a deleted build for an hour, while this
+# script printed srv=ok.
+#
+# The port is the identity that matters — it is what every drive connects to — so kill whatever
+# holds it and wait for the port to actually free, rather than assuming the signal landed.
+kill_server() {
+  local pid; pid=$(port_pid 3000)
+  [ -z "$pid" ] && return 0
+  kill "$pid" 2>/dev/null
+  for _ in 1 2 3 4 5 6 7 8 9 10; do port_busy 3000 || return 0; sleep 1; done
+  kill -9 "$pid" 2>/dev/null
+  for _ in 1 2 3 4 5; do port_busy 3000 || return 0; sleep 1; done
+}
+
+# Is the process on :3000 serving a build that still exists?
+#
+# `next build` REPLACES .next/standalone under a running server. The old process keeps its open
+# file handles, so it serves happily out of an unlinked directory — the kernel marks its cwd
+# "(deleted)" and that is the one signal that cannot be faked or sampled wrong. It is strictly
+# better than the chunk probe below, which asks about ONE chunk: /login's chunks are shared and
+# keep their hashes across builds, so that probe answered "fresh" while /admin/workflows asked for
+# a hash from the dead build, got 400 text/html, and rendered Next's error boundary at HTTP 200.
+server_build_deleted() {
+  local pid; pid=$(port_pid 3000)
+  [ -z "$pid" ] && return 1
+  case "$(readlink "/proc/$pid/cwd" 2>/dev/null)" in *"(deleted)"*) return 0 ;; esac
+  return 1
+}
 
 # The pipeline worker — the component that actually RUNS the workflows. It was not supervised
 # here, so it could die and every heartbeat still read healthy: db ok, srv ok, emu ok, and no
@@ -122,20 +158,73 @@ while true; do
 
   # ── emulated-Claude (only when EMULATE=1) ──
   if [ "$EMULATE" = "1" ]; then
-    if curl -s -o /dev/null --max-time 3 "http://127.0.0.1:${EMU_PORT}/health" 2>/dev/null; then EMU=ok
+    # A HEALTHY EMULATOR CAN STILL BE THE WRONG ONE — the third process this session found serving
+    # code that no longer existed. It loads its responder table once, at boot. Add a responder (the
+    # merge added `source_scout`) and the running process keeps answering /health while falling
+    # THROUGH to the generic text responder for that prompt — which returns no `changed` field, so
+    # `parsed.changed ?? false` makes every real diff "not meaningful" and the drive reports the
+    # product failing to emit an event. Same question as the server and the worker: is the source
+    # newer than the process.
+    if [ -n "$(pgrep -f emulated-claude | head -1)" ] \
+       && [ -n "$(find "$HARNESS/emulated-claude.mjs" -newer "/proc/$(pgrep -f emulated-claude | head -1)" -print -quit 2>/dev/null)" ]; then
+      pkill -f emulated-claude 2>/dev/null; sleep 1; start_emu; EMU="STALE(src-newer)->restarting"
+    elif curl -s -o /dev/null --max-time 3 "http://127.0.0.1:${EMU_PORT}/health" 2>/dev/null; then EMU=ok
     elif [ -f "$HARNESS/emulated-claude.mjs" ]; then start_emu; EMU="DOWN->restarting"
     else EMU="DOWN(no-harness)"; fi
   else EMU=off; fi
 
   # ── frontend server ──
+  #
+  # A 200 ON /login IS NOT ENOUGH, and this check used to stop there.
+  #
+  # `next build` replaces `.next/standalone` underneath a RUNNING server. The old process keeps
+  # serving HTML that references the OLD chunk hashes, which are no longer on disk, so every
+  # `/_next/static/chunks/*.js` answers 400 with `text/html` and the browser refuses to execute it.
+  # The page still renders — it is server HTML — and /login still answers 200, so this said `srv=ok`
+  # for 48 minutes while NOT ONE LINE OF CLIENT JAVASCRIPT LOADED. Nothing hydrated: no handler
+  # fired, no form accepted a file, no toast appeared. It presents as the product being broken —
+  # "the upload form rejects my PDF" — and the first drive to hit it reported a product failure.
+  #
+  # So: pull a chunk URL out of the HTML the server just served, and require it to come back as
+  # JavaScript. That is the cheapest question that distinguishes "serving" from "serving a build
+  # that still exists".
+  HTML=$(curl -s --max-time 5 http://localhost:3000/login 2>/dev/null)
   CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3000/login 2>/dev/null)
-  if [ "$CODE" = "200" ]; then SRV=ok
+  if [ "$CODE" = "200" ] && server_build_deleted; then
+    # The decisive check, and it runs FIRST: this process is serving an unlinked build. Nothing it
+    # returns can be trusted, including a 200 and a valid-looking chunk.
+    SRV="STALE(build-deleted)->restarting"; kill_server; start_server
+  elif [ "$CODE" = "200" ]; then
+    CHUNK=$(printf '%s' "$HTML" | grep -oE '/_next/static/chunks/[A-Za-z0-9._/-]+\.js' | head -1)
+    if [ -n "$CHUNK" ]; then
+      CT=$(curl -s -o /dev/null -w '%{content_type}' --max-time 5 "http://localhost:3000${CHUNK}" 2>/dev/null)
+      case "$CT" in
+        *javascript*) SRV=ok ;;
+        # kill_server first — without it start_server cannot bind :3000 and this branch loops
+        # forever printing "->restarting" while the stale process keeps answering.
+        *) SRV="STALE(chunks->${CT:-none})->restarting"; kill_server; start_server ;;
+      esac
+    else SRV=ok; fi
   elif port_busy 3000; then SRV="booting(${CODE})"
   elif [ -f "$STANDALONE/server.js" ]; then start_server; SRV="DOWN(${CODE})->restarting"
   else SRV="DOWN(no-build:needs-rehydrate)"; fi
 
   # ── pipeline worker (:8080 health server) — the workflow engine ──
-  if port_busy 8080; then WRK=ok
+  #
+  # LISTENING IS NOT THE SAME AS RUNNING THE CODE ON DISK. The worker imports every archetype and
+  # workflow ONCE, at boot. Check out a branch that adds two of them and the process keeps serving
+  # :8080 while knowing nothing about them — so the event fires, no instance is created, and the
+  # drive reports "the workflow engine created an instance from the event — none", which reads as a
+  # product defect. That happened here: a worker booted with 36 archetypes against a checkout that
+  # has 38, and two live archetypes looked dead.
+  #
+  # Same shape as the stale-build check above, same cheap question: is any source file NEWER than
+  # the process. If so the worker is running code that no longer exists, and it is restarted.
+  if port_busy 8080; then
+    WPID=$(pgrep -f 'python3 src/main.py' | head -1)
+    if [ -n "$WPID" ] && [ -n "$(find "$ROOT/pipeline/src" -name '*.py' -newer "/proc/$WPID" -print -quit 2>/dev/null)" ]; then
+      kill "$WPID" 2>/dev/null; sleep 1; start_worker; WRK="STALE(src-newer)->restarting"
+    else WRK=ok; fi
   elif [ -f "$ROOT/pipeline/src/main.py" ]; then start_worker; WRK="DOWN->restarting"
   else WRK="DOWN(no-src)"; fi
 

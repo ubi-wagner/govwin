@@ -191,9 +191,11 @@ async function main() {
     ok('the reading view renders', body.length > 0 && !/Application error|500|Internal Server/i.test(body),
       `${body.length} chars`);
     ok('it names the opportunity', body.includes((up.title ?? '').slice(0, 24)));
-    const [expected] = await owner<Array<{ note: string | null; hl: number; docs: number; manifest: number }>>`
+    const [expected] = await owner<Array<{ note: string | null; hl: number; page: number | null; docs: number; manifest: number }>>`
       SELECT card->>'expertNotes' AS note,
              jsonb_array_length(COALESCE(card->'highlights','[]'::jsonb)) AS hl,
+             -- The page to look for is READ FROM THE CARD, not typed in. See the note below.
+             (card->'highlights'->0->>'page')::int AS page,
              jsonb_array_length(COALESCE(card->'documents','[]'::jsonb)) AS manifest,
              (SELECT count(*)::int FROM tenant_opportunity_documents d
                WHERE d.tenant_id=${t.tenantId}::uuid AND d.opportunity_id=${up.opportunityId}::uuid) AS docs
@@ -209,9 +211,24 @@ async function main() {
      * failed here on a page that was rendering the passage perfectly — the instrument was wrong,
      * not the product, which is why the rule is to validate the harness before believing a finding.
      */
-    ok('the marked passage renders, with its page',
-      expected.hl > 0 && /what our analysts marked/i.test(body) && /page 12/.test(body),
-      expected.hl > 0 ? `${expected.hl} passage(s)` : 'no highlights on the card — UNCOVERED, not passing');
+    /*
+     * ⚠️ AND THE PAGE NUMBER IS READ FROM THE CARD, NOT TYPED IN.
+     *
+     * This asserted `/page 12/` — a literal that belonged to whichever fixture existed the day the
+     * drive was written. Re-ingest the BAA (`drive-end-to-end.mjs --fresh` does exactly that) and
+     * the curation produces different, equally correct pages — here `[14, 162, 17, 17, 19, 4, 5, 5]`
+     * — so the drive failed on a page that was rendering all eight passages perfectly. Same class as
+     * the uppercase matcher above: the instrument was wrong, and its failure named the product.
+     *
+     * Reading the page off the row makes the check STRONGER, not weaker: it now proves the number
+     * the page shows is the number the card holds, which "page 12" never did.
+     */
+    ok('the marked passage renders, with the page the CARD says',
+      expected.hl > 0 && /what our analysts marked/i.test(body)
+        && expected.page !== null && new RegExp(`page\\s*${expected.page}\\b`, 'i').test(body),
+      expected.hl > 0
+        ? `${expected.hl} passage(s), first on page ${expected.page ?? '—'}`
+        : 'no highlights on the card — UNCOVERED, not passing');
     void seeded;
     // Absent is not empty: with a manifest and no local copy the page must say WHICH, not "none".
     if (expected.docs === 0 && expected.manifest > 0) {
