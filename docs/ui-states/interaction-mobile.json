@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48422
+   "bytes": 48425
   },
   {
    "lane": "tenant",
@@ -70,7 +70,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg",
-   "bytes": 223418
+   "bytes": 230612
   },
   {
    "lane": "admin",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1416094
+   "bytes": 1537399
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 604011
+   "bytes": 604013
   },
   {
    "lane": "admin",
@@ -94,7 +94,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-templates__vp-phone-open.jpg",
-   "bytes": 73463
+   "bytes": 73732
   }
  ],
  "summary": [
@@ -103,11 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 36,
-   "candidates": 232,
+   "opened": 37,
+   "candidates": 235,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 337
+   "smallTargets": 341
   },
   {
    "lane": "tenant",
@@ -191,22 +191,22 @@
    "route": "/admin/rfp-curation",
    "status": 200,
    "probed": true,
-   "opened": 1,
-   "candidates": 32,
+   "opened": 2,
+   "candidates": 22,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 80
+   "smallTargets": 71
   },
   {
    "lane": "admin",
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 17,
-   "candidates": 207,
+   "opened": 20,
+   "candidates": 225,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 283
+   "smallTargets": 302
   },
   {
    "lane": "admin",
@@ -217,7 +217,7 @@
    "candidates": 2,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 51
+   "smallTargets": 52
   },
   {
    "lane": "admin",
@@ -228,7 +228,7 @@
    "candidates": 5,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 48
+   "smallTargets": 49
   }
  ]
 }

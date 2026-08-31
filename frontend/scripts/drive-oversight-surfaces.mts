@@ -13,7 +13,10 @@
  * the page's own source rather than re-derived (the rule that stops a lens manufacturing
  * confident, wrong findings).
  *
- * ⚠️ READ-ONLY. It signs in, reads pages, and queries the database. It submits nothing.
+ * ⚠️ NOT READ-ONLY. One check drives the company-details editor for real — that capability had no
+ * UI at all, and a console that only renders is exactly the failure being checked for, so proving
+ * it takes a write. It edits ONE field on the `foundation` tenant and restores it in the same
+ * block. Sandbox only, never production.
  *
  *   cd frontend && npx tsx scripts/drive-oversight-surfaces.mts
  * Exit 0 when every surface renders AND every checked number is true; 1 on a finding; 2 if it
@@ -152,6 +155,35 @@ async function main() {
       const t = rendered(await open(page, '/admin/applications'), '/admin/applications', 100);
       const [a] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM applications`;
       ok(states(t, a.n), 'applications states its own count', `db=${a.n}`);
+    }
+    {
+      // COMPANY ADMINISTRATION — and it must WRITE, not just display. `PATCH
+      // /api/admin/tenants/[id]` has always accepted name · legal_name · website · billing_email ·
+      // product_tier · subscription_status · lifecycle_stage · status, and nothing called it: the
+      // detail page rendered every one of those columns in a read-only list, so an admin could see
+      // a customer's legal name was wrong and had no way to fix it. Drive the real control and
+      // check the database, then put it back.
+      const [t] = await sql<{ id: string; legalName: string | null; website: string | null }[]>`
+        SELECT id, legal_name AS "legalName", website FROM tenants WHERE slug = 'foundation'`;
+      const before = { ...t };
+      rendered(await open(page, `/admin/tenants/${t.id}`), '/admin/tenants/[id]');
+      const edit = page.getByRole('button', { name: /edit company details/i });
+      ok(await edit.count() === 1, 'the company details can be EDITED, not only read');
+      if (await edit.count() === 1) {
+        const marker = `probe-${Date.now()}`;
+        await edit.click();
+        await page.waitForTimeout(300);
+        await page.fill('#t-legal', marker);
+        await page.getByRole('button', { name: /save changes/i }).click();
+        await page.waitForTimeout(1800);
+        const [after] = await sql<{ legalName: string | null }[]>`
+          SELECT legal_name AS "legalName" FROM tenants WHERE id = ${t.id}::uuid`;
+        ok(after.legalName === marker, 'the edit reaches the database', `stored "${after.legalName}"`);
+        const body = await open(page, `/admin/tenants/${t.id}`);
+        ok(body.text.includes(marker), 'and the page shows what was stored');
+        await sql`UPDATE tenants SET legal_name = ${before.legalName} WHERE id = ${t.id}::uuid`;
+        note('company details restored');
+      }
     }
     {
       const t = rendered(await open(page, '/admin/waitlist'), '/admin/waitlist', 60);

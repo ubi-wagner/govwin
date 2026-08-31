@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { TenantAiConfigCard } from '@/components/admin/tenant-ai-config-card';
 import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 import { TenantArchiveControl } from '@/components/admin/tenant-archive-control';
+import { TenantDetailsEditor } from '@/components/admin/tenant-details-editor';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,7 @@ export default async function TenantDetailPage({ params }: Props) {
     website: string | null;
     status: string;
     productTier: string;
+    lifecycleStage: string | null;
     subscriptionStatus: string;
     billingEmail: string | null;
     stripeCustomerId: string | null;
@@ -58,6 +60,7 @@ export default async function TenantDetailPage({ params }: Props) {
   try {
     const [row] = await sql<TenantRow[]>`
       SELECT id, name, slug, legal_name, website, status, product_tier,
+             lifecycle_stage,
              subscription_status, billing_email, stripe_customer_id,
              trial_ends_at, created_at, archived_at
       FROM tenants
@@ -225,7 +228,24 @@ export default async function TenantDetailPage({ params }: Props) {
 
       {/* Company details */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Company Details</h2>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-semibold">Company Details</h2>
+          {/* The PATCH route has always accepted these fields; until now nothing called it, so an
+              admin could see a customer's legal name was wrong and had no way to fix it. */}
+          <TenantDetailsEditor
+            tenantId={tenant.id}
+            initial={{
+              name: tenant.name,
+              legalName: tenant.legalName,
+              website: tenant.website,
+              billingEmail: tenant.billingEmail,
+              productTier: tenant.productTier,
+              subscriptionStatus: tenant.subscriptionStatus,
+              lifecycleStage: tenant.lifecycleStage,
+              status: tenant.status,
+            }}
+          />
+        </div>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
           <div>
             <dt className="text-gray-500">Legal Name</dt>

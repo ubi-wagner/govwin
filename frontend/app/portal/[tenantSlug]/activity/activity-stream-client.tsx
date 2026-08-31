@@ -484,8 +484,14 @@ export function ActivityStreamClient({
                       {/* Correlated child event */}
                       {childEvent && (
                         <div className="mt-2 ml-4 pl-3 border-l-2 border-gray-300">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">
+                          {/* WRAPS. This row is already indented (ml-4 pl-3), so at 390px it has
+                              ~40px less than the parent, and a non-wrapping flex put the phase
+                              badge and the duration past the viewport edge as soon as the child's
+                              label got longer — which happened when the unlabelled event types
+                              were given real sentences. min-w-0 lets the label shrink instead of
+                              forcing its siblings out. */}
+                          <div className="flex flex-wrap items-center gap-2 gap-y-1 min-w-0">
+                            <span className="text-xs text-gray-500 min-w-0 break-words">
                               {describeEvent(
                                 childEvent.namespace,
                                 childEvent.type,
