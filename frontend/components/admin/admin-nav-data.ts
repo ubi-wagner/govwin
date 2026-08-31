@@ -97,7 +97,10 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: '/admin/architecture', label: 'Architecture' },
     ],
   },
-  { title: 'CRM', items: [{ href: '/admin/crm', label: 'CRM Console' }] },
+  // Named for what the page IS. It was 'CRM Console' pointing at a placeholder that linked out
+  // to a separate application; it is now outbound mail — the send ledger and the suppression
+  // list — served from the main database inside this admin.
+  { title: 'CRM', items: [{ href: '/admin/crm', label: 'Outbound Mail' }] },
 ];
 
 /** Every nav item, parents AND children, flattened — for label lookup + tests. */

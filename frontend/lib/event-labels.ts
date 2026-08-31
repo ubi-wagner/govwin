@@ -163,6 +163,10 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   },
 
   // System: tasks, nudges, mail. "task.created" is a to-do landing in somebody's queue.
+  // Lifting a suppression re-opens sending to an address a provider called dead. It is a
+  // deliberate, auditable act by a named administrator, so it reads as one.
+  'email.suppression_lifted': (p) =>
+    `Mail re-enabled for ${str(p.email) ?? 'an address'}`,
   'task.created': 'A to-do was raised',
   'task.assigned': (p) => `To-do assigned${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'task.completed': (p) => `To-do completed${str(p.disposition) ? ` (${str(p.disposition)})` : ''}`,

@@ -195,6 +195,47 @@ refs. What remains is to run §1a's two coverage queries **against production** 
 answer there. Archive the 116 orphaned page-blocks with the migration rather than deleting them
 outright — they are the last copy of three retired pages' copy.
 
+### Phase 3b — the UI comes into the platform admin — **DONE**
+
+Postmark changed what was possible here, so this moved ahead of Phase 4.
+
+`/admin/crm` was a placeholder that linked out to a separately-deployed console. Meanwhile the email
+spine — `email_send_ledger`, `email_suppressions`, the Postmark webhook — was live, wrote on every
+send, and **had no UI anywhere**: nothing in the repository read either table. Every question an
+operator actually asks about mail ("did it go", "why is this customer getting nothing") was
+answerable only with SQL.
+
+Both tables are in the MAIN database — the ledger moved here with migration 215. With Postmark
+carrying the mail there is no part of an outbound console that needs `cms-postgres`, so the UI does
+not have to live in a second application to be complete. That is the consolidation: not a link out,
+a page.
+
+It shows the transport actually in force (the most confusing outage is mail "sending" through a
+driver nobody realised was selected), 30-day sent/failed, sends reserved but never confirmed
+— reserving BEFORE dispatch is what makes a crash mid-send visible — whether the provider has ever
+called back, the last 100 sends, and the blocked addresses.
+
+**And the lift, which did not exist.** `suppress()` shipped with nothing that undid it, in code or
+in any UI. One hard bounce or one spam complaint stopped a person's mail permanently: a mailbox
+full for an afternoon, an address mistyped once and corrected, a colleague hitting "spam" on a
+notification. The customer sees no error — they simply stop receiving things. Suppression is
+correct (mailing a dead address damages the sending domain for every other customer), but a correct
+guard with no release is a trap, and the person it traps cannot see it happening. There is now
+`lift()`, a `DELETE` route, a confirm that shows the reason before re-opening the address, and an
+audited `system:email.suppression_lifted` event.
+
+Two guards caught mistakes in this work, both worth recording:
+* `audit-env-inventory` reported two env reads no document names — because the status tile invented
+  `POSTMARK_WEBHOOK_USER`/`_PASSWORD`. The real variable is `POSTMARK_WEBHOOK_SECRET`, so the tile
+  would have read "not configured" on a correctly configured system: a confidently wrong
+  operational signal on the page built to show operational truth.
+* `email-transport-boundary` refused the console for querying the ledger directly. That rule is not
+  bureaucratic — RLS denies those tables to the application role, so a query written outside
+  `lib/email` compiles, ships, and fails at run time in front of whoever opened the page. The
+  queries moved behind the seam as `recentSends`/`sendTotals`. The test itself then needed fixing
+  for the repo's own reason: it scanned raw source, so a header comment *naming* the tables failed
+  the check. It strips comments now, and was re-verified against a real query.
+
 ### Phase 4 — the CRM's own consolidation
 
 docs/CRM_MIGRATION_PLAN.md, unchanged and still correct: contacts/companies/deals in the main DB

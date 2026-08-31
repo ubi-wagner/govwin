@@ -194,6 +194,42 @@ async function main() {
          `db=${w.n}`);
     }
 
+    console.log('\n4b · Outbound mail — the send record, and who cannot be reached');
+    {
+      // The email spine writes on every send and, until this console, had NO UI anywhere: nothing
+      // in the repository read either table. The check that matters most is the LIFT — `suppress`
+      // shipped with nothing that undid it, so one hard bounce stopped a person's mail for good.
+      const PROBE = `bounced.probe.${Date.now()}@example.test`;
+      await sql`INSERT INTO email_suppressions (email, reason, source, detail)
+                VALUES (${PROBE}, 'hard_bounce', 'postmark_webhook', '{"probe":true}'::jsonb)`;
+      page.on('dialog', (d) => d.accept());
+      const t = rendered(await open(page, '/admin/crm'), '/admin/crm', 400);
+      ok(!/Coming soon/.test(t), 'it is a console, not a placeholder linking out to another app');
+      ok(/transport/i.test(t), 'the transport actually in force is stated');
+
+      const [led] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM email_send_ledger`;
+      const shown = await page.locator('tr[data-send-id]').count();
+      ok(shown === Math.min(led.n, 100), 'every send in the ledger has a row',
+         `page=${shown} db=${led.n}`);
+
+      const row = page.locator(`tr[data-suppressed="${PROBE}"]`);
+      ok(await row.count() === 1, 'a blocked address is listed', PROBE);
+      if (await row.count() === 1) {
+        await row.getByRole('button', { name: /allow mail again/i }).click();
+        await page.waitForTimeout(2200);
+        const [after] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM email_suppressions WHERE email = ${PROBE}`;
+        ok(after.n === 0, 'lifting it reaches the database', `${after.n} row(s) left`);
+        const [ev] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM system_events
+           WHERE namespace='system' AND type='email.suppression_lifted'
+             AND payload->>'email' = ${PROBE}`;
+        ok(ev.n === 1, 'and the lift is audited', `${ev.n} event(s)`);
+      }
+      await sql`DELETE FROM email_suppressions WHERE email = ${PROBE}`;
+      note('probe suppression removed');
+    }
+
     console.log('\n5 · Data flow + architecture explorer');
     {
       const r = await open(page, '/admin/architecture');

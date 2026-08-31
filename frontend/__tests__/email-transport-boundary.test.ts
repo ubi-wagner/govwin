@@ -60,6 +60,20 @@ function sourceFiles(): string[] {
 const rel = (f: string) => f.replace(ROOT + '/', '');
 const read = (f: string) => readFileSync(f, 'utf8');
 
+/**
+ * The file with its comments removed — for asking what the code DOES.
+ *
+ * This repository documents each rule at its own site, so a scan of raw source finds the PROSE
+ * about a constraint and reports it as a violation of that constraint. The outbound-mail console
+ * explains in a header comment which tables it must not query, and that comment alone failed the
+ * ledger check below while the file contained no query at all.
+ *
+ * Only the identifier checks use this. The import checks above deliberately do not: an import
+ * inside a comment is not an import, but neither is it worth the risk of a stripper mangling one.
+ */
+const code = (f: string) =>
+  read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
 /** Files outside a given subtree. */
 function outside(subtree: string): string[] {
   return sourceFiles().filter((f) => !f.includes(subtree));
@@ -121,7 +135,7 @@ describe('email transport boundary', () => {
     // happened to reach it. Catching it here is the difference between a failing test and a
     // 500 in production.
     const offenders = outside(SEAM).filter((f) => {
-      const src = read(f);
+      const src = code(f);
       return /\bemail_send_ledger\b/.test(src) || /\bemail_suppressions\b/.test(src);
     });
     expect(
