@@ -380,6 +380,23 @@ Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't pre
 > anything else. The heartbeat now sources `sandbox-env.sh` (occurrence FIVE of one credential in two
 > places — B146/B147), and note the pool caches credentials at connect time, so fixing the role
 > password requires a server RESTART, not just an `ALTER ROLE`.
+>
+> ⚠️ **Occurrence SIX is the OBJECT STORE, and it is not a credential at all.** The same heartbeat
+> hardcoded `LOCAL_STORAGE_DIR=/tmp/govwin-storage` and `AWS_S3_BUCKET=rfp-pipeline-local` for the
+> server, while `scripts/sandbox-env.sh` gave every drive `/home/user/.govwin/storage` and named no
+> bucket. So the app server wrote uploads into one filesystem tree and in-process drives read a
+> DIFFERENT one — 88 objects on one side, 207 on the other, both live and both real.
+>
+> It presents as a product defect and a convincing one: `drive-pin-honesty` reported that pinning
+> REFUSED to copy a published document, naming the exact storage key — and the key really was
+> there, in the other store. Nothing in the failure points at configuration; the pin code, the copy
+> helper and the refusal are all behaving correctly on the evidence they have.
+>
+> **The rule generalises past passwords: any value BOTH the server and a drive must agree on
+> belongs in `sandbox-env.sh`, and the heartbeat resolves it from there.** Storage now does
+> (`STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `AWS_S3_BUCKET`, `AWS_REGION`). When an in-process drive
+> disagrees with the running product about something that clearly exists, diff
+> `/proc/<server-pid>/environ` against a sourced `sandbox-env.sh` before reading any more code.
 
 **1b. A LONG-LIVED PROCESS SERVING CODE THAT NO LONGER EXISTS — twice in one hour, two different
 processes, and both looked like product defects.**
@@ -1296,8 +1313,27 @@ These are recurring bug-classes — treat them as a checklist, not one-offs:
    failing on the exact behaviour you just added, which reads like your code is wrong. After every
    rebuild, kill by PID and confirm the new one is younger than the build:
    `fuser -k 3000/tcp` then `ps -o pid,lstart -p $(fuser 3000/tcp)`. (`ss` is not installed here; use
-   `fuser`. And `pkill -f standalone/server.js` never matches — the heartbeat launches a bare
-   `node server.js` with cwd=standalone.)
+   `fuser`.)
+
+   **`pkill -f "standalone/server.js"` MATCHES NOTHING — and not for the reason previously written
+   here.** It is not that the heartbeat launches a bare `node server.js`: **Next renames its own
+   process to `next-server (v15…)` once it boots**, so no cmdline pattern mentioning `server.js`,
+   `standalone`, or the path ever matches it, and `ps | grep node` does not list it either. A kill
+   that hits nothing is silent, `port_busy` then reports :3000 healthy, and the stale process
+   survives. A server started at 18:04 survived four deliberate restarts that way and served for an
+   hour. **Kill by PORT** (`fuser -n tcp 3000`), never by cmdline.
+
+   **The decisive staleness signal is `readlink /proc/<pid>/cwd` ending in `(deleted)`.** `next
+   build` REPLACES `.next/standalone`, so the running process keeps serving out of an unlinked
+   directory — a build that no longer exists on disk. Everything still answers 200: `/login`
+   renders, shared chunks keep their hashes across builds, and only a route whose chunk hash
+   CHANGED asks for a file that is gone, gets `400 text/html`, and dies with a ChunkLoadError. That
+   presents as **one page rendering Next's "Something went wrong" boundary at HTTP 200** while the
+   rest of the product looks fine — a completely convincing product defect (it cost most of an hour
+   in the 2026-08-31 sweep, chasing `/admin/workflows`). Sampling ONE chunk to check freshness does
+   not catch it, because the chunk you sample is usually a shared one. `sandbox-heartbeat.sh` now
+   checks the `(deleted)` cwd first, and kills by port before restarting — the old stale branch
+   called `start_server` WITHOUT killing, so the replacement could not bind :3000 and died.
 5. **JWT is the singular-session source of truth:** everything authz reads the active
    membership off the token; never infer tenant from `users.tenant_id`.
 6. **Section ordering = `sort_index`, never `section_number` string:** any new query that lists
