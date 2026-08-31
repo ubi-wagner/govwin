@@ -432,6 +432,15 @@ DRIVES=(
   # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
   # which is the failure that once made it report 75 phantom findings across the whole tree.
   "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # THE TWO OPERATORS' CONSOLES. Every other lens asks whether a page renders or whether an
+  # envelope is well-formed; this asks the question an operator asks — can I see the state of the
+  # system, and is what I am shown TRUE — for rfp_admin and tenant_admin across system status,
+  # workflow status, events and audit, users and companies, the architecture explorer and the
+  # cross-tenant project explorer. It caught /admin/system-state stating ACTIVE WORKFLOWS 0 while
+  # the list beneath it showed 34, and the architecture explorer describing a schema 68 migrations
+  # out of date. It also checks the OTHER direction: a tenant_admin must not reach the platform
+  # console.
+  "oversight-surfaces|scripts/drive-oversight-surfaces.mts"
   # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
   # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
   # kill switch stops everything, the hourly rate limit refuses and allows, and the framework

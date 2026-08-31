@@ -53,6 +53,124 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   // a proposal portal. The events are deliberately tenant-scoped (shadow-transition's own comment
   // says the event "belongs to the customer's audit trail"), so the fix is the wording, not the
   // scope. Found by joining what the DB has actually emitted under a tenant_id against this map.
+  // ── THE SAME GAP, MEASURED RATHER THAN GUESSED (2026-08-31) ────────
+  //
+  // The block below was written from the same join, run again over EVERY (namespace, type) that
+  // has actually reached a row carrying a tenant_id: 115 types, of which 38 had no sentence and
+  // between them accounted for over 2,300 rows in customers' Activity feeds. They read as
+  // "agent invoked", "memory stored", "template applied", "task assigned" — the platform's own
+  // vocabulary, de-punctuated, shown to the company that bought a proposal portal.
+  //
+  // Two rules held throughout. Say what HAPPENED to them, not what the system did internally
+  // ("Your library learned from this" beats "memory stored"). And where the payload carries the
+  // thing a person would ask about next — the title, the format, whether it was compliant, who it
+  // went to — put it in the sentence, because a label that omits it sends the reader to expand a
+  // JSON blob to answer an obvious question.
+
+  // Agent + memory. A customer does not care that an archetype was dispatched; they care that
+  // their assistant did something, and whether it worked.
+  'agent.invoked': (p) => {
+    const who = str(p.archetype)?.replace(/_/g, ' ');
+    const failed = str(p.status) === 'error' || !!str(p.error);
+    const blocked = str(p.guardrail) === 'blocked';
+    if (blocked) return `AI assistant held back${who ? ` (${who})` : ''} — a guardrail stopped it`;
+    if (failed) return `AI assistant could not finish${who ? ` (${who})` : ''}`;
+    return `AI assistant ran${who ? `: ${who}` : ''}`;
+  },
+  'agent.dispatch': (p) => `AI assistant queued${str(p.archetype) ? `: ${String(p.archetype).replace(/_/g, ' ')}` : ''}`,
+  'memory.stored': 'Your workspace learned from this session',
+  'memory.outcome_attributed': (p) =>
+    `Win/loss fed back into your library${str(p.outcome) ? ` — ${str(p.outcome)}` : ''}`,
+  'memory.pattern_promoted': (p) => {
+    const n = typeof p.patternsPromoted === 'number' ? p.patternsPromoted : null;
+    return `${n === null ? 'Recurring patterns' : `${n} recurring pattern${n === 1 ? '' : 's'}`} promoted into your library`;
+  },
+  'memory.preferences_extracted': 'Your team\u2019s drafting preferences updated',
+
+  // Library + documents. "Exported" without the format or the compliance verdict is the row a
+  // person has to click to understand, and the verdict is the whole point of the export gate.
+  'document.created': (p) => `Document created${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'document.updated': (p) => `Document saved${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'document.exported': (p) => {
+    const fmt = str(p.format)?.toUpperCase();
+    const bad = typeof p.complianceViolations === 'number' ? p.complianceViolations : null;
+    return `Document downloaded${fmt ? ` as ${fmt}` : ''}`
+      + (bad && bad > 0 ? ` \u2014 ${bad} compliance issue${bad === 1 ? '' : 's'} flagged` : '');
+  },
+  'template.applied': 'Template applied to your workspace',
+  'starter_set.added': (p) => {
+    const n = typeof p.added === 'number' ? p.added : null;
+    return `Starter library added${n === null ? '' : ` \u2014 ${n} item${n === 1 ? '' : 's'}`}`;
+  },
+  'atom.curated': 'Library item reviewed',
+  'atom.archived': 'Library item archived',
+  'atom.restored': 'Library item restored',
+
+  // Proposal lifecycle. These are the customer's own build, so they are the rows most likely to be
+  // read closely — and the ones where internal wording is most jarring.
+  'artifact.exported': (p) => {
+    const fmt = str(p.format)?.toUpperCase();
+    const bad = typeof p.complianceViolations === 'number' ? p.complianceViolations : null;
+    return `Volume downloaded${fmt ? ` as ${fmt}` : ''}`
+      + (bad && bad > 0 ? ` \u2014 ${bad} compliance issue${bad === 1 ? '' : 's'} flagged` : '');
+  },
+  'artifact.locked': (p) => {
+    const n = typeof p.sectionCount === 'number' ? p.sectionCount : null;
+    return `Submission package locked${n === null ? '' : ` \u2014 ${n} section${n === 1 ? '' : 's'}`}`;
+  },
+  'compliance.checked': 'Section checked against the solicitation\u2019s rules',
+  // `sectionTitle` is what the save route emits; `title` is accepted too because other section
+  // events in this map use it and a label should not go blank over which key an emitter chose.
+  'section.saved': (p) => {
+    const t = str(p.sectionTitle) ?? str(p.title);
+    return `Section saved${t ? `: ${t}` : ''}`;
+  },
+  'preview.generated': 'Preview generated',
+  'draft.completed': (p) => {
+    // The interesting half is what did NOT get drafted, and why. "Draft completed" over a run that
+    // skipped every section is the most misleading row this feed can show.
+    const d = typeof p.drafted === 'number' ? p.drafted : null;
+    const held = typeof p.held === 'number' ? p.held : 0;
+    const skipped = typeof p.skipped === 'number' ? p.skipped : 0;
+    return `AI draft finished${d === null ? '' : ` \u2014 ${d} section${d === 1 ? '' : 's'} drafted`}`
+      + (held ? `, ${held} held for review` : '') + (skipped ? `, ${skipped} skipped` : '');
+  },
+  'collaborator.invited': (p) => `Collaborator invited${str(p.email) ? `: ${str(p.email)}` : ''}`,
+  'outcome.recorded': (p) => `Outcome recorded${str(p.outcome) ? `: ${str(p.outcome)}` : ''}`,
+  'outcome.attributed': (p) => `Outcome credited back to your library${str(p.outcome) ? ` \u2014 ${str(p.outcome)}` : ''}`,
+  'amendment.acknowledged': 'Amendment acknowledged',
+  'amendment.flagged': (p) => {
+    const n = typeof p.proposalCount === 'number' ? p.proposalCount : null;
+    return `Solicitation amended${n === null ? '' : ` \u2014 ${n} build${n === 1 ? '' : 's'} affected`}`;
+  },
+  'project.collaboration_requested': 'Help requested on this work',
+
+  // Capture: purchase, portal, contract. The moments a customer remembers.
+  'purchase.completed': (p) =>
+    p.comp ? 'Proposal portal granted' : 'Proposal portal purchased',
+  'portal.stage_advanced': 'Build advanced to the next stage',
+  'opportunity.pursuit_set': (p) => {
+    const st = str(p.status);
+    return st === 'passed' ? 'Opportunity passed on'
+         : st === 'pursuing' ? 'Opportunity marked as pursuing'
+         : st === 'monitoring' ? 'Opportunity flagged to watch'
+         : 'Opportunity decision recorded';
+  },
+  'contract.started': (p) => `Contract started${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'tenant.cards_backfilled': (p) => {
+    const n = typeof p.cardsBackfilled === 'number' ? p.cardsBackfilled : null;
+    return `Opportunity board filled in${n === null ? '' : ` \u2014 ${n} opportunit${n === 1 ? 'y' : 'ies'}`}`;
+  },
+
+  // System: tasks, nudges, mail. "task.created" is a to-do landing in somebody's queue.
+  'task.created': 'A to-do was raised',
+  'task.assigned': (p) => `To-do assigned${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'task.completed': (p) => `To-do completed${str(p.disposition) ? ` (${str(p.disposition)})` : ''}`,
+  'task.nudge': (p) => `Reminder sent${str(p.title) ? ` about \u201c${str(p.title)}\u201d` : ''}`,
+  'notification.requested': (p) => `Email sent${str(p.template) ? ` (${String(p.template).replace(/_/g, ' ')})` : ''}`,
+  'workflow.wait_timed_out': (p) =>
+    `Automation stopped waiting${str(p.workflow_name) ? ` \u2014 ${String(p.workflow_name).replace(/_/g, ' ')}` : ''}`,
+
   'shadow.descended': 'An RFP administrator opened your workspace to assist',
   'shadow.ascended': 'An RFP administrator left your workspace',
   'card.applied': 'Opportunity added to your board',
@@ -77,7 +195,9 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'proposal.dropbox_file_deleted': 'File removed from proposal dropbox',
 
   // ── Sections / content ──────────────────────────────────────────────
-  'section.saved': (p) => `Section saved${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  // 'section.saved' is defined above, reading `sectionTitle` — the key the save route actually
+  // emits. The version that used to sit here read `p.title`, which is never present, so every row
+  // rendered the bare "Section saved".
   'section.exported': 'Section exported',
   'section.locked': (p) => `Section accepted & locked${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.unlocked': (p) => `Section reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
@@ -87,14 +207,14 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   // ── Collaboration ───────────────────────────────────────────────────
   'comment.created': 'Comment added',
   'comment.resolved': 'Comment resolved',
-  'collaborator.invited': 'Collaborator invited',
+  // 'collaborator.invited' is defined above, and names WHO was invited.
   'collaborator.access_revoked': 'Collaborator access revoked',
   'team_member.invited': 'Team member invited',
 
   // ── Reviews / outcomes ──────────────────────────────────────────────
-  'compliance.checked': 'Compliance checked',
+  // 'compliance.checked' is defined above, and says what was checked against what.
   'review.created': 'Review recorded',
-  'outcome.recorded': (p) => `Outcome recorded${str(p.outcome) ? `: ${str(p.outcome)}` : ''}`,
+  // 'outcome.recorded' is defined above (identical shape).
   'package.export_started': 'Proposal package export started',
 
   // ── Library ─────────────────────────────────────────────────────────
@@ -161,7 +281,19 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
  * system/email/notification namespaces, then the explicit map, then a
  * humanized fallback (never the raw `namespace.type` double-prefix).
  */
-export function describeEvent(ev: EventLike): string {
+/**
+ * The written sentence for an event, or NULL when nobody has written one.
+ *
+ * `describeEvent` wraps this and falls back to the humanizer, which is right for rendering — a row
+ * must always say something. But "it rendered something" and "somebody wrote a sentence for this"
+ * are different claims, and only this function can tell them apart. Two earlier attempts to answer
+ * it from the outside both failed: comparing the output against the de-punctuated type
+ * over-reported (an empty payload collapses every optional suffix, and a good label can
+ * legitimately read the same as the humanized form), and checking membership of the LABELS map
+ * under-reported by 42, because whole namespaces — `project` above all — are labelled by a switch
+ * rather than by that map.
+ */
+export function describeEventOrNull(ev: EventLike): string | null {
   const { namespace, type, phase } = ev;
   const payload = ev.payload ?? {};
 
@@ -531,7 +663,30 @@ export function describeEvent(ev: EventLike): string {
   const entry = LABELS[type];
   if (typeof entry === 'function') return entry(payload);
   if (typeof entry === 'string') return entry;
-  return humanizeType(type);
+  return null;
+}
+
+/** The label a surface renders. Always a string: an unlabelled type still has to say something. */
+export function describeEvent(ev: EventLike): string {
+  return describeEventOrNull(ev) ?? humanizeType(ev.type);
+}
+
+/**
+ * Does this event type have a WRITTEN label, as opposed to falling through to the humanizer?
+ *
+ * The obvious test — compare `describeEvent(...)` against the de-punctuated type — cannot answer
+ * this, in both directions. With an empty payload every label shaped `X${optional}` collapses to
+ * the bare X and looks like a fallback (that over-reported 38 types, most of which were fine). And
+ * a GOOD sentence can legitimately coincide with the humanized form: "Preview generated" is
+ * exactly what a person would write for `preview.generated`, and flagging it would push somebody
+ * to make the wording worse to satisfy a check.
+ *
+ * So ask the function itself, through `describeEventOrNull`, which returns null exactly when it
+ * would have fallen through to the humanizer. Exported for the oversight drive and the jargon
+ * test, so neither has to keep its own copy of this map or guess at its shape.
+ */
+export function hasWrittenLabel(ev: EventLike): boolean {
+  return describeEventOrNull(ev) !== null;
 }
 
 /**

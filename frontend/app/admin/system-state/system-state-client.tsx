@@ -94,6 +94,14 @@ function HealthBar({ health }: { health: HealthSummary }) {
       accent: health.activeWorkflows > 0 ? 'text-blue-700' : 'text-gray-400',
     },
     {
+      // Split out of Active Workflows rather than hidden inside it. These are not slow — they are
+      // stopped, waiting for a person, and that person is usually whoever is reading this bar.
+      label: 'Awaiting a person',
+      value: health.awaitingPerson,
+      color: 'border-amber-400 bg-amber-50',
+      accent: health.awaitingPerson > 0 ? 'text-amber-700' : 'text-gray-400',
+    },
+    {
       label: 'Pending Jobs',
       value: health.pendingJobs,
       color: 'border-indigo-400 bg-indigo-50',

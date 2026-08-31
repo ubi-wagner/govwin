@@ -54,6 +54,10 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: '/admin/waitlist', label: 'Waitlist' },
       { href: '/admin/purchases', label: 'Purchases' },
       { href: '/admin/proposals', label: 'Proposals' },
+      // Post-award. It sits under Customers, next to Proposals, because that is the shape of the
+      // customer's life: a build becomes a contract becomes a project, and an admin who can see
+      // the first two and not the third loses the customer exactly when the money starts.
+      { href: '/admin/projects', label: 'Projects' },
       { href: '/admin/provisioning', label: 'Releases & SLA' },
       { href: '/admin/expert-time', label: 'Expert Time' },
     ],

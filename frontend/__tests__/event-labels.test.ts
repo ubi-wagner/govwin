@@ -18,8 +18,14 @@ describe('describeEvent', () => {
     expect(describeEvent({ namespace: 'library', type: 'file.uploaded', phase: 'single' })).toBe('File uploaded to library');
     expect(describeEvent({ namespace: 'proposal', type: 'comment.created', phase: 'single' })).toBe('Comment added');
     expect(describeEvent({ namespace: 'capture', type: 'topic.pinned', phase: 'single' })).toBe('Opportunity pinned');
-    const saved = describeEvent({ namespace: 'proposal', type: 'section.saved', phase: 'single', payload: { title: 'Technical Volume' } });
+    // `sectionTitle` is the key the save route actually emits — checked against a live row. The
+    // fixture used to say `title`, which the product never sends, so this test passed while the
+    // label rendered a bare "Section saved" for every real event. A fixture that does not match
+    // what the system emits validates the broken behaviour.
+    const saved = describeEvent({ namespace: 'proposal', type: 'section.saved', phase: 'single', payload: { sectionTitle: 'Technical Volume' } });
     expect(saved).toBe('Section saved: Technical Volume');
+    expect(describeEvent({ namespace: 'proposal', type: 'section.saved', phase: 'single', payload: { title: 'Technical Volume' } }))
+      .toBe('Section saved: Technical Volume');
     expect(describeEvent({ namespace: 'proposal', type: 'section.locked', phase: 'single', payload: { title: 'Cost Volume' } })).toBe('Section accepted & locked: Cost Volume');
     expect(describeEvent({ namespace: 'proposal', type: 'section.unlocked', phase: 'single', payload: {} })).toBe('Section reopened');
   });

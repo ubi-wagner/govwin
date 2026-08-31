@@ -11,6 +11,9 @@ export const dynamic = 'force-dynamic';
 
 export type HealthSummary = {
   activeWorkflows: number;
+  /** Of the active ones, how many are parked at a human gate. Reported beside the total, never
+   *  blended into it — "in flight" and "waiting for you" are different asks of an operator. */
+  awaitingPerson: number;
   pendingJobs: number;
   eventsLastHour: number;
   eventsLast24h: number;
@@ -118,6 +121,7 @@ export type EmailAutomationData = {
 
 type HealthRow = {
   activeWorkflows: number;
+  awaitingPerson: number;
   pendingJobs: number;
   eventsLastHour: number;
   eventsLast24h: number;
@@ -257,6 +261,7 @@ function serializeTreeNode(row: EventRow, children: EventTreeNode[]): EventTreeN
 async function fetchHealthSummary(): Promise<HealthSummary> {
   const defaults: HealthSummary = {
     activeWorkflows: 0,
+    awaitingPerson: 0,
     pendingJobs: 0,
     eventsLastHour: 0,
     eventsLast24h: 0,
@@ -267,7 +272,22 @@ async function fetchHealthSummary(): Promise<HealthSummary> {
   try {
     const rows = await sql<HealthRow[]>`
       SELECT
-        (SELECT COUNT(*) FROM process_instances WHERE status IN ('running', 'pending', 'retrying') AND archived_at IS NULL) AS active_workflows,
+        -- ── ONE DEFINITION OF "ACTIVE", SHARED WITH THE LIST BELOW ──────────────────────────
+        -- This tile used to count status IN ('running','pending','retrying'), while the Active
+        -- Workflows tab on the SAME PAGE counts NOT IN ('completed','cancelled','failed'). The
+        -- difference is the paused status, which is the HITL state — a workflow parked at a human gate —
+        -- and there were 34 of them. So the headline an operator reads at a glance said ACTIVE
+        -- WORKFLOWS 0 while the list directly beneath it showed 34 things waiting on that
+        -- operator. A zero that contradicts the list under it is worse than no tile at all.
+        --
+        -- A paused instance IS active for every purpose this page serves: work is in flight and somebody
+        -- has to move it. The list's predicate is the correct one, so it is the one both use.
+        (SELECT COUNT(*) FROM process_instances
+          WHERE status NOT IN ('completed', 'cancelled', 'failed') AND archived_at IS NULL) AS active_workflows,
+        -- The half an operator can act on, called out separately rather than blended in: these
+        -- are not slow, they are WAITING FOR A PERSON.
+        (SELECT COUNT(*) FROM process_instances
+          WHERE status = 'paused' AND archived_at IS NULL) AS awaiting_person,
         (SELECT COUNT(*) FROM pipeline_jobs WHERE status IN ('pending', 'running')) AS pending_jobs,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '1 hour') AS events_last_hour,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '24 hours') AS events_last_24h,
@@ -278,6 +298,7 @@ async function fetchHealthSummary(): Promise<HealthSummary> {
     if (row) {
       return {
         activeWorkflows: Number(row.activeWorkflows) || 0,
+        awaitingPerson: Number(row.awaitingPerson) || 0,
         pendingJobs: Number(row.pendingJobs) || 0,
         eventsLastHour: Number(row.eventsLastHour) || 0,
         eventsLast24h: Number(row.eventsLast24h) || 0,
