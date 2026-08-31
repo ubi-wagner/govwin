@@ -522,10 +522,16 @@ async function fetchContentPipeline(): Promise<ContentPipelineData> {
   };
 
   try {
+    // ── THE CANONICAL STORE, NOT THE RETIRED ONE ──────────────────────────────────────────
+    // This counted page_blocks in `cms_content` — the store front-facing content moved OFF. So
+    // the operator's Content Pipeline panel described the system that was replaced: a fixed 116
+    // published blocks and nothing pending, whatever anybody did in Site Content. A panel that
+    // cannot move is worse than no panel, because it reads as "nothing is happening".
+    // `content_pages` is versioned, so count DISTINCT page keys per status rather than rows.
     const statusRows = await sql<BlockStatusRow[]>`
-      SELECT status, COUNT(*)::int AS count
-      FROM cms_content
-      WHERE content_type = 'page_block'
+      SELECT status, COUNT(DISTINCT page_key)::int AS count
+      FROM content_pages
+      WHERE content_type = 'page'
       GROUP BY status
     `;
     data.blocksByStatus = statusRows.map((r: BlockStatusRow) => ({
@@ -537,11 +543,14 @@ async function fetchContentPipeline(): Promise<ContentPipelineData> {
   }
 
   try {
+    // `draft` is the state a page sits in awaiting publication — the legacy table's 'pending'.
+    // COUNT(DISTINCT page_key) is deliberate: content_pages is VERSIONED, so a page edited three
+    // times has three draft rows and a plain COUNT(*) reported "about — 3 pending" for one page.
     const pendingRows = await sql<PendingPageRow[]>`
-      SELECT tags[1] AS page, COUNT(*)::int AS pending_count
-      FROM cms_content
-      WHERE content_type = 'page_block' AND status = 'pending'
-      GROUP BY tags[1]
+      SELECT page_key AS page, COUNT(DISTINCT version_no)::int AS pending_count
+      FROM content_pages
+      WHERE content_type = 'page' AND status = 'draft'
+      GROUP BY page_key
     `;
     data.pendingByPage = pendingRows.map((r: PendingPageRow) => ({
       page: r.page ?? 'unknown',

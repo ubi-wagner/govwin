@@ -1,9 +1,21 @@
 /**
  * CMS content helpers for server components.
  *
- * Provides typed access to published cms_content rows so any
- * marketing page can pull dynamic blocks without going through
- * the API layer. Direct DB access for server components only.
+ * Typed access to published front-facing content so a marketing page can pull its blocks without
+ * going through the API layer. Direct DB access, server components only.
+ *
+ * ── ONE STORE: `content_pages` ───────────────────────────────────────────────────────────────
+ * Every read here is `content_pages` — the versioned, canvas-native store the admin Site Content
+ * editor writes. The legacy `cms_content` table is no longer read by this module.
+ *
+ * It was, until this pass, through four fallbacks that could not fire. All 14 documents in the
+ * legacy table have a matching active `content_pages` row; all 116 of its page-blocks belong to
+ * nine pages that are migrated (block counts equal or larger) or three whose routes are redirects
+ * and never ask for blocks. A fallback that cannot fire is worse than none: it reads as a
+ * still-live second source, so nobody retires the table and nobody notices when a reader — the
+ * sitemap did exactly this — is still pointed at it and quietly serves the old set.
+ *
+ * docs/CMS_CRM_CONSOLIDATION.md has the measurements and the remaining phases.
  */
 
 import { sql } from '@/lib/db';
@@ -103,22 +115,16 @@ async function activeDocBySlug(slug: string): Promise<ContentRow | null> {
 }
 
 /**
- * Fetch published content by type. Reads content_pages active documents first,
- * falling back to legacy cms_content during transition.
+ * Fetch published content by type, from `content_pages` — the canonical store.
+ *
+ * The legacy `cms_content` fallback that used to sit here is gone. It was unreachable: every one of
+ * the 14 documents in that table has a matching active `content_pages` row (checked by slug and
+ * type, zero uncovered), and this function only reached the fallback when `content_pages` returned
+ * nothing for a type. See docs/CMS_CRM_CONSOLIDATION.md §1a.
  */
 export async function getPublishedContent(contentType: string, limit?: number): Promise<ContentRow[]> {
   try {
-    const docs = await activeDocs([contentType], limit);
-    if (docs.length > 0) return docs;
-    return await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE content_type = ${contentType} AND status = 'published'
-      ORDER BY display_order ASC, published_at DESC
-      ${limit ? sql`LIMIT ${limit}` : sql``}
-    `;
+    return await activeDocs([contentType], limit);
   } catch (e) {
     logReadError('[cms/getPublishedContent]', e);
     return [];
@@ -130,82 +136,15 @@ export async function getPublishedContent(contentType: string, limit?: number): 
  */
 export async function getContentBySlug(slug: string): Promise<ContentRow | null> {
   try {
-    const doc = await activeDocBySlug(slug);
-    if (doc) return doc;
-    const [row] = await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE slug = ${slug} AND status = 'published'
-      LIMIT 1
-    `;
-    return row ?? null;
+    return await activeDocBySlug(slug);
   } catch (e) {
     logReadError('[cms/getContentBySlug]', e);
     return null;
   }
 }
 
-/**
- * Fetch a single content item by slug (any status — for admin preview).
- */
-export async function getContentBySlugAdmin(slug: string): Promise<ContentRow | null> {
-  try {
-    const [row] = await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE slug = ${slug}
-      LIMIT 1
-    `;
-    return row ?? null;
-  } catch (e) {
-    logReadError('[cms/getContentBySlugAdmin]', e);
-    return null;
-  }
-}
 
-/**
- * Fetch a single content item by ID (any status — for admin preview).
- */
-export async function getContentByIdAdmin(id: string): Promise<ContentRow | null> {
-  try {
-    const [row] = await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE id = ${id}
-      LIMIT 1
-    `;
-    return row ?? null;
-  } catch (e) {
-    logReadError('[cms/getContentByIdAdmin]', e);
-    return null;
-  }
-}
 
-/**
- * Fetch published content matching a given tag.
- */
-export async function getContentBlocks(tag: string): Promise<ContentRow[]> {
-  try {
-    const rows = await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE ${tag} = ANY(tags) AND status = 'published'
-      ORDER BY display_order ASC, published_at DESC
-    `;
-    return rows;
-  } catch (e) {
-    logReadError('[cms/getContentBlocks]', e);
-    return [];
-  }
-}
 
 /**
  * Fetch the blocks for a page from the V8 content store (content_pages).
@@ -237,37 +176,18 @@ export async function getPageBlocks(page: string, includeDrafts = false): Promis
     if (Array.isArray(blocks)) {
       return (blocks as Record<string, unknown>[]).map(pageBlockToRow);
     }
-    // Transition safety: no content_pages row yet → fall back to legacy cms_content.
-    return await getPageBlocksLegacy(page, includeDrafts);
+    // No active content_pages row for this page. There is no legacy fallback any more: the twelve
+    // page keys in `cms_content` are nine pages that ARE migrated (block counts equal or larger)
+    // and three whose routes are redirects and never call this. An empty array is the honest
+    // answer for a page nobody has authored — the fallback could only have returned another
+    // page's blocks. docs/CMS_CRM_CONSOLIDATION.md §1a.
+    return [];
   } catch (e) {
     logReadError('[cms/getPageBlocks]', e);
     return [];
   }
 }
 
-/** Legacy per-block read from cms_content. Used only until content_pages is populated for a page. */
-async function getPageBlocksLegacy(page: string, includeDrafts: boolean): Promise<ContentRow[]> {
-  if (includeDrafts) {
-    return await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE content_type = 'page_block' AND ${page} = ANY(tags)
-        AND status IN ('published', 'draft')
-      ORDER BY display_order ASC, created_at ASC
-    `;
-  }
-  return await sql<ContentRow[]>`
-    SELECT id, slug, title, content_type, body, excerpt, author, tags,
-           published, status, published_at, featured_image, external_url,
-           display_order, metadata, created_at, updated_at
-    FROM cms_content
-    WHERE content_type = 'page_block' AND ${page} = ANY(tags)
-      AND status = 'published'
-    ORDER BY display_order ASC, created_at ASC
-  `;
-}
 
 /** Map a content_pages JSON block to the legacy ContentRow shape used by page components. */
 function pageBlockToRow(b: Record<string, unknown>): ContentRow {
@@ -305,7 +225,7 @@ export function buildLookup(blocks: ContentRow[], page: string): Record<string, 
   const grouped: Record<string, ContentRow[]> = {};
   for (const block of blocks) {
     // Prefer the explicit section (what the editor edits); fall back to the
-    // legacy tag-derived section for un-migrated cms_content blocks.
+    // legacy tag-derived section, for blocks that carry their section in `tags`.
     const sectionKey = block.section || block.tags.find((t: string) => t !== page) || 'unknown';
     if (!grouped[sectionKey]) grouped[sectionKey] = [];
     grouped[sectionKey].push(block);
@@ -338,17 +258,7 @@ export function many(entry: ContentRow | ContentRow[] | undefined): ContentRow[]
  */
 export async function getPublishedContentByTypes(contentTypes: string[], limit?: number): Promise<ContentRow[]> {
   try {
-    const docs = await activeDocs(contentTypes, limit);
-    if (docs.length > 0) return docs;
-    return await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, published_at, featured_image, external_url,
-             display_order, metadata, created_at, updated_at
-      FROM cms_content
-      WHERE content_type = ANY(${contentTypes}) AND status = 'published'
-      ORDER BY display_order ASC, published_at DESC
-      ${limit ? sql`LIMIT ${limit}` : sql``}
-    `;
+    return await activeDocs(contentTypes, limit);
   } catch (e) {
     logReadError('[cms/getPublishedContentByTypes]', e);
     return [];

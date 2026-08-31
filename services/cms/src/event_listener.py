@@ -1008,119 +1008,47 @@ async def _action_distribute_social(config: dict, payload: dict, event):
 
 
 async def _action_publish_content(config: dict, payload: dict, event):
-    """Push approved CMS content to Main Postgres cms_content table.
+    """RETIRED — pushed approved CMS content to Main-DB `cms_content`, which the site stopped reading.
 
-    Maps CMS cms_posts fields to Main Postgres cms_content fields.
-    Upserts by slug (unique key).
+    ── AN AUTOMATED WRITER TO A STORE NOBODY READS ─────────────────────────────────────────────
+    Front-facing content is authored in the RFP Pipeline admin at /admin/site, which writes
+    `content_pages`; as of 2026-08-31 the frontend reads nothing else. This action upserted
+    `cms_content`, so a rule firing it changed nothing a visitor could see.
+
+    That is worse here than on the console path. The console at least shows a person a count they
+    could eventually notice was wrong; an automation rule runs unattended, reports success in its
+    own log, and the first sign of trouble is somebody asking why a published article is not on the
+    site. So it returns without writing, and says why at WARNING — loud enough to appear in the
+    rule's own trace rather than being silently absent.
+
+    Retiring the rules themselves is Phase 1 of docs/CMS_CRM_CONSOLIDATION.md.
     """
-    shared_pool = get_event_pool()
-    if not shared_pool:
-        logger.warning('publish_content: shared pool not available, skipping')
-        return
-
-    post_id = payload.get('post_id') or config.get('post_id')
-    if not post_id:
-        logger.warning('publish_content: no post_id in payload or config')
-        return
-
-    # Fetch full post from CMS database
-    from .models.database import get_pool as get_cms_pool
-    cms_pool = get_cms_pool()
-
-    rows = await cms_pool.fetch("""
-        SELECT id, slug, title, body, excerpt, status, author_name, author_email,
-               featured_image_url, category, tags, meta_title, meta_description,
-               published_at, published_by, version
-        FROM cms_posts WHERE id = $1
-    """, uuid.UUID(post_id) if isinstance(post_id, str) else post_id)
-
-    if not rows:
-        logger.warning(f'publish_content: post {post_id} not found in CMS DB')
-        return
-
-    post = dict(rows[0])
-
-    if post['status'] != 'published':
-        logger.info(f'publish_content: post status is {post["status"]}, not published — skipping')
-        return
-
-    # Determine content_type from category or config
-    content_type = config.get('content_type', 'blog_post')
-    if post.get('category') == 'page_block':
-        content_type = 'page_block'
-    elif post.get('category') == 'resource':
-        content_type = 'resource'
-    elif post.get('category') == 'guide':
-        content_type = 'guide'
-
-    tags_array = post.get('tags') or []
-
-    # Upsert into Main Postgres cms_content by slug
-    await shared_pool.execute("""
-        INSERT INTO cms_content (slug, title, body, excerpt, content_type, author, tags,
-                                 status, published, published_at, featured_image,
-                                 metadata, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', true, $8, $9, $10, now())
-        ON CONFLICT (slug) DO UPDATE SET
-            title = EXCLUDED.title,
-            body = EXCLUDED.body,
-            excerpt = EXCLUDED.excerpt,
-            content_type = EXCLUDED.content_type,
-            author = EXCLUDED.author,
-            tags = EXCLUDED.tags,
-            status = 'published',
-            published = true,
-            published_at = COALESCE(EXCLUDED.published_at, cms_content.published_at),
-            featured_image = EXCLUDED.featured_image,
-            metadata = EXCLUDED.metadata,
-            updated_at = now()
-    """, post['slug'], post['title'], post['body'], post.get('excerpt'),
-         content_type, post.get('author_name'), tags_array,
-         post.get('published_at'), post.get('featured_image_url'),
-         json.dumps({"cms_post_id": str(post['id']), "cms_version": post.get('version', 1),
-                      "meta_title": post.get('meta_title'), "meta_description": post.get('meta_description')}))
-
-    logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
+    logger.warning(
+        'publish_content: RETIRED — front-facing content lives in content_pages (main DB), '
+        'authored at /admin/site. Writing cms_content here would not reach the website. '
+        'No write performed. See docs/CMS_CRM_CONSOLIDATION.md'
+    )
+    return
 
 
 async def _action_unpublish_content(config: dict, payload: dict, event):
-    """Mark previously-published CMS content as unpublished in Main Postgres.
+    """RETIRED — flipped a Main-DB `cms_content` row the website no longer reads.
 
-    Symmetric to _action_publish_content: resolve the post's slug and flip the
-    Main DB cms_content row to status='draft', published=false. Wired to the
-    'CMS Content Unpublish Bridge' rule (migration 050), which previously had a
-    live rule but NO handler — every unpublish event fell through to a silent
-    no-op. (EVENT_CONTRACT_V3 gap 8; CLAUDE_CLIFFNOTES Mistake 21.)
+    Symmetric to `_action_publish_content`, and retired for the same reason. Worth keeping the
+    history: this handler was WRITTEN to close a gap where the 'CMS Content Unpublish Bridge' rule
+    (migration 050) fired against no handler at all, so every unpublish was a silent no-op
+    (EVENT_CONTRACT_V3 gap 8). It is now a no-op again — but a LOUD one, which is the difference
+    that mattered then and matters now. The gap was never "this does not run"; it was "nobody can
+    tell that it does not run".
     """
-    shared_pool = get_event_pool()
-    if not shared_pool:
-        logger.warning('unpublish_content: shared pool not available, skipping')
-        return
-
-    slug = payload.get('slug') or config.get('slug')
-    post_id = payload.get('post_id') or config.get('post_id')
-    if not slug and post_id:
-        from .models.database import get_pool as get_cms_pool
-        cms_pool = get_cms_pool()
-        rows = await cms_pool.fetch(
-            "SELECT slug FROM cms_posts WHERE id = $1",
-            uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
-        )
-        if rows:
-            slug = rows[0]['slug']
-    if not slug:
-        logger.warning('unpublish_content: no slug/post_id to resolve target — skipping')
-        return
-
-    result = await shared_pool.execute(
-        """
-        UPDATE cms_content
-        SET status = 'draft', published = false, updated_at = now()
-        WHERE slug = $1
-        """,
-        slug,
+    # RETIRED for the same reason as _action_publish_content above: this flipped a Main-DB
+    # `cms_content` row the website no longer reads. Un-publishing there cannot take anything off
+    # the site, so doing it would only report an action that did not happen.
+    logger.warning(
+        'unpublish_content: RETIRED — front-facing content lives in content_pages (main DB). '
+        'Unpublish at /admin/site. No write performed. See docs/CMS_CRM_CONSOLIDATION.md'
     )
-    logger.info(f'unpublish_content: marked "{slug}" draft in cms_content ({result})')
+    return
 
 
 async def _emit_action_event(*, event_type: str, phase: str, payload: dict,

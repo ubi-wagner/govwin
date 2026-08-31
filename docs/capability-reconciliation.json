@@ -179,18 +179,6 @@
    "nearMiss": true
   },
   {
-   "route": "/api/admin/tenants/[tenantId]",
-   "file": "app/api/admin/tenants/[tenantId]/route.ts",
-   "methods": [
-    "GET",
-    "PATCH"
-   ],
-   "reason": null,
-   "duplicatedBy": "app/admin/tenants/[tenantId]/page.tsx",
-   "secondDoor": null,
-   "nearMiss": true
-  },
-  {
    "route": "/api/auth/[...nextauth]",
    "file": "app/api/auth/[...nextauth]/route.ts",
    "methods": [],
@@ -228,7 +216,7 @@
     "GET"
    ],
    "reason": null,
-   "duplicatedBy": null,
+   "duplicatedBy": "app/(marketing)/resources/[slug]/page.tsx (both call getContentBySlug())",
    "secondDoor": null,
    "nearMiss": false
   },
@@ -794,6 +782,10 @@
    "rows": 241
   },
   {
+   "name": "cms_content",
+   "rows": 130
+  },
+  {
    "name": "deploy_baseline",
    "rows": 2
   },
@@ -1188,28 +1180,5 @@
    "everRan": false
   }
  ],
- "unlabelled": [
-  "amendment.acknowledged",
-  "amendment.flagged",
-  "artifact.exported",
-  "artifact.locked",
-  "atom.archived",
-  "atom.curated",
-  "atom.restored",
-  "contract.started",
-  "document.created",
-  "document.exported",
-  "document.updated",
-  "draft.completed",
-  "opportunity.pursuit_set",
-  "outcome.attributed",
-  "portal.stage_advanced",
-  "preview.generated",
-  "project.collaboration_requested",
-  "purchase.completed",
-  "starter_set.added",
-  "task.assigned",
-  "template.applied",
-  "tenant.cards_backfilled"
- ]
+ "unlabelled": []
 }

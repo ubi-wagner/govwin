@@ -66,30 +66,31 @@ def test_row_to_block_shape():
 
 
 @pytest.mark.asyncio
-async def test_bridge_publish_moves_cms_posts_to_cms_content(mock_cms_pool, mock_shared_pool):
+async def test_bridge_publish_refuses_and_writes_nothing(mock_cms_pool, mock_shared_pool):
+    """The bridge is retired: it must REFUSE, and must not touch either store.
+
+    This test used to assert the opposite — that _bridge_publish flipped cms_posts to published and
+    upserted each row into Main-DB cms_content. That behaviour was correct until front-facing
+    content moved to `content_pages`; after the move it wrote to a table the website no longer
+    reads, so a publish reported a count and changed nothing a visitor could see.
+
+    Asserting BOTH pools are untouched is the point. A refusal that had already flipped cms_posts
+    would leave the two stores disagreeing about what is published — the half-write is the state
+    nobody can reason about later.
+    """
+    from fastapi import HTTPException
     from src.routers import page_blocks
-    rows = [
-        _post_row('homepage-hero', ['homepage', 'hero'],
-                  metadata={'cta_text': 'Apply', '_versions': [1, 2], '_currentVersion': 3, '_draftedBy': 'x'}),
-        _post_row('homepage-stats', ['homepage', 'stats'], metadata={'value': '99'}, display_order=1),
-    ]
-    mock_cms_pool.fetch = AsyncMock(return_value=rows)
+    mock_cms_pool.fetch = AsyncMock(return_value=[_post_row('homepage-hero', ['homepage', 'hero'])])
 
-    count = await page_blocks._bridge_publish(mock_cms_pool, mock_shared_pool, page='homepage')
+    with pytest.raises(HTTPException) as exc:
+        await page_blocks._bridge_publish(mock_cms_pool, mock_shared_pool, page='homepage')
 
-    assert count == 2
-    # 1) cms_posts flipped to published on the CMS pool
-    assert mock_cms_pool.fetch.await_count == 1
-    cms_sql = mock_cms_pool.fetch.await_args.args[0]
-    assert 'UPDATE cms_posts' in cms_sql and "status = 'published'" in cms_sql
-    # 2) one cms_content upsert per row on the shared pool
-    assert mock_shared_pool.execute.await_count == 2
-    upsert_sql = mock_shared_pool.execute.await_args_list[0].args[0]
-    assert 'INSERT INTO cms_content' in upsert_sql
-    # 3) editing bookkeeping stripped from the public metadata copy ($9 -> args[9])
-    published_meta = json.loads(mock_shared_pool.execute.await_args_list[0].args[9])
-    assert published_meta == {'cta_text': 'Apply'}
-    assert '_versions' not in published_meta and '_currentVersion' not in published_meta
+    assert exc.value.status_code == 410
+    # The refusal says where content IS authored — an error that only says "no" sends the reader
+    # looking through a service that is no longer the answer.
+    assert '/admin/site' in exc.value.detail and 'content_pages' in exc.value.detail
+    assert mock_cms_pool.fetch.await_count == 0
+    assert mock_shared_pool.execute.await_count == 0
 
 
 # ── HTTP endpoints ────────────────────────────────────────────────────────────
@@ -108,7 +109,12 @@ async def test_list_reads_cms_posts(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_publish_bridges_to_cms_content(mock_db):
+async def test_publish_endpoint_refuses_rather_than_silently_doing_nothing(mock_db):
+    """POST /publish answers 410 and writes nothing to the main database.
+
+    The endpoint could have been left returning 200 with published=0. It must not: an operator who
+    presses Publish and is told it succeeded has no way to discover their edit is not on the site.
+    """
     cms_pool = AsyncMock()
     cms_pool.fetch = AsyncMock(return_value=[_post_row('homepage-hero', ['homepage', 'hero'])])
     shared_pool = AsyncMock()
@@ -118,13 +124,19 @@ async def test_publish_bridges_to_cms_content(mock_db):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url='http://test', headers=API_KEY) as client:
             resp = await client.post('/api/page-blocks/publish', json={'page': 'homepage'})
-            assert resp.status_code == 200
-            assert resp.json()['data']['published'] == 1
-            assert any('INSERT INTO cms_content' in c.args[0] for c in shared_pool.execute.await_args_list)
+            assert resp.status_code == 410
+            assert not any('cms_content' in str(c.args[0]) for c in shared_pool.execute.await_args_list)
 
 
 @pytest.mark.asyncio
-async def test_delete_removes_from_both_stores(mock_db):
+@pytest.mark.asyncio
+async def test_delete_removes_from_cms_posts_only(mock_db):
+    """Deleting a block removes it from the CMS store and does NOT touch the main database.
+
+    It used to clean up the published copy in Main-DB cms_content. With publishing retired there is
+    no published copy to clean up, and doing it anyway would leave this service as the last writer
+    to a store it no longer authors.
+    """
     cms_pool = AsyncMock()
     cms_pool.fetchrow = AsyncMock(return_value={'slug': 'homepage-hero'})
     shared_pool = AsyncMock()
@@ -136,4 +148,4 @@ async def test_delete_removes_from_both_stores(mock_db):
             resp = await client.delete(f'/api/page-blocks/{uuid.uuid4()}')
             assert resp.status_code == 200
             assert 'DELETE FROM cms_posts' in cms_pool.fetchrow.await_args.args[0]
-            assert any('DELETE FROM cms_content' in c.args[0] for c in shared_pool.execute.await_args_list)
+            assert not any('cms_content' in str(c.args[0]) for c in shared_pool.execute.await_args_list)
